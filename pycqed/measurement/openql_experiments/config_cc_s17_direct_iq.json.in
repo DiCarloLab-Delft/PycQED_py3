@@ -265,12 +265,14 @@
 				{
 					"name": "mw_0",
                     "qubits": [                                             // data qubits:
-                        [2, 8, 14],                                         // [freq L]
-                        [1, 4, 6, 10, 12, 15]                               // [freq H]
+                        [0],
+                        [1],
+                        [2],
+                        [3]
                     ],
                     "ref_signals_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-mw-vsm-hack",
+                    "ref_control_mode": "awg8-mw-direct-iq",
 					"controller": {
 						"name": "cc",	// FIXME
 						"slot": 3,
@@ -280,38 +282,71 @@
 				{
 					"name": "mw_1",
                     "qubits": [                                             // ancilla qubits:
-                        [0, 5, 9, 13],                                      // [freq Mg]
-                        [3, 7, 11, 16]                                      // [freq My]
+                        [4],
+                        [5],
+                        [6],
+                        [7]
                     ],
                     "ref_signals_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-mw-vsm-hack",
+                    "ref_control_mode": "awg8-mw-direct-iq",
 					"controller": {
 						"name": "cc",	// FIXME
 						"slot": 4,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
-
-				// VSM
 				{
-					"name": "vsm_0",
-                    "qubits": [
-                        [2], [8], [14], [],  [], [], [], [],                // [freq L]
-                        [1], [4], [6], [10], [12], [15], [], [],            // [freq H]
-                        [0], [5], [9], [13], [], [], [], [],                // [freq Mg]
-                        [3], [7], [11], [16], [], [], [], []                // [freq My]
+					"name": "mw_2",
+                    "qubits": [                                             // data qubits:
+                        [8],
+                        [9],
+                        [10],
+                        [11]
                     ],
-                    "ref_signals_type": "switch",
-					"ref_instrument_definition": "qutech-vsm",
-                    "ref_control_mode": "vsm-32ch",
+                    "ref_signals_type": "mw",
+					"ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
 					"controller": {
 						"name": "cc",	// FIXME
 						"slot": 5,
-						"io_module": "cc-conn-vsm"
+						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
-
+				{
+					"name": "mw_3",
+                    "qubits": [                                             // ancilla qubits:
+                        [12],
+                        [13],
+                        [14],
+                        [15]
+                    ],
+                    "ref_signals_type": "mw",
+					"ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+					"controller": {
+						"name": "cc",	// FIXME
+						"slot": 6,
+						"io_module": "CC-CONN-DIO-DIFF"
+					}
+				},
+				{
+					"name": "mw_4",
+                    "qubits": [                                             // ancilla qubits:
+                        [16],
+                        [],
+                        [],
+                        []
+                    ],
+                    "ref_signals_type": "mw",
+					"ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+					"controller": {
+						"name": "cc",	// FIXME
+						"slot": 7,
+						"io_module": "CC-CONN-DIO-DIFF"
+					}
+				},
 				// flux
 				{
 					"name": "flux_0",
@@ -322,7 +357,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
 					"controller": {
 						"name": "cc",	// FIXME
-						"slot": 6,
+						"slot": 8,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
@@ -335,7 +370,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
 					"controller": {
 						"name": "cc",	// FIXME
-						"slot": 7,
+						"slot": 9,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
@@ -348,7 +383,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
 					"controller": {
 						"name": "cc",	// FIXME
-						"slot": 8,
+						"slot": 10,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				}

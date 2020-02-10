@@ -71,7 +71,7 @@
 	"eqasm_compiler" : "eqasm_backend_cc",
 
 	"hardware_settings": {
-		"qubit_number": 17,
+		"qubit_number": 7,
 		"cycle_time" : 20,        // in [ns]
 
 		// FIXME: we put this key inside "hardware_settings" for now, but it should preferably be below "backend" or "eqasm_compiler"
@@ -120,17 +120,17 @@
             // - <key>/result_bits              future
             // - <key>/data_valid_bits          future
 			"control_modes": {
-				"awg8-mw-vsm-hack": {					  // ZI_HDAWG8.py::cfg_codeword_protocol() == 'microwave'. Old hack to skip DIO[8]
+				"awg8-mw-vsm-hack": {					  // ZI_HDAWG8.py::cfg_codeword_protocol() == 'microwave'. Old hack to skip DIO[8]. Doesn't support QWG
 					"control_bits": [
 						[7,6,5,4,3,2,1,0],                // group 0
 						[16,15,14,13,12,11,10,9]          // group 1
 					],
 					"trigger_bits": [31]
 				},
-				"awg8-mw-vsm": {						  // the way the mode above should have been
+				"awg8-mw-vsm": {						  // the way the mode above should have been and support for QWG
 					"control_bits": [
 						[7,6,5,4,3,2,1,0],                // group 0
-						[23,22,21,20,19,18,17,16]           // group 1
+                        [23,22,21,20,19,18,17,16]         // group 1
 					],
 					"trigger_bits": [31,15]
 				},
@@ -198,10 +198,6 @@
                             "{gateName}-{instrumentName}:{instrumentGroup}-di",
                             "{gateName}-{instrumentName}:{instrumentGroup}-dq"
                         ]
-                    },
-                    {   "type": "switch",
-                        "operand_idx": 0,
-                        "value": ["dummy"]                                  // NB: no actual signal is generated
                     }
                 ],
                 "two-qubit-flux": [
@@ -214,6 +210,12 @@
                         "value": ["flux-1-{qubit}"]
                     }
                     // FIXME: CZ(a,b) and CZ(a,c) requires different waveforms on a
+                ],
+                "single-qubit-flux": [
+                    {   "type": "flux",
+                        "operand_idx": 0,                                   // control
+                        "value": ["flux-0-{qubit}"]
+                    }
                 ]
             },  // signals
 
@@ -224,20 +226,8 @@
 				// readout.
                 // FIXME: must match 'resources/meas_units' if resource constraint scheduler is used
 				{
-					"name": "ro_0",
-                    "qubits": [[6], [11], [], [], [], [], [], [], []],
-                    "ref_signals_type": "measure",
-					"ref_instrument_definition": "zi-uhfqa",
-                    "ref_control_mode": "uhfqa-9ch",
-					"controller": {
-						"name": "cc",	// FIXME
-						"slot": 0,
-						"io_module": "CC-CONN-DIO"
-					}
-				},
-				{
 					"name": "ro_1",
-                    "qubits": [[0], [1], [2], [3], [7], [8], [12], [13], [15]],
+                    "qubits": [[0], [2], [3], [5], [6], [], [], [], []],
                     "ref_signals_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
@@ -247,75 +237,59 @@
 						"io_module": "CC-CONN-DIO"
 					}
 				},
-				{
-					"name": "ro_2",
-                    "qubits": [[4], [5], [9], [10], [14], [16], [], [], []],
+                {
+                    "name": "ro_2",
+                    "qubits": [[1], [4], [], [], [], [], [], [], []],
                     "ref_signals_type": "measure",
-					"ref_instrument_definition": "zi-uhfqa",
+                    "ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
-					"controller": {
-						"name": "cc",	// FIXME
-						"slot": 2,
-						"io_module": "CC-CONN-DIO"
-					}
-				},
-
+                    "controller": {
+                        "name": "cc",   // FIXME
+                        "slot": 2,
+                        "io_module": "CC-CONN-DIO"
+                    }
+                },
 				// microwave.
                 // FIXME: must match 'resources/qwgs' if resource constraint scheduler is used
 				{
 					"name": "mw_0",
                     "qubits": [                                             // data qubits:
-                        [2, 8, 14],                                         // [freq L]
-                        [1, 4, 6, 10, 12, 15]                               // [freq H]
+                        [0],                                        
+                        [1],
+                        [2],
+                        [3]                              
                     ],
                     "ref_signals_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-mw-vsm-hack",
+                    "ref_control_mode": "awg8-mw-direct-iq",
 					"controller": {
 						"name": "cc",	// FIXME
 						"slot": 3,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
-				{
-					"name": "mw_1",
-                    "qubits": [                                             // ancilla qubits:
-                        [0, 5, 9, 13],                                      // [freq Mg]
-                        [3, 7, 11, 16]                                      // [freq My]
+                {
+                    "name": "mw_1",
+                    "qubits": [                                             // data qubits:
+                        [4],
+                        [5],
+                        [6],
+                        []
                     ],
                     "ref_signals_type": "mw",
-					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-mw-vsm-hack",
-					"controller": {
-						"name": "cc",	// FIXME
-						"slot": 4,
-						"io_module": "CC-CONN-DIO-DIFF"
-					}
-				},
-
-				// VSM
-				{
-					"name": "vsm_0",
-                    "qubits": [
-                        [2], [8], [14], [],  [], [], [], [],                // [freq L]
-                        [1], [4], [6], [10], [12], [15], [], [],            // [freq H]
-                        [0], [5], [9], [13], [], [], [], [],                // [freq Mg]
-                        [3], [7], [11], [16], [], [], [], []                // [freq My]
-                    ],
-                    "ref_signals_type": "switch",
-					"ref_instrument_definition": "qutech-vsm",
-                    "ref_control_mode": "vsm-32ch",
-					"controller": {
-						"name": "cc",	// FIXME
-						"slot": 5,
-						"io_module": "cc-conn-vsm"
-					}
-				},
+                    "ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+                    "controller": {
+                        "name": "cc",   // FIXME
+                        "slot": 4,
+                        "io_module": "CC-CONN-DIO-DIFF"
+                    }
+                },
 
 				// flux
 				{
 					"name": "flux_0",
-                    "qubits": [[0], [1], [2], [3], [4], [5], [6], [7]],
+                    "qubits": [[0], [1], [2], [3], [4], [5], [6], []],
                     "ref_signals_type": "flux",
 					"ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-flux",
@@ -323,32 +297,6 @@
 					"controller": {
 						"name": "cc",	// FIXME
 						"slot": 6,
-						"io_module": "CC-CONN-DIO-DIFF"
-					}
-				},
-				{
-					"name": "flux_1",
-                    "qubits": [[8], [9], [10], [11], [12], [13], [14], [15]],
-                    "ref_signals_type": "flux",
-					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-flux",
-//                    "ref_control_mode": "awg8-flux-vector-8",
-					"controller": {
-						"name": "cc",	// FIXME
-						"slot": 7,
-						"io_module": "CC-CONN-DIO-DIFF"
-					}
-				},
-				{
-					"name": "flux_2",
-                    "qubits": [[16], [], [], [], [], [], [], []],
-                    "ref_signals_type": "flux",
-					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-flux",
-//                    "ref_control_mode": "awg8-flux-vector-8",
-					"controller": {
-						"name": "cc",	// FIXME
-						"slot": 8,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				}
@@ -1043,8 +991,79 @@
                 "signal_ref": "two-qubit-flux",
                 "static_codeword_override": 7
             }
-        }
+        },
 
+        // single qubit flux hacks (compatible with QCC demo/flux lutman)
+        "sf_cz_ne": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_ne",
+            "cc": {
+                "signal_ref": "single-qubit-flux",
+                "static_codeword_override": 1
+            }
+        },
+        "sf_cz_se": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_se",
+            "cc": {
+                "signal_ref": "single-qubit-flux",
+                "static_codeword_override": 2
+            }
+        },
+        "sf_cz_sw": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_sw",
+            "cc": {
+                "signal_ref": "single-qubit-flux",
+                "static_codeword_override": 3
+            }
+        },
+        "sf_cz_nw": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_nw",
+            "cc": {
+                "signal_ref": "single-qubit-flux",
+                "static_codeword_override": 4
+            }
+        },
+        "sf_park": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_park",
+            "cc": {
+                "signal_ref": "single-qubit-flux",
+                "static_codeword_override": 5
+            }
+        },
+        "sf_sp_park": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_sp_park",
+            "cc": {
+                "signal_ref": "single-qubit-flux",
+                "static_codeword_override": 5
+            }
+        },
+        "sf_square": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "signal_ref": "single-qubit-flux",
+                "static_codeword_override": 6
+            }
+        }
 	},	// end of "instructions"
 
 
@@ -1072,54 +1091,14 @@
         // - https://github.com/QE-Lab/OpenQL/blob/847ff7d373b5fe7ce23c0669cb194c79525aad2e/ql/arch/cc_light/cc_light_resource_manager.h#L352
         // NB: the actual edge numbering is irrelevant to the CC, which has no knowledge about edges
         "edges": [
-            { "id":  0, "src":  1, "dst":    2 },
-            { "id":  1, "src":  1, "dst":    6 },
-            { "id":  2, "src":  2, "dst":    1 },
-            { "id":  3, "src":  2, "dst":    7 },
-            { "id":  4, "src":  6, "dst":    1 },
-            { "id":  5, "src":  6, "dst":    7 },
-            { "id":  6, "src":  6, "dst":   11 },
-            { "id":  7, "src":  7, "dst":    2 },
-            { "id":  8, "src":  7, "dst":    6 },
-            { "id":  9, "src":  7, "dst":    8 },
-            { "id": 10, "src":  7, "dst":   12 },
-            { "id": 11, "src":  8, "dst":    7 },
-            { "id": 12, "src":  8, "dst":    9 },
-            { "id": 13, "src":  8, "dst":   13 },
-            { "id": 14, "src":  9, "dst":    8 },
-            { "id": 15, "src":  9, "dst":   14 },
-            { "id": 16, "src": 10, "dst":   11 },
-            { "id": 17, "src": 10, "dst":   15 },
-            { "id": 18, "src": 11, "dst":    6 },
-            { "id": 19, "src": 11, "dst":   10 },
-            { "id": 20, "src": 11, "dst":   12 },
-            { "id": 21, "src": 11, "dst":   16 },
-            { "id": 22, "src": 12, "dst":    7 },
-            { "id": 23, "src": 12, "dst":   11 },
-            { "id": 24, "src": 12, "dst":   13 },
-            { "id": 25, "src": 12, "dst":   17 },
-            { "id": 26, "src": 13, "dst":    8 },
-            { "id": 27, "src": 13, "dst":   12 },
-            { "id": 28, "src": 13, "dst":   14 },
-            { "id": 29, "src": 13, "dst":   18 },
-            { "id": 30, "src": 14, "dst":    9 },
-            { "id": 31, "src": 14, "dst":   13 },
-            { "id": 32, "src": 15, "dst":   10 },
-            { "id": 33, "src": 15, "dst":   16 },
-            { "id": 34, "src": 16, "dst":   11 },
-            { "id": 35, "src": 16, "dst":   15 },
-            { "id": 36, "src": 16, "dst":   17 },
-            { "id": 37, "src": 17, "dst":   12 },
-            { "id": 38, "src": 17, "dst":   16 },
-            { "id": 39, "src": 17, "dst":   18 },
-            { "id": 40, "src": 17, "dst":   22 },
-            { "id": 41, "src": 18, "dst":   13 },
-            { "id": 42, "src": 18, "dst":   17 },
-            { "id": 43, "src": 18, "dst":   23 },
-            { "id": 44, "src": 22, "dst":   17 },
-            { "id": 45, "src": 22, "dst":   23 },
-            { "id": 46, "src": 23, "dst":   18 },
-            { "id": 47, "src": 23, "dst":   22 }
+            { "id":  0, "src":  2, "dst":  0 },
+            { "id":  1, "src":  0, "dst":  3 },
+            { "id":  2, "src":  3, "dst":  1 },
+            { "id":  3, "src":  1, "dst":  4 },
+            { "id":  4, "src":  2, "dst":  5 },
+            { "id":  5, "src":  5, "dst":  3 },
+            { "id":  6, "src":  3, "dst":  6 },
+            { "id":  7, "src":  6, "dst":  4 }
         ]
     },
 
@@ -1128,27 +1107,25 @@
     // the 'resource constraint' scheduler
     "resources": {      // see: https://github.com/QE-Lab/OpenQL/blob/847ff7d373b5fe7ce23c0669cb194c79525aad2e/ql/arch/cc_light/cc_light_resource_manager.h#L724
         "qubits": {
-            "count": 17     // FIXME: duplicates 'hardware_settings/qubit_number'
+            "count": 7     // FIXME: duplicates 'hardware_settings/qubit_number'
         },
         "qwgs" : {
-            "count": 4,
+            "count": 3,
             "connection_map": { // FIXME: must match "instruments"
-                "0": [6, 12, 18],                                           // [freq L]
-                "1": [2, 8, 10, 14, 16, 22],                                // [freq H]
-                "2": [1, 9, 13, 17],                                        // [freq Mg]
-                "3": [7, 11, 15, 23]                                        // [freq My]
+                "0": [0, 1, 5, 6],                          // [freq L]
+                "1": [2, 4],                                // [freq H]
+                "2": [3]                                    // [freq Mg]
             }
         },
         "meas_units" : {
-            "count": 3,
+            "count": 2,
             "connection_map": { // FIXME: must match "instruments"
-                "0": [10, 15],
-                "1": [1, 2, 6, 7, 11, 12, 16, 17, 22],
-                "2": [8, 9, 13, 14, 18, 23]
+                "0": [0, 2, 3, 5, 6],
+                "1": [1, 4]
             }
         },
         "edges": {
-            "count": 48,        // FIXME: must be present and at least match size of 'topology/edges', see edge_resource_t
+            "count": 8,        // FIXME: must be present and at least match size of 'topology/edges', see edge_resource_t
             // connection_map:
             // "0": [2, 10] means that edge 0 'connects' to edges 2 and 10, where edges
             // refer to the "id" in 'topology/edges'
