@@ -30,24 +30,26 @@ log.setLevel(logging.DEBUG)
 
 if 1:
     log.debug('connecting to UHFQA')
+    cw_list = [0, 1, 2, 3]
+    cw_array = np.array(cw_list, dtype=int).flatten()
 
     UHFQC0 = ZI_UHFQC.UHFQC('UHFQC0', device=dev_uhfqa, nr_integration_channels=9)
+    if 1:
+        UHFQC0.load_default_settings()
     UHFQC0.awg_sequence_acquisition_and_DIO_RED_test(
         Iwaves=[np.ones(8), np.ones(8)],
         Qwaves=[np.ones(8), np.ones(8)],
         cases=[2, 5],
-        codewords=a * 2 + 1,
+        dio_out_vect=cw_array * 2 + 1,  # shift codeword, add Data Valid
         acquisition_delay=20e-9)
-    rolut0 = UHFQC_RO_LutMan('rolut0', num_res=5)
-    rolut0.AWG(UHFQC0.name)
+
+    if 0:
+        rolut0 = UHFQC_RO_LutMan('rolut0', num_res=5)
+        rolut0.AWG(UHFQC0.name)
 
     # Prepare AWG_Seq as driver of DIO and set DIO output direction
     UHFQC0.dios_0_mode(1)
     UHFQC0.dios_0_drive(3)
-
-    # Initialize UHF for consecutive triggering and enable it
-    UHFQC0.awgs_0_single(0)
-    UHFQC0.awgs_0_enable(1)
 
     # Determine trigger and strobe bits from DIO
     UHFQC0.awgs_0_dio_valid_index(16)
@@ -56,10 +58,16 @@ if 1:
     UHFQC0.awgs_0_dio_strobe_slope(1)
     UHFQC0.awgs_0_userregs_2(2)
 
+    # Initialize UHF for consecutive triggering and enable it
+    UHFQC0.awgs_0_single(0)
+    UHFQC0.awgs_0_enable(1)
+
+    UHFQC0.start()
 
 
 
-if 1:
+
+if 0:
     log.debug('connecting to CC')
     cc = QuTechCC('cc', IPTransport(ip_cc))
     cc.reset()

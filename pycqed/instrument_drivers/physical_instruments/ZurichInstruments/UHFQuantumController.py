@@ -1154,7 +1154,7 @@ setUserReg(4, err_cnt);"""
 
     def awg_sequence_acquisition_and_DIO_RED_test(
             self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0,
-            codewords=None, timeout=5):
+            dio_out_vect=None, timeout=5):
 
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
@@ -1163,17 +1163,16 @@ setUserReg(4, err_cnt);"""
         sequence = (
             'var wait_delay = getUserReg(2);\n' +
             'cvar i = 0;\n'+
-            'const length = {};\n'.format(len(codewords))
+            'const length = {};\n'.format(len(dio_out_vect))
             )
-        sequence = sequence + array2vect(
-                codewords, "codewords")
-        # starting the loop and switch statement
+        sequence = sequence + array2vect(dio_out_vect, "dio_out_vect")
+        # starting the loop
         sequence = sequence +(
-            ' setDIO(2048);\n'+
+            'setDIO(2048); // NB: workaround because we cannot use setDIO(0)\n'+
             'for (i = 0; i < length; i = i + 1) {\n'
-            ' var codeword =  codewords[i];\n'+
+            ' var dio_out =  dio_out_vect[i];\n'+
             ' waitDIOTrigger();\n' +
-            ' setDIO(codeword);\n'+
+            ' setDIO(dio_out);\n'+
             ' wait(wait_delay);\n' +
             ' setDIO(2048);\n'+
             '}\n'
@@ -1181,10 +1180,8 @@ setUserReg(4, err_cnt);"""
 
         # Define the behavior of our program
         self._reset_awg_program_features()
-
         self._awg_program[0] = sequence
         self._awg_needs_configuration[0] = True
-        # self.awg_string(sequence, timeout=timeout)
 
     def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
         if Iwave is not None and (np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0):
