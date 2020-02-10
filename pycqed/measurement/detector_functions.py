@@ -331,7 +331,7 @@ class Dummy_Detector_Hard(Hard_Detector):
         x = self.sweep_points
         noise = self.noise * (np.random.rand(2, len(x)) - .5)
         data = np.array([np.sin(x / np.pi),
-                         np.cos(x/np.pi)])
+                         np.cos(x / np.pi)])
         data += noise
         time.sleep(self.delay)
         # Counter used in test suite to test how many times data was acquired.

@@ -26,6 +26,16 @@ class DummyParHolder(Instrument):
                 unit="m",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(),
+                initial_value=0.,
+            )
+
+        # Instrument parameters
+        for parname in ["x_int", "y_int", "z_int", "x0_int", "y0_int", "z0_int"]:
+            self.add_parameter(
+                parname,
+                unit="m",
+                parameter_class=ManualParameter,
+                vals=vals.Ints(),
                 initial_value=0,
             )
 
@@ -48,6 +58,8 @@ class DummyParHolder(Instrument):
         )
 
         self.add_parameter("parabola", unit="V", get_cmd=self._measure_parabola)
+
+        self.add_parameter("parabola_int", unit="V", get_cmd=self._measure_parabola_int)
 
         self.add_parameter(
             "parabola_list", unit="V", get_cmd=self._measure_parabola_list
@@ -104,6 +116,15 @@ class DummyParHolder(Instrument):
             (self.x() - self.x0()) ** 2
             + (self.y() - self.y0()) ** 2
             + (self.z() - self.z0()) ** 2
+            + self.noise() * np.random.rand(1)
+        )
+
+    def _measure_parabola_int(self):
+        time.sleep(self.delay())
+        return (
+            (self.x_int() - self.x0_int()) ** 2
+            + (self.y_int() - self.y0_int()) ** 2
+            + (self.z_int() - self.z0_int()) ** 2
             + self.noise() * np.random.rand(1)
         )
 
