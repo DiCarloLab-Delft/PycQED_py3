@@ -634,21 +634,36 @@ class Test_MeasurementControl(unittest.TestCase):
         self.mock_parabola.parabola.unit = saved_unit
 
     def test_adaptive_SKOptLearner(self):
-        # NB cool stuff: this can also optimize integers and other
-        # hyper-parameters
+        # NB cool stuff: this can also optimize hyper-parameters
         self.MC.soft_avg(1)
         self.mock_parabola.noise(0.5)
         self.MC.set_sweep_functions(
             [self.mock_parabola.x, self.mock_parabola.y])
         self.MC.set_adaptive_function_parameters({'adaptive_function': adaptive.SKOptLearner,
-                                                    'goal': lambda l: l.npoints > 24,
+                                                    'goal': lambda l: l.npoints > 15,
                                                     'dimensions': [(-50.0, +50.0),
                                                                 (-20.0, +30.0)],
-                                                    'base_estimator': 'gp',
+                                                    'base_estimator': 'EI',
                                                     'acq_func': 'gp_hedge',
                                                     'acq_optimizer': 'lbfgs'})
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('2D SKOptLearner adaptive sampling test', mode='adaptive')
+
+    def test_adaptive_SKOptLearner_int(self):
+        # Optimize over integer parameters
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0.5)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x_int, self.mock_parabola.y_int])
+        self.MC.set_adaptive_function_parameters({'adaptive_function': adaptive.SKOptLearner,
+                                                    'goal': lambda l: l.npoints > 15,
+                                                    'dimensions': [(-50, +50),
+                                                                (-20, +30)],
+                                                    'base_estimator': 'EI',
+                                                    'acq_func': 'gp_hedge',
+                                                    'acq_optimizer': 'lbfgs'})
+        self.MC.set_detector_function(self.mock_parabola.parabola_int)
+        dat = self.MC.run('2D SKOptLearner int parameters', mode='adaptive')
 
     def test_adaptive_SKOptLearner_list_of_vals(self):
         # NB cool stuff: this can also optimize integers and other
