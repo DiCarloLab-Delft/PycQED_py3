@@ -43,6 +43,7 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
+from pycqed.utilities.learner1D_optimize import Learner1D_Optimize
 from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, evaluate_X
 
 from skopt import Optimizer  # imported for checking types
@@ -219,8 +220,6 @@ class MeasurementControl(Instrument):
                     average data in specific bins for live plotting.
                     This is useful when it is required to take data in single
                     shot mode.
-
-
             mode (str):
                     Measurement mode. Can '1D', '2D', or 'adaptive'.
             disable_snapshot_metadata (bool):
@@ -317,7 +316,7 @@ class MeasurementControl(Instrument):
                 start_idx = self.get_datawriting_start_idx()
                 if len(self.sweep_functions) == 1:
                     self.sweep_functions[0].set_parameter(sweep_points[start_idx])
-                    self.detector_function.prepare(sweep_points=self.get_sweep_points())
+                    self.detector_function.prepare(sweep_points=self.get_sweep_points().astype(np.float64))
                     self.measure_hard()
                 else:  # If mode is 2D
                     for i, sweep_function in enumerate(self.sweep_functions):
@@ -325,7 +324,7 @@ class MeasurementControl(Instrument):
                         val = swf_sweep_points[start_idx]
                         sweep_function.set_parameter(val)
                     self.detector_function.prepare(
-                        sweep_points=sweep_points[start_idx : start_idx + self.xlen, 0]
+                        sweep_points=sweep_points[start_idx : start_idx + self.xlen, 0].astype(np.float64)
                     )
                     self.measure_hard()
         else:
@@ -392,10 +391,9 @@ class MeasurementControl(Instrument):
                     loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
                 )
             elif issubclass(self.adaptive_function, SKOptLearner):
-                # NB: SKOptLearner is a modified version of SKOptLearner
-                # to fix a data type matching problem
                 # NB2: This learner expects the `optimization_function`
                 # to be scalar
+                # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
                 self.learner = Learner(
                     self.optimization_function,
                     dimensions=self.af_pars["dimensions"],
@@ -426,7 +424,9 @@ class MeasurementControl(Instrument):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
-            elif issubclass(self.adaptive_function, LearnerND_Optimize):
+            elif issubclass(self.adaptive_function, LearnerND_Optimize) or issubclass(
+                self.adaptive_function, Learner1D_Optimize
+            ):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
@@ -460,7 +460,7 @@ class MeasurementControl(Instrument):
         return
 
     def measure_hard(self):
-        new_data = np.array(self.detector_function.get_values()).T
+        new_data = np.array(self.detector_function.get_values().astype(np.float64)).T
 
         ###########################
         # Shape determining block #
@@ -478,21 +478,25 @@ class MeasurementControl(Instrument):
                 1 + self.soft_iteration
             )
 
-            self.dset[start_idx:stop_idx, len(self.sweep_functions)] = new_vals
+            self.dset[start_idx:stop_idx, len(self.sweep_functions)] = new_vals.astype(
+                np.float64
+            )
         else:
             old_vals = self.dset[start_idx:stop_idx, len(self.sweep_functions) :]
             new_vals = (new_data + old_vals * self.soft_iteration) / (
                 1 + self.soft_iteration
             )
 
-            self.dset[start_idx:stop_idx, len(self.sweep_functions) :] = new_vals
+            self.dset[
+                start_idx:stop_idx, len(self.sweep_functions) :
+            ] = new_vals.astype(np.float64)
         sweep_len = len(self.get_sweep_points().T)
 
         ######################
         # DATA STORING BLOCK #
         ######################
         if sweep_len == len_new_data:  # 1D sweep
-            self.dset[:, 0] = self.get_sweep_points().T
+            self.dset[:, 0] = self.get_sweep_points().T.astype(np.float64)
         else:
             try:
                 if len(self.sweep_functions) != 1:
@@ -501,11 +505,11 @@ class MeasurementControl(Instrument):
                     ]
                     self.dset[
                         start_idx:, 0 : len(self.sweep_functions)
-                    ] = relevant_swp_points
+                    ] = relevant_swp_points.astype(np.float64)
                 else:
                     self.dset[start_idx:, 0] = self.get_sweep_points()[
                         start_idx : start_idx + len_new_data :
-                    ].T
+                    ].T.astype(np.float64)
             except Exception:
                 # There are some cases where the sweep points are not
                 # specified that you don't want to crash (e.g. on -off seq)
@@ -584,7 +588,7 @@ class MeasurementControl(Instrument):
             1 + self.soft_iteration
         )
 
-        self.dset[start_idx:stop_idx, :] = new_vals
+        self.dset[start_idx:stop_idx, :] = new_vals.astype(np.float64)
         # update plotmon
         check_keyboard_interrupt()
         self.update_instrument_monitor()
@@ -692,7 +696,16 @@ class MeasurementControl(Instrument):
             # create outer loop
             self.sweep_pts_y = self.sweep_points_2D
             y_rep = np.repeat(self.sweep_pts_y, self.xlen)
-            c = np.column_stack((x_tiled, y_rep))
+            # 2020-02-09, This does not preserve types, e.g. integer parameters
+            # and rises validators exceptions
+            if np.issubdtype(type(self.sweep_pts_x[0]), np.integer) or np.issubdtype(
+                type(self.sweep_points_2D[0]), np.integer
+            ):
+                c = np.column_stack(
+                    (x_tiled.astype(np.object), y_rep)
+                )  # this preserves types
+            else:
+                c = np.column_stack((x_tiled, y_rep))
             self.set_sweep_points(c)
             self.initialize_plot_monitor_2D()
         return
@@ -1142,7 +1155,7 @@ class MeasurementControl(Instrument):
                     subplot=xlabels_num + j + 1 + iter_start_idx,
                     symbol="star",
                     symbolSize=12,
-                    color=color_cycle[1]
+                    color=color_cycle[1],
                 )
                 self.iter_bever_traces.append(iter_plotmon.traces[-1])
 
@@ -1633,7 +1646,7 @@ class MeasurementControl(Instrument):
             "sweep_parameter_units": self.sweep_par_units,
             "value_names": self.detector_function.value_names,
             "value_units": self.detector_function.value_units,
-            "opt_res": opt_res
+            "opt_res": opt_res,
         }
         return result_dict
 
@@ -1718,12 +1731,16 @@ class MeasurementControl(Instrument):
             # 'cmaes': result[-2],
             # 'logger': result[-1]}
         elif is_subclass(adaptive_function, Optimizer):
+            # result = learner
             # Because MC saves all the datapoints we save only the best point
             # for convenience
             opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
             opt_indx = opt_idx_selector(result.yi)
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
-        elif is_subclass(adaptive_function, LearnerND_Optimize):
+        elif is_subclass(adaptive_function, Learner1D_Optimize) or is_subclass(
+            adaptive_function, LearnerND_Optimize
+        ):
+            # result = learner
             # Because MC saves all the datapoints we save only the best point
             # for convenience
             # Only works for a function that returns a scalar
@@ -1732,7 +1749,12 @@ class MeasurementControl(Instrument):
             Y = list(result.data.values())
             opt_indx = opt_idx_selector(Y)
             xopt = X[opt_indx]
-            res_dict = {"xopt": np.array(xopt), "fopt": Y[opt_indx]}
+            res_dict = {
+                "xopt": np.array(xopt)
+                if is_subclass(adaptive_function, LearnerND_Optimize)
+                else xopt,
+                "fopt": Y[opt_indx],
+            }
         elif adaptive_function.__module__ == "pycqed.measurement.optimization":
             res_dict = {"xopt": result[0], "fopt": result[1]}
         else:
@@ -2121,7 +2143,8 @@ class MeasurementControl(Instrument):
         elif np.any(np.array(cost_func_names) == zlabel.lower()):
             cmap = (
                 "inferno_clip_high"
-                if hasattr(self, "minimize_optimization") and not self.minimize_optimization
+                if hasattr(self, "minimize_optimization")
+                and not self.minimize_optimization
                 else "inferno_clip_low"
             )
         elif zunit == "%":
