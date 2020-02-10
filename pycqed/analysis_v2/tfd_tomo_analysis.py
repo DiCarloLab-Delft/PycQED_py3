@@ -96,10 +96,6 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                                                                       idx_qubit_ro=idx_qubit_ro,
                                                                       correlations=correlations,
                                                                       num_segments=self.num_segments)
-        self.raw_data_dict['ro_sq_raw_signal'] = qubit_state_avg
-        self.raw_data_dict['ro_tq_raw_signal'] = correl_avg
-        self.raw_data_dict['ro_sq_ch_names'] = idx_qubit_ro
-        self.raw_data_dict['ro_tq_ch_names'] = correlations
         # 7. Compute betas weight-2
         betas_w2, op_idx_w2 = tomo_func.compute_betas_weight2(matrix_B=matrix_B,
                                                               correl_avg=correl_avg,
@@ -107,6 +103,12 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                                                               cal_point_seg_start=cal_point_seg_start,
                                                               idx_qubit_ro=idx_qubit_ro,
                                                               num_qubits=self.num_qubits)
+        self.raw_data_dict['ro_sq_raw_signal'] = qubit_state_avg
+        self.raw_data_dict['ro_tq_raw_signal'] = correl_avg
+        self.raw_data_dict['ro_sq_ch_names'] = idx_qubit_ro
+        self.raw_data_dict['ro_tq_ch_names'] = correlations
+        self.proc_data_dict['betas_w1'] = betas_w1
+        self.proc_data_dict['betas_w2'] = betas_w2
         # 8. Complicating betas on qubit X
         # M_X = II + I_X Z_D2 + Z_X I_D2 + Z_X Z_D2
         # DOES NOT REQUIRES EXTRA PRE-ROT TO SOLVE AS WE ALREADY TOGGLE X-D2 CORRELS

@@ -68,18 +68,18 @@ class TFD_3CZ_Analysis_Pauli_Strings(ba.BaseDataAnalysis):
         self.proc_data_dict = {}
         # combinations = ['X', 'Z', '0000', '1111']
         combinations = self.raw_data_dict['combinations']
-
         raw_shots = self.raw_data_dict['data'][:, 1:]
         value_names = self.raw_data_dict['value_names']
 
+
         binned_data = {}
         for i, ch_name in enumerate(value_names):
-            ch_data = raw_shots[:, i]  # select per channel
+            ch_data = raw_shots[:, i]  # select shots per channel
             binned_data[ch_name] = {}
             for j, comb in enumerate(combinations):
-
                 binned_data[ch_name][comb] = np.mean(
-                    ch_data[j::len(combinations)])  # start at
+                    ch_data[j::len(combinations)])  #get average for shots per combination
+        #data per combination is stored with index steps of len(combinations) starting from j
 
         # Calculate mean voltages to determine threshold
         mn_voltages = {}
