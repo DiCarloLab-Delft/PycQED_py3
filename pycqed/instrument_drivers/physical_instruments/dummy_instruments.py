@@ -61,6 +61,8 @@ class DummyParHolder(Instrument):
 
         self.add_parameter("parabola_int", unit="V", get_cmd=self._measure_parabola_int)
 
+        self.add_parameter("parabola_float_int", unit="V", get_cmd=self._measure_parabola_float_int)
+
         self.add_parameter(
             "parabola_list", unit="V", get_cmd=self._measure_parabola_list
         )
@@ -123,6 +125,18 @@ class DummyParHolder(Instrument):
         time.sleep(self.delay())
         return (
             (self.x_int() - self.x0_int()) ** 2
+            + (self.y_int() - self.y0_int()) ** 2
+            + (self.z_int() - self.z0_int()) ** 2
+            + self.noise() * np.random.rand(1)
+        )
+
+    def _measure_parabola_float_int(self):
+        time.sleep(self.delay())
+        return (
+            (self.x() - self.x0()) ** 2
+            + (self.y() - self.y0()) ** 2
+            + (self.z() - self.z0()) ** 2
+            + (self.x_int() - self.x0_int()) ** 2
             + (self.y_int() - self.y0_int()) ** 2
             + (self.z_int() - self.z0_int()) ** 2
             + self.noise() * np.random.rand(1)
