@@ -1,6 +1,9 @@
 #!/usr/bin/python
 # Based on: http://localhost:8888/notebooks/personal_folders/Miguel/qec_lut_demo.ipynb
 
+### setup logging before all imports (before any logging is done as to prevent a default root logger)
+import CC_logging
+
 import os
 import logging
 import sys
@@ -30,12 +33,12 @@ log.setLevel(logging.DEBUG)
 
 if 1:
     log.debug('connecting to UHFQA')
-    cw_list = [0, 1, 2, 3]
+#    cw_list = [3, 2, 1, 0]
+    cw_list = [7, 6, 5, 4]
     cw_array = np.array(cw_list, dtype=int).flatten()
 
     UHFQC0 = ZI_UHFQC.UHFQC('UHFQC0', device=dev_uhfqa, nr_integration_channels=9)
-    if 1:
-        UHFQC0.load_default_settings()
+    UHFQC0.load_default_settings()
     UHFQC0.awg_sequence_acquisition_and_DIO_RED_test(
         Iwaves=[np.ones(8), np.ones(8)],
         Qwaves=[np.ones(8), np.ones(8)],
@@ -67,22 +70,42 @@ if 1:
 
 
 
-if 0:
+if 1:
+    log.debug('generating program')
+    prog = """
+.DEF    smAddr      S16
+.DEF    lut         0
+.DEF    numIter     4
+        move        $numIter,R0
+loop:   seq_out     0x00010000,100      # UHFQA measurement
+        seq_in_sm   $smAddr,0,0         # SMaddr,LUT,size
+        seq_sw_sm   $smAddr
+        loop        R0,@loop
+        stop
+    """
+
     log.debug('connecting to CC')
     cc = QuTechCC('cc', IPTransport(ip_cc))
     cc.reset()
     cc.clear_status()
     cc.status_preset()
+    log.info(cc.get_identity())
 
-    if 1:
-        cc.debug_marker_out(0, cc.UHFQA_TRIG) # UHF-QA trigger
-        cc.debug_marker_out(8, cc.HDAWG_TRIG) # HDAWG trigger
+    log.debug('uploading program to CC')
+    cc.sequence_program_assemble(prog)
+    if cc.get_assembler_success() != 1:
+        sys.stderr.write('error log = {}\n'.format(cc.get_assembler_log()))  # FIXME: result is messy
+        log.warning('assembly failed')
+    else:
+        log.debug('checking for SCPI errors on CC')
+        err_cnt = cc.get_system_error_count()
+        for i in range(err_cnt):
+            print(cc.get_error())
+        log.debug('done checking for SCPI errors on CC')
+
+        log.debug('starting CC')
+        cc.debug_marker_out(0, cc.UHFQA_TRIG)
+        cc.start()
+    log.debug('finished')
 
 
-
-    err_cnt = cc.get_system_error_count()
-    for i in range(err_cnt):
-        print(cc.get_error())
-
-    log.debug('starting CC')
-    cc.start()

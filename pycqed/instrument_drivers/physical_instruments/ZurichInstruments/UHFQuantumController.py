@@ -1168,7 +1168,7 @@ setUserReg(4, err_cnt);"""
         sequence = sequence + array2vect(dio_out_vect, "dio_out_vect")
         # starting the loop
         sequence = sequence +(
-            'setDIO(2048); // NB: workaround because we cannot use setDIO(0)\n'+
+            'setDIO(2048); // FIXME: workaround because we cannot use setDIO(0)\n'+
             'for (i = 0; i < length; i = i + 1) {\n'
             ' var dio_out =  dio_out_vect[i];\n'+
             ' waitDIOTrigger();\n' +
