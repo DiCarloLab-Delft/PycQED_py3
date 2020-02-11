@@ -760,6 +760,27 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan.AWG.get_instr().getOperationComplete()
 
 
+
+class HDAWG_lutman_par(Soft_Sweep):
+
+    def __init__(self, LutMan, LutMan_parameter, **kw):
+        self.set_kw()
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = LutMan_parameter.unit
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+
+    def set_parameter(self, val):
+        self.LutMan.AWG.get_instr().stop()
+        self.LutMan_parameter.set(val)
+        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.LutMan.AWG.get_instr().start()
+        # self.LutMan.AWG.get_instr().getOperationComplete()
+
+
+
 class QWG_flux_amp(Soft_Sweep):
     """
     Sweep function
