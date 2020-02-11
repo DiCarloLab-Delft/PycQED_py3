@@ -174,11 +174,11 @@ def mk_optimization_loss_func(
 ):
     """
     If you don't specify the threshold you must make use of
-    make_optimization_goal_func!!!
+    mk_optimization_goal_func!!!
 
     Otherwise the global optimization does not work!
 
-    If you specify the threshold you can use make_threshold_goal_func
+    If you specify the threshold you can use mk_threshold_goal_func
     """
     threshold_loss_func = mk_optimization_loss(
         minimize=minimize, threshold=threshold,
@@ -197,7 +197,7 @@ def mk_optimization_loss_func(
     return func
 
 
-def make_optimization_goal_func(minimize: bool = True):
+def mk_optimization_goal_func(minimize: bool = True):
     """
     The generated function alway returns True, but is required for the
     mk_optimization_loss_func to work!!!
@@ -227,7 +227,7 @@ def make_optimization_goal_func(minimize: bool = True):
     return goal
 
 
-def make_threshold_goal_func(
+def mk_threshold_goal_func(
     threshold: float, max_pnts_beyond_threshold: int, minimize: bool = True
 ):
     compare_op = operator.lt if minimize else operator.gt
