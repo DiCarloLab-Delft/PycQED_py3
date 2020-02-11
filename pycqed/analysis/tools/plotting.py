@@ -1,6 +1,7 @@
 '''
-Currently empty should contain the plotting tools portion of the
-analysis toolbox
+Contain the plotting tools portion of the analysis toolbox
+Note: There is an equivalent file for analysis v2, include your new code there,
+unless it is only inteded for analysis v1
 '''
 import lmfit
 import matplotlib.pyplot as plt
