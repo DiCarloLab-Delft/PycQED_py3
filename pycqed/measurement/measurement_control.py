@@ -373,7 +373,7 @@ class MeasurementControl(Instrument):
         if is_subclass(self.adaptive_function, BaseLearner):
             Xs = self.af_pars.get("extra_dims_sweep_pnts", [None])
             for X in Xs:
-                if X is not None:
+                if len(Xs) > 1 and X is not None:
                     opt_func = lambda x: self.optimization_function(flatten([x, X]))
                 else:
                     opt_func = self.optimization_function
@@ -420,11 +420,11 @@ class MeasurementControl(Instrument):
                 if "X0" in self.af_pars:
                     # Teach the learner the initial point if provided
                     evaluate_X(self.learner, self.af_pars["X0"])
-            # N.B. the runner that is used is not an `adaptive.Runner` object
-            # rather it is the `adaptive.runner.simple` function. This
-            # ensures that everything runs in a single process, as is
-            # required by QCoDeS (May 2018) and makes things simpler.
-            self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
+                # N.B. the runner that is used is not an `adaptive.Runner` object
+                # rather it is the `adaptive.runner.simple` function. This
+                # ensures that everything runs in a single process, as is
+                # required by QCoDeS (May 2018) and makes things simpler.
+                self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
             if issubclass(self.adaptive_function, SKOptLearner):
                 # NB: Having an optmizer that also complies with the adaptive
                 # interface breaks a bit the previous structure
