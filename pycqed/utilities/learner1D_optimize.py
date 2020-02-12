@@ -80,6 +80,7 @@ def mk_non_uniform_res_loss_func(
 # Learner1D wrappings to be able to access all learner data
 # ######################################################################
 
+
 class Learner1D_Optimize(Learner1D):
     """
     Does everything that the LearnerND does plus wraps it such that
@@ -116,8 +117,10 @@ class Learner1D_Optimize(Learner1D):
 
 
 def mk_optimization_loss(
-    minimize: bool = True, threshold: float = None, converge_at_local: bool = False,
-    global_search_strategy: str = "random"
+    minimize: bool = True,
+    threshold: float = None,
+    converge_at_local: bool = False,
+    global_search_strategy: str = "dist_value",
 ):
     # This sign vs = version is crutial
     if converge_at_local:
@@ -130,10 +133,30 @@ def mk_optimization_loss(
     # It delays the decision of not considering a local minima interesting
     # anymore
     comp_with = "last_best_min" if minimize else "last_best_max"
+    best_optimal = "best_min" if minimize else "best_max"
+    worse_optimal = "best_max" if minimize else "best_min"
 
     moving_threshold = threshold is None
-    if global_search_strategy == "random":
-        eval_non_interesting = lambda xs_: random.uniform(0, np.abs(xs_[0] - xs_[1]))
+    if "dist_value" in global_search_strategy:
+
+        def eval_non_interesting(xs_, values_, learner_):
+            dist = np.abs(xs_[0] - xs_[1])
+            best_val_in_segment = np.min(values_) if minimize else np.max(values_)
+            # Big loss => interesting point => difference from worse_optimal gives high loss
+            best_val_in_segment_loss_ = np.abs(
+                getattr(learner_, worse_optimal) - best_val_in_segment
+            )
+            loss_ = dist * best_val_in_segment_loss_
+            loss_ = (
+                # In case we want to make the search more random for some reason
+                random.uniform(0, loss_)
+                if global_search_strategy == "dist_value_random"
+                else loss_
+            )
+            return loss_
+
+        eval_non_interesting.needs_values_learner = True
+
     elif global_search_strategy == "default_loss":
         eval_non_interesting = default_loss
     else:
@@ -142,7 +165,6 @@ def mk_optimization_loss(
     def func(xs, values, learner, *args, **kw):
         best_optimal = getattr(learner, comp_with)
         comp_threshold = best_optimal if moving_threshold else threshold
-        # and compare_op(best_optimal, threshold)
 
         values = np.array(values)
         scaled_threshold = comp_threshold / learner._scale[1]
@@ -156,7 +178,10 @@ def mk_optimization_loss(
         else:
             # The default loss is not very good here, it favors the gradient
             # loss = default_loss(xs, values)
-            loss = eval_non_interesting(xs)
+            if hasattr(eval_non_interesting, "needs_values_learner"):
+                loss = eval_non_interesting(xs, values, learner)
+            else:
+                loss = eval_non_interesting(xs, values)
 
         return loss
 
@@ -170,7 +195,7 @@ def mk_optimization_loss_func(
     dist_is_norm=False,
     threshold=None,
     converge_at_local=False,
-    global_search_strategy: str = "random"
+    global_search_strategy: str = "random",
 ):
     """
     If you don't specify the threshold you must make use of
@@ -181,9 +206,10 @@ def mk_optimization_loss_func(
     If you specify the threshold you can use mk_threshold_goal_func
     """
     threshold_loss_func = mk_optimization_loss(
-        minimize=minimize, threshold=threshold,
+        minimize=minimize,
+        threshold=threshold,
         converge_at_local=converge_at_local,
-        global_search_strategy=global_search_strategy
+        global_search_strategy=global_search_strategy,
     )
 
     func = mk_res_loss_func(
@@ -197,28 +223,31 @@ def mk_optimization_loss_func(
     return func
 
 
-def mk_optimization_goal_func(minimize: bool = True):
+def mk_optimization_goal_func():
     """
     The generated function alway returns True, but is required for the
     mk_optimization_loss_func to work!!!
     """
-    update_from = "best_min" if minimize else "best_max"
-    last_update_from = "last_best_min" if minimize else "last_best_max"
-    optimal_selector = np.min if minimize else np.max
-    # Should we keep it like this?
-    # compare_op = operator.lt if minimize else operator.gt
+    # update_from = "best_min" if minimize else "best_max"
+    # last_update_from = "last_best_min" if minimize else "last_best_max"
+    # optimal_selector = np.min if minimize else np.max
 
     def goal(learner):
         if len(learner.data):
             values = list(learner.data.values())
-            # values = np.array(list(learner.data.values()))
-            # current_threshold = getattr(learner, update_from)
-            # where = compare_op(values, current_threshold)
-            # updateQ = np.sum(where) > 0
-            # if updateQ:
-            #     updated_optimal = np.sort(values[np.where(where)])[0]
-            #     updated_optimal = optimal_selector(values[np.where(where)])
-            #     setattr(learner, update_from, updated_optimal)
+
+            update_from = "best_min"
+            last_update_from = "last_best_min"
+            optimal_selector = np.min
+
+            setattr(learner, last_update_from, getattr(learner, update_from))
+            updated_optimal = optimal_selector(values)
+            setattr(learner, update_from, updated_optimal)
+
+            update_from = "best_max"
+            last_update_from = "last_best_max"
+            optimal_selector = np.max
+
             setattr(learner, last_update_from, getattr(learner, update_from))
             updated_optimal = optimal_selector(values)
             setattr(learner, update_from, updated_optimal)
@@ -231,14 +260,16 @@ def mk_threshold_goal_func(
     threshold: float, max_pnts_beyond_threshold: int, minimize: bool = True
 ):
     compare_op = operator.lt if minimize else operator.gt
+    optimization_goal = mk_optimization_goal_func()
 
     def goal(learner):
-        num_pnts = np.sum(
+        # This is a function just to not get evaluate if there is no data yet
+        num_pnts = lambda: np.sum(
             compare_op(np.array(list(learner.data.items())).T[1], threshold)
         )
-        return len(learner.data) and num_pnts >= max_pnts_beyond_threshold
+        return len(learner.data) and num_pnts() >= max_pnts_beyond_threshold
 
-    return goal
+    return lambda l: optimization_goal(l) or goal(l)
 
 
 # ######################################################################
