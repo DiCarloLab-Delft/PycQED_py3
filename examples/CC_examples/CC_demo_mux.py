@@ -73,15 +73,24 @@ if 1:
 if 1:
     log.debug('generating program')
     prog = """
+.DEF    duration    9
+.DEF    wait        100
 .DEF    smAddr      S16
 .DEF    lut         0
 .DEF    numIter     4
-        move        $numIter,R0
-loop:   seq_out     0x00010000,100      # UHFQA measurement
-        seq_in_sm   $smAddr,0,0         # SMaddr,LUT,size
-        seq_sw_sm   $smAddr
-        loop        R0,@loop
-        stop
+# slot 0: UHFQA
+[0]         move        $numIter,R0
+[0]loop:    seq_out     0x00010000,$duration      # UHFQA measurement
+[0]         seq_in_sm   $smAddr,$lut,0
+[0]         seq_sw_sm   $smAddr
+[0]         seq_out     0x0,$wait
+[0]         loop        R0,@loop
+[0]         stop
+# slot 1-4: observe
+[1]loop:    jmp         @loop
+[2]loop:    jmp         @loop
+[3]loop:    jmp         @loop
+[4]loop:    jmp         @loop
     """
 
     log.debug('connecting to CC')
