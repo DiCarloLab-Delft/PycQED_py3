@@ -4,7 +4,7 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.sweep_functions import Soft_Sweep
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
-# Commented out as there is no module named Experiments.CLEAR.prepare_for_CLEAR.prepare_for_CLEAR
+# FIXME: Commented out as there is no module named Experiments.CLEAR.prepare_for_CLEAR.prepare_for_CLEAR
 # from Experiments.CLEAR.prepare_for_CLEAR import prepare_for_CLEAR
 
 import time
@@ -1213,7 +1213,7 @@ class prepare_for_conditional_depletion(Soft_Sweep):
 
     def __init__(self, AllXY_trigger=200, sweep_control='soft', double_pulse_Ramsey_idling=100, RTF_qubit_pulses=False, **kw):
         super(prepare_for_conditional_depletion, self).__init__()
-        import Experiments.CLEAR.prepare_for_CLEAR as pfC
+        import Experiments.CLEAR.prepare_for_CLEAR as pfC  # FIXME: import error
         self.pfC = pfC
         self.sweep_control = sweep_control
         self.name = 'prepare_for_conditional_depletion'
@@ -1252,7 +1252,7 @@ class prepare_for_unconditional_depletion(Soft_Sweep):
 
     def __init__(self, AllXY_trigger=200, sweep_control='soft', RTF_qubit_pulses=False, double_pulse_Ramsey_idling=100, **kw):
         super(prepare_for_unconditional_depletion, self).__init__()
-        import Experiments.CLEAR.prepare_for_CLEAR as pfC
+        import Experiments.CLEAR.prepare_for_CLEAR as pfC  # FIXME: import error
         self.pfC = pfC
         self.sweep_control = sweep_control
         self.name = 'prepare_for_unconditional_depletion'

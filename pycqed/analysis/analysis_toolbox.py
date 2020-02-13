@@ -1,31 +1,28 @@
-# some convenience tools
-#
-import numpy as np
-import logging
 import os
 import time
 import datetime
 import warnings
+import h5py
+
+import pandas as pd
+import colorsys as colors
+# FIXME: was commented out, breaks code below
+#import qutip as qp
+#import qutip.metrics as qpmetrics
+
 from copy import deepcopy
 from collections import OrderedDict as od
-from matplotlib import colors
-import pandas as pd
-from pycqed.utilities.get_default_datadir import get_default_datadir
-from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import h5py
+from scipy.interpolate import griddata
 from scipy.signal import argrelextrema
 from scipy import optimize
-# to allow backwards compatibility with old a_tools code
-from .tools.data_manipulation import *
-from .tools.plotting import *
-import colorsys as colors
-from matplotlib import cm
+
+from pycqed.utilities.get_default_datadir import get_default_datadir
 from pycqed.analysis import composite_analysis as RA
+from .tools.plotting import *
 
-# import qutip as qp
-# import qutip.metrics as qpmetrics
-
+from matplotlib import colors
+from matplotlib import cm
 from matplotlib.colors import LogNorm
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabel,
                                             data_to_table_png,
