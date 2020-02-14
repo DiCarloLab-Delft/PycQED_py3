@@ -210,7 +210,7 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           Qubit.name + ' Sweetspot')
 
             self.add_edge(Qubit.name + ' Flipping',
-                          Qubit.name + ' Rabi')
+                          Qubit.name + ' Frequency Fine')
             self.add_edge(Qubit.name + ' MOTZOI Calibration',
                           Qubit.name + ' Flipping')
             self.add_edge(Qubit.name + ' RB Calibration',
