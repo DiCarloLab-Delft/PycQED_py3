@@ -760,27 +760,6 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan.AWG.get_instr().getOperationComplete()
 
 
-
-class HDAWG_lutman_par(Soft_Sweep):
-
-    def __init__(self, LutMan, LutMan_parameter, **kw):
-        self.set_kw()
-        self.name = LutMan_parameter.name
-        self.parameter_name = LutMan_parameter.label
-        self.unit = LutMan_parameter.unit
-        self.sweep_control = 'soft'
-        self.LutMan = LutMan
-        self.LutMan_parameter = LutMan_parameter
-
-    def set_parameter(self, val):
-        self.LutMan.AWG.get_instr().stop()
-        self.LutMan_parameter.set(val)
-        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
-        self.LutMan.AWG.get_instr().start()
-        # self.LutMan.AWG.get_instr().getOperationComplete()
-
-
-
 class QWG_flux_amp(Soft_Sweep):
     """
     Sweep function
@@ -1290,4 +1269,18 @@ class tim_mw_latency_sweep(Soft_Sweep):
         self.dev.prepare_timing()
 
         time.sleep(.5)
+        return val
+
+class tim_mw_latency_sweep_1D(Soft_Sweep):
+    def __init__(self,device):
+        super().__init__()
+        self.dev = device
+        self.name = 'MW latency'
+        self.parameter_name = 'MW latency'
+        self.unit = 's'
+
+    def set_parameter(self,val):
+        self.dev.tim_mw_latency_0(val)
+        self.dev.tim_mw_latency_1(val)
+        self.dev.prepare_timing()
         return val

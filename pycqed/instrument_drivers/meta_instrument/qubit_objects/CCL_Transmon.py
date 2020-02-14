@@ -4069,6 +4069,39 @@ class CCLight_Transmon(Qubit):
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
 
+    def allxy_GBT(self, MC=None,
+                  label: str = '',
+                  analyze=True, close_fig=True,
+                  prepare_for_timedomain=True,termination_opt=0.01):
+        '''#
+        This function is the same as measure AllXY, but with a termination limit
+        This termination limit is as a system metric to evalulate the calibration 
+        by GBT if good or not. 
+        '''
+        old_avg = self.ro_soft_avg()
+        self.ro_soft_avg(4)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.AllXY(qubit_idx=self.cfg_qubit_nr(), double_points=True,
+                      platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(42))
+        MC.set_detector_function(d)
+        MC.run('AllXY'+label+self.msmt_suffix)
+        self.ro_soft_avg(old_avg)
+        if analyze:
+            a = ma.AllXY_Analysis(close_main_fig=close_fig)
+            if a.deviation_total > termination_opt:
+                return True
+            else:
+                return False
+
+
     def calibrate_mw_gates_restless(
             self, MC=None,
             parameter_list: list = ['G_amp', 'D_amp', 'freq'],
@@ -4226,7 +4259,7 @@ class CCLight_Transmon(Qubit):
             ad_func_pars = {'adaptive_function': nelder_mead,
                             'x0': initial_values,
                             'initial_step': initial_steps,
-                            'no_improv_break': 50,
+                            'no_improv_break': 10,
                             'minimize': minimize,
                             'maxiter': 1500}
 
@@ -5009,6 +5042,18 @@ class CCLight_Transmon(Qubit):
             print('Pulse amplitude changed from {:.3f} to {:.3f}'.format(
                 amp_old, scale_factor*amp_old))
         return a
+
+    def flipping_GBT(self, nr_sequence: int = 2):
+        '''
+        This function is to measure flipping sequence for whaterver nr_of times 
+        a function needs to be run to calibrate the Pi and Pi/2 Pulse. 
+        Right now this method will always return true no matter what 
+        Later we can add a conidition as a check. 
+        '''
+        for i in range(nr_sequence):
+            self.measure_flipping(update=True)
+        # we can add a condition later
+        return True
 
     def measure_motzoi(self, motzoi_amps=None,
                        prepare_for_timedomain: bool = True,
