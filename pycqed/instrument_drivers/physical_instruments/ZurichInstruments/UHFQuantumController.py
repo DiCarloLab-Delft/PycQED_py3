@@ -44,6 +44,10 @@ Changelog:
     if waveform lengths have changed. Otherwise, if waveforms have been updated they will just be downloaded
     directly to the instrument.
 
+20200214 WJV
+- removed unused parameter repetitions from _find_valid_delays()
+- also removed parameter repetitions from calibrate_CC_dio_protocol()
+- split off calibrate_dio_protocol() from calibrate_CC_dio_protocol() to allow standalone use
 """
 
 import time
@@ -1572,7 +1576,7 @@ setTrigger(0);
             cw[n] = (d & ((1 << 10)-1))
         return (ts, cw)
 
-    def _find_valid_delays(self, awg_nr, repetitions=1, verbose=False):
+    def _find_valid_delays(self, awg_nr, verbose=False):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
@@ -1612,6 +1616,35 @@ setTrigger(0);
                 valid_delays.append(delay)
 
         return set(valid_delays)
+
+    def calibrate_dio_protocol(self, verbose=False) -> None:
+        """
+        calibrate DIO protocol. Requires valid DIO input signal
+        """
+        self.assure_ext_clock()
+
+        for awg in [0]:
+            if not self._ensure_activity(awg, verbose=verbose):
+                raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
+
+        valid_delays = self._find_valid_delays(awg, verbose=verbose)
+        if len(valid_delays) == 0:
+            raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
+
+        min_valid_delay = min(valid_delays)
+        # Heuristics to get the 'best' delay in a sequence
+        if (min_valid_delay+1) in valid_delays and (min_valid_delay+2) in valid_delays:
+            min_valid_delay = min_valid_delay + 1
+
+        # Print information
+        if verbose: print("  Valid delays are {}".format(valid_delays))
+        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+
+        # And configure the delays
+        self._set_dio_calibration_delay(min_valid_delay)
+
+        # Clear all detected errors (caused by DIO timing calibration)
+        self.clear_errors()  # FIXME: also clears errors not relating to DIO
 
     ##########################################################################
     # DIO calibration functions for *CC*
@@ -1655,6 +1688,8 @@ setTrigger(0);
         test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
                                       '..', 'examples','CC_examples',
                                       'uhfqc_calibration.vq1asm'))
+        # FIXME: path should not point to examples
+        # FIXME: the particular file refers to fixed slot numbers of the CC
 
         # Set the DIO calibration mask to enable 9 bit measurement
         self._dio_calibration_mask = 0x1ff
@@ -1708,7 +1743,8 @@ while (1) {
 
         self._dio_calibration_mask = 0x7fff
 
-    def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False, repetitions=1):
+    def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False) -> None:
+        # FIXME: parameter feedline assumes knowledge of the control topology, and it's only used for CCL
         log.info('Calibrating DIO delays')
         if verbose: print("Calibrating DIO delays")
         if feedline is None:
@@ -1727,30 +1763,4 @@ while (1) {
             self._prepare_CC_dio_calibration(CC=CC, verbose=verbose)
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
-
-        # Make sure the configuration is up-to-date
-        self.assure_ext_clock()
-
-        for awg in [0]:
-            if not self._ensure_activity(awg, verbose=verbose):
-                raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
-
-        valid_delays = self._find_valid_delays(awg, repetitions, verbose=verbose)
-        if len(valid_delays) == 0:
-            raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
-
-        min_valid_delay = min(valid_delays)
-        # Heuristics to get the 'best' delay in a sequence
-        if (min_valid_delay+1) in valid_delays and (min_valid_delay+2) in valid_delays:
-            min_valid_delay = min_valid_delay + 1
-
-        # Print information
-        if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
-
-        # And configure the delays
-        self._set_dio_calibration_delay(min_valid_delay)
-
-        # Clear all detected errors (caused by DIO timing calibration)
-        self.clear_errors()
-
+        self.calibrate_dio_protocol(verbose)

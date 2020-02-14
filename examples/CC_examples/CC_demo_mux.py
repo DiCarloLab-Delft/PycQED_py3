@@ -100,6 +100,12 @@ if 1:
     cc.status_preset()
     log.info(cc.get_identity())
 
+    if 1:
+        log.debug('calibration DIO')
+        # upload DIO calibration program to CC
+        # upload DIO calibration program to UHFQA
+        cc.calibrate_dio(0)
+
     log.debug('uploading program to CC')
     cc.sequence_program_assemble(prog)
     if cc.get_assembler_success() != 1:

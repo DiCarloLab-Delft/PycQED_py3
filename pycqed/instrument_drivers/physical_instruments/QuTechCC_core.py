@@ -50,6 +50,9 @@ class QuTechCC_core(SCPIBase):
         # only possible if CC is stopped
         return self._transport.ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
 
+    def calibrate_dio(self, ccio: int) -> None:
+        self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL')
+
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')
 

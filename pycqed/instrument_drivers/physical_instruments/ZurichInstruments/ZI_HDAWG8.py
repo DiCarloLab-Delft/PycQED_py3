@@ -71,6 +71,11 @@ Changelog:
 - removed unused parameters cfg_num_codewords and cfg_codeword_protocol from upload_codeword_program()
 - removed unused parameter default_dio_timing from _configure_codeword_protocol()
 
+20200214 WJV
+- removed unused parameter repetitions from _find_valid_delays()
+- also removed parameter repetitions from calibrate_CC_dio_protocol()
+- split off calibrate_dio_protocol() from calibrate_CC_dio_protocol() to allow standalone use
+
 """
 
 import time
@@ -545,7 +550,7 @@ while (1) {
 
         return False
 
-    def _find_valid_delays(self, awgs_and_sequences, repetitions=1, verbose=False):
+    def _find_valid_delays(self, awgs_and_sequences, verbose=False):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
@@ -585,6 +590,36 @@ while (1) {
                 valid_delays.append(delay)
 
         return set(valid_delays)
+
+    def calibrate_dio_protocol(self, expected_sequence, verbose=False) -> None:
+        # FIXME: UHF driver does not need expected_sequence, why the difference
+        self.assure_ext_clock()
+        self.upload_codeword_program()
+
+        for awg, sequence in expected_sequence:
+            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence), verbose=verbose):
+                raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
+
+        valid_delays = self._find_valid_delays(expected_sequence, verbose=verbose)
+        if len(valid_delays) == 0:
+            raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
+
+        min_valid_delay = min(valid_delays)
+
+        # Print information
+        if verbose: print("  Valid delays are {}".format(valid_delays))
+        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+
+        # And configure the delays
+        self._set_dio_calibration_delay(min_valid_delay)  # FIXME: UHF has different heuristics
+
+        # If successful clear all errors and return True
+        self.clear_errors()
+
+    ##########################################################################
+    # DIO calibration functions for *CC*
+    # FIXME: should not be in driver
+    ##########################################################################
 
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
         """
@@ -764,8 +799,7 @@ while (1) {
         CCL.start()
         return expected_sequence
 
-
-    def calibrate_CC_dio_protocol(self, CC, verbose=False, repetitions=1):
+    def calibrate_CC_dio_protocol(self, CC, verbose=False) -> None:
         """
         Calibrates the DIO communication between CC and HDAWG.
         Arguments:
@@ -785,28 +819,4 @@ while (1) {
                 CC=CC, verbose=verbose)
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
-
-        # Make sure the configuration is up-to-date
-        self.assure_ext_clock()
-        self.upload_codeword_program()
-
-        for awg, sequence in expected_sequence:
-            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence), verbose=verbose):
-                raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
-
-        valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
-        if len(valid_delays) == 0:
-            raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
-
-        min_valid_delay = min(valid_delays)
-
-        # Print information
-        if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
-
-        # And configure the delays
-        self._set_dio_calibration_delay(min_valid_delay)
-
-        # If successful clear all errors and return True
-        self.clear_errors()
-        return True
+        self.calibrate_dio_protocol(expected_sequence, verbose)
