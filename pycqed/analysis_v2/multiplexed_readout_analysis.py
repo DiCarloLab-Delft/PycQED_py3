@@ -156,6 +156,41 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         assignment_prob_matrix = calc_assignment_prob_matrix(
             combinations, digitized_data, valid_combinations=valid_combinations)
         self.proc_data_dict['assignment_prob_matrix'] = assignment_prob_matrix
+        self.proc_data_dict['quantities_of_interest'] = {'assignment_probability_matrix':assignment_prob_matrix,
+                                                         'trace':np.trace(assignment_prob_matrix)}
+
+        # calculate cross-fidelity matrix
+        len_labs = len(self.proc_data_dict['qubit_labels'])
+
+        crossFidMat = np.zeros((len_labs, len_labs))
+        for i in range(len_labs):
+            for j in range(len_labs):
+                PeiIj = 0
+                PgiPj = 0
+
+                # Loop over all entries in the Assignment probability matrix
+                for prep_idx, c_prep in enumerate(combinations):
+                    for decl_idx, c_decl in enumerate(combinations):
+                        # Select all entries in the assignment matrix for ei|Ij
+                        if (c_decl[i]=='1') and (c_prep[j] == '0'):
+                            PeiIj += assignment_prob_matrix[prep_idx, decl_idx]
+                        # Select all entries in the assignment matrix for ei|Ij
+                        elif (c_decl[i]=='0') and (c_prep[j] == '1'): # gi|Pj
+                            PgiPj += assignment_prob_matrix[prep_idx, decl_idx]
+
+                # Normalize probabilities
+                normalization_factor = (len(combinations)/2)
+
+                PeiIj = PeiIj/normalization_factor
+                PgiPj = PgiPj/normalization_factor
+
+                # Add entry to cross fidelity matrix
+                Fc = 1 - PeiIj - PgiPj
+                crossFidMat[i,j] = Fc
+
+        self.proc_data_dict['cross_fidelity_matrix'] = crossFidMat
+        self.proc_data_dict['quantities_of_interest'] = {'cross_fidelity_matrix': crossFidMat,
+                                                         'trace': np.trace(crossFidMat)}
 
     def prepare_plots(self):
         self.plot_dicts['assignment_probability_matrix'] = {
@@ -166,6 +201,15 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             'valid_combinations': self.proc_data_dict['valid_combinations'],
             'qubit_labels': self.proc_data_dict['qubit_labels'],
             'plotsize': np.array(np.shape(self.proc_data_dict['assignment_prob_matrix'].T))*.8
+        }
+        self.plot_dicts['plot_cross_ass_Fid_matrix'] = {
+            'plotfn': plot_cross_ass_Fid_matrix,
+            'prob_matrix':
+                self.proc_data_dict['cross_fidelity_matrix'],
+            'combinations': self.proc_data_dict['qubit_labels'],
+            'valid_combinations': self.proc_data_dict['qubit_labels'],
+            'qubit_labels': self.proc_data_dict['qubit_labels'],
+            'plotsize': np.array(np.shape(self.proc_data_dict['cross_fidelity_matrix'].T))*.8
         }
         for i, value_name in enumerate(self.raw_data_dict['value_names']):
             qubit_label = self.proc_data_dict['qubit_labels'][i]
@@ -299,3 +343,64 @@ def plot_mux_ssro_histograms(
                ls='--', color='grey', label='threshold')
     ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
         qubit_labels))
+
+
+def plot_cross_ass_Fid_matrix(prob_matrix,
+                              combinations, qubit_labels, ax=None,
+                              valid_combinations=None, **kw):
+    if ax is None:
+        figsize = np.array(np.shape(prob_matrix))*.7
+        f, ax = plt.subplots(figsize=figsize)
+    else:
+        f = ax.get_figure()
+
+    if valid_combinations is None:
+        valid_combinations = combinations
+
+    alpha_reds = cmap_to_alpha(cmap=pl.cm.Reds)
+#     colors = [(0.6, 0.76, 0.98), (0, 0, 0)]
+    colors = [(0.58, 0.404, 0.741), (0, 0, 0)]
+
+    cm = LinearSegmentedColormap.from_list('my_purple', colors)
+    alpha_blues = cmap_first_to_alpha(cmap=cm)
+
+    red_im = ax.matshow(prob_matrix*100,
+                        cmap=alpha_reds, clim=(-10., 10))
+    red_im = ax.matshow(prob_matrix*100,
+                        cmap='RdBu', clim=(-10., 10))
+
+    blue_im = ax.matshow(prob_matrix*100,
+                         cmap=alpha_blues, clim=(80, 100))
+
+    caxb = f.add_axes([0.9, 0.6, 0.02, 0.3])
+
+    caxr = f.add_axes([0.9, 0.15, 0.02, 0.3])
+    ax.figure.colorbar(red_im, ax=ax, cax=caxr)
+    ax.figure.colorbar(blue_im, ax=ax, cax=caxb)
+
+    rows, cols = np.shape(prob_matrix)
+    for i in range(rows):
+        for j in range(cols):
+            c = prob_matrix[i, j]
+            if c > .05 or c <-0.05:
+                col = 'white'
+            else:
+                col = 'black'
+            ax.text(j, i, '{:.1f}'.format(c*100),
+                    va='center', ha='center', color=col)
+
+    ax.set_xticklabels(valid_combinations)
+    ax.set_xticks(np.arange(len(valid_combinations)))
+
+    ax.set_yticklabels(combinations)
+    ax.set_yticks(np.arange(len(combinations)))
+    ax.set_ylim(len(combinations)-.5, -.5)
+    # matrix[i,j] => i = column, j = row
+    ax.set_ylabel(r'Prepared qubit, $q_i$')
+    ax.set_xlabel(r'Classified qubit $q_j$')
+    ax.xaxis.set_label_position('top')
+
+    qubit_labels_str = ', '.join(qubit_labels)
+#     ax.set_title(r'Cross fidelity $F_{ij}$')
+#     ax.set_title('Assignment probability matrix\n qubits: [{}]'.format(
+#         qubit_labels_str))

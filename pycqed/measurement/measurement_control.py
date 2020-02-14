@@ -5,12 +5,13 @@ import numpy as np
 import collections
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
-from pycqed.utilities import general
 from pycqed.utilities.general import (
     dict_to_ordered_tuples,
     delete_keys_from_dict,
     check_keyboard_interrupt,
     KeyboardFinish,
+    flatten,
+    get_git_revision_hash
 )
 from pycqed.utilities.get_default_datadir import get_default_datadir
 
@@ -43,8 +44,8 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
-from pycqed.utilities.learnerND_optimize import (LearnerND_Optimize,
-    evaluate_X)
+from pycqed.utilities.learner1D_optimize import Learner1D_Optimize
+from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, evaluate_X
 
 from skopt import Optimizer  # imported for checking types
 
@@ -55,6 +56,12 @@ except:
 
 try:
     import PyQt5
+
+    # The line below is necessary for the plotmon_2D to be able to set
+    # colorscales from qcodes_QtPlot_colors_override.py and be able to set the
+    # colorbar range when the plots are created
+    # See also MC.plotmon_2D_cmaps, MC.plotmon_2D_zranges below
+    from . import qcodes_QtPlot_monkey_patching  # KEEP ABOVE QtPlot import!!!
     from qcodes.plots.pyqtgraph import QtPlot, TransformState
 except Exception:
     print(
@@ -64,7 +71,7 @@ except Exception:
     )
     print("When instantiating an MC object," " be sure to set live_plot_enabled=False")
 
-log = logging.getLogger('__name__')
+log = logging.getLogger("__name__")
 
 
 def is_subclass(obj, test_obj):
@@ -176,6 +183,16 @@ class MeasurementControl(Instrument):
         self._persist_xlabs = None
         self._persist_ylabs = None
 
+        # plotmon_2D colorbar color mapping and ranges
+        # Change this to your preferences when using the plotmon_2D
+        # This could be a parameter but it doesn't seem to be worth saving
+        # See `choose_MC_cmap_zrange` in this file to know how this is used
+        # e.g. self.plotmon_2D_cmaps = {"Phase": "anglemap"}
+        # see pycqed.measurment.qcodes_QtPlot_colors_override for more cmaps
+        self.plotmon_2D_cmaps = {}
+        # e.g. self.plotmon_2D_zranges = {"Phase": (0.0, 180.0)}
+        self.plotmon_2D_zranges = {}
+
     ##############################################
     # Functions used to control the measurements #
     ##############################################
@@ -204,8 +221,6 @@ class MeasurementControl(Instrument):
                     average data in specific bins for live plotting.
                     This is useful when it is required to take data in single
                     shot mode.
-
-
             mode (str):
                     Measurement mode. Can '1D', '2D', or 'adaptive'.
             disable_snapshot_metadata (bool):
@@ -302,7 +317,7 @@ class MeasurementControl(Instrument):
                 start_idx = self.get_datawriting_start_idx()
                 if len(self.sweep_functions) == 1:
                     self.sweep_functions[0].set_parameter(sweep_points[start_idx])
-                    self.detector_function.prepare(sweep_points=self.get_sweep_points())
+                    self.detector_function.prepare(sweep_points=self.get_sweep_points().astype(np.float64))
                     self.measure_hard()
                 else:  # If mode is 2D
                     for i, sweep_function in enumerate(self.sweep_functions):
@@ -310,7 +325,7 @@ class MeasurementControl(Instrument):
                         val = swf_sweep_points[start_idx]
                         sweep_function.set_parameter(val)
                     self.detector_function.prepare(
-                        sweep_points=sweep_points[start_idx : start_idx + self.xlen, 0]
+                        sweep_points=sweep_points[start_idx : start_idx + self.xlen, 0].astype(np.float64)
                     )
                     self.measure_hard()
         else:
@@ -356,54 +371,60 @@ class MeasurementControl(Instrument):
         if self.adaptive_function == "Powell":
             self.adaptive_function = fmin_powell
         if is_subclass(self.adaptive_function, BaseLearner):
-            Learner = self.adaptive_function
-            # Pass the rigth parameters two each type of learner
-            if issubclass(self.adaptive_function, Learner1D):
-                self.learner = Learner(
-                    self.optimization_function,
-                    bounds=self.af_pars["bounds"],
-                    loss_per_interval=self.af_pars.get("loss_per_interval", None),
-                )
-            elif issubclass(self.adaptive_function, Learner2D):
-                self.learner = Learner(
-                    self.optimization_function,
-                    bounds=self.af_pars["bounds"],
-                    loss_per_triangle=self.af_pars.get("loss_per_triangle", None),
-                )
-            elif issubclass(self.adaptive_function, LearnerND):
-                self.learner = Learner(
-                    self.optimization_function,
-                    bounds=self.af_pars["bounds"],
-                    loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
-                )
-            elif issubclass(self.adaptive_function, SKOptLearner):
-                # NB: SKOptLearner is a modified version of SKOptLearner
-                # to fix a data type matching problem
-                # NB2: This learner expects the `optimization_function`
-                # to be scalar
-                self.learner = Learner(
-                    self.optimization_function,
-                    dimensions=self.af_pars["dimensions"],
-                    base_estimator=self.af_pars.get("base_estimator", "gp"),
-                    n_initial_points=self.af_pars.get("n_initial_points", 10),
-                    acq_func=self.af_pars.get("acq_func", "gp_hedge"),
-                    acq_optimizer=self.af_pars.get("acq_optimizer", "auto"),
-                    n_random_starts=self.af_pars.get("n_random_starts", None),
-                    random_state=self.af_pars.get("random_state", None),
-                    acq_func_kwargs=self.af_pars.get("acq_func_kwargs", None),
-                    acq_optimizer_kwargs=self.af_pars.get("acq_optimizer_kwargs", None),
-                )
-            else:
-                raise NotImplementedError("Learner subclass type not supported.")
+            Xs = self.af_pars.get("extra_dims_sweep_pnts", [None])
+            for X in Xs:
+                if len(Xs) > 1 and X is not None:
+                    opt_func = lambda x: self.optimization_function(flatten([x, X]))
+                else:
+                    opt_func = self.optimization_function
 
-            if 'X0' in self.af_pars:
-                # Teach the learner the initial point if provided
-                evaluate_X(self.learner, self.af_pars['X0'])
-            # N.B. the runner that is used is not an `adaptive.Runner` object
-            # rather it is the `adaptive.runner.simple` function. This
-            # ensures that everything runs in a single process, as is
-            # required by QCoDeS (May 2018) and makes things simpler.
-            self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
+                Learner = self.adaptive_function
+                # Pass the rigth parameters two each type of learner
+                if issubclass(self.adaptive_function, Learner1D):
+                    self.learner = Learner(
+                        opt_func,
+                        bounds=self.af_pars["bounds"],
+                        loss_per_interval=self.af_pars.get("loss_per_interval", None),
+                    )
+                elif issubclass(self.adaptive_function, Learner2D):
+                    self.learner = Learner(
+                        opt_func,
+                        bounds=self.af_pars["bounds"],
+                        loss_per_triangle=self.af_pars.get("loss_per_triangle", None),
+                    )
+                elif issubclass(self.adaptive_function, LearnerND):
+                    self.learner = Learner(
+                        opt_func,
+                        bounds=self.af_pars["bounds"],
+                        loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
+                    )
+                elif issubclass(self.adaptive_function, SKOptLearner):
+                    # NB2: This learner expects the `optimization_function`
+                    # to be scalar
+                    # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
+                    self.learner = Learner(
+                        opt_func,
+                        dimensions=self.af_pars["dimensions"],
+                        base_estimator=self.af_pars.get("base_estimator", "gp"),
+                        n_initial_points=self.af_pars.get("n_initial_points", 10),
+                        acq_func=self.af_pars.get("acq_func", "gp_hedge"),
+                        acq_optimizer=self.af_pars.get("acq_optimizer", "auto"),
+                        n_random_starts=self.af_pars.get("n_random_starts", None),
+                        random_state=self.af_pars.get("random_state", None),
+                        acq_func_kwargs=self.af_pars.get("acq_func_kwargs", None),
+                        acq_optimizer_kwargs=self.af_pars.get("acq_optimizer_kwargs", None),
+                    )
+                else:
+                    raise NotImplementedError("Learner subclass type not supported.")
+
+                if "X0" in self.af_pars:
+                    # Teach the learner the initial point if provided
+                    evaluate_X(self.learner, self.af_pars["X0"])
+                # N.B. the runner that is used is not an `adaptive.Runner` object
+                # rather it is the `adaptive.runner.simple` function. This
+                # ensures that everything runs in a single process, as is
+                # required by QCoDeS (May 2018) and makes things simpler.
+                self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
             if issubclass(self.adaptive_function, SKOptLearner):
                 # NB: Having an optmizer that also complies with the adaptive
                 # interface breaks a bit the previous structure
@@ -411,7 +432,9 @@ class MeasurementControl(Instrument):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
-            elif issubclass(self.adaptive_function, LearnerND_Optimize):
+            elif issubclass(self.adaptive_function, LearnerND_Optimize) or issubclass(
+                self.adaptive_function, Learner1D_Optimize
+            ):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
@@ -445,7 +468,7 @@ class MeasurementControl(Instrument):
         return
 
     def measure_hard(self):
-        new_data = np.array(self.detector_function.get_values()).T
+        new_data = np.array(self.detector_function.get_values().astype(np.float64)).T
 
         ###########################
         # Shape determining block #
@@ -463,21 +486,25 @@ class MeasurementControl(Instrument):
                 1 + self.soft_iteration
             )
 
-            self.dset[start_idx:stop_idx, len(self.sweep_functions)] = new_vals
+            self.dset[start_idx:stop_idx, len(self.sweep_functions)] = new_vals.astype(
+                np.float64
+            )
         else:
             old_vals = self.dset[start_idx:stop_idx, len(self.sweep_functions) :]
             new_vals = (new_data + old_vals * self.soft_iteration) / (
                 1 + self.soft_iteration
             )
 
-            self.dset[start_idx:stop_idx, len(self.sweep_functions) :] = new_vals
+            self.dset[
+                start_idx:stop_idx, len(self.sweep_functions) :
+            ] = new_vals.astype(np.float64)
         sweep_len = len(self.get_sweep_points().T)
 
         ######################
         # DATA STORING BLOCK #
         ######################
         if sweep_len == len_new_data:  # 1D sweep
-            self.dset[:, 0] = self.get_sweep_points().T
+            self.dset[:, 0] = self.get_sweep_points().T.astype(np.float64)
         else:
             try:
                 if len(self.sweep_functions) != 1:
@@ -486,11 +513,11 @@ class MeasurementControl(Instrument):
                     ]
                     self.dset[
                         start_idx:, 0 : len(self.sweep_functions)
-                    ] = relevant_swp_points
+                    ] = relevant_swp_points.astype(np.float64)
                 else:
                     self.dset[start_idx:, 0] = self.get_sweep_points()[
                         start_idx : start_idx + len_new_data :
-                    ].T
+                    ].T.astype(np.float64)
             except Exception:
                 # There are some cases where the sweep points are not
                 # specified that you don't want to crash (e.g. on -off seq)
@@ -569,7 +596,7 @@ class MeasurementControl(Instrument):
             1 + self.soft_iteration
         )
 
-        self.dset[start_idx:stop_idx, :] = new_vals
+        self.dset[start_idx:stop_idx, :] = new_vals.astype(np.float64)
         # update plotmon
         check_keyboard_interrupt()
         self.update_instrument_monitor()
@@ -677,7 +704,16 @@ class MeasurementControl(Instrument):
             # create outer loop
             self.sweep_pts_y = self.sweep_points_2D
             y_rep = np.repeat(self.sweep_pts_y, self.xlen)
-            c = np.column_stack((x_tiled, y_rep))
+            # 2020-02-09, This does not preserve types, e.g. integer parameters
+            # and rises validators exceptions
+            if np.issubdtype(type(self.sweep_pts_x[0]), np.integer) or np.issubdtype(
+                type(self.sweep_points_2D[0]), np.integer
+            ):
+                c = np.column_stack(
+                    (x_tiled.astype(np.object), y_rep)
+                )  # this preserves types
+            else:
+                c = np.column_stack((x_tiled, y_rep))
             self.set_sweep_points(c)
             self.initialize_plot_monitor_2D()
         return
@@ -869,19 +905,23 @@ class MeasurementControl(Instrument):
             zunits = self.detector_function.value_units
 
             for j in range(len(self.detector_function.value_names)):
-                self.secondary_QtPlot.add(
-                    x=self.sweep_pts_x,
-                    y=self.sweep_pts_y,
-                    z=self.TwoD_array[:, :, j],
-                    xlabel=slabels[0],
-                    xunit=sunits[0],
-                    ylabel=slabels[1],
-                    yunit=sunits[1],
-                    zlabel=zlabels[j],
-                    zunit=zunits[j],
-                    subplot=j + 1,
-                    cmap="viridis",
-                )
+                cmap, zrange = self.choose_MC_cmap_zrange(zlabels[j], zunits[j])
+                config_dict = {
+                    "x": self.sweep_pts_x,
+                    "y": self.sweep_pts_y,
+                    "z": self.TwoD_array[:, :, j],
+                    "xlabel": slabels[0],
+                    "xunit": sunits[0],
+                    "ylabel": slabels[1],
+                    "yunit": sunits[1],
+                    "zlabel": zlabels[j],
+                    "zunit": zunits[j],
+                    "subplot": j + 1,
+                    "cmap": cmap,
+                }
+                if zrange is not None:
+                    config_dict["zrange"] = zrange
+                self.secondary_QtPlot.add(**config_dict)
 
     def update_plotmon_2D(self, force_update=False):
         """
@@ -927,21 +967,25 @@ class MeasurementControl(Instrument):
             self.im_plot_scatters = []
 
             for j in range(len(self.detector_function.value_names)):
-                self.secondary_QtPlot.add(
-                    x=[0, 1],
-                    y=[0, 1],
-                    z=np.zeros([2, 2]),
-                    xlabel=slabels[0],
-                    xunit=sunits[0],
-                    ylabel=slabels[1],
-                    yunit=sunits[1],
-                    zlabel=zlabels[j],
-                    zunit=zunits[j],
-                    subplot=j + 1,
-                    cmap="viridis",
-                )
-
+                cmap, zrange = self.choose_MC_cmap_zrange(zlabels[j], zunits[j])
+                config_dict = {
+                    "x": [0, 1],
+                    "y": [0, 1],
+                    "z": np.zeros([2, 2]),
+                    "xlabel": slabels[0],
+                    "xunit": sunits[0],
+                    "ylabel": slabels[1],
+                    "yunit": sunits[1],
+                    "zlabel": zlabels[j],
+                    "zunit": zunits[j],
+                    "subplot": j + 1,
+                    "cmap": cmap,
+                }
+                if zrange is not None:
+                    config_dict["zrange"] = zrange
+                self.secondary_QtPlot.add(**config_dict)
                 self.im_plots.append(self.secondary_QtPlot.traces[-1])
+
                 self.secondary_QtPlot.add(
                     x=[0],
                     y=[0],
@@ -1119,7 +1163,7 @@ class MeasurementControl(Instrument):
                     subplot=xlabels_num + j + 1 + iter_start_idx,
                     symbol="star",
                     symbolSize=12,
-                    color=color_cycle[1]
+                    color=color_cycle[1],
                 )
                 self.iter_bever_traces.append(iter_plotmon.traces[-1])
 
@@ -1610,7 +1654,7 @@ class MeasurementControl(Instrument):
             "sweep_parameter_units": self.sweep_par_units,
             "value_names": self.detector_function.value_names,
             "value_units": self.detector_function.value_units,
-            "opt_res": opt_res
+            "opt_res": opt_res,
         }
         return result_dict
 
@@ -1695,12 +1739,16 @@ class MeasurementControl(Instrument):
             # 'cmaes': result[-2],
             # 'logger': result[-1]}
         elif is_subclass(adaptive_function, Optimizer):
+            # result = learner
             # Because MC saves all the datapoints we save only the best point
             # for convenience
             opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
             opt_indx = opt_idx_selector(result.yi)
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
-        elif is_subclass(adaptive_function, LearnerND_Optimize):
+        elif is_subclass(adaptive_function, Learner1D_Optimize) or is_subclass(
+            adaptive_function, LearnerND_Optimize
+        ):
+            # result = learner
             # Because MC saves all the datapoints we save only the best point
             # for convenience
             # Only works for a function that returns a scalar
@@ -1709,7 +1757,12 @@ class MeasurementControl(Instrument):
             Y = list(result.data.values())
             opt_indx = opt_idx_selector(Y)
             xopt = X[opt_indx]
-            res_dict = {"xopt": np.array(xopt), "fopt": Y[opt_indx]}
+            res_dict = {
+                "xopt": np.array(xopt)
+                if is_subclass(adaptive_function, LearnerND_Optimize)
+                else xopt,
+                "fopt": Y[opt_indx],
+            }
         elif adaptive_function.__module__ == "pycqed.measurement.optimization":
             res_dict = {"xopt": result[0], "fopt": result[1]}
         else:
@@ -1992,7 +2045,7 @@ class MeasurementControl(Instrument):
     ################################
 
     def get_git_hash(self):
-        self.git_hash = general.get_git_revision_hash()
+        self.git_hash = get_git_revision_hash()
         return self.git_hash
 
     def get_measurement_begintime(self):
@@ -2085,6 +2138,36 @@ class MeasurementControl(Instrument):
 
     def get_optimization_method(self):
         return self.optimization_method
+
+    def choose_MC_cmap_zrange(self, zlabel: str, zunit: str):
+        cost_func_names = ["cost", "cost func", "cost function"]
+        cmap = None
+        zrange = None
+        cmaps = self.plotmon_2D_cmaps
+        zranges = self.plotmon_2D_zranges
+
+        if cmaps and zlabel in cmaps.keys():
+            cmap = cmaps[zlabel]
+        elif np.any(np.array(cost_func_names) == zlabel.lower()):
+            cmap = (
+                "inferno_clip_high"
+                if hasattr(self, "minimize_optimization")
+                and not self.minimize_optimization
+                else "inferno_clip_low"
+            )
+        elif zunit == "%":
+            cmap = "hot"
+        elif zunit.lower() == "deg":
+            cmap = "anglemap45"
+        else:
+            cmap = "viridis"
+
+        if zranges and zlabel in zranges.keys():
+            zrange = zranges[zlabel]
+        elif zunit.lower() == "deg":
+            zrange = (0.0, 360.0)
+
+        return cmap, zrange
 
     ################################
     # Actual parameters            #

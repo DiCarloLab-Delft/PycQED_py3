@@ -23,6 +23,7 @@ import string
 from contextlib import ContextDecorator
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 from IPython.core.ultratb import AutoFormattedTB
+import collections
 
 
 try:
@@ -712,6 +713,28 @@ def delete_keys_from_dict(dictionary: dict, keys: set):
                 modified_dict[key] = value
     return modified_dict
 
+
+def _flatten_gen(l):
+    """
+    Return a generator of a completely flattened list `l`
+    From: https://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists
+    """
+    for el in l:
+        if isinstance(el, collections.abc.Iterable) and not isinstance(el, (str, bytes)):
+            yield from _flatten_gen(el)
+        else:
+            yield el
+
+
+def flatten(l):
+    """
+    Flattens an arbitrary deth and lenghts lists and/or tuples into a
+    completely flat list.
+    Useful for preserving types.
+
+    E.g. flatten([[123, 2], [4., 6.], 9, 'bla']) => [123, 2, 4.0, 6.0, 9, 'bla']
+    """
+    return list(_flatten_gen(l))
 
 # Handy things to print the traceback of exceptions
 
