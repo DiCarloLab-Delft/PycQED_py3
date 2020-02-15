@@ -44,7 +44,7 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
-from pycqed.utilities.learner1D_optimize import Learner1D_Optimize
+from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
 from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, evaluate_X
 
 from skopt import Optimizer  # imported for checking types
@@ -380,25 +380,25 @@ class MeasurementControl(Instrument):
 
                 Learner = self.adaptive_function
                 # Pass the rigth parameters two each type of learner
-                if issubclass(self.adaptive_function, Learner1D):
+                if issubclass(Learner, Learner1D):
                     self.learner = Learner(
                         opt_func,
                         bounds=self.af_pars["bounds"],
                         loss_per_interval=self.af_pars.get("loss_per_interval", None),
                     )
-                elif issubclass(self.adaptive_function, Learner2D):
+                elif issubclass(Learner, Learner2D):
                     self.learner = Learner(
                         opt_func,
                         bounds=self.af_pars["bounds"],
                         loss_per_triangle=self.af_pars.get("loss_per_triangle", None),
                     )
-                elif issubclass(self.adaptive_function, LearnerND):
+                elif issubclass(Learner, LearnerND):
                     self.learner = Learner(
                         opt_func,
                         bounds=self.af_pars["bounds"],
                         loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
                     )
-                elif issubclass(self.adaptive_function, SKOptLearner):
+                elif issubclass(Learner, SKOptLearner):
                     # NB2: This learner expects the `optimization_function`
                     # to be scalar
                     # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
@@ -425,6 +425,9 @@ class MeasurementControl(Instrument):
                 # ensures that everything runs in a single process, as is
                 # required by QCoDeS (May 2018) and makes things simpler.
                 self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
+
+            # NB: If you reload the optimizer module, `issubclass` will fail
+            # This is because the reloaded class is a new distinct object
             if issubclass(self.adaptive_function, SKOptLearner):
                 # NB: Having an optmizer that also complies with the adaptive
                 # interface breaks a bit the previous structure
@@ -433,7 +436,7 @@ class MeasurementControl(Instrument):
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
             elif issubclass(self.adaptive_function, LearnerND_Optimize) or issubclass(
-                self.adaptive_function, Learner1D_Optimize
+                self.adaptive_function, Learner1D_Minimizer
             ):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
@@ -1745,7 +1748,7 @@ class MeasurementControl(Instrument):
             opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
             opt_indx = opt_idx_selector(result.yi)
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
-        elif is_subclass(adaptive_function, Learner1D_Optimize) or is_subclass(
+        elif is_subclass(adaptive_function, Learner1D_Minimizer) or is_subclass(
             adaptive_function, LearnerND_Optimize
         ):
             # result = learner
