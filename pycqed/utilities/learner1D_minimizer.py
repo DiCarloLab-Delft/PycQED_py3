@@ -171,6 +171,16 @@ def mk_minimization_loss(
             # In case the function landscape is constant so far
             return dist
 
+        # learner._scale[1] makes sure it is the biggest loss and is a
+        # finate value such that `dist` can be added
+
+        # `dist_best_val_in_interval` is the distance (>0) of the best
+        # pnt (minimum) in the ineterval with respect to the maximum
+        # seen ao far, in units of sampling function
+        dist_best_val_in_interval = (
+            learner._bbox[1][1] - np.min(values) * learner._scale[1]
+        )
+
         values = np.array(values)
         scaled_threshold = comp_threshold / learner._scale[1]
         if np.any(compare_op(values, scaled_threshold)):
@@ -185,16 +195,6 @@ def mk_minimization_loss(
                 # The `dist` is added to ensure that both sides of the best
                 # point are sampled when the threshold is not moving, avoiding the
                 # sampling to get stuck at one side of the best seen point
-
-                # learner._scale[1] makes sure it is the biggest loss and is a
-                # finate value such that dist can make a difference
-
-                # `dist_best_val_in_interval` is the distance (>0) of the best
-                # pnt (minimum) in the ineterval with respect to the maximum
-                # seen ao far, in units of sampling function
-                dist_best_val_in_interval = (
-                    learner._bbox[1][1] - np.min(values) * learner._scale[1]
-                )
                 loss = dist_best_val_in_interval + dist
             else:
                 # This one make sure the sampling around the minimum beyond the threshold is uniform
@@ -241,10 +241,11 @@ def mk_minimization_loss_func(
     """
     If you don't specify the threshold you must make use of
     mk_minimization_goal_func!!!
-
     Otherwise the global optimization does not work!
-
     If you specify the threshold you must use mk_threshold_goal_func
+
+    This tool is intended to be used for sampling continuous (possibly
+    noisy) functions.
     """
     threshold_loss_func = mk_minimization_loss(
         threshold=threshold,
