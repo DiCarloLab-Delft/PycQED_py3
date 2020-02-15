@@ -3,7 +3,8 @@ Author: Victor Negîrneac
 Last update: 2020-02-15
 
 Minimization toolbox for 1D domain functions.
-Developed based on the `adaptive.Learner1D`
+Developed based on the `adaptive.Learner1D` from adaptive v0.10.0:
+https://github.com/python-adaptive/adaptive/releases/tag/v0.10.0
 
 I hope it survives any changes that the `adaptive` package might suffer
 """
