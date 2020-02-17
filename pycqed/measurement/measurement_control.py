@@ -5,12 +5,13 @@ import numpy as np
 import collections
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
-from pycqed.utilities import general
 from pycqed.utilities.general import (
     dict_to_ordered_tuples,
     delete_keys_from_dict,
     check_keyboard_interrupt,
     KeyboardFinish,
+    flatten,
+    get_git_revision_hash
 )
 from pycqed.utilities.get_default_datadir import get_default_datadir
 
@@ -43,7 +44,7 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
-from pycqed.utilities.learner1D_optimize import Learner1D_Optimize
+from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
 from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, evaluate_X
 
 from skopt import Optimizer  # imported for checking types
@@ -370,53 +371,63 @@ class MeasurementControl(Instrument):
         if self.adaptive_function == "Powell":
             self.adaptive_function = fmin_powell
         if is_subclass(self.adaptive_function, BaseLearner):
-            Learner = self.adaptive_function
-            # Pass the rigth parameters two each type of learner
-            if issubclass(self.adaptive_function, Learner1D):
-                self.learner = Learner(
-                    self.optimization_function,
-                    bounds=self.af_pars["bounds"],
-                    loss_per_interval=self.af_pars.get("loss_per_interval", None),
-                )
-            elif issubclass(self.adaptive_function, Learner2D):
-                self.learner = Learner(
-                    self.optimization_function,
-                    bounds=self.af_pars["bounds"],
-                    loss_per_triangle=self.af_pars.get("loss_per_triangle", None),
-                )
-            elif issubclass(self.adaptive_function, LearnerND):
-                self.learner = Learner(
-                    self.optimization_function,
-                    bounds=self.af_pars["bounds"],
-                    loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
-                )
-            elif issubclass(self.adaptive_function, SKOptLearner):
-                # NB2: This learner expects the `optimization_function`
-                # to be scalar
-                # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
-                self.learner = Learner(
-                    self.optimization_function,
-                    dimensions=self.af_pars["dimensions"],
-                    base_estimator=self.af_pars.get("base_estimator", "gp"),
-                    n_initial_points=self.af_pars.get("n_initial_points", 10),
-                    acq_func=self.af_pars.get("acq_func", "gp_hedge"),
-                    acq_optimizer=self.af_pars.get("acq_optimizer", "auto"),
-                    n_random_starts=self.af_pars.get("n_random_starts", None),
-                    random_state=self.af_pars.get("random_state", None),
-                    acq_func_kwargs=self.af_pars.get("acq_func_kwargs", None),
-                    acq_optimizer_kwargs=self.af_pars.get("acq_optimizer_kwargs", None),
-                )
-            else:
-                raise NotImplementedError("Learner subclass type not supported.")
+            Xs = self.af_pars.get("extra_dims_sweep_pnts", [None])
+            for X in Xs:
+                if len(Xs) > 1 and X is not None:
+                    opt_func = lambda x: self.optimization_function(flatten([x, X]))
+                else:
+                    opt_func = self.optimization_function
 
-            if "X0" in self.af_pars:
-                # Teach the learner the initial point if provided
-                evaluate_X(self.learner, self.af_pars["X0"])
-            # N.B. the runner that is used is not an `adaptive.Runner` object
-            # rather it is the `adaptive.runner.simple` function. This
-            # ensures that everything runs in a single process, as is
-            # required by QCoDeS (May 2018) and makes things simpler.
-            self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
+                Learner = self.adaptive_function
+                # Pass the rigth parameters two each type of learner
+                if issubclass(Learner, Learner1D):
+                    self.learner = Learner(
+                        opt_func,
+                        bounds=self.af_pars["bounds"],
+                        loss_per_interval=self.af_pars.get("loss_per_interval", None),
+                    )
+                elif issubclass(Learner, Learner2D):
+                    self.learner = Learner(
+                        opt_func,
+                        bounds=self.af_pars["bounds"],
+                        loss_per_triangle=self.af_pars.get("loss_per_triangle", None),
+                    )
+                elif issubclass(Learner, LearnerND):
+                    self.learner = Learner(
+                        opt_func,
+                        bounds=self.af_pars["bounds"],
+                        loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
+                    )
+                elif issubclass(Learner, SKOptLearner):
+                    # NB2: This learner expects the `optimization_function`
+                    # to be scalar
+                    # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
+                    self.learner = Learner(
+                        opt_func,
+                        dimensions=self.af_pars["dimensions"],
+                        base_estimator=self.af_pars.get("base_estimator", "gp"),
+                        n_initial_points=self.af_pars.get("n_initial_points", 10),
+                        acq_func=self.af_pars.get("acq_func", "gp_hedge"),
+                        acq_optimizer=self.af_pars.get("acq_optimizer", "auto"),
+                        n_random_starts=self.af_pars.get("n_random_starts", None),
+                        random_state=self.af_pars.get("random_state", None),
+                        acq_func_kwargs=self.af_pars.get("acq_func_kwargs", None),
+                        acq_optimizer_kwargs=self.af_pars.get("acq_optimizer_kwargs", None),
+                    )
+                else:
+                    raise NotImplementedError("Learner subclass type not supported.")
+
+                if "X0" in self.af_pars:
+                    # Teach the learner the initial point if provided
+                    evaluate_X(self.learner, self.af_pars["X0"])
+                # N.B. the runner that is used is not an `adaptive.Runner` object
+                # rather it is the `adaptive.runner.simple` function. This
+                # ensures that everything runs in a single process, as is
+                # required by QCoDeS (May 2018) and makes things simpler.
+                self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
+
+            # NB: If you reload the optimizer module, `issubclass` will fail
+            # This is because the reloaded class is a new distinct object
             if issubclass(self.adaptive_function, SKOptLearner):
                 # NB: Having an optmizer that also complies with the adaptive
                 # interface breaks a bit the previous structure
@@ -425,7 +436,7 @@ class MeasurementControl(Instrument):
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
             elif issubclass(self.adaptive_function, LearnerND_Optimize) or issubclass(
-                self.adaptive_function, Learner1D_Optimize
+                self.adaptive_function, Learner1D_Minimizer
             ):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
@@ -1737,7 +1748,7 @@ class MeasurementControl(Instrument):
             opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
             opt_indx = opt_idx_selector(result.yi)
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
-        elif is_subclass(adaptive_function, Learner1D_Optimize) or is_subclass(
+        elif is_subclass(adaptive_function, Learner1D_Minimizer) or is_subclass(
             adaptive_function, LearnerND_Optimize
         ):
             # result = learner
@@ -2037,7 +2048,7 @@ class MeasurementControl(Instrument):
     ################################
 
     def get_git_hash(self):
-        self.git_hash = general.get_git_revision_hash()
+        self.git_hash = get_git_revision_hash()
         return self.git_hash
 
     def get_measurement_begintime(self):
