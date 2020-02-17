@@ -126,8 +126,8 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           calibrate_function=Qubit.name + '.flipping_GBT')
             self.add_node(Qubit.name + ' MOTZOI Calibration',
                           calibrate_function=Qubit.name + '.calibrate_motzoi')
-            self.add_node(Qubit.name + ' RB Calibration',
-                          calibrate_function=Qubit.name + '.calibrate_mw_gates_rb')
+            # self.add_node(Qubit.name + ' RB Calibration',
+            #               calibrate_function=Qubit.name + '.calibrate_mw_gates_rb')
             self.add_node(Qubit.name + ' ALLXY',
                           calibrate_function=Qubit.name + '.allxy_GBT')
             self.add_node(Qubit.name + ' RB Fidelity',
@@ -213,10 +213,12 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           Qubit.name + ' Frequency Fine')
             self.add_edge(Qubit.name + ' MOTZOI Calibration',
                           Qubit.name + ' Flipping')
-            self.add_edge(Qubit.name + ' RB Calibration',
-                          Qubit.name + ' MOTZOI Calibration')
+            # self.add_edge(Qubit.name + ' RB Calibration',
+            #               Qubit.name + ' MOTZOI Calibration')
             self.add_edge(Qubit.name + ' ALLXY',
-                          Qubit.name + ' RB Calibration')
+                          Qubit.name + ' MOTZOI Calibration')
+            # self.add_edge(Qubit.name + ' ALLXY',
+            #               Qubit.name + ' RB Calibration')
             self.add_edge(Qubit.name + ' ALLXY',
                           Qubit.name + ' Frequency Fine')
             self.add_edge(Qubit.name + ' RB Fidelity',

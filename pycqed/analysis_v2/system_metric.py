@@ -14,7 +14,7 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor,
                                             set_axeslabel_color)
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, ListedColormap, LinearSegmentedColormap
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.measurement.hdf5_data as h5d
 import os
@@ -90,10 +90,10 @@ class System_Metric(ba.BaseDataAnalysis):
             for key in param_dict.keys():
                 if param_dict[key] == 'None' or param_dict[key] == '0':
                     param_dict[key] = np.NaN
-            param_dict['F_RB']=1-float(param_dict['F_RB'])
-            param_dict['F_RB']=str(param_dict['F_RB'])
-            param_dict['F_ssro']=1-float(param_dict['F_ssro'])
-            param_dict['F_ssro']=str(param_dict['F_ssro'])
+            param_dict['F_RB'] = 1-float(param_dict['F_RB'])
+            param_dict['F_RB'] = str(param_dict['F_RB'])
+            param_dict['F_ssro'] = 1-float(param_dict['F_ssro'])
+            param_dict['F_ssro'] = str(param_dict['F_ssro'])
             # for fgate in param_dict['F_RB'`]:
             #     param_dict[F_RB]
         # Two qubit gates dic in pairs
@@ -171,6 +171,8 @@ class System_Metric(ba.BaseDataAnalysis):
 
         val_fmt_str = '{0:1.1e}'
         norm = LogNorm()
+
+        cool_colormap = LinearSegmentedColormap.from_list("", ["green","yellow","red"])
         # Decide metric
         if plot == 'leakage' or plot == 'L1':
             plot_key = 'L1'
@@ -185,14 +187,21 @@ class System_Metric(ba.BaseDataAnalysis):
             clabel = 'Readout infidelity'
             plot_key = 'ro_fid'
         elif plot == 'F_RB':
-            cmap = 'viridis'
+            cmap = cool_colormap 
             clabel = 'Single Gate infidelity'
             plot_key = 'F_RB'
             # val_fmt_str = '{:.3g}'
         elif plot == 'F_ssro':
-            cmap = 'viridis'
+            cmap = cool_colormap 
             clabel = 'Assignment readout fidelity'
             plot_key = 'F_ssro'
+            norm = None
+            # val_fmt_str = '{:.3f}'
+        elif plot == 'ro_res_ext':
+            cmap = cool_colormap 
+            clabel = 'Residual Excitation'
+            plot_key = 'ro_res_ext'
+            norm = None
             # val_fmt_str = '{:.3f}'
         elif plot == 'F_discr':
             cmap = 'ocean'
@@ -209,7 +218,6 @@ class System_Metric(ba.BaseDataAnalysis):
             plot_key = 'freq_qubit'
             norm = None
             val_fmt_str = '{:.3f}'
-            norm = None
             unit = 1e9
         elif plot == 'freq_target':
             cmap = 'nipy_spectral_r'
@@ -284,6 +292,20 @@ class System_Metric(ba.BaseDataAnalysis):
             ax.text(x[i], y[i], s=val_fmt_str.format(values[i]/unit),
                     color='black',
                     va='center', ha='center')
+            if plot == 'freq_max':
+                T = []
+                val_fmt_str = '{:g}'
+                T1 = round(float(self.proc_data_frame.at[qubit, 'T1'])*1e6, 1)
+                T2s = round(
+                    float(self.proc_data_frame.at[qubit, 'T2_star'])*1e6, 1)
+                T2e = round(
+                    float(self.proc_data_frame.at[qubit, 'T2_echo'])*1e6, 1)
+                T.extend([T1, T2e])
+                ax.text(x[i], y[i]-0.38, s=T,
+                        color='black',
+                        va='center', ha='center')
+                ax.text(1,1.5, s='[T1 , T2_echo] in $\mu$s',ha='center',
+                        va='center', color='black')
         # Main figure
         ax.set_ylim(-1.5, 1.6)
         ax.set_xlim(-1.5, 3.5)
@@ -291,7 +313,8 @@ class System_Metric(ba.BaseDataAnalysis):
         # feedline positions
         ax.text(-1., 1.2, 'Feedline 1', rotation=-45,
                 ha='center', va='center', color=main_color)
-        ax.text(3., 1.2, 'Feedline 2', rotation=-45,ha='center', va='center', color=main_color)
+        ax.text(3., 1.2, 'Feedline 2', rotation=-45,
+                ha='center', va='center', color=main_color)
         ax.plot([-1.5, 2], [1.5, -2], c='C0')
         ax.plot([1.5, 3.5], [2.5, .5])
         ax.set_title('System metric GBT', color=main_color)

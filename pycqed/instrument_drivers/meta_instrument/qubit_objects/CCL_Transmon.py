@@ -4072,7 +4072,7 @@ class CCLight_Transmon(Qubit):
     def allxy_GBT(self, MC=None,
                   label: str = '',
                   analyze=True, close_fig=True,
-                  prepare_for_timedomain=True,termination_opt=0.01):
+                  prepare_for_timedomain=True,termination_opt=0.04):
         '''#
         This function is the same as measure AllXY, but with a termination limit
         This termination limit is as a system metric to evalulate the calibration 
@@ -4094,12 +4094,12 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
         MC.run('AllXY'+label+self.msmt_suffix)
         self.ro_soft_avg(old_avg)
-        if analyze:
-            a = ma.AllXY_Analysis(close_main_fig=close_fig)
-            if a.deviation_total > termination_opt:
-                return True
-            else:
-                return False
+        a = ma.AllXY_Analysis(close_main_fig=close_fig)
+        if a.deviation_total > termination_opt:
+            return False
+        else:
+            return True
+
 
 
     def calibrate_mw_gates_restless(
@@ -4285,6 +4285,7 @@ class CCLight_Transmon(Qubit):
                 #     We are varying the LO frequency in the opt, not the q freq.
                 #     self.freq_qubit(opt_par_values[freq_idx] +
                 #                     self.mw_freq_mod.get())
+        return True 
 
     def calibrate_mw_gates_allxy(self, nested_MC=None,
                                  start_values=None,
