@@ -19,6 +19,69 @@ import random
 log = logging.getLogger(__name__)
 
 # ######################################################################
+# Learner1D wrappings to be able to access all learner data
+# ######################################################################
+
+
+class Learner1D_Minimizer(Learner1D):
+    """
+    Does everything that the LearnerND does plus wraps it such that
+    `mk_optimize_res_loss_func` can be used
+
+    It also accepts using loss fucntions made by
+    `mk_non_uniform_res_loss_func` and `mk_res_loss_func`
+    inluding providing one of the loss functions from
+    adaptive.learner.learnerND
+
+    The resolution loss function in this doc are built such that some
+    other loss function is used when the resolution boundaries are respected
+    """
+
+    def __init__(self, func, bounds, loss_per_interval=None):
+        super().__init__(func, bounds, loss_per_interval)
+        # Keep the orignal learner behaviour but pass extra arguments to
+        # the provided input loss function
+        if hasattr(self.loss_per_interval, "needs_learner_access"):
+            # Save the loss function that requires the learner instance
+            input_loss_per_interval = self.loss_per_interval
+            self.loss_per_interval = partial(input_loss_per_interval, learner=self)
+
+            if hasattr(input_loss_per_interval, "threshold"):
+                self.threshold = input_loss_per_interval.threshold
+            else:
+                self.threshold = None
+
+            self.compare_op = None
+            if hasattr(input_loss_per_interval, "converge_below"):
+                self.converge_below = input_loss_per_interval.converge_below
+            else:
+                self.converge_below = None
+
+            self.moving_threshold = np.inf
+            self.no_improve_count = 0
+
+            if hasattr(input_loss_per_interval, "max_no_improve_in_local"):
+                self.max_no_improve_in_local = (
+                    input_loss_per_interval.max_no_improve_in_local
+                )
+                assert self.max_no_improve_in_local > 2
+            else:
+                self.max_no_improve_in_local = 2
+
+            self.last_min = np.inf
+
+            # State variable local vs "global search"
+            # Note that all the segments that were considered interesting at
+            # some point will be still have very high priority when this
+            # variable is set back to False
+            self.sampling_local_minima = False
+
+        # Recompute all losses if the function scale changes i.e. a new best
+        # min or max appeared
+        # This happens in `adaptive.Learner1D.tell`
+        self._recompute_losses_factor = 1
+
+# ######################################################################
 # Utilities for adaptive.learner.learner1D
 # ######################################################################
 
@@ -85,69 +148,6 @@ def mk_non_uniform_res_loss_func(
         func.nth_neighbors = default_loss_func.nth_neighbors
     return func
 
-
-# ######################################################################
-# Learner1D wrappings to be able to access all learner data
-# ######################################################################
-
-
-class Learner1D_Minimizer(Learner1D):
-    """
-    Does everything that the LearnerND does plus wraps it such that
-    `mk_optimize_res_loss_func` can be used
-
-    It also accepts using loss fucntions made by
-    `mk_non_uniform_res_loss_func` and `mk_res_loss_func`
-    inluding providing one of the loss functions from
-    adaptive.learner.learnerND
-
-    The resolution loss function in this doc are built such that some
-    other loss function is used when the resolution boundaries are respected
-    """
-
-    def __init__(self, func, bounds, loss_per_interval=None):
-        super().__init__(func, bounds, loss_per_interval)
-        # Keep the orignal learner behaviour but pass extra arguments to
-        # the provided input loss function
-        if hasattr(self.loss_per_interval, "needs_learner_access"):
-            # Save the loss function that requires the learner instance
-            input_loss_per_interval = self.loss_per_interval
-            self.loss_per_interval = partial(input_loss_per_interval, learner=self)
-            if hasattr(input_loss_per_interval, "threshold"):
-                self.threshold = input_loss_per_interval.threshold
-            else:
-                self.threshold = None
-
-            self.compare_op = None
-            if hasattr(input_loss_per_interval, "converge_below"):
-                self.converge_below = input_loss_per_interval.converge_below
-            else:
-                self.threshold = None
-
-            self.moving_threshold = np.inf
-            self.no_improve_count = 0
-
-            if hasattr(input_loss_per_interval, "max_no_improve_in_local"):
-                self.max_no_improve_in_local = (
-                    input_loss_per_interval.max_no_improve_in_local
-                )
-                assert self.max_no_improve_in_local > 2
-            else:
-                self.max_no_improve_in_local = 2
-            self.last_min = np.inf
-
-            # State variable local vs "global search"
-            # Note that all the segments that were considered interesting at
-            # some point will be still have very high priority when this
-            # variable is set back to False
-            self.sampling_local_minima = False
-
-        # Recompute all losses if the function scale changes i.e. a new best
-        # min or max appeared
-        # This happens in `adaptive.Learner1D.tell`
-        self._recompute_losses_factor = 1
-
-
 # ######################################################################
 # Loss and goal functions to be used with the Learner1D_Minimizer
 # ######################################################################
@@ -197,7 +197,8 @@ def mk_minimization_loss(
                 # sampling to get stuck at one side of the best seen point
                 loss = dist_best_val_in_interval + dist
             else:
-                # This one make sure the sampling around the minimum beyond the threshold is uniform
+                # This makes sure the sampling around the minimum beyond the
+                # threshold is uniform
 
                 # `scaled_threshold - np.min(values)` is added to ensure that,
                 # from intervals with same length with a point that has a
