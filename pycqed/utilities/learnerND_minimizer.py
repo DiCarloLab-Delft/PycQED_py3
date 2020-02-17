@@ -6,7 +6,7 @@ from collections.abc import Iterable
 import logging
 import operator
 import random
-
+import scipy
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class LearnerND_Minimizer(LearnerND):
     `mk_optimize_res_loss_func` can be used
 
     It also accepts using loss fucntions made by
-    `mk_non_uniform_res_loss_func` and `mk_res_loss_func`
+    `mk_non_uniform_res_loss_func` and `mk_vol_limits_loss_func`
     inluding providing one of the loss functions from
     adaptive.learner.learnerND
 
@@ -77,6 +77,17 @@ class LearnerND_Minimizer(LearnerND):
             # variable is set back to False
             self.sampling_local_minima = False
 
+            # Compute the domain volume here to avoid the computation in each
+            # call of the `mk_vol_limits_loss_func`
+            self.vol_bbox = 1.
+            for dim_bounds in self._bbox:
+                self.vol_bbox *= (dim_bounds[1] - dim_bounds[0])
+
+            self.hull_vol_factor = 1.
+            if isinstance(bounds, scipy.spatial.ConvexHull):
+                # In case an irregular shaped boundary is used
+                self.hull_vol_factor = bounds.volume / self.vol_bbox
+
         # Recompute all losses if the function scale changes i.e. a new best
         # min or max appeared
         # This happens in `adaptive.LearnerND._update_range` which gets called
@@ -89,14 +100,28 @@ class LearnerND_Minimizer(LearnerND):
 # ######################################################################
 
 
-def mk_res_loss_func(
+def mk_vol_limits_loss_func(
     default_loss_func, min_volume=0.0, max_volume=1.0, vol_is_norm=False
 ):
+    min_vol_orig = min_volume
+    max_vol_orig = max_volume
+
     def func(simplex, values, value_scale, *args, **kw):
+
+        if vol_is_norm:
+            # We want to the normalization to be with respect to the
+            # hull's volume in case the domain is a hull
+            min_vol_used = min_vol_orig * kw["learner"].hull_vol_factor
+            max_vol_used = max_vol_orig * kw["learner"].hull_vol_factor
+        else:
+            vol_bbox = kw["learner"].vol_bbox
+            min_vol_used = min_vol_orig / vol_bbox
+            max_vol_used = max_vol_orig / vol_bbox
+
         vol = volume(simplex)
-        if vol < min_volume:
+        if vol < min_vol_used:
             return 0.0  # don't keep splitting sufficiently small simplices
-        elif vol > max_volume:
+        elif vol > max_vol_used:
             return np.inf  # maximally prioritize simplices that are too large
         else:
             return default_loss_func(simplex, values, value_scale, *args, **kw)
@@ -109,23 +134,25 @@ def mk_res_loss_func(
 
 
 def mk_non_uniform_res_loss_func(
-    default_loss_func, n_points: int = 249, n_dim: int = 2, res_bounds=(0.5, 3.0)
+    default_loss_func, npoints: int = 249, ndim: int = 2,
+    res_bounds=(0.5, 3.0)
 ):
     """
     This function is intended to allow for specifying the min and max
     simplex volumes in a more user friendly and not precise way.
-    For a more precise way use the mk_res_loss_func to specify the
+    For a more precise way use the mk_vol_limits_loss_func to specify the
     simplex volume limits directly
     """
     # LearnerND normalizes the parameter space to unity
-    normalized_domain_size = 1.0
+    normalized_domain_vol = 1.0
     assert res_bounds[1] > res_bounds[0]
-    pnts_per_dim = np.ceil(np.power(n_points, 1.0 / n_dim))  # n-dim root
-    uniform_resolution = normalized_domain_size / pnts_per_dim
-    min_volume = (uniform_resolution * res_bounds[0]) ** n_dim
-    max_volume = (uniform_resolution * res_bounds[1]) ** n_dim
-    func = mk_res_loss_func(
-        default_loss_func, min_volume=min_volume, max_volume=max_volume
+    pnts_per_dim = np.ceil(np.power(npoints, 1.0 / ndim))  # n-dim root
+    uniform_resolution = normalized_domain_vol / pnts_per_dim
+    min_volume = (uniform_resolution * res_bounds[0]) ** ndim
+    max_volume = (uniform_resolution * res_bounds[1]) ** ndim
+    func = mk_vol_limits_loss_func(
+        default_loss_func, min_volume=min_volume, max_volume=max_volume,
+        vol_is_norm=True
     )
     return func
 
@@ -146,14 +173,15 @@ def mk_minimization_loss(
         comp_threshold = learner.moving_threshold if threshold_is_None else threshold
         compare_op = compare_op_start if learner.compare_op is None else learner.compare_op
 
-        # `vol` is normalised 0 <= vol <= 1 because xs are scaled
+        # `vol` is normalised 0 <= vol <= 1 because the domain is scaled to a
+        # unit hypercube
         vol = volume(simplex)
         if not learner._scale:
             # In case the function landscape is constant so far
             return vol
 
         # learner._scale makes sure it is the biggest loss and is a
-        # finate value such that `vol` can be added
+        # finite value such that `vol` can be added
 
         # `dist_best_val_in_simplex` is the distance (>0) of the best
         # pnt (minimum) in the simplex with respect to the maximum
@@ -162,17 +190,13 @@ def mk_minimization_loss(
             learner._max_value - np.min(values) * learner._scale
         )
 
-        # values should already be a np.array
-        # values = np.array(values)
-
         # NB: this might have numerical issues, consider using
         # `learner._output_multiplier` if issues arise or keep the
         # cost function in a reasonable range
         scaled_threshold = comp_threshold / learner._scale
         if np.any(compare_op(values, scaled_threshold)):
             # This simplex is the most interesting because we are beyond the
-            # threshold
-            # Set its loss to maximum
+            # threshold, set its loss to maximum
 
             if threshold_is_None:
                 # We treat a moving threshold for a global minimization in a
@@ -220,12 +244,15 @@ def mk_minimization_loss(
 def mk_minimization_loss_func(
     threshold=None,
     converge_below=None,
+    converge_at_local=False,
+    randomize_global_search=False,
+    max_no_improve_in_local=7,
     min_volume=0.0,
     max_volume=np.inf,
     vol_is_norm=False,
-    converge_at_local=False,
-    randomize_global_search=False,
-    max_no_improve_in_local=7
+    bounds=None,
+    npoints=None,
+    res_bounds=(0.0, np.inf)
 ):
     """
     If you don't specify the threshold you must make use of
@@ -241,13 +268,25 @@ def mk_minimization_loss_func(
         converge_at_local=converge_at_local,
         randomize_global_search=randomize_global_search,
     )
+    if bounds is None and npoints is None:
+        func = mk_vol_limits_loss_func(
+            threshold_loss_func,
+            min_volume=min_volume,
+            max_volume=max_volume,
+            vol_is_norm=vol_is_norm,
+        )
+    else:
+        if bounds is None or npoints is None:
+            raise ValueError("Both `bounds` and `npoints` must be specified!")
 
-    func = mk_res_loss_func(
-        threshold_loss_func,
-        min_volume=min_volume,
-        max_volume=max_volume,
-        vol_is_norm=vol_is_norm,
-    )
+        if isinstance(bounds, scipy.spatial.ConvexHull):
+            ndim = bounds.ndim
+        else:
+            ndim = len(bounds)
+
+        func = mk_non_uniform_res_loss_func(
+            default_loss_func=threshold_loss_func, npoints=npoints,
+            ndim=ndim, res_bounds=res_bounds)
 
     func.needs_learner_access = True
 
