@@ -87,7 +87,7 @@ class Learner1D_Minimizer(Learner1D):
 
 
 def mk_res_loss_func(
-    default_loss_func, min_distance=0.0, max_distance=1.0, dist_is_norm=True
+    default_loss_func, min_distance=0.0, max_distance=1.0, dist_is_norm=False
 ):
     min_distance_orig = min_distance
     max_distance_orig = max_distance
@@ -124,7 +124,7 @@ def mk_res_loss_func(
 
 
 def mk_non_uniform_res_loss_func(
-    default_loss_func, n_points: int = 49, res_bounds=(0.5, 3.0)
+    default_loss_func, npoints: int = 49, res_bounds=(0.5, 3.0)
 ):
     """
     This function is intended to allow for specifying the min and max
@@ -135,11 +135,12 @@ def mk_non_uniform_res_loss_func(
     # Learner1D normalizes the parameter space to unity
     normalized_domain_size = 1.0
     assert res_bounds[1] > res_bounds[0]
-    uniform_resolution = normalized_domain_size / n_points
+    uniform_resolution = normalized_domain_size / npoints
     min_distance = uniform_resolution * res_bounds[0]
     max_distance = uniform_resolution * res_bounds[1]
     func = mk_res_loss_func(
-        default_loss_func, min_distance=min_distance, max_distance=max_distance
+        default_loss_func, min_distance=min_distance, max_distance=max_distance,
+        dist_is_norm=True
     )
 
     # Preserve loss function atribute in case a loss function from
@@ -172,7 +173,7 @@ def mk_minimization_loss(
             return dist
 
         # learner._scale[1] makes sure it is the biggest loss and is a
-        # finate value such that `dist` can be added
+        # finite value such that `dist` can be added
 
         # `dist_best_val_in_interval` is the distance (>0) of the best
         # pnt (minimum) in the ineterval with respect to the maximum
@@ -185,8 +186,7 @@ def mk_minimization_loss(
         scaled_threshold = comp_threshold / learner._scale[1]
         if np.any(compare_op(values, scaled_threshold)):
             # This interval is the most interesting because we are beyond the
-            # threshold
-            # Set its loss to maximum
+            # threshold, set its loss to maximum
 
             if threshold_is_None:
                 # We treat a moving threshold for a global minimization in a
