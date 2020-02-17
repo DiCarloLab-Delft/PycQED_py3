@@ -61,7 +61,7 @@ from pycqed.analysis_v2.timedomain_analysis import (
     Grovers_TwoQubitAllStates_Analysis)
 from pycqed.analysis_v2.readout_analysis import (
     Singleshot_Readout_Analysis, RO_acquisition_delayAnalysis,
-    Dispersive_shift_Analysis)
+    Dispersive_shift_Analysis, Readout_landspace_Analysis)
 
 from pycqed.analysis_v2.multiplexed_readout_analysis import \
     Multiplexed_Readout_Analysis

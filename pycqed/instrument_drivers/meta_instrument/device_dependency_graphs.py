@@ -132,9 +132,15 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           calibrate_function=Qubit.name + '.measure_dispersive_shift_pulsed')
             self.add_node(Qubit.name + ' SSRO Coarse tune-up',
                           calibrate_function=Qubit.name + '.calibrate_ssro_coarse')
+            self.add_node(Qubit.name + ' SSRO Pulse Duration',
+                          calibrate_function=Qubit.name + '.calibrate_ssro_pulse_duration')
             self.add_node(Qubit.name + ' SSRO Optimization',
                           calibrate_function=Qubit.name + '.calibrate_ssro_fine')
-
+            self.add_node(Qubit.name + ' RO mixer calibration',
+                          calibrate_function=Qubit.name + '.calibrate_mixer_offsets_RO')
+            self.add_node(Qubit.name + ' SSRO Fidelity',
+                          calibrate_function=Qubit.name + '.measure_ssro',
+                          calibrate_function_args={'post_select': True})
 
             # If all goes well, the qubit is fully 'calibrated' and can be controlled
 
@@ -215,8 +221,14 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           Qubit.name + ' Dispersive Shift')
             self.add_edge(Qubit.name + ' SSRO Coarse tune-up',
                           Qubit.name + ' Acquisition Delay Calibration')
-            self.add_edge(Qubit.name + ' SSRO Optimization',
+            self.add_edge(Qubit.name + ' SSRO Pulse Duration',
                           Qubit.name + ' SSRO Coarse tune-up')
+            self.add_edge(Qubit.name + ' SSRO Optimization',
+                          Qubit.name + ' SSRO Pulse Duration')
+            self.add_edge(Qubit.name + ' SSRO Fidelity',
+                          Qubit.name + ' SSRO Optimization')
+            self.add_edge(Qubit.name + ' SSRO Fidelity',
+                          Qubit.name + ' RO mixer calibration')
 
             self.add_edge(Qubit.name + ' T1',
                           Qubit.name + ' Frequency Fine')

@@ -14,6 +14,8 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.utilities.general import gen_sweep_pts
+from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
+    mk_optimize_res_loss_func
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import (
@@ -3318,6 +3320,98 @@ class CCLight_Transmon(Qubit):
 
             return True
 
+    def calibrate_ssro_pulse_duration(self, MC=None,
+                                      nested_MC=None,
+                                      amps=None,
+                                      times= None,
+                                      use_adaptive: bool = True,
+                                      n_points: int = 150,
+                                      analyze: bool = True,
+                                      update: bool = True):
+        '''
+        Calibrates the RO pulse duration by measuring the assignment fidelity of
+        SSRO experiments as a function of the RO pulse duration and amplitude.
+        For each set of parameters, the routine calibrates optimal weights and
+        then extracts readout fidelity.
+        This measurement can be performed using an adaptive sampler
+        (use_adaptive=True) or a regular 2D parameter sweep (use_adaptive=False).
+        Designed to be used in the GBT node 'SSRO Pulse Duration'.
+
+        Args:
+            amps (array):
+                If using 2D sweep:
+                    Set of RO amplitudes sampled in the 2D sweep.
+                If using adaptive sampling:
+                    Minimum and maximum (respectively) of the RO amplitude range
+                    used in the adaptive sampler.
+
+            times (array):
+                If using 2D sweep:
+                    Set of RO pulse durations sampled in the 2D sweep.
+                If using adaptive sampling:
+                    Minimum and maximum (respectively) of the RO pulse duration
+                    range used in the adaptive sampler.
+
+            use_adaptive (bool):
+                Boolean that sets the sampling mode. Set to "False" for a
+                regular 2D sweep or set to "True" for adaptive sampling.
+
+            n_points:
+                Only relevant in the adaptive sampling mode. Sets the maximum
+                number of points sampled.
+        '''
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        if times is None:
+            times = np.arange(10e-9, 401e-9, 10e-9)
+
+        if amps is None:
+            amps = np.linspace(.01,.25,11)
+        ######################
+        # Experiment
+        ######################
+        nested_MC.set_sweep_functions([self.ro_pulse_length,
+                                       self.ro_pulse_amp])
+        d = det.Function_Detector(self.calibrate_optimal_weights,
+                                  result_keys=['F_a','F_d','SNR'],
+                                  value_names=['F_a','F_d','SNR'],
+                                  value_units=['a.u.','a.u.','a.u.'])
+        nested_MC.set_detector_function(d)
+        # Use adaptive sampling
+        if use_adaptive is True:
+            # Adaptive sampler cost function
+            loss_function = mk_optimize_res_loss_func(n_dim=2,
+                                                      n_points=n_points,
+                                                      minimize=False,
+                                                      res_bound=(.3,np.inf))
+            nested_MC.set_adaptive_function_parameters(
+                {'adaptive_function': LearnerND_Optimize,
+                 'goal': lambda l: l.npoints > n_points,
+                 'bounds': [(times[0], times[-1]), (amps[0], amps[-1]) ],
+                 'minimize': False})
+            nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
+                          mode='adaptive')
+        # Use standard 2D sweep
+        else:
+            nested_MC.set_sweep_points(times)
+            nested_MC.set_sweep_points_2D(amps)
+            nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
+                          mode='2D')
+        #####################
+        # Analysis
+        #####################
+        if analyze is True:
+            if use_adaptive is True:
+                A = ma2.Readout_landspace_Analysis(label='RO_duration_tuneup')
+            else:
+                A = ma.TwoD_Analysis(label='RO_duration_tuneup', auto=True)
+            return True
+
     def calibrate_ssro_fine(self, MC=None,
                             nested_MC=None,
                             start_freq=None,
@@ -4318,7 +4412,7 @@ class CCLight_Transmon(Qubit):
                                   start_values=None,
                                   initial_steps=None, f_termination=0.01):
         '''
-        FIXME! Merge both calibrate allxy methods. 
+        FIXME! Merge both calibrate allxy methods.
         Optimizes ALLXY sequency by tunning 2 parameters:
         mw_channel_amp and mw_motzoi.
 
