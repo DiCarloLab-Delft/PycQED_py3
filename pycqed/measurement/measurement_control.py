@@ -187,7 +187,7 @@ class MeasurementControl(Instrument):
         # Change this to your preferences when using the plotmon_2D
         # This could be a parameter but it doesn't seem to be worth saving
         # See `choose_MC_cmap_zrange` in this file to know how this is used
-        # e.g. self.plotmon_2D_cmaps = {"Phase": "anglemap"}
+        # e.g. self.plotmon_2D_cmaps = {"Phase": "anglemap45"}
         # see pycqed.measurment.qcodes_QtPlot_colors_override for more cmaps
         self.plotmon_2D_cmaps = {}
         # e.g. self.plotmon_2D_zranges = {"Phase": (0.0, 180.0)}
