@@ -76,17 +76,21 @@ Changelog:
 - also removed parameter repetitions from calibrate_CC_dio_protocol()
 - split off calibrate_dio_protocol() from calibrate_CC_dio_protocol() to allow standalone use
 
+20200217 WJV
+- moved DIO calibration helpers to their respective drivers
+- we now implement new interface DIOCalibration
+
 """
 
 import time
 import logging
 import numpy as np
 import re
-import os
-import pycqed
+from typing import Tuple,List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
+from pycqed.instrument_drivers.meta_instrument import DIOCalibration
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
@@ -110,7 +114,7 @@ class ziDIOCalibrationError(Exception):
 # Class
 ##########################################################################
 
-class ZI_HDAWG8(zicore.ZI_HDAWG_core):
+class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIOCalibration):
 
     def __init__(self,
                  name: str,
@@ -359,80 +363,24 @@ while (1) {
             # No special requirements regarding waveforms by default
             self._clear_readonly_waveforms(awg_nr)
 
-            if 1:   # FIXME: new
-                num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
-                dio_mode_list = {
-                    'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
-                    'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
-                    'novsm_microwave':      { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
-                    'flux':                 { 'mask': 0x3F, 'shift': [0,  6,  16, 22] },    # FIXME: mask for 2 channels
-                }
-                # FIXME: define DIO modes centrally in device independent way (lsb, width, channelCount)
-                dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
-                if dio_mode is None:
-                    raise ValueError("Unsupported value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
-                mask = dio_mode['mask']
-                self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
-                shift = dio_mode['shift'][awg_nr]
-                self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
-                # FIXME: flux mode sets mask, using 6 bits=2channels
-                # FIXME: check _num_codewords against mode
-                # FIXME: derive amp vs direct mode from dio_mode_list
-            else:
-                # the mask determines how many bits will be used in the protocol
-                # e.g., mask 3 will mask the bits with bin(3) = 00000011 using
-                # only the 2 Least Significant Bits.
-                num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), num_codewords - 1)
-
-                # set mask and shift for codeword protocol
-                # N.B. The shift is applied before the mask
-                # The relevant bits can be selected by first shifting them
-                # and then masking them.
-
-                if self.cfg_codeword_protocol() == 'identical':
-                    # In the identical protocol all bits are used to trigger
-                    # the same codewords on all AWG's
-                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-
-                # NEW
-                # In the new mw protocol bits [0:7] -> CW0 and bits [23:16] -> CW1
-                elif self.cfg_codeword_protocol() == 'microwave':
-                    if awg_nr in [0, 1]:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                    elif awg_nr in [2, 3]:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
-
-                # NEW
-                # In the NO-VSM mw protocol bits [0:6] -> CW0, bits [13, 7] -> CW1,
-                # bits [22:16] -> CW2 and bits [29:23] -> CW4
-                elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
-                    if awg_nr == 0:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                    elif awg_nr == 1:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 7)
-                    elif awg_nr == 2:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
-                    elif awg_nr == 3:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 23)
-
-                # NEW
-                # Proper use of flux AWG to allow independent triggering of flux
-                # bits[0:2] for awg0_ch0, bits[3:5] for awg0_ch1,
-                # bits[6:8] for awg0_ch2, bits[9:11] for awg0_ch3,
-                # bits[16:18] for awg0_ch4, bits[19:21] for awg0_ch5,
-                # bits[22:24] for awg0_ch6, bits[25:27] for awg0_ch7
-                elif self.cfg_codeword_protocol() == 'flux':
-                    self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
-
-                    if awg_nr == 0:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-                    elif awg_nr == 1:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 6)
-                    elif awg_nr == 2:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
-                    elif awg_nr == 3:
-                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 22)
+            num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
+            dio_mode_list = {
+                'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
+                'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
+                'novsm_microwave':      { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
+                'flux':                 { 'mask': 0x3F, 'shift': [0,  6,  16, 22] },    # FIXME: mask for 2 channels
+            }
+            # FIXME: define DIO modes centrally in device independent way (lsb, width, channelCount)
+            dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
+            if dio_mode is None:
+                raise ValueError("Unsupported value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
+            mask = dio_mode['mask']
+            self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
+            shift = dio_mode['shift'][awg_nr]
+            self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
+            # FIXME: flux mode sets mask, using 6 bits=2channels
+            # FIXME: check _num_codewords against mode
+            # FIXME: derive amp vs direct mode from dio_mode_list
 
         ####################################################
         # Turn on device
@@ -591,13 +539,42 @@ while (1) {
 
         return set(valid_delays)
 
-    def calibrate_dio_protocol(self, expected_sequence, verbose=False) -> None:
+    ##########################################################################
+    # overrides for DIOCalibration interface
+    ##########################################################################
+
+    # NB: based on UHFQuantumController.py::_prepare_HDAWG8_dio_calibration
+    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+        """
+        Configures an HDAWG with a default program that generates data suitable for DIO calibration.
+        Also starts the HDAWG.
+        """
+        program = '''
+        var A = 0xffff0000;
+        var B = 0x00000000;
+
+        while (1) {
+          setDIO(A);
+          wait(2);
+          setDIO(B);
+          wait(2);
+        }
+        '''
+        self.configure_awg_from_string(0, program)
+        self.seti('awgs/0/enable', 1)
+
+        dio_mask = 0x7fff0000
+        expected_sequence = []
+        return dio_mask,expected_sequence
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        verbose = False  # FIXME: use logging
         # FIXME: UHF driver does not need expected_sequence, why the difference
         self.assure_ext_clock()
         self.upload_codeword_program()
 
         for awg, sequence in expected_sequence:
-            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence), verbose=verbose):
+            if not self._ensure_activity(awg, mask_value=dio_mask, verbose=verbose):
                 raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
         valid_delays = self._find_valid_delays(expected_sequence, verbose=verbose)
@@ -618,205 +595,7 @@ while (1) {
 
     ##########################################################################
     # DIO calibration functions for *CC*
-    # FIXME: should not be in driver
     ##########################################################################
 
-    def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
-        """
-        Prepares the appropriate program to calibrate DIO and returns
-        expected sequence.
-        N.B. only works for microwave on DIO4 and for Flux on DIO3
-            (TODO add support for microwave on DIO5)
-        """
-        log.info('Calibrating DIO delays')
-        if verbose: print("Calibrating DIO delays")
-
-        cs_filepath = os.path.join(pycqed.__path__[0],
-            'measurement',
-            'openql_experiments',
-            's17', 'cs.txt')
-
-        opc_filepath = os.path.join(pycqed.__path__[0],
-            'measurement',
-            'openql_experiments',
-            's17', 'qisa_opcodes.qmap')
-
-        # Configure QCC
-        QCC.control_store(cs_filepath)
-        QCC.qisa_opcode(opc_filepath)
-
-        if self.cfg_codeword_protocol() == 'flux':
-            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','QCC_example',
-                'qisa_test_assembly','flux_calibration.qisa'))
-
-            sequence_length = 8
-            staircase_sequence = np.arange(1, sequence_length)
-
-            # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
-            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (3, list(staircase_sequence+ (staircase_sequence << 3)))]
-
-        elif self.cfg_codeword_protocol() == 'microwave':
-
-            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','QCC_example',
-                'qisa_test_assembly','withvsm_calibration.qisa'))
-
-            sequence_length = 32
-            staircase_sequence = range(1, sequence_length)
-            expected_sequence =  [(0, list(staircase_sequence)), \
-                                 (1, list(staircase_sequence)), \
-                                 (2, list(reversed(staircase_sequence))), \
-                                 (3, list(reversed(staircase_sequence)))]
-
-
-        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
-
-            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..','examples','QCC_example',
-                'qisa_test_assembly','novsm_calibration.qisa'))
-
-            sequence_length = 32
-            staircase_sequence = range(1, sequence_length)
-            expected_sequence = [(0, list(staircase_sequence)), \
-                                 (1, list(reversed(staircase_sequence))), \
-                                 (2, list(staircase_sequence)), \
-                                 (3, list(reversed(staircase_sequence))) ]
-
-        else:
-            zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
-
-        # Start the QCC with the program configured above
-        QCC.eqasm_program(test_fp)
-        QCC.start()
-        return expected_sequence
-
-    def _prepare_CC_dio_calibration(self, CC, verbose=False):
-        """
-        Prepares the appropriate program to calibrate DIO and returns
-        expected sequence.
-        """
-        log.info('Calibrating DIO delays')
-        if verbose: print("Calibrating DIO delays")
-
-        if self.cfg_codeword_protocol() == 'flux':
-            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','CC_examples',
-                'flux_calibration.vq1asm'))
-
-            sequence_length = 8
-            staircase_sequence = np.arange(1, sequence_length)
-
-            # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
-            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (3, list(staircase_sequence+ (staircase_sequence << 3)))]
-
-        elif self.cfg_codeword_protocol() == 'microwave':
-
-            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                                      '..', 'examples','CC_examples',
-                                      'old_hdawg_calibration.vq1asm'))
-
-            sequence_length = 32
-            staircase_sequence = range(0, sequence_length)
-            expected_sequence = [(0, list(staircase_sequence)), \
-                                 (1, list(staircase_sequence)), \
-                                 (2, list(staircase_sequence)), \
-                                 (3, list(staircase_sequence))]
-
-        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
-            raise NotImplementedError
-
-        else:
-            raise zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
-
-        # Start the QCC with the program configured above
-        CC.eqasm_program(test_fp)
-        CC.start()
-        return expected_sequence
-
-    def _prepare_CCL_dio_calibration(self, CCL, verbose=False):
-        """
-        Prepares the appropriate program to calibrate DIO and returns
-        expected sequence.
-        N.B. only works for microwave on DIO4 and for Flux on DIO3
-            (TODO add support for microwave on DIO5)
-        """
-        log.info('Calibrating DIO delays')
-        if verbose: print("Calibrating DIO delays")
-
-        cs_filepath = os.path.join(pycqed.__path__[0],
-            'measurement',
-            'openql_experiments',
-            'output', 'cs.txt')
-
-        opc_filepath = os.path.join(pycqed.__path__[0],
-            'measurement',
-            'openql_experiments',
-            'output', 'qisa_opcodes.qmap')
-
-        # Configure CCL
-        CCL.control_store(cs_filepath)
-        CCL.qisa_opcode(opc_filepath)
-
-        if self.cfg_codeword_protocol() == 'flux':
-            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','CCLight_example',
-                'qisa_test_assembly','calibration_cws_flux.qisa'))
-
-            sequence_length = 8
-            staircase_sequence = np.arange(1, sequence_length)
-            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (3, list(staircase_sequence))]
-        elif self.cfg_codeword_protocol() == 'microwave':
-            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..','examples','CCLight_example',
-                'qisa_test_assembly','calibration_cws_mw.qisa'))
-
-            sequence_length = 32
-            staircase_sequence = np.arange(1, sequence_length)
-            expected_sequence = [(0, list(reversed(staircase_sequence))), \
-                                 (1, list(reversed(staircase_sequence))), \
-                                 (2, list(reversed(staircase_sequence))), \
-                                 (3, list(reversed(staircase_sequence)))]
-
-        else:
-            zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
-
-        # Start the CCL with the program configured above
-        CCL.eqasm_program(test_fp)
-        CCL.start()
-        return expected_sequence
-
     def calibrate_CC_dio_protocol(self, CC, verbose=False) -> None:
-        """
-        Calibrates the DIO communication between CC and HDAWG.
-        Arguments:
-            CC (instr) : an instance of a CCL or QCC
-            verbose (bool): if True prints to stdout
-        """
-
-        CC_model = CC.IDN()['model']
-        if 'QCC' in CC_model:
-            expected_sequence = self._prepare_QCC_dio_calibration(
-                QCC=CC, verbose=verbose)
-        elif 'CCL' in CC_model:
-            expected_sequence = self._prepare_CCL_dio_calibration(
-                CCL=CC, verbose=verbose)
-        elif 'cc' in CC_model:
-            expected_sequence = self._prepare_CC_dio_calibration(
-                CC=CC, verbose=verbose)
-        else:
-            raise ValueError('CC model ({}) not recognized.'.format(CC_model))
-        self.calibrate_dio_protocol(expected_sequence, verbose)
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.DIOCalibration")

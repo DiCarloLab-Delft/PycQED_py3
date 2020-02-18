@@ -11,9 +11,11 @@
 """
 
 import logging
-from typing import List
+from typing import Tuple,List
+
 from .QuTechCC_core import QuTechCC_core
 from .Transport import Transport
+from pycqed.instrument_drivers.meta_instrument import DIOCalibration
 
 from qcodes.utils import validators as vals
 from qcodes import Instrument
@@ -34,8 +36,7 @@ inner:      seq_out         R0,$duration
 """
 
 
-
-class QuTechCC(QuTechCC_core, Instrument):
+class QuTechCC(QuTechCC_core, Instrument, DIOCalibration):
     def __init__(self,
                  name: str,
                  transport: Transport,
@@ -188,12 +189,83 @@ class QuTechCC(QuTechCC_core, Instrument):
         self.start()
 
     ##########################################################################
-    # DIO calibration support for connected instruments
+    # DIO calibration functions imported from UHFQuantumController.py
     ##########################################################################
 
-    def output_dio_calibration_data(self, dio_mode, port=None):
+    def _prepare_CC_dio_calibration_uhfqa(self, verbose=False):
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                                      '..', 'examples','CC_examples',
+                                      'uhfqc_calibration.vq1asm'))
+        # FIXME: path should not point to examples
+        # FIXME: the particular file refers to fixed slot numbers of the CC
+
+        # Set the DIO calibration mask to enable 9 bit measurement
+        UHF._dio_calibration_mask = 0x1ff
+        self.eqasm_program(test_fp)
+        self.start()
+
+    ##########################################################################
+    # DIO calibration functions imported from ZI_HDAWG8.py
+    ##########################################################################
+
+    def _prepare_CC_dio_calibration_hdawg(self, CC, verbose=False):
+        """
+        Prepares the appropriate program to calibrate DIO and returns
+        expected sequence.
+        """
+        log.info('Calibrating DIO delays')
+        if verbose: print("Calibrating DIO delays")
+
+        if self.cfg_codeword_protocol() == 'flux':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','CC_examples',
+                'flux_calibration.vq1asm'))
+
+            sequence_length = 8
+            staircase_sequence = np.arange(1, sequence_length)
+
+            # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
+            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (3, list(staircase_sequence+ (staircase_sequence << 3)))]
+
+        elif self.cfg_codeword_protocol() == 'microwave':
+
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                                      '..', 'examples','CC_examples',
+                                      'old_hdawg_calibration.vq1asm'))
+
+            sequence_length = 32
+            staircase_sequence = range(0, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence)), \
+                                 (1, list(staircase_sequence)), \
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(staircase_sequence))]
+
+        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+            raise NotImplementedError
+
+        else:
+            raise RuntimeError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
+
+        # Start the CC with the program configured above
+        CC.eqasm_program(test_fp)
+        CC.start()
+        return expected_sequence
+
+    ##########################################################################
+    # overrides for DIOCalibration interface
+    ##########################################################################
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        self.calibrate_dio(port)
+
+    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         if dio_mode == "microwave":
             cc_prog = _cc_prog_dio_cal_microwave
+            dio_mask = 0x7fff0000
         elif dio_mode == "new_microwave":
             # FIXME
             pass
@@ -216,7 +288,13 @@ class QuTechCC(QuTechCC_core, Instrument):
             print(self.get_error())
         self.start()
         log.debug('starting CC')
+        
+        expected_sequence = []
+        return dio_mask,expected_sequence
 
+##########################################################################
+# helpers
+##########################################################################
 
 # helpers for Instrument::add_parameter.set_cmd
 def _gen_set_func_1par(fun, par1):

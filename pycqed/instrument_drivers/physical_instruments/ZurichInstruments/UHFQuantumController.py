@@ -48,15 +48,21 @@ Changelog:
 - removed unused parameter repetitions from _find_valid_delays()
 - also removed parameter repetitions from calibrate_CC_dio_protocol()
 - split off calibrate_dio_protocol() from calibrate_CC_dio_protocol() to allow standalone use
+
+20200217 WJV
+- moved DIO calibration helpers to their respective drivers
+- we now implement new interface DIOCalibration
+- removed self._dio_calibration_mask and added parameter dio_mask where appropriate
+
 """
 
 import time
-import os
 import logging
 import numpy as np
-import pycqed
+from typing import Tuple,List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
+from pycqed.instrument_drivers.meta_instrument import DIOCalibration
 from pycqed.utilities.general import check_keyboard_interrupt
 
 from qcodes.utils import validators
@@ -147,7 +153,7 @@ def array2vect(array, name):
 ##########################################################################
 
 
-class UHFQC(zibase.ZI_base_instrument):
+class UHFQC(zibase.ZI_base_instrument, DIOCalibration):
     """
     This is the PycQED driver for the 1.8 Gsample/s UHFQA developed
     by Zurich Instruments.
@@ -236,9 +242,6 @@ class UHFQC(zibase.ZI_base_instrument):
 
         # Set default waveform length to 20 ns at 1.8 GSa/s
         self._default_waveform_length = 32
-
-        # Mask used for detecting codeword activity during DIO calibration
-        self._dio_calibration_mask = None
 
         t1 = time.time()
         log.info(f'{self.devname}: Initialized UHFQC in {t1 - t0}s')
@@ -1517,7 +1520,7 @@ setTrigger(0);
     # DIO calibration functions
     ##########################################################################
 
-    def _ensure_activity(self, awg_nr, timeout=5, verbose=False):
+    def _ensure_activity(self, awg_nr, mask_value: int, timeout=5, verbose=False):
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
@@ -1528,11 +1531,6 @@ setTrigger(0);
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
 
-        # Make sure the DIO calibration mask is configured
-        if self._dio_calibration_mask is None:
-            raise ValueError('DIO calibration bit mask not defined.')
-
-        mask_value = self._dio_calibration_mask
         cw_mask = mask_value << 17
 
         for i in range(timeout):
@@ -1576,7 +1574,7 @@ setTrigger(0);
             cw[n] = (d & ((1 << 10)-1))
         return (ts, cw)
 
-    def _find_valid_delays(self, awg_nr, verbose=False):
+    def _find_valid_delays(self, awg_nr, mask_value: int, verbose=False):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
@@ -1587,11 +1585,6 @@ setTrigger(0);
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
 
-        # Make sure the DIO calibration mask is configured
-        if self._dio_calibration_mask is None:
-            raise ValueError('DIO calibration bit mask not defined.')
-
-        mask_value = self._dio_calibration_mask
         cw_mask = mask_value << 17
 
         combined_mask = cw_mask
@@ -1617,17 +1610,25 @@ setTrigger(0);
 
         return set(valid_delays)
 
-    def calibrate_dio_protocol(self, verbose=False) -> None:
+    ##########################################################################
+    # overrides for DIOCalibration interface
+    ##########################################################################
+
+    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+        raise RuntimeError("not implemented")
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
         """
         calibrate DIO protocol. Requires valid DIO input signal
         """
+        verbose = False  # FIXME: use logging
         self.assure_ext_clock()
 
         for awg in [0]:
-            if not self._ensure_activity(awg, verbose=verbose):
+            if not self._ensure_activity(awg, mask_value=dio_mask, verbose=verbose):
                 raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
-        valid_delays = self._find_valid_delays(awg, verbose=verbose)
+        valid_delays = self._find_valid_delays(awg, mask_value=dio_mask, verbose=verbose)
         if len(valid_delays) == 0:
             raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
 
@@ -1648,119 +1649,7 @@ setTrigger(0);
 
     ##########################################################################
     # DIO calibration functions for *CC*
-    # FIXME: should not be in driver
     ##########################################################################
 
-    def _prepare_CCL_dio_calibration(self, CCL, feedline=1, verbose=False):
-        """Configures a CCL with a default program that generates data suitable for DIO calibration.
-        Also starts the program."""
-        cs_filepath = os.path.join(pycqed.__path__[0],
-                'measurement',
-                'openql_experiments',
-                'output', 'cs.txt')
-
-        opc_filepath = os.path.join(pycqed.__path__[0],
-                'measurement',
-                'openql_experiments',
-                'output', 'qisa_opcodes.qmap')
-
-        CCL.control_store(cs_filepath)
-        CCL.qisa_opcode(opc_filepath)
-
-        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','CCLight_example',
-                'qisa_test_assembly','calibration_cws_ro.qisa'))
-
-        # Start the CCL with the program configured above
-        CCL.eqasm_program(test_fp)
-        CCL.start()
-
-        # Set the DIO calibration mask to enable 5 bit measurement
-        if feedline == 1:
-            self._dio_calibration_mask = 0x1f
-        elif feedline == 2:
-            self._dio_calibration_mask = 0x3
-        else:
-            raise ValueError('Invalid feedline {} selected for calibration.'.format(feedline))
-
-    def _prepare_CC_dio_calibration(self, CC, verbose=False):
-        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                                      '..', 'examples','CC_examples',
-                                      'uhfqc_calibration.vq1asm'))
-        # FIXME: path should not point to examples
-        # FIXME: the particular file refers to fixed slot numbers of the CC
-
-        # Set the DIO calibration mask to enable 9 bit measurement
-        self._dio_calibration_mask = 0x1ff
-        CC.eqasm_program(test_fp)
-        CC.start()
-
-    def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
-        """Configures a QCC with a default program that generates data suitable for DIO calibration. Also starts the QCC."""
-
-        cs_filepath = os.path.join(pycqed.__path__[0],
-                'measurement',
-                'openql_experiments',
-                's17', 'cs.txt')
-
-        opc_filepath = os.path.join(pycqed.__path__[0],
-                'measurement',
-                'openql_experiments',
-                's17', 'qisa_opcodes.qmap')
-
-        QCC.control_store(cs_filepath)
-        QCC.qisa_opcode(opc_filepath)
-
-        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','QCC_example',
-                'qisa_test_assembly','ro_calibration.qisa'))
-
-        # Start the QCC with the program configured above
-        QCC.stop()
-        QCC.eqasm_program(test_fp)
-        QCC.start()
-
-        # Set the DIO calibration mask to enable 9 bit measurement
-        self._dio_calibration_mask = 0x1ff
-
-    def _prepare_HDAWG8_dio_calibration(self, HDAWG, verbose=False):
-        """Configures an HDAWG with a default program that generates data suitable for DIO calibration. Also starts the HDAWG."""
-        program = '''
-var A = 0xffff0000;
-var B = 0x00000000;
-
-while (1) {
-  setDIO(A);
-  wait(2);
-  setDIO(B);
-  wait(2);
-}
-'''
-        HDAWG.configure_awg_from_string(0, program)
-        HDAWG.seti('awgs/0/enable', 1)
-
-        self._dio_calibration_mask = 0x7fff
-
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False) -> None:
-        # FIXME: parameter feedline assumes knowledge of the control topology, and it's only used for CCL
-        log.info('Calibrating DIO delays')
-        if verbose: print("Calibrating DIO delays")
-        if feedline is None:
-            raise ziUHFQCDIOCalibrationError('No feedline specified for calibration')
-
-        CC_model = CC.IDN()['model']
-        if 'QCC' in CC_model:
-            self._prepare_QCC_dio_calibration(
-                QCC=CC, verbose=verbose)
-        elif 'CCL' in CC_model:
-            self._prepare_CCL_dio_calibration(
-                CCL=CC, feedline=feedline, verbose=verbose)
-        elif 'HDAWG8' in CC_model:
-            self._prepare_HDAWG8_dio_calibration(HDAWG=CC, verbose=verbose)
-        elif 'cc' in CC_model:
-            self._prepare_CC_dio_calibration(CC=CC, verbose=verbose)
-        else:
-            raise ValueError('CC model ({}) not recognized.'.format(CC_model))
-        self.calibrate_dio_protocol(verbose)
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.DIOCalibration")
