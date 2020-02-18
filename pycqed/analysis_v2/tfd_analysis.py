@@ -79,7 +79,7 @@ class TFD_3CZ_Analysis_Pauli_Strings(ba.BaseDataAnalysis):
             for j, comb in enumerate(combinations):
                 binned_data[ch_name][comb] = np.mean(
                     ch_data[j::len(combinations)])  #get average for shots per combination
-        #data per combination is stored with index steps of len(combinations) starting from j
+        #data per combination is stored with index steps of len(combinations) starting from j.
 
         # Calculate mean voltages to determine threshold
         mn_voltages = {}
@@ -227,10 +227,10 @@ def plot_all_pauli_ops(full_dict, ax=None, **kw):
         ax.bar(i, full_dict[label], color=c, align='center')
         ax.set_xticks(np.arange(len(labels)))
         ax.set_xticklabels(labels, rotation=60)
-        ax.text(1, -.5, '$Inter=${:.2f}'.format(full_dict['ZIZI']+full_dict['IZIZ']+
-                                                      full_dict['XIXI']+full_dict['IXIX']))
-        ax.text(15, -.5, '$Intra=${:.2f}'.format(full_dict['ZZII']+full_dict['IIZZ']+
-                                                      full_dict['XXII']+full_dict['IIXX']))
+        ax.text(1, -.5, '$Inter=${:.2f}'.format(np.abs(full_dict['ZIZI'])+np.abs(full_dict['IZIZ'])+
+                                                np.abs(full_dict['XIXI'])+np.abs(full_dict['IXIX'])))
+        ax.text(15, -.5, '$Intra=${:.2f}'.format(np.abs(full_dict['ZZII'])+np.abs(full_dict['IIZZ'])+
+                                                np.abs(full_dict['XXII'])+np.abs(full_dict['IIXX'])))
     ax.set_ylabel('Expectation value')
     ax.set_ylim(-1.05, 1.05)
     ax.set_title('All pauli expectation values')
