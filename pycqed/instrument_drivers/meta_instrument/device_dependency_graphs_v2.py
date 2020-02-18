@@ -101,7 +101,7 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                             '.calibrate_mixer_offsets_RO')
             self.add_node(Qubit.name + ' SSRO Fidelity',
                           calibrate_function=Qubit.name + '.measure_ssro',
-                          calibrate_function_args={'post_select': True})
+                          calibrate_function_kwargs={'post_select': True})
 
             ##############################
             # Coherence Measurments

@@ -16,6 +16,9 @@ from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.utilities.general import gen_sweep_pts
 from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
     mk_optimize_res_loss_func
+from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
+    mk_minimization_loss_func, mk_minimization_goal_func
+
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import (
@@ -3372,6 +3375,7 @@ class CCLight_Transmon(Qubit):
 
         if amps is None:
             amps = np.linspace(.01,.25,11)
+
         ######################
         # Experiment
         ######################
@@ -3385,15 +3389,16 @@ class CCLight_Transmon(Qubit):
         # Use adaptive sampling
         if use_adaptive is True:
             # Adaptive sampler cost function
-            loss_function = mk_optimize_res_loss_func(n_dim=2,
-                                                      n_points=n_points,
-                                                      minimize=False,
-                                                      res_bound=(.3,np.inf))
+            loss_per_simplex = mk_minimization_loss_func()
+            goal = mk_minimization_goal_func()
+
             nested_MC.set_adaptive_function_parameters(
-                {'adaptive_function': LearnerND_Optimize,
-                 'goal': lambda l: l.npoints > n_points,
-                 'bounds': [(times[0], times[-1]), (amps[0], amps[-1]) ],
-                 'minimize': False})
+                {'adaptive_function': LearnerND_Minimizer,
+                 'goal': lambda l: goal(l) or l.npoints > npoints,
+                 'loss_per_simplex': loss_per_simplex,
+                 'bounds': [(10e-9, 400e-9), (0.01, 0.3)],
+                 'minimize': False
+                 })
             nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
                           mode='adaptive')
         # Use standard 2D sweep
@@ -3408,6 +3413,10 @@ class CCLight_Transmon(Qubit):
         if analyze is True:
             if use_adaptive is True:
                 A = ma2.Readout_landspace_Analysis(label='RO_duration_tuneup')
+                optimal_pulse_duration  = A.qoi['Optimal_parameter_X']
+                optimal_pulse_amplitude = A.qoi['Optimal_parameter_Y']
+                self.ro_pulse_length(optimal_pulse_duration)
+                self.ro_pulse_amp(optimal_pulse_amplitude)
             else:
                 A = ma.TwoD_Analysis(label='RO_duration_tuneup', auto=True)
             return True
@@ -4169,8 +4178,8 @@ class CCLight_Transmon(Qubit):
                   prepare_for_timedomain=True,termination_opt=0.04):
         '''#
         This function is the same as measure AllXY, but with a termination limit
-        This termination limit is as a system metric to evalulate the calibration 
-        by GBT if good or not. 
+        This termination limit is as a system metric to evalulate the calibration
+        by GBT if good or not.
         '''
         old_avg = self.ro_soft_avg()
         self.ro_soft_avg(4)
@@ -4379,7 +4388,7 @@ class CCLight_Transmon(Qubit):
                 #     We are varying the LO frequency in the opt, not the q freq.
                 #     self.freq_qubit(opt_par_values[freq_idx] +
                 #                     self.mw_freq_mod.get())
-        return True 
+        return True
 
     def calibrate_mw_gates_allxy(self, nested_MC=None,
                                  start_values=None,
@@ -5140,10 +5149,10 @@ class CCLight_Transmon(Qubit):
 
     def flipping_GBT(self, nr_sequence: int = 2):
         '''
-        This function is to measure flipping sequence for whaterver nr_of times 
-        a function needs to be run to calibrate the Pi and Pi/2 Pulse. 
-        Right now this method will always return true no matter what 
-        Later we can add a conidition as a check. 
+        This function is to measure flipping sequence for whaterver nr_of times
+        a function needs to be run to calibrate the Pi and Pi/2 Pulse.
+        Right now this method will always return true no matter what
+        Later we can add a conidition as a check.
         '''
         for i in range(nr_sequence):
             self.measure_flipping(update=True)
