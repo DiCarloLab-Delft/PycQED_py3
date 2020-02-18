@@ -3,28 +3,7 @@ from autodepgraph import AutoDepGraph_DAG
 # AutoDepGraph
 ###########################################################################
 """
-Dependancy graphs for different devices can be made here. Usually, a new class
-is created for each new device, with nameing convention 'device_dep_graph' with
-device the name of the device (e.g. Octobox).
-
-Graphs usually consist of two parts:
-- A global part which normally is just charactarizing resonators
-- A qubit specific part, which is made with a loop over all qubits
-
-For now, the general part is performed by calling functions over a 'fakequbit',
-which is a hacky way of doing the resonator measurements without setting any
-parameters in the real qubits.
-The calibration methods should already be compatible with this way of
-characterizing, and they should already update the relevant qubit parameters
-(but it won't hurt to check)
-
-Args:
-    name    (str)   : Name of the dependency graph (not sure what this does).
-    device  (device): The device object that you would like to make a graph of.
-
-This should be called as 'dag = DDG.device_dep_graph(name, device)'. Then you
-can work with the dag object that was just created, and do any operation on
-there.
+GBTwo Graph.
 """
 
 
@@ -41,7 +20,6 @@ class octobox_dep_graph(AutoDepGraph_DAG):
 
     def create_dep_graph(self, Qubit_list):
         print('Creating Graph ...')
-        Qubit = self.device.find_instrument('fakequbit')
 
         cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
 
@@ -56,9 +34,9 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             ################################
             self.add_node(Qubit.name + ' Rabi',
                           calibrate_function=Qubit.name +
-                            '.calibrate_mw_pulse_amplitude_coarse',
-                          check_function=Qubit.name + '.check_rabi',
-                          tolerance=0.01)
+                            '.calibrate_mw_pulse_amplitude_coarse')#,
+                          # check_function=Qubit.name + '.check_rabi',
+                          # tolerance=0.01)+
             self.add_node(Qubit.name + ' Frequency Fine',
                           calibrate_function=Qubit.name +
                             '.calibrate_frequency_ramsey',
@@ -74,9 +52,15 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             ################################
             # Single Qubit Gate Calibration
             ################################
+            self.add_node(Qubit.name + ' Flipping',
+                          calibrate_function=Qubit.name + '.flipping_GBT')
+            self.add_node(Qubit.name + ' MOTZOI Calibration',
+                          calibrate_function=Qubit.name + '.calibrate_motzoi')
             self.add_node(Qubit.name + ' ALLXY',
-                          calibrate_function=Qubit.name +
-                            '.calibrate_mw_gates_allxy2')
+                          calibrate_function=Qubit.name + '.allxy_GBT')
+            self.add_node(Qubit.name + ' RB Fidelity',
+                          calibrate_function=Qubit.name + \
+                            '.measure_randomized_benchmarking_old')
 
             ################################
             # Readout Calibration
@@ -121,10 +105,17 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             self.add_edge(Qubit.name + ' Frequency Fine',
                           Qubit.name + ' Rabi')
 
+            self.add_edge(Qubit.name + ' Flipping',
+                          Qubit.name + ' Frequency Fine')
+            self.add_edge(Qubit.name + ' MOTZOI Calibration',
+                          Qubit.name + ' Flipping')
             self.add_edge(Qubit.name + ' ALLXY',
-                          Qubit.name + ' Rabi')
+                          Qubit.name + ' MOTZOI Calibration')
             self.add_edge(Qubit.name + ' ALLXY',
                           Qubit.name + ' Frequency Fine')
+            self.add_edge(Qubit.name + ' RB Fidelity',
+                          Qubit.name + ' ALLXY')
+
             self.add_edge(Qubit.name + ' Acquisition Delay Calibration',
                           Qubit.name + ' Rabi')
             self.add_edge(Qubit.name + ' Dispersive Shift',
