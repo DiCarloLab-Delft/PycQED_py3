@@ -4,6 +4,7 @@ from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
+from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.simulations import cz_superoperator_simulation_new2 as cz_main
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
 import adaptive
@@ -259,6 +260,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            parameter_class=ManualParameter)
         # CODEWORDS 1-4: CZ
         for this_cz in ['NE', 'NW', 'SW', 'SE']:
+
             self.add_parameter('czd_double_sided_%s' % this_cz,
                                initial_value=False,
                                vals=vals.Bool(),
@@ -267,7 +269,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                initial_value=False,
                                vals=vals.Bool(),
                                parameter_class=ManualParameter)
-
+            self.add_parameter('czd_initial_wait_%s' % this_cz,
+                               unit='s',
+                               initial_value=0e-9, vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
             self.add_parameter(
                 'czd_net_integral_%s' % this_cz,
                 docstring='Used determine what the integral of'
@@ -440,8 +445,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         # Now the sinusoidal step for phase acquisition
         if is_double_sided:
-            corr_pulse += phase_corr_sine_series([corr_amp],
-                                                 corr_samples)
+            # corr_pulse += phase_corr_sine_series([corr_amp],
+            corr_pulse += phase_corr_soft_double_square([corr_amp],
+                                                        corr_samples)
         else:
             corr_pulse += phase_corr_sine_series_half([corr_amp],
                                                       corr_samples)
@@ -487,6 +493,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         czd_amp_ratio = self.get('czd_amp_ratio_%s' % which_gate)
         czd_amp_offset = self.get('czd_amp_offset_%s' % which_gate)
+        initial_wait = self.get('czd_initial_wait_%s' % which_gate)
+        initial_wait_vec = np.zeros(int(initial_wait*self.sampling_rate()))
 
         dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
         eps_i = self.calc_amp_to_eps(0, state_A='11',
@@ -566,8 +574,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 CZ_B *= 0
             # Combine both halves of the double sided CZ gate
             amp_rat = czd_amp_ratio
-            waveform = np.concatenate(
-                [CZ_A, amp_rat*CZ_B + czd_amp_offset])
+            if initial_wait == 0:
+                list_wvf = [CZ_A, amp_rat*CZ_B + czd_amp_offset]
+            else:
+                list_wvf = [initial_wait_vec, CZ_A,
+                            amp_rat*CZ_B + czd_amp_offset,
+                            initial_wait_vec]
+            waveform = np.concatenate(list_wvf)
 
             return waveform
 
@@ -1846,6 +1859,24 @@ def phase_corr_sine_series(a_i, nr_samples):
     for i, a in enumerate(a_i):
         s += a*np.sin((i+1)*x)
     return s
+
+
+def phase_corr_soft_double_square(a_i, nr_samples, window_len=4):
+    """
+    Phase correction pulse as a soft_double_square.
+
+    The integeral (sum) of this waveform is
+    gauranteed to be equal to zero (within rounding error)
+    by the choice of function.
+    """
+
+    x = np.linspace(0, 2*np.pi, nr_samples)
+    s = np.zeros(nr_samples)
+    s[:nr_samples//2] = a_i[0]*np.ones(nr_samples//2)
+    s[-nr_samples//2:] = -a_i[0]*np.ones(nr_samples-nr_samples//2)
+    s2 = a_tools.smooth(np.concatenate(([0], s, [0])),
+                        window_len=window_len)[1:-1]
+    return s2
 
 
 def phase_corr_sine_series_half(a_i, nr_samples):
