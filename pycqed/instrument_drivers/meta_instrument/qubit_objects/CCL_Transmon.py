@@ -2077,11 +2077,18 @@ class CCLight_Transmon(Qubit):
             self.ro_pulse_mixer_offs_Q(offset_Q)
         return True
 
-    def calibrate_mw_pulses_basic(self, amps=np.linspace(0,1,31),
-                                  freq_steps=[1, 3, 10, 30, 100, 300, 1000],
-                                  n_iter_flipping=2, soft_avg_allxy=3,
-                                  cal_skewness=False, cal_offsets=True,
-                                  f_target_offsets=-120,
+    def calibrate_mw_pulses_basic(self,
+                                  cal_steps=['offsets', 'amp_coarse', 'freq',
+                                             'drag', 'amp_fine', 'amp_fine',
+                                             'amp_fine'],
+                                  kw_freqs={'steps': [1, 3, 10, 30, 100,
+                                                      300, 1000]},
+                                  kw_amp_coarse={'amps': np.linspace(0, 1, 31)},
+                                  kw_amp_fine={'update': True},
+                                  soft_avg_allxy=3,
+                                  kw_offsets={'ftarget': -120},
+                                  kw_skewness={},
+                                  kw_motzoi={'update': True},
                                   f_target_skewness=-120):
         """
         Performs a standard calibration of microwave pulses consisting of
@@ -2092,21 +2099,25 @@ class CCLight_Transmon(Qubit):
         - frequency (ramsey)
         - motzoi
         - ampl fine (flipping)
+
         - AllXY (to verify)
 
         Note that this is a basic calibration and does not involve fine tuning
         to ~99.9% and only works if the qubit is well behaved.
         """
-        if cal_offsets:
-            self.calibrate_mixer_offsets_drive(f_target=f_target_offsets)
-        if cal_skewness:
-            self.calibrate_mixer_skewness_drive(f_target=f_target_skewness)
-
-        self.calibrate_mw_pulse_amplitude_coarse(amps=amps)
-        self.find_frequency('ramsey', steps=freq_steps)
-        self.calibrate_motzoi()
-        for i in range(n_iter_flipping):
-            self.measure_flipping(update=True)
+        for this_step in cal_steps:
+            if this_step == 'offsets':
+                self.calibrate_mixer_offsets_drive(**kw_offsets)
+            elif this_step == 'skewness':
+                self.calibrate_mixer_skewness_drive(**kw_skewness)
+            elif this_step == 'amp_coarse':
+                self.calibrate_mw_pulse_amplitude_coarse(**kw_amp_coarse)
+            elif this_step == 'freq':
+                self.find_frequency('ramsey', **kw_freqs)
+            elif this_step == 'drag':
+                self.calibrate_motzoi(**kw_motzoi)
+            elif this_step == 'amp_fine':
+                self.measure_flipping(**kw_amp_fine)
         old_soft_avg = self.ro_soft_avg()
         self.ro_soft_avg(soft_avg_allxy)
         self.measure_allxy()
