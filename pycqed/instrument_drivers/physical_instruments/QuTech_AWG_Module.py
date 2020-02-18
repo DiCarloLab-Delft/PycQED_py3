@@ -23,7 +23,9 @@ import logging
 import warnings
 import re
 import json
-from typing import List, Sequence, Dict
+from typing import Tuple, List, Sequence, Dict
+
+from pycqed.instrument_drivers.meta_instrument import DIOCalibration
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
@@ -126,7 +128,7 @@ cw_protocols_mt = {
 # class
 ##########################################################################
 
-class QuTech_AWG_Module(SCPI):
+class QuTech_AWG_Module(SCPI, DIOCalibration):
     __doc__ = f"""
     Driver for a Qutech AWG Module (QWG) instrument. Will establish a connection to a module via ethernet.
     :param name: Name of the instrument  
@@ -309,6 +311,16 @@ class QuTech_AWG_Module(SCPI):
                     f'- Interboard detected: {self.dio_interboard()}'
 
         return info
+
+    ##########################################################################
+    # overrides for DIOCalibration interface
+    ##########################################################################
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        raise RuntimeError("not implemented")
+
+    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+        raise RuntimeError("not implemented")
 
     ##########################################################################
     # AWG5014 functions: WLIST (Waveform list)

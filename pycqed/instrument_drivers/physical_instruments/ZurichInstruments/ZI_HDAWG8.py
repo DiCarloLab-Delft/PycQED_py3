@@ -90,7 +90,7 @@ from typing import Tuple,List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
-from pycqed.instrument_drivers.meta_instrument import DIOCalibration
+from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter

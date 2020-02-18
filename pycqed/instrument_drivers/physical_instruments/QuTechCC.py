@@ -15,7 +15,7 @@ from typing import Tuple,List
 
 from .QuTechCC_core import QuTechCC_core
 from .Transport import Transport
-from pycqed.instrument_drivers.meta_instrument import DIOCalibration
+from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
 
 from qcodes.utils import validators as vals
 from qcodes import Instrument
@@ -288,7 +288,7 @@ class QuTechCC(QuTechCC_core, Instrument, DIOCalibration):
             print(self.get_error())
         self.start()
         log.debug('starting CC')
-        
+
         expected_sequence = []
         return dio_mask,expected_sequence
 

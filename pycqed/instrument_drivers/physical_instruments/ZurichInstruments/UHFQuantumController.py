@@ -62,7 +62,7 @@ import numpy as np
 from typing import Tuple,List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
-from pycqed.instrument_drivers.meta_instrument import DIOCalibration
+from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
 from pycqed.utilities.general import check_keyboard_interrupt
 
 from qcodes.utils import validators
