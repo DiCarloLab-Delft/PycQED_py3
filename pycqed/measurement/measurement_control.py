@@ -11,7 +11,7 @@ from pycqed.utilities.general import (
     check_keyboard_interrupt,
     KeyboardFinish,
     flatten,
-    get_git_revision_hash
+    get_git_revision_hash,
 )
 from pycqed.utilities.get_default_datadir import get_default_datadir
 
@@ -45,7 +45,8 @@ from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
 from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
-from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, evaluate_X
+from pycqed.utilities.learnerND_optimize import LearnerND_Optimize
+from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, evaluate_X
 
 from skopt import Optimizer  # imported for checking types
 
@@ -317,7 +318,9 @@ class MeasurementControl(Instrument):
                 start_idx = self.get_datawriting_start_idx()
                 if len(self.sweep_functions) == 1:
                     self.sweep_functions[0].set_parameter(sweep_points[start_idx])
-                    self.detector_function.prepare(sweep_points=self.get_sweep_points().astype(np.float64))
+                    self.detector_function.prepare(
+                        sweep_points=self.get_sweep_points().astype(np.float64)
+                    )
                     self.measure_hard()
                 else:  # If mode is 2D
                     for i, sweep_function in enumerate(self.sweep_functions):
@@ -325,7 +328,9 @@ class MeasurementControl(Instrument):
                         val = swf_sweep_points[start_idx]
                         sweep_function.set_parameter(val)
                     self.detector_function.prepare(
-                        sweep_points=sweep_points[start_idx : start_idx + self.xlen, 0].astype(np.float64)
+                        sweep_points=sweep_points[
+                            start_idx : start_idx + self.xlen, 0
+                        ].astype(np.float64)
                     )
                     self.measure_hard()
         else:
@@ -412,7 +417,9 @@ class MeasurementControl(Instrument):
                         n_random_starts=self.af_pars.get("n_random_starts", None),
                         random_state=self.af_pars.get("random_state", None),
                         acq_func_kwargs=self.af_pars.get("acq_func_kwargs", None),
-                        acq_optimizer_kwargs=self.af_pars.get("acq_optimizer_kwargs", None),
+                        acq_optimizer_kwargs=self.af_pars.get(
+                            "acq_optimizer_kwargs", None
+                        ),
                     )
                 else:
                     raise NotImplementedError("Learner subclass type not supported.")
@@ -424,7 +431,9 @@ class MeasurementControl(Instrument):
                 # rather it is the `adaptive.runner.simple` function. This
                 # ensures that everything runs in a single process, as is
                 # required by QCoDeS (May 2018) and makes things simpler.
-                self.runner = runner.simple(learner=self.learner, goal=self.af_pars["goal"])
+                self.runner = runner.simple(
+                    learner=self.learner, goal=self.af_pars["goal"]
+                )
 
             # NB: If you reload the optimizer module, `issubclass` will fail
             # This is because the reloaded class is a new distinct object
@@ -435,8 +444,10 @@ class MeasurementControl(Instrument):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
                 self.save_optimization_results(self.adaptive_function, self.learner)
-            elif issubclass(self.adaptive_function, LearnerND_Optimize) or issubclass(
-                self.adaptive_function, Learner1D_Minimizer
+            elif (
+                issubclass(self.adaptive_function, LearnerND_Optimize)
+                or issubclass(self.adaptive_function, Learner1D_Minimizer)
+                or issubclass(self.adaptive_function, LearnerND_Minimizer)
             ):
                 # Because this is also an optimizer we save the result
                 # Pass the learner because it contains all the points
@@ -1748,8 +1759,10 @@ class MeasurementControl(Instrument):
             opt_idx_selector = np.argmin if self.minimize_optimization else np.argmax
             opt_indx = opt_idx_selector(result.yi)
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
-        elif is_subclass(adaptive_function, Learner1D_Minimizer) or is_subclass(
-            adaptive_function, LearnerND_Optimize
+        elif (
+            is_subclass(adaptive_function, Learner1D_Minimizer)
+            or is_subclass(adaptive_function, LearnerND_Optimize)
+            or is_subclass(adaptive_function, LearnerND_Minimizer)
         ):
             # result = learner
             # Because MC saves all the datapoints we save only the best point
@@ -1763,6 +1776,7 @@ class MeasurementControl(Instrument):
             res_dict = {
                 "xopt": np.array(xopt)
                 if is_subclass(adaptive_function, LearnerND_Optimize)
+                or is_subclass(adaptive_function, Learner1D_Minimizer)
                 else xopt,
                 "fopt": Y[opt_indx],
             }

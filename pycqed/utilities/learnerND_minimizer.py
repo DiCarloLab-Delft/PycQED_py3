@@ -189,6 +189,7 @@ def mk_minimization_loss(
         dist_best_val_in_simplex = (
             learner._max_value - np.min(values) * learner._scale
         )
+        dist_all = np.average(learner._max_value - np.array(values) * learner._scale)
 
         # NB: this might have numerical issues, consider using
         # `learner._output_multiplier` if issues arise or keep the
@@ -227,7 +228,8 @@ def mk_minimization_loss(
 
             # Big loss => interesting point => difference from maximum function
             # value gives high loss
-            loss = dist_best_val_in_simplex * vol
+            # loss = dist_best_val_in_simplex * vol
+            loss = dist_all * vol
 
         if randomize_global_search:
             # In case the learner is not working well some biased random
