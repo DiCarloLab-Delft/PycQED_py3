@@ -38,10 +38,9 @@ class DIOCalibration(ABC):
         pass
 
 
-def calibrate(self,
-              sender: DIOCalibration,
-              sender_dio_mode: str,
+def calibrate(sender: DIOCalibration,
               receiver: DIOCalibration,
+              sender_dio_mode: str='',
               sender_port: int=0,
               receiver_port: int=0
               ):
@@ -55,6 +54,7 @@ def calibrate(self,
         sender_port: the port on which to generate the data (other ports are also ALLOWED to produce data)
         receiver_port: the port on which to receive the data
     """
+    # FIXME: allow list of senders or receivers
     dio_mask,expected_sequence = sender.output_dio_calibration_data(dio_mode=sender_dio_mode, port=sender_port)
     # FIXME: disable receiver connector outputs? And other receivers we're not aware of?
     receiver.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=receiver_port)

@@ -494,7 +494,7 @@ class UHFQC(zibase.ZI_base_instrument, DIOCalibration):
             self.awg_sequence_acquisition()
 
         # Setting the clock to external
-        self.system_extclk(1)
+        self.assure_ext_clock()
 
         # Turn on both outputs
         self.sigouts_0_on(1)
@@ -1615,12 +1615,27 @@ setTrigger(0);
     ##########################################################################
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
-        raise RuntimeError("not implemented")
+        # NB: ignoring dio_mode and port, because we have no choice
+        # FIXME: does not seem to produce data in sync with 10 MHz/50 MHz
+        program = '''
+        var A = 0x00000CFF; // DV=0x0001, CW=0xCF7
+        var B = 0x00000000;
+
+        while (1) {
+            setDIO(A);
+            wait(2);
+            setDIO(B);
+            wait(2);
+        }
+        '''
+        self.configure_awg_from_string(0, program)
+        self.seti('awgs/0/enable', 1)
+
+        dio_mask = 0x00000CFF
+        expected_sequence = []
+        return dio_mask,expected_sequence
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
-        """
-        calibrate DIO protocol. Requires valid DIO input signal
-        """
         verbose = False  # FIXME: use logging
         self.assure_ext_clock()
 

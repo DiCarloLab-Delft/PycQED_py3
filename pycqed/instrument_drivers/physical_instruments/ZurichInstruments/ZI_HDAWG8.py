@@ -544,6 +544,7 @@ while (1) {
     ##########################################################################
 
     # NB: based on UHFQuantumController.py::_prepare_HDAWG8_dio_calibration
+    # FIXME: also requires fiddling with DIO data direction
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         """
         Configures an HDAWG with a default program that generates data suitable for DIO calibration.
@@ -554,10 +555,10 @@ while (1) {
         var B = 0x00000000;
 
         while (1) {
-          setDIO(A);
-          wait(2);
-          setDIO(B);
-          wait(2);
+            setDIO(A);
+            wait(2);
+            setDIO(B);
+            wait(2);
         }
         '''
         self.configure_awg_from_string(0, program)

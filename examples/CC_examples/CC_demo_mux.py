@@ -13,6 +13,8 @@ from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
+from pycqed.instrument_drivers.meta_instrument.DIOCalibration import calibrate
+
 
 
 # parameter handling
@@ -22,7 +24,8 @@ if len(sys.argv)>1:
 
 # constants
 ip_cc = '192.168.0.241'
-dev_uhfqa = 'dev2493'
+dev_uhfqa = 'dev2271'
+cc_port_uhfqa = 2
 
 
 
@@ -101,10 +104,15 @@ if 1:
     log.info(cc.get_identity())
 
     if 1:
-        log.debug('calibration DIO')
-        # upload DIO calibration program to CC
-        # upload DIO calibration program to UHFQA
-        cc.calibrate_dio(0)
+        log.debug('calibration DIO: CC to UHFQA')
+
+
+        log.debug('calibration DIO: UHFQA to CC')
+        calibrate(
+            sender=UHFQC0,
+            receiver=cc,
+            receiver_port=cc_port_uhfqa
+        )
 
     log.debug('uploading program to CC')
     cc.sequence_program_assemble(prog)
