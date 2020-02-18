@@ -25,7 +25,7 @@ import re
 import json
 from typing import Tuple, List, Sequence, Dict
 
-from pycqed.instrument_drivers.meta_instrument import DIOCalibration
+from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
