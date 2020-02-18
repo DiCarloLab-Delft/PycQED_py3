@@ -21,22 +21,13 @@ class SCPIBase:
         self._transport = transport
 
     ###
-    # Helpers
+    # Convenience functions for user
     ###
 
-    def _ask(self, cmd_str: str) -> str:
-        self._transport.write(cmd_str)
-        return self._transport.readline().rstrip()  # remove trailing white space, CR, LF
-
-    def _ask_float(self, cmd_str: str) -> float:
-        return float(self._ask(cmd_str))  # FIXME: can raise ValueError
-
-    def _ask_int(self, cmd_str: str) -> int:
-        return int(self._ask(cmd_str))  # FIXME: can raise ValueError
-
-    def _ask_bin(self, cmd_str: str) -> bytes:
-        self._transport.write(cmd_str)
-        return self.bin_block_read()
+    def init(self) -> None:
+        self.reset()
+        self.clear_status()
+        self.status_preset()
 
     ###
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
@@ -164,6 +155,24 @@ class SCPIBase:
         bin_block = self._transport.read_binary(byte_cnt)
         self._transport.read_binary(2)                                  # consume <CR><LF>
         return bin_block
+
+    ###
+    # Helpers
+    ###
+
+    def _ask(self, cmd_str: str) -> str:
+        self._transport.write(cmd_str)
+        return self._transport.readline().rstrip()  # remove trailing white space, CR, LF
+
+    def _ask_float(self, cmd_str: str) -> float:
+        return float(self._ask(cmd_str))  # FIXME: can raise ValueError
+
+    def _ask_int(self, cmd_str: str) -> int:
+        return int(self._ask(cmd_str))  # FIXME: can raise ValueError
+
+    def _ask_bin(self, cmd_str: str) -> bytes:
+        self._transport.write(cmd_str)
+        return self.bin_block_read()
 
     ###
     # IEEE488.2 status constants

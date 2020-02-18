@@ -1,10 +1,10 @@
 """
-File:       QuTech_AWG_Module.py
+File:       QWG.py
 Author:     Wouter Vlothuizen, TNO/QuTech,
             edited by Adriaan Rol, Gerco Versloot
 Purpose:    Instrument driver for Qutech QWG
 Usage:
-Notes:      To be replaced by QuTech/QWG.py
+Notes:      This file is to replace QuTech_AWG_Module.py
             It is possible to view the QWG log using ssh. To do this:
             - connect using ssh e.g., "ssh root@192.168.0.10"
             - view log using "tail -f /var/log/qwg.log"
@@ -261,7 +261,6 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
             raise RuntimeError(f'{repr(self)}: ' + ', '.join(errMgs))
             # FIXME: is raising a potentially very long string useful?
 
-    # FIXME: HDAWG: def calibrate_dio_protocol(self, expected_sequence=None, verbose=False, repetitions=1) -> None:
     def dio_calibrate(self, target_index: int = ''):
         # FIXME: cleanup docstring
         """
@@ -317,11 +316,11 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
     # overrides for DIOCalibration interface
     ##########################################################################
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
-        raise RuntimeError("not implemented")
-
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
-        raise RuntimeError("not implemented")
+        raise RuntimeError("QWG cannot output calibration data")
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        self.dio_calibrate()    # FIXME: integrate
 
     ##########################################################################
     # AWG5014 functions: WLIST (Waveform list)
@@ -613,7 +612,7 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
     def _setMatrix(self, chPair, mat):
         """
         Args:
-            chPair(int): ckannel pair for operation, 1 or 3
+            chPair(int): channel pair for operation, 1 or 3
 
             matrix(np.matrix): 2x2 matrix for mixer calibration
         """
@@ -1134,10 +1133,9 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                     'Effective immediately when sent')
 
     ##########################################################################
-    # parameter support
+    # parameter helpers
     ##########################################################################
 
-    # Used for setting the channel pairs
     @staticmethod
     def _gen_ch_set_func(fun, ch):
         def set_func(val):

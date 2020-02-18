@@ -98,9 +98,7 @@ if 1:
 
     log.debug('connecting to CC')
     cc = QuTechCC('cc', IPTransport(ip_cc))
-    cc.reset()
-    cc.clear_status()
-    cc.status_preset()
+    cc.init()
     log.info(cc.get_identity())
 
     if 1:
