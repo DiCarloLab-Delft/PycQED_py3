@@ -20,7 +20,7 @@ from functools import reduce
 def flatten_list(l): return reduce(lambda x, y: x+y, l)
 
 
-class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
+class TFD_Analysis_Pauli_Tomo(tfd_an.TFD_Analysis_Pauli_Strings):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
                  g: float = 1, T: float = 1,
@@ -28,7 +28,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                  options_dict: dict = None, extract_only: bool = False,
                  auto=True):
         """
-        Analysis for 3CZ version of the Thermal Field Double VQE circuit.
+        Analysis for the Thermal Field Double state QAOA experiment.
 
         Args:
             g (float):
@@ -321,15 +321,20 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
             **self.proc_data_dict['energy_terms']}
 
     def prepare_plots(self):
-        self.plot_dicts['pauli_operators_Tomo'] = {
+        self.plot_dicts['pauli_operators_tomo'] = {
             'plotfn': tfd_an.plot_pauli_ops,
             'pauli_terms': self.proc_data_dict['pauli_terms'],
             'energy_terms': self.proc_data_dict['energy_terms']
         }
-        self.plot_dicts['pauli_operators_Tomo_full'] = {
+        self.plot_dicts['pauli_operators_tomo_full'] = {
             'plotfn': tfd_an.plot_all_pauli_ops,
             'full_dict': self.proc_data_dict['quantities_of_interest']['full_tomo_dict']
-            # 'pauli_terms': self.proc_data_dict['pauli_terms']
+        }
+        self.plot_dicts['expectation_values'] = {
+            'plotfn': tfd_an.plot_expectation_values_TFD,
+            'full_dict': self.proc_data_dict['quantities_of_interest']['full_tomo_dict'],
+            'T': self.T
+
         }
         for ch_id,ch in enumerate(self.raw_data_dict['ro_sq_ch_names']):
             self.plot_dicts['TV_{}'.format(ch)] = {
@@ -351,7 +356,7 @@ class TFD_3CZ_Analysis_Pauli_Tomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
                 'title': (self.raw_data_dict['timestamps'][0]+' - ' + ' TV: {}'.format(ch))}
 
 
-class TFD_3CZ_Analysis_Pauli_FullTomo(tfd_an.TFD_3CZ_Analysis_Pauli_Strings):
+class TFD_Analysis_Pauli_FullTomo(tfd_an.TFD_Analysis_Pauli_Strings):
     """
     Difference with Pauli_Tomo (not Full) is that this one inverts the full betas (which can always be done because of all calibration points)
     """
