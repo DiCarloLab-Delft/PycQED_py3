@@ -18,10 +18,11 @@ import pycqed.analysis.fitting_models as fit_mods
 from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v2.simple_analysis as sa
 from scipy.optimize import minimize
-from pycqed.analysis.tools.plotting import SI_val_to_msg_str
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
-    set_cbarlabel, flex_colormesh_plot_vs_xy
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str, \
+    set_xlabel, set_ylabel, set_cbarlabel, flex_colormesh_plot_vs_xy
+from pycqed.analysis_v2.tools.plotting import scatter_pnts_overlay
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.utilities.general import int2base
@@ -747,7 +748,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 kb = 1.38064852e-23
                 res_exc = a_sp.value
                 effective_temp = h*6.42e9/(kb*np.log((1-res_exc)/res_exc))
-                fit_text += '\n\nEffective qubit temperature = {:.2f} mK\n@{:.0f}'.format(effective_temp*1e3,self.qubit_freq)
+                fit_text += '\n\nQubit '+'$T_{eff}$'+\
+                    ' = {:.2f} mK\n@{:.0f}'.format(effective_temp*1e3,
+                                                  self.qubit_freq)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {
@@ -1315,6 +1318,104 @@ class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
             'plotfn': self.plot_bar,
             'bar_kws': { 'alpha': .25, 'facecolor': 'C1'}
             }
+
+
+class Readout_landspace_Analysis(sa.Basic2DInterpolatedAnalysis):
+    '''
+    Analysis for Readout landscapes using adaptive sampling.
+    Stores maximum fidelity parameters in quantities of interest dict as:
+        - <analysis_object>.qoi['Optimal_parameter_X']
+        - <analysis_object>.qoi['Optimal_parameter_Y']
+    '''
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 interp_method: str = 'linear',
+                 options_dict: dict=None, auto=True,
+                 **kw):
+
+        super().__init__(t_start = t_start, t_stop = t_stop,
+                         label = label,
+                         data_file_path = data_file_path,
+                         options_dict = options_dict,
+                         auto = auto,
+                         interp_method=interp_method,
+                         **kw)
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        super().process_data()
+
+        # Extract maximum interpolated fidelity
+        idx = [i for i, s in enumerate(self.proc_data_dict['value_names']) \
+                if 'F_a' in s][0]
+        X = self.proc_data_dict['x_int']
+        Y = self.proc_data_dict['y_int']
+        Z = self.proc_data_dict['interpolated_values'][idx]
+
+        max_idx = np.unravel_index(np.argmax(Z), (len(X),len(Y)) )
+        self.proc_data_dict['Max_F_a_idx'] = max_idx
+        self.proc_data_dict['Max_F_a'] = Z[max_idx[1],max_idx[0]]
+
+        self.proc_data_dict['quantities_of_interest'] = {
+            'Optimal_parameter_X': X[max_idx[1]],
+            'Optimal_parameter_Y': Y[max_idx[0]]
+            }
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        for i, val_name in enumerate(self.proc_data_dict['value_names']):
+
+            zlabel = '{} ({})'.format(val_name,
+                                      self.proc_data_dict['value_units'][i])
+            # Plot interpolated landscape
+            self.plot_dicts[val_name] = {
+                'ax_id': val_name,
+                'plotfn': a_tools.color_plot,
+                'x': self.proc_data_dict['x_int'],
+                'y': self.proc_data_dict['y_int'],
+                'z': self.proc_data_dict['interpolated_values'][i],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'x_unit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'y_unit': self.proc_data_dict['yunit'],
+                'zlabel': zlabel,
+                'title': '{}\n{}'.format(
+                    self.timestamp, self.proc_data_dict['measurementstring'])
+                }
+            # Plot sampled values
+            self.plot_dicts[val_name+str('_sampled_values')] = {
+                'ax_id': val_name,
+                'plotfn': scatter_pnts_overlay,
+                'x': self.proc_data_dict['x'],
+                'y': self.proc_data_dict['y'],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'x_unit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'y_unit': self.proc_data_dict['yunit'],
+                'alpha': .75,
+                'setlabel': 'Sampled points',
+                'do_legend': True
+                }
+            # Plot maximum fidelity point
+            self.plot_dicts[val_name+str('_max_fidelity')] = {
+                'ax_id': val_name,
+                'plotfn': self.plot_line,
+                'xvals': [self.proc_data_dict['x_int']\
+                            [self.proc_data_dict['Max_F_a_idx'][1]]],
+                'yvals': [self.proc_data_dict['y_int']\
+                            [self.proc_data_dict['Max_F_a_idx'][0]]],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'xunit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'yunit': self.proc_data_dict['yunit'],
+                'marker': 'x',
+                'linestyle': '',
+                'color': 'red',
+                'setlabel': 'Max fidelity',
+                'do_legend': True,
+                'legend_pos': 'upper right'
+                }
 
 
 class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):

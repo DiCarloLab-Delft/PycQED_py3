@@ -46,9 +46,6 @@ except ImportError:
     oqh = None
 
 
-
-
-
 class DeviceCCL(Instrument):
     """
     Device object for systems controlled using the
@@ -302,18 +299,33 @@ class DeviceCCL(Instrument):
 
         """
         # 2. Setting the latencies
-        latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
-                                 ('ro_1', self.tim_ro_latency_1()),
-                                 ('ro_2', self.tim_ro_latency_2()),
-                                 ('mw_0', self.tim_mw_latency_0()),
-                                 ('mw_1', self.tim_mw_latency_1()),
-                                 ('flux_0', self.tim_flux_latency_0()),
-                                 ('flux_1', self.tim_flux_latency_1()),
-                                 ('flux_2', self.tim_flux_latency_2()),
-                                 ('mw_2', self.tim_mw_latency_2()),
-                                 ('mw_3', self.tim_mw_latency_3()),
-                                 ('mw_4', self.tim_mw_latency_4())]
-                                )
+        cc = self.instr_CC.get_instr()
+        if isinstance(cc, CCL):
+            latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
+                                     ('ro_1', self.tim_ro_latency_1()),
+                                     # ('ro_2', self.tim_ro_latency_2()),
+                                     ('mw_0', self.tim_mw_latency_0()),
+                                     ('mw_1', self.tim_mw_latency_1()),
+                                     ('flux_0', self.tim_flux_latency_0())
+                                     # ('flux_1', self.tim_flux_latency_1()),
+                                     # ('flux_2', self.tim_flux_latency_2()),
+                                     # ('mw_2', self.tim_mw_latency_2()),
+                                     # ('mw_3', self.tim_mw_latency_3()),
+                                     # ('mw_4', self.tim_mw_latency_4())]
+                                     ])
+        else:
+            latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
+                                     ('ro_1', self.tim_ro_latency_1()),
+                                     ('ro_2', self.tim_ro_latency_2()),
+                                     ('mw_0', self.tim_mw_latency_0()),
+                                     ('mw_1', self.tim_mw_latency_1()),
+                                     ('flux_0', self.tim_flux_latency_0()),
+                                     ('flux_1', self.tim_flux_latency_1()),
+                                     ('flux_2', self.tim_flux_latency_2()),
+                                     ('mw_2', self.tim_mw_latency_2()),
+                                     ('mw_3', self.tim_mw_latency_3()),
+                                     ('mw_4', self.tim_mw_latency_4())]
+                                    )
 
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
@@ -1317,7 +1329,8 @@ class DeviceCCL(Instrument):
             MC = self.instr_MC.get_instr()
 
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q_spec_idx_list = [self.find_instrument(q_s).cfg_qubit_nr() for q_s in q_spectators]
+        q_spec_idx_list = [self.find_instrument(
+            q_s).cfg_qubit_nr() for q_s in q_spectators]
 
         p = mqo.residual_coupling_sequence(times, q0idx, q_spec_idx_list,
                                            spectator_state,
@@ -1328,7 +1341,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('Residual_ZZ_{}_{}_{}{}'.format(q0, q_spectators, spectator_state, self.msmt_suffix))
+        MC.run('Residual_ZZ_{}_{}_{}{}'.format(
+            q0, q_spectators, spectator_state, self.msmt_suffix))
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
@@ -2061,7 +2075,9 @@ class DeviceCCL(Instrument):
         s = swf.tim_flux_latency_sweep(self)
         s2 = swf.tim_mw_latency_sweep(self)
         MC.set_sweep_functions([s, s2])
+        # MC.set_sweep_functions(s2)
 
+        # MC.set_sweep_points(microwave_latencies)
         MC.set_sweep_points(flux_latencies)
         MC.set_sweep_points_2D(microwave_latencies)
         MC.run_2D(label.format(self.name, q0))
@@ -2072,6 +2088,52 @@ class DeviceCCL(Instrument):
                                  flux_latency=0,
                                  flux_pulse_duration=10e-9,
                                  mw_pulse_separation=80e-9)
+
+    def measure_timing_diagram_1D(self, q0,  microwave_latencies,
+                                  MC=None,  label='timing_{}_{}',
+                                  qotheridx=2,
+                                  prepare_for_timedomain: bool = True):
+        """
+        Measure timing diagram. 
+
+        Args:
+            q0  (str)     :
+                name of the target qubit
+            microwave_latencies (array): 
+                array of microwave latencies to set (in seconds)
+
+            label (str):
+                used to label the experiment
+
+            prepare_for_timedomain (bool):
+                calls self.prepare_for_timedomain on start
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+
+        CC = self.instr_CC.get_instr()
+
+        # Pi pulse + ro measurement
+        # p = sqo.single_elt_on(q0idx,
+        #                       platf_cfg=self.cfg_openql_platform_fn())
+        p = sqo.TimingCalibration_1D(q0idx,
+                                     times=[40e-9],
+                                     platf_cfg=self.cfg_openql_platform_fn(),
+                                     # flux_cw='fl_cw_06',
+                                     qubit_other_idx=qotheridx,
+                                     cal_points=False)
+        CC.eqasm_program(p.filename)
+
+        d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
+        MC.set_detector_function(d)
+
+        s = swf.tim_mw_latency_sweep_1D(self)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(microwave_latencies)
+        MC.run(label.format(self.name, q0))
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
                                        MC=None,

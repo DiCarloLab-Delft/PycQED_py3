@@ -1,40 +1,37 @@
-# FIXME: file has errors according to PyCharm
 
 import time
 import logging
 import numpy as np
-import warnings
-import pytest
-import cma
-import datetime
 from autodepgraph import AutoDepGraph_DAG
-
-from .qubit_object import Qubit
+import warnings
 
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
 from pycqed.measurement.openql_experiments import pygsti_oql
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
+from pycqed.analysis.tools import cryoscope_tools as ct
+from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis.tools import plotting as plt_tools
+from pycqed.utilities.general import gen_sweep_pts
+from .qubit_object import Qubit
+from qcodes.utils import validators as vals
+from qcodes.instrument.parameter import (
+    ManualParameter, InstrumentRefParameter)
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis_v2 import measurement_analysis as ma2
+from pycqed.measurement import calibration_toolbox as cal_toolbox
 from pycqed.measurement.openql_experiments.openql_helpers import \
     load_range_of_oql_programs
-from pycqed.measurement import calibration_toolbox as cal_toolbox
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 import pycqed.measurement.composite_detector_functions as cdf
-from pycqed.measurement.optimization import nelder_mead
-from pycqed.analysis.tools import cryoscope_tools as ct
-from pycqed.analysis import analysis_toolbox as a_tools
-from pycqed.analysis.tools import plotting as plt_tools
-from pycqed.analysis import measurement_analysis as ma
-from pycqed.analysis_v2 import measurement_analysis as ma2
-from pycqed.utilities.general import gen_sweep_pts
-from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman
+import pytest
 
-from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import (
-    ManualParameter, InstrumentRefParameter)
+import cma
+from pycqed.measurement.optimization import nelder_mead
+import datetime
 
 # Imported for a type check
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
