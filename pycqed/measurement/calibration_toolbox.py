@@ -1,4 +1,4 @@
-# FIXME: commented out CBox stuff for PR #620
+# FIXME: commented out CBox stuff for PR #620, needs further cleanup
 import numpy as np
 #import logging
 import cma
