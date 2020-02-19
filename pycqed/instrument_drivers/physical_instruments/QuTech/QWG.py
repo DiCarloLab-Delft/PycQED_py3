@@ -96,7 +96,7 @@ class QWG(QWGCore, Instrument):
         self._params_exclude_snapshot = []
         self._params_to_skip_update = []
         self._add_parameters()
-        self.connect_message()
+#        self.connect_message()
 
     ##########################################################################
     # QCoDeS parameter support
@@ -204,7 +204,7 @@ class QWG(QWGCore, Instrument):
                         self._set_cw_waveform, ch, cw),
                     get_cmd=_gen_get_func_2par(
                         self._get_cw_waveform, ch, cw),
-                    snapshot_exclude=True,
+#                    snapshot_exclude=True,
                     docstring=docst)
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(parname)
@@ -437,8 +437,8 @@ class QWG(QWGCore, Instrument):
                 get_cmd=triglev_cmd + '?',
                 set_cmd=triglev_cmd + ' {}',
                 vals=self._dev_desc.mvals_trigger_level,
-                get_parser=float,
-                snapshot_exclude=True)
+                get_parser=float)
+#                snapshot_exclude=True)
                 # FIXME: docstring
 
             # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
@@ -464,8 +464,8 @@ class QWG(QWGCore, Instrument):
                     cw_param,
                     get_cmd=cw_cmd+'?',
                     set_cmd=cw_cmd+' "{:s}"',
-                    vals=vals.Strings(),
-                    snapshot_exclude=True)
+                    vals=vals.Strings())
+#                    snapshot_exclude=True)
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(cw_param)
 

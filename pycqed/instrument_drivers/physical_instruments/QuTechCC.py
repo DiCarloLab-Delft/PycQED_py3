@@ -272,7 +272,6 @@ class QuTechCC(QuTechCC_core, Instrument, DIOCalibration):
             [6]             seq_out         0x00000000,301          # cycle 0-301: padding on 'flux_0'
             
                             jmp             @mainLoop               # loop indefinitely
-
             """
             sequence_length = 32
             staircase_sequence = range(0, sequence_length)

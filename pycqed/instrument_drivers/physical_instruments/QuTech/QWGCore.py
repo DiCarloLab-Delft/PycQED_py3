@@ -23,7 +23,7 @@ from pycqed.instrument_drivers.physical_instruments.SCPIBase import SCPIBase
 from pycqed.instrument_drivers.physical_instruments.Transport import Transport
 from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
 
-log = log.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 # Codeword protocols: Pre-defined per channel bit maps
 cw_protocols_dio = {
@@ -98,28 +98,33 @@ class QWGCore(SCPIBase, DIOCalibration):
         # Check for driver / QWG compatibility
         version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
 
-        idn_firmware = self.get_idn()["firmware"]  # NB: called 'version' in QWG source code
-        # FIXME: above will make usage of DummyTransport more difficult
-        regex = r"swVersion=(\d).(\d).(\d)"
-        sw_version = re.search(regex, idn_firmware)
-        version_cur = (int(sw_version.group(1)), int(sw_version.group(2)), int(sw_version.group(3)))
-        driver_outdated = True
+        if 0:  # FIXME: get_idn
+            idn_firmware = self.get_idn()["firmware"]  # NB: called 'version' in QWG source code
+            # FIXME: above will make usage of DummyTransport more difficult
+            regex = r"swVersion=(\d).(\d).(\d)"
+            sw_version = re.search(regex, idn_firmware)
+            version_cur = (int(sw_version.group(1)), int(sw_version.group(2)), int(sw_version.group(3)))
+            driver_outdated = True
 
-        if sw_version and version_cur >= version_min:
-            self._dev_desc.numSelectCwInputs = self.get_codewords_select()
-            self._dev_desc.numMaxCwBits = self.get_max_codeword_bits()
-            driver_outdated = False
-        else:
-            # FIXME: we could be less rude and only disable the new parameters
-            # FIXME: let parameters depend on SW version, and on IORear type
-            log.warning(f"Incompatible driver version of QWG ({self.name}); The version ({version_cur[0]}."
-                            f"{version_cur[1]}.{version_cur[2]}) "
-                            f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
-                            f"parameters will not operate and timeout. Please update the QWG software to "
-                            f"{version_min[0]}.{version_min[1]}.{version_min[2]} or later")
+            if sw_version and version_cur >= version_min:
+                self._dev_desc.numSelectCwInputs = self.get_codewords_select()
+                self._dev_desc.numMaxCwBits = self.get_max_codeword_bits()
+                driver_outdated = False
+            else:
+                # FIXME: we could be less rude and only disable the new parameters
+                # FIXME: let parameters depend on SW version, and on IORear type
+                log.warning(f"Incompatible driver version of QWG ({self.name}); The version ({version_cur[0]}."
+                                f"{version_cur[1]}.{version_cur[2]}) "
+                                f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
+                                f"parameters will not operate and timeout. Please update the QWG software to "
+                                f"{version_min[0]}.{version_min[1]}.{version_min[2]} or later")
+                self._dev_desc.numMaxCwBits = 7
+                self._dev_desc.numSelectCwInputs = 7
+            self._dev_desc.numCodewords = pow(2, self._dev_desc.numSelectCwInputs)
+        else:  # FIXME: hack
             self._dev_desc.numMaxCwBits = 7
             self._dev_desc.numSelectCwInputs = 7
-        self._dev_desc.numCodewords = pow(2, self._dev_desc.numSelectCwInputs)
+            self._dev_desc.numCodewords = pow(2, self._dev_desc.numSelectCwInputs)
 
         if self._dev_desc.numMaxCwBits <= 7:    # FIXME: random constant
             self.codeword_protocols = cw_protocols_mt
@@ -140,7 +145,7 @@ class QWGCore(SCPIBase, DIOCalibration):
         #     raise RuntimeError('No run mode is specified')
         self._transport.write('awgcontrol:run:immediate')
 
-        self._get_errors()
+        #self._get_errors()
 
         # status = self.get_system_status()
         # warn_msg = self._detect_underdrive(status)
@@ -153,7 +158,7 @@ class QWGCore(SCPIBase, DIOCalibration):
         """
         self._transport.write('awgcontrol:stop:immediate')
 
-        self._get_errors()
+        #self._get_errors()
 
     def _get_errors(self):
         """
