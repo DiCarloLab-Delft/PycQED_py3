@@ -1,15 +1,18 @@
 """
-    File:               QuTechCC_core.py
-    Author:             Wouter Vlothuizen, QuTech
-    Purpose:            Python control of Qutech Central Controller. Core driver independent of QCoDeS
-    Notes:              here, we follow the SCPI convention of NOT checking parameter values but leaving that to
-                        the device
+    File:       QuTechCC_core.py
+    Author:     Wouter Vlothuizen, QuTech
+    Purpose:    Core Instrument driver for QuTech Central Controller, independent of QCoDeS.
+                All instrument protocol handling is provided here
+    Usage:      Can be used directly, or with QuTechCC.py, which adds access via QCoDeS parameters
+    Notes:      Here, we follow the SCPI convention of NOT checking parameter values but leaving that to
+                the device
     Usage:
     Bugs:
 
 """
 
 import logging
+import sys
 
 from .SCPIBase import SCPIBase
 from .Transport import Transport
@@ -27,6 +30,20 @@ class QuTechCC_core(SCPIBase):
                  name: str,
                  transport: Transport):
         super().__init__(name, transport)
+
+    ##########################################################################
+    # convenience functions
+    ##########################################################################
+
+    def assemble(self, program_string: str) -> None:
+        self.sequence_program_assemble(program_string)
+        if self.get_assembler_success() != 1:
+            sys.stderr.write('error log = {}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
+            raise RuntimeError('assembly failed')
+
+    ##########################################################################
+    # CC SCPI protocol wrapper functions
+    ##########################################################################
 
     def sequence_program_assemble(self, program_string: str) -> None:
         """
@@ -48,7 +65,7 @@ class QuTechCC_core(SCPIBase):
 
     def get_q1_reg(self, ccio: int, reg: int) -> int:
         # only possible if CC is stopped
-        return self._transport.ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
+        return self._ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
 
     def calibrate_dio(self, ccio: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL')
@@ -93,10 +110,14 @@ class QuTechCC_core(SCPIBase):
     def get_status_questionable_frequency_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')
 
+    ##########################################################################
+    # constants
+    ##########################################################################
+
     # HDAWG DIO/marker bit definitions: CC output
     HDAWG_TOGGLE_DS = 30
     HDAWG_TRIG = 31
-    HDAWG_CW = range(0,23)
+    HDAWG_CW = range(0,29)  # NB: bits used depend on mode
 
     # QWG DIO/marker bit definitions: CC output
     QWG_TOGGLE_DS = 30

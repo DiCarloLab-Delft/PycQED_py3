@@ -1,40 +1,34 @@
 """
-File:       QWG.py
-Author:     Wouter Vlothuizen, TNO/QuTech,
-            edited by Adriaan Rol, Gerco Versloot
-Purpose:    Instrument driver for Qutech QWG
-Usage:
-Notes:      This file is to replace QuTech_AWG_Module.py
-            It is possible to view the QWG log using ssh. To do this:
-            - connect using ssh e.g., "ssh root@192.168.0.10"
-            - view log using "tail -f /var/log/qwg.log"
-Bugs:
-            - requires QWG software version > 1.5.0, which isn't officially released yet
-Todo:
-            - cleanup after https://github.com/QCoDeS/Qcodes/pull/1653
-            - cleanup after https://github.com/QCoDeS/Qcodes/issues/236
-
+    File:       QWG.py
+    Author:     Wouter Vlothuizen, TNO/QuTech,
+                edited by Adriaan Rol, Gerco Versloot
+    Purpose:    QCoDeS instrument driver for Qutech QWG
+    Usage:
+    Notes:      This file is to replace QuTech_AWG_Module.py
+                It is possible to view the QWG log using ssh. To do this:
+                - connect using ssh e.g., "ssh root@192.168.0.10"
+                - view log using "tail -f /var/log/qwg.log"
+    Bugs:       - requires QWG software version > 1.5.0, which isn't officially released yet
+    Todo:       - cleanup after https://github.com/QCoDeS/Qcodes/pull/1653
+                - cleanup after https://github.com/QCoDeS/Qcodes/issues/236
 """
-
-from .SCPI import SCPI
 
 import os
 import numpy as np
 import logging
-import warnings
-import re
 import json
 from typing import Tuple, List, Sequence, Dict
 
-from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
+from .QWGCore import QWGCore
+from pycqed.instrument_drivers.physical_instruments.Transport import Transport
 
 from qcodes.instrument.base import Instrument
-from qcodes.instrument.parameter import ManualParameter
 from qcodes.instrument.parameter import Parameter
 from qcodes.instrument.parameter import Command
 from qcodes import validators as vals
 from qcodes.utils.helpers import full_class
 
+log = logging.getLogger(__name__)
 
 # Note: the HandshakeParameter is a temporary param that should be replaced
 # once qcodes issue #236 is closed
@@ -81,443 +75,28 @@ Configures the codeword input bits/channels per channel. These are predefined se
 \tNote: at the moment the presets are created for CCL use which only allows calibration of
 8 bits, the QWG can support up to 14 bits of which 10 are selectable'''
 
-# other constants
-_nr_cw_bits_cmd = "SYSTem:CODEwords:BITs?"
-_nr_cw_inp_cmd = "SYSTem:CODEwords:SELect?"
-
-# Codeword protocols: Pre-defined per channel bit maps
-cw_protocols_dio = {
-    # FIXME: CCLight is limited to 8 cw bits output, QWG can have up to cw 14 bits input of which 10 are
-    #  selectable
-    'MICROWAVE': [
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
-        [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
-
-    'MICROWAVE_NO_VSM': [
-        [0, 1, 2, 3, 4, 5, 6],  # Ch1
-        [0, 1, 2, 3, 4, 5, 6],  # Ch2
-        [7, 8, 9, 10, 11, 12, 13],  # Ch3
-        [7, 8, 9, 10, 11, 12, 13]],  # Ch4
-
-    'FLUX': [
-        [0, 1, 2],  # Ch1
-        [3, 4, 5],  # Ch2
-        [6, 7, 8],  # Ch3
-        [9, 10, 11]],  # Ch4  # See limitation/fixme; will use ch 3's bitmap
-}
-
-# Marker trigger protocols
-# FIXME: which input is trigger? Do modes make sense?
-cw_protocols_mt = {
-    # Name
-    'MICROWAVE': [
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
-        [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
-
-    'FLUX': [
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
-        [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
-        [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
-}
 
 ##########################################################################
 # class
 ##########################################################################
 
-class QuTech_AWG_Module(SCPI, DIOCalibration):
-    __doc__ = f"""
-    Driver for a Qutech AWG Module (QWG) instrument. Will establish a connection to a module via ethernet.
-    :param name: Name of the instrument  
-    :param address: Ethernet address of the device
-    :param port: Device port  
-    :param reset: Set device to the default settings
-    :param run_mode: {_run_mode_doc}
-    :param dio_mode: {_dio_mode_doc}
-    :param codeword_protocol: {_codeword_protocol_doc}
-    :param kwargs: base class parameters (Instruments)
-    """
-
-    ##########################################################################
-    # 'public' functions for the end user
-    ##########################################################################
-
+class QWG(QWGCore, Instrument):
     def __init__(self,
                  name: str,
-                 address: str,
-                 port: int = 5025,
-                 # FIXME: remove 4 parameters below? Adds little
-                 reset: bool = False,
-                 run_mode: str = None,
-                 dio_mode: str = None,
-                 codeword_protocol: str = None,
-                 **kwargs):
-        super().__init__(name, address, port, **kwargs)
-
-        # AWG properties
-        self._dev_desc = lambda:0  # create empty device descriptor
-        self._dev_desc.model = 'QWG'
-        self._dev_desc.numChannels = 4
-#        self._dev_desc.numDacBits = 12
-#        self._dev_desc.numMarkersPerChannel = 2 # FIXME
-#        self._dev_desc.numMarkers = 8 # FIXME
-        self._dev_desc.numTriggers = 8  # FIXME: depends on IORear type
-
-        # Check for driver / QWG compatibility
-        version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
-
-        idn_firmware = self.get_idn()["firmware"]  # NB: called 'version' in QWG source code
-        # FIXME: above will make usage of DummyTransport more difficult
-        regex = r"swVersion=(\d).(\d).(\d)"
-        sw_version = re.search(regex, idn_firmware)
-        version_cur = (int(sw_version.group(1)), int(sw_version.group(2)), int(sw_version.group(3)))
-        driver_outdated = True
-
-        if sw_version and version_cur >= version_min:
-            self._dev_desc.numSelectCwInputs = int(self.ask(_nr_cw_inp_cmd))
-            self._dev_desc.numMaxCwBits = int(self.ask(_nr_cw_bits_cmd))
-            driver_outdated = False
-        else:
-            # FIXME: we could be less rude and only disable the new parameters
-            # FIXME: let parameters depend on SW version, and on IORear type
-            logging.warning(f"Incompatible driver version of QWG ({self.name}); The version ({version_cur[0]}."
-                            f"{version_cur[1]}.{version_cur[2]}) "
-                            f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
-                            f"parameters will not operate and timeout. Please update the QWG software to "
-                            f"{version_min[0]}.{version_min[1]}.{version_min[2]} or later")
-            self._dev_desc.numMaxCwBits = 7
-            self._dev_desc.numSelectCwInputs = 7
-        self._dev_desc.numCodewords = pow(2, self._dev_desc.numSelectCwInputs)
+                 transport: Transport
+                 ) -> None:
+        super().__init__(name, transport) # calls QuTechCC_core
+        Instrument.__init__(self, name) # calls Instrument
 
         # validator values
         self._dev_desc.mvals_trigger_impedance = vals.Enum(50),
         self._dev_desc.mvals_trigger_level = vals.Numbers(0, 5.0)
 
-        if self._dev_desc.numMaxCwBits <= 7:    # FIXME: random constant
-            self.codeword_protocols = cw_protocols_mt
-        else:
-            self.codeword_protocols = cw_protocols_dio
-
         # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         self._params_exclude_snapshot = []
-
         self._params_to_skip_update = []
         self._add_parameters()
         self.connect_message()
-
-        if reset:
-            self.reset()
-
-        if run_mode:
-            self.run_mode(run_mode)
-
-        if dio_mode and not driver_outdated:
-            self.dio_mode(dio_mode)
-
-        if codeword_protocol and not driver_outdated:
-            self.codeword_protocol(codeword_protocol)
-
-    def start(self):
-        """
-        Activates output on channels with the current settings. When started this function will check for
-        possible warnings
-        """
-        run_mode = self.run_mode()
-        if run_mode == 'NONE':
-            raise RuntimeError('No run mode is specified')
-        self.write('awgcontrol:run:immediate')
-
-        self.getErrors()
-
-        status = self.get_system_status()
-        warn_msg = self._detect_underdrive(status)
-
-        if(len(warn_msg) > 0):
-            warnings.warn(', '.join(warn_msg))
-
-    def stop(self):
-        """
-        Shutdown output on channels. When stopped will check for errors or overflow (FIXME: does it)
-        """
-        self.write('awgcontrol:stop:immediate')
-
-        self.getErrors()
-
-    def getErrors(self):
-        """
-        The SCPI protocol by default does not return errors. Therefore the user needs
-        to ask for errors. This function retrieves all errors and will raise them.
-        """
-        errNr = self.getSystemErrorCount()
-
-        if errNr > 0:
-            errMgs = []
-            for i in range(errNr):
-                errMgs.append(self.getError())
-            raise RuntimeError(f'{repr(self)}: ' + ', '.join(errMgs))
-            # FIXME: is raising a potentially very long string useful?
-
-    def dio_calibrate(self, target_index: int = ''):
-        # FIXME: cleanup docstring
-        """
-        Calibrate the DIO input signals.\n
-
-        The QWG will analyze the input signals for each DIO input (used to transfer codeword bits), secondly,
-        the most preferable index (active index) is set.\n\n
-
-        Each signal is sampled and divided into sections. These sections are analyzed to find a stable
-        signal. These stable sections are addressed by there index.\n\n
-
-        After calibration the suitable indexes list (see dio_suitable_indexes()) contains all indexes which are stable.
-
-        Parameters:
-        :param target_index: unsigned int, optional: When provided the calibration will select an active index based
-        on the target index. Used to determine the new index before or after the edge. This parameter is commonly used
-        to calibrate a DIO slave where the target index is the active index after calibration of the DIO master
-
-        Notes:
-        \t- Expects a DIO calibration signal on the inputs where all codewords bits show activity (e.g. high followed \
-        by all codeword bits low in a continuous repetition. This results in a square wave of 25 MHz on the DIO inputs \
-        of the DIO connection).
-        \t- Individual DIO inputs where no signal is detected will not be calibrated (See dio_calibrated_inputs())\n
-        \t- The QWG will continuously validate if the active index is still stable.\n
-        \t- If no suitable indexes are found FIXME is empty and an error is pushed onto the error stack\n
-        """
-        self.write(f'DIO:CALibrate {target_index}')
-
-        # FIXME: define relation with mode and #codewords in use
-        # FIXME: provide high level function that performs the calibration
-
-    def dio_calibration_rapport(self, extended: bool=False) -> str:
-        """
-        Return a string containing the latest DIO calibration report (successful and failed calibrations). Includes:
-        selected index, dio mode, valid indexes, calibrated DIO bits and the DIO bitDiff table.
-        :param extended: Adds more information about DIO: interboard and LVDS
-        :return: String of DIO calibration rapport
-        """
-        info = f'- Calibrated:          {self.dio_is_calibrated()}\n' \
-               f'- Mode:                {self.dio_mode()}\n' \
-               f'- Selected index:      {self.dio_active_index()}\n' \
-               f'- Suitable indexes:    {self.dio_suitable_indexes()}\n' \
-               f'- Calibrated DIO bits: {bin(self.dio_calibrated_inputs())}\n' \
-               f'- DIO bit diff table:\n{self._dio_bit_diff_table()}'
-
-        if extended:
-            info += f'- LVDS detected:       {self.dio_lvds()}\n' \
-                    f'- Interboard detected: {self.dio_interboard()}'
-
-        return info
-
-    ##########################################################################
-    # overrides for DIOCalibration interface
-    ##########################################################################
-
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
-        raise RuntimeError("QWG cannot output calibration data")
-
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
-        self.dio_calibrate()    # FIXME: integrate
-
-    ##########################################################################
-    # AWG5014 functions: WLIST (Waveform list)
-    ##########################################################################
-
-    # FIXME: disabled, but supported by QWG
-    # def getWlistSize(self):
-    #     return self.ask_int('wlist:size?')
-
-    def _getWlistName(self, idx):
-        """
-        Args:
-            idx(int): 0..size-1
-        """
-        return self.ask('wlist:name? %d' % idx)
-
-    def _getWlist(self):
-        """
-        NB: takes a few seconds on 5014: our fault or Tek's?
-        """
-        size = self.WlistSize()
-        wlist = []                                  # empty list
-        for k in range(size):                       # build list of names
-            wlist.append(self._getWlistName(k+1))
-        return wlist
-
-    def deleteWaveform(self, name):
-        """
-        Args:
-            name (string):  waveform name excluding double quotes, e.g.
-            'test'
-        """
-        self.write('wlist:waveform:delete "%s"' % name)
-
-    def getWaveformType(self, name):
-        """
-        Args:
-            name (string):  waveform name excluding double quotes, e.g.
-            '*Sine100'
-
-        Returns:
-            'INT' or 'REAL'
-        """
-        return self.ask('wlist:waveform:type? "%s"' % name)
-
-    def getWaveformLength(self, name):
-        """
-        Args:
-            name (string):  waveform name excluding double quotes, e.g.
-            '*Sine100'
-        """
-        return self.ask_int('wlist:waveform:length? "%s"' % name)
-
-    def newWaveformReal(self, name, len):
-        """
-        Args:
-            name (string):  waveform name excluding double quotes, e.g.
-            '*Sine100'
-
-        NB: seems to do nothing (on Tek5014) if waveform already exists
-        """
-        self.write('wlist:waveform:new "%s",%d,real' % (name, len))
-
-    def getWaveformDataFloat(self, name):
-        """
-        Args:
-            name (string):  waveform name excluding double quotes, e.g.
-            '*Sine100'
-
-        Returns:
-            waveform  (np.array of float): waveform data
-
-        Compatibility: QWG
-        """
-        self.write('wlist:waveform:data? "%s"' % name)
-        binBlock = self.binBlockRead()
-        waveform = np.frombuffer(binBlock, dtype=np.float32)  # extract waveform
-        return waveform
-
-    def sendWaveformDataReal(self, name, waveform):
-        """
-        send waveform and markers directly to AWG memory, i.e. not to a file
-        on the AWG disk.
-        NB: uses real data normalized to the range from -1 to 1 (independent
-        of number of DAC bits of AWG)
-
-        Args:
-            name (string): waveform name excluding double quotes, e.g. 'test'.
-            Must already exist in AWG
-
-            waveform (np.array of float)): vector defining the waveform,
-            normalized between -1.0 and 1.0
-
-        Compatibility:  QWG
-
-        Based on:
-            Tektronix_AWG5014.py::send_waveform, which sends data to an AWG
-            _file_, not a memory waveform
-            'awg_transferRealDataWithMarkers', Author = Stefano Poletto,
-            Compatibility = Tektronix AWG5014, AWG7102
-        """
-
-        # generate the binblock
-        arr = np.asarray(waveform, dtype=np.float32)
-        binBlock = arr.tobytes()
-
-        # write binblock
-        hdr = f'wlist:waveform:data "{name}",'
-        self.binBlockWrite(binBlock, hdr)
-
-    def createWaveformReal(self, name, waveform):
-        """
-        Convenience function to create a waveform in the AWG and then send
-        data to it
-
-        Args:
-            name(string): name of waveform for internal use by the AWG
-
-            waveform (float[numpoints]): vector defining the waveform,
-            normalized between -1.0 and 1.0
-
-
-        Compatibility:  QWG
-        """
-        wv_val = vals.Arrays(min_value=-1, max_value=1)
-        wv_val.validate(waveform)
-
-        maxWaveLen = 2**17-4  # FIXME: this is the hardware max
-
-        waveLen = len(waveform)
-        if waveLen > maxWaveLen:
-            raise ValueError(f'Waveform length ({waveLen}) must be < {maxWaveLen}')
-
-        self.newWaveformReal(name, waveLen)
-        self.sendWaveformDataReal(name, waveform)
-
-    ##########################################################################
-    # Generic (i.e. at least AWG520 and AWG5014) Tektronix AWG functions
-    ##########################################################################
-
-    # Tek_AWG functions: menu Setup|Waveform/Sequence
-    def loadWaveformOrSequence(self, awgFileName):
-        """
-        awgFileName:        name referring to AWG file system
-        """
-        self.write('source:def:user "%s"' % awgFileName)
-        # NB: we only  support default Mass Storage Unit Specifier "Main",
-        # which is the internal harddisk
-
-    ##########################################################################
-    # private helpers
-    ##########################################################################
-
-    @staticmethod
-    def _int_to_array(msg):
-        """
-        Convert a scpi array of ints into a python int array
-        :param msg: scpi result
-        :return: array of ints
-        """
-        if msg == "\"\"":
-            return []
-        return msg.split(',')
-
-    ##########################################################################
-    # (sort of) private DIO functions
-    ##########################################################################
-
-    def _dio_bit_diff_table(self):
-        """
-        FOR DEVELOPMENT ONLY: Get the bit diff table of the last calibration
-        :return: String of the bitDiff table
-        """
-        return self.ask("DIO:BDT").replace("\"", '').replace(",", "\n")
-
-    def _dio_calibrate_param(self, meas_time: float, nr_itr: int, target_index: int = ""):
-        """
-        FOR DEVELOPMENT ONLY: Calibrate the DIO input signals with extra arguments.\n
-        Parameters:
-        \t meas_time: Measurement time between indexes in seconds, resolution of 1e-6 s
-        \tNote that when select a measurement time longer than 25e-2 S the scpi connection
-        will timeout, but the calibration is than still running. The timeout will happen on the
-        first `get` parameter after this call\n
-        \tnr_itr: Number of DIO signal data (bitDiffs) gathering iterations\n
-        \ttarget_index: DIO index which determines on which side of the edge to select the active index from\n
-        Calibration duration = meas_time * nr_itr * 20 * 1.1 (10% to compensate for log printing time)\n
-        """
-        if meas_time < 1e-6:
-            raise ValueError(f"Cannot calibration inputs: meas time is too low; min 1e-6, actual: {meas_time}")
-
-        if nr_itr < 1:
-            raise ValueError(f"Cannot calibration inputs: nr_itr needs to be positive; actual: {nr_itr}")
-
-        if target_index is not "":
-            target_index = f",{target_index}"
-
-        self.write(f'DIO:CALibrate:PARam {meas_time},{nr_itr}{target_index}')
 
     ##########################################################################
     # QCoDeS parameter support
@@ -577,8 +156,7 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
             except:
                 # really log this twice. Once verbose for the UI and once
                 # at lower level with more info for file based loggers
-                logging.info(
-                    "Snapshot: Could not update parameter: {}".format(name))
+                log.info("Snapshot: Could not update parameter: {}".format(name))
                 self.log.info(f"Details for Snapshot:",
                               exc_info=True)
                 snap['parameters'][name] = param.snapshot(update=False)
@@ -596,102 +174,6 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
         # FIXME: End remove
 
     ##########################################################################
-    # QCoDeS parameter helpers
-    ##########################################################################
-
-    def _set_cw_waveform(self, ch: int, cw: int, waveform):
-        wf_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
-        cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
-        self.createWaveformReal(wf_name, waveform)
-        self.write(cw_cmd + ' "{:s}"'.format(wf_name))
-
-    def _get_cw_waveform(self, ch: int, cw: int):
-        wf_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
-        return self.getWaveformDataFloat(wf_name)
-
-    def _setMatrix(self, chPair, mat):
-        """
-        Args:
-            chPair(int): channel pair for operation, 1 or 3
-
-            matrix(np.matrix): 2x2 matrix for mixer calibration
-        """
-        # function used internally for the parameters because of formatting
-        self.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(
-            chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
-
-    def _getMatrix(self, chPair):
-        # function used internally for the parameters because of formatting
-        mstring = self.ask(f'qutech:output{chPair}:matrix?')
-        M = np.zeros(4)
-        for i, x in enumerate(mstring.split(',')):
-            M[i] = x
-        M = M.reshape(2, 2, order='F')
-        return (M)
-
-    def _setCodewordProtocol(self, protocol_name):
-        """
-        Args:
-            protocol_name(string): Name of the predefined protocol
-        """
-        # function used internally for the parameters because of formatting
-        protocol = self.codeword_protocols.get(protocol_name)
-        if protocol is None:
-            allowed_protocols = ", ".join(f'{protocol_name}' for protocols_name in self.codeword_protocols)
-            raise ValueError(f"Invalid protocol: actual: {protocol_name}, expected: {allowed_protocols}")
-
-        for ch, bitMap in enumerate(protocol):
-            self.set(f"ch{ch + 1}_bit_map", bitMap)
-
-    def _getCodewordProtocol(self):
-        channels_bit_maps = []
-        result = "Custom"  # Default, if no protocol matches
-        for ch in range(1, self._dev_desc.numChannels + 1):
-            channels_bit_maps.append(list(map(int, self.get(f"ch{ch}_bit_map"))))
-
-        for prtc_name, prtc_bit_map in self.codeword_protocols.items():
-            if channels_bit_maps == prtc_bit_map:
-                result = prtc_name
-                break
-
-        return result
-
-    def _set_bit_map(self, ch: int, bit_map: List[int]):
-        """
-        Helper function to set a bitMap
-        :param ch:  int, channel of the bitmap
-        :param bit_map:  array of ints, element determines the codeword input
-        :return: none
-        """
-        if len(bit_map) > self._dev_desc.numSelectCwInputs:
-            raise ValueError(f'Cannot set bit map; Number of codeword bits inputs are too high; '
-                             f'max: {self._dev_desc.numSelectCwInputs}, actual: {len(bit_map)}')
-        invalid_inputs = list(x for x in bit_map if x > (
-            self._dev_desc.numMaxCwBits - 1))
-        if invalid_inputs:
-            err_msg = ', '.join(f"input {cw_bit_input} at index {bit_map.index(cw_bit_input) + 1}"
-                                for index, cw_bit_input in enumerate(invalid_inputs))
-            raise ValueError(f'Cannot set bit map; invalid codeword bit input(s); '
-                             f'max: {self._dev_desc.numMaxCwBits - 1}, actual: {err_msg}')
-
-        array_raw = ''
-        if bit_map:
-            array_raw = ',' + ','.join(str(x) for x in bit_map)
-        self.write(f"DAC{ch}:BITmap {len(bit_map)}{array_raw}")
-
-    def _JSON_parser(self, msg):
-        """
-        Converts the result of a SCPI message to a JSON.
-
-        msg: SCPI message where the body is a JSON
-        return: JSON object with the data of the SCPI message
-        """
-        result = str(msg)[1:-1]
-        # SCPI/visa adds additional quotes
-        result = result.replace('\"\"', '\"')
-        return json.loads(result)
-
-    ##########################################################################
     # QCoDeS parameter definitions: codewords
     ##########################################################################
 
@@ -700,8 +182,8 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
             'codeword_protocol',
             unit='',
             label='Codeword protocol',
-            get_cmd=self._getCodewordProtocol,
-            set_cmd=self._setCodewordProtocol,
+            get_cmd=self._get_codeword_protocol,
+            set_cmd=self._set_codeword_protocol,
             vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
             docstring=_codeword_protocol_doc + '\nEffective immediately when sent')
         # FIXME: HDAWG uses cfg_codeword_protocol, with different options
@@ -718,24 +200,14 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                     parname,
                     label='Waveform channel {} codeword {:03}'.format(ch, cw),
                     vals=vals.Arrays(min_value=-1, max_value=1),
-                    set_cmd=self._gen_ch_cw_set_func(
+                    set_cmd=_gen_set_func_2par(
                         self._set_cw_waveform, ch, cw),
-                    get_cmd=self._gen_ch_cw_get_func(
+                    get_cmd=_gen_get_func_2par(
                         self._get_cw_waveform, ch, cw),
                     snapshot_exclude=True,
                     docstring=docst)
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(parname)
-
-        if add_extra:
-            self.add_parameter(
-                'get_max_codeword_bits',
-                unit='',
-                label='Max codeword bits',
-                get_cmd=_nr_cw_bits_cmd,
-                vals=vals.Strings(),
-                get_parser=int,
-                docstring='Reads the maximum number of codeword bits for all channels')
 
     ##########################################################################
     # QCoDeS parameter definitions: DIO
@@ -822,91 +294,6 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                 )
 
     ##########################################################################
-    # QCoDeS parameter definitions: parameters not used in normal lab setup
-    ##########################################################################
-
-    def _add_extra_parameters(self):
-        self.add_parameter(
-            'status_frontIO_temperature',
-            unit='C',
-            label='FrontIO temperature',
-            get_cmd='STATus:FrontIO:TEMperature?',
-            get_parser=float,
-            docstring='Reads the temperature of the frontIO.\n'
-                      'Temperature measurement interval is 10 seconds\n'
-                      'Return:\n     float with temperature in Celsius')
-
-        self.add_parameter(
-            'status_fpga_temperature',
-            unit='C',
-            label='FPGA temperature',
-            get_cmd='STATus:FPGA:TEMperature?',
-            get_parser=int,
-            docstring='Reads the temperature of the FPGA.\n'
-                      'Temperature measurement interval is 10 seconds\n'
-                      'Return:\n     float with temperature in Celsius')
-
-        for ch in range(1, self._dev_desc.numChannels+1):
-            output_voltage_cmd = f'QUTEch:OUTPut{ch}:Voltage'
-            dac_temperature_cmd = f'STATus:DAC{ch}:TEMperature'
-            gain_adjust_cmd = f'DAC{ch}:GAIn:DRIFt:ADJust'
-            dac_digital_value_cmd = f'DAC{ch}:DIGitalvalue'
-
-            self.add_parameter(
-                f'status_dac{ch}_temperature',
-                unit='C',
-                label=f'DAC {ch} temperature',
-                get_cmd=dac_temperature_cmd + '?',
-                get_parser=float,
-                docstring='Reads the temperature of a DAC.\n'
-                          'Temperature measurement interval is 10 seconds\n'
-                          'Return:\n     float with temperature in Celsius')
-
-            self.add_parameter(
-                f'output{ch}_voltage',
-                unit='V',
-                label=f'Channel {ch} voltage output',
-                get_cmd=output_voltage_cmd + '?',
-                get_parser=float,
-                docstring='Reads the output voltage of a channel.\n'
-                          'Notes:\n    Measurement interval is 10 seconds.\n'
-                          '    The output voltage will only be read if the channel is disabled:\n'
-                          '    E.g.: qwg.chX_state(False)\n'
-                          '    If the channel is enabled it will return an low value: >0.1\n'
-                          'Return:\n   float in voltage')
-
-            self.add_parameter(
-                f'dac{ch}_gain_drift_adjust',
-                unit='',
-                label=f'DAC {ch}, gain drift adjust',
-                get_cmd=gain_adjust_cmd + '?',
-                set_cmd=gain_adjust_cmd + ' {}',
-                vals=vals.Ints(0, 4095),
-                get_parser=int,
-                docstring='Gain drift adjust setting of the DAC of a channel.\n'
-                          'Used for calibration of the DAC. Do not use to set the gain of a channel!\n'
-                          'Notes:\n  The gain setting is from 0 to 4095 \n'
-                          '    Where 0 is 0 V and 4095 is 3.3V \n'
-                          'Get Return:\n   Setting of the gain in interger (0 - 4095)\n'
-                          'Set parameter:\n   Integer: Gain of the DAC in , min: 0, max: 4095')
-
-            self.add_parameter(
-                f'_dac{ch}_digital_value',
-                unit='',
-                label=f'DAC {ch}, set digital value',
-                set_cmd=dac_digital_value_cmd + ' {}',
-                vals=vals.Ints(0, 4095),
-                docstring='FOR DEVELOPMENT ONLY: Set a digital value directly into the DAC\n'
-                          'Used for testing the DACs.\n'
-                          'Notes:\n\tThis command will also set the '
-                          '\tinternal correction matrix (Phase and amplitude) of the channel pair '
-                          'to [0,0,0,0], '
-                          'disabling any influence from the wave memory.'
-                          'This will also stop the wave the other channel of the pair!\n\n'
-                          'Set parameter:\n\tInteger: Value to write to the DAC, min: 0, max: 4095\n'
-                          '\tWhere 0 is minimal DAC scale and 4095 is maximum DAC scale \n')
-
-    ##########################################################################
     # QCoDeS parameter definitions: AWG related
     ##########################################################################
 
@@ -921,8 +308,7 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                 f'ch_pair{ch_pair}_sideband_frequency',
                 parameter_class=HandshakeParameter,
                 unit='Hz',
-                label=('Sideband frequency channel ' +
-                      'pair {} (Hz)'.format(i)),
+                label=('Sideband frequency channel pair {} (Hz)'.format(i)),
                 get_cmd=sfreq_cmd + '?',
                 set_cmd=sfreq_cmd + ' {}',
                 vals=vals.Numbers(-300e6, 300e6),
@@ -935,8 +321,7 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                 f'ch_pair{ch_pair}_sideband_phase',
                 parameter_class=HandshakeParameter,
                 unit='deg',
-                label=('Sideband phase channel' +
-                      ' pair {} (deg)'.format(i)),
+                label=('Sideband phase channel pair {} (deg)'.format(i)),
                 get_cmd=sph_cmd + '?',
                 set_cmd=sph_cmd + ' {}',
                 vals=vals.Numbers(-180, 360),
@@ -948,13 +333,12 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                 f'ch_pair{ch_pair}_transform_matrix',
                 parameter_class=HandshakeParameter,
                 unit='%',
-                label=('Transformation matrix channel' +
-                      'pair {}'.format(i)),
-                get_cmd=self._gen_ch_get_func(self._getMatrix, ch_pair),
-                set_cmd=self._gen_ch_set_func(self._setMatrix, ch_pair),
+                label=('Transformation matrix channel pair {}'.format(i)),
+                get_cmd=_gen_get_func_1par(self._get_matrix, ch_pair),
+                set_cmd=_gen_set_func_1par(self._set_matrix, ch_pair),
                 # NB range is not a hardware limit
                 vals=vals.Arrays(-2, 2, shape=(2, 2)),
-                docstring='Q & I transformation per channel pair.\n'
+                docstring='transformation matrix per channel pair.\n'
                           'Used for mixer correction\n'
                           'Effective immediately when sent')
 
@@ -1013,7 +397,7 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                 unit='',
                 label=f'Channel {ch}, set bit map for this channel',
                 get_cmd=f"DAC{ch}:BITmap?",
-                set_cmd=self._gen_ch_set_func(
+                set_cmd=_gen_set_func_1par(
                    self._set_bit_map, ch),
                 get_parser=self._int_to_array,
                 docstring='Codeword bit map for a channel, 14 bits available of which 10 are '
@@ -1086,40 +470,39 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                 self._params_exclude_snapshot.append(cw_param)
 
         # Waveform parameters
-        self.add_parameter(
-            'WlistSize',
-            label='Waveform list size',
-            unit='#',
-            get_cmd='wlist:size?',
-            get_parser=int,
-            snapshot_exclude=True)
-        # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        self._params_exclude_snapshot.append('WlistSize')
+        # self.add_parameter(
+        #     'WlistSize',
+        #     label='Waveform list size',
+        #     unit='#',
+        #     get_cmd='wlist:size?',
+        #     get_parser=int,
+        #     snapshot_exclude=True)
+        # # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        # self._params_exclude_snapshot.append('WlistSize')
 
-        self.add_parameter(
-            'Wlist',
-            label='Waveform list',
-            get_cmd=self._getWlist,
-            snapshot_exclude=True)
-        # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        self._params_exclude_snapshot.append('Wlist')
+        # self.add_parameter(
+        #     'Wlist',
+        #     label='Waveform list',
+        #     get_cmd=self._getWlist,
+        #     snapshot_exclude=True)
+        # # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        # self._params_exclude_snapshot.append('Wlist')
 
-        self.add_parameter(
-            'get_system_status',
-            unit='JSON',
-            label="System status",
-            get_cmd='SYSTem:STAtus?',
-            vals=vals.Strings(),
-            get_parser=self._JSON_parser,
-            docstring='Reads the current system status. E.q. channel '
-                      'status: on or off, overflow, underdrive.\n'
-                      'Return:\n     JSON object with system status')
+        # self.add_parameter(
+        #     'get_system_status',
+        #     unit='JSON',
+        #     label="System status",
+        #     get_cmd='SYSTem:STAtus?',
+        #     vals=vals.Strings(),
+        #     get_parser=self._JSON_parser,
+        #     docstring='Reads the current system status. E.q. channel '
+        #               'status: on or off, overflow, underdrive.\n'
+        #               'Return:\n     JSON object with system status')
 
     def _add_parameters(self):
         self._add_awg_parameters()
         self._add_codeword_parameters()
         self._add_dio_parameters()  # FIXME: conditional on QWG SW version?
-        self._add_extra_parameters()
 
         self.add_function(
                 'deleteWaveformAll',
@@ -1133,48 +516,150 @@ class QuTech_AWG_Module(SCPI, DIOCalibration):
                     'Effective immediately when sent')
 
     ##########################################################################
-    # parameter helpers
+    # QCoDeS parameter helpers
     ##########################################################################
 
-    @staticmethod
-    def _gen_ch_set_func(fun, ch):
-        def set_func(val):
-            return fun(ch, val)
-        return set_func
+    def _set_cw_waveform(self, ch: int, cw: int, waveform):
+        wf_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
+        cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
+        self.createWaveformReal(wf_name, waveform)
+        self._transport.write(cw_cmd + ' "{:s}"'.format(wf_name))
 
-    @staticmethod
-    def _gen_ch_get_func(fun, ch):
-        def get_func():
-            return fun(ch)
-        return get_func
+    def _get_cw_waveform(self, ch: int, cw: int):
+        wf_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
+        return self.get_waveform_data_float(wf_name)
 
-    @staticmethod
-    def _gen_ch_cw_set_func(fun, ch, cw):
-        def set_func(val):
-            return fun(ch, cw, val)
-        return set_func
-
-    @staticmethod
-    def _gen_ch_cw_get_func(fun, ch, cw):
-        def get_func():
-            return fun(ch, cw)
-        return get_func
-
-    ##########################################################################
-    # helpers
-    ##########################################################################
-
-    @staticmethod
-    def _detect_underdrive(status):
+    def _set_matrix(self, chPair, mat):
         """
-        Will raise an warning if on a channel underflow is detected
-        """
-        msg = []
-        for channel in status["channels"]:
-            if(channel["on"] == True) and (channel["underdrive"] == True):
-                msg.append(f"Possible wave underdrive detected on channel: {channel['id']}")
-        return msg
+        Args:
+            chPair(int): channel pair for operation, 1 or 3
 
+            matrix(np.matrix): 2x2 matrix for mixer calibration
+        """
+        # function used internally for the parameters because of formatting
+        self._transport.write('qutech:output{:d}:matrix {:f},{:f},{:f},{:f}'.format(
+            chPair, mat[0, 0], mat[1, 0], mat[0, 1], mat[1, 1]))
+
+    def _get_matrix(self, chPair):
+        # function used internally for the parameters because of formatting
+        mstring = self._ask(f'qutech:output{chPair}:matrix?')
+        M = np.zeros(4)
+        for i, x in enumerate(mstring.split(',')):
+            M[i] = x
+        M = M.reshape(2, 2, order='F')
+        return (M)
+
+    def _set_codeword_protocol(self, protocol_name):
+        """
+        Args:
+            protocol_name(string): Name of the predefined protocol
+        """
+        # function used internally for the parameters because of formatting
+        protocol = self.codeword_protocols.get(protocol_name)
+        if protocol is None:
+            allowed_protocols = ", ".join(f'{protocol_name}' for protocols_name in self.codeword_protocols)
+            raise ValueError(f"Invalid protocol: actual: {protocol_name}, expected: {allowed_protocols}")
+
+        for ch, bitMap in enumerate(protocol):
+            self.set(f"ch{ch + 1}_bit_map", bitMap)
+
+    def _get_codeword_protocol(self):
+        channels_bit_maps = []
+        result = "Custom"  # Default, if no protocol matches
+        for ch in range(1, self._dev_desc.numChannels + 1):
+            channels_bit_maps.append(list(map(int, self.get(f"ch{ch}_bit_map"))))
+
+        for prtc_name, prtc_bit_map in self.codeword_protocols.items():
+            if channels_bit_maps == prtc_bit_map:
+                result = prtc_name
+                break
+
+        return result
+
+    def _set_bit_map(self, ch: int, bit_map: List[int]):
+        """
+        Helper function to set a bitMap
+        :param ch:  int, channel of the bitmap
+        :param bit_map:  array of ints, element determines the codeword input
+        :return: none
+        """
+        if len(bit_map) > self._dev_desc.numSelectCwInputs:
+            raise ValueError(f'Cannot set bit map; Number of codeword bits inputs are too high; '
+                             f'max: {self._dev_desc.numSelectCwInputs}, actual: {len(bit_map)}')
+        invalid_inputs = list(x for x in bit_map if x > (
+            self._dev_desc.numMaxCwBits - 1))
+        if invalid_inputs:
+            err_msg = ', '.join(f"input {cw_bit_input} at index {bit_map.index(cw_bit_input) + 1}"
+                                for index, cw_bit_input in enumerate(invalid_inputs))
+            raise ValueError(f'Cannot set bit map; invalid codeword bit input(s); '
+                             f'max: {self._dev_desc.numMaxCwBits - 1}, actual: {err_msg}')
+
+        array_raw = ''
+        if bit_map:
+            array_raw = ',' + ','.join(str(x) for x in bit_map)
+        self._transport.write(f"DAC{ch}:BITmap {len(bit_map)}{array_raw}")
+
+    def _JSON_parser(self, msg):
+        """
+        Converts the result of a SCPI message to a JSON.
+
+        msg: SCPI message where the body is a JSON
+        return: JSON object with the data of the SCPI message
+        """
+        result = str(msg)[1:-1]
+        # SCPI/visa adds additional quotes
+        result = result.replace('\"\"', '\"')
+        return json.loads(result)
+
+    ##########################################################################
+    # private static helpers
+    ##########################################################################
+
+    @staticmethod
+    def _int_to_array(msg):
+        """
+        Convert a scpi array of ints into a python int array
+        :param msg: scpi result
+        :return: array of ints
+        """
+        if msg == "\"\"":
+            return []
+        return msg.split(',')
+
+
+##########################################################################
+# helpers
+##########################################################################
+
+
+# helpers for Instrument::add_parameter.set_cmd
+def _gen_set_func_1par(fun, par1):
+    def set_func(val):
+        return fun(par1, val)
+
+    return set_func
+
+
+def _gen_set_func_2par(fun, par1, par2):
+    def set_func(val):
+        return fun(par1, par2, val)
+
+    return set_func
+
+
+# helpers for Instrument::add_parameter.get_cmd
+def _gen_get_func_1par(fun, par1):
+    def get_func():
+        return fun(par1)
+
+    return get_func
+
+
+def _gen_get_func_2par(fun, par1, par2):
+    def get_func():
+        return fun(par1, par2)
+
+    return get_func
 
 ##########################################################################
 # Calibration with CC. FIXME: move out of driver
@@ -1187,7 +672,7 @@ class QWGMultiDevices:
     """
 
     @staticmethod
-    def dio_calibration(cc, qwgs: List[QuTech_AWG_Module],
+    def dio_calibration(cc, qwgs: List[QWG],
             verbose: bool = False):
         """
         Calibrate multiple QWG using a CCLight
@@ -1229,7 +714,7 @@ class QWGMultiDevices:
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
-        if cc.ask("QUTech:RUN?") == '1':
+        if cc._ask("QUTech:RUN?") == '1':
             cc.stop()
 
         old_cs = cc.control_store()
@@ -1270,61 +755,3 @@ class QWGMultiDevices:
         #Set the control store
         cc.control_store(old_cs)
         cc.qisa_opcode(old_qisa_opcode)
-
-
-##########################################################################
-# Mock_QWG
-##########################################################################
-
-class Mock_QWG(QuTech_AWG_Module):
-    """
-    Mock QWG instrument designed to mock QWG interface for testing purposes.
-    """
-
-    def __init__(self, name, **kwargs):
-        Instrument.__init__(self, name=name,  **kwargs)
-        self._socket = None  # exists so close method of IP instrument works
-
-        # AWG properties
-        self._dev_desc = type('', (), {})()
-        self._socket = None  # exists so close method of IP instrument works
-        self._dev_desc.model = 'QWG'
-        self._dev_desc.numChannels = 4
-        self._dev_desc.numDacBits = 12
-        self._dev_desc.numMarkersPerChannel = 2
-        self._dev_desc.numMarkers = 8
-        self._dev_desc.numTriggers = 8
-
-        self._dev_desc.numMaxCwBits = 32  # Some random mock val
-        self._dev_desc.numSelectCwInputs = 10  # mock val based on DIO
-        self._dev_desc.numCodewords = pow(2, 5)  # Some random mock val
-
-        # valid values
-        self._dev_desc.mvals_trigger_impedance = vals.Enum(50),
-        self._dev_desc.mvals_trigger_level = vals.Numbers(0, 5.0)
-
-        if self._dev_desc.numMaxCwBits <= 7:
-            self.codeword_protocols = cw_protocols_mt
-        else:
-            self.codeword_protocols = cw_protocols_dio
-
-        # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        self._params_exclude_snapshot = []
-
-        self._params_to_skip_update = []
-        self._add_parameters()
-        # self.connect_message()
-
-    def add_parameter(self, name: str,
-                      parameter_class: type=Parameter, **kwargs) -> None:
-
-        kwargs.pop('get_cmd', None)
-        kwargs.pop('set_cmd', None)
-        return super().add_parameter(name=name,
-                                     parameter_class=ManualParameter, **kwargs)
-
-    def stop(self):
-        pass
-
-    def start(self):
-        pass

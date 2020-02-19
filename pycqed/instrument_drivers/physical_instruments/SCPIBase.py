@@ -13,25 +13,36 @@
 
 """
 
+import logging
 from .Transport import Transport
 
+log = logging.getLogger(__name__)
 
 class SCPIBase:
     def __init__(self, name: str, transport: Transport) -> None:
+        self._name = name
         self._transport = transport
 
-    ###
+    ##########################################################################
     # Convenience functions for user
-    ###
+    ##########################################################################
 
     def init(self) -> None:
         self.reset()
         self.clear_status()
         self.status_preset()
 
-    ###
+    def check_errors(self) -> None:
+        err_cnt = self.get_system_error_count()
+        if err_cnt>0:
+            log.error(f"{self._name}: Found {err_cnt} SCPI errors:")
+            for i in range(err_cnt):
+                log.error(self.get_error())
+            raise RuntimeError("SCPI errors found")
+
+    ##########################################################################
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
-    ###
+    ##########################################################################
 
     def clear_status(self) -> None:
         self._transport.write('*CLS')
@@ -79,9 +90,9 @@ class SCPIBase:
     def reset(self) -> None:
         self._transport.write('*RST')
 
-    ###
+    ##########################################################################
     # Required SCPI commands (SCPI std V1999.0 4.2.1)
-    ###
+    ##########################################################################
 
     def get_error(self) -> str:
         """ Returns:    '0,"No error"' or <error message>
@@ -123,9 +134,9 @@ class SCPIBase:
     def get_status_operation_enable(self) -> int:
         return self._ask_int('STATus:OPERation:ENABle?')
 
-    ###
+    ##########################################################################
     # IEEE 488.2 binblock handling
-    ###
+    ##########################################################################
 
     def bin_block_write(self, bin_block: bytes, cmd_str: str) -> None:
         """
@@ -156,9 +167,9 @@ class SCPIBase:
         self._transport.read_binary(2)                                  # consume <CR><LF>
         return bin_block
 
-    ###
+    ##########################################################################
     # Helpers
-    ###
+    ##########################################################################
 
     def _ask(self, cmd_str: str) -> str:
         self._transport.write(cmd_str)
@@ -174,9 +185,9 @@ class SCPIBase:
         self._transport.write(cmd_str)
         return self.bin_block_read()
 
-    ###
+    ##########################################################################
     # IEEE488.2 status constants
-    ###
+    ##########################################################################
 
     # bits for *ESR and *ESE
     ESR_OPERATION_COMPLETE      = 0x01
@@ -215,9 +226,9 @@ class SCPIBase:
     STAT_QUES_INST_SUMMARY      = 0x2000
     STAT_QUES_COMMAND_WARNING   = 0x4000
 
-    ###
+    ##########################################################################
     # static methods
-    ###
+    ##########################################################################
 
     @staticmethod
     def _build_header_string(byte_cnt: int) -> str:

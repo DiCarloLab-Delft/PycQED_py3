@@ -113,20 +113,14 @@ if 1:
         )
 
     log.debug('uploading program to CC')
-    cc.sequence_program_assemble(prog)
-    if cc.get_assembler_success() != 1:
-        sys.stderr.write('error log = {}\n'.format(cc.get_assembler_log()))  # FIXME: result is messy
-        log.warning('assembly failed')
-    else:
-        log.debug('checking for SCPI errors on CC')
-        err_cnt = cc.get_system_error_count()
-        for i in range(err_cnt):
-            print(cc.get_error())
-        log.debug('done checking for SCPI errors on CC')
+    cc.assemble(prog)
+    log.debug('checking for SCPI errors on CC')
+    cc.check_errors()
+    log.debug('done checking for SCPI errors on CC')
 
-        log.debug('starting CC')
-        cc.debug_marker_out(0, cc.UHFQA_TRIG)
-        cc.start()
+    log.debug('starting CC')
+    cc.debug_marker_out(0, cc.UHFQA_TRIG)
+    cc.start()
     log.debug('finished')
 
 
