@@ -58,4 +58,4 @@ def calibrate(sender: DIOCalibration,
     dio_mask,expected_sequence = sender.output_dio_calibration_data(dio_mode=sender_dio_mode, port=sender_port)
     # FIXME: disable receiver connector outputs? And other receivers we're not aware of?
     receiver.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=receiver_port)
-    # FIXME: stop sender
+    sender.stop()  # FIXME: not in interface

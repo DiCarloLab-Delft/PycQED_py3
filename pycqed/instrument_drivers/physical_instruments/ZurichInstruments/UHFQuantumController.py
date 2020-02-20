@@ -247,209 +247,6 @@ class UHFQC(zibase.ZI_base_instrument, DIOCalibration):
         log.info(f'{self.devname}: Initialized UHFQC in {t1 - t0}s')
 
     ##########################################################################
-    # Overriding Qcodes InstrumentBase methods
-    ##########################################################################
-
-    def snapshot_base(self, update: bool=False,
-                      params_to_skip_update =None,
-                      params_to_exclude = None ):
-        """
-        State of the instrument as a JSON-compatible dict.
-        Args:
-            update: If True, update the state by querying the
-                instrument. If False, just use the latest values in memory.
-            params_to_skip_update: List of parameter names that will be skipped
-                in update even if update is True. This is useful if you have
-                parameters that are slow to update but can be updated in a
-                different way (as in the qdac)
-        Returns:
-            dict: base snapshot
-        """
-
-        if params_to_exclude is None:
-            params_to_exclude = self._params_to_exclude
-
-        snap = {
-            "functions": {name: func.snapshot(update=update)
-                          for name, func in self.functions.items()},
-            "submodules": {name: subm.snapshot(update=update)
-                           for name, subm in self.submodules.items()},
-            "__class__": full_class(self)
-        }
-
-        snap['parameters'] = {}
-        for name, param in self.parameters.items():
-            if params_to_exclude and name in params_to_exclude:
-                pass
-            elif params_to_skip_update and name in params_to_skip_update:
-                update_par = False
-            else:
-                update_par = update
-                try:
-                    snap['parameters'][name] = param.snapshot(update=update_par)
-                except:
-                    logging.info("Snapshot: Could not update parameter: {}".format(name))
-                    snap['parameters'][name] = param.snapshot(update=False)
-
-        for attr in set(self._meta_attrs):
-            if hasattr(self, attr):
-                snap[attr] = getattr(self, attr)
-        return snap
-
-    ##########################################################################
-    # Overriding ZI_base_instrument methods
-    ##########################################################################
-
-    def _check_devtype(self):
-        if self.devtype != 'UHFQA':
-            raise zibase.ziDeviceError(
-                'Device {} of type {} is not a UHFQA instrument!'.format(self.devname, self.devtype))
-
-    def _check_options(self):
-        """
-        Checks that the correct options are installed on the instrument.
-        """
-        options = self.gets('features/options').split('\n')
-        if 'QA' not in options and 'QC' not in options:
-            raise zibase.ziOptionsError(
-                'Device {} is missing the QA or QC option!'.format(self.devname))
-        if 'AWG' not in options:
-            raise zibase.ziOptionsError(
-                'Device {} is missing the AWG option!'.format(self.devname))
-
-    def _check_awg_nr(self, awg_nr):
-        """
-        Checks that the given AWG index is valid for the device.
-        """
-        if (awg_nr != 0):
-            raise zibase.ziValueError(
-                'Invalid AWG index of {} detected!'.format(awg_nr))
-
-    def _check_versions(self):
-        """
-        Checks that sufficient versions of the firmware are available.
-        """
-        if self.geti('system/fwrevision') < UHFQC.MIN_FWREVISION:
-            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(
-                UHFQC.MIN_FWREVISION, self.geti('system/fwrevision')))
-
-        if self.geti('system/fpgarevision') < UHFQC.MIN_FPGAREVISION:
-            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(
-                UHFQC.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
-
-    def _num_channels(self):
-        return 2
-
-    def _add_extra_parameters(self) -> None:
-        """
-        We add a few additional custom parameters on top of the ones defined in the device files. These are:
-          qas_0_trans_offset_weightfunction - an offset correction parameter for all weight functions,
-            this allows normalized calibration when performing cross-talk suppressed readout. The parameter
-            is not actually used in this driver, but in some of the support classes that make use of the driver.
-          AWG_file - allows the user to configure the AWG with a SeqC program from a specific file.
-            Provided only because the old version of the driver had this parameter. It is discouraged to use
-            it.
-          wait_dly - a parameter that enables the user to set a delay in AWG clocks cycles (4.44 ns) to be
-            applied between when the AWG starts playing the readout waveform, and when it triggers the
-            actual readout.
-          cases - a parameter that can be used to define which combination of readout waveforms to actually
-            download to the instrument. As the instrument has a limited amount of memory available, it is
-            not currently possible to store all 1024 possible combinations of readout waveforms that would
-            be required to address the maximum number of qubits supported by the instrument (10). Therefore,
-            the 'cases' mechanism is used to reduce that number to the combinations actually needed by
-            an experiment.
-          dio_calibration_delay - the delay that is programmed on the DIO lines as part of the DIO calibration
-            process in order for the instrument to reliably sample data from the CC. Can be used to detect
-            unexpected changes in timing of the entire system. The parameter can also be used to force a specific
-            delay to be used on the DIO although that is not generally recommended.
-        """
-        super()._add_extra_parameters()
-
-        # storing an offset correction parameter for all weight functions,
-        # this allows normalized calibration when performing cross-talk suppressed
-        # readout
-        for i in range(self._nr_integration_channels):
-            self.add_parameter(
-                "qas_0_trans_offset_weightfunction_{}".format(i),
-                unit='',  # unit is adc value
-                label='RO normalization offset',
-                initial_value=0.0,
-                docstring='an offset correction parameter for all weight functions, '
-                'this allows normalized calibration when performing cross-talk suppressed readout. The parameter '
-                'is not actually used in this driver, but in some of the support classes that make use of the driver.',
-                parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'AWG_file',
-            set_cmd=self._do_set_AWG_file,
-            docstring='Configures the AWG with a SeqC program from a specific file. '
-            'Provided only for backwards compatibility. It is discouraged to use '
-            'this parameter unless you know what you are doing',
-            vals=validators.Anything())
-
-        self.add_parameter(
-            'wait_dly',
-            set_cmd=self._set_wait_dly,
-            get_cmd=self._get_wait_dly,
-            unit='',
-            label='AWG cycle delay',
-            docstring='Configures a delay in AWG clocks cycles (4.44 ns) to be '
-            'applied between when the AWG starts playing the readout waveform, and when it triggers the '
-            'actual readout.',
-            vals=validators.Ints())
-
-        self.add_parameter(
-            'cases',
-            set_cmd=self._set_cases,
-            get_cmd=self._get_cases,
-            docstring='Configures which combination of readout waveforms to actually '
-            'download to the instrument. As the instrument has a limited amount of memory available, it is '
-            'not currently possible to store all 1024 possible combinations of readout waveforms that would '
-            'be required to address the maximum number of qubits supported by the instrument (10). Therefore, '
-            'the \'cases\' mechanism is used to reduce that number to the combinations actually needed by '
-            'an experiment. The parameter must be set to a list of integers. The list defines the codewords '
-            'to be handled by the AWG program. For example, setting the parameter to [1, 5, 7] would result in '
-            'an AWG program that handles only codewords 1, 5 and 7. When running, if the AWG receives a codeword '
-            'that is not part of this list, an error will be triggered.',
-            vals=validators.Lists())
-
-        self.add_parameter('dio_calibration_delay',
-            set_cmd=self._set_dio_calibration_delay,
-            get_cmd=self._get_dio_calibration_delay,
-            unit='',
-            label='DIO Calibration delay',
-            docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
-            'to be applied on the DIO interface in order to achieve reliable sampling '
-            'of the codewords. The valid range is 0 to 15.',
-            vals=validators.Ints())
-
-    def _codeword_table_preamble(self, awg_nr):
-        """
-        Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
-        The generated code depends on the instrument type. For the UHF-QA we simply define the raw waveforms.
-        """
-        program = ''
-
-        # If the program doesn't need waveforms, just return here
-        if not self._awg_program_features['waves']:
-            return program
-
-        # If the program needs cases, but none are defined, flag it as an error
-        if self._awg_program_features['cases'] and self._cases is None:
-            raise zibase.ziConfigurationError(
-                'Missing definition of cases for AWG program!')
-
-        wf_table = self._get_waveform_table(awg_nr)
-        for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
-            csvname_l = self.devname + '_' + wf_l
-            csvname_r = self.devname + '_' + wf_r
-            program += 'wave {} = "{}";\n'.format(
-                wf_l, csvname_l)
-            program += 'wave {} = "{}";\n'.format(
-                wf_r, csvname_r)
-        return program
-
-    ##########################################################################
     # 'public' overrides for ZI_base_instrument
     ##########################################################################
 
@@ -558,147 +355,91 @@ class UHFQC(zibase.ZI_base_instrument, DIOCalibration):
         self.sigouts_1_enables_0(0)
         self.sigouts_1_enables_1(0)
 
-    ##########################################################################
-    # Private methods
-    ##########################################################################
-
-    def _reset_awg_program_features(self):
+    def check_errors(self) -> None:
         """
-        Resets the self._awg_program_features to disable all features. The UHFQC can be configured with a number
-        of application-specific AWG programs using this driver. However, all the programs share some characteristics that
-        are described in the _awg_program_features dictionary. For example, all of the programs include a main loop
-        that runs for a number of iterations given by a user register. This feature is indicated by the 'loop_cnt'
-        item in the dictionary. In contrast, not all program include an extra loop for the number of averages that
-        should be done. Therefore, the 'awg_cnt' item in the dictionary is not automatically set. The driver
-        uses these features to keep track of what the current AWG program can do. It then raises errors in case
-        the user tries to do something that is not supported.
+        Checks the instrument for errors. As the UHFQA does not yet support the same error
+        stack as the HDAWG instruments we do the checks by reading specific nodes
+        in the system and then constructing similar messages as on the HDAWG.
         """
-        self._awg_program_features = {
-            'loop_cnt': False,
-            'avg_cnt': False,
-            'wait_dly': False,
-            'waves': False,
-            'cases': False,
-            'diocws': False}
-
-    def _set_dio_calibration_delay(self, value):
-        # Sanity check the value
-        if value < 0 or value > 15:
-            raise zibase.ziValueError(
-                'Trying to set DIO calibration delay to invalid value! Expected value in range 0 to 15. Got {}.'.format(
-                    value))
-
-        log.info('Setting DIO calibration delay to {}'.format(value))
-        # Store the value
-        self._dio_calibration_delay = value
-
-        # And configure the delays
-        self.setd('raw/dios/0/delay', self._dio_calibration_delay)
-
-    def _get_dio_calibration_delay(self):
-        return self._dio_calibration_delay
-
-    def _set_wait_dly(self, value):
-        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), value)
-
-    def _get_wait_dly(self):
-        return self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY))
-
-    def _set_cases(self, value):
-        # Generate error if we don't have an AWG program that supports cases
-        if not self._awg_program_features['cases']:
-            raise zibase.ziValueError(
-                'Trying to define cases for an AWG program that does not support them!')
-
-        # Check against number of codewords
-        if len(value) > self._num_codewords:
-            raise zibase.ziValueError('Trying to define a number of cases ({}) greater than configured number of codewords ({})!'.format(
-                len(value), self._num_codewords))
-
-        self._cases = value
-        self._cw_mask = 0
-        for case in self._cases:
-            self._cw_mask |= case
-
-        if self._awg_program_features['diocws'] and self._diocws is None:
-            raise zibase.ziValueError(
-                'AWG program defines DIO output, but no output values have been defined!')
-
-        self._awg_program[0] = \
-            awg_sequence_acquisition_preamble() + """
-// Mask for selecting our codeword bits
-const CW_MASK = ({:08x} << 17);
-// Counts wrong codewords
-var err_cnt = 0;
-""".format(self._cw_mask)
-
-        if self._awg_program_features['diocws']:
-            self._awg_program[0] += \
-                array2vect(self._diocws, "diocws") + """
-// Loop once for each DIO codeword to output
-for (cvar i = 0; i < {}; i = i + 1) {{""".format(len(self._diocws))
+        # If this is the first time we are called, log the detected errors, but don't raise
+        # any exceptions
+        if self._errors is None:
+            raise_exceptions = False
+            self._errors = {}
         else:
-            self._awg_program[0] += """
-// Loop for all measurements
-repeat (loop_cnt) {"""
+            raise_exceptions = True
 
-        self._awg_program[0] += """
-    waitDIOTrigger();
-    // Get codeword and apply mask
-    var cw = getDIOTriggered() & CW_MASK;
-    // Generate waveforms based on codeword output
-    switch (cw) {"""
-        # Add each of the cases
-        for case in self._cases:
-            self._awg_program[0] += """
-        case 0x{:08x}: playWave({}, {});""".format(case << 17, zibase.gen_waveform_name(0, case), zibase.gen_waveform_name(1, case))
+        # Stores the errors before processing
+        errors = {'messages': []}
 
-        # Add a default for ensuring we see something when the other cases fail
-        self._awg_program[0] += """
-        default: playWave(ones(32), ones(32)); err_cnt += 1;
-    }
-    wait(wait_dly);"""
+        # Now check for errors from the different functional units
+        if self.qas_0_result_errors() > 0:
+            errors['messages'].append({
+                'code': 'RESHOLDOFF',
+                'severity': 1.0,
+                'count': self.qas_0_result_errors(),
+                'message': 'Holdoff error detected when reading Quantum Analyzer Results! '
+                'Increase the delay between trigger signals from the AWG!'})
 
-        if self._awg_program_features['diocws']:
-            self._awg_program[0] += """
-    setDIO(diocws[i]);
-"""
-        self._awg_program[0] += """
-    setTrigger(ro_trig);
-    setTrigger(ro_arm);
-}
-wait(300);
-setTrigger(0);
-setUserReg(4, err_cnt);"""
+        if self.qas_0_monitor_errors() > 0:
+            errors['messages'].append({
+                'code': 'MONHOLDOFF',
+                'severity': 1.0,
+                'count': self.qas_0_monitor_errors(),
+                'message': 'Holdoff error detected when reading Quantum Analyzer Input Monitor! '
+                'Increase the delay between trigger signals from the AWG!'})
 
-        self._awg_needs_configuration[0] = True
+        # Check optional codeword-based errors
+        if self._awg_program_features['cases'] and self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_ERR_CNT)) > 0:
+            errors['messages'].append({
+                'code': 'DIOCWCASE',
+                'severity': 1.0,
+                'count': self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_ERR_CNT)),
+                'message': 'AWG detected invalid codewords not covered by the configured cases!'})
 
-    def _get_cases(self):
-        return self._cases
+        # Asserted in case errors were found
+        found_errors = False
 
-    def _get_waveform_table(self, awg_nr: int) -> list:
-        """
-        Returns the waveform table.
+        # Go through the errors and update our structure, raise exceptions if anything changed
+        for m in errors['messages']:
+            code = m['code']
+            count = m['count']
+            severity = m['severity']
+            message = m['message']
 
-        The waveform table determines the mapping of waveforms to DIO codewords.
-        The index of the table corresponds to the DIO codeword.
-        The entry is a tuple of waveform names.
+            if not raise_exceptions:
+                self._errors[code] = {
+                    'count': count,
+                    'severity': severity,
+                    'message': message}
+                log.warning('{}: Code {}: "{}" ({})'.format(
+                    self.devname, code, message, severity))
+            else:
+                # Optionally skip the error completely
+                if code in self._errors_to_ignore:
+                    continue
 
-        Example:
-            ["wave_ch7_cw000", "wave_ch8_cw000",
-            "wave_ch7_cw001", "wave_ch8_cw001",
-            "wave_ch7_cw002", "wave_ch8_cw002"]
+                # Check if there are new errors
+                if code not in self._errors or count > self._errors[code]['count']:
+                    log.error('{}: {} ({}/{})'.format(self.devname,
+                                                      message, code, severity))
+                    found_errors = True
 
-        The waveform table generated depends on the awg_nr and the codeword
-        protocol.
-        """
-        ch = awg_nr*2
-        wf_table = []
-        if self.cases() is not None:
-            for case in self.cases():
-                wf_table.append((zibase.gen_waveform_name(ch, case),
-                                 zibase.gen_waveform_name(ch+1, case)))
-        return wf_table
+                if code in self._errors:
+                    self._errors[code]['count'] = count
+                else:
+                    self._errors[code] = {
+                        'count': count,
+                        'severity': severity,
+                        'message': message}
+
+        # FIXME: code commented out
+        # if found_errors:
+        #     raise zibase.ziRuntimeError('Errors detected during run-time!')
+
+    def clear_errors(self) -> None:
+        self.qas_0_result_reset(1)
+        self.qas_0_monitor_reset(1)
 
     ##########################################################################
     # 'public' functions
@@ -892,91 +633,6 @@ setUserReg(4, err_cnt);"""
             self.unsubs(p)
         self.unsubs(self._get_full_path('auxins/0/sample'))
 
-    def check_errors(self) -> None:
-        """
-        Checks the instrument for errors. As the UHFQA does not yet support the same error
-        stack as the HDAWG instruments we do the checks by reading specific nodes
-        in the system and then constructing similar messages as on the HDAWG.
-        """
-        # If this is the first time we are called, log the detected errors, but don't raise
-        # any exceptions
-        if self._errors is None:
-            raise_exceptions = False
-            self._errors = {}
-        else:
-            raise_exceptions = True
-
-        # Stores the errors before processing
-        errors = {'messages': []}
-
-        # Now check for errors from the different functional units
-        if self.qas_0_result_errors() > 0:
-            errors['messages'].append({
-                'code': 'RESHOLDOFF',
-                'severity': 1.0,
-                'count': self.qas_0_result_errors(),
-                'message': 'Holdoff error detected when reading Quantum Analyzer Results! '
-                'Increase the delay between trigger signals from the AWG!'})
-
-        if self.qas_0_monitor_errors() > 0:
-            errors['messages'].append({
-                'code': 'MONHOLDOFF',
-                'severity': 1.0,
-                'count': self.qas_0_monitor_errors(),
-                'message': 'Holdoff error detected when reading Quantum Analyzer Input Monitor! '
-                'Increase the delay between trigger signals from the AWG!'})
-
-        # Check optional codeword-based errors
-        if self._awg_program_features['cases'] and self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_ERR_CNT)) > 0:
-            errors['messages'].append({
-                'code': 'DIOCWCASE',
-                'severity': 1.0,
-                'count': self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_ERR_CNT)),
-                'message': 'AWG detected invalid codewords not covered by the configured cases!'})
-
-        # Asserted in case errors were found
-        found_errors = False
-
-        # Go through the errors and update our structure, raise exceptions if anything changed
-        for m in errors['messages']:
-            code = m['code']
-            count = m['count']
-            severity = m['severity']
-            message = m['message']
-
-            if not raise_exceptions:
-                self._errors[code] = {
-                    'count': count,
-                    'severity': severity,
-                    'message': message}
-                log.warning('{}: Code {}: "{}" ({})'.format(
-                    self.devname, code, message, severity))
-            else:
-                # Optionally skip the error completely
-                if code in self._errors_to_ignore:
-                    continue
-
-                # Check if there are new errors
-                if code not in self._errors or count > self._errors[code]['count']:
-                    log.error('{}: {} ({}/{})'.format(self.devname,
-                                                      message, code, severity))
-                    found_errors = True
-
-                if code in self._errors:
-                    self._errors[code]['count'] = count
-                else:
-                    self._errors[code] = {
-                        'count': count,
-                        'severity': severity,
-                        'message': message}
-
-        # if found_errors:
-        #     raise zibase.ziRuntimeError('Errors detected during run-time!')
-
-    def clear_errors(self) -> None:
-        self.qas_0_result_reset(1)
-        self.qas_0_monitor_reset(1)
-
     ##########################################################################
     # 'public' functions: DIO support
     ##########################################################################
@@ -1060,8 +716,465 @@ setUserReg(4, err_cnt);"""
         return matrix
 
     ##########################################################################
+    # 'public' functions: print overview helpers
+    ##########################################################################
+
+    def print_correlation_overview(self):
+        msg = '\tCorrelations overview \n'
+        for i in range(10):
+            enabled = self.get('qas_0_correlations_{}_enable'.format(i))
+            source = self.get('qas_0_correlations_{}_source'.format(i))
+            msg += "Correlations {}, enabled: {} \tsource: {}\n".format(
+                i, enabled, source)
+        msg += '\n\tThresholded correlations overview \n'
+        for i in range(10):
+            enabled = self.get(
+                'qas_0_thresholds_{}_correlation_enable'.format(i))
+            source = self.get(
+                'qas_0_thresholds_{}_correlation_source'.format(i))
+            msg += "Thresholds correlation {}, enabled: {} \tsource: {}\n".format(
+                i, enabled, source)
+        print(msg)
+
+    def print_deskew_overview(self):
+        msg = '\tDeskew overview \n'
+
+        deskew_mat = np.zeros((2, 2))
+        for i in range(2):
+            for j in range(2):
+                deskew_mat[i, j] = self.get(
+                    'qas_0_deskew_rows_{}_cols_{}'.format(i, j))
+        msg += 'Deskew matrix: \n'
+        msg += str(deskew_mat)
+        print(msg)
+
+    def print_crosstalk_overview(self):
+        msg = '\tCrosstalk overview \n'
+        msg += 'Bypass crosstalk: {} \n'.format(self.qas_0_crosstalk_bypass())
+
+        crosstalk_mat = np.zeros((10, 10))
+        for i in range(10):
+            for j in range(10):
+                crosstalk_mat[i, j] = self.get(
+                    'qas_0_crosstalk_rows_{}_cols_{}'.format(i, j))
+        msg += 'Crosstalk matrix: \n'
+        print(msg)
+        print(crosstalk_mat)
+
+    def print_integration_overview(self):
+        msg = '\tIntegration overview \n'
+        msg += 'Integration mode: {} \n'.format(
+            self.qas_0_integration_mode())
+        for i in range(10):
+            msg += 'Integration source {}: {}\n'.format(
+                i, self.get('qas_0_integration_sources_{}'.format(i)))
+        print(msg)
+
+    def print_rotations_overview(self):
+        msg = '\tRotations overview \n'
+        for i in range(10):
+            msg += 'Rotations {}: {}\n'.format(
+                i, self.get('qas_0_rotations_{}'.format(i)))
+        print(msg)
+
+    def print_thresholds_overview(self):
+        msg = '\t Thresholds overview \n'
+        for i in range(10):
+            msg += 'Threshold {}: {}\n'.format(
+                i, self.get('qas_0_thresholds_{}_level'.format(i)))
+        print(msg)
+
+    def print_user_regs_overview(self):
+        msg = '\t User registers overview \n'
+        user_reg_funcs = ['']*16
+        user_reg_funcs[0] = 'Loop count'
+        user_reg_funcs[1] = 'Readout mode'
+        user_reg_funcs[2] = 'Wait delay'
+        user_reg_funcs[3] = 'Average count'
+        user_reg_funcs[4] = 'Error count'
+
+        for i in range(16):
+            msg += 'User reg {}: \t{}\t({})\n'.format(
+                i, self.get('awgs_0_userregs_{}'.format(i)), user_reg_funcs[i])
+        print(msg)
+
+    def print_overview(self):
+        """
+        Print a readable overview of relevant parameters of the UHFQC.
+
+        N.B. This overview is not complete, but combines different
+        print helpers
+        """
+        self.print_correlation_overview()
+        self.print_crosstalk_overview()
+        self.print_deskew_overview()
+        self.print_integration_overview()
+        self.print_rotations_overview()
+        self.print_thresholds_overview()
+        self.print_user_regs_overview()
+
+    ##########################################################################
+    # Overriding private ZI_base_instrument methods
+    ##########################################################################
+
+    def _check_devtype(self):
+        if self.devtype != 'UHFQA':
+            raise zibase.ziDeviceError(
+                'Device {} of type {} is not a UHFQA instrument!'.format(self.devname, self.devtype))
+
+    def _check_options(self):
+        """
+        Checks that the correct options are installed on the instrument.
+        """
+        options = self.gets('features/options').split('\n')
+        if 'QA' not in options and 'QC' not in options:
+            raise zibase.ziOptionsError(
+                'Device {} is missing the QA or QC option!'.format(self.devname))
+        if 'AWG' not in options:
+            raise zibase.ziOptionsError(
+                'Device {} is missing the AWG option!'.format(self.devname))
+
+    def _check_awg_nr(self, awg_nr):
+        """
+        Checks that the given AWG index is valid for the device.
+        """
+        if (awg_nr != 0):
+            raise zibase.ziValueError(
+                'Invalid AWG index of {} detected!'.format(awg_nr))
+
+    def _check_versions(self):
+        """
+        Checks that sufficient versions of the firmware are available.
+        """
+        if self.geti('system/fwrevision') < UHFQC.MIN_FWREVISION:
+            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(
+                UHFQC.MIN_FWREVISION, self.geti('system/fwrevision')))
+
+        if self.geti('system/fpgarevision') < UHFQC.MIN_FPGAREVISION:
+            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(
+                UHFQC.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
+
+    def _num_channels(self):
+        return 2
+
+    def _add_extra_parameters(self) -> None:
+        """
+        We add a few additional custom parameters on top of the ones defined in the device files. These are:
+          qas_0_trans_offset_weightfunction - an offset correction parameter for all weight functions,
+            this allows normalized calibration when performing cross-talk suppressed readout. The parameter
+            is not actually used in this driver, but in some of the support classes that make use of the driver.
+          AWG_file - allows the user to configure the AWG with a SeqC program from a specific file.
+            Provided only because the old version of the driver had this parameter. It is discouraged to use
+            it.
+          wait_dly - a parameter that enables the user to set a delay in AWG clocks cycles (4.44 ns) to be
+            applied between when the AWG starts playing the readout waveform, and when it triggers the
+            actual readout.
+          cases - a parameter that can be used to define which combination of readout waveforms to actually
+            download to the instrument. As the instrument has a limited amount of memory available, it is
+            not currently possible to store all 1024 possible combinations of readout waveforms that would
+            be required to address the maximum number of qubits supported by the instrument (10). Therefore,
+            the 'cases' mechanism is used to reduce that number to the combinations actually needed by
+            an experiment.
+          dio_calibration_delay - the delay that is programmed on the DIO lines as part of the DIO calibration
+            process in order for the instrument to reliably sample data from the CC. Can be used to detect
+            unexpected changes in timing of the entire system. The parameter can also be used to force a specific
+            delay to be used on the DIO although that is not generally recommended.
+        """
+        super()._add_extra_parameters()
+
+        # storing an offset correction parameter for all weight functions,
+        # this allows normalized calibration when performing cross-talk suppressed
+        # readout
+        for i in range(self._nr_integration_channels):
+            self.add_parameter(
+                "qas_0_trans_offset_weightfunction_{}".format(i),
+                unit='',  # unit is adc value
+                label='RO normalization offset',
+                initial_value=0.0,
+                docstring='an offset correction parameter for all weight functions, '
+                'this allows normalized calibration when performing cross-talk suppressed readout. The parameter '
+                'is not actually used in this driver, but in some of the support classes that make use of the driver.',
+                parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'AWG_file',
+            set_cmd=self._do_set_AWG_file,
+            docstring='Configures the AWG with a SeqC program from a specific file. '
+            'Provided only for backwards compatibility. It is discouraged to use '
+            'this parameter unless you know what you are doing',
+            vals=validators.Anything())
+
+        self.add_parameter(
+            'wait_dly',
+            set_cmd=self._set_wait_dly,
+            get_cmd=self._get_wait_dly,
+            unit='',
+            label='AWG cycle delay',
+            docstring='Configures a delay in AWG clocks cycles (4.44 ns) to be '
+            'applied between when the AWG starts playing the readout waveform, and when it triggers the '
+            'actual readout.',
+            vals=validators.Ints())
+
+        self.add_parameter(
+            'cases',
+            set_cmd=self._set_cases,
+            get_cmd=self._get_cases,
+            docstring='Configures which combination of readout waveforms to actually '
+            'download to the instrument. As the instrument has a limited amount of memory available, it is '
+            'not currently possible to store all 1024 possible combinations of readout waveforms that would '
+            'be required to address the maximum number of qubits supported by the instrument (10). Therefore, '
+            'the \'cases\' mechanism is used to reduce that number to the combinations actually needed by '
+            'an experiment. The parameter must be set to a list of integers. The list defines the codewords '
+            'to be handled by the AWG program. For example, setting the parameter to [1, 5, 7] would result in '
+            'an AWG program that handles only codewords 1, 5 and 7. When running, if the AWG receives a codeword '
+            'that is not part of this list, an error will be triggered.',
+            vals=validators.Lists())
+
+        self.add_parameter('dio_calibration_delay',
+            set_cmd=self._set_dio_calibration_delay,
+            get_cmd=self._get_dio_calibration_delay,
+            unit='',
+            label='DIO Calibration delay',
+            docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
+            'to be applied on the DIO interface in order to achieve reliable sampling '
+            'of the codewords. The valid range is 0 to 15.',
+            vals=validators.Ints())
+
+    def _codeword_table_preamble(self, awg_nr):
+        """
+        Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
+        The generated code depends on the instrument type. For the UHF-QA we simply define the raw waveforms.
+        """
+        program = ''
+
+        # If the program doesn't need waveforms, just return here
+        if not self._awg_program_features['waves']:
+            return program
+
+        # If the program needs cases, but none are defined, flag it as an error
+        if self._awg_program_features['cases'] and self._cases is None:
+            raise zibase.ziConfigurationError(
+                'Missing definition of cases for AWG program!')
+
+        wf_table = self._get_waveform_table(awg_nr)
+        for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
+            csvname_l = self.devname + '_' + wf_l
+            csvname_r = self.devname + '_' + wf_r
+            program += 'wave {} = "{}";\n'.format(
+                wf_l, csvname_l)
+            program += 'wave {} = "{}";\n'.format(
+                wf_r, csvname_r)
+        return program
+
+    def plot_dio_snapshot(self, bits=range(32)):
+        zibase.plot_timing_diagram(self.getv('awgs/0/dio/data'), bits, 64)
+
+    ##########################################################################
+    # Overriding Qcodes InstrumentBase methods
+    ##########################################################################
+
+    def snapshot_base(self, update: bool=False,
+                      params_to_skip_update =None,
+                      params_to_exclude = None ):
+        """
+        State of the instrument as a JSON-compatible dict.
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+        Returns:
+            dict: base snapshot
+        """
+
+        if params_to_exclude is None:
+            params_to_exclude = self._params_to_exclude
+
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                pass
+            elif params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+                try:
+                    snap['parameters'][name] = param.snapshot(update=update_par)
+                except:
+                    logging.info("Snapshot: Could not update parameter: {}".format(name))
+                    snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        return snap
+
+    ##########################################################################
+    # Private methods
+    ##########################################################################
+
+    def _reset_awg_program_features(self):
+        """
+        Resets the self._awg_program_features to disable all features. The UHFQC can be configured with a number
+        of application-specific AWG programs using this driver. However, all the programs share some characteristics that
+        are described in the _awg_program_features dictionary. For example, all of the programs include a main loop
+        that runs for a number of iterations given by a user register. This feature is indicated by the 'loop_cnt'
+        item in the dictionary. In contrast, not all program include an extra loop for the number of averages that
+        should be done. Therefore, the 'awg_cnt' item in the dictionary is not automatically set. The driver
+        uses these features to keep track of what the current AWG program can do. It then raises errors in case
+        the user tries to do something that is not supported.
+        """
+        self._awg_program_features = {
+            'loop_cnt': False,
+            'avg_cnt': False,
+            'wait_dly': False,
+            'waves': False,
+            'cases': False,
+            'diocws': False}
+
+    def _set_dio_calibration_delay(self, value):
+        # Sanity check the value
+        if value < 0 or value > 15:
+            raise zibase.ziValueError(
+                'Trying to set DIO calibration delay to invalid value! Expected value in range 0 to 15. Got {}.'.format(
+                    value))
+
+        log.info('Setting DIO calibration delay to {}'.format(value))
+        # Store the value
+        self._dio_calibration_delay = value
+
+        # And configure the delays
+        self.setd('raw/dios/0/delay', self._dio_calibration_delay)
+
+    def _get_dio_calibration_delay(self):
+        return self._dio_calibration_delay
+
+    def _set_wait_dly(self, value):
+        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), value)
+
+    def _get_wait_dly(self):
+        return self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY))
+
+    def _set_cases(self, value):
+        # Generate error if we don't have an AWG program that supports cases
+        if not self._awg_program_features['cases']:
+            raise zibase.ziValueError(
+                'Trying to define cases for an AWG program that does not support them!')
+
+        # Check against number of codewords
+        if len(value) > self._num_codewords:
+            raise zibase.ziValueError('Trying to define a number of cases ({}) greater than configured number of codewords ({})!'.format(
+                len(value), self._num_codewords))
+
+        self._cases = value
+        self._cw_mask = 0
+        for case in self._cases:
+            self._cw_mask |= case
+
+        if self._awg_program_features['diocws'] and self._diocws is None:
+            raise zibase.ziValueError(
+                'AWG program defines DIO output, but no output values have been defined!')
+
+        self._awg_program[0] = \
+            awg_sequence_acquisition_preamble() + """
+// Mask for selecting our codeword bits
+const CW_MASK = ({:08x} << 17);
+// Counts wrong codewords
+var err_cnt = 0;
+""".format(self._cw_mask)
+
+        if self._awg_program_features['diocws']:
+            self._awg_program[0] += \
+                array2vect(self._diocws, "diocws") + """
+// Loop once for each DIO codeword to output
+for (cvar i = 0; i < {}; i = i + 1) {{""".format(len(self._diocws))
+        else:
+            self._awg_program[0] += """
+// Loop for all measurements
+repeat (loop_cnt) {"""
+
+        self._awg_program[0] += """
+    waitDIOTrigger();
+    // Get codeword and apply mask
+    var cw = getDIOTriggered() & CW_MASK;
+    // Generate waveforms based on codeword output
+    switch (cw) {"""
+        # Add each of the cases
+        for case in self._cases:
+            self._awg_program[0] += """
+        case 0x{:08x}: playWave({}, {});""".format(case << 17, zibase.gen_waveform_name(0, case), zibase.gen_waveform_name(1, case))
+
+        # Add a default for ensuring we see something when the other cases fail
+        self._awg_program[0] += """
+        default: playWave(ones(32), ones(32)); err_cnt += 1;
+    }
+    wait(wait_dly);"""
+
+        if self._awg_program_features['diocws']:
+            self._awg_program[0] += """
+    setDIO(diocws[i]);
+"""
+        self._awg_program[0] += """
+    setTrigger(ro_trig);
+    setTrigger(ro_arm);
+}
+wait(300);
+setTrigger(0);
+setUserReg(4, err_cnt);"""
+
+        self._awg_needs_configuration[0] = True
+
+    def _get_cases(self):
+        return self._cases
+
+    def _get_waveform_table(self, awg_nr: int) -> list:
+        """
+        Returns the waveform table.
+
+        The waveform table determines the mapping of waveforms to DIO codewords.
+        The index of the table corresponds to the DIO codeword.
+        The entry is a tuple of waveform names.
+
+        Example:
+            ["wave_ch7_cw000", "wave_ch8_cw000",
+            "wave_ch7_cw001", "wave_ch8_cw001",
+            "wave_ch7_cw002", "wave_ch8_cw002"]
+
+        The waveform table generated depends on the awg_nr and the codeword
+        protocol.
+        """
+        ch = awg_nr*2
+        wf_table = []
+        if self.cases() is not None:
+            for case in self.cases():
+                wf_table.append((zibase.gen_waveform_name(ch, case),
+                                 zibase.gen_waveform_name(ch+1, case)))
+        return wf_table
+
+    ##########################################################################
+    ##########################################################################
+    # Application dependent code starts here:
+    # - dedicated sequence programs
+    # - DIO support
+    # FIXME: move to separate class
+    ##########################################################################
+    ##########################################################################
+
+
+    ##########################################################################
+    # 'public' functions: sequencer functions
+    ##########################################################################
     """
-    'public' functions: sequencer functions
     Before acquisition can take place one of "awg_sequence_acquisition_and_"
     has to be called. These take care that the right program is uploaded.
     The variants are:
@@ -1080,7 +1193,6 @@ setUserReg(4, err_cnt);"""
         awg_sequence_acquisition_and_DIO_RED_test
             special DIO acquisition for testing real time error correction.
     """
-    ##########################################################################
 
     def awg_sequence_acquisition_and_DIO_triggered_pulse(
             self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0, timeout=5) -> None:
@@ -1415,109 +1527,8 @@ setTrigger(0);
         self.awgs_0_outputs_0_mode(0)
         self.awgs_0_outputs_1_mode(0)
 
-    def plot_dio_snapshot(self, bits=range(32)):
-        zibase.plot_timing_diagram(self.getv('awgs/0/dio/data'), bits, 64)
-
     ##########################################################################
-    # 'public' functions: print overview helpers
-    ##########################################################################
-
-    def print_correlation_overview(self):
-        msg = '\tCorrelations overview \n'
-        for i in range(10):
-            enabled = self.get('qas_0_correlations_{}_enable'.format(i))
-            source = self.get('qas_0_correlations_{}_source'.format(i))
-            msg += "Correlations {}, enabled: {} \tsource: {}\n".format(
-                i, enabled, source)
-        msg += '\n\tThresholded correlations overview \n'
-        for i in range(10):
-            enabled = self.get(
-                'qas_0_thresholds_{}_correlation_enable'.format(i))
-            source = self.get(
-                'qas_0_thresholds_{}_correlation_source'.format(i))
-            msg += "Thresholds correlation {}, enabled: {} \tsource: {}\n".format(
-                i, enabled, source)
-        print(msg)
-
-    def print_deskew_overview(self):
-        msg = '\tDeskew overview \n'
-
-        deskew_mat = np.zeros((2, 2))
-        for i in range(2):
-            for j in range(2):
-                deskew_mat[i, j] = self.get(
-                    'qas_0_deskew_rows_{}_cols_{}'.format(i, j))
-        msg += 'Deskew matrix: \n'
-        msg += str(deskew_mat)
-        print(msg)
-
-    def print_crosstalk_overview(self):
-        msg = '\tCrosstalk overview \n'
-        msg += 'Bypass crosstalk: {} \n'.format(self.qas_0_crosstalk_bypass())
-
-        crosstalk_mat = np.zeros((10, 10))
-        for i in range(10):
-            for j in range(10):
-                crosstalk_mat[i, j] = self.get(
-                    'qas_0_crosstalk_rows_{}_cols_{}'.format(i, j))
-        msg += 'Crosstalk matrix: \n'
-        print(msg)
-        print(crosstalk_mat)
-
-    def print_integration_overview(self):
-        msg = '\tIntegration overview \n'
-        msg += 'Integration mode: {} \n'.format(
-            self.qas_0_integration_mode())
-        for i in range(10):
-            msg += 'Integration source {}: {}\n'.format(
-                i, self.get('qas_0_integration_sources_{}'.format(i)))
-        print(msg)
-
-    def print_rotations_overview(self):
-        msg = '\tRotations overview \n'
-        for i in range(10):
-            msg += 'Rotations {}: {}\n'.format(
-                i, self.get('qas_0_rotations_{}'.format(i)))
-        print(msg)
-
-    def print_thresholds_overview(self):
-        msg = '\t Thresholds overview \n'
-        for i in range(10):
-            msg += 'Threshold {}: {}\n'.format(
-                i, self.get('qas_0_thresholds_{}_level'.format(i)))
-        print(msg)
-
-    def print_user_regs_overview(self):
-        msg = '\t User registers overview \n'
-        user_reg_funcs = ['']*16
-        user_reg_funcs[0] = 'Loop count'
-        user_reg_funcs[1] = 'Readout mode'
-        user_reg_funcs[2] = 'Wait delay'
-        user_reg_funcs[3] = 'Average count'
-        user_reg_funcs[4] = 'Error count'
-
-        for i in range(16):
-            msg += 'User reg {}: \t{}\t({})\n'.format(
-                i, self.get('awgs_0_userregs_{}'.format(i)), user_reg_funcs[i])
-        print(msg)
-
-    def print_overview(self):
-        """
-        Print a readable overview of relevant parameters of the UHFQC.
-
-        N.B. This overview is not complete, but combines different
-        print helpers
-        """
-        self.print_correlation_overview()
-        self.print_crosstalk_overview()
-        self.print_deskew_overview()
-        self.print_integration_overview()
-        self.print_rotations_overview()
-        self.print_thresholds_overview()
-        self.print_user_regs_overview()
-
-    ##########################################################################
-    # DIO calibration functions
+    # DIO calibration helpers
     ##########################################################################
 
     def _ensure_activity(self, awg_nr, mask_value: int, timeout=5, verbose=False):
@@ -1615,10 +1626,10 @@ setTrigger(0);
     ##########################################################################
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
-        # NB: ignoring dio_mode and port, because we have no choice
+        # NB: ignoring dio_mode and port, because we have single mode only
         # FIXME: does not seem to produce data in sync with 10 MHz/50 MHz
         program = '''
-        var A = 0x00000CFF; // DV=0x0001, CW=0xCF7
+        var A = 0x00000CFF; // DV=0x0001, CW=0x0CF7
         var B = 0x00000000;
 
         while (1) {

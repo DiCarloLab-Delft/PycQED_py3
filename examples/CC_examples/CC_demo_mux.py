@@ -25,24 +25,44 @@ if len(sys.argv)>1:
 # constants
 ip_cc = '192.168.0.241'
 dev_uhfqa = 'dev2271'
-cc_port_uhfqa = 2
+cc_port_uhfqa0 = 2
 
 
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
+log.debug('connecting to UHFQA')
+uhfqa0 = ZI_UHFQC.UHFQC('uhfqa0', device=dev_uhfqa, nr_integration_channels=9)
+uhfqa0.load_default_settings(upload_sequence=False)
+
+log.debug('connecting to CC')
+cc = QuTechCC('cc', IPTransport(ip_cc))
+cc.init()
+log.info(cc.get_identity())
 
 
 if 1:
-    log.debug('connecting to UHFQA')
-#    cw_list = [3, 2, 1, 0]
+    log.debug('calibration DIO: CC to UHFQA')
+
+    log.debug('calibration DIO: UHFQA to CC')
+    calibrate(
+        sender=uhfqa0,
+        receiver=cc,
+        receiver_port=cc_port_uhfqa0
+    )
+
+
+
+
+
+
+if 1:
+    log.debug('run UHFQA codeword generator')
+    #cw_list = [3, 2, 1, 0]
     cw_list = [7, 6, 5, 4]
     cw_array = np.array(cw_list, dtype=int).flatten()
-
-    UHFQC0 = ZI_UHFQC.UHFQC('UHFQC0', device=dev_uhfqa, nr_integration_channels=9)
-    UHFQC0.load_default_settings()
-    UHFQC0.awg_sequence_acquisition_and_DIO_RED_test(
+    uhfqa0.awg_sequence_acquisition_and_DIO_RED_test(
         Iwaves=[np.ones(8), np.ones(8)],
         Qwaves=[np.ones(8), np.ones(8)],
         cases=[2, 5],
@@ -51,69 +71,53 @@ if 1:
 
     if 0:
         rolut0 = UHFQC_RO_LutMan('rolut0', num_res=5)
-        rolut0.AWG(UHFQC0.name)
+        rolut0.AWG(uhfqa0.name)
 
-    # Prepare AWG_Seq as driver of DIO and set DIO output direction
-    UHFQC0.dios_0_mode(1)
-    UHFQC0.dios_0_drive(3)
+    if 1:  # FIXME: remove duplicates of load_default_settings
+        # Prepare AWG_Seq as driver of DIO and set DIO output direction
+        uhfqa0.dios_0_mode(1)
+        uhfqa0.dios_0_drive(3)
 
-    # Determine trigger and strobe bits from DIO
-    UHFQC0.awgs_0_dio_valid_index(16)
-    UHFQC0.awgs_0_dio_valid_polarity(0)
-    UHFQC0.awgs_0_dio_strobe_index(16)
-    UHFQC0.awgs_0_dio_strobe_slope(1)
-    UHFQC0.awgs_0_userregs_2(2)
+        # Determine trigger and strobe bits from DIO
+        uhfqa0.awgs_0_dio_valid_index(16)
+        uhfqa0.awgs_0_dio_valid_polarity(0)
+        uhfqa0.awgs_0_dio_strobe_index(16)
+        uhfqa0.awgs_0_dio_strobe_slope(1)
+        uhfqa0.awgs_0_userregs_2(2)
 
-    # Initialize UHF for consecutive triggering and enable it
-    UHFQC0.awgs_0_single(0)
-    UHFQC0.awgs_0_enable(1)
+        # Initialize UHF for consecutive triggering and enable it
+        uhfqa0.awgs_0_single(0)
+        uhfqa0.awgs_0_enable(1)
 
-    UHFQC0.start()
+    uhfqa0.start()
 
 
 
 
 if 1:
-    log.debug('generating program')
+    log.debug('upload CC feedback test program')
     prog = """
-.DEF    duration    9
-.DEF    wait        100
-.DEF    smAddr      S16
-.DEF    lut         0
-.DEF    numIter     4
-# slot 0: UHFQA
-[0]         move        $numIter,R0
-[0]loop:    seq_out     0x00010000,$duration      # UHFQA measurement
-[0]         seq_in_sm   $smAddr,$lut,0
-[0]         seq_sw_sm   $smAddr
-[0]         seq_out     0x0,$wait
-[0]         loop        R0,@loop
-[0]         stop
-# slot 1-4: observe
-[1]loop:    jmp         @loop
-[2]loop:    jmp         @loop
-[3]loop:    jmp         @loop
-[4]loop:    jmp         @loop
+    .DEF    duration    9
+    .DEF    wait        100
+    .DEF    smAddr      S16
+    .DEF    lut         0
+    .DEF    numIter     4
+    # slot 0: UHFQA
+    [0]         move        $numIter,R0
+    [0]loop:    seq_out     0x00010000,$duration      # UHFQA measurement
+    [0]         seq_in_sm   $smAddr,$lut,0
+    [0]         seq_sw_sm   $smAddr
+    [0]         seq_out     0x0,$wait
+    [0]         loop        R0,@loop
+    [0]         stop
+    # slot 1-4: observe
+    [1]loop:    jmp         @loop
+    [2]loop:    jmp         @loop
+    [3]loop:    jmp         @loop
+    [4]loop:    jmp         @loop
     """
-
-    log.debug('connecting to CC')
-    cc = QuTechCC('cc', IPTransport(ip_cc))
-    cc.init()
-    log.info(cc.get_identity())
-
-    if 1:
-        log.debug('calibration DIO: CC to UHFQA')
-
-
-        log.debug('calibration DIO: UHFQA to CC')
-        calibrate(
-            sender=UHFQC0,
-            receiver=cc,
-            receiver_port=cc_port_uhfqa
-        )
-
-    log.debug('uploading program to CC')
     cc.assemble(prog)
+
     log.debug('checking for SCPI errors on CC')
     cc.check_errors()
     log.debug('done checking for SCPI errors on CC')
