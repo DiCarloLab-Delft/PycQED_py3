@@ -167,7 +167,6 @@ def mk_minimization_loss(
     randomize_global_search: bool = False,
     volume_weight: float = 10.
 ):
-    print("Making with: ", volume_weight)
     assert volume_weight >= 0.0 and volume_weight <= 1000
     compare_op_start = operator.le if converge_at_local else operator.lt
 
