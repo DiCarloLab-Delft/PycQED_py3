@@ -2,7 +2,6 @@ from adaptive.learner import LearnerND
 from adaptive.learner.learnerND import volume
 import numpy as np
 from functools import partial
-from collections.abc import Iterable
 import logging
 import operator
 import random
@@ -53,6 +52,7 @@ class LearnerND_Minimizer(LearnerND):
                 self.threshold = None
 
             self.compare_op = None
+
             if hasattr(input_loss_per_simplex, "converge_below"):
                 self.converge_below = input_loss_per_simplex.converge_below
             else:
@@ -165,8 +165,31 @@ def mk_minimization_loss(
     threshold: float = None,
     converge_at_local: bool = False,
     randomize_global_search: bool = False,
+    volume_weight: float = 10.
 ):
+    assert volume_weight >= 0.0 and volume_weight <= 1000
     compare_op_start = operator.le if converge_at_local else operator.lt
+
+    # `w` controls how "square" is the resulting function
+    # more "square" => x needs to be lower in order for the vol_factor
+    # to be lower
+    w = volume_weight
+    with np.errstate(divide='ignore'):
+        A = np.divide(1., np.arctan(np.divide(1., w)))
+
+    def vol_factor(vol):
+        with np.errstate(divide='ignore'):
+            out = A * np.arctan(np.divide(vol, w))
+        return out
+
+    w_not = 1 - volume_weight
+    with np.errstate(divide='ignore'):
+        A_not = np.divide(1., np.arctan(np.divide(1., w_not)))
+
+    def dist_factor(scale, dist):
+        with np.errstate(divide='ignore'):
+            out = A_not * np.arctan(np.divide(dist, scale * w_not))
+        return out
 
     def func(simplex, values, value_scale, learner, *args, **kw):
         threshold_is_None = threshold is None
@@ -176,9 +199,6 @@ def mk_minimization_loss(
         # `vol` is normalised 0 <= vol <= 1 because the domain is scaled to a
         # unit hypercube
         vol = volume(simplex)
-        if not learner._scale:
-            # In case the function landscape is constant so far
-            return vol
 
         # learner._scale makes sure it is the biggest loss and is a
         # finite value such that `vol` can be added
@@ -186,10 +206,15 @@ def mk_minimization_loss(
         # `dist_best_val_in_simplex` is the distance (>0) of the best
         # pnt (minimum) in the simplex with respect to the maximum
         # seen ao far, in units of sampling function
-        dist_best_val_in_simplex = (
-            learner._max_value - np.min(values) * learner._scale
-        )
-        dist_all = np.average(learner._max_value - np.array(values) * learner._scale)
+        # dist_best_val_in_simplex = (
+        #     learner._max_value - np.min(values) * learner._scale
+        # )
+        # dist_all = np.average(learner._max_value - np.array(values) * learner._scale)
+        dist_best = np.average(learner._max_value - np.sort(values)[-learner.ndim:] * learner._scale)
+
+        if dist_best == 0.:
+            # In case the function landscape is constant so far
+            return vol
 
         # NB: this might have numerical issues, consider using
         # `learner._output_multiplier` if issues arise or keep the
@@ -207,18 +232,21 @@ def mk_minimization_loss(
                 # point are sampled when the threshold is not moving, avoiding
                 # the sampling to get stuck in the initial simplex of the best
                 # seen point
-                loss = dist_best_val_in_simplex + vol
+
+                # loss = dist_best_val_in_simplex + vol
+                loss = dist_best + vol
             else:
                 # This makes sure the sampling around the minimum beyond the
                 # threshold is uniform
 
                 # `scaled_threshold - np.min(values)` is added to ensure that,
-                # from simplices with same length with a point that has a
-                # function value beyond the fixed threshold, the points closer
-                # to the best value are sampled first
+                # from simplices with same volume with a point that has a
+                # function value beyond the fixed threshold, the simplices
+                # closer to the best value are sampled first
 
                 # `scaled_threshold - np.min(values)` is normalized
                 # 0 <= scaled_threshold - np.min(values) <= 1
+                # + 1.0 avoids getting a 0.
                 side_weight = vol * (1.0 + scaled_threshold - np.min(values))
                 loss = (learner._max_value - comp_threshold) + side_weight
         else:
@@ -229,7 +257,8 @@ def mk_minimization_loss(
             # Big loss => interesting point => difference from maximum function
             # value gives high loss
             # loss = dist_best_val_in_simplex * vol
-            loss = dist_all * vol
+
+            loss = dist_factor(learner._scale, dist_best) * vol_factor(vol)
 
         if randomize_global_search:
             # In case the learner is not working well some biased random
@@ -245,6 +274,7 @@ def mk_minimization_loss(
 
 def mk_minimization_loss_func(
     threshold=None,
+    volume_weight=10.,
     converge_below=None,
     converge_at_local=False,
     randomize_global_search=False,
@@ -269,6 +299,7 @@ def mk_minimization_loss_func(
         threshold=threshold,
         converge_at_local=converge_at_local,
         randomize_global_search=randomize_global_search,
+        volume_weight=volume_weight,
     )
     if bounds is None and npoints is None:
         func = mk_vol_limits_loss_func(
@@ -292,7 +323,7 @@ def mk_minimization_loss_func(
 
     func.needs_learner_access = True
 
-    # This is inteded to accessed by the learner
+    # This is inteded to accessed by the learner and goal func
     # Just to make life easier for the user
     func.threshold = threshold
     func.converge_at_local = converge_at_local
@@ -312,7 +343,8 @@ def mk_minimization_goal_func():
 
     def goal(learner):
         # No action if no points
-        if len(learner.data):
+        print("sampling local: ", learner.sampling_local_minima)
+        if len(learner.data) > 2 ** learner.ndim:
             if len(learner.data) < 2:
                 # First point, just take it as the threshold
                 # Do it here to make sure calculation with the
@@ -371,30 +403,3 @@ def mk_min_threshold_goal_func(max_pnts_beyond_threshold: int):
         return len(learner.data) and num_pnts() >= max_pnts_beyond_threshold
 
     return lambda l: minimization_goal(l) or goal(l)
-
-# ######################################################################
-# Utilities for evaluating points before starting the runner
-# ######################################################################
-
-
-def evaluate_X(learner, X):
-    """
-    Evaluates the learner's sampling function at the given point
-    or points.
-    Can be used to evaluate some initial points that the learner will
-    remember before running the runner.
-
-    Arguments:
-        learner: (BaseLearner) an instance of the learner
-        X: single point or iterable of points
-            A tuple is considered single point for a multi-variable
-            domain.
-    """
-    if type(X) is tuple or not isinstance(X, Iterable):
-        # A single-variable domain single point or
-        # a multi-variable domain single point is given
-        learner.tell(X, learner.function(X))
-    else:
-        # Several points are to be evaluated
-        Y = [learner.function(Xi) for Xi in X]
-        learner.tell_many(X, Y)

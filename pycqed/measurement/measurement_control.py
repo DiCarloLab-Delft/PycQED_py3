@@ -3,6 +3,7 @@ import logging
 import time
 import numpy as np
 import collections
+import operator
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities.general import (
@@ -46,7 +47,8 @@ from adaptive.learner import SKOptLearner
 # Optimizer based on adaptive sampling
 from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
 from pycqed.utilities.learnerND_optimize import LearnerND_Optimize
-from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, evaluate_X
+from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer
+from pycqed.utilities.learner_utils import evaluate_X
 
 from skopt import Optimizer  # imported for checking types
 
@@ -668,10 +670,11 @@ class MeasurementControl(Instrument):
 
         # if is_subclass(self.adaptive_function, BaseLearner):
         if self.mode == "adaptive":
-            # Keep track of the best seen points so far so that they can
+            # Keep track of the best seen points so far so that they can be
             # plotted as stars
             col_indx = len(self.sweep_function_names) + self.par_idx
-            if self.dset[self.adaptive_besteval_indxs[-1], col_indx] > vals:
+            comp_op = operator.lt if self.minimize_optimization else operator.gt
+            if comp_op(vals, self.dset[self.adaptive_besteval_indxs[-1], col_indx]):
                 self.adaptive_besteval_indxs.append(len(self.dset) - 1)
 
         return vals

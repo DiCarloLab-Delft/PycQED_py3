@@ -318,7 +318,8 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         L1_thr=0.3,
         clustering_thr=10,
         cluster_from_interp: bool = True,
-        opt_are_interp: bool = True,
+        _opt_are_interp: bool = True,
+        sort_clusters_by: str = "cost",
         rescore_spiked_optimals: bool = False,
         plt_optimal_waveforms_all: bool = False,
         plt_optimal_waveforms: bool = False,
@@ -336,10 +337,14 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.plt_optimal_values = plt_optimal_values
         self.plt_optimal_values_max = plt_optimal_values_max
         self.plt_clusters = plt_clusters
+
         # Optimals are interpolated
         # Manually set to false if the default analysis flow is changed
         # e.g. in get_guesses_from_cz_sim in flux_lutman
-        self.opt_are_interp = opt_are_interp
+        # In that case we re-evaluate the optimals to be able to proint
+        # true values and not interpolated, even though the optimal is
+        # obtained from interpolation
+        self._opt_are_interp = _opt_are_interp
 
         self.clims = clims
 
@@ -348,6 +353,11 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         self.L1_thr = L1_thr
         self.clustering_thr = clustering_thr
         self.cluster_from_interp = cluster_from_interp
+        # This alows for different strategies of scoring several optima
+        # NB: When interpolation we will not get any lower value than what
+        # already exists on the landscape
+        self.sort_clusters_by = sort_clusters_by
+        assert sort_clusters_by in {"cost", "L1_av_around"}
 
         self.rescore_spiked_optimals = rescore_spiked_optimals
         self.plt_optimal_waveforms = plt_optimal_waveforms
@@ -817,10 +827,12 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 lambda_2_arr=lambda_2_arr,
                 cond_phase_arr=cond_phase_arr,
                 L1_arr=L1_arr,
+                cost_arr=cost_func,
                 target_phase=self.target_cond_phase,
                 phase_thr=self.phase_thr,
                 L1_thr=self.L1_thr,
                 clustering_thr=self.clustering_thr,
+                sort_by_mode=self.sort_clusters_by
             )
         else:
             optimal_idxs = np.array([cost_func.argmin()])
@@ -1030,7 +1042,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
         if not optimal_measured_values:
             optimal_measured_values = self.proc_data_dict["optimal_measured_values"]
         if opt_are_interp is None:
-            opt_are_interp = self.opt_are_interp
+            opt_are_interp = self._opt_are_interp
 
         optimals_max = len(optimal_pars_values)
         spiked = (
@@ -1074,11 +1086,13 @@ def get_optimal_pnts_indxs(
     lambda_2_arr,
     cond_phase_arr,
     L1_arr,
+    cost_arr,
     target_phase=180,
     phase_thr=5,
     L1_thr=0.3,
     clustering_thr=10,
     tolerances=[1, 2, 3],
+    sort_by_mode="cost"
 ):
     """
     target_phase and low L1 need to match roughtly cost function's minimums
@@ -1105,7 +1119,7 @@ def get_optimal_pnts_indxs(
     x_norm = x / 360.0
     y_norm = y / (2 * np.pi)
 
-    # Select points based low leakage and on how close to the
+    # Select points based on low leakage and on how close to the
     # target_phase they are
     for tol in tolerances:
         phase_thr *= tol
@@ -1116,7 +1130,9 @@ def get_optimal_pnts_indxs(
         sel = cond_phase_abs_diff <= phase_thr
         sel = sel * (L1_arr <= L1_thr)
         # sel = sel * (x_norm > y_norm)
-        # Exclude point on the boundaries
+
+        # Exclude point on the boundaries of the entire landscape
+        # This is because of some interpolation problems
         sel = (
             sel * (x < np.max(x)) * (x > np.min(x)) * (y < np.max(y)) * (y > np.min(y))
         )
@@ -1128,6 +1144,7 @@ def get_optimal_pnts_indxs(
                 )
             )
             if tol == tolerances[-1]:
+                log.warning("No optima found giving up.")
                 return np.array([], dtype=int), np.array([], dtype=int)
             log.warning(
                 "Increasing tolerance for phase_thr and L1 to x{}.".format(tol + 1)
@@ -1144,6 +1161,7 @@ def get_optimal_pnts_indxs(
     thresh = clustering_thr / 360.0
     clusters = hcluster.fclusterdata(x_y_filt, thresh, criterion="distance")
 
+    # Sorting the clusters
     cluster_id_min = np.min(clusters)
     cluster_id_max = np.max(clusters)
     clusters_by_indx = []
@@ -1151,53 +1169,74 @@ def get_optimal_pnts_indxs(
     av_L1 = []
     # av_cp_diff = []
     # neighbors_num = []
-    for cluster_id in range(cluster_id_min, cluster_id_max + 1):
+    if sort_by_mode == "cost":
+        # Iterate over all clusters and calculate the metrics we want
+        for cluster_id in range(cluster_id_min, cluster_id_max + 1):
 
-        cluster_indxs = np.where(clusters == cluster_id)
-        indxs_in_orig_array = selected_points_indxs[cluster_indxs]
-        L1_av_around = [
-            av_around(x_norm, y_norm, L1_arr, idx, thresh * 1.5)[0]
-            for idx in indxs_in_orig_array
-        ]
-        min_idx = np.argmin(L1_av_around)
+            cluster_indxs = np.where(clusters == cluster_id)
+            indxs_in_orig_array = selected_points_indxs[cluster_indxs]
 
-        optimal_idx = indxs_in_orig_array[min_idx]
-        optimal_idxs.append(optimal_idx)
+            min_cost_idx = np.argmin(cost_arr[indxs_in_orig_array])
+            optimal_idx = indxs_in_orig_array[min_cost_idx]
 
-        clusters_by_indx.append(indxs_in_orig_array)
+            optimal_idxs.append(optimal_idx)
+            clusters_by_indx.append(indxs_in_orig_array)
 
-        # sq_dist = (x_norm - x_norm[optimal_idx])**2 + (y_norm - y_norm[optimal_idx])**2
-        # neighbors_indx = np.where(sq_dist <= (thresh * 1.5)**2)
-        # neighbors_num.append(np.size(neighbors_indx))
-        # av_cp_diff.append(np.average(cond_phase_abs_diff[neighbors_indx]))
-        # av_L1.append(np.average(L1_arr[neighbors_indx]))
+        # Low cost function is considered the most interesting optimum
+        sort_by = cost_arr[optimal_idxs]
 
-        av_L1.append(L1_av_around[min_idx])
+        if np.any(np.array(sort_by) != np.sort(sort_by)):
+            log.debug(" Optimal points rescored based on cost function.")
 
-    av_L1_w = 1.0
-    # This would be biased towards the original adpative sampling cost func
-    # neighbors_num_w = 0.
-    # Very few points will actually be precisely on the target phase contour
-    # Therefore not used
-    # av_cp_diff_w = 0.
-    # low leakage is best
-    w1 = (
-        av_L1_w
-        * np.array(av_L1)
-        / np.max(av_L1)
-        / np.array([it for it in map(np.size, clusters_by_indx)])
-    )
-    # value more the points with more neighbors as a confirmation of
-    # low leakage area and also scores less points near the boundaries
-    # of the sampling area
-    # w2 = neighbors_num_w * (1 - np.flip(np.array(neighbors_num) / np.max(neighbors_num)))
-    # low phase diff is best
-    # w3 = av_cp_diff_w * np.array(av_cp_diff) / np.max(av_cp_diff)
+    elif sort_by_mode == "L1_av_around":
+        # Iterate over all clusters and calculate the metrics we want
+        for cluster_id in range(cluster_id_min, cluster_id_max + 1):
 
-    sort_by = w1  # + w2 + w3
+            cluster_indxs = np.where(clusters == cluster_id)
+            indxs_in_orig_array = selected_points_indxs[cluster_indxs]
+            L1_av_around = [
+                av_around(x_norm, y_norm, L1_arr, idx, thresh * 1.5)[0]
+                for idx in indxs_in_orig_array
+            ]
+            min_idx = np.argmin(L1_av_around)
 
-    if np.any(np.array(sort_by) != np.sort(sort_by)):
-        log.debug(" Optimal points rescored based on low leakage areas.")
+            optimal_idx = indxs_in_orig_array[min_idx]
+            optimal_idxs.append(optimal_idx)
+
+            clusters_by_indx.append(indxs_in_orig_array)
+
+            # sq_dist = (x_norm - x_norm[optimal_idx])**2 + (y_norm - y_norm[optimal_idx])**2
+            # neighbors_indx = np.where(sq_dist <= (thresh * 1.5)**2)
+            # neighbors_num.append(np.size(neighbors_indx))
+            # av_cp_diff.append(np.average(cond_phase_abs_diff[neighbors_indx]))
+            # av_L1.append(np.average(L1_arr[neighbors_indx]))
+
+            av_L1.append(L1_av_around[min_idx])
+
+        # Here I tried different strategies for scoring the local optima
+        # For landscapes that didn't look very regular
+
+        # low leakage is best
+        w1 = (
+            np.array(av_L1) / np.max(av_L1) /  # normalize to maximum leakage
+            # and consider bigger clusters more interesting
+            np.array([it for it in map(np.size, clusters_by_indx)])
+        )
+
+        # value more the points with more neighbors as a confirmation of
+        # low leakage area and also scores less points near the boundaries
+        # of the sampling area
+        # w2 = (1 - np.flip(np.array(neighbors_num) / np.max(neighbors_num)))
+
+        # Very few points will actually be precisely on the target phase contour
+        # Therefore not used
+        # low phase diff is best
+        # w3 = np.array(av_cp_diff) / np.max(av_cp_diff)
+
+        sort_by = w1  # + w2 + w3
+
+        if np.any(np.array(sort_by) != np.sort(sort_by)):
+            log.debug(" Optimal points rescored based on low leakage areas.")
 
     optimal_idxs = np.array(optimal_idxs)[np.argsort(sort_by)]
     clusters_by_indx = np.array(clusters_by_indx)[np.argsort(sort_by)]
