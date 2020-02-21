@@ -115,7 +115,7 @@ if 1:
 
     if 1:  # FIXME: remove duplicates of load_default_settings
         # Prepare AWG_Seq as driver of DIO and set DIO output direction
-        uhfqa0.dios_0_mode(DIOS_0_MODE_AWG_SEQ)  # FIXME: change from default
+        uhfqa0.dios_0_mode(uhfqa0.DIOS_0_MODE_AWG_SEQ)  # FIXME: change from default
 #        uhfqa0.dios_0_drive(3)
 
         # Determine trigger and strobe bits from DIO

@@ -2,12 +2,14 @@ import re
 import logging
 import numpy as np
 from os.path import join, dirname
-from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
+
+from pycqed.utilities.general import suppress_stdout
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import is_more_rencent
+
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform, CReg, Operation
 

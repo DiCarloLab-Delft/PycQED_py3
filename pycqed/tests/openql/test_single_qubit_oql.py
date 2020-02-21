@@ -3,10 +3,9 @@ import unittest
 import pytest
 import numpy as np
 
-try:
+#try:  # FIXME: hides import problems
+if 1:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-    from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
-        generate_config
     from openql import openql as ql
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
@@ -159,8 +158,7 @@ try:
 
     # FIXME: This only works with Wouters custom OpenQL.
     # Need a better check for this
-
-    if ql.get_version() > '0.7.0':
+    if ql.get_version() > '0.8.0': # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
         class Test_single_qubit_seqs_CC(Test_single_qubit_seqs_CCL):
             def setUp(self):
                 curdir = os.path.dirname(__file__)
@@ -175,13 +173,13 @@ try:
                 pytest.skip("test_fast_feedback_control() uses conditional gates, which are not implemented yet")
     else:
         class Test_single_qubit_seqs_CC(unittest.TestCase):
-                @unittest.skip('OpenQL version does not support CC')
-                def test_fail(self):
-                    pass
+            @unittest.skip('OpenQL version does not support CC')
+            def test_fail(self):
+                pass
 
-except ImportError as e:
-    class Test_single_qubit_seqs_CCL(unittest.TestCase):
-
-        @unittest.skip('Missing dependency - ' + str(e))
-        def test_fail(self):
-            pass
+# except ImportError as e:
+#     class Test_single_qubit_seqs_CCL_import_error(unittest.TestCase):
+#
+#         @unittest.skip('Missing dependency - ' + str(e))
+#         def test_fail(self):
+#             pass
