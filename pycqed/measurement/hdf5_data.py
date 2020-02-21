@@ -325,7 +325,7 @@ def extract_pars_from_datafile(filepath: str, param_spec: dict)-> dict:
         for par_name, par_spec in param_spec.items():
             entry = f[par_spec[0]]
             if par_spec[1].startswith('dset'):
-                param_dict[par_name] = entry.value
+                param_dict[par_name] = entry[()]
             elif par_spec[1].startswith('attr'):
                 param_dict[par_name] = entry.attrs[par_spec[1][5:]]
 
