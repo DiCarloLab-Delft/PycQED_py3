@@ -41,6 +41,14 @@ class QuTechCC_core(SCPIBase):
             sys.stderr.write('error log = {}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
             raise RuntimeError('assembly failed')
 
+    def assemble_and_start(self, program_string: str) -> None:
+        self.assemble(program_string)
+        log.debug('starting CC')
+        self.start()
+        log.debug('checking for SCPI errors on CC')
+        self.check_errors()
+        log.debug('done checking for SCPI errors on CC')
+
     ##########################################################################
     # CC SCPI protocol wrapper functions
     ##########################################################################

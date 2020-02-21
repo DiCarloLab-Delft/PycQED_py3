@@ -322,10 +322,10 @@ class UHFQC(zibase.ZI_base_instrument, DIOCalibration):
         if self._use_dio:
             self.dios_0_mode(2)  # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
             self.dios_0_drive(0x3)  # Drive DIO bits 15 to 0
-            self.dios_0_extclk(2)  # 50 MHz clocking of the DIO
+            self.dios_0_extclk(self.DIOS_0_EXTCLK_50MHZ)  # 50 MHz clocking of the DIO
             self.awgs_0_dio_strobe_slope(0)  # no edge, replaced by dios_0_extclk(2)
             self.awgs_0_dio_strobe_index(15)  # NB: 15 for QCC (was 31 for CCL). Irrelevant now we use 50 MHz clocking
-            self.awgs_0_dio_valid_polarity(2)  # high polarity
+            self.awgs_0_dio_valid_polarity(2)  # high polarity FIXME: does not match AWGS_0_DIO_VALID_POLARITY_HIGH
             self.awgs_0_dio_valid_index(16)
 
         # No rotation on the output of the weighted integration unit, i.e. take
@@ -345,7 +345,7 @@ class UHFQC(zibase.ZI_base_instrument, DIOCalibration):
         self.qas_0_result_length(1000)
         self.qas_0_result_averages(pow(2, LOG2_AVG_CNT))
         # result_logging_mode 2 => raw (IQ)
-        self.qas_0_result_source(2)
+        self.qas_0_result_source(2)  # FIXME: not documented in "node_doc_UHFQA.json"
 
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
@@ -1679,3 +1679,20 @@ setTrigger(0);
 
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False) -> None:
         raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.DIOCalibration")
+
+
+    ##########################################################################
+    # constants definitions from "node_doc_UHFQA.json"
+    ##########################################################################
+
+    DIOS_0_MODE_MANUAL = 0  # "0": "Manual setting of the DIO output value.",
+    DIOS_0_MODE_AWG_SEQ = 1  # "1": "Enables setting of DIO output values by AWG sequencer commands.",
+    DIOS_0_MODE_AWG_WAV = 2  # "2": "Enables the output of AWG waveform data as digital pattern on the DIO connector."
+    # FIXME: comments in this file state: QuExpress thresholds on DIO (mode == 2)
+
+    DIOS_0_EXTCLK_50MHZ = 2  # FIXME: not in "node_doc_UHFQA.json"
+
+    AWGS_0_DIO_VALID_POLARITY_NONE = 0  # "0": "None: VALID bit is ignored.",
+    AWGS_0_DIO_VALID_POLARITY_HIGH = 1  # "1": "High: VALID bit must be logical high.",
+    AWGS_0_DIO_VALID_POLARITY_LOW = 2  # "2": "Low: VALID bit must be logical zero.",
+    AWGS_0_DIO_VALID_POLARITY_BOTH = 3  # "3": "Both: VALID bit may be logical high or zero."

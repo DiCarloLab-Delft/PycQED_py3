@@ -45,13 +45,53 @@ log.info(cc.get_identity())
 if 1:
     log.debug('calibration DIO: CC to UHFQA')
 
+if 0:
     log.debug('calibration DIO: UHFQA to CC')
     calibrate(
         sender=uhfqa0,
         receiver=cc,
         receiver_port=cc_port_uhfqa0
     )
+else: # inspired by calibrate
+    log.debug('sending triggered DIO test program to UHFQA')
+    program = '''
+    var A = 0x00000CFF; // DV=0x0001, CW=0x0CF7
+    var B = 0x00000000;
 
+    while (1) {
+        waitDIOTrigger();
+        setDIO(A);
+        wait(2);
+        setDIO(B);
+    }
+    '''
+    uhfqa0.configure_awg_from_string(0, program)
+    uhfqa0.seti('awgs/0/enable', 1)
+
+
+    log.debug('sending UHFQA trigger program to CC')
+    cc.debug_marker_out(cc_port_uhfqa0, cc.UHFQA_DV)  # watch DV to check period/frequency
+    prog = """
+    # depends on HW configuration
+    .DEF    duration    9
+    .DEF    wait        100
+    # slot 2: UHFQA
+    [0]loop:    seq_out     0x00010000,$duration      # trigger UHFQA
+    [0]         seq_out     0x0,$wait
+    [0]         jmp         @loop
+    [0]         stop
+    # slot 3: observe
+    [3]loop:    jmp         @loop
+    """
+    cc.assemble_and_start(prog)
+    dio_mask = 0x00000CFF
+    expected_sequence = []
+
+
+    log.debug('calibrating DIO protocol on CC')
+    cc.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=cc_port_uhfqa0)
+    cc.stop()
+    uhfqa0.stop()
 
 
 
@@ -75,20 +115,19 @@ if 1:
 
     if 1:  # FIXME: remove duplicates of load_default_settings
         # Prepare AWG_Seq as driver of DIO and set DIO output direction
-        uhfqa0.dios_0_mode(1)
-        uhfqa0.dios_0_drive(3)
+        uhfqa0.dios_0_mode(DIOS_0_MODE_AWG_SEQ)  # FIXME: change from default
+#        uhfqa0.dios_0_drive(3)
 
         # Determine trigger and strobe bits from DIO
-        uhfqa0.awgs_0_dio_valid_index(16)
-        uhfqa0.awgs_0_dio_valid_polarity(0)
-        uhfqa0.awgs_0_dio_strobe_index(16)
-        uhfqa0.awgs_0_dio_strobe_slope(1)
+#        uhfqa0.awgs_0_dio_valid_index(16)
+#        uhfqa0.awgs_0_dio_valid_polarity(0)
+#?        uhfqa0.awgs_0_dio_strobe_index(16)
+#?       uhfqa0.awgs_0_dio_strobe_slope(1)
         uhfqa0.awgs_0_userregs_2(2)
 
         # Initialize UHF for consecutive triggering and enable it
         uhfqa0.awgs_0_single(0)
-        uhfqa0.awgs_0_enable(1)
-
+#?        uhfqa0.awgs_0_enable(1)
     uhfqa0.start()
 
 
@@ -116,15 +155,8 @@ if 1:
     [3]loop:    jmp         @loop
     [4]loop:    jmp         @loop
     """
-    cc.assemble(prog)
-
-    log.debug('checking for SCPI errors on CC')
-    cc.check_errors()
-    log.debug('done checking for SCPI errors on CC')
-
-    log.debug('starting CC')
-    cc.debug_marker_out(0, cc.UHFQA_TRIG)
-    cc.start()
+    cc.debug_marker_out(cc_port_uhfqa0, cc.UHFQA_TRIG)
+    cc.assemble_and_start(prog)
     log.debug('finished')
 
 
