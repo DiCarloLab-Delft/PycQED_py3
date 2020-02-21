@@ -686,7 +686,7 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
     i = 0
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
-            k = oqh.create_kernel('RB_{}Cl_s{}'.format(n_cl, seed), p)
+            k = oqh.create_kernel('RB_{}Cl_s{}_{}'.format(n_cl, seed,j), p)
             if not restless:
                 k.prepz(qubit_idx)
             if cal_points and (j == (len(nr_cliffords)-4) or
@@ -803,8 +803,8 @@ def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
                          qubit_other_idx=0,
                          cal_points: bool = True):
     """
-    A Ramsey sequence with varying waiting times `times`in between. 
-    It calibrates the timing between spec and measurement pulse. 
+    A Ramsey sequence with varying waiting times `times`in between.
+    It calibrates the timing between spec and measurement pulse.
     """
     p = oqh.create_program('TimingCalibration1D', platf_cfg)
 
