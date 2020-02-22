@@ -2252,6 +2252,10 @@ class MeasurementControl(Instrument):
 
         if cmaps and zlabel in cmaps.keys():
             cmap = cmaps[zlabel]
+        elif zunit == "%":
+            cmap = "hot"
+        elif zunit.lower() == "deg":
+            cmap = "anglemap45"
         elif np.any(np.array(cost_func_names) == zlabel.lower()):
             cmap = (
                 "inferno_clip_high"
@@ -2259,10 +2263,6 @@ class MeasurementControl(Instrument):
                 and not self.minimize_optimization
                 else "inferno_clip_low"
             )
-        elif zunit == "%":
-            cmap = "hot"
-        elif zunit.lower() == "deg":
-            cmap = "anglemap45"
         else:
             cmap = "viridis"
 
