@@ -178,7 +178,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
-            vals=validators.Enum('identical', 'microwave', 'new_novsm_microwave', 'flux'), docstring=(
+            vals=validators.Enum('identical', 'microwave', 'novsm_microwave', 'flux'), docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
