@@ -253,6 +253,10 @@ class MeasurementControl(Instrument):
         return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
 
+        # Flag used to update a specific plot trace for LearnerND_Minimizer
+        # and Learner1D_Minimizer. Set to false here to avoid interference
+        self.is_Learner_Minimizer = False
+
         with h5d.Data(
             name=self.get_measurement_name(), datadir=self.datadir()
         ) as self.data_object:
@@ -368,6 +372,12 @@ class MeasurementControl(Instrument):
         """
         self.save_optimization_settings()
         self.adaptive_function = self.af_pars.pop("adaptive_function")
+
+        # Used to update plots specific to this optimizer
+        self.is_Learner_Minimizer = is_subclass(
+            self.adaptive_function, Learner1D_Minimizer
+        ) or is_subclass(self.adaptive_function, LearnerND_Minimizer)
+
         if self.live_plot_enabled():
             self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
@@ -406,7 +416,7 @@ class MeasurementControl(Instrument):
                         loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
                     )
                 elif issubclass(Learner, SKOptLearner):
-                    # NB2: This learner expects the `optimization_function`
+                    # NB: This learner expects the `optimization_function`
                     # to be scalar
                     # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
                     self.learner = Learner(
@@ -656,6 +666,14 @@ class MeasurementControl(Instrument):
         if isinstance(vals, collections.abc.Iterable):
             vals = vals[self.par_idx]
 
+        if self.mode == "adaptive":
+            # Keep track of the best seen points so far so that they can be
+            # plotted as stars, need to be done before inverting `vals`
+            col_indx = len(self.sweep_function_names) + self.par_idx
+            comp_op = operator.lt if self.minimize_optimization else operator.gt
+            if comp_op(vals, self.dset[self.adaptive_besteval_indxs[-1], col_indx]):
+                self.adaptive_besteval_indxs.append(len(self.dset) - 1)
+
         if self.minimize_optimization:
             if self.f_termination is not None:
                 if vals < self.f_termination:
@@ -667,15 +685,6 @@ class MeasurementControl(Instrument):
                 if vals > self.f_termination:
                     raise StopIteration()
             vals = np.multiply(-1, vals)
-
-        # if is_subclass(self.adaptive_function, BaseLearner):
-        if self.mode == "adaptive":
-            # Keep track of the best seen points so far so that they can be
-            # plotted as stars
-            col_indx = len(self.sweep_function_names) + self.par_idx
-            comp_op = operator.lt if self.minimize_optimization else operator.gt
-            if comp_op(vals, self.dset[self.adaptive_besteval_indxs[-1], col_indx]):
-                self.adaptive_besteval_indxs.append(len(self.dset) - 1)
 
         return vals
 
@@ -771,13 +780,13 @@ class MeasurementControl(Instrument):
     # Plotmon #
     ###########
     """
-    There are (will be) three kinds of plotmons, the regular plotmon,
+    There are three kinds of plotmons, the regular plotmon,
     the 2D plotmon (which does a heatmap) and the adaptive plotmon.
     """
 
     def create_plot_monitor(self):
         """
-        Creates new PyQTgraph plotting monitor.
+        Creates new PyQtGraph plotting monitor.
         Can also be used to recreate these when plotting has crashed.
         """
         if hasattr(self, "main_QtPlot"):
@@ -793,7 +802,6 @@ class MeasurementControl(Instrument):
         )
 
     def initialize_plot_monitor(self):
-        # new code
         if self.main_QtPlot.traces != []:
             self.main_QtPlot.clear()
         self.curves = []
@@ -838,7 +846,6 @@ class MeasurementControl(Instrument):
                     yunit=yunits[yi],
                     subplot=j + 1,
                     color=color_cycle[j % len(color_cycle)],
-                    # pen=None,
                     symbol="o",
                     symbolSize=5,
                     **kw
@@ -856,7 +863,7 @@ class MeasurementControl(Instrument):
             i = 0
             try:
                 time_since_last_mon_update = time.time() - self._mon_upd_time
-            except:
+            except Exception:
                 # creates the time variables if they did not exists yet
                 self._mon_upd_time = time.time()
                 time_since_last_mon_update = 1e9
@@ -982,9 +989,16 @@ class MeasurementControl(Instrument):
 
             self.im_plots = []
             self.im_plot_scatters = []
+            self.im_plot_scatters_last = []
+            self.im_plot_scatters_last_one = []
 
             for j in range(len(self.detector_function.value_names)):
-                cmap, zrange = self.choose_MC_cmap_zrange(zlabels[j], zunits[j])
+                cmap, zrange = self.choose_MC_cmap_zrange(
+                    # force the choice of clipped cmap because we are likely
+                    # running an optimization
+                    "cost" if self.mode == "adaptive" and j == 0 else zlabels[j],
+                    zunits[j],
+                )
                 config_dict = {
                     "x": [0, 1],
                     "y": [0, 1],
@@ -1010,10 +1024,34 @@ class MeasurementControl(Instrument):
                     color=1.0,
                     width=0,
                     symbol="o",
-                    symbolSize=2,
+                    symbolSize=4,
                     subplot=j + 1,
                 )
                 self.im_plot_scatters.append(self.secondary_QtPlot.traces[-1])
+
+                # Used to show the position of the last sampled points
+                self.secondary_QtPlot.add(
+                    x=[0],
+                    y=[0],
+                    # pen=None,
+                    color=1.0,
+                    width=0,
+                    symbol="o",
+                    symbolSize=4,
+                    subplot=j + 1,
+                )
+                self.im_plot_scatters_last.append(self.secondary_QtPlot.traces[-1])
+                self.secondary_QtPlot.add(
+                    x=[0],
+                    y=[0],
+                    pen=None,
+                    color=color_cycle[3],  # Make the last one red
+                    width=0,
+                    symbol="o",
+                    symbolSize=7,  # and larger than the rest
+                    subplot=j + 1,
+                )
+                self.im_plot_scatters_last_one.append(self.secondary_QtPlot.traces[-1])
 
     def update_plotmon_2D_interp(self, force_update=False):
         """
@@ -1054,6 +1092,15 @@ class MeasurementControl(Instrument):
                         trace = self.im_plot_scatters[j]
                         trace["config"]["x"] = x_vals
                         trace["config"]["y"] = y_vals
+                        # Mark the last sampled points
+                        pnts_num = 4
+                        if len(x_vals) > pnts_num:
+                            trace = self.im_plot_scatters_last[j]
+                            trace["config"]["x"] = x_vals[-pnts_num:]
+                            trace["config"]["y"] = y_vals[-pnts_num:]
+                        trace = self.im_plot_scatters_last_one[j]
+                        trace["config"]["x"] = x_vals[-1:]
+                        trace["config"]["y"] = y_vals[-1:]
 
                     self.time_last_2Dplot_update = time.time()
                     self.secondary_QtPlot.update_plot()
@@ -1184,6 +1231,22 @@ class MeasurementControl(Instrument):
                 )
                 self.iter_bever_traces.append(iter_plotmon.traces[-1])
 
+                # We want to plot a line that indicates the moving threshold
+                # for the cost function when we use the `LearnerND_Minimizer` or
+                # the `Learner1D_Minimizer` samplers
+                if self.is_Learner_Minimizer and j == 0:
+                    iter_plotmon.add(
+                        x=[0],
+                        y=[0],
+                        name="Thresh max priority pnts",
+                        xlabel="iteration",
+                        subplot=xlabels_num + j + 1 + iter_start_idx,
+                        symbol="o",
+                        symbolSize=5,
+                        color=color_cycle[3],
+                    )
+                    self.iter_mv_threshold = iter_plotmon.traces[-1]
+
     def update_plotmon_adaptive(self, force_update=False):
         if self.adaptive_function.__module__ == "cma.evolution_strategy":
             return self.update_plotmon_adaptive_cma(force_update=force_update)
@@ -1227,6 +1290,27 @@ class MeasurementControl(Instrument):
                         self.iter_traces[iter_traces_idx]["config"]["y"] = y
                         self.iter_bever_traces[j]["config"]["x"] = besteval_idxs
                         self.iter_bever_traces[j]["config"]["y"] = y_besteval
+                        if self.is_Learner_Minimizer:
+                            # We want just a line from the first pnt to the last
+                            threshold = (
+                                self.learner.moving_threshold
+                                if self.learner.threshold is None
+                                else self.learner.threshold
+                            )
+                            if threshold < np.inf:
+                                threshold = (
+                                    threshold
+                                    if self.minimize_optimization
+                                    else -threshold
+                                )
+                                self.iter_mv_threshold["config"]["x"] = [
+                                    0,
+                                    len_dset - 1,
+                                ]
+                                self.iter_mv_threshold["config"]["y"] = [
+                                    threshold,
+                                    threshold,
+                                ]
                         self.time_last_ad_plot_update = time.time()
                     self.secondary_QtPlot.update_plot()
             except Exception as e:
