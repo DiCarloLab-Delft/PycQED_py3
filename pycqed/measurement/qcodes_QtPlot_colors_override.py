@@ -301,10 +301,10 @@ for name, scale in list(colorscales.items()):
     ]
     colorscales[name + "_reversed"] = reversed_scale
 
-# Generate also all scales with cliping at red
+# Generate also all scales with cliping at green
 for name, scale in list(colorscales.items()):
     clip_percent = 0.03
-    clip_color = (255, 0, 0, 255)
+    clip_color = (0, 255, 0, 255)
 
     scale_low = list(scale)
     scale_low.insert(1, scale[0])
