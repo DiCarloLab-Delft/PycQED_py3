@@ -174,7 +174,7 @@ def mk_minimization_loss(
     threshold: float = None,
     converge_at_local: bool = False,
     randomize_global_search: bool = False,
-    volume_weight: float = 10.0,
+    volume_weight: float = 5.0,
 ):
     assert volume_weight >= 0.0 and volume_weight <= 1000.0
     compare_op_start = operator.le if converge_at_local else operator.lt
