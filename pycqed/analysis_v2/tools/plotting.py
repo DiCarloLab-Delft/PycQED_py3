@@ -20,6 +20,8 @@ def scatter_pnts_overlay(
         marker='.',
         s=None,
         c=None,
+        alpha=1,
+        setlabel= None,
         **kw):
     """
     Adds a scattered overlay of the provided data points
@@ -36,10 +38,12 @@ def scatter_pnts_overlay(
     if transpose:
         log.debug('Inverting x and y axis for non-interpolated points')
         ax.scatter(y, x, marker=marker,
-                   color=color, edgecolors=edgecolors, linewidth=linewidth, s=s, c=c)
+                   color=color, edgecolors=edgecolors, linewidth=linewidth, s=s,
+                   c=c, alpha=alpha, label=setlabel)
     else:
         ax.scatter(x, y, marker=marker,
-                   color=color, edgecolors=edgecolors, linewidth=linewidth, s=s, c=c)
+                   color=color, edgecolors=edgecolors, linewidth=linewidth, s=s,
+                   c=c, alpha=alpha, label=setlabel)
 
     return fig, ax
 

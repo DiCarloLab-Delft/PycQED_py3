@@ -1520,10 +1520,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             rescore_spiked_optimals=True,
             plt_optimal_waveforms_all=True,
             waveform_flux_lm_name=self.name,
-            opt_are_interp=not (
+            _opt_are_interp=not (
                 evaluate_local_optimals and cluster_from_interp),
             clims={
-                'L1': [0, 1],
+                'L1': [0, 20],
                 # 'Cost func': [0, 100] # was useful when the cost func
                 # was being top and bottom bounded with a modified
                 # Lennard-Jones potential

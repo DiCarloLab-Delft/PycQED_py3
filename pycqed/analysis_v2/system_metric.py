@@ -14,7 +14,7 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor,
                                             set_axeslabel_color)
-# from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm, ListedColormap, LinearSegmentedColormap
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.measurement.hdf5_data as h5d
 import os
@@ -87,6 +87,15 @@ class System_Metric(ba.BaseDataAnalysis):
                 param_dict[param] = list(h5d.extract_pars_from_datafile(
                     data_fp, param_spec).values())[0]
             self.raw_data_dict[qubit] = param_dict
+            for key in param_dict.keys():
+                if param_dict[key] == 'None' or param_dict[key] == '0':
+                    param_dict[key] = np.NaN
+            param_dict['F_RB'] = 1-float(param_dict['F_RB'])
+            param_dict['F_RB'] = str(param_dict['F_RB'])
+            param_dict['F_ssro'] = 1-float(param_dict['F_ssro'])
+            param_dict['F_ssro'] = str(param_dict['F_ssro'])
+            # for fgate in param_dict['F_RB'`]:
+            #     param_dict[F_RB]
         # Two qubit gates dic in pairs
         self.raw_data_dict_2Q = {}
         for pair in self.pairs:
@@ -161,6 +170,9 @@ class System_Metric(ba.BaseDataAnalysis):
             f = ax.get_figure()
 
         val_fmt_str = '{0:1.1e}'
+        norm = LogNorm()
+
+        cool_colormap = LinearSegmentedColormap.from_list("", ["green","yellow","red"])
         # Decide metric
         if plot == 'leakage' or plot == 'L1':
             plot_key = 'L1'
@@ -175,15 +187,22 @@ class System_Metric(ba.BaseDataAnalysis):
             clabel = 'Readout infidelity'
             plot_key = 'ro_fid'
         elif plot == 'F_RB':
-            cmap = 'ocean'
-            clabel = 'Single Gate fidelity'
+            cmap = cool_colormap 
+            clabel = 'Single Gate infidelity'
             plot_key = 'F_RB'
-            val_fmt_str = '{:.3f}'
+            # val_fmt_str = '{:.3g}'
         elif plot == 'F_ssro':
-            cmap = 'ocean'
+            cmap = cool_colormap 
             clabel = 'Assignment readout fidelity'
             plot_key = 'F_ssro'
-            val_fmt_str = '{:.3f}'
+            norm = None
+            # val_fmt_str = '{:.3f}'
+        elif plot == 'ro_res_ext':
+            cmap = cool_colormap 
+            clabel = 'Residual Excitation'
+            plot_key = 'ro_res_ext'
+            norm = None
+            # val_fmt_str = '{:.3f}'
         elif plot == 'F_discr':
             cmap = 'ocean'
             clabel = 'Discriminated readout fidelity'
@@ -197,24 +216,27 @@ class System_Metric(ba.BaseDataAnalysis):
             cmap = 'PuOr'
             clabel = 'Frequency (GHz)'
             plot_key = 'freq_qubit'
-            val_fmt_str = '{:.3f}'
             norm = None
+            val_fmt_str = '{:.3f}'
             unit = 1e9
         elif plot == 'freq_target':
             cmap = 'nipy_spectral_r'
             clabel = 'Frequency (GHz)'
+            norm = None
             plot_key = 'freq_target_GHz'
             val_fmt_str = '{:.3f}'
             norm = None
         elif plot == 'T1':
             cmap = 'RdYlGn'
             clabel = r"T1 ($\mu$s)"
+            norm = None
             plot_key = 'T1'
             val_fmt_str = '{:.3f}'
             norm = None
             unit = 1e-6
         elif plot == 'T2_echo':
             cmap = 'RdYlGn'
+            norm = None
             clabel = r"T2 echo ($\mu$s)"
             plot_key = 'T2_echo'
             val_fmt_str = '{:.3f}'
@@ -222,6 +244,7 @@ class System_Metric(ba.BaseDataAnalysis):
             unit = 1e-6
         elif plot == 'T2_star':
             cmap = 'RdYlGn'
+            norm = None
             clabel = r"T2 star ($\mu$s)"
             plot_key = 'T2_star'
             val_fmt_str = '{:.3f}'
@@ -269,6 +292,20 @@ class System_Metric(ba.BaseDataAnalysis):
             ax.text(x[i], y[i], s=val_fmt_str.format(values[i]/unit),
                     color='black',
                     va='center', ha='center')
+            if plot == 'freq_max':
+                T = []
+                val_fmt_str = '{:g}'
+                T1 = round(float(self.proc_data_frame.at[qubit, 'T1'])*1e6, 1)
+                T2s = round(
+                    float(self.proc_data_frame.at[qubit, 'T2_star'])*1e6, 1)
+                T2e = round(
+                    float(self.proc_data_frame.at[qubit, 'T2_echo'])*1e6, 1)
+                T.extend([T1, T2e])
+                ax.text(x[i], y[i]-0.38, s=T,
+                        color='black',
+                        va='center', ha='center')
+                ax.text(1,1.5, s='[T1 , T2_echo] in $\mu$s',ha='center',
+                        va='center', color='black')
         # Main figure
         ax.set_ylim(-1.5, 1.6)
         ax.set_xlim(-1.5, 3.5)
@@ -276,9 +313,10 @@ class System_Metric(ba.BaseDataAnalysis):
         # feedline positions
         ax.text(-1., 1.2, 'Feedline 1', rotation=-45,
                 ha='center', va='center', color=main_color)
-        # ax.text(3., 1.2, 'Feedline 2', rotation=-45,ha='center', va='center', color=main_color)
+        ax.text(3., 1.2, 'Feedline 2', rotation=-45,
+                ha='center', va='center', color=main_color)
         ax.plot([-1.5, 2], [1.5, -2], c='C0')
-        # ax.plot([1.5, 3.5], [2.5, .5])
+        ax.plot([1.5, 3.5], [2.5, .5])
         ax.set_title('System metric GBT', color=main_color)
 
         # Color bar
@@ -289,36 +327,36 @@ class System_Metric(ba.BaseDataAnalysis):
         if not axis:
             ax.set_axis_off()
 
-        # # Two qubit part
-        if df_2Q is None:
-            df_2Q = self.proc_data_frame_2Q
-            x = np.array([c[0] for c in df_2Q['coords']])
-            y = np.array([c[1] for c in df_2Q['coords']])
+        # # # Two qubit part
+        # if df_2Q is None:
+        #     df_2Q = self.proc_data_frame_2Q
+        #     x = np.array([c[0] for c in df_2Q['coords']])
+        #     y = np.array([c[1] for c in df_2Q['coords']])
 
-            ax.scatter(x, y, s=2000, edgecolors=main_color, color='None',
-                       marker=(4, 0, i*90),)
-            if plot in {'gate', 'leakage'}:
-                sc = ax.scatter(x, y, s=2000, c=df_2Q[plot_key], vmin=vmin, vmax=vmax, cmap=cmap,
-                                marker=(4, 0, i*90),
-                                norm=norm)
-                for ind, row in df_2Q.iterrows():
-                    if row[plot_key] > 1e-3 and plot == 'leakage':
-                        c = 'black'
-                    else:
-                        c = 'white'
-                    ax.text(row['coords'][0], row['coords'][1], s=val_fmt_str.format(row[plot_key]),
-                            color=c,
-                            va='center', ha='center')
+        #     ax.scatter(x, y, s=2000, edgecolors=main_color, color='None',
+        #                marker=(4, 0, i*90),)
+        #     if plot in {'gate', 'leakage'}:
+        #         sc = ax.scatter(x, y, s=2000, c=df_2Q[plot_key], vmin=vmin, vmax=vmax, cmap=cmap,
+        #                         marker=(4, 0, i*90),
+        #                         norm=norm)
+        #         for ind, row in df_2Q.iterrows():
+        #             if row[plot_key] > 1e-3 and plot == 'leakage':
+        #                 c = 'black'
+        #             else:
+        #                 c = 'white'
+        #             ax.text(row['coords'][0], row['coords'][1], s=val_fmt_str.format(row[plot_key]),
+        #                     color=c,
+        #                     va='center', ha='center')
 
-        # plotting saving
-        if figdir is None:
-            figdir = os.path.dirname(
-                get_datafilepath_from_timestamp(self.t_start))
+        # # plotting saving
+        # if figdir is None:
+        #     figdir = os.path.dirname(
+        #         get_datafilepath_from_timestamp(self.t_start))
 
-        f.patch.set_alpha(0)
-        f.savefig(os.path.join(figdir, os.path.basename(figdir) + 'System_Metric_SW_freqs{}.png'.format(main_color)),
-                  dpi=1200, bbox_inches='tight')
-        f.savefig(os.path.join(figdir, os.path.basename(figdir) + 'System_Metric_SW_freqs{}.svg'.format(main_color)),
-                  bbox_inches='tight')
-        f.savefig(os.path.join(figdir, os.path.basename(figdir) + 'System_Metric_SW_freqs{}.pdf'.format(
-            main_color)), bbox_inches='tight')
+        # f.patch.set_alpha(0)
+        # f.savefig(os.path.join(figdir, os.path.basename(figdir) + 'System_Metric_SW_freqs{}.png'.format(main_color)),
+        #           dpi=1200, bbox_inches='tight')
+        # f.savefig(os.path.join(figdir, os.path.basename(figdir) + 'System_Metric_SW_freqs{}.svg'.format(main_color)),
+        #           bbox_inches='tight')
+        # f.savefig(os.path.join(figdir, os.path.basename(figdir) + 'System_Metric_SW_freqs{}.pdf'.format(
+        #     main_color)), bbox_inches='tight')

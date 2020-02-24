@@ -15,8 +15,8 @@ from pycqed.instrument_drivers.physical_instruments.dummy_instruments import (
     DummyParHolder,
 )
 from pycqed.measurement.optimization import nelder_mead, SPSA
-from pycqed.utilities.learner1D_optimize import (Learner1D_Optimize,
-    mk_optimization_loss_func, mk_optimization_goal_func)
+from pycqed.utilities.learner1D_minimizer import (Learner1D_Minimizer,
+    mk_minimization_loss_func, mk_minimization_goal_func)
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.utilities.get_default_datadir import get_default_datadir
 from pycqed.measurement.hdf5_data import read_dict_from_hdf5
@@ -661,12 +661,12 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.soft_avg(1)
         self.mock_parabola.noise(0)
         self.MC.set_sweep_functions([self.mock_parabola.x, self.mock_parabola.y_int])
-        loss = mk_optimization_loss_func()
-        goal = mk_optimization_goal_func()
+        loss = mk_minimization_loss_func()
+        goal = mk_minimization_goal_func()
 
         self.MC.set_adaptive_function_parameters(
             {
-                "adaptive_function": Learner1D_Optimize,
+                "adaptive_function": Learner1D_Minimizer,
                 "goal": lambda l: l.npoints > 15 or goal(l),
                 "bounds": (-50., +50.),
                 "loss_per_interval": loss,
