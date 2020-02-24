@@ -2,7 +2,7 @@
 
 import sys
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
+from pycqed.instrument_drivers.lib.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC_core import QuTechCC_core
 
 # parameter handling

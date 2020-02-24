@@ -3,9 +3,8 @@
 import os
 import logging
 import sys
-import numpy as np
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
+from pycqed.instrument_drivers.lib.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 

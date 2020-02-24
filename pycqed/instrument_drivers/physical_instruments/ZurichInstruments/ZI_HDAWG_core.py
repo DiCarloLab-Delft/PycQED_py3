@@ -42,11 +42,8 @@ Changelog:
 """
 
 import logging
-import os
 import time
-import ctypes
 import json
-from zlib import crc32
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 

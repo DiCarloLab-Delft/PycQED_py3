@@ -11,14 +11,12 @@
 """
 
 import logging
-import os
 import numpy as np
 from typing import Tuple,List
 
 from .QuTechCC_core import QuTechCC_core
-from .Transport import Transport
-from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
-import pycqed
+from pycqed.instrument_drivers.lib.Transport import Transport
+import pycqed.instrument_drivers.lib.DIO as DIO
 
 from qcodes.utils import validators as vals
 from qcodes import Instrument
@@ -26,7 +24,7 @@ from qcodes import Instrument
 log = logging.getLogger(__name__)
 
 
-class QuTechCC(QuTechCC_core, Instrument, DIOCalibration):
+class QuTechCC(QuTechCC_core, Instrument, DIO.CalInterface):
     def __init__(self,
                  name: str,
                  transport: Transport,
@@ -179,7 +177,7 @@ class QuTechCC(QuTechCC_core, Instrument, DIOCalibration):
         self.start()
 
     ##########################################################################
-    # overrides for DIOCalibration interface
+    # overrides for CalInterface interface
     # FIXME: move to QuTechCC_core? or CC_DIOCAL
     ##########################################################################
 

@@ -17,11 +17,11 @@
 import logging
 import re
 import numpy as np
-from typing import Tuple, List, Sequence, Dict
+from typing import Tuple, List
 
-from pycqed.instrument_drivers.physical_instruments.SCPIBase import SCPIBase
-from pycqed.instrument_drivers.physical_instruments.Transport import Transport
-from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
+import pycqed.instrument_drivers.lib.DIO as DIO
+from pycqed.instrument_drivers.lib.SCPIBase import SCPIBase
+from pycqed.instrument_drivers.lib.Transport import Transport
 
 log = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ cw_protocols_mt = {
 # class
 ##########################################################################
 
-class QWGCore(SCPIBase, DIOCalibration):
+class QWGCore(SCPIBase, DIO.CalInterface):
     __doc__ = f"""
     Driver for a Qutech AWG Module (QWG) instrument. Will establish a connection to a module via ethernet.
     :param name: Name of the instrument  
@@ -375,7 +375,7 @@ class QWGCore(SCPIBase, DIOCalibration):
         return self._ask_int("SYSTem:CODEwords:SELect?")
 
     ##########################################################################
-    # overrides for DIOCalibration interface
+    # overrides for CalInterface interface
     ##########################################################################
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:

@@ -25,7 +25,7 @@ from typing import Tuple,List
 from .SCPI import SCPI
 from ._CCL.CCLightMicrocode import CCLightMicrocode
 import pycqed
-from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
+import pycqed.instrument_drivers.lib.DIO as DIO
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
@@ -54,7 +54,7 @@ CHAR_MIN = -128
 
 MAX_NUM_INSN = 2**15
 
-class CCL(SCPI, DIOCalibration):
+class CCL(SCPI, DIO.CalInterface):
     """
     This is class is used to serve as the driver between the user and the
     CC-Light hardware. The class starts by querying the hardware via the
@@ -590,7 +590,7 @@ class CCL(SCPI, DIOCalibration):
         return expected_sequence
 
     ##########################################################################
-    # overrides for DIOCalibration interface
+    # overrides for CalInterface interface
     ##########################################################################
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:

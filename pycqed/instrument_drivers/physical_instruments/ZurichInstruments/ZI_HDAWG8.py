@@ -78,7 +78,7 @@ Changelog:
 
 20200217 WJV
 - moved DIO calibration helpers to their respective drivers
-- we now implement new interface DIOCalibration
+- we now implement new interface CalInterface
 
 """
 
@@ -90,7 +90,7 @@ from typing import Tuple,List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
-from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
+import pycqed.instrument_drivers.lib.DIO as DIO
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
@@ -114,7 +114,7 @@ class ziDIOCalibrationError(Exception):
 # Class
 ##########################################################################
 
-class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIOCalibration):
+class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
 
     def __init__(self,
                  name: str,
@@ -540,7 +540,7 @@ while (1) {
         return set(valid_delays)
 
     ##########################################################################
-    # overrides for DIOCalibration interface
+    # overrides for CalInterface interface
     ##########################################################################
 
     # NB: based on UHFQuantumController.py::_prepare_HDAWG8_dio_calibration
@@ -599,4 +599,4 @@ while (1) {
     ##########################################################################
 
     def calibrate_CC_dio_protocol(self, CC, verbose=False) -> None:
-        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.DIOCalibration")
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.CalInterface")

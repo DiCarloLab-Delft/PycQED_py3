@@ -2,20 +2,14 @@
 # Based on: http://localhost:8888/notebooks/personal_folders/Miguel/qec_lut_demo.ipynb
 
 ### setup logging before all imports (before any logging is done as to prevent a default root logger)
-import CC_logging
 
-import os
 import logging
 import sys
 import numpy as np
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
+from pycqed.instrument_drivers.lib.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
-from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
-from pycqed.instrument_drivers.meta_instrument.DIOCalibration import calibrate
-
-
 
 # parameter handling
 sel = 0

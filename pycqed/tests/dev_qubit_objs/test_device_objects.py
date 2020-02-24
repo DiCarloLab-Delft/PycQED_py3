@@ -18,10 +18,10 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy
 #from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 #from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 #from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
-from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL, CCL
-from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC, QCC
+from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
+from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
-from pycqed.instrument_drivers.physical_instruments.Transport import DummyTransport
+from pycqed.instrument_drivers.lib.Transport import DummyTransport
 
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do

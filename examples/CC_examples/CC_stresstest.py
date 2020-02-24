@@ -2,9 +2,8 @@
 
 import logging
 import sys
-from random import randint
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
+from pycqed.instrument_drivers.lib.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 

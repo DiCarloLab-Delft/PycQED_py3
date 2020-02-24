@@ -1,10 +1,9 @@
 import pycqed as pq
 import unittest
-import tempfile
 import os
 from pathlib import Path
 
-from pycqed.instrument_drivers.physical_instruments.Transport import FileTransport
+from pycqed.instrument_drivers.lib.Transport import FileTransport
 from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG
 
 

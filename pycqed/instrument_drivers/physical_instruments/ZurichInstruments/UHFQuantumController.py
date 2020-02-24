@@ -51,7 +51,7 @@ Changelog:
 
 20200217 WJV
 - moved DIO calibration helpers to their respective drivers
-- we now implement new interface DIOCalibration
+- we now implement new interface CalInterface
 - removed self._dio_calibration_mask and added parameter dio_mask where appropriate
 
 """
@@ -62,7 +62,7 @@ import numpy as np
 from typing import Tuple,List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
-from pycqed.instrument_drivers.meta_instrument.DIOCalibration import DIOCalibration
+import pycqed.instrument_drivers.lib.DIO as DIO
 from pycqed.utilities.general import check_keyboard_interrupt
 
 from qcodes.utils import validators
@@ -153,7 +153,7 @@ def array2vect(array, name):
 ##########################################################################
 
 
-class UHFQC(zibase.ZI_base_instrument, DIOCalibration):
+class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     """
     This is the PycQED driver for the 1.8 Gsample/s UHFQA developed
     by Zurich Instruments.
@@ -1622,7 +1622,7 @@ setTrigger(0);
         return set(valid_delays)
 
     ##########################################################################
-    # overrides for DIOCalibration interface
+    # overrides for CalInterface interface
     ##########################################################################
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
@@ -1678,7 +1678,7 @@ setTrigger(0);
     ##########################################################################
 
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False) -> None:
-        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.DIOCalibration")
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.CalInterface")
 
 
     ##########################################################################

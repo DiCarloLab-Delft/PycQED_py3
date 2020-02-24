@@ -1,14 +1,13 @@
 #!/usr/bin/python
 
 ### setup logging before all imports (before any logging is done as to prevent a default root logger)
-import CC_logging
 
 import logging
 import sys
 import math
 import numpy as np
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
+from pycqed.instrument_drivers.lib.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 # configure our logger

@@ -5,11 +5,10 @@ import logging
 import sys
 import numpy as np
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
+from pycqed.instrument_drivers.lib.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
 # parameter handling
 sel = 0
