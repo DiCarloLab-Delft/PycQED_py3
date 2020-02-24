@@ -25,10 +25,13 @@ from pycqed.instrument_drivers.lib.Transport import Transport
 
 log = logging.getLogger(__name__)
 
+# FIXME: replace by info from DIO.py
 # Codeword protocols: Pre-defined per channel bit maps
 cw_protocols_dio = {
-    # FIXME: CCLight is limited to 8 cw bits output, QWG can have up to cw 14 bits input of which 10 are
-    #  selectable
+    # FIXME:
+    #  - CCLight is limited to 8 cw bits output
+    #  - QWG has 14 codeword bits input at the interface (+ trigger, toggle_ds). Out of these 14, 10 bits are
+    #   selectable per channel
     'MICROWAVE': [
         [0, 1, 2, 3, 4, 5, 6, 7],  # Ch1
         [0, 1, 2, 3, 4, 5, 6, 7],  # Ch2
@@ -198,7 +201,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
             wlist.append(self.get_wlist_name(k+1))
         return wlist
 
-    def delete_waveform(self, name):
+    def delete_waveform(self, name: str):
         """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
@@ -206,7 +209,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         self._transport.write(f'wlist:waveform:delete "{name}"')
 
-    def get_waveform_type(self, name):
+    def get_waveform_type(self, name: str):
         """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
@@ -217,7 +220,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return self._ask(f'wlist:waveform:type? "{name}"')
 
-    def get_waveform_length(self, name):
+    def get_waveform_length(self, name: str):
         """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
@@ -225,7 +228,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return self._ask_int(f'wlist:waveform:length? "{name}"')
 
-    def new_waveform_real(self, name, len):
+    def new_waveform_real(self, name: str, len: int):
         """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
@@ -235,7 +238,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         self._transport.write(f'wlist:waveform:new "{name}",{len:d},real')
 
-    def get_waveform_data_float(self, name):
+    def get_waveform_data_float(self, name: str):
         """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
@@ -251,7 +254,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         waveform = np.frombuffer(bin_block, dtype=np.float32)  # extract waveform
         return waveform
 
-    def send_waveform_data_real(self, name, waveform):
+    def send_waveform_data_real(self, name: str, waveform):
         """
         send waveform and markers directly to AWG memory, i.e. not to a file
         on the AWG disk.
@@ -282,7 +285,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         hdr = f'wlist:waveform:data "{name}",'
         self.bin_block_write(bin_block, hdr)
 
-    def create_waveform_real(self, name, waveform):
+    def create_waveform_real(self, name: str, waveform):
         """
         Convenience function to create a waveform in the AWG and then send
         data to it
@@ -453,7 +456,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         :param ch: channel number [0..3]
         :param val: DAC setting from 0 to 4095 (-FS to FS)
         """
-        self._transport.write(f'DAC{ch}:DIGitalvalue')
+        self._transport.write(f'DAC{ch}:DIGitalvalue {val}')
 
     ##########################################################################
     # private static helpers

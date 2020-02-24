@@ -1,16 +1,18 @@
+# FIXME: do not use yet, work in progress
+
 """
     File:       QWG.py
     Author:     Wouter Vlothuizen, TNO/QuTech,
                 edited by Adriaan Rol, Gerco Versloot
     Purpose:    QCoDeS instrument driver for Qutech QWG
     Usage:
-    Notes:      This file is to replace QuTech_AWG_Module.py
+    Notes:      This file replaces QuTech_AWG_Module.py
                 It is possible to view the QWG log using ssh. To do this:
                 - connect using ssh e.g., "ssh root@192.168.0.10"
                 - view log using "tail -f /var/log/qwg.log"
     Bugs:       - requires QWG software version > 1.5.0, which isn't officially released yet
-    Todo:       - cleanup after https://github.com/QCoDeS/Qcodes/pull/1653
-                - cleanup after https://github.com/QCoDeS/Qcodes/issues/236
+    Todo:       - cleanup after https://github.com/QCoDeS/Qcodes/pull/1653  NB: was merged 20190807
+                - cleanup after https://github.com/QCoDeS/Qcodes/issues/236  NB: looks stale
 """
 
 import os
@@ -468,25 +470,6 @@ class QWG(QWGCore, Instrument):
 #                    snapshot_exclude=True)
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(cw_param)
-
-        # Waveform parameters
-        # self.add_parameter(
-        #     'WlistSize',
-        #     label='Waveform list size',
-        #     unit='#',
-        #     get_cmd='wlist:size?',
-        #     get_parser=int,
-        #     snapshot_exclude=True)
-        # # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        # self._params_exclude_snapshot.append('WlistSize')
-
-        # self.add_parameter(
-        #     'Wlist',
-        #     label='Waveform list',
-        #     get_cmd=self._getWlist,
-        #     snapshot_exclude=True)
-        # # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        # self._params_exclude_snapshot.append('Wlist')
 
         # self.add_parameter(
         #     'get_system_status',

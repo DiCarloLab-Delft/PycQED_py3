@@ -159,8 +159,10 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
 
         for i in range(8):
             self._snapshot_whitelist.update({
-                'sigouts_{}_direct'.format(i), 'sigouts_{}_offset'.format(i),
-                'sigouts_{}_on'.format(i) , 'sigouts_{}_range'.format(i)})
+                'sigouts_{}_direct'.format(i),
+                'sigouts_{}_offset'.format(i),
+                'sigouts_{}_on'.format(i),
+                'sigouts_{}_range'.format(i)})
 
         self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
 
@@ -363,22 +365,29 @@ while (1) {
             # No special requirements regarding waveforms by default
             self._clear_readonly_waveforms(awg_nr)
 
-            num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
-            dio_mode_list = {
-                'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
-                'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
-                'novsm_microwave':      { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
-                'flux':                 { 'mask': 0x3F, 'shift': [0,  6,  16, 22] },    # FIXME: mask for 2 channels
-            }
-            # FIXME: define DIO modes centrally in device independent way (lsb, width, channelCount)
-            dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
-            if dio_mode is None:
-                raise ValueError("Unsupported value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
-            mask = dio_mode['mask']
-            self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
-            shift = dio_mode['shift'][awg_nr]
-            self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
-            # FIXME: flux mode sets mask, using 6 bits=2channels
+            if 0:
+                num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
+                dio_mode_list = {
+                    'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
+                    'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
+                    'novsm_microwave':      { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
+                    'flux':                 { 'mask': 0x3F, 'shift': [0,  6,  16, 22] },    # FIXME: mask for 2 channels
+                }
+                # FIXME: define DIO modes centrally in device independent way (lsb, width, channelCount)
+                dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
+                if dio_mode is None:
+                    raise ValueError("Unsupported value '{}' for parameter cfg_codeword_protocol".format(self.cfg_codeword_protocol))
+                mask = dio_mode['mask']
+                self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
+                shift = dio_mode['shift'][awg_nr]
+                self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
+                # FIXME: flux mode sets mask, using 6 bits=2channels
+            else:
+                channels = [2*awg_nr, 2*awg_nr+1]
+                shift,mask = DIO.get_shift_and_mask(self.cfg_codeword_protocol(), channels)
+                self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
+                self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
+
             # FIXME: check _num_codewords against mode
             # FIXME: derive amp vs direct mode from dio_mode_list
 
