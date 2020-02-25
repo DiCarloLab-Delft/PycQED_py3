@@ -23,7 +23,7 @@ def flatten_list(l): return reduce(lambda x, y: x+y, l)
 class TFD_Analysis_Pauli_Tomo(tfd_an.TFD_Analysis_Pauli_Strings):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
-                 g: float = 1, T: float = 1,
+                 g: float = 1, T=1,
                  num_qubits: int = 4, complexity_of_readout_model: int = 1,
                  options_dict: dict = None, extract_only: bool = False,
                  auto=True):

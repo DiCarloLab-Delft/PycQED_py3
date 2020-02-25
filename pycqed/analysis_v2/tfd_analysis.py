@@ -19,7 +19,7 @@ import pandas as pd
 class TFD_Analysis_Pauli_Strings(ba.BaseDataAnalysis):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
-                 g: float = 1, T: float = 1,
+                 g: float = 1, T=1,
                  options_dict: dict = None, extract_only: bool = False,
                  auto=True):
         """
@@ -184,7 +184,10 @@ def calc_tfd_hamiltonian(pauli_terms: dict, g: float = 1, T=1):
     H_AB = pauli_terms['ZIZI'] + pauli_terms['IZIZ'] + \
         pauli_terms['XIXI'] + pauli_terms['IXIX']
 
-    H = H_A + H_B - (T**1.57)*H_AB
+    if np.isinf(T):
+        H = -1*H_AB
+    else:
+        H = H_A + H_B - (T**1.57)*H_AB
 
     return {'H': H, 'H_A': H_A, 'H_B': H_B, 'H_AB': H_AB}
 
@@ -248,8 +251,9 @@ def plot_expectation_values_TFD(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'],
         f, ax = plt.subplots(figsize=(12,5))
     else:
         f = ax.get_figure()
-    
 
+    f.set_figwidth(12)
+    f.set_figheight(10)
     operators = full_dict.keys()
     color_dict = dict()
     labels = ['IIII']
@@ -270,7 +274,7 @@ def plot_expectation_values_TFD(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'],
                     elif (system_A_qubits[1] in label and system_B_qubits[1] in label):
                         color_dict[label] = 'b'
                     else:
-                        color_dict[label] = 'purple'    
+                        color_dict[label] = 'purple'
                 else:
                     color_dict[label] = 'purple'
 
@@ -284,7 +288,7 @@ def plot_expectation_values_TFD(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'],
         ax.text(1, -.5, '$Inter=${:.2f}'.format(np.abs(full_dict['ZIZI'])+np.abs(full_dict['IZIZ'])+
                                                 np.abs(full_dict['XIXI'])+np.abs(full_dict['IXIX'])))
         ax.text(15, -.5, '$Intra=${:.2f}'.format(np.abs(full_dict['ZZII'])+np.abs(full_dict['IIZZ'])+
-                                                np.abs(full_dict['XXII'])+np.abs(full_dict['IIXX'])))
+                                                 np.abs(full_dict['XXII'])+np.abs(full_dict['IIXX'])))
     ax.set_ylabel('Expectation value')
     ax.set_ylim(-1.05, 1.05)
     ax.set_title('Expectation values for pauli operators')
@@ -314,12 +318,12 @@ class TFD_versus_temperature_analysis(ba.BaseDataAnalysis):
             self.operators = operators
         else:
             self.operators = None
-        
+
         if exact_dict is not None:
             self.exact_dict = exact_dict
         else:
             self.exact_dict = None
-        
+
         if auto:
             self.run_analysis()
 
@@ -336,7 +340,7 @@ class TFD_versus_temperature_analysis(ba.BaseDataAnalysis):
             param_spec = {'TFD_dict': ('Analysis/quantities_of_interest', 'attr:all_attr'),
                          'tomo_dict': ('Analysis/quantities_of_interest/full_tomo_dict', 'attr:all_attr')}
             self.raw_data_dict[ts] = h5d.extract_pars_from_datafile(data_fp, param_spec)
-        
+
         # Parts added to be compatible with base analysis data requirements
         self.raw_data_dict['timestamps'] = self.timestamps
         self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
@@ -364,10 +368,10 @@ class TFD_versus_temperature_analysis(ba.BaseDataAnalysis):
             'numplotsy': len(self.operators),
             'presentation_mode': True
         }
-def plot_TFD_versus_T(tomo_dict, operators=None, beta=False, ax=None, ax_dict=None, figsize=(10,10), exact_dict=None, **kw):
+def plot_TFD_versus_T(tomo_dict, operators=None, beta=False, ax=None, ax_dict=None, figsize=(10, 10), exact_dict=None, **kw):
     if ax is None:
         fig, ax = plt.subplots(len(operators), figsize=figsize)
-    else: 
+    else:
         fig = ax[0].get_figure()
     fig.set_figwidth(10)
     fig.set_figheight(15)
@@ -382,7 +386,7 @@ def plot_TFD_versus_T(tomo_dict, operators=None, beta=False, ax=None, ax_dict=No
         if exact_dict is not None:
             x_exact = exact_dict['T']
     for i, operator in enumerate(operators):
-        ax[i].plot(x, tomo_dict[operator], color = 'red', label='experiment')
+        ax[i].plot(x, tomo_dict[operator], color='red', label='experiment')
         ax[i].scatter(x, tomo_dict[operator], facecolor='red')
         if exact_dict is not None:
             ax[i].plot(x_exact, exact_dict[operator], color = 'black', label='exact')
@@ -391,7 +395,7 @@ def plot_TFD_versus_T(tomo_dict, operators=None, beta=False, ax=None, ax_dict=No
         ax[i].set_ylabel(operator)
         ax[i].legend()
         if '+' in operator:
-            ax[i].set_ylim(-2,2)
+            ax[i].set_ylim(-2, 2)
         else:
-            ax[i].set_ylim(-1,1)
+            ax[i].set_ylim(-1, 1)
     return fig, ax
