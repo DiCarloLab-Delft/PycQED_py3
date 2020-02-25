@@ -136,4 +136,21 @@ def compute_betas_weight2(matrix_B, correl_avg, correlations, idx_qubit_ro, num_
         betas_w2[i_c, :] = inv_subB @ correl_avg[cal_point_seg_start:, i_c]
     return betas_w2, op_idx_w2
 
+def grab_bases_from_prerot():
+    # needs convention of operators listing
+    # needs convention for prerotation labeling
+    raise NotImplementedError()
 
+def rotate_operator(op, bases):
+    # needs convention of operators listing
+    rotated_op_str = []
+    for i_ol,op_letter in enumerate(op):
+        if op_letter == 'Z':
+            rotated_op_str.append(bases)
+        elif op_letter == 'I':
+            rotated_op_str.append('I')
+        else:
+            raise ValueError("Tomo::operator_rotation Measurement operator is not undestood {} in {}".format(op_letter,op))
+    operator_str_base4 = rotated_op_str.replace('I', '0').replace('X', '1').replace('Y', '2').replace('Z', '3')
+    rotated_op_idx = int(operator_str_base4,4) # transforms this into the integer in base 10
+    return rotated_op_idx,rotated_op_str
