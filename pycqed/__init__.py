@@ -2,6 +2,10 @@
 
 from pycqed.version import __version__
 
+# We need to import this here so that any later imports of `QtPlot` from qcodes
+# KEEP ABOVE any QtPlot import!!!
+from pycqed.measurement import qcodes_QtPlot_monkey_patching
+
 # from pycqed import measurement
 # from pycqed import analysis
 # from pycqed import instrument_drivers
