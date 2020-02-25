@@ -135,6 +135,10 @@ class Base_MW_LutMan(Base_LutMan):
                            vals=vals.Numbers(), unit='frac',
                            parameter_class=ManualParameter,
                            initial_value=1)
+        # parameters related to timings
+        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 1e-6),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
 
         self.add_parameter(
             'mw_modulation', vals=vals.Numbers(), unit='Hz',
@@ -196,7 +200,8 @@ class Base_MW_LutMan(Base_LutMan):
                     sigma_length=self.mw_gauss_width(),
                     f_modulation=f_modulation,
                     sampling_rate=self.sampling_rate(),
-                    motzoi=self.mw_motzoi())
+                    motzoi=self.mw_motzoi(),
+                    delay=self.pulse_delay())
             elif waveform['type'] == 'ef':
                 amp = theta_to_amp(theta=waveform['theta'],
                                    amp180=self.mw_ef_amp180())
@@ -206,7 +211,8 @@ class Base_MW_LutMan(Base_LutMan):
                     sigma_length=self.mw_gauss_width(),
                     f_modulation=self.mw_ef_modulation(),
                     sampling_rate=self.sampling_rate(),
-                    motzoi=0)
+                    motzoi=0,
+                    delay=self.pulse_delay())
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
                     **waveform["drag_pars"])

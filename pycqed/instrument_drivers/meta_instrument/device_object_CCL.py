@@ -342,25 +342,25 @@ class DeviceCCL(Instrument):
             CC.set('dio{}_out_delay'.format(dio_ch), lat_coarse)
 
             # RO devices do not support fine delay setting.
-            if 'mw' in lat_key or 'flux' in lat_key:
-                # Check name to prevent crash when instrument not specified
-                AWG_name = self.get('instr_AWG_{}'.format(lat_key))
-                if AWG_name is not None:
-                    AWG = self.find_instrument(AWG_name)
-                    using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
-                    if not using_QWG:
-                        # All channels are set globally from the device object.
-                        AWG.stop()
-                        for i in range(8):  # assumes the AWG is an HDAWG
-                            AWG.set('sigouts_{}_delay'.format(i), lat_fine)
-                        AWG.start()
-                        ch_not_ready = 8
-                        while(ch_not_ready > 0):
-                            ch_not_ready = 0
-                            for i in range(8):
-                                ch_not_ready += AWG.geti(
-                                    'sigouts/{}/busy'.format(i))
-                            check_keyboard_interrupt()
+            # if 'mw' in lat_key or 'flux' in lat_key:
+            #     # Check name to prevent crash when instrument not specified
+            #     AWG_name = self.get('instr_AWG_{}'.format(lat_key))
+            #     if AWG_name is not None:
+            #         AWG = self.find_instrument(AWG_name)
+            #         using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+            #         if not using_QWG:
+            #             # All channels are set globally from the device object.
+            #             AWG.stop()
+            #             for i in range(8):  # assumes the AWG is an HDAWG
+            #                 AWG.set('sigouts_{}_delay'.format(i), lat_fine)
+            #             AWG.start()
+            #             ch_not_ready = 8
+            #             while(ch_not_ready > 0):
+            #                 ch_not_ready = 0
+            #                 for i in range(8):
+            #                     ch_not_ready += AWG.geti(
+            #                         'sigouts/{}/busy'.format(i))
+            #                 check_keyboard_interrupt()
 
     def prepare_fluxing(self, qubits):
         for qb_name in qubits:
@@ -2027,6 +2027,8 @@ class DeviceCCL(Instrument):
     def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
                                MC=None,  label='timing_{}_{}',
                                qotheridx=2,
+                               pulse_length=40e-9, flux_cw='fl_cw_06',
+                               extra_buffer=0e-9,
                                prepare_for_timedomain: bool = True):
         """
         Measure the ramsey-like sequence with the 40 ns flux pulses played between
@@ -2059,15 +2061,15 @@ class DeviceCCL(Instrument):
         assert q0 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        fl_lutman.sq_length(40e-9)
+        fl_lutman.sq_length(pulse_length)
 
         CC = self.instr_CC.get_instr()
 
         # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns
         p = sqo.FluxTimingCalibration(q0idx,
-                                      times=[40e-9],
+                                      times=[extra_buffer],
                                       platf_cfg=self.cfg_openql_platform_fn(),
-                                      flux_cw='fl_cw_06',
+                                      flux_cw=flux_cw,
                                       qubit_other_idx=qotheridx,
                                       cal_points=False)
         CC.eqasm_program(p.filename)
