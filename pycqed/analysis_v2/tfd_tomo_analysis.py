@@ -551,9 +551,11 @@ class TFD_fullTomo_2Q(tfd_an.TFD_Analysis_Pauli_Strings):
                                  'ZI', 'ZX', 'ZY', 'ZZ',
                                  ]
         self.op_values = {}
-        self.op_values.update({self.operators_labels[i]: p for i, p in enumerate(pauli_terms)})
-        self.proc_data_dict['quantities_of_interest'] = {}
-        self.proc_data_dict['quantities_of_interest']['full_tomo_dict'] = self.op_values
+        self.op_values['II'] = 1
+        self.op_values.update({self.operators_labels[i+1]: p for i, p in enumerate(pauli_terms)})
+        self.proc_data_dict['quantities_of_interest'] = {
+            'g': self.g, 'T': self.T,
+            'full_tomo_dict': self.op_values}
 
     def prepare_plots(self):
         # plotting of bars disabled
