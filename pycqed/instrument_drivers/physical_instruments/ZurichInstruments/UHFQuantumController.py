@@ -381,7 +381,6 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                 'message': 'Holdoff error detected when reading Quantum Analyzer Results! '
                 'Increase the delay between trigger signals from the AWG!'})
 
-<<<<<<< HEAD
         if self.qas_0_monitor_errors() > 0:
             errors['messages'].append({
                 'code': 'MONHOLDOFF',
@@ -389,68 +388,6 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                 'count': self.qas_0_monitor_errors(),
                 'message': 'Holdoff error detected when reading Quantum Analyzer Input Monitor! '
                 'Increase the delay between trigger signals from the AWG!'})
-=======
-        # And configure the delays
-        self.setd('raw/dios/0/delay', self._dio_calibration_delay)
-
-    def _get_dio_calibration_delay(self):
-        return self._dio_calibration_delay
-
-    def _set_wait_dly(self, value):
-        self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), value)
-
-    def _get_wait_dly(self):
-        return self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY))
-
-    def _set_cases(self, value):
-        # Generate error if we don't have an AWG program that supports cases
-        if not self._awg_program_features['cases']:
-            raise zibase.ziValueError(
-                'Trying to define cases for an AWG program that does not support them!')
-
-        # Check against number of codewords
-        if len(value) > self._num_codewords:
-            raise zibase.ziValueError('Trying to define a number of cases ({}) greater than configured number of codewords ({})!'.format(
-                len(value), self._num_codewords))
-
-        self._cases = value
-        self._cw_mask = 0
-        for case in self._cases:
-            self._cw_mask |= case
-
-        if self._awg_program_features['diocws'] and self._diocws is None:
-            raise zibase.ziValueError(
-                'AWG program defines DIO output, but no output values have been defined!')
-
-        self._awg_program[0] = \
-            awg_sequence_acquisition_preamble() + """
-// Mask for selecting our codeword bits
-const CW_MASK = (0x1ff << 17);
-// Counts wrong codewords
-var err_cnt = 0;
-""".format(self._cw_mask)
-
-        if self._awg_program_features['diocws']:
-            self._awg_program[0] += \
-                array2vect(self._diocws, "diocws") + """
-// Loop once for each DIO codeword to output
-for (cvar i = 0; i < {}; i = i + 1) {{""".format(len(self._diocws))
-        else:
-            self._awg_program[0] += """
-// Loop for all measurements
-repeat (loop_cnt) {"""
-
-        self._awg_program[0] += """
-    waitDIOTrigger();
-    // Get codeword and apply mask
-    var cw = getDIOTriggered() & CW_MASK;
-    // Generate waveforms based on codeword output
-    switch (cw) {"""
-        # Add each of the cases
-        for case in self._cases:
-            self._awg_program[0] += """
-        case 0x{:08x}: playWave({}, {});""".format(case << 17, zibase.gen_waveform_name(0, case), zibase.gen_waveform_name(1, case))
->>>>>>> 172f80c8a5f5131f2368e881e5d4c728721ea12d
 
         # Check optional codeword-based errors
         if self._awg_program_features['cases'] and self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_ERR_CNT)) > 0:
@@ -1151,7 +1088,7 @@ repeat (loop_cnt) {"""
         self._awg_program[0] = \
             awg_sequence_acquisition_preamble() + """
 // Mask for selecting our codeword bits
-const CW_MASK = ({:08x} << 17);
+const CW_MASK = (0x1ff << 17);
 // Counts wrong codewords
 var err_cnt = 0;
 """.format(self._cw_mask)
@@ -1759,3 +1696,12 @@ setTrigger(0);
     AWGS_0_DIO_VALID_POLARITY_HIGH = 1  # "1": "High: VALID bit must be logical high.",
     AWGS_0_DIO_VALID_POLARITY_LOW = 2  # "2": "Low: VALID bit must be logical zero.",
     AWGS_0_DIO_VALID_POLARITY_BOTH = 3  # "3": "Both: VALID bit may be logical high or zero."
+
+
+
+
+## FIXME: merge conflicts to solve
+    def foo_FIXME(self):   # FIXME
+        # And configure the delays
+        self.setd('raw/dios/0/delay', self._dio_calibration_delay)
+
