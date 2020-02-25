@@ -2255,11 +2255,8 @@ class MeasurementControl(Instrument):
         cmaps = self.plotmon_2D_cmaps
         zranges = self.plotmon_2D_zranges
 
-        # WARNING!!! If this ever gives problems make sure you are not
-        # importing anyware `from qcodes.plots.pyqtgraph import QtPlot`
-        # Because of the overrides that this file applies to `qcodes`
-        # importing it anyware else will rise issues as the overrides
-        # have no effect
+        # WARNING!!! If this ever gives problems see `__init__.py` in `pycqed`
+        # module folder
 
         if cmaps and zlabel in cmaps.keys():
             cmap = cmaps[zlabel]
