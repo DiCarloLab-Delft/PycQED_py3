@@ -60,6 +60,7 @@ An example of `ast` in action
 https://stackoverflow.com/questions/46388130/insert-a-node-into-an-abstract-syntax-tree
 
 === NBs: ===
+- Don't import QtPlot before this file
 - Namespaces can screw you up easily
 - Order of imports matters!
 - Reloading QtPlot will likely break this
@@ -71,7 +72,7 @@ import ast
 import inspect
 
 # Do not import anything else from qcodes, it breaks this code
-from . import qcodes_QtPlot_colors_override
+from pycqed.measurement import qcodes_QtPlot_colors_override
 import qcodes.plots.colors
 
 # # Patch the color scales

@@ -60,11 +60,16 @@ except:
 try:
     import PyQt5
 
-    # The line below is necessary for the plotmon_2D to be able to set
-    # colorscales from qcodes_QtPlot_colors_override.py and be able to set the
+    # For reference:
+    # from pycqed.measurement import qcodes_QtPlot_monkey_patching
+    # The line above was (and still is but keep rading) necessary
+    # for the plotmon_2D to be able to set colorscales from
+    # `qcodes_QtPlot_colors_override.py` and be able to set the
     # colorbar range when the plots are created
-    # See also MC.plotmon_2D_cmaps, MC.plotmon_2D_zranges below
-    from . import qcodes_QtPlot_monkey_patching  # KEEP ABOVE QtPlot import!!!
+    # See also `MC.plotmon_2D_cmaps`, `MC.plotmon_2D_zranges` below
+    # That line was moved into the `__init__.py` of pycqed so that
+    # `QtPlot` can be imported from qcodes with all the modifications
+
     from qcodes.plots.pyqtgraph import QtPlot, TransformState
 except Exception:
     print(
@@ -2249,6 +2254,12 @@ class MeasurementControl(Instrument):
         zrange = None
         cmaps = self.plotmon_2D_cmaps
         zranges = self.plotmon_2D_zranges
+
+        # WARNING!!! If this ever gives problems make sure you are not
+        # importing anyware `from qcodes.plots.pyqtgraph import QtPlot`
+        # Because of the overrides that this file applies to `qcodes`
+        # importing it anyware else will rise issues as the overrides
+        # have no effect
 
         if cmaps and zlabel in cmaps.keys():
             cmap = cmaps[zlabel]
