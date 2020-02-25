@@ -245,8 +245,11 @@ def plot_all_pauli_ops(full_dict, ax=None, **kw):
 ############################################
 #Addition from 18-02-2020
 ############################################
-def plot_expectation_values_TFD(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'], system_A_qubits=['X1','D3'],
-                                system_B_qubits=['D1', 'Z1'], bases = ['Z','X'], ax=None, T:float = None, exact_dict: dict = None, **kw):
+def plot_expectation_values_TFD(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'],
+                                system_A_qubits=['X1', 'D3'],
+                                system_B_qubits=['D1', 'Z1'], bases = ['Z', 'X'],
+                                ax=None, T:float = None,
+                                exact_dict: dict = None, **kw):
     if ax is None:
         f, ax = plt.subplots(figsize=(12,5))
     else:
