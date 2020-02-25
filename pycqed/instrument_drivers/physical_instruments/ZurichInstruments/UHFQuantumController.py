@@ -100,55 +100,6 @@ class ziUHFQCDIOCalibrationError(Exception):
     pass
 
 ##########################################################################
-# Module level functions
-##########################################################################
-
-
-def awg_sequence_acquisition_preamble():
-    """
-    This function defines a standard AWG program preamble, which is used
-    regardless of the specific acquisition mode. The preamble defines standard
-    functionality of the user registers, which are used for dynamically
-    controlling e.g. number of iterations in a loop, etc.
-    The preamble also defines a standard way of selecting between triggering
-    the readout units or the time-domain input monitor.
-    """
-    preamble = """
-// Reset error counter
-setUserReg(4, 0);
-
-// Define standard variables
-var loop_cnt = getUserReg(0);
-var ro_mode  = getUserReg(1);
-var wait_dly = getUserReg(2);
-var avg_cnt  = getUserReg(3);
-var ro_arm;
-var ro_trig;
-
-// Configure readout mode
-if (ro_mode) {
-  ro_arm  = AWG_INTEGRATION_ARM;
-  ro_trig = AWG_MONITOR_TRIGGER + AWG_INTEGRATION_ARM + AWG_INTEGRATION_TRIGGER;
-} else {
-  ro_arm  = AWG_INTEGRATION_ARM;
-  ro_trig = AWG_INTEGRATION_ARM + AWG_INTEGRATION_TRIGGER;
-}"""
-    return preamble
-
-
-def array2vect(array, name):
-    # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
-    # this is to avoid python crashes (was found to crash for vectors of
-    # length> 1490)
-    if len(array) > 1024:
-        splitted_array = np.array_split(array, len(array)//1024)
-        string_array = ['\nvect(' + ','.join(['{:.8f}'.format(x)
-                                              for x in sub_array]) + ')' for sub_array in splitted_array]
-        return 'wave ' + name + ' = join(' + ','.join(string_array) + ');\n'
-    else:
-        return 'wave ' + name + ' = ' + 'vect(' + ','.join(['{:.8f}'.format(x) for x in array]) + ');\n'
-
-##########################################################################
 # Class
 ##########################################################################
 
@@ -175,6 +126,19 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     USER_REG_WAIT_DLY = 2
     USER_REG_AVG_CNT = 3
     USER_REG_ERR_CNT = 4
+
+    # Constants definitions from "node_doc_UHFQA.json"
+    DIOS_0_MODE_MANUAL = 0  # "0": "Manual setting of the DIO output value.",
+    DIOS_0_MODE_AWG_SEQ = 1  # "1": "Enables setting of DIO output values by AWG sequencer commands.",
+    DIOS_0_MODE_AWG_WAV = 2  # "2": "Enables the output of AWG waveform data as digital pattern on the DIO connector."
+    # FIXME: comments in this file state: QuExpress thresholds on DIO (mode == 2)
+
+    DIOS_0_EXTCLK_50MHZ = 2  # FIXME: not in "node_doc_UHFQA.json"
+
+    AWGS_0_DIO_VALID_POLARITY_NONE = 0  # "0": "None: VALID bit is ignored.",
+    AWGS_0_DIO_VALID_POLARITY_HIGH = 1  # "1": "High: VALID bit must be logical high.",
+    AWGS_0_DIO_VALID_POLARITY_LOW = 2  # "2": "Low: VALID bit must be logical zero.",
+    AWGS_0_DIO_VALID_POLARITY_BOTH = 3  # "3": "Both: VALID bit may be logical high or zero."
 
     ##########################################################################
     # 'public' functions: device control
@@ -575,7 +539,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
         self.start()
 
     def acquisition_poll(self, samples, arm=True,
-                         acquisition_time=0.010) -> None:  # FIXME: wrong return type
+                         acquisition_time=0.010) -> dict:
         """
         Polls the UHFQC for data.
 
@@ -637,7 +601,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     # 'public' functions: DIO support
     ##########################################################################
 
-    def plot_dio(self, bits=range(32), line_length=64):
+    def plot_dio(self, bits=range(32), line_length=64) -> None:
         data = self.getv('awgs/0/dio/data')
         zibase.plot_timing_diagram(data, bits, line_length)
 
@@ -719,7 +683,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     # 'public' functions: print overview helpers
     ##########################################################################
 
-    def print_correlation_overview(self):
+    def print_correlation_overview(self) -> None:
         msg = '\tCorrelations overview \n'
         for i in range(10):
             enabled = self.get('qas_0_correlations_{}_enable'.format(i))
@@ -736,7 +700,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                 i, enabled, source)
         print(msg)
 
-    def print_deskew_overview(self):
+    def print_deskew_overview(self) -> None:
         msg = '\tDeskew overview \n'
 
         deskew_mat = np.zeros((2, 2))
@@ -748,7 +712,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
         msg += str(deskew_mat)
         print(msg)
 
-    def print_crosstalk_overview(self):
+    def print_crosstalk_overview(self) -> None:
         msg = '\tCrosstalk overview \n'
         msg += 'Bypass crosstalk: {} \n'.format(self.qas_0_crosstalk_bypass())
 
@@ -761,7 +725,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
         print(msg)
         print(crosstalk_mat)
 
-    def print_integration_overview(self):
+    def print_integration_overview(self) -> None:
         msg = '\tIntegration overview \n'
         msg += 'Integration mode: {} \n'.format(
             self.qas_0_integration_mode())
@@ -770,21 +734,21 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                 i, self.get('qas_0_integration_sources_{}'.format(i)))
         print(msg)
 
-    def print_rotations_overview(self):
+    def print_rotations_overview(self) -> None:
         msg = '\tRotations overview \n'
         for i in range(10):
             msg += 'Rotations {}: {}\n'.format(
                 i, self.get('qas_0_rotations_{}'.format(i)))
         print(msg)
 
-    def print_thresholds_overview(self):
+    def print_thresholds_overview(self) -> None:
         msg = '\t Thresholds overview \n'
         for i in range(10):
             msg += 'Threshold {}: {}\n'.format(
                 i, self.get('qas_0_thresholds_{}_level'.format(i)))
         print(msg)
 
-    def print_user_regs_overview(self):
+    def print_user_regs_overview(self) -> None:
         msg = '\t User registers overview \n'
         user_reg_funcs = ['']*16
         user_reg_funcs[0] = 'Loop count'
@@ -798,7 +762,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                 i, self.get('awgs_0_userregs_{}'.format(i)), user_reg_funcs[i])
         print(msg)
 
-    def print_overview(self):
+    def print_overview(self) -> None:
         """
         Print a readable overview of relevant parameters of the UHFQC.
 
@@ -817,12 +781,12 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     # Overriding private ZI_base_instrument methods
     ##########################################################################
 
-    def _check_devtype(self):
+    def _check_devtype(self) -> None:
         if self.devtype != 'UHFQA':
             raise zibase.ziDeviceError(
                 'Device {} of type {} is not a UHFQA instrument!'.format(self.devname, self.devtype))
 
-    def _check_options(self):
+    def _check_options(self) -> None:
         """
         Checks that the correct options are installed on the instrument.
         """
@@ -834,7 +798,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
             raise zibase.ziOptionsError(
                 'Device {} is missing the AWG option!'.format(self.devname))
 
-    def _check_awg_nr(self, awg_nr):
+    def _check_awg_nr(self, awg_nr) -> None:
         """
         Checks that the given AWG index is valid for the device.
         """
@@ -842,7 +806,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
             raise zibase.ziValueError(
                 'Invalid AWG index of {} detected!'.format(awg_nr))
 
-    def _check_versions(self):
+    def _check_versions(self) -> None:
         """
         Checks that sufficient versions of the firmware are available.
         """
@@ -854,7 +818,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
             raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(
                 UHFQC.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
 
-    def _num_channels(self):
+    def _num_channels(self) -> int:
         return 2
 
     def _add_extra_parameters(self) -> None:
@@ -940,7 +904,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
             'of the codewords. The valid range is 0 to 15.',
             vals=validators.Ints())
 
-    def _codeword_table_preamble(self, awg_nr):
+    def _codeword_table_preamble(self, awg_nr) -> str:
         """
         Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
         The generated code depends on the instrument type. For the UHF-QA we simply define the raw waveforms.
@@ -1023,7 +987,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     # Private methods
     ##########################################################################
 
-    def _reset_awg_program_features(self):
+    def _reset_awg_program_features(self) -> None:
         """
         Resets the self._awg_program_features to disable all features. The UHFQC can be configured with a number
         of application-specific AWG programs using this driver. However, all the programs share some characteristics that
@@ -1042,7 +1006,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
             'cases': False,
             'diocws': False}
 
-    def _set_dio_calibration_delay(self, value):
+    def _set_dio_calibration_delay(self, value) -> None:
         # Sanity check the value
         if value < 0 or value > 15:
             raise zibase.ziValueError(
@@ -1059,13 +1023,13 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     def _get_dio_calibration_delay(self):
         return self._dio_calibration_delay
 
-    def _set_wait_dly(self, value):
+    def _set_wait_dly(self, value) -> None:
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), value)
 
     def _get_wait_dly(self):
         return self.get('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY))
 
-    def _set_cases(self, value):
+    def _set_cases(self, value) -> None:
         # Generate error if we don't have an AWG program that supports cases
         if not self._awg_program_features['cases']:
             raise zibase.ziValueError(
@@ -1095,7 +1059,7 @@ var err_cnt = 0;
 
         if self._awg_program_features['diocws']:
             self._awg_program[0] += \
-                array2vect(self._diocws, "diocws") + """
+                _array2vect(self._diocws, "diocws") + """
 // Loop once for each DIO codeword to output
 for (cvar i = 0; i < {}; i = i + 1) {{""".format(len(self._diocws))
         else:
@@ -1284,7 +1248,7 @@ setUserReg(4, err_cnt);"""
             'cvar i = 0;\n'+
             'const length = {};\n'.format(len(dio_out_vect))
             )
-        sequence = sequence + array2vect(dio_out_vect, "dio_out_vect")
+        sequence = sequence + _array2vect(dio_out_vect, "dio_out_vect")
         # starting the loop
         sequence = sequence +(
             'setDIO(2048); // FIXME: workaround because we cannot use setDIO(0)\n'+
@@ -1681,27 +1645,50 @@ setTrigger(0);
         raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.CalInterface")
 
 
-    ##########################################################################
-    # constants definitions from "node_doc_UHFQA.json"
-    ##########################################################################
-
-    DIOS_0_MODE_MANUAL = 0  # "0": "Manual setting of the DIO output value.",
-    DIOS_0_MODE_AWG_SEQ = 1  # "1": "Enables setting of DIO output values by AWG sequencer commands.",
-    DIOS_0_MODE_AWG_WAV = 2  # "2": "Enables the output of AWG waveform data as digital pattern on the DIO connector."
-    # FIXME: comments in this file state: QuExpress thresholds on DIO (mode == 2)
-
-    DIOS_0_EXTCLK_50MHZ = 2  # FIXME: not in "node_doc_UHFQA.json"
-
-    AWGS_0_DIO_VALID_POLARITY_NONE = 0  # "0": "None: VALID bit is ignored.",
-    AWGS_0_DIO_VALID_POLARITY_HIGH = 1  # "1": "High: VALID bit must be logical high.",
-    AWGS_0_DIO_VALID_POLARITY_LOW = 2  # "2": "Low: VALID bit must be logical zero.",
-    AWGS_0_DIO_VALID_POLARITY_BOTH = 3  # "3": "Both: VALID bit may be logical high or zero."
+##########################################################################
+# Module level functions
+##########################################################################
 
 
+def awg_sequence_acquisition_preamble():
+    """
+    This function defines a standard AWG program preamble, which is used
+    regardless of the specific acquisition mode. The preamble defines standard
+    functionality of the user registers, which are used for dynamically
+    controlling e.g. number of iterations in a loop, etc.
+    The preamble also defines a standard way of selecting between triggering
+    the readout units or the time-domain input monitor.
+    """
+    preamble = """
+// Reset error counter
+setUserReg(4, 0);
 
+// Define standard variables
+var loop_cnt = getUserReg(0);
+var ro_mode  = getUserReg(1);
+var wait_dly = getUserReg(2);
+var avg_cnt  = getUserReg(3);
+var ro_arm;
+var ro_trig;
 
-## FIXME: merge conflicts to solve
-    def foo_FIXME(self):   # FIXME
-        # And configure the delays
-        self.setd('raw/dios/0/delay', self._dio_calibration_delay)
+// Configure readout mode
+if (ro_mode) {
+  ro_arm  = AWG_INTEGRATION_ARM;
+  ro_trig = AWG_MONITOR_TRIGGER + AWG_INTEGRATION_ARM + AWG_INTEGRATION_TRIGGER;
+} else {
+  ro_arm  = AWG_INTEGRATION_ARM;
+  ro_trig = AWG_INTEGRATION_ARM + AWG_INTEGRATION_TRIGGER;
+}"""
+    return preamble
 
+def _array2vect(array, name):
+    # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
+    # this is to avoid python crashes (was found to crash for vectors of
+    # length> 1490)
+    if len(array) > 1024:
+        splitted_array = np.array_split(array, len(array) // 1024)
+        string_array = ['\nvect(' + ','.join(['{:.8f}'.format(x)
+                                              for x in sub_array]) + ')' for sub_array in splitted_array]
+        return 'wave ' + name + ' = join(' + ','.join(string_array) + ');\n'
+    else:
+        return 'wave ' + name + ' = ' + 'vect(' + ','.join(['{:.8f}'.format(x) for x in array]) + ');\n'
