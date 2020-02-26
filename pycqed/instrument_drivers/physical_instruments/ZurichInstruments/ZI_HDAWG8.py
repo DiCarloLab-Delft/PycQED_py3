@@ -459,11 +459,11 @@ while (1) {
             cw[n] = (d & ((1 << 10)-1))
         return (ts, cw)
 
-    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5, verbose=False):
+    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5):
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
-        if verbose: print("Testing DIO activity for AWG {}".format(awg_nr))
+        log.debug(f"Testing DIO activity for AWG {awg_nr}")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
@@ -491,15 +491,15 @@ while (1) {
                 strb_activity |= (d & strb_mask)
 
             if cw_activity != cw_mask:
-                print("Did not see all codeword bits toggle! Got 0x{:08x}, expected 0x{:08x}.".format(cw_activity, cw_mask))
+                log.warning(f"Did not see all codeword bits toggle! Got 0x{cw_activity:08x}, expected 0x{cw_mask:08x}.")
                 valid = False
 
             if vld_polarity != 0 and vld_activity != vld_mask:
-                print("Did not see valid bit toggle!")
+                log.warning("Did not see valid bit toggle!")
                 valid = False
 
             if strb_slope != 0 and strb_activity != strb_mask:
-                print("Did not see valid bit toggle!")
+                log.warning("Did not see strobe bit toggle!")
                 valid = False
 
             if valid:
@@ -507,14 +507,14 @@ while (1) {
 
         return False
 
-    def _find_valid_delays(self, awgs_and_sequences, verbose=False):
+    def _find_valid_delays(self, awgs_and_sequences):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
-        if verbose: print("  Finding valid delays")
+        log.debug("  Finding valid delays")
         valid_delays= []
         for delay in range(16):
-            if verbose: print('   Testing delay {}'.format(delay))
+            log.debug(f'   Testing delay {delay}')
             self.setd('raw/dios/0/delays/*/value', delay)
             time.sleep(1)
             valid_sequence = True
@@ -526,8 +526,8 @@ while (1) {
                     for n, cw in enumerate(cws):
                         if n == 0:
                             if cw not in sequence:
-                                if verbose: print("WARNING: Codeword {} with value {} not in expected sequence {}!".format(n, cw, sequence))
-                                if verbose: print("Detected codeword sequence: {}".format(cws))
+                                log.warning(f"Codeword {n} with value {cw} not in expected sequence {sequence}!")
+                                log.debug(f"Detected codeword sequence: {cws}")
                                 valid_sequence = False
                                 break
                             else:
@@ -536,8 +536,8 @@ while (1) {
                             last_index = index
                             index = (index + 1) % len(sequence)
                             if cw != sequence[index]:
-                                if verbose: print("WARNING: Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(n, cw, sequence[last_index], sequence))
-                                if verbose: print("Detected codeword sequence: {}".format(cws))
+                                log.warning("Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(n, cw, sequence[last_index], sequence))
+                                log.info(f"Detected codeword sequence: {cws}")
                                 valid_sequence = False
                                 break
                 else:
@@ -554,6 +554,7 @@ while (1) {
 
     # NB: based on UHFQuantumController.py::_prepare_HDAWG8_dio_calibration
     # FIXME: also requires fiddling with DIO data direction
+    # FIXME: is this guaranteed to be synchronous to 10 MHz?
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         """
         Configures an HDAWG with a default program that generates data suitable for DIO calibration.
@@ -584,18 +585,18 @@ while (1) {
         self.upload_codeword_program()
 
         for awg, sequence in expected_sequence:
-            if not self._ensure_activity(awg, mask_value=dio_mask, verbose=verbose):
+            if not self._ensure_activity(awg, mask_value=dio_mask):
                 raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
-        valid_delays = self._find_valid_delays(expected_sequence, verbose=verbose)
+        valid_delays = self._find_valid_delays(expected_sequence)
         if len(valid_delays) == 0:
             raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
 
         min_valid_delay = min(valid_delays)
 
         # Print information
-        if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+        log.info(f"Valid delays are {valid_delays}")
+        log.info(f"Setting delay to {min_valid_delay}")
 
         # And configure the delays
         self._set_dio_calibration_delay(min_valid_delay)  # FIXME: UHF has different heuristics
@@ -608,4 +609,4 @@ while (1) {
     ##########################################################################
 
     def calibrate_CC_dio_protocol(self, CC, verbose=False) -> None:
-        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.CalInterface")
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.lib.DIO.calibrate")

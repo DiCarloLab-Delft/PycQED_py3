@@ -1495,11 +1495,11 @@ setTrigger(0);
     # DIO calibration helpers
     ##########################################################################
 
-    def _ensure_activity(self, awg_nr, mask_value: int, timeout=5, verbose=False):
+    def _ensure_activity(self, awg_nr, mask_value: int, timeout=5):
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
-        if verbose: print("Testing DIO activity for AWG {}".format(awg_nr))
+        log.debug(f"Testing DIO activity for AWG {awg_nr}")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
@@ -1524,15 +1524,15 @@ setTrigger(0);
                 strb_activity |= (d & strb_mask)
 
             if cw_activity != cw_mask:
-                print("Did not see all codeword bits toggle! Got 0x{:08x}, expected 0x{:08x}.".format(cw_activity, cw_mask))
+                log.warning(f"Did not see all codeword bits toggle! Got 0x{cw_activity:08x}, expected 0x{cw_mask:08x}.")
                 valid = False
 
             if vld_polarity != 0 and vld_activity != vld_mask:
-                print("Did not see valid bit toggle!")
+                log.warning("Did not see valid bit toggle!")
                 valid = False
 
             if strb_slope != 0 and strb_activity != strb_mask:
-                print("Did not see valid bit toggle!")
+                log.warning("Did not see strobe bit toggle!")
                 valid = False
 
             if valid:
@@ -1549,11 +1549,11 @@ setTrigger(0);
             cw[n] = (d & ((1 << 10)-1))
         return (ts, cw)
 
-    def _find_valid_delays(self, awg_nr, mask_value: int, verbose=False):
+    def _find_valid_delays(self, awg_nr, mask_value: int):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
-        if verbose: print("  Finding valid delays")
+        log.debug(" Finding valid delays")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
@@ -1567,11 +1567,11 @@ setTrigger(0);
             combined_mask |= vld_mask
         if strb_slope != 0:
             combined_mask |= strb_mask
-        if verbose: print("  Using a mask value of 0x{:08x}".format(combined_mask))
+        log.debug(f"  Using a mask value of 0x{combined_mask:08x}")
 
         valid_delays= []
         for delay in range(16):
-            if verbose: print('   Testing delay {}'.format(delay))
+            log.debug(f'   Testing delay {delay}')
             self.setd('raw/dios/0/delay', delay)
             time.sleep(1)
             valid_sequence = True
@@ -1615,10 +1615,10 @@ setTrigger(0);
         self.assure_ext_clock()
 
         for awg in [0]:
-            if not self._ensure_activity(awg, mask_value=dio_mask, verbose=verbose):
+            if not self._ensure_activity(awg, mask_value=dio_mask):
                 raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
-        valid_delays = self._find_valid_delays(awg, mask_value=dio_mask, verbose=verbose)
+        valid_delays = self._find_valid_delays(awg, mask_value=dio_mask)
         if len(valid_delays) == 0:
             raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
 
@@ -1628,8 +1628,8 @@ setTrigger(0);
             min_valid_delay = min_valid_delay + 1
 
         # Print information
-        if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+        log.info(f"Valid delays are {valid_delays}")
+        log.info(f"Setting delay to {min_valid_delay}")
 
         # And configure the delays
         self._set_dio_calibration_delay(min_valid_delay)
@@ -1642,7 +1642,7 @@ setTrigger(0);
     ##########################################################################
 
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False) -> None:
-        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use meta_instrument.CalInterface")
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.lib.DIO.calibrate")
 
 
 ##########################################################################

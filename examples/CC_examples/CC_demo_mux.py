@@ -39,14 +39,17 @@ log.info(cc.get_identity())
 if 1:
     log.debug('calibration DIO: CC to UHFQA')
 
+
+
+
+log.debug('calibration DIO: UHFQA to CC')
 if 0:
-    log.debug('calibration DIO: UHFQA to CC')
     calibrate(
         sender=uhfqa0,
         receiver=cc,
         receiver_port=cc_port_uhfqa0
     )
-else: # inspired by calibrate
+else: # inspired by calibrate, but with CC program to trigger UHFQA
     log.debug('sending triggered DIO test program to UHFQA')
     program = '''
     var A = 0x00000CFF; // DV=0x0001, CW=0x0CF7
@@ -80,7 +83,6 @@ else: # inspired by calibrate
     cc.assemble_and_start(prog)
     dio_mask = 0x00000CFF
     expected_sequence = []
-
 
     log.debug('calibrating DIO protocol on CC')
     cc.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=cc_port_uhfqa0)

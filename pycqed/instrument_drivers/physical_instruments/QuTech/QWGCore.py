@@ -184,14 +184,14 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     def get_wlist_size(self) -> int:
         return self._ask_int('wlist:size?')
 
-    def get_wlist_name(self, idx):
+    def get_wlist_name(self, idx) -> str:
         """
         Args:
             idx(int): 0..size-1
         """
         return self._ask(f'wlist:name? {idx:d}')
 
-    def get_wlist(self):
+    def get_wlist(self) -> List:
         """
         NB: takes a few seconds on 5014: our fault or Tek's?
         """
@@ -201,13 +201,16 @@ class QWGCore(SCPIBase, DIO.CalInterface):
             wlist.append(self.get_wlist_name(k+1))
         return wlist
 
-    def delete_waveform(self, name: str):
+    def delete_waveform(self, name: str) -> None:
         """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
             'test'
         """
         self._transport.write(f'wlist:waveform:delete "{name}"')
+
+    def delete_waveform_all(self) -> None:
+        self._transport.write('wlist:waveform:delete all')
 
     def get_waveform_type(self, name: str):
         """
@@ -313,6 +316,17 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         self.send_waveform_data_real(name, waveform)
 
     ##########################################################################
+    # QWG specific
+    ##########################################################################
+
+    def sync_sideband_generators(self) -> None:
+        """
+        Synchronize both sideband generators, i.e. restart them with phase=0
+        """
+        self._transport.write('QUTEch:OUTPut:SYNCsideband')
+
+
+    ##########################################################################
     # DIO support
     ##########################################################################
 
@@ -347,6 +361,35 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         # FIXME: define relation with mode and #codewords in use
         # FIXME: provide high level function that performs the calibration
 
+    def dio_suitable_indexes(self):
+        """
+        Get DIO all suitable indexes. The array is ordered by most preferable index first
+        """
+        return _int_to_array(self._ask('DIO:INDexes?'))
+
+
+    def dio_calibrated_inputs(self) -> int:
+        """
+        'Get all DIO inputs which are calibrated\n'
+        """
+        return self._ask_int('DIO:INPutscalibrated?')
+
+    def dio_lvds(self) -> bool:
+        """
+        Get the DIO LVDS connection status. Result:
+             True: Cable detected
+             No cable detected
+        """
+        return bool(self._ask_int('DIO:LVDS?'))
+
+    def dio_interboard(self):
+        """
+        Get the DIO interboard status. Result:
+             True:  To master interboard connection detected
+             False: No interboard connection detected
+        """
+        return bool(self._ask_int('DIO:IB?'))
+
     def dio_calibration_report(self, extended: bool=False) -> str:
         """
         Return a string containing the latest DIO calibration report (successful and failed calibrations). Includes:
@@ -370,12 +413,39 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     def get_max_codeword_bits(self) -> int:
         """
         Reads the maximum number of codeword bits for all channels
-        :return:
         """
         return self._ask_int("SYSTem:CODEwords:BITs?")
 
     def get_codewords_select(self) -> int:
         return self._ask_int("SYSTem:CODEwords:SELect?")
+
+    def get_triggers_logic_input(self, ch: int) -> int:
+        """
+        Reads the current input values on the all the trigger inputs for a channel, after the bitSelect.
+        Return:
+            uint32 where trigger 1 (T1) is on the Least significant bit (LSB),
+            T2 on the second bit after LSB, etc.
+            For example, if only T3 is connected to a high signal, the return value is 4 (0b0000100)
+
+            Note: To convert the return value to a readable binary output use: `print(\"{0:#010b}\".format(qwg.'
+            'triggers_logic_input()))`')
+        """
+        return self._ask_int(f'QUTEch:TRIGgers{ch}:LOGIcinput?')
+
+
+    def set_bitmap(self, ch: int) -> None:
+        """
+        Codeword bit map for a channel, 14 bits available of which 10 are selectable.
+        The codeword bit map specifies which bits of the codeword (coming from a
+        central controller) are used for the codeword of a channel. This allows to
+        split up the codeword into sections for each channel
+        FIXME: rewrite
+        """
+        self._transport.write(f'DAC{ch}:BITmap')
+
+    def get_bitmap(self, ch: int) -> List:
+        return _int_to_array(self._ask(f'DAC{ch}:BITmap?'))
+
 
     ##########################################################################
     # overrides for CalInterface interface
@@ -388,7 +458,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         self.dio_calibrate()    # FIXME: integrate
 
     ##########################################################################
-    # calibration support
+    # DAC calibration support
     ##########################################################################
 
     def get_iofront_temperature(self) -> float:
@@ -472,6 +542,17 @@ class QWGCore(SCPIBase, DIO.CalInterface):
             if(channel["on"] == True) and (channel["underdrive"] == True):
                 msg.append(f"Possible wave underdrive detected on channel: {channel['id']}")
         return msg
+
+    @staticmethod
+    def _int_to_array(msg):
+        """
+        Convert a scpi array of ints into a python int array
+        :param msg: scpi result
+        :return: array of ints
+        """
+        if msg == '""':
+            return []
+        return msg.split(',')
 
     ##########################################################################
     # private DIO functions

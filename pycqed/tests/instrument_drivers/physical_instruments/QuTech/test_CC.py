@@ -8,9 +8,9 @@ from pycqed.instrument_drivers.lib.Transport import FileTransport
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 
-class Test_QutechCC(unittest.TestCase):
+class Test_CC(unittest.TestCase):
     def test_all(self):
-        file_name = 'Test_QutechCC_test_all.scpi.txt'
+        file_name = 'Test_CC_test_all.scpi.txt'
         test_path = Path('test_output') / file_name
         os.makedirs('test_output', exist_ok=True)
 

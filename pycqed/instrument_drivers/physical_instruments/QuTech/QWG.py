@@ -101,201 +101,6 @@ class QWG(QWGCore, Instrument):
 #        self.connect_message()
 
     ##########################################################################
-    # QCoDeS parameter support
-    ##########################################################################
-
-    # overrides IPInstrument
-    def snapshot_base(self, update=False,
-                      params_to_skip_update: Sequence[str] = None,
-                      params_to_exclude: Sequence[str] = None) -> Dict:
-        """
-        State of the instrument as a JSON-compatible dict.
-
-        Args:
-            update: If True, update the state by querying the
-                instrument. If False, just use the latest values in memory.
-            params_to_skip_update: List of parameter names that will be skipped
-                in update even if update is True. This is useful if you have
-                parameters that are slow to update but can be updated in a
-                different way (as in the qdac)
-            params_to_exclude: List of parameter names that will be excluded from the snapshot
-
-        Returns:
-            dict: base snapshot
-        """
-
-        if params_to_skip_update is None:
-            params_to_skip_update = self._params_to_skip_update
-
-        # FIXME: Enable when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        # snap = super().snapshot_base(update=update,
-        #                              params_to_skip_update=params_to_skip_update)
-        # return snap
-
-        # FIXME: Workaround, remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        if params_to_exclude is None:
-            params_to_exclude = self._params_exclude_snapshot
-        #
-        snap = {
-            "functions": {name: func.snapshot(update=update)
-                          for name, func in self.functions.items()},
-            "submodules": {name: subm.snapshot(update=update)
-                           for name, subm in self.submodules.items()},
-            "__class__": full_class(self)
-        }
-
-        snap['parameters'] = {}
-        for name, param in self.parameters.items():
-            if params_to_exclude and name in params_to_exclude:
-                continue
-            if params_to_skip_update and name in params_to_skip_update:
-                update_par = False
-            else:
-                update_par = update
-
-            try:
-                snap['parameters'][name] = param.snapshot(update=update_par)
-            except:
-                # really log this twice. Once verbose for the UI and once
-                # at lower level with more info for file based loggers
-                log.info("Snapshot: Could not update parameter: {}".format(name))
-                self.log.info(f"Details for Snapshot:",
-                              exc_info=True)
-                snap['parameters'][name] = param.snapshot(update=False)
-
-        for attr in set(self._meta_attrs):
-            if hasattr(self, attr):
-                snap[attr] = getattr(self, attr)
-        snap['port'] = self._port
-        snap['confirmation'] = self._confirmation
-        snap['address'] = self._address
-        snap['terminator'] = self._terminator
-        snap['timeout'] = self._timeout
-        snap['persistent'] = self._persistent
-        return snap
-        # FIXME: End remove
-
-    ##########################################################################
-    # QCoDeS parameter definitions: codewords
-    ##########################################################################
-
-    def _add_codeword_parameters(self, add_extra: bool=True):
-        self.add_parameter(
-            'codeword_protocol',
-            unit='',
-            label='Codeword protocol',
-            get_cmd=self._get_codeword_protocol,
-            set_cmd=self._set_codeword_protocol,
-            vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
-            docstring=_codeword_protocol_doc + '\nEffective immediately when sent')
-        # FIXME: HDAWG uses cfg_codeword_protocol, with different options
-
-        docst = 'Specifies a waveform for a specific codeword. \n' \
-                'The channel number corresponds' \
-                ' to the channel as indicated on the device (1 is lowest).'
-        for j in range(self._dev_desc.numChannels):
-            for cw in range(self._dev_desc.numCodewords):
-                ch = j+1
-
-                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)
-                self.add_parameter(
-                    parname,
-                    label='Waveform channel {} codeword {:03}'.format(ch, cw),
-                    vals=vals.Arrays(min_value=-1, max_value=1),
-                    set_cmd=_gen_set_func_2par(
-                        self._set_cw_waveform, ch, cw),
-                    get_cmd=_gen_get_func_2par(
-                        self._get_cw_waveform, ch, cw),
-#                    snapshot_exclude=True,
-                    docstring=docst)
-                # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-                self._params_exclude_snapshot.append(parname)
-
-    ##########################################################################
-    # QCoDeS parameter definitions: DIO
-    ##########################################################################
-
-    def _add_dio_parameters(self, add_extra: bool=True):
-        self.add_parameter(
-            'dio_mode',
-            unit='',
-            label='DIO input operation mode',
-            get_cmd='DIO:MODE?',
-            set_cmd='DIO:MODE ' + '{}',
-            vals=vals.Enum('MASTER', 'SLAVE'),
-            val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
-            docstring=_dio_mode_doc + '\nEffective immediately when sent') # FIXME: no way, not a HandshakeParameter
-
-        self.add_parameter(
-            'dio_is_calibrated',
-            unit='',
-            label='DIO calibration status',
-            get_cmd='DIO:CALibrate?',
-            val_mapping={True: '1', False: '0'},
-            docstring='Get DIO calibration status\n'
-                      'Result:\n'
-                      '\tTrue: DIO is calibrated\n'
-                      '\tFalse: DIO is not calibrated'
-            )
-
-        self.add_parameter(
-            'dio_active_index',
-            unit='',
-            label='DIO calibration index',
-            get_cmd='DIO:INDexes:ACTive?',
-            set_cmd='DIO:INDexes:ACTive {}',
-            get_parser=np.uint32,
-            vals=vals.Ints(0, 20),
-            docstring='Get and set DIO calibration index\n' 
-                      'See dio_calibrate() parameter\n'
-                      'Effective immediately when sent' # FIXME: no way, not a HandshakeParameter
-            )
-
-        if add_extra:
-            self.add_parameter(
-                'dio_suitable_indexes',
-                unit='',
-                label='DIO suitable indexes',
-                get_cmd='DIO:INDexes?',
-                get_parser=self._int_to_array,
-                docstring='Get DIO all suitable indexes\n'
-                          '\t- The array is ordered by most preferable index first\n'
-                )
-
-            self.add_parameter(
-                'dio_calibrated_inputs',
-                unit='',
-                label='DIO calibrated inputs',
-                get_cmd='DIO:INPutscalibrated?',
-                get_parser=int,
-                docstring='Get all DIO inputs which are calibrated\n'
-                )
-
-            self.add_parameter(
-                'dio_lvds',
-                unit='bool',
-                label='LVDS DIO connection detected',
-                get_cmd='DIO:LVDS?',
-                val_mapping={True: '1', False: '0'},
-                docstring='Get the DIO LVDS connection status.\n'
-                         'Result:\n'
-                         '\tTrue: Cable detected\n'
-                         '\tFalse: No cable detected'
-                )
-
-            self.add_parameter(
-                'dio_interboard',
-                unit='bool',
-                label='DIO interboard detected',
-                get_cmd='DIO:IB?',
-                val_mapping={True: '1', False: '0'},
-                docstring='Get the DIO interboard status.\n'
-                         'Result:\n'
-                         '\tTrue:  To master interboard connection detected\n'
-                         '\tFalse: No interboard connection detected'
-                )
-
-    ##########################################################################
     # QCoDeS parameter definitions: AWG related
     ##########################################################################
 
@@ -305,7 +110,6 @@ class QWG(QWGCore, Instrument):
             ch_pair = i*2+1
             sfreq_cmd = f'qutech:output{ch_pair}:frequency'
             sph_cmd = f'qutech:output{ch_pair}:phase'
-            # NB: sideband frequency has a resolution of ~0.23 Hz:
             self.add_parameter(
                 f'ch_pair{ch_pair}_sideband_frequency',
                 parameter_class=HandshakeParameter,
@@ -394,37 +198,6 @@ class QWG(QWGCore, Instrument):
                 vals=vals.Strings())
                 # FIXME: docstring
 
-            self.add_parameter(
-                f'ch{ch}_bit_map',
-                unit='',
-                label=f'Channel {ch}, set bit map for this channel',
-                get_cmd=f"DAC{ch}:BITmap?",
-                set_cmd=_gen_set_func_1par(
-                   self._set_bit_map, ch),
-                get_parser=self._int_to_array,
-                docstring='Codeword bit map for a channel, 14 bits available of which 10 are '
-                          'selectable \n'
-                          'The codeword bit map specifies which bits of the codeword (coming from a '
-                          'central controller) are used for the codeword of a channel. This allows to '
-                          'split up the codeword into sections for each channel\n'
-                          'Effective immediately when sent')
-
-            # Per channel trigger parameters
-            self.add_parameter(
-                f'ch{ch}_triggers_logic_input',
-                label='Read triggers input value',
-                get_cmd=f'QUTEch:TRIGgers{ch}:LOGIcinput?',
-                get_parser=np.uint32,
-                docstring='Reads the current input values on the all the trigger '
-                          'inputs for a channel, after the bitSelect.\nReturn:'
-                          '\n\tuint32 where rigger 1 (T1) ' 
-                          'is on the Least significant bit (LSB), T2 on the second  '
-                          'bit after LSB, etc.\n\n For example, if only T3 is '
-                          'connected to a high signal, the return value is: '
-                          '4 (0b0000100)\n\n Note: To convert the return value '
-                          'to a readable '
-                          'binary output use: `print(\"{0:#010b}\".format(qwg.'
-                          'triggers_logic_input()))`')
             # end for(ch...
 
         # Triggers parameter
@@ -487,16 +260,159 @@ class QWG(QWGCore, Instrument):
         self._add_codeword_parameters()
         self._add_dio_parameters()  # FIXME: conditional on QWG SW version?
 
-        self.add_function(
-                'deleteWaveformAll',
-                call_cmd='wlist:waveform:delete all')
 
-        self.add_function(
-            'syncSidebandGenerators',
-            call_cmd='QUTEch:OUTPut:SYNCsideband',
-            docstring='Synchronize both sideband frequency '
-                    'generators, i.e. restart them with their defined phases.\n'
-                    'Effective immediately when sent')
+    ##########################################################################
+    # QCoDeS parameter definitions: codewords
+    ##########################################################################
+
+    def _add_codeword_parameters(self, add_extra: bool = True):
+        self.add_parameter(
+            'codeword_protocol',
+            unit='',
+            label='Codeword protocol',
+            get_cmd=self._get_codeword_protocol,
+            set_cmd=self._set_codeword_protocol,
+            vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
+            docstring=_codeword_protocol_doc + '\nEffective immediately when sent')
+        # FIXME: HDAWG uses cfg_codeword_protocol, with different options
+
+        docst = 'Specifies a waveform for a specific codeword. \n' \
+                'The channel number corresponds' \
+                ' to the channel as indicated on the device (1 is lowest).'
+        for j in range(self._dev_desc.numChannels):
+            for cw in range(self._dev_desc.numCodewords):
+                ch = j + 1
+
+                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)
+                self.add_parameter(
+                    parname,
+                    label='Waveform channel {} codeword {:03}'.format(ch, cw),
+                    vals=vals.Arrays(min_value=-1, max_value=1),
+                    set_cmd=_gen_set_func_2par(
+                        self._set_cw_waveform, ch, cw),
+                    get_cmd=_gen_get_func_2par(
+                        self._get_cw_waveform, ch, cw),
+                    #                    snapshot_exclude=True,
+                    docstring=docst)
+                # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+                self._params_exclude_snapshot.append(parname)
+
+
+    ##########################################################################
+    # QCoDeS parameter definitions: DIO
+    ##########################################################################
+
+    def _add_dio_parameters(self):
+        self.add_parameter(
+            'dio_mode',
+            unit='',
+            label='DIO input operation mode',
+            get_cmd='DIO:MODE?',
+            set_cmd='DIO:MODE ' + '{}',
+            vals=vals.Enum('MASTER', 'SLAVE'),
+            val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
+            docstring=_dio_mode_doc + '\nEffective immediately when sent') # FIXME: no way, not a HandshakeParameter
+
+        # FIXME: handle through SCPI status
+        self.add_parameter(
+            'dio_is_calibrated',
+            unit='',
+            label='DIO calibration status',
+            get_cmd='DIO:CALibrate?',
+            val_mapping={True: '1', False: '0'},
+            docstring='Get DIO calibration status\n'
+                      'Result:\n'
+                      '\tTrue: DIO is calibrated\n'
+                      '\tFalse: DIO is not calibrated'
+            )
+
+        self.add_parameter(
+            'dio_active_index',
+            unit='',
+            label='DIO calibration index',
+            get_cmd='DIO:INDexes:ACTive?',
+            set_cmd='DIO:INDexes:ACTive {}',
+            get_parser=np.uint32,
+            vals=vals.Ints(0, 20),
+            docstring='Get and set DIO calibration index\n' 
+                      'See dio_calibrate() parameter\n'
+                      'Effective immediately when sent' # FIXME: no way, not a HandshakeParameter
+            )
+
+
+    ##########################################################################
+    # QCoDeS override for InstrumentBase
+    ##########################################################################
+
+    def snapshot_base(self, update=False,
+                      params_to_skip_update: Sequence[str] = None,
+                      params_to_exclude: Sequence[str] = None) -> Dict:
+        """
+        State of the instrument as a JSON-compatible dict.
+
+        Args:
+            update: If True, update the state by querying the
+                instrument. If False, just use the latest values in memory.
+            params_to_skip_update: List of parameter names that will be skipped
+                in update even if update is True. This is useful if you have
+                parameters that are slow to update but can be updated in a
+                different way (as in the qdac)
+            params_to_exclude: List of parameter names that will be excluded from the snapshot
+
+        Returns:
+            dict: base snapshot
+        """
+
+        if params_to_skip_update is None:
+            params_to_skip_update = self._params_to_skip_update
+
+        # FIXME: Enable when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        # snap = super().snapshot_base(update=update,
+        #                              params_to_skip_update=params_to_skip_update)
+        # return snap
+
+        # FIXME: Workaround, remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
+        if params_to_exclude is None:
+            params_to_exclude = self._params_exclude_snapshot
+        #
+        snap = {
+            "functions": {name: func.snapshot(update=update)
+                          for name, func in self.functions.items()},
+            "submodules": {name: subm.snapshot(update=update)
+                           for name, subm in self.submodules.items()},
+            "__class__": full_class(self)
+        }
+
+        snap['parameters'] = {}
+        for name, param in self.parameters.items():
+            if params_to_exclude and name in params_to_exclude:
+                continue
+            if params_to_skip_update and name in params_to_skip_update:
+                update_par = False
+            else:
+                update_par = update
+
+            try:
+                snap['parameters'][name] = param.snapshot(update=update_par)
+            except:
+                # really log this twice. Once verbose for the UI and once
+                # at lower level with more info for file based loggers
+                log.info("Snapshot: Could not update parameter: {}".format(name))
+                self.log.info(f"Details for Snapshot:",
+                              exc_info=True)
+                snap['parameters'][name] = param.snapshot(update=False)
+
+        for attr in set(self._meta_attrs):
+            if hasattr(self, attr):
+                snap[attr] = getattr(self, attr)
+        snap['port'] = self._port
+        snap['confirmation'] = self._confirmation
+        snap['address'] = self._address
+        snap['terminator'] = self._terminator
+        snap['timeout'] = self._timeout
+        snap['persistent'] = self._persistent
+        return snap
+        # FIXME: End remove
 
     ##########################################################################
     # QCoDeS parameter helpers
@@ -593,21 +509,6 @@ class QWG(QWGCore, Instrument):
         # SCPI/visa adds additional quotes
         result = result.replace('\"\"', '\"')
         return json.loads(result)
-
-    ##########################################################################
-    # private static helpers
-    ##########################################################################
-
-    @staticmethod
-    def _int_to_array(msg):
-        """
-        Convert a scpi array of ints into a python int array
-        :param msg: scpi result
-        :return: array of ints
-        """
-        if msg == "\"\"":
-            return []
-        return msg.split(',')
 
 
 ##########################################################################
