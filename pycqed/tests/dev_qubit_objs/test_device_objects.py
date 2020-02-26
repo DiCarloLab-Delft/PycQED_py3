@@ -14,7 +14,8 @@ import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
-from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
+#from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
+from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 #from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 #from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 #from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
@@ -67,7 +68,7 @@ class Test_Device_obj(unittest.TestCase):
         self.CCL = dummy_CCL('CCL')
         self.QCC = dummy_QCC('QCC')
         self.CC = QuTechCC('CC', DummyTransport())
-        self.VSM = Dummy_Duplexer('VSM')
+        self.VSM = Dummy_QuTechVSMModule('VSM')
 
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
