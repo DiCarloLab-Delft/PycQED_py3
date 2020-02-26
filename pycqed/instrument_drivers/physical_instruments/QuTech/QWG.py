@@ -87,7 +87,7 @@ class QWG(QWGCore, Instrument):
                  name: str,
                  transport: Transport
                  ) -> None:
-        super().__init__(name, transport) # calls QuTechCC_core
+        super().__init__(name, transport) # calls CCCore
         Instrument.__init__(self, name) # calls Instrument
 
         # validator values

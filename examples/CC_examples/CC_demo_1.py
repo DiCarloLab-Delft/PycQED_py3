@@ -6,7 +6,7 @@ import sys
 import numpy as np
 
 from pycqed.instrument_drivers.lib.Transport import IPTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 
@@ -56,7 +56,7 @@ if sel==2:  # Rabi
 
 if 1:
     log.debug('connecting to CC')
-    cc = QuTechCC('cc', IPTransport(ip))
+    cc = CC('cc', IPTransport(ip))
     cc.reset()
     cc.clear_status()
     cc.status_preset()

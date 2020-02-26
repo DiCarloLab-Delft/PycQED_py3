@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from pycqed.instrument_drivers.lib.Transport import FileTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 
 class Test_CC(unittest.TestCase):
@@ -15,7 +15,7 @@ class Test_CC(unittest.TestCase):
         os.makedirs('test_output', exist_ok=True)
 
         transport = FileTransport(str(test_path))
-        cc = QuTechCC('cc', transport, ccio_slots_driving_vsm=[5])
+        cc = CC('cc', transport, ccio_slots_driving_vsm=[5])
 
         cc.reset()
         cc.clear_status()

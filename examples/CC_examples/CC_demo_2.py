@@ -10,7 +10,7 @@ import numpy as np
 from pathlib import Path
 
 from pycqed.instrument_drivers.lib.Transport import IPTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import ZI_HDAWG8
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
@@ -145,7 +145,7 @@ for i, dev in enumerate(conf.ro):
     #station.add_component(instr.ro[i])
 
 log.debug('connecting to CC')
-instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
+instr.cc = CC('cc', IPTransport(conf.cc_ip))
 instr.cc.reset()
 instr.cc.clear_status()
 instr.cc.status_preset()

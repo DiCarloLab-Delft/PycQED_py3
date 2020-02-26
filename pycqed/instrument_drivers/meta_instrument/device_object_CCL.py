@@ -24,7 +24,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 
 log = logging.getLogger(__name__)
@@ -256,8 +256,8 @@ class DeviceCCL(Instrument):
                        'mw_3': 10,
                        'mw_4': 11
                        }
-        elif isinstance(cc, QuTechCC):
-            # NB: we number from 0 in accordance with QuTechCC driver (which adheres to hardware slot numbering)
+        elif isinstance(cc, CC):
+            # NB: we number from 0 in accordance with CC driver (which adheres to hardware slot numbering)
             # NB: slot 5 contains VSM interface
             dio_map = {'ro_0': 0,
                        'ro_1': 1,

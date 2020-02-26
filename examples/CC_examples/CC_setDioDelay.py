@@ -3,7 +3,7 @@
 import sys
 
 from pycqed.instrument_drivers.lib.Transport import IPTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC_core import QuTechCC_core
+from pycqed.instrument_drivers.physical_instruments.QuTech.CCCore import CCCore
 
 # parameter handling
 ccio = 0
@@ -18,7 +18,7 @@ if len(sys.argv)>2:
 ip = '192.168.0.241'
 reg = 63 # register used for delay control in OpenQL CC backend
 
-cc = QuTechCC_core('cc', IPTransport(ip)) # NB: QuTechCC_core loads much quicker then QuTechCC
+cc = CCCore('cc', IPTransport(ip)) # NB: CCCore loads much quicker then CC
 cc.stop()
 cc.set_q1_reg(ccio, reg, val)
 cc.start()

@@ -20,7 +20,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy
 #from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.lib.Transport import DummyTransport
 
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
@@ -66,7 +66,7 @@ class Test_Device_obj(unittest.TestCase):
 
         self.CCL = dummy_CCL('CCL')
         self.QCC = dummy_QCC('QCC')
-        self.CC = QuTechCC('CC', DummyTransport())
+        self.CC = CC('CC', DummyTransport())
         self.VSM = Dummy_Duplexer('VSM')
 
         self.MC = measurement_control.MeasurementControl(

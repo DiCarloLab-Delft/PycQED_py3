@@ -1,8 +1,8 @@
 """
-    File:       QuTechCC.py
+    File:       CC.py
     Author:     Wouter Vlothuizen, QuTech
-    Purpose:    QCoDeS instrument driver for Qutech Central Controller: adds application dependent stuff to QuTechCC_core
-    Notes:      use QuTechCC_core to talk to instrument, do not add knowledge of SCPI syntax here
+    Purpose:    QCoDeS instrument driver for Qutech Central Controller: adds application dependent stuff to CCCore
+    Notes:      use CCCore to talk to instrument, do not add knowledge of SCPI syntax here
     Usage:
     Bugs:
     - _ccio_slots_driving_vsm not handled correctly
@@ -14,7 +14,7 @@ import logging
 import numpy as np
 from typing import Tuple,List
 
-from .QuTechCC_core import QuTechCC_core
+from .CCCore import CCCore
 from pycqed.instrument_drivers.lib.Transport import Transport
 import pycqed.instrument_drivers.lib.DIO as DIO
 
@@ -24,14 +24,14 @@ from qcodes import Instrument
 log = logging.getLogger(__name__)
 
 
-class QuTechCC(QuTechCC_core, Instrument, DIO.CalInterface):
+class CC(CCCore, Instrument, DIO.CalInterface):
     def __init__(self,
                  name: str,
                  transport: Transport,
                  num_ccio: int=9,
                  ccio_slots_driving_vsm: List[int] = None  # NB: default can not be '[]' because that is a mutable default argument
                  ) -> None:
-        super().__init__(name, transport) # calls QuTechCC_core
+        super().__init__(name, transport) # calls CCCore
         Instrument.__init__(self, name) # calls Instrument
 
         # user constants
@@ -178,7 +178,7 @@ class QuTechCC(QuTechCC_core, Instrument, DIO.CalInterface):
 
     ##########################################################################
     # overrides for CalInterface interface
-    # FIXME: move to QuTechCC_core? or CC_DIOCAL
+    # FIXME: move to CCCore? or CC_DIOCAL
     ##########################################################################
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):

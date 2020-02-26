@@ -1,11 +1,13 @@
 """
-    File:       QuTechCC_core.py
+    File:       CCCore.py
     Author:     Wouter Vlothuizen, QuTech
     Purpose:    Core Instrument driver for QuTech Central Controller, independent of QCoDeS.
                 All instrument protocol handling is provided here
-    Usage:      Can be used directly, or with QuTechCC.py, which adds access via QCoDeS parameters
+    Usage:      Can be used directly, or with CC.py, which adds access via QCoDeS parameters
     Notes:      Here, we follow the SCPI convention of NOT checking parameter values but leaving that to
                 the device
+                The name CCCore refers to the fact that this is a 'core' driver (just as QWGCore and ZI_HDAWG_core),
+                not to the CCCORE board within the CC
     Usage:
     Bugs:
 
@@ -20,7 +22,7 @@ from pycqed.instrument_drivers.lib.Transport import Transport
 log = logging.getLogger(__name__)
 
 
-class QuTechCC_core(SCPIBase):
+class CCCore(SCPIBase):
 
     ##########################################################################
     # 'public' functions for the end user

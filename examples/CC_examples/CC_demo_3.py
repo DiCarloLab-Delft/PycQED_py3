@@ -8,7 +8,7 @@ import math
 import numpy as np
 
 from pycqed.instrument_drivers.lib.Transport import IPTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 # configure our logger
 log = logging.getLogger('demo_3')
@@ -213,7 +213,7 @@ log.debug('program generated: {} lines, {} bytes'.format(prog.count('\n'), len(p
 
 
 log.debug('connecting to CC')
-cc = QuTechCC('cc', IPTransport(ip))
+cc = CC('cc', IPTransport(ip))
 cc.reset()
 cc.clear_status()
 cc.status_preset()
