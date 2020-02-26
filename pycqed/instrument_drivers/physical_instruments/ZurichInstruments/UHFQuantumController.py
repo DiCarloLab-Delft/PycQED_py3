@@ -1611,7 +1611,6 @@ setTrigger(0);
         return dio_mask,expected_sequence
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
-        verbose = False  # FIXME: use logging
         self.assure_ext_clock()
 
         for awg in [0]:

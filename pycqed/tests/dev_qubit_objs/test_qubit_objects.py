@@ -29,6 +29,8 @@ from pycqed.instrument_drivers.library.Transport import DummyTransport
 
 from qcodes import station
 
+from openql import openql as ql
+
 
 Dummy_VSM_not_fixed = False
 
@@ -430,17 +432,27 @@ class Test_CCL(unittest.TestCase):
             except KeyError:
                 pass
 
-class Test_CC(Test_CCL):
 
-    @classmethod
-    def setUpClass(self):
-        super().setUpClass()
-        self.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
-        self.CCL_qubit.instr_CC(self.CC.name)
+##########################################################################
+# repeat same tests for Qutech Central Controller
+# NB: we just hijack the parent class to run the same tests
+# NB: requires OpenQL with CC backend support
+##########################################################################
 
-        config_fn = os.path.join(
-            pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
-        self.CCL_qubit.cfg_openql_platform_fn(config_fn)
+if ql.get_version() > '0.8.0':  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
+    class Test_CC(Test_CCL):
+        def setUp(self):
+            self.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
+            self.CCL_qubit.instr_CC(self.CC.name)
+
+            config_fn = os.path.join(
+                pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
+            self.CCL_qubit.cfg_openql_platform_fn(config_fn)
+else:
+    class Test_CC_incompatible_openql_version(unittest.TestCase):
+        @unittest.skip('OpenQL version does not support CC')
+        def test_fail(self):
+            pass
 
 
 class Test_Instantiate(unittest.TestCase):

@@ -579,8 +579,7 @@ while (1) {
         return dio_mask,expected_sequence
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
-        verbose = False  # FIXME: use logging
-        # FIXME: UHF driver does not need expected_sequence, why the difference
+        # FIXME: UHF driver does not use expected_sequence, why the difference
         self.assure_ext_clock()
         self.upload_codeword_program()
 

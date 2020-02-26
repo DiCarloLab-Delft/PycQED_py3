@@ -210,17 +210,12 @@ if 1:
             self.assertEqual(p.name, 'sliding_flux_pulses_seq')
 
 
-    """
-        Author:             Wouter Vlothuizen, QuTech
-        Purpose:            multi qubit OpenQL tests for Qutech Central Controller
-        Notes:              requires OpenQL with CC backend support
-    """
-    # import test_multi_qubit_oql as parent  # rename to stop pytest from running tests directly
-
+    ##########################################################################
+    # repeat same tests for Qutech Central Controller
     # NB: we just hijack the parent class to run the same tests
+    # NB: requires OpenQL with CC backend support
+    ##########################################################################
 
-    # FIXME: This only works with Wouters custom OpenQL.
-    # Need a better check for this
     if ql.get_version() > '0.8.0':   # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
         class Test_multi_qubit_oql_CC(Test_multi_qubit_oql):
             def setUp(self):
@@ -232,7 +227,7 @@ if 1:
             def test_multi_qubit_off_on(self):
                 pytest.skip("test_multi_qubit_off_on() gives signalconflict (FIXME)")
     else:
-        class Test_multi_qubit_oql_CC(unittest.TestCase):
+        class Test_multi_qubit_oql_CC_incompatible_openql_version(unittest.TestCase):
             @unittest.skip('OpenQL version does not support CC')
             def test_fail(self):
                 pass

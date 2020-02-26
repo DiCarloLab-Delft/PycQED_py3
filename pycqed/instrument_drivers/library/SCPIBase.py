@@ -36,7 +36,7 @@ class SCPIBase:
         err_cnt = self.get_system_error_count()
         if err_cnt>0:
             log.error(f"{self._name}: Found {err_cnt} SCPI errors:")
-            for i in range(err_cnt):
+            for _ in range(err_cnt):
                 log.error(self.get_error())
             raise RuntimeError("SCPI errors found")
 

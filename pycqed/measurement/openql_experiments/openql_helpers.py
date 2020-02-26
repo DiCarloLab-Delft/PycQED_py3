@@ -84,7 +84,7 @@ def compile(p, quiet: bool = True):
         p.compile()
 
     # determine extension of generated file
-    if p.eqasm_compiler=='eqasm_backend_cc':
+    if p.eqasm_compiler=='eqasm_backend_cc':  # NB: field .eqasm_compiler is set by p.compile()
         ext = '.vq1asm' # CC
     else:
         ext = '.qisa' # CC-light, QCC

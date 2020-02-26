@@ -334,7 +334,7 @@ class QWG(QWGCore, Instrument):
             set_cmd='DIO:INDexes:ACTive {}',
             get_parser=np.uint32,
             vals=vals.Ints(0, 20),
-            docstring='Get and set DIO calibration index\n' 
+            docstring='Get and set DIO calibration index\n'
                       'See dio_calibrate() parameter\n'
                       'Effective immediately when sent' # FIXME: no way, not a HandshakeParameter
             )
@@ -498,17 +498,17 @@ class QWG(QWGCore, Instrument):
             array_raw = ',' + ','.join(str(x) for x in bit_map)
         self._transport.write(f"DAC{ch}:BITmap {len(bit_map)}{array_raw}")
 
-    def _JSON_parser(self, msg):
-        """
-        Converts the result of a SCPI message to a JSON.
-
-        msg: SCPI message where the body is a JSON
-        return: JSON object with the data of the SCPI message
-        """
-        result = str(msg)[1:-1]
-        # SCPI/visa adds additional quotes
-        result = result.replace('\"\"', '\"')
-        return json.loads(result)
+    # def _JSON_parser(self, msg):
+    #     """
+    #     Converts the result of a SCPI message to a JSON.
+    #
+    #     msg: SCPI message where the body is a JSON
+    #     return: JSON object with the data of the SCPI message
+    #     """
+    #     result = str(msg)[1:-1]
+    #     # SCPI/visa adds additional quotes
+    #     result = result.replace('\"\"', '\"')
+    #     return json.loads(result)
 
 
 ##########################################################################
@@ -556,8 +556,7 @@ class QWGMultiDevices:
     """
 
     @staticmethod
-    def dio_calibration(cc, qwgs: List[QWG],
-            verbose: bool = False):
+    def dio_calibration(cc, qwgs: List[QWG], verbose: bool = False):
         """
         Calibrate multiple QWG using a CCLight
         First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO

@@ -138,7 +138,8 @@ def get_shift_and_mask(dio_mode: str, channels: List[int]) -> Tuple[int, int]:
     if control_mode is None:
         raise ValueError(f"Unsupported DIO mode '{dio_mode}'")
     control_bits = control_mode['control_bits']
-    trigger_bits = control_mode['trigger_bits']
+    # FIXME: also return trigger_bits
+    # trigger_bits = control_mode['trigger_bits']
 
     # calculate mask
     nr_channels = 8  # fixed assumption for HDAWG and dual-QWG combo

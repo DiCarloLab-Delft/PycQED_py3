@@ -172,7 +172,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
 
         if errNr > 0:
             errMgs = []
-            for i in range(errNr):
+            for _ in range(errNr):
                 errMgs.append(self.get_error())
             raise RuntimeError(f'{repr(self)}: ' + ', '.join(errMgs))
             # FIXME: is raising a potentially very long string useful?
@@ -231,7 +231,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return self._ask_int(f'wlist:waveform:length? "{name}"')
 
-    def new_waveform_real(self, name: str, len: int):
+    def new_waveform_real(self, name: str, length: int):
         """
         Args:
             name (string):  waveform name excluding double quotes, e.g.
@@ -239,7 +239,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
 
         NB: seems to do nothing (on Tek5014) if waveform already exists
         """
-        self._transport.write(f'wlist:waveform:new "{name}",{len:d},real')
+        self._transport.write(f'wlist:waveform:new "{name}",{length:d},real')
 
     def get_waveform_data_float(self, name: str):
         """
