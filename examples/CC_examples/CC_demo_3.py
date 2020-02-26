@@ -7,7 +7,7 @@ import sys
 import math
 import numpy as np
 
-from pycqed.instrument_drivers.lib.Transport import IPTransport
+from pycqed.instrument_drivers.library.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 # configure our logger

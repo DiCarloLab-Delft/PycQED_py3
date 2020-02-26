@@ -3,7 +3,7 @@ import unittest
 import os
 from pathlib import Path
 
-from pycqed.instrument_drivers.lib.Transport import FileTransport
+from pycqed.instrument_drivers.library.Transport import FileTransport
 from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG
 
 

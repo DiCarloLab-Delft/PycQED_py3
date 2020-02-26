@@ -16,8 +16,8 @@
 import logging
 import sys
 
-from pycqed.instrument_drivers.lib.SCPIBase import SCPIBase
-from pycqed.instrument_drivers.lib.Transport import Transport
+from pycqed.instrument_drivers.library.SCPIBase import SCPIBase
+from pycqed.instrument_drivers.library.Transport import Transport
 
 log = logging.getLogger(__name__)
 

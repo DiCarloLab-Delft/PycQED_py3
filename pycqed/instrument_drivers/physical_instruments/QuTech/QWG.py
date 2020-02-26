@@ -22,7 +22,7 @@ import json
 from typing import List, Sequence, Dict
 
 from .QWGCore import QWGCore
-from pycqed.instrument_drivers.lib.Transport import Transport
+from pycqed.instrument_drivers.library.Transport import Transport
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import Parameter

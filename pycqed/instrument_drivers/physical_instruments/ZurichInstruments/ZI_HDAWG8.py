@@ -90,7 +90,7 @@ from typing import Tuple,List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
-import pycqed.instrument_drivers.lib.DIO as DIO
+import pycqed.instrument_drivers.library.DIO as DIO
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
@@ -609,4 +609,4 @@ while (1) {
     ##########################################################################
 
     def calibrate_CC_dio_protocol(self, CC, verbose=False) -> None:
-        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.lib.DIO.calibrate")
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")

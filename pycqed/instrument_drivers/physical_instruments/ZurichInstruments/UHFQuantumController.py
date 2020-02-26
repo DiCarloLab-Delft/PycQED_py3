@@ -62,7 +62,7 @@ import numpy as np
 from typing import Tuple,List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
-import pycqed.instrument_drivers.lib.DIO as DIO
+import pycqed.instrument_drivers.library.DIO as DIO
 from pycqed.utilities.general import check_keyboard_interrupt
 
 from qcodes.utils import validators
@@ -1642,7 +1642,7 @@ setTrigger(0);
     ##########################################################################
 
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False) -> None:
-        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.lib.DIO.calibrate")
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")
 
 
 ##########################################################################

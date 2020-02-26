@@ -15,8 +15,8 @@ import numpy as np
 from typing import Tuple,List
 
 from .CCCore import CCCore
-from pycqed.instrument_drivers.lib.Transport import Transport
-import pycqed.instrument_drivers.lib.DIO as DIO
+from pycqed.instrument_drivers.library.Transport import Transport
+import pycqed.instrument_drivers.library.DIO as DIO
 
 from qcodes.utils import validators as vals
 from qcodes import Instrument

@@ -19,9 +19,9 @@ import re
 import numpy as np
 from typing import Tuple, List
 
-import pycqed.instrument_drivers.lib.DIO as DIO
-from pycqed.instrument_drivers.lib.SCPIBase import SCPIBase
-from pycqed.instrument_drivers.lib.Transport import Transport
+import pycqed.instrument_drivers.library.DIO as DIO
+from pycqed.instrument_drivers.library.SCPIBase import SCPIBase
+from pycqed.instrument_drivers.library.Transport import Transport
 
 log = logging.getLogger(__name__)
 

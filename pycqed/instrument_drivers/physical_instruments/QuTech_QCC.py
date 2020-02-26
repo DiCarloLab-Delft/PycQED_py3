@@ -22,7 +22,7 @@ from typing import Tuple,List
 from .SCPI import SCPI
 from ._QCC.QCCMicrocode import QCCMicrocode
 import pycqed
-import pycqed.instrument_drivers.lib.DIO as DIO
+import pycqed.instrument_drivers.library.DIO as DIO
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter

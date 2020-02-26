@@ -26,7 +26,7 @@ import re
 import json
 from typing import Tuple, List, Sequence, Dict
 
-from pycqed.instrument_drivers.lib.DIO import CalInterface
+from pycqed.instrument_drivers.library.DIO import CalInterface
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter

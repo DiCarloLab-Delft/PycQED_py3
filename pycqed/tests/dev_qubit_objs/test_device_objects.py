@@ -21,7 +21,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
-from pycqed.instrument_drivers.lib.Transport import DummyTransport
+from pycqed.instrument_drivers.library.Transport import DummyTransport
 
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do

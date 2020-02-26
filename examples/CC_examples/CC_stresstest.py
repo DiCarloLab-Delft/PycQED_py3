@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from pycqed.instrument_drivers.lib.Transport import IPTransport
+from pycqed.instrument_drivers.library.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 
