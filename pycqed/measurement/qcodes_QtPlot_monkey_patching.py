@@ -73,29 +73,9 @@ import inspect
 
 # Do not import anything else from qcodes before this, it breaks this code
 
-# Patch the color scales
-
-# The line below is the naive way of doing it but will not work consistenly
-# qcodes.plots.colors.colorscales = qcodes_QtPlot_colors_override.colorscales
-
-from pycqed.measurement import qcodes_QtPlot_colors_override as qc_cols_override
-import qcodes.plots.colors
-
-str_colorscales = "colorscales = " + repr(qc_cols_override.colorscales)
-str_colorscales_raw = "colorscales_raw = " + repr(qc_cols_override.colorscales_raw)
-
-parsed_colorscales = ast.parse(str_colorscales)
-parsed_colorscales_raw = ast.parse(str_colorscales_raw)
-
-co = compile(parsed_colorscales, "<string>", "exec")
-exec(co, qcodes.plots.colors.__dict__)
-co = compile(parsed_colorscales_raw, "<string>", "exec")
-exec(co, qcodes.plots.colors.__dict__)
-
-
-
 # Below: patch the QtPlot method to allow for setting a fixed color scale range
 
+import qcodes
 from qcodes.plots.pyqtgraph import QtPlot
 
 
@@ -144,4 +124,32 @@ ast.fix_missing_locations(parsedQtPlotSource)
 # Compile and execute the code in the namespace of the "pyqtgraph" module
 # such that on next import of QtPlot the patched version will be used
 co = compile(parsedQtPlotSource, "<string>", "exec")
+exec(co, qcodes.plots.pyqtgraph.__dict__)
+
+
+# Patch the color scales
+
+# The line below is the naive way of doing it but will not work consistenly
+# qcodes.plots.colors.colorscales = qcodes_QtPlot_colors_override.colorscales
+
+from pycqed.measurement import qcodes_QtPlot_colors_override as qc_cols_override
+
+str_colorscales = "colorscales = " + repr(qc_cols_override.colorscales)
+str_colorscales_raw = "colorscales_raw = " + repr(qc_cols_override.colorscales_raw)
+
+parsed_colorscales = ast.parse(str_colorscales)
+parsed_colorscales_raw = ast.parse(str_colorscales_raw)
+
+co = compile(parsed_colorscales, "<string>", "exec")
+exec(co, qcodes.plots.colors.__dict__)
+co = compile(parsed_colorscales_raw, "<string>", "exec")
+exec(co, qcodes.plots.colors.__dict__)
+
+
+# On some systems this is also required probably because the colors get imported
+# there as well and, depending on the python version, the reference doesn't
+# change everywhere
+co = compile(parsed_colorscales, "<string>", "exec")
+exec(co, qcodes.plots.pyqtgraph.__dict__)
+co = compile(parsed_colorscales_raw, "<string>", "exec")
 exec(co, qcodes.plots.pyqtgraph.__dict__)
