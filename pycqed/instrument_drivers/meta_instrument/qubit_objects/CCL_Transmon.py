@@ -14,6 +14,11 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.utilities.general import gen_sweep_pts
+from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
+    mk_optimize_res_loss_func
+from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
+    mk_minimization_loss_func, mk_minimization_goal_func
+
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import (
@@ -2114,6 +2119,400 @@ class CCLight_Transmon(Qubit):
         self.measure_allxy()
         self.ro_soft_avg(old_soft_avg)
         return True
+
+    def calibrate_ssro_coarse(self, MC=None,
+                              nested_MC=None,
+                              freqs=None,
+                              amps=None,
+                              analyze: bool = True,
+                              update: bool = True):
+        '''
+        Performs a 2D sweep of <qubit>.ro_freq and <qubit>.ro_pulse_amp and
+        measures SSRO parameters (SNR, F_a, F_d).
+        After the sweep is done, it sets the parameters for which the assignment
+        fidelity was maximum.
+
+        Args:
+            freq (array):
+                Range of frequencies of sweep.
+
+            amps (array):
+                Range of amplitudes of sweep.
+        '''
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        if freqs is None:
+            if self.dispersive_shift() is not None:
+                freqs = np.arange(-2*abs(self.dispersive_shift()),
+                                  abs(self.dispersive_shift()), .5e6) + self.freq_res()
+            else:
+                raise ValueError('self.dispersive_shift is None. Please specify\
+                                 range of sweep frequencies.')
+
+        if amps is None:
+            amps = np.linspace(.001, .5, 31)
+
+        nested_MC.set_sweep_function(self.ro_freq)
+        nested_MC.set_sweep_points(freqs)
+        nested_MC.set_sweep_function_2D(self.ro_pulse_amp)
+        nested_MC.set_sweep_points_2D(amps)
+
+        d = det.Function_Detector(self.measure_ssro,
+                                  result_keys=['SNR', 'F_a', 'F_d'],
+                                  value_names=['SNR', 'F_a', 'F_d'],
+                                  value_units=['a.u.', 'a.u.', 'a.u.'])
+        nested_MC.set_detector_function(d)
+        nested_MC.run(name='RO_coarse_tuneup', mode='2D')
+
+        if analyze is True:
+            # Analysis
+            a = ma.TwoD_Analysis(label='RO_coarse_tuneup', auto=False)
+            # Get best parameters
+            a.get_naming_and_values_2D()
+            arg = np.argmax(a.measured_values[1])
+            index = np.unravel_index(arg, (len(a.sweep_points),
+                                           len(a.sweep_points_2D)))
+            best_freq = a.sweep_points[index[0]]
+            best_amp = a.sweep_points_2D[index[1]]
+            a.run_default_analysis()
+            print('Frequency: {}, Amplitude: {}'.format(best_freq, best_amp))
+
+            if update is True:
+                self.ro_freq(best_freq)
+                self.ro_pulse_amp(best_amp)
+
+            return True
+
+    def calibrate_ssro_pulse_duration(self, MC=None,
+                                      nested_MC=None,
+                                      amps=None,
+                                      times= None,
+                                      use_adaptive: bool = True,
+                                      n_points: int = 150,
+                                      analyze: bool = True,
+                                      update: bool = True):
+        '''
+        Calibrates the RO pulse duration by measuring the assignment fidelity of
+        SSRO experiments as a function of the RO pulse duration and amplitude.
+        For each set of parameters, the routine calibrates optimal weights and
+        then extracts readout fidelity.
+        This measurement can be performed using an adaptive sampler
+        (use_adaptive=True) or a regular 2D parameter sweep (use_adaptive=False).
+        Designed to be used in the GBT node 'SSRO Pulse Duration'.
+
+        Args:
+            amps (array):
+                If using 2D sweep:
+                    Set of RO amplitudes sampled in the 2D sweep.
+                If using adaptive sampling:
+                    Minimum and maximum (respectively) of the RO amplitude range
+                    used in the adaptive sampler.
+
+            times (array):
+                If using 2D sweep:
+                    Set of RO pulse durations sampled in the 2D sweep.
+                If using adaptive sampling:
+                    Minimum and maximum (respectively) of the RO pulse duration
+                    range used in the adaptive sampler.
+
+            use_adaptive (bool):
+                Boolean that sets the sampling mode. Set to "False" for a
+                regular 2D sweep or set to "True" for adaptive sampling.
+
+            n_points:
+                Only relevant in the adaptive sampling mode. Sets the maximum
+                number of points sampled.
+        '''
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        if times is None:
+            times = np.arange(10e-9, 401e-9, 10e-9)
+
+        if amps is None:
+            amps = np.linspace(.01,.25,11)
+
+        ######################
+        # Experiment
+        ######################
+        nested_MC.set_sweep_functions([self.ro_pulse_length,
+                                       self.ro_pulse_amp])
+        d = det.Function_Detector(self.calibrate_optimal_weights,
+                                  result_keys=['F_a','F_d','SNR'],
+                                  value_names=['F_a','F_d','SNR'],
+                                  value_units=['a.u.','a.u.','a.u.'])
+        nested_MC.set_detector_function(d)
+        # Use adaptive sampling
+        if use_adaptive is True:
+            # Adaptive sampler cost function
+            loss_per_simplex = mk_minimization_loss_func()
+            goal = mk_minimization_goal_func()
+
+            nested_MC.set_adaptive_function_parameters(
+                {'adaptive_function': LearnerND_Minimizer,
+                 'goal': lambda l: goal(l) or l.npoints > n_points,
+                 'loss_per_simplex': loss_per_simplex,
+                 'bounds': [(10e-9, 400e-9), (0.01, 0.3)],
+                 'minimize': False
+                 })
+            nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
+                          mode='adaptive')
+        # Use standard 2D sweep
+        else:
+            nested_MC.set_sweep_points(times)
+            nested_MC.set_sweep_points_2D(amps)
+            nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
+                          mode='2D')
+        #####################
+        # Analysis
+        #####################
+        if analyze is True:
+            if use_adaptive is True:
+                A = ma2.Readout_landspace_Analysis(label='RO_duration_tuneup')
+                optimal_pulse_duration  = A.qoi['Optimal_parameter_X']
+                optimal_pulse_amplitude = A.qoi['Optimal_parameter_Y']
+                self.ro_pulse_length(optimal_pulse_duration)
+                self.ro_pulse_amp(optimal_pulse_amplitude)
+            else:
+                A = ma.TwoD_Analysis(label='RO_duration_tuneup', auto=True)
+            return True
+
+    def calibrate_ssro_fine(self, MC=None,
+                            nested_MC=None,
+                            start_freq=None,
+                            start_amp=None,
+                            start_freq_step=None,
+                            start_amp_step=None,
+                            threshold: float = .99,
+                            analyze: bool = True,
+                            update: bool = True):
+        '''
+        Runs an optimizer routine on the SSRO assignment fidelity of the
+        <qubit>.ro_freq and <qubit>.ro_pulse_amp parameters.
+        Intended to be used in the "SSRO Optimization" node of GBT.
+
+        Args:
+            start_freq (float):
+                Starting frequency of the optmizer.
+
+            start_amp (float):
+                Starting amplitude of the optimizer.
+
+            start_freq_step (float):
+                Starting frequency step of the optmizer.
+
+            start_amp_step (float):
+                Starting amplitude step of the optimizer.
+
+            threshold (float):
+                Fidelity thershold after which the optimizer stops iterating.
+        '''
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        if start_freq_step is None:
+            if start_freq is None:
+                start_freq = self.ro_freq()
+                start_freq_step = 0.1e6
+            else:
+                raise ValueError('Must provide start frequency step if start\
+                                frequency is specified.')
+
+        if start_amp_step is None:
+            if start_amp is None:
+                start_amp = self.ro_pulse_amp()
+                start_amp_step = 0.01
+            else:
+                raise ValueError('Must provide start amplitude step if start\
+                                amplitude is specified.')
+
+        if start_amp is None:
+            start_amp = self.ro_pulse_amp()
+
+        nested_MC.set_sweep_functions([self.ro_freq, self.ro_pulse_amp])
+
+        d = det.Function_Detector(self.calibrate_optimal_weights,
+                                  result_keys=['F_a'],
+                                  value_names=['F_a'],
+                                  value_units=['a.u.'])
+        nested_MC.set_detector_function(d)
+
+        ad_func_pars = {'adaptive_function': nelder_mead,
+                        'x0': [self.ro_freq(), self.ro_pulse_amp()],
+                        'initial_step': [start_freq_step, start_amp_step],
+                        'no_improv_break': 10,
+                        'minimize': False,
+                        'maxiter': 20,
+                        'f_termination': threshold}
+        nested_MC.set_adaptive_function_parameters(ad_func_pars)
+
+        nested_MC.set_optimization_method('nelder_mead')
+        nested_MC.run(name='RO_fine_tuneup', mode='adaptive')
+
+        if analyze is True:
+            ma.OptimizationAnalysis(label='RO_fine_tuneup')
+            return True
+
+    def calibrate_ro_acq_delay(self, MC=None,
+                               analyze: bool = True,
+                               prepare: bool = True,
+                               disable_metadata: bool = False):
+        """
+        Calibrates the ro_acq_delay parameter for the readout.
+        For that it analyzes the transients.
+
+        """
+
+        self.ro_acq_delay(0)  # set delay to zero
+        old_pow = self.ro_pulse_amp()
+        self.ro_pulse_amp(0.5)
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # if plot_max_time is None:
+        #     plot_max_time = self.ro_acq_integration_length()+250e-9
+
+        if prepare:
+            self.prepare_for_timedomain()
+            p = sqo.off_on(
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb='off',
+                initialize=False,
+                platf_cfg=self.cfg_openql_platform_fn())
+            self.instr_CC.get_instr().eqasm_program(p.filename)
+        else:
+            p = None  # object needs to exist for the openql_sweep to work
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Transient time', unit='s',
+                             upload=prepare)
+        MC.set_sweep_function(s)
+
+        if 'UHFQC' in self.instr_acquisition():
+            sampling_rate = 1.8e9
+        else:
+            raise NotImplementedError()
+
+        MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) /
+                            sampling_rate)
+        MC.set_detector_function(self.input_average_detector)
+        MC.run(name='Measure_Acq_Delay_{}'.format(self.msmt_suffix),
+               disable_snapshot_metadata=disable_metadata)
+
+        self.ro_pulse_amp(old_pow)
+
+        if analyze:
+            a = ma2.RO_acquisition_delayAnalysis(qubit_name=self.name)
+            # Delay time is averaged over the two quadratures.
+            delay_time = (a.proc_data_dict['I_pulse_start'] +
+                          a.proc_data_dict['Q_pulse_start'])/2
+            self.ro_acq_delay(delay_time)
+            return True
+
+    def calibrate_optimal_weights(self, MC=None, verify: bool = True,
+                                  analyze: bool = True, update: bool = True,
+                                  no_figs: bool = False,
+                                  optimal_IQ: bool = False,
+                                  measure_transients_CCL_switched: bool = False,
+                                  prepare: bool = True,
+                                  disable_metadata: bool = False,
+                                  nr_shots_per_case: int = 2**13,
+                                  post_select: bool = False,
+                                  averages: int = 2**15,
+                                  post_select_threshold: float = None,
+                                  )->bool:
+        """
+        Measures readout transients for the qubit in ground and excited state to indicate
+        at what times the transients differ. Based on the transients calculates weights
+        that are used to  weigh measuremet traces to maximize the SNR.
+
+        Args:
+            optimal_IQ (bool):
+                if set to True sets both the I and Q weights of the optimal
+                weight functions for the verification experiment.
+                A good sanity check is that when using optimal IQ one expects
+                to see no signal in the  Q quadrature of the verification
+                SSRO experiment.
+            verify (bool):
+                indicates whether to run measure_ssro at the end of the routine
+                to find the new SNR and readout fidelities with optimized weights
+
+            update (bool):
+                specifies whether to update the weights in the qubit object
+        """
+        log.info('Calibrating optimal weights for {}'.format(self.name))
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare:
+            self.prepare_for_timedomain()
+
+        # Ensure that enough averages are used to get accurate weights
+        old_avg = self.ro_acq_averages()
+
+        self.ro_acq_averages(averages)
+        if measure_transients_CCL_switched:
+            transients = self.measure_transients_CCL_switched(MC=MC,
+                                                              analyze=analyze,
+                                                              depletion_analysis=False)
+        else:
+            transients = self.measure_transients(MC=MC, analyze=analyze,
+                                                 depletion_analysis=False,
+                                                 disable_metadata=disable_metadata)
+        if analyze:
+            ma.Input_average_analysis(IF=self.ro_freq_mod())
+
+        self.ro_acq_averages(old_avg)
+        # deskewing the input signal
+
+        # Calculate optimal weights
+        optimized_weights_I = (transients[1][0] - transients[0][0])
+        optimized_weights_Q = (transients[1][1] - transients[0][1])
+        # joint rescaling to +/-1 Volt
+        maxI = np.max(np.abs(optimized_weights_I))
+        maxQ = np.max(np.abs(optimized_weights_Q))
+        # fixme: deviding the weight functions by four to not have overflow in
+        # thresholding of the UHFQC
+        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
+        optimized_weights_I = np.array(
+            weight_scale_factor*optimized_weights_I)
+        optimized_weights_Q = np.array(
+            weight_scale_factor*optimized_weights_Q)
+
+        if update:
+            self.ro_acq_weight_func_I(optimized_weights_I)
+            self.ro_acq_weight_func_Q(optimized_weights_Q)
+            if optimal_IQ:
+                self.ro_acq_weight_type('optimal IQ')
+            else:
+                self.ro_acq_weight_type('optimal')
+            if verify:
+                self._prep_ro_integration_weights()
+                self._prep_ro_instantiate_detectors()
+                ssro_dict = self.measure_ssro(
+                    no_figs=no_figs, update=update,
+                    prepare=True, disable_metadata=disable_metadata,
+                    nr_shots_per_case=nr_shots_per_case,
+                    post_select=post_select,
+                    post_select_threshold=post_select_threshold)
+                return ssro_dict
+        if verify:
+            warnings.warn('Not verifying as settings were not updated.')
+        return True
+
+
     #####################################################
     # "measure_" methods below
     #####################################################
@@ -3250,154 +3649,6 @@ class CCLight_Transmon(Qubit):
                 'relaxation': a.proc_data_dict['relaxation_events'],
                 'excitation': a.proc_data_dict['residual_excitation']}
 
-    def calibrate_ssro_coarse(self, MC=None,
-                              nested_MC=None,
-                              freqs=None,
-                              amps=None,
-                              analyze: bool = True,
-                              update: bool = True):
-        '''
-        Performs a 2D sweep of <qubit>.ro_freq and <qubit>.ro_pulse_amp and
-        measures SSRO parameters (SNR, F_a, F_d).
-        After the sweep is done, it sets the parameters for which the assignment
-        fidelity was maximum.
-
-        Args:
-            freq (array):
-                Range of frequencies of sweep.
-
-            amps (array):
-                Range of amplitudes of sweep.
-        '''
-
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        if nested_MC is None:
-            nested_MC = self.instr_nested_MC.get_instr()
-
-        if freqs is None:
-            if self.dispersive_shift() is not None:
-                freqs = np.arange(-2*abs(self.dispersive_shift()),
-                                  abs(self.dispersive_shift()), .5e6) + self.freq_res()
-            else:
-                raise ValueError('self.dispersive_shift is None. Please specify\
-                                 range of sweep frequencies.')
-
-        if amps is None:
-            amps = np.linspace(.001, .5, 31)
-
-        nested_MC.set_sweep_function(self.ro_freq)
-        nested_MC.set_sweep_points(freqs)
-        nested_MC.set_sweep_function_2D(self.ro_pulse_amp)
-        nested_MC.set_sweep_points_2D(amps)
-
-        d = det.Function_Detector(self.measure_ssro,
-                                  result_keys=['SNR', 'F_a', 'F_d'],
-                                  value_names=['SNR', 'F_a', 'F_d'],
-                                  value_units=['a.u.', 'a.u.', 'a.u.'])
-        nested_MC.set_detector_function(d)
-        nested_MC.run(name='RO_coarse_tuneup', mode='2D')
-
-        if analyze is True:
-            # Analysis
-            a = ma.TwoD_Analysis(label='RO_coarse_tuneup', auto=False)
-            # Get best parameters
-            a.get_naming_and_values_2D()
-            arg = np.argmax(a.measured_values[1])
-            index = np.unravel_index(arg, (len(a.sweep_points),
-                                           len(a.sweep_points_2D)))
-            best_freq = a.sweep_points[index[0]]
-            best_amp = a.sweep_points_2D[index[1]]
-            a.run_default_analysis()
-            print('Frequency: {}, Amplitude: {}'.format(best_freq, best_amp))
-
-            if update is True:
-                self.ro_freq(best_freq)
-                self.ro_pulse_amp(best_amp)
-
-            return True
-
-    def calibrate_ssro_fine(self, MC=None,
-                            nested_MC=None,
-                            start_freq=None,
-                            start_amp=None,
-                            start_freq_step=None,
-                            start_amp_step=None,
-                            threshold: float = .99,
-                            analyze: bool = True,
-                            update: bool = True):
-        '''
-        Runs an optimizer routine on the SSRO assignment fidelity of the
-        <qubit>.ro_freq and <qubit>.ro_pulse_amp parameters.
-        Intended to be used in the "SSRO Optimization" node of GBT.
-
-        Args:
-            start_freq (float):
-                Starting frequency of the optmizer.
-
-            start_amp (float):
-                Starting amplitude of the optimizer.
-
-            start_freq_step (float):
-                Starting frequency step of the optmizer.
-
-            start_amp_step (float):
-                Starting amplitude step of the optimizer.
-
-            threshold (float):
-                Fidelity thershold after which the optimizer stops iterating.
-        '''
-
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        if nested_MC is None:
-            nested_MC = self.instr_nested_MC.get_instr()
-
-        if start_freq_step is None:
-            if start_freq is None:
-                start_freq = self.ro_freq()
-                start_freq_step = 0.1e6
-            else:
-                raise ValueError('Must provide start frequency step if start\
-                                frequency is specified.')
-
-        if start_amp_step is None:
-            if start_amp is None:
-                start_amp = self.ro_pulse_amp()
-                start_amp_step = 0.01
-            else:
-                raise ValueError('Must provide start amplitude step if start\
-                                amplitude is specified.')
-
-        if start_amp is None:
-            start_amp = self.ro_pulse_amp()
-
-        nested_MC.set_sweep_functions([self.ro_freq, self.ro_pulse_amp])
-
-        d = det.Function_Detector(self.calibrate_optimal_weights,
-                                  result_keys=['F_a'],
-                                  value_names=['F_a'],
-                                  value_units=['a.u.'])
-        nested_MC.set_detector_function(d)
-
-        ad_func_pars = {'adaptive_function': nelder_mead,
-                        'x0': [self.ro_freq(), self.ro_pulse_amp()],
-                        'initial_step': [start_freq_step, start_amp_step],
-                        'no_improv_break': 10,
-                        'minimize': False,
-                        'maxiter': 20,
-                        'f_termination': threshold}
-        nested_MC.set_adaptive_function_parameters(ad_func_pars)
-
-        nested_MC.set_optimization_method('nelder_mead')
-        nested_MC.run(name='RO_fine_tuneup', mode='adaptive')
-
-        if analyze is True:
-            ma.OptimizationAnalysis(label='RO_fine_tuneup')
-            return True
-
     def measure_ssro_vs_frequency_amplitude(
             self, freqs=None, amps_rel=np.linspace(0, 1, 11),
             nr_shots=4092*4, nested_MC=None, analyze=True,
@@ -3702,62 +3953,6 @@ class CCLight_Transmon(Qubit):
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
-    def calibrate_ro_acq_delay(self, MC=None,
-                               analyze: bool = True,
-                               prepare: bool = True,
-                               disable_metadata: bool = False):
-        """
-        Calibrates the ro_acq_delay parameter for the readout.
-        For that it analyzes the transients.
-
-        """
-
-        self.ro_acq_delay(0)  # set delay to zero
-        old_pow = self.ro_pulse_amp()
-        self.ro_pulse_amp(0.5)
-
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-        # if plot_max_time is None:
-        #     plot_max_time = self.ro_acq_integration_length()+250e-9
-
-        if prepare:
-            self.prepare_for_timedomain()
-            p = sqo.off_on(
-                qubit_idx=self.cfg_qubit_nr(), pulse_comb='off',
-                initialize=False,
-                platf_cfg=self.cfg_openql_platform_fn())
-            self.instr_CC.get_instr().eqasm_program(p.filename)
-        else:
-            p = None  # object needs to exist for the openql_sweep to work
-
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name='Transient time', unit='s',
-                             upload=prepare)
-        MC.set_sweep_function(s)
-
-        if 'UHFQC' in self.instr_acquisition():
-            sampling_rate = 1.8e9
-        else:
-            raise NotImplementedError()
-
-        MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) /
-                            sampling_rate)
-        MC.set_detector_function(self.input_average_detector)
-        MC.run(name='Measure_Acq_Delay_{}'.format(self.msmt_suffix),
-               disable_snapshot_metadata=disable_metadata)
-
-        self.ro_pulse_amp(old_pow)
-
-        if analyze:
-            a = ma2.RO_acquisition_delayAnalysis(qubit_name=self.name)
-            # Delay time is averaged over the two quadratures.
-            delay_time = (a.proc_data_dict['I_pulse_start'] +
-                          a.proc_data_dict['Q_pulse_start'])/2
-            self.ro_acq_delay(delay_time)
-            return True
-
     def measure_dispersive_shift_pulsed(self, freqs=None, MC=None, analyze: bool = True,
                                         prepare: bool = True):
         """
@@ -3831,96 +4026,6 @@ class CCLight_Transmon(Qubit):
                 a.qoi['dispersive_shift']*1e-6))
 
             return True
-
-    def calibrate_optimal_weights(self, MC=None, verify: bool = True,
-                                  analyze: bool = True, update: bool = True,
-                                  no_figs: bool = False,
-                                  optimal_IQ: bool = False,
-                                  measure_transients_CCL_switched: bool = False,
-                                  prepare: bool = True,
-                                  disable_metadata: bool = False,
-                                  nr_shots_per_case: int = 2**13,
-                                  post_select: bool = False,
-                                  averages: int = 2**15,
-                                  post_select_threshold: float = None,
-                                  )->bool:
-        """
-        Measures readout transients for the qubit in ground and excited state to indicate
-        at what times the transients differ. Based on the transients calculates weights
-        that are used to  weigh measuremet traces to maximize the SNR.
-
-        Args:
-            optimal_IQ (bool):
-                if set to True sets both the I and Q weights of the optimal
-                weight functions for the verification experiment.
-                A good sanity check is that when using optimal IQ one expects
-                to see no signal in the  Q quadrature of the verification
-                SSRO experiment.
-            verify (bool):
-                indicates whether to run measure_ssro at the end of the routine
-                to find the new SNR and readout fidelities with optimized weights
-
-            update (bool):
-                specifies whether to update the weights in the qubit object
-        """
-        log.info('Calibrating optimal weights for {}'.format(self.name))
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-        if prepare:
-            self.prepare_for_timedomain()
-
-        # Ensure that enough averages are used to get accurate weights
-        old_avg = self.ro_acq_averages()
-
-        self.ro_acq_averages(averages)
-        if measure_transients_CCL_switched:
-            transients = self.measure_transients_CCL_switched(MC=MC,
-                                                              analyze=analyze,
-                                                              depletion_analysis=False)
-        else:
-            transients = self.measure_transients(MC=MC, analyze=analyze,
-                                                 depletion_analysis=False,
-                                                 disable_metadata=disable_metadata)
-        if analyze:
-            ma.Input_average_analysis(IF=self.ro_freq_mod())
-
-        self.ro_acq_averages(old_avg)
-        # deskewing the input signal
-
-        # Calculate optimal weights
-        optimized_weights_I = (transients[1][0] - transients[0][0])
-        optimized_weights_Q = (transients[1][1] - transients[0][1])
-        # joint rescaling to +/-1 Volt
-        maxI = np.max(np.abs(optimized_weights_I))
-        maxQ = np.max(np.abs(optimized_weights_Q))
-        # fixme: deviding the weight functions by four to not have overflow in
-        # thresholding of the UHFQC
-        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
-        optimized_weights_I = np.array(
-            weight_scale_factor*optimized_weights_I)
-        optimized_weights_Q = np.array(
-            weight_scale_factor*optimized_weights_Q)
-
-        if update:
-            self.ro_acq_weight_func_I(optimized_weights_I)
-            self.ro_acq_weight_func_Q(optimized_weights_Q)
-            if optimal_IQ:
-                self.ro_acq_weight_type('optimal IQ')
-            else:
-                self.ro_acq_weight_type('optimal')
-            if verify:
-                self._prep_ro_integration_weights()
-                self._prep_ro_instantiate_detectors()
-                ssro_dict = self.measure_ssro(
-                    no_figs=no_figs, update=update,
-                    prepare=True, disable_metadata=disable_metadata,
-                    nr_shots_per_case=nr_shots_per_case,
-                    post_select=post_select,
-                    post_select_threshold=post_select_threshold)
-                return ssro_dict
-        if verify:
-            warnings.warn('Not verifying as settings were not updated.')
-        return True
 
     def measure_rabi(self, MC=None, amps=np.linspace(0, 1, 31),
                      analyze=True, close_fig=True, real_imag=True,
@@ -4068,6 +4173,39 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
+
+    def allxy_GBT(self, MC=None,
+                  label: str = '',
+                  analyze=True, close_fig=True,
+                  prepare_for_timedomain=True,termination_opt=0.04):
+        '''#
+        This function is the same as measure AllXY, but with a termination limit
+        This termination limit is as a system metric to evalulate the calibration
+        by GBT if good or not.
+        '''
+        old_avg = self.ro_soft_avg()
+        self.ro_soft_avg(4)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.AllXY(qubit_idx=self.cfg_qubit_nr(), double_points=True,
+                      platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(42))
+        MC.set_detector_function(d)
+        MC.run('AllXY'+label+self.msmt_suffix)
+        self.ro_soft_avg(old_avg)
+        a = ma.AllXY_Analysis(close_main_fig=close_fig)
+        if a.deviation_total > termination_opt:
+            return False
+        else:
+            return True
+
+
 
     def calibrate_mw_gates_restless(
             self, MC=None,
@@ -4226,7 +4364,7 @@ class CCLight_Transmon(Qubit):
             ad_func_pars = {'adaptive_function': nelder_mead,
                             'x0': initial_values,
                             'initial_step': initial_steps,
-                            'no_improv_break': 50,
+                            'no_improv_break': 10,
                             'minimize': minimize,
                             'maxiter': 1500}
 
@@ -4252,6 +4390,7 @@ class CCLight_Transmon(Qubit):
                 #     We are varying the LO frequency in the opt, not the q freq.
                 #     self.freq_qubit(opt_par_values[freq_idx] +
                 #                     self.mw_freq_mod.get())
+        return True
 
     def calibrate_mw_gates_allxy(self, nested_MC=None,
                                  start_values=None,
@@ -4318,7 +4457,7 @@ class CCLight_Transmon(Qubit):
                                   start_values=None,
                                   initial_steps=None, f_termination=0.01):
         '''
-        FIXME! Merge both calibrate allxy methods. 
+        FIXME! Merge both calibrate allxy methods.
         Optimizes ALLXY sequency by tunning 2 parameters:
         mw_channel_amp and mw_motzoi.
 
@@ -5009,6 +5148,18 @@ class CCLight_Transmon(Qubit):
             print('Pulse amplitude changed from {:.3f} to {:.3f}'.format(
                 amp_old, scale_factor*amp_old))
         return a
+
+    def flipping_GBT(self, nr_sequence: int = 2):
+        '''
+        This function is to measure flipping sequence for whaterver nr_of times
+        a function needs to be run to calibrate the Pi and Pi/2 Pulse.
+        Right now this method will always return true no matter what
+        Later we can add a conidition as a check.
+        '''
+        for i in range(nr_sequence):
+            self.measure_flipping(update=True)
+        # we can add a condition later
+        return True
 
     def measure_motzoi(self, motzoi_amps=None,
                        prepare_for_timedomain: bool = True,

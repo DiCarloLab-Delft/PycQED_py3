@@ -60,6 +60,7 @@ An example of `ast` in action
 https://stackoverflow.com/questions/46388130/insert-a-node-into-an-abstract-syntax-tree
 
 === NBs: ===
+- Don't import QtPlot before this file
 - Namespaces can screw you up easily
 - Order of imports matters!
 - Reloading QtPlot will likely break this
@@ -70,13 +71,28 @@ Happy monkey patching!
 import ast
 import inspect
 
-# Do not import anything else from qcodes, it breaks this code
-from . import qcodes_QtPlot_colors_override
+# Do not import anything else from qcodes before this, it breaks this code
+
+# Patch the color scales
+
+# The line below is the naive way of doing it but will not work consistenly
+# qcodes.plots.colors.colorscales = qcodes_QtPlot_colors_override.colorscales
+
+from pycqed.measurement import qcodes_QtPlot_colors_override as qc_cols_override
 import qcodes.plots.colors
 
-# # Patch the color scales
-# # NB: KEEP THIS ABOVE QtPlot import THE REST OF THE CODE!
-qcodes.plots.colors.colorscales = qcodes_QtPlot_colors_override.colorscales
+str_colorscales = "colorscales = " + repr(qc_cols_override.colorscales)
+str_colorscales_raw = "colorscales_raw = " + repr(qc_cols_override.colorscales_raw)
+
+parsed_colorscales = ast.parse(str_colorscales)
+parsed_colorscales_raw = ast.parse(str_colorscales_raw)
+
+co = compile(parsed_colorscales, "<string>", "exec")
+exec(co, qcodes.plots.colors.__dict__)
+co = compile(parsed_colorscales_raw, "<string>", "exec")
+exec(co, qcodes.plots.colors.__dict__)
+
+
 
 # Below: patch the QtPlot method to allow for setting a fixed color scale range
 
