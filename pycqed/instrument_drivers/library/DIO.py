@@ -132,6 +132,7 @@ _control_modes = {
     }
 }
 
+
 def get_shift_and_mask(dio_mode: str, channels: List[int]) -> Tuple[int, int]:
     # extract information for dio_mode from _control_modes
     control_mode = _control_modes.get(dio_mode)
