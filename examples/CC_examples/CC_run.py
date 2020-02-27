@@ -31,9 +31,7 @@ log.setLevel(logging.DEBUG)
 
 log.debug('connecting to CC')
 cc = CC('cc', IPTransport(ip))
-cc.reset()
-cc.clear_status()
-cc.status_preset()
+cc.init()
 
 if 0:
     cc.debug_marker_out(0, cc.UHFQA_TRIG) # UHF-QA trigger
@@ -43,10 +41,7 @@ log.debug(f'uploading {filename}')
 with open(filename, 'r') as f:
     prog = f.read()
 cc.sequence_program_assemble(prog)
-
-err_cnt = cc.get_system_error_count()
-for i in range(err_cnt):
-    print(cc.get_error())
+cc.check_errors()
 
 log.debug('starting CC')
 cc.start()

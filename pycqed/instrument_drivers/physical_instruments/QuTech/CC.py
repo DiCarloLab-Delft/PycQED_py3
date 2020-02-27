@@ -157,7 +157,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     def _eqasm_program(self, file_name: str) -> None:
         with open(file_name, 'r') as f:
             prog = f.read()
-        self.sequence_program_assemble(prog)
+        self.assemble(prog)
 
     # helper for parameter 'vsm_channel_delay{}'
     # NB: CC-light range max = 127*2.5 ns = 317.5 ns, our fine delay range is 48/1200 MHz = 40 ns, so we must also shift program

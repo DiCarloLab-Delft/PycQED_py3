@@ -24,6 +24,8 @@ log = logging.getLogger(__name__)
 
 class CCCore(SCPIBase):
 
+    MAX_PROG_STR_LEN = 10*1024*1024-1024  # size of CC input buffer, minus some room for command
+
     ##########################################################################
     # 'public' functions for the end user
     ##########################################################################
@@ -38,7 +40,7 @@ class CCCore(SCPIBase):
     ##########################################################################
 
     def assemble(self, program_string: str) -> None:
-        self.sequence_program_assemble(program_string)
+        self.sequence_program_assemble(program_string)  # NB: takes ~1.1 s for RB with 2048 Cliffords (1 measurement only)
         if self.get_assembler_success() != 1:
             sys.stderr.write('error log = {}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
             raise RuntimeError('assembly failed')
@@ -59,6 +61,10 @@ class CCCore(SCPIBase):
         """
         upload sequence program string
         """
+        # check size, because overrunning gives irrecoverable errors. FIXME: move to Transport
+        if len(program_string) > self.MAX_PROG_STR_LEN:
+            raise RuntimeError('source program size {len(program_string)} exceeds maximum of {self.MAX_PROG_STR_LEN}')
+
         hdr = 'QUTech:SEQuence:PROGram:ASSEMble ' # NB: include space as separator for binblock parameter
         bin_block = program_string.encode('ascii')
         self.bin_block_write(bin_block, hdr)
