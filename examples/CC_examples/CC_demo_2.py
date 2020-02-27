@@ -1,7 +1,5 @@
 #!/usr/bin/python
 
-### setup logging before all imports (before any logging is done as to prevent a default root logger)
-
 ### imports
 import sys
 import os

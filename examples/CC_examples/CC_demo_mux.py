@@ -2,6 +2,7 @@
 # Based on: http://localhost:8888/notebooks/personal_folders/Miguel/qec_lut_demo.ipynb
 
 ### setup logging before all imports (before any logging is done as to prevent a default root logger)
+import CC_logging
 
 import logging
 import sys
@@ -68,18 +69,19 @@ else: # inspired by calibrate, but with CC program to trigger UHFQA
 
     log.debug('sending UHFQA trigger program to CC')
     cc.debug_marker_out(cc_port_uhfqa0, cc.UHFQA_DV)  # watch DV to check period/frequency
+    # FIXME: prog below must be left aligned, but we get no warning if not
     prog = """
-    # depends on HW configuration
-    .DEF    duration    9
-    .DEF    wait        100
-    # slot 2: UHFQA
-    [0]loop:    seq_out     0x00010000,$duration      # trigger UHFQA
-    [0]         seq_out     0x0,$wait
-    [0]         jmp         @loop
-    [0]         stop
-    # slot 3: observe
-    [3]loop:    jmp         @loop
-    """
+# depends on HW configuration
+.DEF    duration    9
+.DEF    wait        100
+# slot 2: UHFQA
+[2]loop:    seq_out     0x00010000,$duration      # trigger UHFQA
+[2]         seq_out     0x0,$wait
+[2]         jmp         @loop
+[2]         stop
+# slot 3: observe
+[3]loop:    jmp         @loop
+"""
     cc.assemble_and_start(prog)
     dio_mask = 0x00000CFF
     expected_sequence = []
@@ -132,27 +134,33 @@ if 1:
 if 1:
     log.debug('upload CC feedback test program')
     prog = """
-    .DEF    duration    9
-    .DEF    wait        100
-    .DEF    smAddr      S16
-    .DEF    lut         0
-    .DEF    numIter     4
-    # slot 0: UHFQA
-    [0]         move        $numIter,R0
-    [0]loop:    seq_out     0x00010000,$duration      # UHFQA measurement
-    [0]         seq_in_sm   $smAddr,$lut,0
-    [0]         seq_sw_sm   $smAddr
-    [0]         seq_out     0x0,$wait
-    [0]         loop        R0,@loop
-    [0]         stop
-    # slot 1-4: observe
-    [1]loop:    jmp         @loop
-    [2]loop:    jmp         @loop
-    [3]loop:    jmp         @loop
-    [4]loop:    jmp         @loop
-    """
+.DEF    duration    9
+.DEF    wait        100
+.DEF    smAddr      S16
+.DEF    lut         0
+.DEF    numIter     4
+# slot 2: UHFQA
+[2]         move        $numIter,R0
+[2]loop:    seq_out     0x00010000,$duration      # UHFQA measurement
+[2]         seq_in_sm   $smAddr,$lut,0
+[2]         seq_sw_sm   $smAddr
+[2]         seq_out     0x0,$wait
+[2]         loop        R0,@loop
+[2]         stop
+# slot 3: observe
+#[1]loop:    jmp         @loop
+#[2]loop:    jmp         @loop
+[3]loop:    jmp         @loop
+#[4]loop:    jmp         @loop
+"""
     cc.debug_marker_out(cc_port_uhfqa0, cc.UHFQA_TRIG)
     cc.assemble_and_start(prog)
-    log.debug('finished')
 
+if 0:
+    log.debug('test: reading CCIO registers')
+    ccio = 2
+    for i in range(21):
+        log.debug(f"ccio[{ccio}]reg[{i}] = {cc.debug_get_ccio_reg(ccio, i)}")
+    cc.check_errors()
 
+log.debug('finished')

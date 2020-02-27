@@ -208,7 +208,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
         self._default_waveform_length = 32
 
         t1 = time.time()
-        log.info(f'{self.devname}: Initialized UHFQC in {t1 - t0}s')
+        log.info(f'{self.devname}: Initialized UHFQC in {t1 - t0:.3f}s')
 
     ##########################################################################
     # 'public' overrides for ZI_base_instrument

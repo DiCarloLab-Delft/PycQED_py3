@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 
 class CCCore(SCPIBase):
 
-    MAX_PROG_STR_LEN = 10*1024*1024-1024  # size of CC input buffer, minus some room for command
+    MAX_PROG_STR_LEN = 40*1024*1024-1024  # size of CC input buffer, minus some room for command. FIXME: get from instrument
 
     ##########################################################################
     # 'public' functions for the end user
@@ -106,6 +106,9 @@ class CCCore(SCPIBase):
 
     def debug_marker_out(self, ccio: int, bit: int) -> None:
         self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:MARKER:OUT {bit}')
+
+    def debug_get_ccio_reg(self, ccio: int, reg: int) -> int:
+        self._ask_int(f'QUTech:DEBUG:CCIO{ccio}:REG{reg}?')
 
     def start(self) -> None:
         self._transport.write('awgcontrol:run:immediate')
