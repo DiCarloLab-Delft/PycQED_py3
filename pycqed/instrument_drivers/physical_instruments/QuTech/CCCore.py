@@ -26,6 +26,12 @@ class CCCore(SCPIBase):
 
     MAX_PROG_STR_LEN = 40*1024*1024-1024  # size of CC input buffer, minus some room for command. FIXME: get from instrument
 
+    # trace units
+    TRACE_CCIO_DEV_IN = 0
+    TRACE_CCIO_DEV_OUT = 1
+    TRACE_CCIO_BP_IN = 2
+    TRACE_CCIO_BP_OUT = 3
+
     ##########################################################################
     # 'public' functions for the end user
     ##########################################################################
@@ -108,7 +114,10 @@ class CCCore(SCPIBase):
         self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:MARKER:OUT {bit}')
 
     def debug_get_ccio_reg(self, ccio: int, reg: int) -> int:
-        self._ask_int(f'QUTech:DEBUG:CCIO{ccio}:REG{reg}?')
+        return self._ask_int(f'QUTech:DEBUG:CCIO{ccio}:REG{reg}?')
+
+    def debug_set_ccio_trace_on(self, ccio: int, tu_idx: int) -> None:
+        self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:TRACE{tu_idx}:ON')
 
     def start(self) -> None:
         self._transport.write('awgcontrol:run:immediate')
