@@ -417,7 +417,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     ##########################################################################
 
     def reset_acquisition_params(self):
-        log.info('Setting user registers to 0')
+        log.info(f'{self.devname}: Setting user registers to 0')
         for i in range(16):
             self.set('awgs_0_userregs_{}'.format(i), 0)
 
@@ -1013,7 +1013,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                 'Trying to set DIO calibration delay to invalid value! Expected value in range 0 to 15. Got {}.'.format(
                     value))
 
-        log.info('Setting DIO calibration delay to {}'.format(value))
+        log.info(f"{self.devname}: Setting DIO calibration delay to {value}")
         # Store the value
         self._dio_calibration_delay = value
 
@@ -1499,14 +1499,14 @@ setTrigger(0);
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
-        log.debug(f"Testing DIO activity for AWG {awg_nr}")
+        log.debug(f"{self.devname}: Testing DIO activity for AWG {awg_nr}")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
 
-        cw_mask = mask_value << 17
+        cw_mask = mask_value  # FIXME: changed parameter to define mask that's already shifted in place << 17
 
         for i in range(timeout):
             valid = True
@@ -1524,15 +1524,15 @@ setTrigger(0);
                 strb_activity |= (d & strb_mask)
 
             if cw_activity != cw_mask:
-                log.warning(f"Did not see all codeword bits toggle! Got 0x{cw_activity:08x}, expected 0x{cw_mask:08x}.")
+                log.warning(f"{self.devname}: Did not see all codeword bits toggle! Got 0x{cw_activity:08x}, expected 0x{cw_mask:08x}.")
                 valid = False
 
             if vld_polarity != 0 and vld_activity != vld_mask:
-                log.warning("Did not see valid bit toggle!")
+                log.warning("{self.devname}: Did not see valid bit toggle!")
                 valid = False
 
             if strb_slope != 0 and strb_activity != strb_mask:
-                log.warning("Did not see strobe bit toggle!")
+                log.warning("{self.devname}: Did not see strobe bit toggle!")
                 valid = False
 
             if valid:
@@ -1553,7 +1553,7 @@ setTrigger(0);
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
-        log.debug(" Finding valid delays")
+        log.debug("{self.devname}:  Finding valid delays")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
@@ -1567,11 +1567,11 @@ setTrigger(0);
             combined_mask |= vld_mask
         if strb_slope != 0:
             combined_mask |= strb_mask
-        log.debug(f"  Using a mask value of 0x{combined_mask:08x}")
+        log.debug(f"{self.devname}:   Using a mask value of 0x{combined_mask:08x}")
 
         valid_delays= []
         for delay in range(16):
-            log.debug(f'   Testing delay {delay}')
+            log.debug(f'{self.devname}:    Testing delay {delay}')
             self.setd('raw/dios/0/delay', delay)
             time.sleep(1)
             valid_sequence = True
@@ -1627,8 +1627,8 @@ setTrigger(0);
             min_valid_delay = min_valid_delay + 1
 
         # Print information
-        log.info(f"Valid delays are {valid_delays}")
-        log.info(f"Setting delay to {min_valid_delay}")
+        log.info(f"{self.devname}: Valid delays are {valid_delays}")
+        log.info(f"{self.devname}: Setting delay to {min_valid_delay}")
 
         # And configure the delays
         self._set_dio_calibration_delay(min_valid_delay)
