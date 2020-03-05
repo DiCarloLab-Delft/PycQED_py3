@@ -17,8 +17,8 @@ class CalInterface(ABC):
             port: the port on which to generate the data (other ports are also ALLOWED to produce data)
 
         Returns:
-            dio_mask: mask defining bits that are actually toggled. On certain architectures this may be a subset of
-            the bits used by dio_mode
+            dio_mask: mask defining bits that are actually toggled (codeword, trigger, toggle). On certain architectures
+            this may be a subset of the bits used by dio_mode
             expected_sequence: list, may be empty
         """
         pass
@@ -29,8 +29,8 @@ class CalInterface(ABC):
         calibrate DIO protocol timing. Requires valid input signal on bits defined by dio_mask
 
         Args:
-            dio_mask: mask defining bits that are actually toggled. On certain architectures this may be a subset of
-            the bits used by dio_mode
+            dio_mask: mask defining bits that are actually toggled (codeword, trigger, toggle). On certain architectures
+            this may be a subset of the bits used by dio_mode
             expected_sequence: list, may be empty
             port: the port on which to receive the data
 

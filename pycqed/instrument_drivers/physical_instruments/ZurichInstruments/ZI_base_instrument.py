@@ -656,6 +656,7 @@ class ZI_base_instrument(Instrument):
         # add qcodes parameters based on JSON parameter file
         # FIXME: we might want to skip/remove/(add  to _params_to_skip_update) entries like AWGS/*/ELF/DATA,
         #       AWGS/*/SEQUENCER/ASSEMBLY, AWGS/*/DIO/DATA
+        # FIXME: there is no check whether the parameter file matches our firmware version
         filename = os.path.join(os.path.dirname(os.path.abspath(
             __file__)), 'zi_parameter_files', 'node_doc_{}.json'.format(self.devtype))
         if not os.path.isfile(filename):

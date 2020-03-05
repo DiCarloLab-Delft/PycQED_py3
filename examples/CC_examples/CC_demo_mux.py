@@ -27,6 +27,7 @@ cc_slot_uhfqa0 = 2
 # FIXME: CCIO register offsets
 SYS_ST_QUES_DIOCAL_COND = 18
 SYS_ST_OPER_DIO_RD_INDEX = 19
+SYS_ST_OPER_DIO_MARGIN = 20
 
 
 
@@ -63,18 +64,23 @@ if 1:   # DIO calibration
                 receiver_port=cc_slot_uhfqa0
             )
         else: # inspired by calibrate, but with CC program to trigger UHFQA
-            log.debug('sending triggered DIO test program to UHFQA')
+            log.debug('sending triggered upstream DIO calibration program to UHFQA')
             program = inspect.cleandoc("""
-            var A = 0x00000CFF; // DV=0x0001, RSLT[8:0]=0x0CF7
+            // triggered upstream DIO calibration program
+            var A = 0x000003FF; // DV=0x0001, RSLT[8:0]=0x03FE
             var B = 0x00000000;
         
             while (1) {
                 waitDIOTrigger();
                 setDIO(A);
-                wait(2);
+                //wait(2);    // documentation: 4.44 ns periods, measured high time 14.8...15.6 ns, depending on trigger rate
+                wait(3);        // ~18 ns high time
                 setDIO(B);
             }
             """)
+
+            uhfqa0.dios_0_mode(uhfqa0.DIOS_0_MODE_AWG_SEQ) # FIXME
+
             uhfqa0.configure_awg_from_string(0, program)
             uhfqa0.seti('awgs/0/enable', 1)
             uhfqa0.start()  # FIXME?
@@ -83,22 +89,26 @@ if 1:   # DIO calibration
             log.debug('sending UHFQA trigger program to CC')
             prog = inspect.cleandoc("""
             # UHFQA trigger program
-            .DEF    duration    9
-            .DEF    wait        100
-            loop:   seq_out     0x00010000,$duration      # trigger UHFQA
+            .DEF    duration    1
+            .DEF    wait        9
+            loop:   seq_out     0x03FF0000,$duration      # NB: TRIG=0x00010000, CW[8:0]=0x03FE0000
                     seq_out     0x0,$wait
                     jmp         @loop
             """)
             cc.assemble_and_start(prog)
-            dio_mask = 0x00000CFF
+            dio_mask = 0x000003FF
             expected_sequence = []
 
             log.debug('calibrating DIO protocol on CC')
-            cc.debug_marker_out(cc_slot_uhfqa0, cc.UHFQA_DV)  # watch DV to check period/frequency
-            #cc.debug_marker_out(cc_slot_uhfqa0, cc.UHFQA_TRIG)  # watch TRIG to check period/frequency
+            if 1:
+                cc.debug_marker_in(cc_slot_uhfqa0, cc.UHFQA_DV)  # watch DV to check upstream period/frequency
+            else:
+                cc.debug_marker_out(cc_slot_uhfqa0, cc.UHFQA_TRIG)  # watch TRIG to check downstream period/frequency
             cc.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=cc_slot_uhfqa0)
-            log.info(f'DIO calibration condition = {cc.debug_get_ccio_reg(cc_slot_uhfqa0, SYS_ST_QUES_DIOCAL_COND)} (0=OK)')
+            log.info(f'DIO calibration condition = 0x{cc.debug_get_ccio_reg(cc_slot_uhfqa0, SYS_ST_QUES_DIOCAL_COND):x} (0=OK)')
             log.info(f'DIO read index = {cc.debug_get_ccio_reg(cc_slot_uhfqa0, SYS_ST_OPER_DIO_RD_INDEX)}')
+            log.info(f'DIO margin = {cc.debug_get_ccio_reg(cc_slot_uhfqa0, SYS_ST_OPER_DIO_MARGIN)}')
+
             if 0:  # allow scope measurements
                 cc.stop()
                 uhfqa0.stop()
