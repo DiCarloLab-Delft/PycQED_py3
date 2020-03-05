@@ -106,11 +106,11 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
 
     nr_clocks = int(spec_pulse_length/20e-9)
     print('Adding {} [ns] to spec seq'.format(wait_time_ns))
-    if cc == 'CCL':
+    if cc.upper() == 'CCL':
         spec_instr = 'spec'
-    elif cc == 'QCC':
+    elif cc.upper() == 'QCC':
         spec_instr = 'sf_square'
-    elif cc == 'CC':
+    elif cc.upper() == 'CC':
         spec_instr = 'spec'
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
