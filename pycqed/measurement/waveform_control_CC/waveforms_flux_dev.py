@@ -78,7 +78,7 @@ def victor_waveform(
     amps_q_phase_correction = np.full(int(half_time_q_ph_corr / dt), amp_q_ph_corr)
     half_NZ_amps = np.insert(half_NZ_amps, insert_idx, amps_q_phase_correction)
 
-    amp = np.concatenate((np.flip(half_NZ_amps), -half_NZ_amps[1:]))
+    amp = np.concatenate((np.flip(half_NZ_amps, 0), -half_NZ_amps[1:]))
     # Extra points for starting and finishing at the sweetspot
     if force_start_end_swtspt and amp[0] != 0.0:
         amp = np.concatenate(([amp_at_sweetspot], amp, [amp_at_sweetspot]))

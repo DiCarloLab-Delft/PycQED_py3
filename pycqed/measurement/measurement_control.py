@@ -60,11 +60,16 @@ except:
 try:
     import PyQt5
 
-    # The line below is necessary for the plotmon_2D to be able to set
-    # colorscales from qcodes_QtPlot_colors_override.py and be able to set the
+    # For reference:
+    # from pycqed.measurement import qcodes_QtPlot_monkey_patching
+    # The line above was (and still is but keep rading) necessary
+    # for the plotmon_2D to be able to set colorscales from
+    # `qcodes_QtPlot_colors_override.py` and be able to set the
     # colorbar range when the plots are created
-    # See also MC.plotmon_2D_cmaps, MC.plotmon_2D_zranges below
-    from . import qcodes_QtPlot_monkey_patching  # KEEP ABOVE QtPlot import!!!
+    # See also `MC.plotmon_2D_cmaps`, `MC.plotmon_2D_zranges` below
+    # That line was moved into the `__init__.py` of pycqed so that
+    # `QtPlot` can be imported from qcodes with all the modifications
+
     from qcodes.plots.pyqtgraph import QtPlot, TransformState
 except Exception:
     print(
@@ -805,6 +810,7 @@ class MeasurementControl(Instrument):
         if self.main_QtPlot.traces != []:
             self.main_QtPlot.clear()
         self.curves = []
+        self.curves_mv_thresh = []
         xlabels = self.sweep_par_names
         xunits = self.sweep_par_units
         ylabels = self.detector_function.value_names
@@ -851,6 +857,22 @@ class MeasurementControl(Instrument):
                     **kw
                 )
                 self.curves.append(self.main_QtPlot.traces[-1])
+
+                if self.is_Learner_Minimizer and yi == 0:
+                    self.main_QtPlot.add(
+                        x=[0],
+                        y=[0],
+                        xlabel=xlab,
+                        xunit=xunits[xi],
+                        ylabel=ylab,
+                        yunit=yunits[yi],
+                        subplot=j + 1,
+                        color=color_cycle[3],
+                        symbol="s",
+                        symbolSize=3,
+                    )
+                    self.curves_mv_thresh.append(self.main_QtPlot.traces[-1])
+
                 j += 1
             self.main_QtPlot.win.nextRow()
 
@@ -904,6 +926,28 @@ class MeasurementControl(Instrument):
                             self.curves[i]["config"]["x"] = x
                             self.curves[i]["config"]["y"] = y
                             i += 1
+                            if self.is_Learner_Minimizer and y_ind == 0:
+                                min_x = np.min(x)
+                                max_x = np.max(x)
+                                threshold = (
+                                    self.learner.moving_threshold
+                                    if self.learner.threshold is None
+                                    else self.learner.threshold
+                                )
+                                if threshold < np.inf:
+                                    threshold = (
+                                        threshold
+                                        if self.minimize_optimization
+                                        else -threshold
+                                    )
+                                    self.curves_mv_thresh[x_ind]["config"]["x"] = [
+                                        min_x,
+                                        max_x,
+                                    ]
+                                    self.curves_mv_thresh[x_ind]["config"]["y"] = [
+                                        threshold,
+                                        threshold,
+                                    ]
                     self._mon_upd_time = time.time()
                     self.main_QtPlot.update_plot()
             except Exception as e:
@@ -1241,8 +1285,8 @@ class MeasurementControl(Instrument):
                         name="Thresh max priority pnts",
                         xlabel="iteration",
                         subplot=xlabels_num + j + 1 + iter_start_idx,
-                        symbol="o",
-                        symbolSize=5,
+                        symbol="s",
+                        symbolSize=3,
                         color=color_cycle[3],
                     )
                     self.iter_mv_threshold = iter_plotmon.traces[-1]
@@ -2249,6 +2293,9 @@ class MeasurementControl(Instrument):
         zrange = None
         cmaps = self.plotmon_2D_cmaps
         zranges = self.plotmon_2D_zranges
+
+        # WARNING!!! If this ever gives problems see `__init__.py` in `pycqed`
+        # module folder
 
         if cmaps and zlabel in cmaps.keys():
             cmap = cmaps[zlabel]

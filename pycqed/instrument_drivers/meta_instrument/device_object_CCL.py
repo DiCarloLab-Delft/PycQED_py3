@@ -879,6 +879,7 @@ class DeviceCCL(Instrument):
             q2: int = None, q3: int = None,
             flux_codeword='cz',
             flux_codeword_park=None,
+            reduced_swp_points=False,
             prepare_for_timedomain=True, MC=None,
             CZ_disabled: bool = False,
             wait_time_ns: int = 0, label='',
@@ -953,7 +954,10 @@ class DeviceCCL(Instrument):
             q3idx = self.find_instrument(q3).cfg_qubit_nr()
 
         # These are hardcoded angles in the mw_lutman for the AWG8
-        angles = np.arange(0, 341, 20)
+        if reduced_swp_points:
+            angles = np.arange(0, 341, 40)
+        else:
+            angles = np.arange(0, 341, 20)
 
         p = mqo.conditional_oscillation_seq(
             q0idx, q1idx, q2idx, q3idx,
