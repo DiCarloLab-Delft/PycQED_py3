@@ -90,6 +90,11 @@ def is_subclass(obj, test_obj):
     """
     return isinstance(obj, type) and issubclass(obj, test_obj)
 
+def get_module_name(obj):
+    """
+    Get the lowest level module of `obj`
+    """
+    return obj.__module__.split('.')[-1]
 
 class MeasurementControl(Instrument):
 
@@ -379,9 +384,11 @@ class MeasurementControl(Instrument):
         self.adaptive_function = self.af_pars.pop("adaptive_function")
 
         # Used to update plots specific to this optimizer
-        self.is_Learner_Minimizer = is_subclass(
-            self.adaptive_function, Learner1D_Minimizer
-        ) or is_subclass(self.adaptive_function, LearnerND_Minimizer)
+        module_name = get_module_name(self.adaptive_function)
+        self.is_Learner_Minimizer = (
+            module_name == 'learner1D_minimizer' or
+            module_name == 'learnerND_minimizer'
+        )
 
         if self.live_plot_enabled():
             self.initialize_plot_monitor_adaptive()
