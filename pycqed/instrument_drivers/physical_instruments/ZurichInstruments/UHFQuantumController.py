@@ -1244,15 +1244,19 @@ setUserReg(4, err_cnt);"""
         self.cases(cases)
 
     def awg_sequence_acquisition_and_DIO_RED_test(
-            self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0,
-            dio_out_vect=None, timeout=5):
+            self,
+            acquisition_delay=0,
+            dio_out_vect=None):
         # FIXME: acquisition_delay is a misnomer
-        # FIXME: unused parameters
+        # FIXME: removed unused parameters: Iwaves, Qwaves, cases, timeout
         """
         USER_REG_WAIT_DLY value versus measured DIO pulse time:
             0   ~25 ns
             1   ~30 ns
             2   ~35 ns
+            Note that the official DIO pulse time is 20 ns, longer pulses can result in spurious triggers on the
+            Central Controller. CC-light/QCC use edge triggering and are thus insensitive, but do not adhere to
+            the protocol. If you like, I can explain why adhering to the protocol is a Good Thing.
         """
 
         # setting the acquisition delay samples
@@ -1566,8 +1570,7 @@ setTrigger(0);
 
     def _find_valid_delays(self, awg_nr, mask_value: int):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
-        configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
-        codewords are sampled incorrectly."""
+        configured bits."""
         log.debug("{self.devname}:  Finding valid delays")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
@@ -1575,9 +1578,7 @@ setTrigger(0);
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
         strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
 
-        cw_mask = mask_value << 17
-
-        combined_mask = cw_mask
+        combined_mask = mask_value
         if vld_polarity != 0:
             combined_mask |= vld_mask
         if strb_slope != 0:
@@ -1588,12 +1589,12 @@ setTrigger(0);
         for delay in range(16):
             log.debug(f'{self.devname}:    Testing delay {delay}')
             self.setd('raw/dios/0/delay', delay)
-            time.sleep(1)
+            time.sleep(0.5)  # FIXME: was 1.0, 0.3 gives erroneous results, 0.4 is OK
             valid_sequence = True
-            for awg in [0]:
-                error_timing = self.geti('raw/dios/0/error/timing')
-                if error_timing & combined_mask != 0:
-                    valid_sequence = False
+            error_timing = self.geti('raw/dios/0/error/timing')
+            log.debug(f"[{delay}] error_timing=0x{error_timing:x}, combined_mask=0x{combined_mask:x}")
+            if error_timing & combined_mask != 0:
+                valid_sequence = False
 
             if valid_sequence:
                 valid_delays.append(delay)
@@ -1626,7 +1627,7 @@ setTrigger(0);
         return dio_mask,expected_sequence
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
-        log.info(f"{self.devname}: Calibrating DIO protocol")
+        log.info(f"{self.devname}: Calibrating DIO protocol, dio_mask=0x{dio_mask:x}")
         self.assure_ext_clock()
 
         for awg in [0]:

@@ -48,7 +48,7 @@ class CCCore(SCPIBase):
     def assemble(self, program_string: str) -> None:
         self.sequence_program_assemble(program_string)  # NB: takes ~1.1 s for RB with 2048 Cliffords (1 measurement only)
         if self.get_assembler_success() != 1:
-            sys.stderr.write('error log = {}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
+            sys.stderr.write('assembly error log:\n{}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
             raise RuntimeError('assembly failed')
 
     def assemble_and_start(self, program_string: str) -> None:

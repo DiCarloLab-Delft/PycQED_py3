@@ -23,6 +23,7 @@ if len(sys.argv)>1:
 ip_cc = '192.168.0.241'
 dev_uhfqa = 'dev2271'
 cc_slot_uhfqa0 = 2
+cc_slot_awg = 3
 
 # FIXME: CCIO register offsets
 SYS_ST_QUES_DIOCAL_COND = 18
@@ -49,11 +50,14 @@ if 1:   # DIO calibration
     if 1:
         log.debug('calibration DIO: CC to UHFQA')
         DIO.calibrate(
-        sender=cc,
-        receiver=uhfqa0,
-        receiver_port=cc_slot_uhfqa0,
-        sender_dio_mode='uhfqa'
-    )
+            sender=cc,
+            receiver=uhfqa0,
+            receiver_port=cc_slot_uhfqa0,
+            sender_dio_mode='uhfqa'
+        )
+    if 1:
+        log.warning("Forcing DIO delay to fixed value (awaiting merge of optimal choice in driver)")
+        uhfqa0.setd('raw/dios/0/delay', 5)
 
     if 1:
         log.debug('calibration DIO: UHFQA to CC')
@@ -128,15 +132,12 @@ if 1:  # test of Distributed Shared Memory
         cw_list = [7, 6, 5, 4]
         cw_array = np.array(cw_list, dtype=int).flatten()
         uhfqa0.awg_sequence_acquisition_and_DIO_RED_test(
-            Iwaves=[np.ones(8), np.ones(8)],
-            Qwaves=[np.ones(8), np.ones(8)],
-            cases=[2, 5],
             dio_out_vect=cw_array * 2 + 1,  # shift codeword, add Data Valid
             acquisition_delay=20e-9) # FIXME: misnomer, overridden below by USER_REG_WAIT_DLY
 
-        # uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}", 2)    # high time ~35 ns, results in spurious trigger
-        # uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}", 1)    # high time ~30 ns
-        uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}", 0)  # high time ~25 ns
+        uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}", 2)    # high time ~35 ns, results in spurious trigger on CC
+        #uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}", 1)    # high time ~30 ns, results in spurious trigger on CC
+        #uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}", 0)  # high time ~25 ns, gives SEQ_IN_EMPTY on CC
 
         if 1:  # FIXME: remove duplicates of load_default_settings
             # Prepare AWG_Seq as driver of DIO and set DIO output direction
@@ -159,24 +160,31 @@ if 1:  # test of Distributed Shared Memory
     if 1:
         log.debug('upload CC feedback test program')
 
-        prog = inspect.cleandoc("""
+        # shorthand slot definitions for code generation
+        uhf = cc_slot_uhfqa0
+        awg = cc_slot_awg
+        prog = inspect.cleandoc(f"""
         # program:  CC feedback test program
+        .DEF    numIter     4
         .DEF    duration    100 #9
         .DEF    wait        100
         .DEF    smAddr      S16
         .DEF    lut         0
-        .DEF    numIter     4
         
+                
+                seq_bar     1                       # synchronize processors so markers make sense
                 move        $numIter,R0
-        loop:   seq_out     0x00010000,$duration      # UHFQA measurement
-                seq_in_sm   $smAddr,$lut,0
-                seq_sw_sm   $smAddr
+        loop:   seq_out     0x00010000,$duration    # trigger UHFQA
+        [{uhf}] seq_in_sm   $smAddr,$lut,0
+        [{uhf}] seq_sw_sm   $smAddr
+        [{awg}] seq_out     0,2                     # balance duration with UHF
                 seq_out     0x0,$wait
                 loop        R0,@loop
                 stop
         """)
 
         if 1:
+            cc.debug_marker_out(cc_slot_awg, cc.UHFQA_TRIG)  # watch TRIG, so we can see TRIG to DV latency (requires seq_bar)
             cc.debug_marker_in(cc_slot_uhfqa0, cc.UHFQA_DV)  # watch DV to check upstream period/frequency
         else:
             cc.debug_marker_out(cc_slot_uhfqa0, cc.UHFQA_TRIG)  # watch TRIG to check downstream period/frequency
