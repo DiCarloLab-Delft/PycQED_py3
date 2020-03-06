@@ -155,6 +155,7 @@ class TFD_Analysis_Pauli_Strings(ba.BaseDataAnalysis):
             'energy_terms': self.proc_data_dict['energy_terms']
         }
 
+
 def calc_tfd_hamiltonian(pauli_terms: dict, g: float = 1, T=1):
     """
     Calculate the thermal field double Hamiltonian expectation value.
@@ -242,11 +243,11 @@ def plot_all_pauli_ops(full_dict, ax=None, **kw):
     ax.set_ylim(-1.05, 1.05)
     ax.set_title('All pauli expectation values')
 
+############################################
+# Addition from 18-02-2020
+############################################
 
 
-############################################
-#Addition from 18-02-2020
-############################################
 def plot_expectation_values_TFD(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'],
                                 system_A_qubits=['X1', 'D3'],
                                 system_B_qubits=['D1', 'Z1'], bases = ['Z', 'X'],
@@ -374,6 +375,7 @@ class TFD_versus_temperature_analysis(ba.BaseDataAnalysis):
             'presentation_mode': True
         }
 
+
 def plot_TFD_versus_T(tomo_dict, operators=None, beta=False, ax=None, ax_dict=None, figsize=(10, 10), exact_dict=None, **kw):
     if ax is None:
         fig, ax = plt.subplots(len(operators), figsize=figsize)
@@ -411,6 +413,7 @@ def plot_TFD_versus_T(tomo_dict, operators=None, beta=False, ax=None, ax_dict=No
 Fidelity analysis functions added 02-25-2020
 """
 
+
 def operator(operator_string):
     """
     Inputs a string consisting of I, X, Y and Z characters
@@ -438,11 +441,13 @@ def operator(operator_string):
         full_operator=np.kron(full_operator,operator)
     return full_operator
 
+
 def vec2dm(vec):
     vec=vec.reshape(len(vec), 1)
     vec_transpose=vec.reshape(1, len(vec))
     rho = np.dot(vec,vec_transpose)
     return rho
+
 
 def vecs2mat(vec1,vec2):
     if len(vec1) != len(vec2):
@@ -451,6 +456,7 @@ def vecs2mat(vec1,vec2):
     vec2 = vec2.reshape(1, len(vec2))
     rho = np.dot(vec1,vec2)
     return rho
+
 
 def fidelity(rho_1, rho_2, trace_conserved = False):
     if trace_conserved:
@@ -463,11 +469,13 @@ def fidelity(rho_1, rho_2, trace_conserved = False):
     pos_eig = [vals for vals in eig_vals if vals > 0]
     return float(np.sum(np.real(np.sqrt(pos_eig))))**2
 
+
 def trace_distance(rho_1, rho_2):
     """
     To be constructed
     """
     return
+
 
 def tomo2dm(tomo_dict):
     num_qubits = len(list(tomo_dict.keys())[0])
@@ -476,6 +484,7 @@ def tomo2dm(tomo_dict):
     for op, value in tomo_dict.items():
         dm += value*operator(op)
     return dm
+
 
 class Hamiltonian:
     def __init__(self, hamiltonian=operator('ZZ')+operator('XI')+operator('IX')):
@@ -600,8 +609,7 @@ class Hamiltonian:
         return pauli_dict
 
 
-
-def plot_fidelities_versus_T(fid_dict, beta=False, ax=None, ax_dict=None, figsize=(10, 10), **kw):
+def plot_fidelities_versus_T(fid_dict, data_label=None, data_marker=None, data_color='black', beta=False, ax=None, ax_dict=None, figsize=(10, 10), **kw):
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
@@ -615,16 +623,17 @@ def plot_fidelities_versus_T(fid_dict, beta=False, ax=None, ax_dict=None, figsiz
     else:
         x_label = 'Temperature'
         x = list(fid_dict.keys())
-    ax.plot(x, list(fid_dict.values()), color='blue', label='Fidelity')
-    ax.scatter(x, list(fid_dict.values()), facecolor='blue')
+    ax.plot(x, list(fid_dict.values()), color=data_color)
+    ax.scatter(x, list(fid_dict.values()), marker=data_marker, facecolor=data_color, label=data_label)
     ax.set_xlabel(x_label)
     ax.set_ylabel('Fidelity')
     ax.legend()
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0.6, 1.01)
     return fig, ax
 
+
 class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
-    def __init__(self, t_start: str = None, t_stop: str = None,
+    def __init__(self, t_start: str = None, t_stop: str = None, ts_list=None,
                  label: str = '',
                  g: float = 1, T=1,
                  options_dict: dict = None, extract_only: bool = False,
@@ -645,6 +654,7 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
                          extract_only=extract_only)
         self.g = g
         self.T = T
+        self.ts_list = ts_list
         if auto:
             self.run_analysis()
 
@@ -653,13 +663,16 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
         Extract two qubit tomography terms.
         """
         self.raw_data_dict = {}
-        self.timestamps = a_tools.get_timestamps_in_range(
-            self.t_start, self.t_stop,
-            label=self.labels)
+        if self.ts_list is None:
+            self.timestamps = a_tools.get_timestamps_in_range(self.t_start,
+                                                              self.t_stop,
+                                                              label=self.labels)
+        else:
+            self.timestamps = self.ts_list
         for ts in self.timestamps:
             data_fp = get_datafilepath_from_timestamp(ts)
             param_spec = {'TFD_dict': ('Analysis/quantities_of_interest', 'attr:all_attr'),
-                         'tomo_dict': ('Analysis/quantities_of_interest/full_tomo_dict', 'attr:all_attr')}
+                          'tomo_dict': ('Analysis/quantities_of_interest/full_tomo_dict', 'attr:all_attr')}
             self.raw_data_dict[ts] = h5d.extract_pars_from_datafile(data_fp, param_spec)
 
         # Parts added to be compatible with base analysis data requirements
@@ -683,9 +696,15 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
             self.proc_data_dict[Ti]['density_matrices']['experiment'] = tomo2dm(self.raw_data_dict[self.proc_data_dict['timestamps'][i]]['tomo_dict'])
             self.proc_data_dict[Ti]['density_matrices']['theory'] = self.hamiltonian.thermal_gibbs_rho(T=Ti)
             self.proc_data_dict[Ti]['fidelity'] = fidelity(self.proc_data_dict[Ti]['density_matrices']['experiment'],self.proc_data_dict[Ti]['density_matrices']['theory'])
+        fid_df = pd.DataFrame.from_dict({T:self.proc_data_dict[T]['fidelity'] for T in self.proc_data_dict['T']}, orient='index',columns=['F']).transpose()
+        operator_df = pd.DataFrame.from_dict({op:values for op, values in self.proc_data_dict.items() if op in self.proc_data_dict['operators']}, orient='index',columns=list(self.proc_data_dict['T']))
+        self.proc_data_dict['dataframe'] = pd.concat([fid_df, operator_df])
 
     def prepare_plots(self):
         self.plot_dicts['fidelities_vs_temperature'] = {
             'plotfn': plot_fidelities_versus_T,
-            'fid_dict': {T:gf.proc_data_dict[T]['fidelity'] for T in gf.proc_data_dict['T']},
+            'fid_dict': {T:self.proc_data_dict[T]['fidelity'] for T in self.proc_data_dict['T']},
+            'beta': self.options_dict['beta'],
+            'data_label': self.options_dict['data_label'],
+            'data_color': self.options_dict['data_color']
         }

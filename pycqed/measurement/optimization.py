@@ -239,9 +239,9 @@ def SPSA(fun, x0,
         x = np.where(x > ctrl_max, ctrl_max, x)
         score = fun(x)
         log.warning("SPSA: Evaluated gradient at x_minus={};x_plus={}".format(x_minus,
-                                                                          x_plus))
+                                                                              x_plus))
         log.warning("SPSA: y_minus={};y_plus={}".format(y_plus,
-                                                    y_minus))
+                                                        y_minus))
         log.warning("SPSA: Gradient={}".format(gradient))
         log.warning("SPSA: Jump={};new_x={}".format(a_k*gradient, x))
         res.append([x, score])
