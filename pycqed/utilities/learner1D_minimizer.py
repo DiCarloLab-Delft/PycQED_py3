@@ -38,6 +38,9 @@ class Learner1D_Minimizer(Learner1D):
     """
 
     def __init__(self, func, bounds, loss_per_interval=None):
+        # Sanity check that can save hours of debugging...
+        assert bounds[1] > bounds[0]
+
         super().__init__(func, bounds, loss_per_interval)
         # Keep the orignal learner behaviour but pass extra arguments to
         # the provided input loss function
