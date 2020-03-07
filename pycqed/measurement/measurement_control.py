@@ -90,11 +90,13 @@ def is_subclass(obj, test_obj):
     """
     return isinstance(obj, type) and issubclass(obj, test_obj)
 
+
 def get_module_name(obj):
     """
     Get the lowest level module of `obj`
     """
-    return obj.__module__.split('.')[-1]
+    return obj.__module__.split(".")[-1]
+
 
 class MeasurementControl(Instrument):
 
@@ -381,14 +383,10 @@ class MeasurementControl(Instrument):
         specified in self.af_pars()
         """
         self.save_optimization_settings()
-        self.adaptive_function = self.af_pars.pop("adaptive_function")
-
-        # Used to update plots specific to this optimizer
-        module_name = get_module_name(self.adaptive_function)
-        self.is_Learner_Minimizer = (
-            module_name == 'learner1D_minimizer' or
-            module_name == 'learnerND_minimizer'
-        )
+        # CMA is treated specially this line allows to check the functions
+        self.adaptive_function = self.af_pars.get("adaptive_function", None)
+        if self.adaptive_function == "Powell":
+            self.adaptive_function = fmin_powell
 
         if self.live_plot_enabled():
             self.initialize_plot_monitor_adaptive()
@@ -397,104 +395,151 @@ class MeasurementControl(Instrument):
         self.detector_function.prepare()
         self.get_measurement_preparetime()
 
-        if self.adaptive_function == "Powell":
-            self.adaptive_function = fmin_powell
-        if is_subclass(self.adaptive_function, BaseLearner):
-            Xs = self.af_pars.get("extra_dims_sweep_pnts", [None])
+        # This allows to use adaptive samplers with distinct setting and
+        # keep the data in the same dataset. E.g. sample a segment of the
+        # positive axis and a segment of the negative axis
+        multi_adaptive_single_dset = self.af_pars.get(
+            "multi_adaptive_single_dset", False
+        )
+        log.error(multi_adaptive_single_dset)
+        if multi_adaptive_single_dset:
+            af_pars_list = self.af_pars.pop("adaptive_pars_list")
+        else:
+            af_pars_list = [self.af_pars]
+
+        # #####################################################################
+        # BEGIN for loop of adaptive samplers with distinct settings
+        # #####################################################################
+        for af_pars in af_pars_list:
+            self.adaptive_function = af_pars.pop("adaptive_function")
+
+            # Used to update plots specific to this optimizers
+            module_name = get_module_name(self.adaptive_function)
+            self.is_Learner_Minimizer = (
+                module_name == "learner1D_minimizer"
+                or module_name == "learnerND_minimizer"
+            )
+
+            # #################################################################
+            # BEGIN loop of adaptive samplers for each pnt in extra dims
+            # #################################################################
+            Xs = af_pars.get("extra_dims_sweep_pnts", [None])
             for X in Xs:
                 if len(Xs) > 1 and X is not None:
                     opt_func = lambda x: self.optimization_function(flatten([x, X]))
                 else:
                     opt_func = self.optimization_function
 
-                Learner = self.adaptive_function
-                # Pass the rigth parameters two each type of learner
-                if issubclass(Learner, Learner1D):
-                    self.learner = Learner(
-                        opt_func,
-                        bounds=self.af_pars["bounds"],
-                        loss_per_interval=self.af_pars.get("loss_per_interval", None),
+                if is_subclass(self.adaptive_function, BaseLearner):
+                    Learner = self.adaptive_function
+                    # Pass the rigth parameters two each type of learner
+                    if issubclass(Learner, Learner1D):
+                        self.learner = Learner(
+                            opt_func,
+                            bounds=af_pars["bounds"],
+                            loss_per_interval=af_pars.get("loss_per_interval", None),
+                        )
+                    elif issubclass(Learner, Learner2D):
+                        self.learner = Learner(
+                            opt_func,
+                            bounds=af_pars["bounds"],
+                            loss_per_triangle=af_pars.get("loss_per_triangle", None),
+                        )
+                    elif issubclass(Learner, LearnerND):
+                        self.learner = Learner(
+                            opt_func,
+                            bounds=af_pars["bounds"],
+                            loss_per_simplex=af_pars.get("loss_per_simplex", None),
+                        )
+                    elif issubclass(Learner, SKOptLearner):
+                        # NB: This learner expects the `optimization_function`
+                        # to be scalar
+                        # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
+                        self.learner = Learner(
+                            opt_func,
+                            dimensions=af_pars["dimensions"],
+                            base_estimator=af_pars.get("base_estimator", "gp"),
+                            n_initial_points=af_pars.get("n_initial_points", 10),
+                            acq_func=af_pars.get("acq_func", "gp_hedge"),
+                            acq_optimizer=af_pars.get("acq_optimizer", "auto"),
+                            n_random_starts=af_pars.get("n_random_starts", None),
+                            random_state=af_pars.get("random_state", None),
+                            acq_func_kwargs=af_pars.get("acq_func_kwargs", None),
+                            acq_optimizer_kwargs=af_pars.get(
+                                "acq_optimizer_kwargs", None
+                            ),
+                        )
+                    else:
+                        raise NotImplementedError(
+                            "Learner subclass type not supported."
+                        )
+
+                    if "X0" in af_pars:
+                        # Teach the learner the initial point if provided
+                        evaluate_X(self.learner, af_pars["X0"])
+
+                    # N.B. the runner that is used is not an `adaptive.Runner` object
+                    # rather it is the `adaptive.runner.simple` function. This
+                    # ensures that everything runs in a single process, as is
+                    # required by QCoDeS (May 2018) and makes things simpler.
+                    self.runner = runner.simple(
+                        learner=self.learner, goal=af_pars["goal"]
                     )
-                elif issubclass(Learner, Learner2D):
-                    self.learner = Learner(
-                        opt_func,
-                        bounds=self.af_pars["bounds"],
-                        loss_per_triangle=self.af_pars.get("loss_per_triangle", None),
-                    )
-                elif issubclass(Learner, LearnerND):
-                    self.learner = Learner(
-                        opt_func,
-                        bounds=self.af_pars["bounds"],
-                        loss_per_simplex=self.af_pars.get("loss_per_simplex", None),
-                    )
-                elif issubclass(Learner, SKOptLearner):
-                    # NB: This learner expects the `optimization_function`
-                    # to be scalar
-                    # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
-                    self.learner = Learner(
-                        opt_func,
-                        dimensions=self.af_pars["dimensions"],
-                        base_estimator=self.af_pars.get("base_estimator", "gp"),
-                        n_initial_points=self.af_pars.get("n_initial_points", 10),
-                        acq_func=self.af_pars.get("acq_func", "gp_hedge"),
-                        acq_optimizer=self.af_pars.get("acq_optimizer", "auto"),
-                        n_random_starts=self.af_pars.get("n_random_starts", None),
-                        random_state=self.af_pars.get("random_state", None),
-                        acq_func_kwargs=self.af_pars.get("acq_func_kwargs", None),
-                        acq_optimizer_kwargs=self.af_pars.get(
-                            "acq_optimizer_kwargs", None
-                        ),
-                    )
+
+                    # Only save optimization results if the sampling is a single
+                    # adaptive run
+                    # Needs more elaborated developments
+                    if not multi_adaptive_single_dset and Xs[0] is None:
+                        # NB: If you reload the optimizer module, `issubclass` will fail
+                        # This is because the reloaded class is a new distinct object
+                        if issubclass(self.adaptive_function, SKOptLearner):
+                            # NB: Having an optmizer that also complies with the adaptive
+                            # interface breaks a bit the previous structure
+                            # now there are many checks for this case
+                            # Because this is also an optimizer we save the result
+                            # Pass the learner because it contains all the points
+                            self.save_optimization_results(
+                                self.adaptive_function, self.learner
+                            )
+                        elif (
+                            issubclass(self.adaptive_function, LearnerND_Optimize)
+                            or issubclass(self.adaptive_function, Learner1D_Minimizer)
+                            or issubclass(self.adaptive_function, LearnerND_Minimizer)
+                        ):
+                            # Because this is also an optimizer we save the result
+                            # Pass the learner because it contains all the points
+                            self.save_optimization_results(
+                                self.adaptive_function, self.learner
+                            )
+
+                elif isinstance(self.adaptive_function, types.FunctionType) or isinstance(
+                    self.adaptive_function, np.ufunc
+                ):
+                    try:
+                        # exists so it is possible to extract the result
+                        # of an optimization post experiment
+                        self.adaptive_result = self.adaptive_function(
+                            self.optimization_function, **af_pars
+                        )
+                    except StopIteration:
+                        print("Reached f_termination: %s" % (self.f_termination))
+
+                    if not multi_adaptive_single_dset and Xs[0] is None:
+                        self.save_optimization_results(
+                            self.adaptive_function, result=self.adaptive_result
+                        )
                 else:
-                    raise NotImplementedError("Learner subclass type not supported.")
+                    raise Exception(
+                        'optimization function: "%s" not recognized'
+                        % self.adaptive_function
+                    )
+            # #################################################################
+            # END loop of adaptive samplers for each pnt in extra dims
+            # #################################################################
 
-                if "X0" in self.af_pars:
-                    # Teach the learner the initial point if provided
-                    evaluate_X(self.learner, self.af_pars["X0"])
-                # N.B. the runner that is used is not an `adaptive.Runner` object
-                # rather it is the `adaptive.runner.simple` function. This
-                # ensures that everything runs in a single process, as is
-                # required by QCoDeS (May 2018) and makes things simpler.
-                self.runner = runner.simple(
-                    learner=self.learner, goal=self.af_pars["goal"]
-                )
-
-            # NB: If you reload the optimizer module, `issubclass` will fail
-            # This is because the reloaded class is a new distinct object
-            if issubclass(self.adaptive_function, SKOptLearner):
-                # NB: Having an optmizer that also complies with the adaptive
-                # interface breaks a bit the previous structure
-                # now there are many checks for this case
-                # Because this is also an optimizer we save the result
-                # Pass the learner because it contains all the points
-                self.save_optimization_results(self.adaptive_function, self.learner)
-            elif (
-                issubclass(self.adaptive_function, LearnerND_Optimize)
-                or issubclass(self.adaptive_function, Learner1D_Minimizer)
-                or issubclass(self.adaptive_function, LearnerND_Minimizer)
-            ):
-                # Because this is also an optimizer we save the result
-                # Pass the learner because it contains all the points
-                self.save_optimization_results(self.adaptive_function, self.learner)
-
-        elif isinstance(self.adaptive_function, types.FunctionType) or isinstance(
-            self.adaptive_function, np.ufunc
-        ):
-            try:
-                # exists so it is possible to extract the result
-                # of an optimization post experiment
-                self.adaptive_result = self.adaptive_function(
-                    self.optimization_function, **self.af_pars
-                )
-            except StopIteration:
-                print("Reached f_termination: %s" % (self.f_termination))
-            self.save_optimization_results(
-                self.adaptive_function, result=self.adaptive_result
-            )
-        else:
-            raise Exception(
-                'optimization function: "%s" not recognized' % self.adaptive_function
-            )
+        # #####################################################################
+        # END for loop of adaptive samplers with distinct settings
+        # #####################################################################
 
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
