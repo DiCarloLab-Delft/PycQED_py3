@@ -402,40 +402,47 @@ class MeasurementControl(Instrument):
         self.detector_function.prepare()
         self.get_measurement_preparetime()
 
-        # #####################################################################
-        # BEGIN for loop of adaptive samplers with distinct settings
-        # #####################################################################
-        for af_pars in af_pars_list:
-            # We detect the type of adaptive function here so that the right
-            # adaptive plot monitor is initialized
-            self.Learner_Minimizer_detected = False
-            self.CMA_detected = False
-            # Used to update plots specific to this type of optimizers
-            module_name = get_module_name(af_pars.get("adaptive_function", self))
-            self.Learner_Minimizer_detected = self.Learner_Minimizer_detected or (
-                module_name == "learner1D_minimizer"
-                or module_name == "learnerND_minimizer")
-            self.CMA_detected = (self.CMA_detected or
-                module_name == "cma.evolution_strategy")
+        # ######################################################################
+        # BEGIN loop of pnts in extra dims
+        # ######################################################################
+        # Used to (re)initialize the plot monitor only betwen the iterations
+        # of this for loop
+        last_i_af_pars = -1
 
-            # Determines if the optimization will minimize or maximize
-            self.minimize_optimization = af_pars.pop("minimize", True)
-            self.f_termination = af_pars.pop("f_termination", None)
+        Xs = self.af_pars.get("extra_dims_sweep_pnts", [None])
+        for X in Xs:
+            # ##################################################################
+            # BEGIN loop of adaptive samplers with distinct settings
+            # ##################################################################
 
-            self.adaptive_besteval_indxs = [0]
+            for i_af_pars, af_pars in enumerate(af_pars_list):
+                # We detect the type of adaptive function here so that the right
+                # adaptive plot monitor is initialized
+                self.Learner_Minimizer_detected = False
+                self.CMA_detected = False
+                # Used to update plots specific to this type of optimizers
+                module_name = get_module_name(af_pars.get("adaptive_function", self))
+                self.Learner_Minimizer_detected = self.Learner_Minimizer_detected or (
+                    module_name == "learner1D_minimizer"
+                    or module_name == "learnerND_minimizer")
+                self.CMA_detected = (self.CMA_detected or
+                    module_name == "cma.evolution_strategy")
 
-            if self.live_plot_enabled():
-                self.initialize_plot_monitor_adaptive()
+                # Determines if the optimization will minimize or maximize
+                self.minimize_optimization = af_pars.get("minimize", True)
+                self.f_termination = af_pars.get("f_termination", None)
 
-            self.adaptive_function = af_pars.pop("adaptive_function")
-            if self.adaptive_function == "Powell":
-                self.adaptive_function = fmin_powell
+                self.adaptive_besteval_indxs = [0]
 
-            # #################################################################
-            # BEGIN loop of adaptive samplers for each pnt in extra dims
-            # #################################################################
-            Xs = af_pars.get("extra_dims_sweep_pnts", [None])
-            for X in Xs:
+                if self.live_plot_enabled() and i_af_pars > last_i_af_pars:
+                    self.initialize_plot_monitor_adaptive()
+                last_i_af_pars = i_af_pars
+
+                self.adaptive_function = af_pars.get("adaptive_function")
+
+                if self.adaptive_function == "Powell":
+                    self.adaptive_function = fmin_powell
+
                 if len(Xs) > 1 and X is not None:
                     opt_func = lambda x: self.mk_optimization_function()(flatten([x, X]))
                 else:
@@ -529,8 +536,10 @@ class MeasurementControl(Instrument):
                     try:
                         # exists so it is possible to extract the result
                         # of an optimization post experiment
+                        af_pars_copy = dict(af_pars)
+                        af_pars_copy.pop("adaptive_function")
                         self.adaptive_result = self.adaptive_function(
-                            self.mk_optimization_function(), **af_pars
+                            self.mk_optimization_function(), **af_pars_copy
                         )
                     except StopIteration:
                         print("Reached f_termination: %s" % (self.f_termination))
@@ -544,13 +553,13 @@ class MeasurementControl(Instrument):
                         'optimization function: "%s" not recognized'
                         % self.adaptive_function
                     )
-            # #################################################################
-            # END loop of adaptive samplers for each pnt in extra dims
-            # #################################################################
+            # ##################################################################
+            # END loop of adaptive samplers with distinct settings
+            # ##################################################################
 
-        # #####################################################################
-        # END for loop of adaptive samplers with distinct settings
-        # #####################################################################
+        # ######################################################################
+        # END loop of pnts in extra dims
+        # ######################################################################
 
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
