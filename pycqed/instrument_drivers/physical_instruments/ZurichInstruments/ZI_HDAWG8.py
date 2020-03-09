@@ -697,8 +697,17 @@ while (1) {
                                  (2, list(staircase_sequence)), \
                                  (3, list(staircase_sequence))]
 
-        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
-            raise NotImplementedError
+        elif self.cfg_codeword_protocol() == 'novsm_microwave':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                                '..', 'examples','CC_examples',
+                                'hdawg_calibration.vq1asm'))
+
+            sequence_length = 32
+            staircase_sequence = range(0, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence)), \
+                                 (1, list(staircase_sequence)), \
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(staircase_sequence))]
 
         else:
             raise zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
