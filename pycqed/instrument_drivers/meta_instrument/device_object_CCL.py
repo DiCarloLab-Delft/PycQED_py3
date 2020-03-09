@@ -2058,6 +2058,7 @@ class DeviceCCL(Instrument):
             MC = self.instr_MC.get_instr()
 
         assert q0 in self.qubits()
+        self.prepare_for_timedomain(qubits=[q0])
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         fl_lutman.sq_length(40e-9)
