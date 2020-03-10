@@ -230,9 +230,19 @@ class DeviceCCL(Instrument):
                            vals=vals.Numbers())
 
         self.add_parameter('dio_map',
-                           docstring='Returns the map between DIO'
-                           ' channel number and functionality',
-                           get_cmd=self._get_dio_map)
+                           docstring='The map between DIO'
+                           ' channel number and functionality (ro_x, mw_x, flux_x).',
+                           initial_value=None,
+                           set_cmd=self._set_dio_map,
+                           vals=vals.Dict()
+                           )
+
+    def _set_dio_map(self, dio_map_dict):
+        allowed_keys = {'ro_', 'mw_', 'flux_'}
+        for key in dio_map_dict:
+            assert np.any([a_key in key and len(key) > len(a_key) for a_key in allowed_keys]), ("Key `{}` must start with:"
+            " `{}`!".format(key, list(allowed_keys)))
+        return dio_map_dict
 
     def _get_dio_map(self):
         # FIXME: assumes single mapping for instrument
@@ -326,32 +336,35 @@ class DeviceCCL(Instrument):
                                      ('mw_3', self.tim_mw_latency_3()),
                                      ('mw_4', self.tim_mw_latency_4())]
                                     )
-
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
         # calibrating)
-
         lowest_value = min(latencies.values())
         for key, val in latencies.items():
-            latencies[key] = val - lowest_value
+            # Align to minimum and change to ns to avoid number precision problems
+            # The individual multiplications are on purpose
+            latencies[key] = val * 1e9 - lowest_value * 1e9
 
         # ensuring that RO latency is a multiple of 20 ns as the UHFQC does
         # not have a fine timing control.
-        ro_latency_modulo_20 = latencies['ro_0'] % 20e-9
-        for key, val in latencies.items():
-            latencies[key] = val + (20e-9 - ro_latency_modulo_20) % 20e-9
+        ro_latency_modulo_20 = latencies['ro_0'] % 20
+        # `% 20` is for the case ro_latency_modulo_20 == 20ns
+        correction_for_multiple = (20 - ro_latency_modulo_20) % 20
+        if correction_for_multiple >= 1e-3:  # at least one 1 ps
+            # Only apply corrections if they are significant
+            for key, val in latencies.items():
+                latencies[key] = val + correction_for_multiple
 
         # Setting the latencies in the CCL
-        CC = self.instr_CC.get_instr()
-        dio_map = self.dio_map()
-
         # Iterate over keys in dio_map as this ensures only relevant
         # timing setting are set.
-        for lat_key, dio_ch in dio_map.items():
+        for lat_key, dio_ch in self.dio_map().items():
             lat = latencies[lat_key]
-            lat_coarse = int(lat*1e9 // 20)  # Convert to CC dio value
-            lat_fine = int(lat*1e9 % 20)*1e-9
-            CC.set('dio{}_out_delay'.format(dio_ch), lat_coarse)
+            lat_coarse = int(np.round(lat) // 20)  # Convert to CC dio value
+            lat_fine = (lat % 20) * 1e-9
+            log.debug('Setting `dio{}_out_delay` for `{}` to `{}`'.format(
+                dio_ch, lat_key, lat_coarse))
+            cc.set('dio{}_out_delay'.format(dio_ch), lat_coarse)
 
             # RO devices do not support fine delay setting.
             if 'mw' in lat_key or 'flux' in lat_key:
@@ -364,6 +377,8 @@ class DeviceCCL(Instrument):
                         # All channels are set globally from the device object.
                         AWG.stop()
                         for i in range(8):  # assumes the AWG is an HDAWG
+                            log.debug("Setting `sigouts_{}_delay` to {:4g}"
+                                " in {}".format(i, lat_fine, AWG.name))
                             AWG.set('sigouts_{}_delay'.format(i), lat_fine)
                         AWG.start()
                         ch_not_ready = 8
@@ -879,6 +894,7 @@ class DeviceCCL(Instrument):
             q2: int = None, q3: int = None,
             flux_codeword='cz',
             flux_codeword_park=None,
+            reduced_swp_points=False,
             prepare_for_timedomain=True, MC=None,
             CZ_disabled: bool = False,
             wait_time_ns: int = 0, label='',
@@ -953,7 +969,10 @@ class DeviceCCL(Instrument):
             q3idx = self.find_instrument(q3).cfg_qubit_nr()
 
         # These are hardcoded angles in the mw_lutman for the AWG8
-        angles = np.arange(0, 341, 20)
+        if reduced_swp_points:
+            angles = np.arange(0, 341, 40)
+        else:
+            angles = np.arange(0, 341, 20)
 
         p = mqo.conditional_oscillation_seq(
             q0idx, q1idx, q2idx, q3idx,
@@ -1781,18 +1800,21 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function_2D(sw)
         MC.set_detector_function(d)
 
+        label = 'Chevron {} {}'.format(q0, q_spec)
+
         if not adaptive_sampling:
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
 
-            MC.run('Chevron {} {}'.format(q0, q_spec), mode='2D')
-            ma.TwoD_Analysis()
+            MC.run(label, mode='2D')
+            ma2.Basic2D_Analysis()
         else:
             MC.set_adaptive_function_parameters(
                 {'adaptive_function': adaptive.Learner2D,
                  'goal': lambda l: l.npoints > adaptive_sampling_pts,
                  'bounds': (amps, lengths)})
-            MC.run('Chevron {} {}'.format(q0, q_spec), mode='adaptive')
+            MC.run(label + " adaptive", mode='adaptive')
+            ma2.Basic2DInterpolatedAnalysis()
 
     def measure_two_qubit_ramsey(self, q0: str, q_spec: str,
                                  times,
@@ -2054,6 +2076,7 @@ class DeviceCCL(Instrument):
             MC = self.instr_MC.get_instr()
 
         assert q0 in self.qubits()
+        self.prepare_for_timedomain(qubits=[q0])
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         fl_lutman.sq_length(40e-9)

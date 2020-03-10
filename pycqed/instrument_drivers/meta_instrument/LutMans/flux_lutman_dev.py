@@ -11,7 +11,9 @@ from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
+from importlib import reload
 from pycqed.measurement.waveform_control_CC import waveforms_flux_dev as wfl_dev
+reload(wfl_dev)
 
 try:
     from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
@@ -449,7 +451,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
                 initial_value=2 / 2.4e9,
                 unit="s",
-                label="Time ramp middle",
+                label="Time ramp outside",
             )
             self.add_parameter(
                 "czv_speed_limit_%s" % this_cz,
@@ -459,7 +461,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
                 initial_value=7.777e-9,
                 unit="s",
-                label="Time ramp middle",
+                label="Speed limit",
             )
             self.add_parameter(
                 "czv_total_time_%s" % this_cz,
@@ -468,7 +470,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
                 initial_value=40e-9,
                 unit="s",
-                label="Time ramp middle",
+                label="Total gate time",
             )
             self.add_parameter(
                 "czv_sq_amp_%s" % this_cz,
@@ -478,7 +480,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(0.0, 10.0),
                 initial_value=1.0,
                 unit="a.u.",
-                label="Time ramp middle",
+                label="Relative amp",
             )
             self.add_parameter(
                 "czv_amp_q_ph_corr_%s" % this_cz,
@@ -508,6 +510,22 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Bool(),
                 initial_value=False,
                 label="Pulse polarity inversion",
+            )
+            self.add_parameter(
+                "czv_fixed_amp_%s" % this_cz,
+                docstring="",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=False,
+                label="",
+            )
+            self.add_parameter(
+                "czv_correct_q_phase_%s" % this_cz,
+                docstring="",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=False,
+                label="",
             )
             # #################################################################
             # END new CZ parameterization

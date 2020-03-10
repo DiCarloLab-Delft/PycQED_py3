@@ -906,8 +906,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         elif self.cal_points == 'ge':
             # calibration point indices are when ignoring the f-state cal pts
             cal_points = [
-                [[-4, -3], [-2, -1]],  # oscillating qubits
-                [[-4, -2], [-3, -1]],  # spec qubit
+                [[-4, -3], [-2, -1]],  # spec qubit
+                [[-4, -2], [-3, -1]],  # oscillating qubits
             ]
 
         for idx, type_str in zip([ch_idx_osc, ch_idx_spec], ['osc', 'spec']):
@@ -917,29 +917,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 type_str)] = self.raw_data_dict['value_names'][0][idx]
             self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
 
-            # This is in case of readout crosstalk making a difference between on and off cases
-            cals_osc_qubit = cal_points[0]
-            idx_cal_off = [c[1] for c in cals_osc_qubit]
-            idx_cal_on = [c[0] for c in cals_osc_qubit]
-            yvals_off = np.concatenate((yvals[:cals_osc_qubit[0][0]:2],
-                                        yvals[idx_cal_off]))
-            yvals_on = np.concatenate((yvals[1:cals_osc_qubit[0][0]:2],
-                                       yvals[idx_cal_on]))
-
             if normalize_to_cal_points:
-                yvals_off = a_tools.normalize_TD_data(
-                    data=yvals_off,
-                    data_zero=yvals[cals_osc_qubit[0][1]],
-                    data_one=yvals[cals_osc_qubit[1][1]])
-                yvals_on = a_tools.normalize_TD_data(
-                    data=yvals_on,
-                    data_zero=yvals[cals_osc_qubit[0][0]],
-                    data_one=yvals[cals_osc_qubit[1][0]])
+                yvals = a_tools.normalize_data_v3(
+                    yvals,
+                    cal_zero_points=cal_points[idx][0],
+                    cal_one_points=cal_points[idx][1])
 
                 self.proc_data_dict['yvals_{}_off'.format(
-                    type_str)] = yvals_off
+                    type_str)] = yvals[::2]
                 self.proc_data_dict['yvals_{}_on'.format(
-                    type_str)] = yvals_on
+                    type_str)] = yvals[1::2]
                 self.proc_data_dict['xvals_off'] = self.raw_data_dict['xvals'][0][::2]
                 self.proc_data_dict['xvals_on'] = self.raw_data_dict['xvals'][0][1::2]
 

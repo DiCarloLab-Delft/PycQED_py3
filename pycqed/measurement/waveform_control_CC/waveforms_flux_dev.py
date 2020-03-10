@@ -25,7 +25,11 @@ def victor_waveform(
     amp_at_sweetspot = 0.0
     amp_at_int_11_02 = fluxlutman.calc_eps_to_amp(
         0, state_A="11", state_B="02", which_gate=which_gate
-    )
+    ) / ( fluxlutman.cfg_awg_channel_range() / 2 * fluxlutman.cfg_awg_channel_amplitude() )
+
+    if fluxlutman.get("czv_fixed_amp_{}".format(which_gate)):
+        amp_at_int_11_02 = 0.5
+
     sampling_rate = fluxlutman.sampling_rate()
 
     # New parameters specific to this parameterization
@@ -73,12 +77,13 @@ def victor_waveform(
 
     half_NZ_amps = np.piecewise(time, conditions, funcs)
 
-    # Insert extra square part to correct single qubit phase
-    insert_idx = np.where(half_NZ_amps >= amp_q_ph_corr)[0][-1] + 1
-    amps_q_phase_correction = np.full(int(half_time_q_ph_corr / dt), amp_q_ph_corr)
-    half_NZ_amps = np.insert(half_NZ_amps, insert_idx, amps_q_phase_correction)
+    if fluxlutman.get("czv_correct_q_phase_{}".format(which_gate)):
+        # Insert extra square part to correct single qubit phase
+        insert_idx = np.where(half_NZ_amps >= amp_q_ph_corr)[0][-1] + 1
+        amps_q_phase_correction = np.full(int(half_time_q_ph_corr / dt), amp_q_ph_corr)
+        half_NZ_amps = np.insert(half_NZ_amps, insert_idx, amps_q_phase_correction)
 
-    amp = np.concatenate((np.flip(half_NZ_amps), -half_NZ_amps[1:]))
+    amp = np.concatenate((np.flip(half_NZ_amps, 0), -half_NZ_amps[1:]))
     # Extra points for starting and finishing at the sweetspot
     if force_start_end_swtspt and amp[0] != 0.0:
         amp = np.concatenate(([amp_at_sweetspot], amp, [amp_at_sweetspot]))
