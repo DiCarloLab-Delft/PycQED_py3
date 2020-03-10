@@ -162,7 +162,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
     # helper for parameter 'vsm_channel_delay{}'
     # NB: CC-light range max = 127*2.5 ns = 317.5 ns, our fine delay range is 48/1200 MHz = 40 ns, so we must also shift program
-    # NB: supports one VSM only, no intend to upgrade
+    # NB: supports one VSM only, no intend to upgrade that for now
     def _set_vsm_channel_delay(self, bit: int, cnt_in_2ns5_steps: int) -> None:
         delay_ns = cnt_in_2ns5_steps * 2.5
         cnt_in_20ns_steps = int(delay_ns // 20)
@@ -176,6 +176,8 @@ class CC(CCCore, Instrument, DIO.CalInterface):
         self.stop()
         self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)
         self.start()
+        # FIXME: assumes Q1 was running, and has valid program
+        # FIXME: stop/start can be removed when we switch to setSeqBarCnt
 
     ##########################################################################
     # overrides for CalInterface interface

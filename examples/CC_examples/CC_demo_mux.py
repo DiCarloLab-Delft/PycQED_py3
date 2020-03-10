@@ -107,7 +107,7 @@ if 1:   # DIO calibration
 
 
 
-if 0:  # test of Distributed Shared Memory
+if 1:  # test of Distributed Shared Memory
     if 1:
         log.debug('run UHFQA codeword generator')
 
