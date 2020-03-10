@@ -537,7 +537,9 @@ class MeasurementControl(Instrument):
                         # exists so it is possible to extract the result
                         # of an optimization post experiment
                         af_pars_copy = dict(af_pars)
-                        af_pars_copy.pop("adaptive_function")
+                        non_used_pars = ["adaptive_function", "minimize", "f_termination"]
+                        for non_used_par in non_used_pars:
+                            af_pars_copy.pop(non_used_par, None)
                         self.adaptive_result = self.adaptive_function(
                             self.mk_optimization_function(), **af_pars_copy
                         )
