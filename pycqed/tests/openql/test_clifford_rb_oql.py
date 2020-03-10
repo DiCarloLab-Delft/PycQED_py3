@@ -2,6 +2,7 @@ import os
 import unittest
 from openql import openql as ql
 from pycqed.measurement.openql_experiments import clifford_rb_oql as rb_oql
+from pycqed.measurement.openql_experiments import openql_helpers as oqh
 
 
 class Test_cliff_rb_oql(unittest.TestCase):
@@ -56,9 +57,7 @@ class Test_char_rb_oql(unittest.TestCase):
 
 # NB: we just hijack the parent class to run the same tests
 
-# FIXME: This only works with Wouters custom OpenQL.
-# Need a better check for this
-if ql.get_version() > '0.8.0':  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
+if oqh.is_compatible_openql_version_cc():
     class Test_cliff_rb_oql_CC(Test_cliff_rb_oql):
         def setUp(self):
             curdir = os.path.dirname(__file__)
