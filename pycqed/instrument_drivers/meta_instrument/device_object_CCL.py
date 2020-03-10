@@ -1763,18 +1763,21 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function_2D(sw)
         MC.set_detector_function(d)
 
+        label = 'Chevron {} {}'.format(q0, q_spec)
+
         if not adaptive_sampling:
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
 
-            MC.run('Chevron {} {}'.format(q0, q_spec), mode='2D')
-            ma.TwoD_Analysis()
+            MC.run(label, mode='2D')
+            ma2.Basic2D_Analysis()
         else:
             MC.set_adaptive_function_parameters(
                 {'adaptive_function': adaptive.Learner2D,
                  'goal': lambda l: l.npoints > adaptive_sampling_pts,
                  'bounds': (amps, lengths)})
-            MC.run('Chevron {} {}'.format(q0, q_spec), mode='adaptive')
+            MC.run(label + " adaptive", mode='adaptive')
+            ma2.Basic2DInterpolatedAnalysis()
 
     def measure_two_qubit_ramsey(self, q0: str, q_spec: str,
                                  times,
