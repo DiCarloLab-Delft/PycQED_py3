@@ -1235,7 +1235,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return axs
 
-    def plot_level_diagram(self, ax=None, show=True, which_gate='NE'):
+    def plot_level_diagram(self, ax=None, show=True, which_gate=None):
         """
         Plots the level diagram as specified by the q_ parameters.
             1. Plotting levels

@@ -195,7 +195,7 @@ def mk_minimization_loss(
     with np.errstate(divide="ignore"):
         A_not = np.divide(1.0, np.arctan(np.divide(1.0, w_not)))
 
-    def dist_factor(scale, dist):
+    def close_to_optimal_factor(scale, dist):
         with np.errstate(divide="ignore"):
             out = A_not * np.arctan(np.divide(dist, scale * w_not))
         return out
@@ -268,7 +268,7 @@ def mk_minimization_loss(
             # value gives high loss
             # loss = dist_best_val_in_simplex * vol
 
-            loss = dist_factor(learner._scale, dist_best) * vol_factor(vol)
+            loss = close_to_optimal_factor(learner._scale, dist_best) * vol_factor(vol)
 
         if randomize_global_search:
             # In case the learner is not working well some biased random
@@ -394,12 +394,11 @@ def mk_minimization_goal_func():
                             learner.moving_threshold = learner._min_value
 
                             # Force update all losses such that the learner stops
-                            # sampling points in the minima
+                            # sampling points in the local minimum
 
                             # This has some computation overhead but should not
                             # happen too often as finding a new minimum is not
                             # expected to happen many times
-                            # print(learner.npoints, " Recomputing all losses...")
                             learner._recompute_all_losses()
                     else:
                         learner.no_improve_count += 1

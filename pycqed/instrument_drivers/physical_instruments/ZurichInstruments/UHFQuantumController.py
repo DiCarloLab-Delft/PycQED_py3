@@ -1621,17 +1621,23 @@ setTrigger(0);
         if len(valid_delays) == 0:
             raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
 
-        min_valid_delay = min(valid_delays)
-        # Heuristics to get the 'best' delay in a sequence
-        if (min_valid_delay+1) in valid_delays and (min_valid_delay+2) in valid_delays:
-            min_valid_delay = min_valid_delay + 1
+        # Find center of first valid region
+        subseq = [[]]
+        for e in valid_delays:
+            if not subseq[-1] or subseq[-1][-1] == e - 1:
+                subseq[-1].append(e)
+            else:
+                subseq.append([e])
+
+        subseq = max(subseq, key=len)
+        delay = len(subseq)//2 + subseq[0]
 
         # Print information
         log.info(f"{self.devname}: Valid delays are {valid_delays}")
-        log.info(f"{self.devname}: Setting delay to {min_valid_delay}")
+        log.info(f"{self.devname}: Setting delay to {delay}")
 
         # And configure the delays
-        self._set_dio_calibration_delay(min_valid_delay)
+        self._set_dio_calibration_delay(delay)
 
         # Clear all detected errors (caused by DIO timing calibration)
         self.clear_errors()  # FIXME: also clears errors not relating to DIO
