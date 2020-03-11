@@ -737,8 +737,9 @@ class MeasurementControl(Instrument):
             Measurement function with scaling to correct physical value
             """
             if self.x_scale is not None:
-                for i in range(len(x)):
-                    x[i] = float(x[i]) / float(self.x_scale[i])
+                x_ = np.array(x, dtype=np.float64)
+                scale_ = np.array(self.x_scale, dtype=np.float64)
+                x = type(x)(x_ / scale_)
 
             vals = self.measurement_function(x)
             # This takes care of data that comes from a "single" segment of a
