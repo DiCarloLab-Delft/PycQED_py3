@@ -113,7 +113,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     Installation instructions for Zurich Instrument Libraries.
     1. install ziPython 3.5/3.6 ucs4 19.05 for 64bit Windows from
         http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
-    2. upload the latest firmware to the UHFQA usingthe LabOne GUI
+    2. upload the latest firmware to the UHFQA using the LabOne GUI
     """
 
     # Define minimum required revisions
