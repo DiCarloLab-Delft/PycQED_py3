@@ -454,24 +454,35 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Time ramp outside",
             )
             self.add_parameter(
-                "czv_speed_limit_%s" % this_cz,
-                docstring="Minimum time required for the CZ gate for a "
-                "single sided square pulse with infinite slope.",
+                "czv_time_sum_sqrs_%s" % this_cz,
+                docstring="The sum of the duration of both squares."
+                "Each square part will have half of this duration."
+                "You should set it close to the speed limit (minimum "
+                "time required to perform a full swap, i.e. 11 -> 02 -> 11)",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
                 initial_value=7.777e-9,
                 unit="s",
-                label="Speed limit",
+                label="A + B",
             )
             self.add_parameter(
-                "czv_total_time_%s" % this_cz,
-                docstring="Total gate time",
+                "czv_time_at_sweetspot_%s" % this_cz,
+                docstring="Time between the two square parts.",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
-                initial_value=40e-9,
+                vals=vals.Numbers(1e-12, 500e-9),
+                initial_value=None,
                 unit="s",
-                label="Total gate time",
+                label="Time between NZ halves",
             )
+            # self.add_parameter(
+            #     "czv_total_time_%s" % this_cz,
+            #     docstring="Total gate time",
+            #     parameter_class=ManualParameter,
+            #     vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
+            #     initial_value=40e-9,
+            #     unit="s",
+            #     label="Total gate time",
+            # )
             self.add_parameter(
                 "czv_sq_amp_%s" % this_cz,
                 docstring="Amplitude of the square parts of the NZ pulse. "

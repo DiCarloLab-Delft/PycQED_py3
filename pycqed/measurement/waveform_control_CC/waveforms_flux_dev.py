@@ -23,11 +23,14 @@ def victor_waveform(
     # NB: the ramps are extra time, they are NOT substracted from sq_length!
 
     amp_at_sweetspot = 0.0
+    # This should eventually become a parameter and do not depend on anything else
     amp_at_int_11_02 = fluxlutman.calc_eps_to_amp(
         0, state_A="11", state_B="02", which_gate=which_gate
-    ) / ( fluxlutman.cfg_awg_channel_range() / 2 * fluxlutman.cfg_awg_channel_amplitude() )
+    ) / (fluxlutman.cfg_awg_channel_range() / 2 * fluxlutman.cfg_awg_channel_amplitude() )
 
     if fluxlutman.get("czv_fixed_amp_{}".format(which_gate)):
+        # This is a temporary hack while testing this pulse for the first
+        # time in a buggy setup
         amp_at_int_11_02 = 0.5
 
     sampling_rate = fluxlutman.sampling_rate()
@@ -35,8 +38,9 @@ def victor_waveform(
     # New parameters specific to this parameterization
     time_ramp_middle = fluxlutman.get("czv_time_ramp_middle_{}".format(which_gate))
     time_ramp_outside = fluxlutman.get("czv_time_ramp_outside_{}".format(which_gate))
-    speed_limit = fluxlutman.get("czv_speed_limit_{}".format(which_gate))
-    total_time = fluxlutman.get("czv_total_time_{}".format(which_gate))
+    time_sum_sqrs = fluxlutman.get("czv_time_sum_sqrs_{}".format(which_gate))
+    # total_time = fluxlutman.get("czv_total_time_{}".format(which_gate))
+    time_at_sweetspot = fluxlutman.get("czv_time_at_sweetspot_{}".format(which_gate))
     invert_polarity = fluxlutman.get("czv_invert_polarity_{}".format(which_gate))
     norm_sq_amp_par = fluxlutman.get("czv_sq_amp_{}".format(which_gate))
     time_q_ph_corr = fluxlutman.get("czv_time_q_ph_corr_{}".format(which_gate))
@@ -45,17 +49,18 @@ def victor_waveform(
     dt = 1 / sampling_rate
 
     half_time_ramp_middle = time_ramp_middle / 2.0
-    half_time_sq = speed_limit / 2.0
+    half_time_sq = time_sum_sqrs / 2.0
     half_time_q_ph_corr = time_q_ph_corr / 2.0
-    half_time_at_swtspt = (
-        total_time - time_ramp_middle - 2 * time_ramp_outside - speed_limit
-    ) / 2.0
+    # half_time_at_swtspt = (
+    #     total_time - time_ramp_middle - 2 * time_ramp_outside - time_sum_sqrs
+    # ) / 2.0
+    half_time_at_swtspt = time_at_sweetspot / 2.0
 
-    if half_time_at_swtspt < 0:
-        raise ValueError(
-            "Total time is not enough to accomodate for speed "
-            "limit and pulse ramps!"
-        )
+    # if half_time_at_swtspt < 0:
+    #     raise ValueError(
+    #         "Total time is not enough to accomodate for speed "
+    #         "limit and pulse ramps!"
+    #     )
 
     half_total_time = (
         half_time_at_swtspt + half_time_ramp_middle + half_time_sq + time_ramp_outside
