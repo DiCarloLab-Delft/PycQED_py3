@@ -14,6 +14,7 @@ from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter,
 
 from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
+reload(det)
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import tomography as tomo
@@ -299,6 +300,10 @@ class DeviceCCL(Instrument):
                                      ('mw_3', self.tim_mw_latency_3()),
                                      ('mw_4', self.tim_mw_latency_4())]
                                     )
+
+        # NB: Mind that here number precision matters a lot!
+        # Tripple check everything if any changes are to be made
+
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
         # calibrating)
@@ -308,12 +313,15 @@ class DeviceCCL(Instrument):
             # The individual multiplications are on purpose
             latencies[key] = val * 1e9 - lowest_value * 1e9
 
+        # Only apply fine latencies above 1 ps (HDAWG8 minum fine delay)
+        ns_tol = 1e-3
+
         # ensuring that RO latency is a multiple of 20 ns as the UHFQC does
         # not have a fine timing control.
         ro_latency_modulo_20 = latencies['ro_0'] % 20
         # `% 20` is for the case ro_latency_modulo_20 == 20ns
         correction_for_multiple = (20 - ro_latency_modulo_20) % 20
-        if correction_for_multiple >= 1e-3:  # at least one 1 ps
+        if correction_for_multiple >= ns_tol:  # at least one 1 ps
             # Only apply corrections if they are significant
             for key, val in latencies.items():
                 latencies[key] = val + correction_for_multiple
@@ -324,9 +332,10 @@ class DeviceCCL(Instrument):
         for lat_key, dio_ch in self.dio_map().items():
             lat = latencies[lat_key]
             lat_coarse = int(np.round(lat) // 20)  # Convert to CC dio value
-            lat_fine = (lat % 20) * 1e-9
-            log.debug('Setting `dio{}_out_delay` for `{}` to `{}`'.format(
-                dio_ch, lat_key, lat_coarse))
+            lat_fine = lat % 20
+            lat_fine = lat_fine * 1e-9 if lat_fine <= 20 - ns_tol else 0
+            log.debug('Setting `dio{}_out_delay` for `{}` to `{}`. (lat_fine: {:4g})'.format(
+                dio_ch, lat_key, lat_coarse, lat_fine))
             cc.set('dio{}_out_delay'.format(dio_ch), lat_coarse)
 
             # RO devices do not support fine delay setting.
@@ -772,6 +781,7 @@ class DeviceCCL(Instrument):
 
         int_avg_dets = []
         for i, acq_instr_name in enumerate(acq_ch_map.keys()):
+            # The master detector is the one that holds the CC object
             if i == 0:
                 CC = self.instr_CC.get_instr()
             else:
