@@ -420,10 +420,10 @@ def operator(operator_string):
     Outputs an array of the crossproduct of the corresponding operators
     """
     #Pauli matrices
-    I=np.array([[1.,0],[0,1.]])
-    X=np.array([[0,1],[1,0]])
-    Y=np.array([[0,0+-1j],[0+1j,0]])
-    Z=np.array([[1,0],[0,-1]])
+    I=np.array([[1.,0],[0,1.]])/2
+    X=np.array([[0,1.],[1.,0]])/2
+    Y=np.array([[0,0+-1.j],[0+1.j,0]])/2
+    Z=np.array([[1,0],[0,-1]])/2
     full_operator=1
     for operator in operator_string:
         if operator == 'I':
@@ -441,13 +441,11 @@ def operator(operator_string):
         full_operator=np.kron(full_operator,operator)
     return full_operator
 
-
 def vec2dm(vec):
-    vec=vec.reshape(len(vec), 1)
-    vec_transpose=vec.reshape(1, len(vec))
-    rho = np.dot(vec,vec_transpose)
+    vec = vec.reshape(len(vec), 1)
+    vec_transpose = vec.reshape(1, len(vec))
+    rho = np.dot(vec, vec_transpose)
     return rho
-
 
 def vecs2mat(vec1,vec2):
     if len(vec1) != len(vec2):
@@ -457,18 +455,16 @@ def vecs2mat(vec1,vec2):
     rho = np.dot(vec1,vec2)
     return rho
 
-
 def fidelity(rho_1, rho_2, trace_conserved = False):
     if trace_conserved:
-        if np.round(np.trace(rho_1),3)!=1:
+        if np.round(np.trace(rho_1), 3) !=1:
             raise ValueError('rho_1 unphysical, trace =/= 1, but ', np.trace(rho_1))
-        if np.round(np.trace(rho_2),3)!=1:
+        if np.round(np.trace(rho_2), 3) !=1:
             raise ValueError('rho_2 unphysical, trace =/= 1, but ', np.trace(rho_2))
-    sqrt_rho_1=linalg.sqrtm(rho_1)
-    eig_vals=linalg.eig(np.dot(np.dot(sqrt_rho_1,rho_2),sqrt_rho_1))[0]
+    sqrt_rho_1 = linalg.sqrtm(rho_1)
+    eig_vals = linalg.eig(np.dot(np.dot(sqrt_rho_1,rho_2),sqrt_rho_1))[0]
     pos_eig = [vals for vals in eig_vals if vals > 0]
     return float(np.sum(np.real(np.sqrt(pos_eig))))**2
-
 
 def trace_distance(rho_1, rho_2):
     """
@@ -476,15 +472,13 @@ def trace_distance(rho_1, rho_2):
     """
     return
 
-
 def tomo2dm(tomo_dict):
     num_qubits = len(list(tomo_dict.keys())[0])
     dim = 2**num_qubits
-    dm = np.zeros((dim,dim))
+    dm = np.zeros((dim,dim), dtype=np.complex128)
     for op, value in tomo_dict.items():
         dm += value*operator(op)
     return dm
-
 
 class Hamiltonian:
     def __init__(self, hamiltonian=operator('ZZ')+operator('XI')+operator('IX')):
@@ -609,6 +603,7 @@ class Hamiltonian:
         return pauli_dict
 
 
+
 def plot_fidelities_versus_T(fid_dict, data_label=None, data_marker=None, data_color='black', beta=False, ax=None, ax_dict=None, figsize=(10, 10), **kw):
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
@@ -627,10 +622,10 @@ def plot_fidelities_versus_T(fid_dict, data_label=None, data_marker=None, data_c
     ax.scatter(x, list(fid_dict.values()), marker=data_marker, facecolor=data_color, label=data_label)
     ax.set_xlabel(x_label)
     ax.set_ylabel('Fidelity')
+    ax.set_xscale('symlog')
     ax.legend()
-    ax.set_ylim(0.6, 1.01)
+    ax.set_ylim(0.7, 1.01)
     return fig, ax
-
 
 class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str = None, t_stop: str = None, ts_list=None,
@@ -655,6 +650,10 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
         self.g = g
         self.T = T
         self.ts_list = ts_list
+        if options_dict == None:
+            self.options_dict = {'beta': False,
+                                 'data_label': 'Data',
+                                 'data_color': 'black'}
         if auto:
             self.run_analysis()
 
@@ -708,3 +707,53 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
             'data_label': self.options_dict['data_label'],
             'data_color': self.options_dict['data_color']
         }
+        self.plot_dicts['Gibbs_tomograph'] = {
+            'plotfn': plot_expectation_values_Gibbs,
+            'full_dict': self.raw_data_dict[list(self.raw_data_dict.keys())[0]]['tomo_dict'],
+            'T':self.raw_data_dict[list(self.raw_data_dict.keys())[0]]['TFD_dict']['T'],
+            'beta': self.options_dict['beta'],
+        }
+
+def plot_expectation_values_Gibbs(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'], system_A_qubits=['X1','D3'],
+                                  system_B_qubits=['D1', 'Z1'], gibbs_qubits=['X1','D3'], bases = ['Z','X','Y'], ax=None, T:float = None,
+                                  exact_dict:bool = True, non_zero_only=False, **kw):
+    if ax is None:
+        f, ax = plt.subplots(figsize=(12,5))
+    else:
+        f = ax.get_figure()
+
+    f.set_figwidth(12)
+    f.set_figheight(10)
+
+    hamiltonian = Hamiltonian()
+    if non_zero_only:
+        operators = [key for key in full_dict.keys() if np.round(full_dict[key], 3) != 0]
+    else:
+        operators = full_dict.keys()
+    exact_dict = {operator_string:hamiltonian.expectation_value(operator(operator_string), hamiltonian.thermal_gibbs_rho(T=T)) for operator_string in operators}
+    color_dict = dict()
+    labels = [gibbs_qubits[0]+' '+gibbs_qubits[1]]
+    color_dict[gibbs_qubits[0]+' '+gibbs_qubits[1]] = 'purple'
+    for i, op in enumerate(operators):
+        if op != 'II':
+            labels.append(op)
+        if op == 'XX':
+            color_dict[i] = 'r'
+        elif op == 'YY':
+            color_dict[i] = 'yellow'
+        elif op == 'ZZ':
+            color_dict[i] = 'b'
+        elif op == 'IX' or op == 'XI':
+            color_dict[i] = 'green'
+        else:
+            color_dict[i] = 'purple'
+    for i, op in enumerate(operators):
+        ax.bar(i, full_dict[op], color=color_dict[i], align='center', zorder=1)
+        if exact_dict is not None:
+            ax.bar(list(full_dict).index(op), exact_dict[op]*4, fill=False, linestyle='--', edgecolor='black', align='center', zorder = 2)
+        ax.set_xticks(np.arange(len(labels)))
+        ax.set_xticklabels(labels, rotation=75)
+    ax.set_ylabel('Expectation value')
+    ax.set_ylim(-1.05, 1.05)
+    ax.set_title('Expectation values for pauli operators')
+    return f, ax
