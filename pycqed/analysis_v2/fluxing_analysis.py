@@ -6,23 +6,29 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 
-# from pycqed.analysis.tools.data_manipulation import populations_using_rate_equations
 from pycqed.analysis.tools.plotting import (
     set_xlabel,
     set_ylabel,
     plot_fit,
     hsluv_anglemap45,
+    SI_prefix_and_scale_factor,
 )
+
+from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis import measurement_analysis as ma_old
+from pycqed.analysis.analysis_toolbox import color_plot
+
 import matplotlib.pyplot as plt
 import matplotlib.colors as col
 from pycqed.analysis.fitting_models import (
     CosFunc,
     Cos_guess,
     avoided_crossing_freq_shift,
+    ChevronFunc,
+    ChevronGuess,
 )
-from pycqed.analysis_v2.simple_analysis import Basic2DInterpolatedAnalysis
+import pycqed.analysis_v2.simple_analysis as sa
 
-from pycqed.analysis.analysis_toolbox import color_plot
 import scipy.cluster.hierarchy as hcluster
 
 from copy import deepcopy
@@ -287,7 +293,425 @@ def plot_chevron_FFT(
     ax.text(1.05, 0.5, coupling_msg, transform=ax.transAxes)
 
 
-class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
+class Chevron_Alignment_Analysis(sa.Basic2DInterpolatedAnalysis):
+    """
+    """
+
+    def __init__(
+        self,
+        t_start: str = None,
+        t_stop: str = None,
+        label: str = "",
+        data_file_path: str = None,
+        close_figs: bool = True,
+        options_dict: dict = None,
+        extract_only: bool = False,
+        do_fitting: bool = True,
+        auto: bool = True,
+        save_qois: bool = True,
+        fit_from="",
+        fit_threshold=None,
+        sq_pulse_duration=None,
+    ):
+        self.fit_from = fit_from
+        self.fit_threshold = fit_threshold
+        self.sq_pulse_duration = sq_pulse_duration
+
+        if do_fitting and sq_pulse_duration is None:
+            log.error(
+                "Pulse duration is required for fitting. Fitting will be skipped!"
+            )
+        do_fitting = do_fitting and sq_pulse_duration is not None
+
+        super().__init__(
+            t_start=t_start,
+            t_stop=t_stop,
+            label=label,
+            data_file_path=data_file_path,
+            close_figs=close_figs,
+            options_dict=options_dict,
+            extract_only=extract_only,
+            do_fitting=do_fitting,
+            save_qois=save_qois,
+            auto=auto,
+            interp_method="linear",
+        )
+
+    def extract_data(self):
+        super().extract_data()
+
+    def process_data(self):
+        super().process_data()
+
+        pdd = self.proc_data_dict
+
+        bias_axis = "x" if "FBL" in self.raw_data_dict["xlabel"].upper() else "y"
+        pdd["bias_axis"] = bias_axis
+        amps_axis = "y" if bias_axis == "x" else "x"
+        pdd["amps_axis"] = amps_axis
+        unique_bias_values = np.unique(self.raw_data_dict[bias_axis])
+        pdd["unique_bias_values"] = unique_bias_values
+        bias_1D_cuts = []
+        pdd["bias_1D_cuts"] = bias_1D_cuts
+        bias_strs = []
+        pdd["bias_strs"] = bias_strs
+        for unique_bias in unique_bias_values:
+            is_this_unique = self.raw_data_dict[bias_axis] == unique_bias
+            is_neg_amp = self.raw_data_dict[amps_axis] < 0
+            is_pos_amp = self.raw_data_dict[amps_axis] > 0
+            idxs_amps = np.where(is_this_unique)[0]
+            idxs_amps_neg = np.where(is_this_unique * is_neg_amp)[0]
+            idxs_amps_pos = np.where(is_this_unique * is_pos_amp)[0]
+            amps_neg = self.raw_data_dict[amps_axis][idxs_amps_neg]
+            amps_pos = self.raw_data_dict[amps_axis][idxs_amps_pos]
+            amps = self.raw_data_dict[amps_axis][idxs_amps]
+            mv = self.raw_data_dict["measured_values"][:, idxs_amps]
+            mv_neg = self.raw_data_dict["measured_values"][:, idxs_amps_neg]
+            mv_pos = self.raw_data_dict["measured_values"][:, idxs_amps_pos]
+            bias_1D_cuts.append(
+                {
+                    "amps_neg": amps_neg,
+                    "amps_pos": amps_pos,
+                    "mv_neg": mv_neg,
+                    "mv_pos": mv_pos,
+                    "amps": amps,
+                    "mv": mv,
+                }
+            )
+
+            scale_factor, unit = SI_prefix_and_scale_factor(
+                val=unique_bias, unit=self.proc_data_dict["yunit"]
+            )
+            bias_strs.append("{:4g} ({})".format(unique_bias * scale_factor, unit))
+
+        # values stored in quantities of interest will be saved in the data file
+        self.proc_data_dict["quantities_of_interest"] = {}
+
+    def prepare_fitting(self):
+        t = self.sq_pulse_duration
+
+        fit_d = self.fit_dicts
+
+        pdd = self.proc_data_dict
+
+        if self.fit_from != "":
+            fit_from_idx = self.raw_data_dict["value_names"].index(self.fit_from)
+        else:
+            fit_from_idx = 0
+            self.fit_from = self.raw_data_dict["value_names"][fit_from_idx]
+
+        for i, bdict in enumerate(pdd["bias_1D_cuts"]):
+            chevron_model = lmfit.Model(ChevronFunc)
+            chevron_model.guess = ChevronGuess
+
+            fit_key = "chevron_fit_{}".format(i)
+            fit_xvals = bdict["amps"]
+            fit_yvals = bdict["mv"][fit_from_idx]
+
+            if self.fit_threshold is not None:
+                # For some cases the fit might not work well due to noise
+                # This is to fit above a threshold only
+                sel_idx = np.where(fit_yvals > self.fit_threshold)[0]
+                fit_yvals = fit_yvals[sel_idx]
+                fit_xvals = fit_xvals[sel_idx]
+
+            fit_d[fit_key] = {
+                "model": chevron_model,
+                "guessfn_pars": {"model": chevron_model, "t": t},
+                "fit_xvals": {"amp": fit_xvals},
+                "fit_yvals": {"data": fit_yvals},
+            }
+
+    def analyze_fit_results(self):
+        pdd = self.proc_data_dict
+        ubv = pdd["unique_bias_values"]
+        fit_res = self.fit_res
+        qoi = pdd["quantities_of_interest"]
+
+        centers_diffs = []
+
+        chevron_centers_L = []
+        chevron_centers_R = []
+        chevron_centers_L_vals = []
+        chevron_centers_R_vals = []
+        for bias, fit_key in zip(ubv, fit_res.keys()):
+            amp_center_1 = fit_res[fit_key].params["amp_center_1"]
+            amp_center_2 = fit_res[fit_key].params["amp_center_2"]
+            centers = [amp_center_1, amp_center_2]
+            arg_amp_L = np.argmin([amp_center_1.value, amp_center_2.value])
+            arg_amp_R = np.argmax([amp_center_1.value, amp_center_2.value])
+
+            stderr_L = (
+                centers[arg_amp_L].stderr
+                if centers[arg_amp_L].stderr is not None
+                else np.nan
+            )
+            stderr_R = (
+                centers[arg_amp_R].stderr
+                if centers[arg_amp_R].stderr is not None
+                else np.nan
+            )
+
+            chevron_centers_L.append(ufloat(centers[arg_amp_L].value, stderr_L))
+            chevron_centers_R.append(ufloat(centers[arg_amp_R].value, stderr_R))
+
+            chevron_centers_L_vals.append(centers[arg_amp_L].value)
+            chevron_centers_R_vals.append(centers[arg_amp_R].value)
+
+            centers_diffs.append(centers[arg_amp_L].value + centers[arg_amp_R].value)
+
+        pdd["chevron_centers_L"] = chevron_centers_L
+        pdd["chevron_centers_R"] = chevron_centers_R
+        pdd["centers_diffs"] = centers_diffs
+
+        bias_calibration_coeffs = np.polyfit(centers_diffs, ubv, 1)
+        pdd["bias_calibration_coeffs"] = bias_calibration_coeffs
+        calib_bias = bias_calibration_coeffs[1]
+        pdd["calibration_bias"] = calib_bias
+
+        bias_calibration_coeffs_L = np.polyfit(chevron_centers_L_vals, ubv, 1)
+        bias_calibration_coeffs_R = np.polyfit(chevron_centers_R_vals, ubv, 1)
+
+        p = bias_calibration_coeffs_L
+        int_pnt_L = (calib_bias - p[1]) / p[0]
+        p = bias_calibration_coeffs_R
+        int_pnt_R = (calib_bias - p[1]) / p[0]
+        pdd["interaction_pnts"] = (int_pnt_L, int_pnt_R)
+
+        amp_interaction_pnt = (np.abs(int_pnt_L) + np.abs(int_pnt_R)) / 2
+        pdd["amp_interaction_pnt"] = amp_interaction_pnt
+
+        qoi["calibration_bias"] = calib_bias
+        qoi["amp_interaction_pnt"] = amp_interaction_pnt
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        super().prepare_plots()
+
+        bias_1D_cuts = self.proc_data_dict["bias_1D_cuts"]
+        num_cuts = len(bias_1D_cuts)
+
+        for i, val_name in enumerate(self.proc_data_dict["value_names"]):
+            ax_id = "all_bias_1D_cuts_" + val_name
+            self.plot_dicts[ax_id] = {
+                "ax_id": ax_id,
+                "plotfn": plot_chevron_bias_1D_cuts,
+                "bias_1D_cuts_dicts": bias_1D_cuts,
+                "xlabel": self.proc_data_dict["xlabel"],
+                "xunit": self.proc_data_dict["xunit"],
+                "ylabel": val_name,
+                "yunit": self.proc_data_dict["value_units"][i],
+                "title": "{}\n{}".format(
+                    self.timestamp, self.proc_data_dict["measurementstring"]
+                ),
+                "title_neg": val_name + " (amp < 0)",
+                "title_pos": val_name + " (amp > 0)",
+                "sharex": False,
+                "sharey": True,
+                "plotsize": (13, 5 * num_cuts),
+                "numplotsy": num_cuts,
+                "numplotsx": 2,
+                "mv_indx": i,
+            }
+        if self.do_fitting:
+            self._prepare_fit_plots()
+
+    def _prepare_fit_plots(self):
+        pdd = self.proc_data_dict
+        pd = self.plot_dicts
+        for i, fit_key in enumerate(self.fit_res.keys()):
+            bias_str = pdd["bias_strs"][i]
+            pd[fit_key + "_L"] = {
+                "ax_id": "all_bias_1D_cuts_" + self.fit_from,
+                "plotfn": self.plot_fit,
+                "fit_res": self.fit_dicts[fit_key]["fit_res"],
+                "plot_init": self.options_dict["plot_init"],
+                "setlabel": "Fit flux bias = " + bias_str,
+                "do_legend": True,
+                "ax_row": i,
+                "ax_col": 0,
+            }
+            pd[fit_key + "_R"] = {
+                "ax_id": "all_bias_1D_cuts_" + self.fit_from,
+                "plotfn": self.plot_fit,
+                "fit_res": self.fit_dicts[fit_key]["fit_res"],
+                "plot_init": self.options_dict["plot_init"],
+                "setlabel": "Fit bias = " + bias_str,
+                "do_legend": True,
+                "ax_row": i,
+                "ax_col": 1,
+            }
+
+            pd["all_bias_1D_cuts_" + self.fit_from]["fit_threshold"] = self.fit_threshold
+            pd["all_bias_1D_cuts_" + self.fit_from]["fit_threshold"] = self.fit_threshold
+
+            center_L = pdd["chevron_centers_L"][i]
+            center_R = pdd["chevron_centers_R"][i]
+            pd[fit_key + "_L_center"] = {
+                "ax_id": "all_bias_1D_cuts_" + self.fit_from,
+                "plotfn": plot_chevron_center_on_1D_cut,
+                "center_amp_ufloat": center_L,
+                # "plot_init": self.options_dict["plot_init"],
+                # "setlabel": "Fit bias = " + bias_str,
+                # "do_legend": True,
+                "label": center_L,
+                "ax_row": i,
+                "ax_col": 0,
+            }
+            pd[fit_key + "_R_center"] = {
+                "ax_id": "all_bias_1D_cuts_" + self.fit_from,
+                "plotfn": plot_chevron_center_on_1D_cut,
+                "center_amp_ufloat": center_R,
+                # "plot_init": self.options_dict["plot_init"],
+                # "setlabel": "Fit bias = " + bias_str,
+                # "do_legend": True,
+                "label": center_R,
+                "ax_row": i,
+                "ax_col": 1,
+            }
+
+        calib_bias = pdd["calibration_bias"]
+        scale_factor, unit = SI_prefix_and_scale_factor(
+            val=calib_bias, unit=pdd["yunit"]
+        )
+        calib_bias_str = "{:4g} ({})".format(calib_bias * scale_factor, unit)
+
+        poly_calib = np.poly1d(pdd["bias_calibration_coeffs"])
+        xs = np.array(pdd["centers_diffs"])[[0, -1]]
+
+        amp_interaction_pnt = pdd["amp_interaction_pnt"]
+        for i, val_name in enumerate(pdd["value_names"]):
+            # Order here matters due to the legend
+            self.plot_dicts["int_pnts_" + val_name] = {
+                "ax_id": val_name,
+                "plotfn": self.plot_line,
+                "func": "scatter",
+                "xvals": [pdd["interaction_pnts"][0], pdd["interaction_pnts"][1]],
+                "yvals": [calib_bias, calib_bias],
+                "marker": "o",
+                "color": "gold",
+                "line_kws": {"edgecolors": "gray", "linewidth": 0.7, "s": 100},
+                "setlabel": "Amp at interaction: {:3g}".format(amp_interaction_pnt),
+            }
+            self.plot_dicts["bias_fit_calib_" + val_name] = {
+                "ax_id": val_name,
+                "plotfn": self.plot_matplot_ax_method,
+                "func": "axhline",
+                "plot_kws": {
+                    "y": calib_bias,
+                    "ls": "--",
+                    "color": "red",
+                    "label": "Sweet spot bias: " + calib_bias_str,
+                },
+            }
+            self.plot_dicts["bias_fit_" + val_name] = {
+                "ax_id": val_name,
+                "plotfn": self.plot_line,
+                "xvals": xs,
+                "yvals": poly_calib(xs),
+                "setlabel": "Flux bias fit",
+                "do_legend": True,
+                "marker": "",
+                "linestyles": "r--",
+                "color": "red",
+            }
+            self.plot_dicts["bias_fit_data_" + val_name] = {
+                "ax_id": val_name,
+                "plotfn": self.plot_line,
+                "func": "scatter",
+                "xvals": pdd["centers_diffs"],
+                "yvals": pdd["unique_bias_values"],
+                "marker": "o",
+                "color": "orange",
+                "line_kws": {"edgecolors": "gray", "linewidth": 0.5},
+            }
+
+
+def plot_chevron_bias_1D_cuts(bias_1D_cuts_dicts, mv_indx, fig=None, ax=None, **kw):
+    if ax is None:
+        num_cuts = len(bias_1D_cuts_dicts)
+        fig, ax = plt.subplots(
+            num_cuts, 2, sharex=False, sharey=True, figsize=(13, 5 * num_cuts)
+        )
+        fig.tight_layout()
+
+    xlabel = kw.get("xlabel", "")
+    ylabel = kw.get("ylabel", "")
+    x_unit = kw.get("xunit", "")
+    y_unit = kw.get("yunit", "")
+
+    fit_threshold = kw.get("fit_threshold", None)
+
+    title_neg = kw.pop("title_neg", None)
+    title_pos = kw.pop("title_pos", None)
+
+    if title_neg is not None:
+        ax[0][0].set_title(title_neg)
+    if title_pos is not None:
+        ax[0][1].set_title(title_pos)
+
+    edgecolors = "grey"
+    linewidth = 0.2
+    cmap = "plasma"
+    for i, d in enumerate(bias_1D_cuts_dicts):
+        ax[i][0].scatter(
+            d["amps_neg"],
+            d["mv_neg"][mv_indx],
+            edgecolors=edgecolors,
+            linewidth=linewidth,
+            c=range(len(d["amps_neg"])),
+            cmap=cmap,
+        )
+        ax[i][0].set_xlim(np.min(d["amps_neg"]), np.max(d["amps_neg"]))
+        ax[i][1].scatter(
+            d["amps_pos"],
+            d["mv_pos"][mv_indx],
+            edgecolors=edgecolors,
+            linewidth=linewidth,
+            c=range(len(d["amps_pos"])),
+            cmap=cmap,
+        )
+        ax[i][1].set_xlim(np.min(d["amps_pos"]), np.max(d["amps_pos"]))
+
+        # shide the spines between
+        ax[i][0].spines["right"].set_visible(False)
+        ax[i][1].spines["left"].set_visible(False)
+        ax[i][0].yaxis.tick_left()
+        ax[i][1].tick_params(labelleft=False)
+        ax[i][1].yaxis.tick_right()
+
+        set_ylabel(ax[i][0], ylabel, unit=y_unit)
+
+        if fit_threshold is not None:
+            label = "Fit threshold"
+            ax[i][0].axhline(fit_threshold,
+                ls="--", color="green", label=label)
+            ax[i][1].axhline(fit_threshold,
+                ls="--", color="green", label=label)
+
+    set_xlabel(ax[-1][0], xlabel, unit=x_unit)
+    set_xlabel(ax[-1][1], xlabel, unit=x_unit)
+
+    return fig, ax
+
+
+def plot_chevron_center_on_1D_cut(
+    center_amp_ufloat, ax_row, ax_col, label, ax, fig=None, **kw
+):
+    ax[ax_row][ax_col].axvline(
+        center_amp_ufloat.n, ls="--", label="Center: " + str(label)
+    )
+    ax[ax_row][ax_col].legend()
+    ax[ax_row][ax_col].axvline(
+        center_amp_ufloat.n - center_amp_ufloat.s, ls=":", color="grey"
+    )
+    ax[ax_row][ax_col].axvline(
+        center_amp_ufloat.n + center_amp_ufloat.s, ls=":", color="grey"
+    )
+    return fig, ax
+
+
+class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
     """
     Intended for the analysis of CZ tuneup (theta_f, lambda_2) heatmaps
     The data can be from an experiment or simulation
@@ -459,9 +883,35 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
             extract_only=extract_only,
             do_fitting=do_fitting,
             save_qois=save_qois,
-            auto=auto,
-            interp_method=interp_method,
         )
+        self.interp_method = interp_method
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.raw_data_dict = OrderedDict()
+        self.timestamps = a_tools.get_timestamps_in_range(
+            self.t_start, self.t_stop, label=self.labels
+        )
+        self.raw_data_dict["timestamps"] = self.timestamps
+
+        self.timestamp = self.timestamps[0]
+        a = ma_old.MeasurementAnalysis(
+            timestamp=self.timestamp, auto=False, close_file=False
+        )
+        a.get_naming_and_values()
+
+        for idx, lab in enumerate(["x", "y"]):
+            self.raw_data_dict[lab] = a.sweep_points[idx]
+            self.raw_data_dict["{}label".format(lab)] = a.parameter_names[idx]
+            self.raw_data_dict["{}unit".format(lab)] = a.parameter_units[idx]
+
+        self.raw_data_dict["measured_values"] = a.measured_values
+        self.raw_data_dict["value_names"] = a.value_names
+        self.raw_data_dict["value_units"] = a.value_units
+        self.raw_data_dict["measurementstring"] = a.measurementstring
+        self.raw_data_dict["folder"] = a.folder
+        a.finish()
 
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
@@ -832,7 +1282,7 @@ class Conditional_Oscillation_Heatmap_Analysis(Basic2DInterpolatedAnalysis):
                 phase_thr=self.phase_thr,
                 L1_thr=self.L1_thr,
                 clustering_thr=self.clustering_thr,
-                sort_by_mode=self.sort_clusters_by
+                sort_by_mode=self.sort_clusters_by,
             )
         else:
             optimal_idxs = np.array([cost_func.argmin()])
@@ -1092,7 +1542,7 @@ def get_optimal_pnts_indxs(
     L1_thr=0.3,
     clustering_thr=10,
     tolerances=[1, 2, 3],
-    sort_by_mode="cost"
+    sort_by_mode="cost",
 ):
     """
     target_phase and low L1 need to match roughtly cost function's minimums
@@ -1218,7 +1668,9 @@ def get_optimal_pnts_indxs(
 
         # low leakage is best
         w1 = (
-            np.array(av_L1) / np.max(av_L1) /  # normalize to maximum leakage
+            np.array(av_L1)
+            / np.max(av_L1)
+            /  # normalize to maximum leakage
             # and consider bigger clusters more interesting
             np.array([it for it in map(np.size, clusters_by_indx)])
         )

@@ -14,7 +14,6 @@ from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter,
 
 from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
-reload(det)
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import tomography as tomo
@@ -24,9 +23,12 @@ from pycqed.utilities.general import check_keyboard_interrupt
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
-from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+# from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
+# from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
+from pycqed.utilities import learner1D_minimizer as l1dm
+
+reload(det)
 
 log = logging.getLogger(__name__)
 
@@ -1789,6 +1791,230 @@ class DeviceCCL(Instrument):
             MC.run(label + " adaptive", mode='adaptive')
             ma2.Basic2DInterpolatedAnalysis()
 
+    def measure_chevron_1D_bias_sweep(
+        self,
+        q0: str,
+        q_spec: str,
+        q_park: str = None,
+        amps=np.arange(0, 1, 0.05),
+        prepare_for_timedomain=True,
+        MC=None,
+        freq_tone=6e9,
+        pow_tone=-10,
+        spec_tone=False,
+        measure_parked_qubit=False,
+        target_qubit_sequence: str = "ramsey",
+        waveform_name="square",
+        adaptive_sampling=False,
+        adaptive_sampling_pts=None,
+        adaptive_sample_for_alignment=True,
+        max_pnts_beyond_threshold=10,
+        minimizer_threshold=0.500,
+        mv_bias_by=[-150e-6, 150e-6],
+    ):
+        """
+        Measure a chevron patter of esulting from swapping of the excitations
+        of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
+        close to the interaction zone using (usually) a rectangular pulse.
+        Meanwhile q1 is prepared in 0, 1 or superposition state. If it is in 0
+        state flipping between 01-10 can be observed. It if is in 1 state flipping
+        between 11-20 as well as 11-02 show up. In superpostion everything is visible.
+
+        Args:
+            q0 (str):
+                flux-pulsed qubit (prepared in 1 state at the beginning)
+            q_spec (str):
+                stationary qubit (in 0, 1 or superposition)
+            q_park (str):
+                qubit to move out of the interaction zone by applying a
+                square flux pulse. Note that this is optional. Not specifying
+                this means no extra pulses are applied.
+                Note that this qubit is not read out.
+
+            amps (array):
+                amplitudes of the applied flux pulse controlled via the amplitude
+                of the correspnding AWG channel
+
+            lengths (array):
+                durations of the applied flux pulses
+
+            adaptive_sampling (bool):
+                indicates whether to adaptivelly probe
+                values of ampitude and duration, with points more dense where
+                the data has more fine features
+
+            adaptive_sampling_pts (int):
+                number of points to measur in the adaptive_sampling mode
+
+            prepare_for_timedomain (bool):
+                should all instruments be reconfigured to
+                time domain measurements
+
+            target_qubit_sequence (str {"ground", "extited", "ramsey"}):
+                specifies whether the spectator qubit should be
+                prepared in the 0 state ('ground'), 1 state ('extited') or
+                in superposition ('ramsey')
+
+        Circuit:
+            q0    -x180-flux-x180-RO-
+            qspec --x90-----------RO- (target_qubit_sequence='ramsey')
+
+            q0    -x180-flux-x180-RO-
+            qspec -x180-----------RO- (target_qubit_sequence='excited')
+
+            q0    -x180-flux-x180-RO-
+            qspec ----------------RO- (target_qubit_sequence='ground')
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        assert q_spec in self.qubits()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
+        if q_park is not None:
+            q_park_idx = self.find_instrument(q_park).cfg_qubit_nr()
+            fl_lutman_park = self.find_instrument(q_park).instr_LutMan_Flux.get_instr()
+            if fl_lutman_park.sq_amp() < 0.1:
+                # This can cause weird behaviour if not paid attention to.
+                log.warning("Square amp for park pulse < 0.1")
+        else:
+            q_park_idx = None
+
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+
+        if waveform_name == "square":
+            length_par = fl_lutman.sq_length
+            flux_cw = 6
+        else:
+            raise ValueError("Waveform shape not understood")
+
+        if prepare_for_timedomain:
+            if measure_parked_qubit:
+                self.prepare_for_timedomain(qubits=[q0, q_spec, q_park])
+            else:
+                self.prepare_for_timedomain(qubits=[q0, q_spec])
+
+        awg = fl_lutman.AWG.get_instr()
+        using_QWG = isinstance(awg, QuTech_AWG_Module)
+        if using_QWG:
+            awg_ch = fl_lutman.cfg_awg_channel()
+            amp_par = awg.parameters["ch{}_amp".format(awg_ch)]
+        else:
+            # -1 is to account for starting at 1
+            awg_ch = fl_lutman.cfg_awg_channel() - 1
+            ch_pair = awg_ch % 2
+            awg_nr = awg_ch // 2
+
+            amp_par = awg.parameters["awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)]
+
+        p = mqo.Chevron(
+            q0idx,
+            q_specidx,
+            q_park_idx,
+            buffer_time=40e-9,
+            buffer_time2=length_par() + 40e-9,
+            flux_cw=flux_cw,
+            measure_parked_qubit=measure_parked_qubit,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            target_qubit_sequence=target_qubit_sequence,
+            cc=self.instr_CC.get_instr().name,
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+
+        if measure_parked_qubit:
+            d = self.get_int_avg_det(
+                qubits=[q0, q_spec, q_park],
+                single_int_avg=True,
+                seg_per_point=1,
+                always_prepare=True,
+            )
+        else:
+            d = self.get_correlation_detector(
+                qubits=[q0, q_spec],
+                single_int_avg=True,
+                seg_per_point=1,
+                always_prepare=True,
+            )
+
+        # if we want to add a spec tone
+        if spec_tone:
+            spec_source = self.find_instrument(q0).instr_spec_source.get_instr()
+            spec_source.pulsemod_state(False)
+            spec_source.power(pow_tone)
+            spec_source.frequency(freq_tone)
+            spec_source.on()
+
+        MC.set_sweep_function(amp_par)
+        MC.set_detector_function(d)
+
+        label = "Chevron {} {} [{:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
+
+        if not adaptive_sampling:
+            MC.set_sweep_points(amps)
+
+            MC.run(label, mode="1D")
+            ma2.Basic1DAnalysis()
+        elif adaptive_sample_for_alignment:
+            goal = l1dm.mk_min_threshold_goal_func(
+                max_pnts_beyond_threshold=max_pnts_beyond_threshold
+            )
+            loss = l1dm.mk_minimization_loss_func(
+                threshold=-minimizer_threshold, interval_weight=200.0
+            )
+
+            adaptive_pars_pos = {
+                "adaptive_function": l1dm.Learner1D_Minimizer,
+                "goal": lambda l: goal(l) or l.npoints > adaptive_sampling_pts,
+                "bounds": amps,
+                "loss_per_interval": loss,
+                "minimize": False,
+            }
+
+            adaptive_pars_neg = {
+                "adaptive_function": l1dm.Learner1D_Minimizer,
+                "goal": lambda l: goal(l) or l.npoints > adaptive_sampling_pts,
+                # NB: order of the bounds matters, mind negative numbers ordering
+                "bounds": np.flip(-np.array(amps), 0),
+                "loss_per_interval": loss,
+                "minimize": False,
+            }
+
+            fluxcurrent_instr = self.find_instrument(q0).instr_FluxCtrl.get_instr()
+            flux_bias_par_name = "FBL_" + q0
+            flux_bias_par = fluxcurrent_instr[flux_bias_par_name]
+
+            flux_bias_old_val = flux_bias_par()
+
+            MC.set_sweep_functions([amp_par, flux_bias_par])
+            adaptive_pars = {
+                "multi_adaptive_single_dset": True,
+                "adaptive_pars_list": [adaptive_pars_pos, adaptive_pars_neg],
+                "extra_dims_sweep_pnts": flux_bias_par() + np.array(mv_bias_by),
+            }
+
+            MC.set_adaptive_function_parameters(adaptive_pars)
+            MC.run(label, mode="adaptive")
+
+            # Restore old bias value
+            flux_bias_par(flux_bias_old_val)
+
+            ma2.Chevron_Alignment_Analysis(
+                label=label,
+                sq_pulse_duration=length_par(),
+                fit_threshold=minimizer_threshold)
+
+        else:
+            adaptive_pars = {
+                "adaptive_function": adaptive.Learner1D,
+                "goal": lambda l: l.npoints > adaptive_sampling_pts,
+                "bounds": amps,
+            }
+            MC.set_adaptive_function_parameters(adaptive_pars)
+            MC.run(label, mode="adaptive")
+            ma2.Basic1DAnalysis()
+
     def measure_two_qubit_ramsey(self, q0: str, q_spec: str,
                                  times,
                                  prepare_for_timedomain=True, MC=None,
@@ -2090,12 +2316,12 @@ class DeviceCCL(Instrument):
                                   qotheridx=2,
                                   prepare_for_timedomain: bool = True):
         """
-        Measure timing diagram. 
+        Measure timing diagram.
 
         Args:
             q0  (str)     :
                 name of the target qubit
-            microwave_latencies (array): 
+            microwave_latencies (array):
                 array of microwave latencies to set (in seconds)
 
             label (str):

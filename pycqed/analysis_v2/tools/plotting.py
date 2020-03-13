@@ -21,7 +21,7 @@ def scatter_pnts_overlay(
         s=None,
         c=None,
         alpha=1,
-        setlabel= None,
+        setlabel=None,
         **kw):
     """
     Adds a scattered overlay of the provided data points
