@@ -171,8 +171,7 @@ if 1:  # test of Distributed Shared Memory
         .DEF    smAddr      S16
         .DEF    lut         0
         
-                
-                seq_bar     1                       # synchronize processors so markers make sense
+        #        seq_bar     1                       # synchronize processors so markers make sense
                 move        $numIter,R0
         loop:   seq_out     0x00010000,$duration    # trigger UHFQA
         [{uhf}] seq_in_sm   $smAddr,$lut,0
