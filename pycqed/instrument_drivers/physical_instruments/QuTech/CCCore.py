@@ -48,7 +48,7 @@ class CCCore(SCPIBase):
     def assemble(self, program_string: str) -> None:
         self.sequence_program_assemble(program_string)  # NB: takes ~1.1 s for RB with 2048 Cliffords (1 measurement only)
         if self.get_assembler_success() != 1:
-            sys.stderr.write('error log = {}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
+            sys.stderr.write('assembly error log:\n{}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
             raise RuntimeError('assembly failed')
 
     def assemble_and_start(self, program_string: str) -> None:
@@ -89,8 +89,8 @@ class CCCore(SCPIBase):
         # only possible if CC is stopped
         return self._ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
 
-    def calibrate_dio(self, ccio: int) -> None:
-        self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL')
+    def calibrate_dio(self, ccio: int, expected_bits: int) -> None:
+        self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL {expected_bits}')
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')

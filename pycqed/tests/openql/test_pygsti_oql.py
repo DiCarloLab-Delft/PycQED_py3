@@ -4,6 +4,7 @@ import pytest
 from openql import openql as ql
 from pycqed.measurement.openql_experiments.pygsti_oql import \
     poor_mans_2q_gst, single_qubit_gst, two_qubit_gst
+from pycqed.measurement.openql_experiments import openql_helpers as oqh
 
 # pytestmark = pytest.mark.skip
 class Test_pygsti_oql(unittest.TestCase):
@@ -33,7 +34,8 @@ class Test_pygsti_oql(unittest.TestCase):
 # NB: we just hijack the parent class to run the same tests
 # NB: requires OpenQL with CC backend support
 ##########################################################################
-if ql.get_version() > '0.8.0':  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
+
+if oqh.is_compatible_openql_version_cc():
     class Test_pygsti_oql_CC(Test_pygsti_oql):
         def setUp(self):
             curdir = os.path.dirname(__file__)

@@ -185,7 +185,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     ##########################################################################
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
-        self.calibrate_dio(port)
+        self.calibrate_dio(port, expected_bits=dio_mask)
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         # default return values
