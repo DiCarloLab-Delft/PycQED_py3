@@ -469,10 +469,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "czv_time_at_sweetspot_%s" % this_cz,
                 docstring="Time between the two square parts.",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(1e-12, 500e-9),
-                initial_value=None,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=0.,
                 unit="s",
-                label="Time between NZ halves",
+                label="Time at sweet spot",
             )
             # self.add_parameter(
             #     "czv_total_time_%s" % this_cz,
