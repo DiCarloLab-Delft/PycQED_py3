@@ -546,7 +546,7 @@ class MeasurementControl(Instrument):
                     except StopIteration:
                         print("Reached f_termination: %s" % (self.f_termination))
 
-                    if not multi_adaptive_single_dset and Xs[0] is None:
+                    if not multi_adaptive_single_dset and Xs[0] is None and hasattr(self, "adaptive_result"):
                         self.save_optimization_results(
                             self.adaptive_function, result=self.adaptive_result
                         )
