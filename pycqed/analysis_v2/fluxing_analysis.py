@@ -733,8 +733,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         clims: dict = None,
         find_local_optimals: bool = True,
         phase_thr=5,
-        L1_thr=0.3,
-        clustering_thr=10,
+        L1_thr=0.5,
+        clustering_thr=10 / 360,
         cluster_from_interp: bool = True,
         _opt_are_interp: bool = True,
         sort_clusters_by: str = "cost",
@@ -759,7 +759,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         # Optimals are interpolated
         # Manually set to false if the default analysis flow is changed
         # e.g. in get_guesses_from_cz_sim in flux_lutman
-        # In that case we re-evaluate the optimals to be able to proint
+        # In that case we re-evaluate the optimals to be able to return
         # true values and not interpolated, even though the optimal is
         # obtained from interpolation
         self._opt_are_interp = _opt_are_interp
@@ -1534,7 +1534,7 @@ def get_optimal_pnts_indxs(
     target_phase=180,
     phase_thr=5,
     L1_thr=0.3,
-    clustering_thr=10,
+    clustering_thr=10 / 360,
     tolerances=[1, 2, 3],
     sort_by_mode="cost",
 ):
@@ -1560,8 +1560,13 @@ def get_optimal_pnts_indxs(
     y = np.array(lambda_2_arr)
 
     # Normalize distance
-    x_norm = x / 360.0
-    y_norm = y / (2 * np.pi)
+    x_min = np.min(x)
+    x_max = np.max(x)
+    y_min = np.min(y)
+    y_max = np.max(y)
+
+    x_norm = (x - x_min) / (x_max - x_min)
+    y_norm = (y - y_min) / (y_max - y_min)
 
     # Select points based on low leakage and on how close to the
     # target_phase they are
@@ -1602,8 +1607,7 @@ def get_optimal_pnts_indxs(
 
     # Cluster points based on distance
     x_y_filt = np.transpose([x_filt, y_filt])
-    thresh = clustering_thr / 360.0
-    clusters = hcluster.fclusterdata(x_y_filt, thresh, criterion="distance")
+    clusters = hcluster.fclusterdata(x_y_filt, clustering_thr, criterion="distance")
 
     # Sorting the clusters
     cluster_id_min = np.min(clusters)
@@ -1639,7 +1643,7 @@ def get_optimal_pnts_indxs(
             cluster_indxs = np.where(clusters == cluster_id)
             indxs_in_orig_array = selected_points_indxs[cluster_indxs]
             L1_av_around = [
-                av_around(x_norm, y_norm, L1_arr, idx, thresh * 1.5)[0]
+                av_around(x_norm, y_norm, L1_arr, idx, clustering_thr * 1.5)[0]
                 for idx in indxs_in_orig_array
             ]
             min_idx = np.argmin(L1_av_around)
@@ -1650,7 +1654,7 @@ def get_optimal_pnts_indxs(
             clusters_by_indx.append(indxs_in_orig_array)
 
             # sq_dist = (x_norm - x_norm[optimal_idx])**2 + (y_norm - y_norm[optimal_idx])**2
-            # neighbors_indx = np.where(sq_dist <= (thresh * 1.5)**2)
+            # neighbors_indx = np.where(sq_dist <= (clustering_thr * 1.5)**2)
             # neighbors_num.append(np.size(neighbors_indx))
             # av_cp_diff.append(np.average(cond_phase_abs_diff[neighbors_indx]))
             # av_L1.append(np.average(L1_arr[neighbors_indx]))
