@@ -26,7 +26,7 @@ def victor_waveform(
     # This should eventually become a parameter and do not depend on anything else
     amp_at_int_11_02 = fluxlutman.calc_eps_to_amp(
         0, state_A="11", state_B="02", which_gate=which_gate
-    ) / (fluxlutman.cfg_awg_channel_range() / 2 * fluxlutman.cfg_awg_channel_amplitude() )
+    ) * fluxlutman.get_amp_to_dac_val_scalefactor()
 
     if fluxlutman.get("czv_fixed_amp_{}".format(which_gate)):
         # This is a temporary hack while testing this pulse for the first
@@ -123,7 +123,7 @@ def victor_waveform(
         intervals = time_interp[1:] - time_interp[:-1]
         intervals_list = np.concatenate((intervals, [np.min(intervals)]))
 
-        return_dict = {
+        return {
             "time": time_interp,
             "amp": amp_interp,
             "intervals_list": intervals_list,
