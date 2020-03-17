@@ -5,6 +5,7 @@ from collections import OrderedDict
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
+from scipy.spatial import ConvexHull
 
 from pycqed.analysis.tools.plotting import (
     set_xlabel,
@@ -746,6 +747,11 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         single_q_phase_offset: bool = False,
         calc_L1_from_missing_frac: bool = True,
         calc_L1_from_offset_diff: bool = False,
+        hull_clustering_thr=0.1,
+        hull_phase_thr=5,
+        hull_L1_thr=5,
+        generate_optima_hulls=False,
+        plt_optimal_hulls=False,
         comparison_timestamp: str = None,
     ):
 
@@ -793,6 +799,14 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         # Compare to any other dataset that has the same shape for
         # 'measured_values'
         self.comparison_timestamp = comparison_timestamp
+
+        # Used to generate the vertices of hulls that can be used later
+        # reoptimize only in the regions of interest
+        self.hull_clustering_thr = hull_clustering_thr
+        self.hull_phase_thr = hull_phase_thr
+        self.hull_L1_thr = hull_L1_thr
+        self.generate_optima_hulls = generate_optima_hulls
+        self.plt_optimal_hulls = plt_optimal_hulls
 
         self._generate_waveform = False
         if (
@@ -1022,6 +1036,24 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     }
                 else:
                     log.warning("No data found named {}".format(self.L1_names))
+
+            if self.plt_optimal_hulls and self.generate_optima_hulls:
+                sorted_hull_vertices = self.proc_data_dict["hull_vertices"]
+                for hull_i, hull_vertices in sorted_hull_vertices.items():
+                    vertices_x, vertices_y = np.transpose(hull_vertices)
+                    # vertices_x = hull_vertices["vertices_x"]
+                    # Close the start and end of the line
+                    x_vals = np.concatenate((vertices_x, vertices_x[-1:]))
+                    y_vals = np.concatenate((vertices_y, vertices_y[-1:]))
+                    self.plot_dicts[val_name + "_hull_{}".format(hull_i)] = {
+                        "ax_id": val_name,
+                        "plotfn": self.plot_line,
+                        "xvals": x_vals,
+                        "yvals": y_vals,
+                        "marker": "",
+                        "linestyles": "-",
+                        "color": "blue",
+                    }
 
             if (
                 self.plt_optimal_values
@@ -1414,6 +1446,9 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict["optimal_measured_values"] = optimal_measured_values
         self.proc_data_dict["optimal_measured_units"] = optimal_measured_units
 
+        if self.generate_optima_hulls:
+            self._proc_data_hulls()
+
         # Save quantities of interest
         save_these = {
             "optimal_pars_values",
@@ -1426,6 +1461,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             "clusters_pnts_y",
             "clusters_pnts_x",
             "clusters_pnts_colors",
+            "hull_vertices",
         }
         pdd = self.proc_data_dict
         quantities_of_interest = dict()
@@ -1435,6 +1471,52 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     quantities_of_interest[save_this] = pdd[save_this]
         if bool(quantities_of_interest):
             self.proc_data_dict["quantities_of_interest"] = quantities_of_interest
+
+    def _proc_data_hulls(self):
+        # Must be at the end of the main process_data
+
+        vln = self.proc_data_dict["value_names"]
+
+        interp_vals = self.proc_data_dict["interpolated_values"]
+
+        where = [(name in self.cost_func_Names) for name in vln]
+        cost_func_indxs = np.where(where)[0][0]
+        cost_func = interp_vals[cost_func_indxs]
+        cost_func = interp_to_1D_arr(z_int=cost_func)
+
+        where = [(name in self.cond_phase_names) for name in vln]
+        cond_phase_indx = np.where(where)[0][0]
+        cond_phase_arr = interp_vals[cond_phase_indx]
+        cond_phase_arr = interp_to_1D_arr(z_int=cond_phase_arr)
+
+        where = [(name in self.L1_names) for name in vln]
+        L1_indx = np.where(where)[0][0]
+        L1_arr = interp_vals[L1_indx]
+        L1_arr = interp_to_1D_arr(z_int=L1_arr)
+
+        x_int = self.proc_data_dict["x_int"]
+        y_int = self.proc_data_dict["y_int"]
+
+        x_int_reshaped, y_int_reshaped = interp_to_1D_arr(
+            x_int=x_int, y_int=y_int
+        )
+
+        sorted_hull_vertices = generate_optima_hull_vertices(
+            x_arr=x_int_reshaped,
+            y_arr=y_int_reshaped,
+            L1_arr=L1_arr,
+            cond_phase_arr=cond_phase_arr,
+            target_phase=self.target_cond_phase,
+            clustering_thr=self.hull_clustering_thr,
+            phase_thr=self.hull_phase_thr,
+            L1_thr=self.hull_L1_thr,
+        )
+
+        # We save this as a disctionary so that we don't have hdf5 issues
+        self.proc_data_dict["hull_vertices"] = {
+            str(h_i): hull_vertices for h_i, hull_vertices in enumerate(sorted_hull_vertices)
+        }
+        log.debug("Hulls are sorted by increasing y value.")
 
     def plot_text(self, pdict, axs):
         """
@@ -1539,7 +1621,7 @@ def get_optimal_pnts_indxs(
     sort_by_mode="cost",
 ):
     """
-    target_phase and low L1 need to match roughtly cost function's minimums
+    target_phase and low L1 need to match roughtly cost function's minima
 
     Args:
     target_phase: unit = deg
@@ -1692,6 +1774,119 @@ def get_optimal_pnts_indxs(
     clusters_by_indx = np.array(clusters_by_indx)[np.argsort(sort_by)]
 
     return optimal_idxs, clusters_by_indx
+
+
+def generate_optima_hull_vertices(
+    x_arr,
+    y_arr,
+    cond_phase_arr,
+    L1_arr,
+    target_phase=180,
+    phase_thr=5,
+    L1_thr=np.inf,
+    clustering_thr=0.1,
+    tolerances=[1, 2, 3]
+):
+    """
+    WARNING: OUTDATED
+
+    Args:
+    target_phase: unit = deg
+    phase_thr: unit = deg, only points with cond phase below this threshold
+        will be used for clustering
+
+    L1_thr: unit = %, only points with leakage below this threshold
+        will be used for clustering
+
+    clustering_thr: unit = deg, represents distance between points on the
+        landscape (lambda_2 gets normalized to [0, 360])
+
+    tolerances: phase_thr and L1_thr will be multiplied by the values in
+    this list successively if no points are found for the first element
+    in the list
+    """
+    x = np.array(x_arr)
+    y = np.array(y_arr)
+
+    # Normalize distance
+    x_min = np.min(x)
+    x_max = np.max(x)
+    y_min = np.min(y)
+    y_max = np.max(y)
+
+    x_norm = (x - x_min) / (x_max - x_min)
+    y_norm = (y - y_min) / (y_max - y_min)
+
+    # Select points based on low leakage and on how close to the
+    # target_phase they are
+    for tol in tolerances:
+        phase_thr *= tol
+        L1_thr *= tol
+        cond_phase_dev_f = multi_targets_phase_offset(target_phase, 2 * target_phase)
+        cond_phase_abs_diff = cond_phase_dev_f(cond_phase_arr)
+        sel = cond_phase_abs_diff <= phase_thr
+        sel = sel * (L1_arr <= L1_thr)
+
+        selected_points_indxs = np.where(sel)[0]
+        if np.size(selected_points_indxs) == 0:
+            log.warning(
+                "No optimal points found with  |target_phase - cond phase| < {} and L1 < {}.".format(
+                    phase_thr, L1_thr
+                )
+            )
+            if tol == tolerances[-1]:
+                log.warning("No optima found giving up.")
+                return []
+            log.warning(
+                "Increasing tolerance for phase_thr and L1 to x{}.".format(tol + 1)
+            )
+        else:
+            x_filt = x_norm[selected_points_indxs]
+            y_filt = y_norm[selected_points_indxs]
+            break
+
+    # Cluster points based on distance
+    x_y_filt = np.transpose([x_filt, y_filt])
+    clusters = hcluster.fclusterdata(x_y_filt, clustering_thr, criterion="distance")
+
+    # Sorting the clusters
+    cluster_id_min = np.min(clusters)
+    cluster_id_max = np.max(clusters)
+    clusters_by_indx = []
+    sort_by_idx = []
+
+    # Iterate over all clusters and calculate the metrics we want
+    for cluster_id in range(cluster_id_min, cluster_id_max + 1):
+
+        cluster_indxs = np.where(clusters == cluster_id)
+        indxs_in_orig_array = selected_points_indxs[cluster_indxs]
+        clusters_by_indx.append(indxs_in_orig_array)
+
+        min_sort_idx = np.argmin(y[indxs_in_orig_array])
+        optimal_idx = indxs_in_orig_array[min_sort_idx]
+
+        sort_by_idx.append(optimal_idx)
+
+    # Low cost function is considered the most interesting optimum
+    sort_by = y[sort_by_idx]
+
+    if np.any(np.array(sort_by) != np.sort(sort_by)):
+        log.debug(" Optimal points rescored.")
+
+    # optimal_idxs = np.array(optimal_idxs)[np.argsort(sort_by)]
+    clusters_by_indx = np.array(clusters_by_indx)[np.argsort(sort_by)]
+
+    x_y = np.transpose([x, y])
+
+    sorted_hull_vertices = []
+    # Generate the list of vertices for each optimal hull
+    for cluster_by_indx in clusters_by_indx:
+        pnts_for_hull = x_y[cluster_by_indx]
+        hull = ConvexHull(pnts_for_hull)
+
+        sorted_hull_vertices.append(hull.points[hull.vertices])
+
+    return sorted_hull_vertices
 
 
 def av_around(x, y, z, idx, radius):
