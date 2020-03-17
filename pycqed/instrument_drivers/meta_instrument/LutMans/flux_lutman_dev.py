@@ -538,6 +538,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 initial_value=False,
                 label="",
             )
+            self.add_parameter(
+                "czv_incl_q_phase_in_cz_%s" % this_cz,
+                docstring="",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=False,
+                label="",
+            )
             # #################################################################
             # END new CZ parameterization
             # #################################################################

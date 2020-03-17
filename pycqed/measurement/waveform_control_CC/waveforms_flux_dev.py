@@ -18,15 +18,18 @@ def victor_waveform(
     which_gate: str,
     sim_ctrl_cz=None,
     return_dict=False,
-    force_start_end_swtspt=True,
+    ensure_start_at_zero=True,
+    ensure_end_at_zero=True,
+    output_q_phase_corr=True
 ):
     # NB: the ramps are extra time, they are NOT substracted from sq_length!
 
     amp_at_sweetspot = 0.0
     # This should eventually become a parameter and do not depend on anything else
-    amp_at_int_11_02 = fluxlutman.calc_eps_to_amp(
-        0, state_A="11", state_B="02", which_gate=which_gate
-    ) * fluxlutman.get_amp_to_dac_val_scalefactor()
+    amp_at_int_11_02 = (
+        fluxlutman.calc_eps_to_amp(0, state_A="11", state_B="02", which_gate=which_gate)
+        * fluxlutman.get_amp_to_dac_val_scalefactor()
+    )
 
     if fluxlutman.get("czv_fixed_amp_{}".format(which_gate)):
         # This is a temporary hack while testing this pulse for the first
@@ -42,7 +45,8 @@ def victor_waveform(
     # total_time = fluxlutman.get("czv_total_time_{}".format(which_gate))
     time_at_sweetspot = fluxlutman.get("czv_time_at_sweetspot_{}".format(which_gate))
     invert_polarity = fluxlutman.get("czv_invert_polarity_{}".format(which_gate))
-    norm_sq_amp_par = fluxlutman.get("czv_sq_amp_{}".format(which_gate))
+    # Normalized to the amplitude at the CZ interaction point
+    norm_sq_amp = fluxlutman.get("czv_sq_amp_{}".format(which_gate))
     time_q_ph_corr = fluxlutman.get("czv_time_q_ph_corr_{}".format(which_gate))
     amp_q_ph_corr = fluxlutman.get("czv_amp_q_ph_corr_{}".format(which_gate))
 
@@ -75,23 +79,60 @@ def victor_waveform(
     conditions = [time <= t1, time > t1, time >= t2, time > t3]
     funcs = [
         lambda x: amp_at_sweetspot,
-        lambda x: (x - half_time_at_swtspt) * norm_sq_amp_par / half_time_ramp_middle,
-        lambda x: norm_sq_amp_par,
-        lambda x: -(x - t3) * norm_sq_amp_par / time_ramp_outside + norm_sq_amp_par,
+        lambda x: (x - half_time_at_swtspt) * norm_sq_amp / half_time_ramp_middle,
+        lambda x: norm_sq_amp,
+        lambda x: -(x - t3) * norm_sq_amp / time_ramp_outside + norm_sq_amp,
     ]
 
     half_NZ_amps = np.piecewise(time, conditions, funcs)
 
-    if fluxlutman.get("czv_correct_q_phase_{}".format(which_gate)):
-        # Insert extra square part to correct single qubit phase
-        insert_idx = np.where(half_NZ_amps >= amp_q_ph_corr)[0][-1] + 1
-        amps_q_phase_correction = np.full(int(half_time_q_ph_corr / dt), amp_q_ph_corr)
-        half_NZ_amps = np.insert(half_NZ_amps, insert_idx, amps_q_phase_correction)
+    correct_q_phase = fluxlutman.get("czv_correct_q_phase_{}".format(which_gate))
+    incl_q_phase_in_cz = fluxlutman.get("czv_incl_q_phase_in_cz_{}".format(which_gate))
+    if correct_q_phase:
+        if incl_q_phase_in_cz:
+            # Insert extra square part to correct single qubit phase
+            if amp_q_ph_corr < norm_sq_amp:
+                # When the correction amplitude is smaller then the main
+                # square amplitude we insert the correction at the right
+                # saple point such that the pulse amplitude does not decrease
+                # ever before the main square part
+                insert_idx = np.where(half_NZ_amps >= amp_q_ph_corr)[0][-1] + 1
+            else:
+                # If the amplitude is higher than the main square amplitude
+                # we insert the correction before the main square pulse after
+                # the ramp up
+                # The goal of using this feature would be to require less
+                # sample points to correct for single qubit phase
+                insert_idx = np.where(half_NZ_amps == norm_sq_amp)[0][-1] + 1
+            amps_q_phase_correction = np.full(
+                int(half_time_q_ph_corr / dt), amp_q_ph_corr
+            )
+            half_NZ_amps = np.insert(half_NZ_amps, insert_idx, amps_q_phase_correction)
+        else:
+            amps_q_phase_correction = np.full(
+                int(half_time_q_ph_corr / dt), amp_q_ph_corr
+            )
+            # Ensure we end at zero
+            amps_q_phase_correction = np.concatenate(
+                (amps_q_phase_correction, -amps_q_phase_correction))
 
     amp = np.concatenate((np.flip(half_NZ_amps, 0), -half_NZ_amps[1:]))
+
+    if correct_q_phase and not incl_q_phase_in_cz and amp[-1] != amp_at_sweetspot:
+        # For this case we always add an extra pnt at zero so that the NZ
+        # effect preserved before starting the correction pulse
+        # This is also ncessary to relibly determine the main pulse length
+        # when calling with `output_q_phase_corr=False`
+        amp = np.concatenate((amp, [amp_at_sweetspot]))
+
+    if output_q_phase_corr:
+        amp = np.concatenate((amp, amps_q_phase_correction))
+
     # Extra points for starting and finishing at the sweetspot
-    if force_start_end_swtspt and amp[0] != 0.0:
-        amp = np.concatenate(([amp_at_sweetspot], amp, [amp_at_sweetspot]))
+    if ensure_start_at_zero and amp[0] != 0.0:
+        amp = np.concatenate(([amp_at_sweetspot], amp))
+    if ensure_end_at_zero and amp[-1] != 0.0:
+        amp = np.concatenate((amp, [amp_at_sweetspot]))
 
     if invert_polarity:
         amp = -amp
