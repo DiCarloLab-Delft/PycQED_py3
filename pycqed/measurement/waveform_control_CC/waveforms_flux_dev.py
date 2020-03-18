@@ -25,16 +25,8 @@ def victor_waveform(
     # NB: the ramps are extra time, they are NOT substracted from sq_length!
 
     amp_at_sweetspot = 0.0
-    # This should eventually become a parameter and do not depend on anything else
-    amp_at_int_11_02 = (
-        fluxlutman.calc_eps_to_amp(0, state_A="11", state_B="02", which_gate=which_gate)
-        * fluxlutman.get_amp_to_dac_val_scalefactor()
-    )
 
-    if fluxlutman.get("czv_fixed_amp_{}".format(which_gate)):
-        # This is a temporary hack while testing this pulse for the first
-        # time in a buggy setup
-        amp_at_int_11_02 = 0.5
+    amp_at_int_11_02 = fluxlutman.get("czv_amp_at_11_02_{}".format(which_gate))
 
     sampling_rate = fluxlutman.sampling_rate()
 

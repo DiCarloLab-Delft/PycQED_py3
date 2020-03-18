@@ -494,6 +494,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Relative amp",
             )
             self.add_parameter(
+                "czv_dac_amp_at_11_02_%s" % this_cz,
+                docstring="Dac amplitude (in the case of HDAWG) at the 11-02 "
+                "interaction point.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 1.0),
+                initial_value=0.5,
+                unit="a.u.",
+                label="Dac amp at the interaction point",
+            )
+            self.add_parameter(
                 "czv_amp_q_ph_corr_%s" % this_cz,
                 docstring="Amplitude at the sides of the NZ pulse for single "
                 "qubit phase correction.",
@@ -851,6 +861,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         polycoeffs_B = self.get_polycoeffs_state(state=state_B, which_gate=which_gate)
         polycoeffs = polycoeffs_B - polycoeffs_A
         return np.polyval(polycoeffs, amp)
+
+    def calc_eps_to_dac(
+        self,
+        eps,
+        state_A: str = "01",
+        state_B: str = "02",
+        which_gate: str = "NE",
+        positive_branch=True,
+    ):
+        """
+        See `calc_eps_to_amp`
+        """
+        return (self.calc_eps_to_amp(
+            eps, state_A, state_B, which_gate, positive_branch) *
+            self.get_amp_to_dac_val_scalefactor())
 
     def calc_eps_to_amp(
         self,
