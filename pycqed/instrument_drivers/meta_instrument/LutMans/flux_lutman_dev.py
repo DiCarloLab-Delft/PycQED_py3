@@ -431,7 +431,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 parameter_class=ManualParameter,
             )
             # #################################################################
-            # Development parameters for testing the  new CZ parameterization
+            # Development parameters for testing the Victory CZ gate
             # #################################################################
             self.add_parameter(
                 "czv_time_ramp_middle_%s" % this_cz,
@@ -541,6 +541,19 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             self.add_parameter(
                 "czv_incl_q_phase_in_cz_%s" % this_cz,
                 docstring="",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=False,
+                label="",
+            )
+            self.add_parameter(
+                "czv_q_ph_corr_only_%s" % this_cz,
+                docstring="Set True to make the main cz pulse zero and keep "
+                "the single qubit phase corrections.\n"
+                "NB: To get the time alignment right, "
+                "you should set all the czv parameters in the lower freq "
+                "qubit as in the fluxlutman of the high freq qubit and set "
+                "this flag to True.", # this statement need confirmation yet
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
                 initial_value=False,

@@ -49,6 +49,7 @@ def victor_waveform(
     norm_sq_amp = fluxlutman.get("czv_sq_amp_{}".format(which_gate))
     time_q_ph_corr = fluxlutman.get("czv_time_q_ph_corr_{}".format(which_gate))
     amp_q_ph_corr = fluxlutman.get("czv_amp_q_ph_corr_{}".format(which_gate))
+    q_ph_corr_only = fluxlutman.get("czv_q_ph_corr_only_{}".format(which_gate))
 
     dt = 1 / sampling_rate
 
@@ -118,6 +119,8 @@ def victor_waveform(
 
     amp = np.concatenate((np.flip(half_NZ_amps, 0), -half_NZ_amps[1:]))
 
+    len_base_wf = len(amp)
+
     if correct_q_phase and not incl_q_phase_in_cz and amp[-1] != amp_at_sweetspot:
         # For this case we always add an extra pnt at zero so that the NZ
         # effect preserved before starting the correction pulse
@@ -125,17 +128,26 @@ def victor_waveform(
         # when calling with `output_q_phase_corr=False`
         amp = np.concatenate((amp, [amp_at_sweetspot]))
 
-    if output_q_phase_corr:
+    if correct_q_phase and output_q_phase_corr:
         amp = np.concatenate((amp, amps_q_phase_correction))
 
+    cz_start_idx = 0
     # Extra points for starting and finishing at the sweetspot
     if ensure_start_at_zero and amp[0] != 0.0:
+        cz_start_idx = 1
         amp = np.concatenate(([amp_at_sweetspot], amp))
     if ensure_end_at_zero and amp[-1] != 0.0:
         amp = np.concatenate((amp, [amp_at_sweetspot]))
 
     if invert_polarity:
         amp = -amp
+
+    if q_ph_corr_only:
+        # We set to zero the main pulse when the qubit is only single
+        # qubit phase corrected
+        # `cz_start_idx` is needed so that we don't mess the time
+        # alignment between the corrections on both qubits
+        amp[cz_start_idx:len_base_wf + cz_start_idx] = amp_at_sweetspot
 
     amp = amp_at_int_11_02 * amp
 
