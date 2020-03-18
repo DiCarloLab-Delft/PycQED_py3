@@ -496,7 +496,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             self.add_parameter(
                 "czv_dac_amp_at_11_02_%s" % this_cz,
                 docstring="Dac amplitude (in the case of HDAWG) at the 11-02 "
-                "interaction point.",
+                "interaction point. NB: the units might be different for some "
+                "other AWG that is distinct from the HDAWG",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(0.0, 1.0),
                 initial_value=0.5,

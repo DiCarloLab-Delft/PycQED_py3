@@ -26,7 +26,7 @@ def victor_waveform(
 
     amp_at_sweetspot = 0.0
 
-    amp_at_int_11_02 = fluxlutman.get("czv_amp_at_11_02_{}".format(which_gate))
+    amp_at_int_11_02 = fluxlutman.get("czv_dac_amp_at_11_02_{}".format(which_gate))
 
     sampling_rate = fluxlutman.sampling_rate()
 
