@@ -350,7 +350,7 @@ def calc_assignment_prob_matrix(combinations, digitized_data,
             
             for j, outcome in enumerate(valid_combinations):
                 first_key = next(iter(digitized_data))
-                Check = np.ones(len(digitized_data[first_key][outcome])) # use first qubit for reference
+                Check = np.ones(len(digitized_data[first_key][input_state])) # use first qubit for reference
                 
                 for k, ch in enumerate(digitized_data.keys()):
                     check = digitized_data[ch][input_state] == int(outcome[k])
