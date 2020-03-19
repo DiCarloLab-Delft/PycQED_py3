@@ -353,7 +353,7 @@ def calc_assignment_prob_matrix(combinations, digitized_data,
                 Check = np.ones(len(digitized_data[first_key][outcome])) # use first qubit for reference
                 
                 for k, ch in enumerate(digitized_data.keys()):
-                    check = digitized_data[ch][outcome] == int(input_state[k])
+                    check = digitized_data[ch][input_state] == int(outcome[k])
                     Check *= check
 
                 assignment_prob_matrix[i][j] = sum(Check)/len(Check)

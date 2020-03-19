@@ -1493,7 +1493,12 @@ class DeviceCCL(Instrument):
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
-            a = ma2.Multiplexed_Readout_Analysis(label=label)
+            if initialize == True:
+                ma2.Multiplexed_Readout_Analysis(label=label,
+                                                 post_selection=True,
+                                                 post_selec_threshold=0)
+            else:
+                a = ma2.Multiplexed_Readout_Analysis(label=label)
         return
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
