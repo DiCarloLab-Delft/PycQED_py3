@@ -7,6 +7,7 @@ import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
     cmap_to_alpha, cmap_first_to_alpha
+import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.utilities.general import int2base
 import pycqed.measurement.hdf5_data as h5d
 
@@ -24,6 +25,8 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                  label: str = '',
                  options_dict: dict = None, extract_only: bool = False,
                  extract_combinations: bool = False,
+                 post_selection: bool = False,
+                 post_selec_threshold: float = None,
                  auto=True):
         """
         Inherits from BaseDataAnalysis.
@@ -38,6 +41,8 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                          options_dict=options_dict,
                          extract_only=extract_only)
         self.extract_combinations = extract_combinations
+        self.post_selection = post_selection
+        self.post_selec_threshold = post_selec_threshold
         if auto:
             self.run_analysis()
 
@@ -97,26 +102,90 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         # Bin data in histograms
         raw_shots = self.raw_data_dict['data'][:, 1:]
         hist_data = {}
+        # for i, ch_name in enumerate(value_names):
+        #     ch_data = raw_shots[:, i]  # select per channel
+        #     hist_data[ch_name] = {}
+        #     for j, comb in enumerate(combinations):
+        #         cnts, bin_edges = np.histogram(
+        #             ch_data[j::len(combinations)],
+        #             bins=100, range=(np.min(ch_data), np.max(ch_data)))
+        #         bin_centers = bin_edges[:-1]+(bin_edges[1]-bin_edges[0])/2
+        #         hist_data[ch_name][comb] = (cnts, bin_centers)
+        # self.proc_data_dict['hist_data'] = hist_data
+        
+        #############################################
+        # Sort post-selection from measurement shots
+        #############################################
+        if self.post_selection == True:
+            self.proc_data_dict['post_selected_shots'] = \
+                {ch_name : {} for ch_name in value_names}
+            self.proc_data_dict['post_selecting_shots'] = \
+                {ch_name : {} for ch_name in value_names}
+        # Loop over qubits
         for i, ch_name in enumerate(value_names):
             ch_data = raw_shots[:, i]  # select per channel
             hist_data[ch_name] = {}
+            # Loop over prepared state
             for j, comb in enumerate(combinations):
-                cnts, bin_edges = np.histogram(
-                    ch_data[j::len(combinations)],
-                    bins=100, range=(np.min(ch_data), np.max(ch_data)))
+                if self.post_selection == True:
+                    post_selec_shots = ch_data[2*j::len(combinations)*2]
+                    shots = ch_data[2*j+1::len(combinations)*2]
+                    self.proc_data_dict['post_selected_shots'][ch_name][comb] = shots
+                    self.proc_data_dict['post_selecting_shots'][ch_name][comb] = post_selec_shots
+                else:
+                    shots = ch_data[j::len(combinations)]
+        
+                cnts, bin_edges = np.histogram(shots, bins=100,
+                    range=(min(ch_data), max(ch_data)))
+                    #range=(np.min(ch_data), np.max(ch_data))) # was crashing with np (check if necessary)
                 bin_centers = bin_edges[:-1]+(bin_edges[1]-bin_edges[0])/2
-                hist_data[ch_name][comb] = (cnts, bin_centers)
+                hist_data[ch_name][comb] = (cnts, bin_centers) 
         self.proc_data_dict['hist_data'] = hist_data
-
-        # Calculate mean voltages (used for threshold )
+        #########################
+        # Execute post_selection
+        #########################
+        if self.post_selection == True:
+            for comb in combinations: # Loop over prepared states    
+                Idxs = []
+                '''
+                For each prepared state one needs to eliminate every shot 
+                if a single qubit fails post selection.
+                '''
+                for ch in value_names: # Loop over qubits
+                    '''
+                    First find all idxs for all qubits. This has to loop
+                    over alll qubits before in pre-measurement.
+                    '''
+                    post_selec_shots = self.proc_data_dict['post_selecting_shots'][ch][comb]
+                    post_select_indices = dm_tools.get_post_select_indices(
+                        thresholds=[0], 
+                        init_measurements=[post_selec_shots])           
+                    Idxs += list(post_select_indices)
+                for ch in value_names: # Loop over qubits
+                    '''
+                    Now that we have all idxs, we can discard the shots that
+                    failed in every qubit.
+                    '''
+                    shots = self.proc_data_dict['post_selected_shots'][ch][comb]
+                
+                    shots[Idxs] = np.nan # signal post_selection
+                    shots = shots[~np.isnan(shots)] # discard post failed shots
+                    self.proc_data_dict['post_selected_shots'][ch][comb] = shots
+        
+        ###############################################
+        # Calculate mean voltages (used for threshold)
+        ###############################################
         binned_data = {}
         for i, ch_name in enumerate(value_names):
             ch_data = raw_shots[:, i]  # select per channel
             binned_data[ch_name] = {}
             for j, comb in enumerate(combinations):
-
-                binned_data[ch_name][comb] = np.mean(
-                    ch_data[j::len(combinations)])  # start at
+                if self.post_selection == True:
+                    binned_data[ch_name][comb] = np.mean(
+                        self.proc_data_dict['post_selected_shots'][ch_name][comb])
+                else:
+                    binned_data[ch_name][comb] = np.mean(
+                        ch_data[j::len(combinations)])  # start at
 
         mn_voltages = {}
         for i, ch_name in enumerate(value_names):
@@ -135,26 +204,46 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                  mn_voltages[ch_name]['1']])
         self.proc_data_dict['mn_voltages'] = mn_voltages
 
+        ################
         # Digitize data
-        digitized_data = np.zeros(raw_shots.shape)
-        for i, vn in enumerate(value_names):
-            digitized_data[:, i] = np.array(
-                raw_shots[:, i] > mn_voltages[vn]['threshold'], dtype=int)
-
+        ################
+        if self.post_selection == True:
+            self.proc_data_dict['post_selected_shots_digitized'] = {ch_name : {} for ch_name in value_names}
+            for ch in value_names:
+                for comb in combinations:
+                    self.proc_data_dict['post_selected_shots_digitized'][ch][comb] = np.array( 
+                        self.proc_data_dict['post_selected_shots'][ch][comb] > mn_voltages[ch]['threshold'], dtype=int)
+        else:
+            digitized_data = np.zeros(raw_shots.shape)
+            for i, vn in enumerate(value_names):
+                digitized_data[:, i] = np.array(
+                    raw_shots[:, i] > mn_voltages[vn]['threshold'], dtype=int)
+        
         # Bin digitized data
         binned_dig_data = {}
         for i, ch_name in enumerate(value_names):
-            ch_data = digitized_data[:, i]  # select per channel
             binned_dig_data[ch_name] = {}
-            for j, comb in enumerate(combinations):
-
-                binned_dig_data[ch_name][comb] = np.mean(
-                    ch_data[j::len(combinations)])  # start at
+            if self.post_selection == True:
+                ch_data = self.proc_data_dict['post_selected_shots_digitized'][ch_name]
+                for comb in combinations:
+                    binned_dig_data[ch_name][comb] = np.mean(
+                        ch_data[comb])  # start at
+            else:
+                ch_data = digitized_data[:, i]  # select per channel
+                for j, comb in enumerate(combinations):
+                    binned_dig_data[ch_name][comb] = np.mean(
+                        ch_data[j::len(combinations)])  # start at
 
         self.proc_data_dict['binned_dig_data'] = binned_dig_data
         # Calculate assignment probability matrix
-        assignment_prob_matrix = calc_assignment_prob_matrix(
-            combinations, digitized_data, valid_combinations=valid_combinations)
+        if self.post_selection == True:
+            assignment_prob_matrix = calc_assignment_prob_matrix(combinations,
+                        self.proc_data_dict['post_selected_shots_digitized'],
+                        valid_combinations = valid_combinations,
+                        post_selection = True)
+        else:
+            assignment_prob_matrix = calc_assignment_prob_matrix(
+                combinations, digitized_data, valid_combinations=valid_combinations)
         self.proc_data_dict['assignment_prob_matrix'] = assignment_prob_matrix
         self.proc_data_dict['quantities_of_interest'] = {'assignment_probability_matrix':assignment_prob_matrix,
                                                          'trace':np.trace(assignment_prob_matrix)}
@@ -225,27 +314,63 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             }
 
 
+# def calc_assignment_prob_matrix(combinations, digitized_data,
+#         valid_combinations=None):
+
+#     if valid_combinations is None:
+#         valid_combinations = combinations
+#     assignment_prob_matrix = np.zeros((len(combinations),
+#         len(valid_combinations)))
+#     # for input_state in combinations:
+
+#     for i, outcome in enumerate(digitized_data):
+#         decl_state = ''.join([str(int(s)) for s in outcome])
+#         # check what combination the declared state corresponds to
+#         decl_state_idx = valid_combinations.index(decl_state)
+
+#         # row -> input state
+#         # column -> declared state
+#         # increment the count of the declared state for the input state by 1
+#         assignment_prob_matrix[i % len(combinations), decl_state_idx] += 1
+
+#     # Normalize the matrix
+#     assignment_prob_matrix /= np.sum(assignment_prob_matrix, axis=1)[0]
+#     return assignment_prob_matrix
+
 def calc_assignment_prob_matrix(combinations, digitized_data,
-        valid_combinations=None):
+        valid_combinations=None, post_selection = False):
 
     if valid_combinations is None:
         valid_combinations = combinations
     assignment_prob_matrix = np.zeros((len(combinations),
         len(valid_combinations)))
-    # for input_state in combinations:
 
-    for i, outcome in enumerate(digitized_data):
-        decl_state = ''.join([str(int(s)) for s in outcome])
-        # check what combination the declared state corresponds to
-        decl_state_idx = valid_combinations.index(decl_state)
+    if post_selection == True:
+        for i, input_state in enumerate(combinations):
+            
+            for j, outcome in enumerate(valid_combinations):
+                first_key = next(iter(digitized_data))
+                Check = np.ones(len(digitized_data[first_key][outcome])) # use first qubit for reference
+                
+                for k, ch in enumerate(digitized_data.keys()):
+                    check = digitized_data[ch][outcome] == int(input_state[k])
+                    Check *= check
 
-        # row -> input state
-        # column -> declared state
-        # increment the count of the declared state for the input state by 1
-        assignment_prob_matrix[i % len(combinations), decl_state_idx] += 1
+                assignment_prob_matrix[i][j] = sum(Check)/len(Check)
+    else:
+        for i, outcome in enumerate(digitized_data):
+            decl_state = ''.join([str(int(s)) for s in outcome])
+            # check what combination the declared state corresponds to
+            decl_state_idx = valid_combinations.index(decl_state)
 
-    # Normalize the matrix
-    assignment_prob_matrix /= np.sum(assignment_prob_matrix, axis=1)[0]
+            # row -> input state
+            # column -> declared state
+            # increment the count of the declared state for the input state by 1
+            assignment_prob_matrix[i % len(combinations), decl_state_idx] += 1
+
+        # Normalize the matrix
+        assignment_prob_matrix /= np.sum(assignment_prob_matrix, axis=1)[0]
+        
     return assignment_prob_matrix
 
 
