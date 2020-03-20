@@ -1731,7 +1731,7 @@ class DeviceCCL(Instrument):
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
             if initialize == True:
-                thresholds = [eval(qubit).ro_acq_threshold() for qubit in qubits]
+                thresholds = [self.find_instrument(qubit).ro_acq_threshold() for qubit in qubits]
                 ma2.Multiplexed_Readout_Analysis(label=label,
                                                  post_selection=True,
                                                  post_selec_thresholds=thresholds)
