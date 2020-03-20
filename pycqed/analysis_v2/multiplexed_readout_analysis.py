@@ -19,6 +19,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     Does data binning and creates histograms of data.
     Threshold is auto determined as the mean of the data.
     Used to construct a assignment probability matris.
+
+    WARNING: Not sure if post selection supports measurement
+    data in two quadratures. Should use optimal weights if 
+    using post-selection.
     """
 
     def __init__(self, t_start: str = None, t_stop: str = None,
@@ -26,7 +30,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                  options_dict: dict = None, extract_only: bool = False,
                  extract_combinations: bool = False,
                  post_selection: bool = False,
-                 post_selec_threshold: float = None,
+                 post_selec_thresholds: list = None,
                  auto=True):
         """
         Inherits from BaseDataAnalysis.
@@ -42,7 +46,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                          extract_only=extract_only)
         self.extract_combinations = extract_combinations
         self.post_selection = post_selection
-        self.post_selec_threshold = post_selec_threshold
+        self.post_selec_thresholds = post_selec_thresholds
         if auto:
             self.run_analysis()
 
@@ -141,6 +145,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 bin_centers = bin_edges[:-1]+(bin_edges[1]-bin_edges[0])/2
                 hist_data[ch_name][comb] = (cnts, bin_centers) 
         self.proc_data_dict['hist_data'] = hist_data
+        
         #########################
         # Execute post_selection
         #########################
@@ -151,14 +156,14 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 For each prepared state one needs to eliminate every shot 
                 if a single qubit fails post selection.
                 '''
-                for ch in value_names: # Loop over qubits
+                for i, ch in enumerate(value_names): # Loop over qubits
                     '''
                     First find all idxs for all qubits. This has to loop
                     over alll qubits before in pre-measurement.
                     '''
                     post_selec_shots = self.proc_data_dict['post_selecting_shots'][ch][comb]
                     post_select_indices = dm_tools.get_post_select_indices(
-                        thresholds=[0], 
+                        thresholds=self.post_selec_thresholds[i], 
                         init_measurements=[post_selec_shots])           
                     Idxs += list(post_select_indices)
                 for ch in value_names: # Loop over qubits
