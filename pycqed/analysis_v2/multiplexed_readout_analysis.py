@@ -144,8 +144,9 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     #range=(np.min(ch_data), np.max(ch_data))) # was crashing with np (check if necessary)
                 bin_centers = bin_edges[:-1]+(bin_edges[1]-bin_edges[0])/2
                 hist_data[ch_name][comb] = (cnts, bin_centers) 
+
         self.proc_data_dict['hist_data'] = hist_data
-        
+
         #########################
         # Execute post_selection
         #########################
@@ -163,10 +164,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     '''
                     post_selec_shots = self.proc_data_dict['post_selecting_shots'][ch][comb]
                     post_select_indices = dm_tools.get_post_select_indices(
-                        thresholds=self.post_selec_thresholds[i], 
+                        thresholds=[self.post_selec_thresholds[i]], 
                         init_measurements=[post_selec_shots])           
                     Idxs += list(post_select_indices)
-                for ch in value_names: # Loop over qubits
+                for i, ch in enumerate(value_names): # Loop over qubits
                     '''
                     Now that we have all idxs, we can discard the shots that
                     failed in every qubit.
@@ -176,6 +177,13 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     shots[Idxs] = np.nan # signal post_selection
                     shots = shots[~np.isnan(shots)] # discard post failed shots
                     self.proc_data_dict['post_selected_shots'][ch][comb] = shots
+
+                    cnts, bin_edges = np.histogram(shots, bins=100,
+                        range=(min(raw_shots[:, i]), max(raw_shots[:, i])))
+                        #range=(np.min(ch_data), np.max(ch_data))) # was crashing with np (check if necessary)
+                    bin_centers = bin_edges[:-1]+(bin_edges[1]-bin_edges[0])/2
+                    self.proc_data_dict['hist_data'][ch][comb] = (cnts, bin_centers) 
+        
         
         ###############################################
         # Calculate mean voltages (used for threshold)

@@ -21,7 +21,7 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.utilities.general import SafeFormatter, format_value_string
 from scipy.ndimage.filters import gaussian_filter
-import imp
+from importlib import reload
 import math
 
 # try:
@@ -59,7 +59,7 @@ from pycqed.analysis import composite_analysis as ca
 #     else:
 #         raise
 
-imp.reload(dm_tools)
+reload(dm_tools)
 
 sfmt = SafeFormatter()
 
