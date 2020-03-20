@@ -49,6 +49,8 @@ reload(fla)
 import pycqed.analysis_v2.timing_cal_analysis as ta
 reload(ta)
 
+import pycqed.analysis_v2.multiplexed_readout_analysis as mra
+reload(mra)
 
 # from pycqed.analysis_v2.base_analysis import  # remove me if everything still works*
 from pycqed.analysis_v2.simple_analysis import (
