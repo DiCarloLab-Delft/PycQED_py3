@@ -55,9 +55,6 @@ if 1:   # DIO calibration
             receiver_port=cc_slot_uhfqa0,
             sender_dio_mode='uhfqa'
         )
-    if 1:
-        log.warning("Forcing DIO delay to fixed value (awaiting merge of optimal choice in driver)")
-        uhfqa0.setd('raw/dios/0/delay', 5)
 
     if 1:
         log.debug('calibration DIO: UHFQA to CC')
@@ -166,18 +163,30 @@ if 1:  # test of Distributed Shared Memory
         prog = inspect.cleandoc(f"""
         # program:  CC feedback test program
         .DEF    numIter     4
-        .DEF    duration    100 #9
+        .DEF    uhfLatency  10 # 11
+        .DEF    smWait      4
         .DEF    wait        100
         .DEF    smAddr      S16
-        .DEF    lut         0
-        
-        #        seq_bar     1                       # synchronize processors so markers make sense
+        .DEF    mux         0                       # SM[3:0] := I[3:0]
+        .DEF    lut         0                       # 4 times CW=1 conditional on SM[3:0]
+
+                seq_bar     1                       # synchronize processors so markers make sense
+                seq_out     0x0,1                   # no action, but does show on trace unit if enabled (so does seq_bar?)
                 move        $numIter,R0
-        loop:   seq_out     0x00010000,$duration    # trigger UHFQA
-        [{uhf}] seq_in_sm   $smAddr,$lut,0
+        loop:   
+        [{uhf}] seq_out     0x00010000,$uhfLatency  # trigger UHFQA
+        [{awg}] seq_wait    $uhfLatency             # balance UHF duration
+        #[{awg}] seq_out     0x0,$uhfLatency         # balance UHF duration
+        [{uhf}] seq_in_sm   $smAddr,$mux,0          # 0=byte
         [{uhf}] seq_sw_sm   $smAddr
-        [{awg}] seq_out     0,2                     # balance duration with UHF
-                seq_out     0x0,$wait
+        [{awg}] seq_wait    2                       # balance UHF duration
+        #[{awg}] seq_out     0x0,2                   # balance UHF duration
+               seq_wait    $smWait                 # wait for data distribution
+        #        seq_out     0x0,$smWait             # wait for data distribution
+        [{awg}] seq_out_sm  $smAddr,$lut,1
+        [{uhf}] seq_wait    1
+               seq_wait    $wait
+        #        seq_out     0x0,$wait         
                 loop        R0,@loop
                 stop
         """)
