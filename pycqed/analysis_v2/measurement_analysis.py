@@ -49,6 +49,8 @@ reload(fla)
 import pycqed.analysis_v2.timing_cal_analysis as ta
 reload(ta)
 
+import pycqed.analysis_v2.multiplexed_readout_analysis as mra
+reload(mra)
 
 # from pycqed.analysis_v2.base_analysis import  # remove me if everything still works*
 from pycqed.analysis_v2.simple_analysis import (
@@ -102,5 +104,5 @@ from pycqed.analysis_v2.gate_set_tomography_analysis import \
 
 
 from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis,\
-    Conditional_Oscillation_Heatmap_Analysis, scatter_pnts_overlay,\
-    contour_overlay, annotate_pnts, interp_to_1D_arr
+    Conditional_Oscillation_Heatmap_Analysis, interp_to_1D_arr,\
+    Chevron_Alignment_Analysis
