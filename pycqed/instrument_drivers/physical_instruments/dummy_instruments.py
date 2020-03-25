@@ -4,6 +4,7 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.analysis.fitting_models import LorentzFunc
 import time
+from pycqed.analysis import fitting_models as fm
 
 
 class DummyParHolder(Instrument):
@@ -29,7 +30,7 @@ class DummyParHolder(Instrument):
                 initial_value=0.,
             )
 
-        # Instrument parameters
+        # Instrument integer parameters
         for parname in ["x_int", "y_int", "z_int", "x0_int", "y0_int", "z0_int"]:
             self.add_parameter(
                 parname,
@@ -167,3 +168,161 @@ class DummyParHolder(Instrument):
         return (self.x() ** 2 + self.y() ** 2 + self.z() ** 2) * (
             1 + abs(self.y() - self.x())
         ) + self.noise() * np.random.rand(1)
+
+
+class DummyChevronAlignmentParHolder(Instrument):
+    """
+    Holds dummy parameters which are get and set able as well as provides
+    some basic functions that depends on these parameters for testing
+    purposes.
+
+    Dedicated specifically for a Chevron Alignment testind and also a
+    good example for testing adaptive sampling
+
+    Located in physical instruments because it mimics a instrument that
+    talks directly to the hardware.
+    """
+
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
+
+        # Instrument parameters
+        self.add_parameter(
+            "t",
+            unit="s",
+            label="Pulse duration",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(0., 500e-6),
+            initial_value=10e-9,
+        )
+
+        self.add_parameter(
+            "amp",
+            unit="a.u.",
+            label="Square pulse amplitude",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=.180,
+        )
+
+        self.add_parameter(
+            "amp_center_1",
+            unit="a.u.",
+            label="Amplitude center of chevron on one left side",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=-.167,
+        )
+
+        self.add_parameter(
+            "amp_center_2",
+            unit="a.u.",
+            label="Amplitude center of chevron on one right side",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=+.187,
+        )
+
+        self.add_parameter(
+            "J2",
+            unit="Hz",
+            label="Coupling of interacting states",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(1e6, 500e6),
+            initial_value=12.5e6,
+        )
+
+        self.add_parameter(
+            "detuning_swt_spt",
+            unit="Hz",
+            label="Detuning @ swtspt",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(1e5, 100e9),
+            initial_value=2.0e9,
+        )
+
+        self.add_parameter(
+            "flux_bias",
+            unit="A",
+            label="Square pulse amplitude",
+            # parameter_class=ManualParameter,
+            vals=vals.Numbers(-5e-3, 5e-3),
+            initial_value=180e-6,
+            set_cmd=self._set_bias_and_center_amps,
+        )
+
+        self.add_parameter(
+            "noise",
+            unit="frac",
+            label="Noise amplitude",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=0.05,
+        )
+
+        self.add_parameter(
+            "delay",
+            unit="s",
+            label="Sampling delay",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=0,
+        )
+
+        self.add_parameter(
+            "frac_excited",
+            unit="frac",
+            vals=vals.Numbers(),
+            get_cmd=self._measure_chevron_excited)
+
+        self.add_parameter(
+            "frac_ground",
+            unit="frac",
+            vals=vals.Numbers(),
+            get_cmd=self._measure_chevron_ground)
+
+    def get_idn(self):
+        return "dummy chevron alignment"
+
+    def _get_noise(self):
+        return np.random.uniform(-self.noise(), self.noise())
+
+    def _measure_chevron_excited(self):
+        time.sleep(self.delay())
+
+        population = fm.ChevronFunc(
+            amp=self.amp(),
+            amp_center_1=self.amp_center_1(),
+            amp_center_2=self.amp_center_2(),
+            J2=self.J2(),
+            detuning_swt_spt=self.detuning_swt_spt(),
+            t=self.t(),
+        )
+        population += self._get_noise()
+        return population
+
+    def _measure_chevron_ground(self):
+        time.sleep(self.delay())
+
+        population = fm.ChevronInvertedFunc(
+            amp=self.amp(),
+            amp_center_1=self.amp_center_1(),
+            amp_center_2=self.amp_center_2(),
+            J2=self.J2(),
+            detuning_swt_spt=self.detuning_swt_spt(),
+            t=self.t(),
+        )
+        population += self._get_noise()
+        return population
+
+    def _set_bias_and_center_amps(self, val):
+        """
+        Will be usefull for testing the ChevronAlignment analysis
+        """
+        poly_pos = np.poly1d([71.875, 0.164062])
+        poly_neg = np.poly1d([53.125, -0.186563])
+
+        self.amp_center_1(poly_neg(val))
+        self.amp_center_2(poly_pos(val))
+
+        return val
