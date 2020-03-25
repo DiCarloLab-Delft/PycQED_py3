@@ -250,6 +250,12 @@ class MeasurementControl(Instrument):
         """
         # Setting to zero at the start of every run, used in soft avg
         self.soft_iteration = 0
+
+        if mode != "adaptive":
+            # Certain adaptive visualization features leave undesired effects
+            # on the plots of non-adaptive plots
+            self.clean_previous_adaptive_run()
+
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
 
@@ -2359,7 +2365,8 @@ class MeasurementControl(Instrument):
         # self.minimize_optimization = self.af_pars.pop("minimize", True)
         # self.f_termination = self.af_pars.pop("f_termination", None)
 
-        # self.adaptive_besteval_indxs = [0]
+        module_name = get_module_name(self.af_pars.get("adaptive_function", self))
+        self.CMA_detected = module_name == "cma.evolution_strategy"
 
         # ensures the cma optimization results are saved during the experiment
         if self.CMA_detected and "callback" not in self.af_pars:
@@ -2382,6 +2389,16 @@ class MeasurementControl(Instrument):
 
     def get_optimization_method(self):
         return self.optimization_method
+
+    def clean_previous_adaptive_run(self):
+        """
+        Performs a reset of variables and parameters used in the previous run
+        that are not relevant or even conflicting with the current one.
+        """
+        self.learner = None
+        self.Learner_Minimizer_detected = False
+        self.CMA_detected = False
+        self.af_pars = dict()
 
     def choose_MC_cmap_zrange(self, zlabel: str, zunit: str):
         cost_func_names = ["cost", "cost func", "cost function"]
