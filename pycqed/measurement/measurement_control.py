@@ -15,6 +15,7 @@ from pycqed.utilities.general import (
     get_git_revision_hash,
 )
 from pycqed.utilities.get_default_datadir import get_default_datadir
+from pycqed.utilities.general import get_module_name
 
 # Used for auto qcodes parameter wrapping
 from pycqed.measurement import sweep_functions as swf
@@ -89,13 +90,6 @@ def is_subclass(obj, test_obj):
     throwing an error if test_obj is not a class but a function
     """
     return isinstance(obj, type) and issubclass(obj, test_obj)
-
-
-def get_module_name(obj):
-    """
-    Get the lowest level module of `obj`
-    """
-    return obj.__module__.split(".")[-1]
 
 
 class MeasurementControl(Instrument):
@@ -209,8 +203,7 @@ class MeasurementControl(Instrument):
         self.plotmon_2D_zranges = {}
 
         # Flag used to create a specific plot trace for LearnerND_Minimizer
-        # and Learner1D_Minimizer. `self.af_is_Learner_Minimizer()` is used
-        # for plot updating
+        # and Learner1D_Minimizer.
         self.Learner_Minimizer_detected = False
         self.CMA_detected = False
 
@@ -422,11 +415,21 @@ class MeasurementControl(Instrument):
                 self.CMA_detected = False
                 # Used to update plots specific to this type of optimizers
                 module_name = get_module_name(af_pars.get("adaptive_function", self))
-                self.Learner_Minimizer_detected = self.Learner_Minimizer_detected or (
-                    module_name == "learner1D_minimizer"
-                    or module_name == "learnerND_minimizer")
-                self.CMA_detected = (self.CMA_detected or
-                    module_name == "cma.evolution_strategy")
+                self.Learner_Minimizer_detected = (
+                    self.Learner_Minimizer_detected
+                    or (
+                        module_name == "learner1D_minimizer"
+                        and hasattr(af_pars.get("loss_per_interval", self), "threshold")
+                    )
+                    or (
+                        module_name == "learnerND_minimizer"
+                        and hasattr(af_pars.get("loss_per_simplex", self), "threshold")
+                    )
+                )
+
+                self.CMA_detected = (
+                    self.CMA_detected or module_name == "cma.evolution_strategy"
+                )
 
                 # Determines if the optimization will minimize or maximize
                 self.minimize_optimization = af_pars.get("minimize", True)
@@ -444,7 +447,9 @@ class MeasurementControl(Instrument):
                     self.adaptive_function = fmin_powell
 
                 if len(Xs) > 1 and X is not None:
-                    opt_func = lambda x: self.mk_optimization_function()(flatten([x, X]))
+                    opt_func = lambda x: self.mk_optimization_function()(
+                        flatten([x, X])
+                    )
                 else:
                     opt_func = self.mk_optimization_function()
 
@@ -530,14 +535,18 @@ class MeasurementControl(Instrument):
                                 self.adaptive_function, self.learner
                             )
 
-                elif isinstance(self.adaptive_function, types.FunctionType) or isinstance(
-                    self.adaptive_function, np.ufunc
-                ):
+                elif isinstance(
+                    self.adaptive_function, types.FunctionType
+                ) or isinstance(self.adaptive_function, np.ufunc):
                     try:
                         # exists so it is possible to extract the result
                         # of an optimization post experiment
                         af_pars_copy = dict(af_pars)
-                        non_used_pars = ["adaptive_function", "minimize", "f_termination"]
+                        non_used_pars = [
+                            "adaptive_function",
+                            "minimize",
+                            "f_termination",
+                        ]
                         for non_used_par in non_used_pars:
                             af_pars_copy.pop(non_used_par, None)
                         self.adaptive_result = self.adaptive_function(
@@ -546,7 +555,11 @@ class MeasurementControl(Instrument):
                     except StopIteration:
                         print("Reached f_termination: %s" % (self.f_termination))
 
-                    if not multi_adaptive_single_dset and Xs[0] is None and hasattr(self, "adaptive_result"):
+                    if (
+                        not multi_adaptive_single_dset
+                        and Xs[0] is None
+                        and hasattr(self, "adaptive_result")
+                    ):
                         self.save_optimization_results(
                             self.adaptive_function, result=self.adaptive_result
                         )
@@ -723,6 +736,7 @@ class MeasurementControl(Instrument):
         This construction is necessary to be able to run several adaptive
         samplers with distinct settings in the same dataset
         """
+
         def func(x):
             """
             A wrapper around the measurement function.
@@ -773,6 +787,7 @@ class MeasurementControl(Instrument):
                 vals = np.multiply(-1, vals)
 
             return vals
+
         return func
 
     def finish(self, result):
@@ -2347,7 +2362,7 @@ class MeasurementControl(Instrument):
         # self.adaptive_besteval_indxs = [0]
 
         # ensures the cma optimization results are saved during the experiment
-        if (self.CMA_detected and "callback" not in self.af_pars):
+        if self.CMA_detected and "callback" not in self.af_pars:
             self.af_pars["callback"] = self.save_cma_optimization_results
 
     def get_adaptive_function_parameters(self):
