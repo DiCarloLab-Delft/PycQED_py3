@@ -1,3 +1,4 @@
+Cython
 qcodes
 adaptive>=0.10.0
 cma
@@ -14,7 +15,6 @@ pyqtgraph
 pygsti==0.9.6
 pyvisa>=1.8
 numpy
-Cython
 scipy
 spirack
 autodepgraph
