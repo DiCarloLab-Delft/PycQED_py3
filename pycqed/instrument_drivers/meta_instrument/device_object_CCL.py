@@ -1743,7 +1743,7 @@ class DeviceCCL(Instrument):
                 fraction=0
                 for comb in Dict[key].keys():
                     fraction += len(Dict[key][comb])/(2**12 * 4)
-                print('Fraction of discarded results was {:2f}'.format(1-fraction))
+                print('Fraction of discarded results was {:.2f}'.format(1-fraction))
             else:
                 a = ma2.Multiplexed_Readout_Analysis(label=label)
         return
