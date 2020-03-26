@@ -142,11 +142,12 @@ class Gaussian_OptimizationAnalysis(ba.BaseDataAnalysis):
                         'plotfn': plot_gaussian_optimization,
                         'optimization_dict': self.proc_data_dict,
                         'compare': True,
+                        'compare_labels':self.options_dict.get('compare_labels'),
                         'numplotsy': 1,
                         'presentation_mode': True
                         }
 
-def plot_gaussian_optimization(optimization_dict, ax=None, figsize=None, compare=False, **kw):
+def plot_gaussian_optimization(optimization_dict, ax=None, figsize=None, compare=False, compare_labels=None, **kw):
     if 'function_values' not in list(optimization_dict):
         compare = True
     if compare:
@@ -174,14 +175,19 @@ def plot_gaussian_optimization(optimization_dict, ax=None, figsize=None, compare
     for i, axis in enumerate(fig.get_axes()):
         if i < len(functions):
             if compare:
-                for ts in timestamps:
+                for l, ts in enumerate(timestamps):
+                    if compare_labels == None:
+                        label = ts
+                    else:
+                        label = compare_labels[l]
                     y_val = optimization_dict[ts]['function_values'][functions[i]]
                     x_val = np.arange(len(y_val))
                     median_range=max(int(len(x_val)*0.01),2)
                     opt_idx = np.where(y_val==optimization_dict[ts]['optimal_values'][functions[i]])[0][0]
                     axis.plot(x_val, np.array([np.median(y_val[max(k-median_range,0):k+median_range]) for k in range(len(x_val))]), zorder=3)
                     axis.scatter(opt_idx, optimization_dict[ts]['optimal_values'][functions[i]],
-                               color=axis.get_lines()[-1].get_color(), edgecolor='black', s=100, marker='*', zorder=4, label='{}_{}={}'.format(functions[i], ts, round(optimization_dict[ts]['optimal_values'][functions[i]],2)))
+                               color=axis.get_lines()[-1].get_color(), edgecolor='black', s=100,
+                               marker='*', zorder=4, label='{}_{}={}'.format(functions[i], label, round(optimization_dict[ts]['optimal_values'][functions[i]],2)))
                 axis.set_ylabel('{} ({})'.format(functions[i], optimization_dict[timestamps[-1]]['function_units'][i]))
             else:
                 y_val = optimization_dict['function_values'][functions[i]]
