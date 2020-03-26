@@ -1,4 +1,4 @@
-qutip
+Cython
 qcodes
 adaptive>=0.10.0
 cma
@@ -24,4 +24,4 @@ qutechopenql
 zhinst
 plotly<3.8
 packaging
-Cython
+qutip
