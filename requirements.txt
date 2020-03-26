@@ -24,4 +24,3 @@ zhinst
 plotly<3.8
 packaging
 qutip
-Cython
