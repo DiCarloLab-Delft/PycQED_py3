@@ -1049,8 +1049,6 @@ class DeviceCCL(Instrument):
                 the final afterrotations
         """
 
-        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q1])
             for q in [q0, q1]:
