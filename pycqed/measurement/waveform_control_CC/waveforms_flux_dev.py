@@ -34,7 +34,7 @@ def victor_waveform(
     time_ramp_middle = fluxlutman.get("czv_time_ramp_middle_{}".format(which_gate))
     time_ramp_outside = fluxlutman.get("czv_time_ramp_outside_{}".format(which_gate))
     time_sum_sqrs = fluxlutman.get("czv_time_sum_sqrs_{}".format(which_gate))
-    # total_time = fluxlutman.get("czv_total_time_{}".format(which_gate))
+    time_before_q_ph_corr = fluxlutman.get("czv_time_before_q_ph_corr_{}".format(which_gate))
     time_at_sweetspot = fluxlutman.get("czv_time_at_sweetspot_{}".format(which_gate))
     invert_polarity = fluxlutman.get("czv_invert_polarity_{}".format(which_gate))
     # Normalized to the amplitude at the CZ interaction point
@@ -119,16 +119,19 @@ def victor_waveform(
         # This is also ncessary to relibly determine the main pulse length
         # when calling with `output_q_phase_corr=False`
         amp = np.concatenate((amp, [amp_at_sweetspot]))
+        buffer_before_q_ph_corr = np.full(int(time_before_q_ph_corr / dt), amp_at_sweetspot)
+        if len(buffer_before_q_ph_corr) > 0:
+            amp = np.concatenate((amp, buffer_before_q_ph_corr))
 
     if correct_q_phase and output_q_phase_corr:
         amp = np.concatenate((amp, amps_q_phase_correction))
 
     cz_start_idx = 0
     # Extra points for starting and finishing at the sweetspot
-    if ensure_start_at_zero and amp[0] != 0.0:
+    if ensure_start_at_zero and amp[0] != amp_at_sweetspot:
         cz_start_idx = 1
         amp = np.concatenate(([amp_at_sweetspot], amp))
-    if ensure_end_at_zero and amp[-1] != 0.0:
+    if ensure_end_at_zero and amp[-1] != amp_at_sweetspot:
         amp = np.concatenate((amp, [amp_at_sweetspot]))
 
     if invert_polarity:

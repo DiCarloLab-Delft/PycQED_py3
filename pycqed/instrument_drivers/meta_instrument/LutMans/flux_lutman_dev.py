@@ -474,6 +474,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 unit="s",
                 label="Time at sweet spot",
             )
+            self.add_parameter(
+                "czv_time_before_q_ph_corr_%s" % this_cz,
+                docstring="Time after main pulse before single qubit phase "
+                "correction.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=0.,
+                unit="s",
+                label="Time before correction",
+            )
             # self.add_parameter(
             #     "czv_total_time_%s" % this_cz,
             #     docstring="Total gate time",

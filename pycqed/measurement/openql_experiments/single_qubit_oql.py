@@ -961,7 +961,7 @@ def ef_rabi_seq(q0: int,
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = oqh.create_kernel("ef_A{}".format(int(abs(1000*amp))), p)
+        k = oqh.create_kernel("ef_A{}".format(int(abs(1000 * amp))), p)
         k.prepz(q0)
         k.gate('rx180', [q0])
         k.gate('cw_{:02}'.format(cw_idx), [q0])
@@ -970,13 +970,13 @@ def ef_rabi_seq(q0: int,
         k.measure(q0)
         p.add_kernel(k)
     if add_cal_points:
-        p = oqh.add_single_qubit_cal_points(p,  qubit_idx=q0)
+        p = oqh.add_single_qubit_cal_points(p, qubit_idx=q0)
 
     p = oqh.compile(p)
 
     if add_cal_points:
-        cal_pts_idx = [amps[-1]+.1, amps[-1]+.15,
-                       amps[-1]+.2, amps[-1]+.25]
+        cal_pts_idx = [amps[-1] + .1, amps[-1] + .15,
+                       amps[-1] + .2, amps[-1] + .25]
     else:
         cal_pts_idx = []
 
