@@ -1,4 +1,3 @@
-Cython
 qcodes
 adaptive>=0.10.0
 cma
@@ -25,3 +24,4 @@ zhinst
 plotly<3.8
 packaging
 qutip
+Cython
