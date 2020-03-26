@@ -1681,7 +1681,11 @@ class DeviceCCL(Instrument):
 
         # off and on, not including post selection init measurements yet
         nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
-        nr_shots = nr_shots_per_case * nr_cases
+        
+        if initialize == True:
+            nr_shots = 2 * nr_shots_per_case * nr_cases
+        else:
+            nr_shots = nr_shots_per_case * nr_cases
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
@@ -1732,9 +1736,16 @@ class DeviceCCL(Instrument):
         if analyze:
             if initialize == True:
                 thresholds = [self.find_instrument(qubit).ro_acq_threshold() for qubit in qubits]
-                ma2.Multiplexed_Readout_Analysis(label=label,
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
                                                  post_selection=True,
                                                  post_selec_thresholds=thresholds)
+                # Print fraction of discarded shots
+                Dict = a.proc_data_dict['post_selected_shots']
+                key = next(iter(Dict))
+                fraction=0
+                for comb in Dict[key].keys():
+                    fraction += len(Dict[key][comb])/(2**12 * 4)
+                print('Fraction of discarded results was {:2f}'.format(1-fraction))
             else:
                 a = ma2.Multiplexed_Readout_Analysis(label=label)
         return
