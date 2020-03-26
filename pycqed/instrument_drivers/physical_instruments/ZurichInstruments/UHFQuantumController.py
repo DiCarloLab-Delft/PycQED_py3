@@ -58,6 +58,7 @@ Changelog:
 
 import time
 import logging
+import inspect
 import numpy as np
 from typing import Tuple,List
 
@@ -1264,6 +1265,33 @@ setUserReg(4, err_cnt);"""
         # Define the behavior of our program
         self._reset_awg_program_features()
         self._awg_program[0] = sequence
+        self._awg_needs_configuration[0] = True
+
+    def awg_sequence_test_pattern(
+            self,
+            dio_out_vect=None):
+
+        # setting the acquisition delay samples
+        sequence = f"""
+            cvar i = 0;
+            const length = {len(dio_out_vect)};
+        """
+        sequence = sequence + _array2vect(dio_out_vect, "dio_out_vect")
+        # starting the loop
+        sequence = sequence + """
+            setDIO(2048); // FIXME: workaround because we cannot use setDIO(0), still required in UHF firmware:65939
+            for (i = 0; i < length; i = i + 1) {
+              var dio_out =  dio_out_vect[i];
+              waitDIOTrigger();
+              setDIO(dio_out);
+              wait(3);      // ~20 ns pulse time
+              setDIO(2048);
+            }
+        """
+
+        # Define the behavior of our program
+        self._reset_awg_program_features()
+        self._awg_program[0] = inspect.cleandoc(sequence)
         self._awg_needs_configuration[0] = True
 
     def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
