@@ -179,7 +179,6 @@ def add_two_q_cal_points(p, q0: int, q1: int,
     if measured_qubits == None:
         measured_qubits = [q0, q1]
 
-
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
         k.prepz(q0)
@@ -261,14 +260,14 @@ def clocks_to_s(time, clock_cycle=20e-9):
     """
     Converts a time in clocks to a time in s
     """
-    return time*clock_cycle
+    return time * clock_cycle
 
 
 def infer_tqisa_filename(qisa_fn: str):
     """
     Get's the expected tqisa filename based on the qisa filename.
     """
-    return qisa_fn[:-4]+'tqisa'
+    return qisa_fn[:-4] + 'tqisa'
 
 
 def get_start_time(line: str):
