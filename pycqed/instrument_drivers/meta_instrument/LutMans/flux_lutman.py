@@ -258,6 +258,11 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=40e-9,
                            vals=vals.Numbers(0, 100e-6),
                            parameter_class=ManualParameter)
+        self.add_parameter('cfg_awg_channel_delay', unit='s',
+                           label='HDAWG channel individual delay',
+                           initial_value=0e-9,
+                           vals=vals.Numbers(0, 30e-9),
+                           parameter_class=ManualParameter)
         # CODEWORDS 1-4: CZ
         for this_cz in ['NE', 'NW', 'SW', 'SE']:
 

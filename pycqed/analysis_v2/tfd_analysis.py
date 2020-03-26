@@ -182,15 +182,16 @@ def calc_tfd_hamiltonian(pauli_terms: dict, g: float = 1, T=1):
         H_AB = (Z_1^A * Z_1^B)+(Z_2^A * Z_2^B) + (X_1^A* X_1^B)+(X_2^A * X_2^B)
         <H_AB>  = ZIZI + IZIZ + XIXI + IXIX
     """
-    H_A = 1.57*pauli_terms['ZZII'] + g*pauli_terms['XIII'] + g*pauli_terms['IXII']
-    H_B = 1.57*pauli_terms['IIZZ'] + g*pauli_terms['IIXI'] + g*pauli_terms['IIIX']
+    factor=1.0
+    H_A = factor*pauli_terms['ZZII'] + g*pauli_terms['XIII'] + g*pauli_terms['IXII']
+    H_B = factor*pauli_terms['IIZZ'] + g*pauli_terms['IIXI'] + g*pauli_terms['IIIX']
     H_AB = pauli_terms['ZIZI'] + pauli_terms['IZIZ'] + \
         pauli_terms['XIXI'] + pauli_terms['IXIX']
 
     if np.isinf(T):
         H = -1*H_AB
     else:
-        H = H_A + H_B - (T**1.57)*H_AB
+        H = H_A + H_B - (T**factor)*H_AB
 
     return {'H': H, 'H_A': H_A, 'H_B': H_B, 'H_AB': H_AB}
 
@@ -653,7 +654,8 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
         if options_dict == None:
             self.options_dict = {'beta': False,
                                  'data_label': 'Data',
-                                 'data_color': 'black'}
+                                 'data_color': 'black',
+                                 'save_figs': True}
         if auto:
             self.run_analysis()
 
@@ -700,6 +702,8 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['dataframe'] = pd.concat([fid_df, operator_df])
 
     def prepare_plots(self):
+        if len(self.timestamps) == 1:
+            self.options_dict['data_label'] = str(round(self.proc_data_dict[self.proc_data_dict['T'][0]]['fidelity'],3))
         self.plot_dicts['fidelities_vs_temperature'] = {
             'plotfn': plot_fidelities_versus_T,
             'fid_dict': {T:self.proc_data_dict[T]['fidelity'] for T in self.proc_data_dict['T']},
@@ -709,8 +713,8 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
         }
         self.plot_dicts['Gibbs_tomograph'] = {
             'plotfn': plot_expectation_values_Gibbs,
-            'full_dict': self.raw_data_dict[list(self.raw_data_dict.keys())[0]]['tomo_dict'],
-            'T':self.raw_data_dict[list(self.raw_data_dict.keys())[0]]['TFD_dict']['T'],
+            'full_dict': self.raw_data_dict[list(self.raw_data_dict)[0]]['tomo_dict'],
+            'T':self.raw_data_dict[list(self.raw_data_dict)[0]]['TFD_dict']['T'],
             'beta': self.options_dict['beta'],
         }
 
