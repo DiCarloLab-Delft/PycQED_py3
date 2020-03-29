@@ -66,7 +66,7 @@ try:
         def test_residual_coupling_sequence(self):
             p = mqo.residual_coupling_sequence(
                 times=np.arange(0, 100e-9, 20e-9),
-                q0=0, q1=1, platf_cfg=self.config_fn)
+                q0=0, q_spectator_idx=[1], spectator_state='1', platf_cfg=self.config_fn)
             self.assertEqual(p.name, 'residual_coupling_sequence')
 
         def test_Cryoscope(self):
@@ -93,6 +93,7 @@ try:
                 p = mqo.Chevron(
                     qubit_idx=0,
                     qubit_idx_spec=2,
+                    qubit_idx_park=None,
                     buffer_time=0, buffer_time2=0, flux_cw=2,
                     target_qubit_sequence=target_qubit_sequence,
                     platf_cfg=self.config_fn)
@@ -113,10 +114,10 @@ try:
             for bell_state in [0, 1, 2, 3]:
                 p = mqo.two_qubit_tomo_bell(
                     q0=0,
-                    q1=2,
+                    q1=3,
                     bell_state=bell_state,
                     platf_cfg=self.config_fn)
-                self.assertEqual(p.name, 'two_qubit_tomo_bell_2_0')
+                self.assertEqual(p.name, 'two_qubit_tomo_bell_3_0')
 
 
         def test_two_qubit_tomo_bell_by_waiting(self):
@@ -150,7 +151,7 @@ try:
             # function
             p = mqo.conditional_oscillation_seq(
                 q0=0,
-                q1=2,
+                q1=3,
                 platf_cfg=self.config_fn)
             self.assertEqual(p.name, 'conditional_oscillation_seq')
 

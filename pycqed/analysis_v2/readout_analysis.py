@@ -18,10 +18,11 @@ import pycqed.analysis.fitting_models as fit_mods
 from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v2.simple_analysis as sa
 from scipy.optimize import minimize
-from pycqed.analysis.tools.plotting import SI_val_to_msg_str
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
-    set_cbarlabel, flex_colormesh_plot_vs_xy
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str, \
+    set_xlabel, set_ylabel, set_cbarlabel, flex_colormesh_plot_vs_xy
+from pycqed.analysis_v2.tools.plotting import scatter_pnts_overlay
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.utilities.general import int2base
@@ -72,6 +73,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.options_dict['auto_rotation_angle'] = self.options_dict.get(
             'auto_rotation_angle', man_angle)
 
+        self.predict_qubit_temp = 'predict_qubit_temp' in self.options_dict
+        if self.predict_qubit_temp:
+            self.qubit_freq = self.options_dict['qubit_freq']
+
         if auto:
             self.run_analysis()
 
@@ -85,7 +90,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         nr_samples = self.options_dict.get('nr_samples', 2)
         sample_0 = self.options_dict.get('sample_0', 0)
         sample_1 = self.options_dict.get('sample_1', 1)
-        nr_bins = self.options_dict.get('nr_bins', 100)
+        nr_bins = int(self.options_dict.get('nr_bins', 100))
 
         ######################################################
         #  Separating data into shots for 0 and shots for 1  #
@@ -115,8 +120,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             data_range_y = (np.min([np.min(b) for b in shots[:, 1]]),
                             np.max([np.max(b) for b in shots[:, 1]]))
             data_range_xy = (data_range_x, data_range_y)
-            nr_bins_2D = self.options_dict.get(
-                'nr_bins_2D', 6*np.sqrt(nr_bins))
+            nr_bins_2D = int(self.options_dict.get(
+                'nr_bins_2D', 6*np.sqrt(nr_bins)))
             H0, xedges, yedges = np.histogram2d(x=shots[0, 0],
                                                 y=shots[0, 1],
                                                 bins=nr_bins_2D,
@@ -281,7 +286,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         cum_params['A_amplitude'].value = np.max(cdf_ys[0])
         cum_params['A_amplitude'].vary = False
         cum_params['B_amplitude'].value = np.max(cdf_ys[1])
-        cum_params['A_amplitude'].vary = False
+        cum_params['A_amplitude'].vary = False # FIXME: check if correct
         self.fit_dicts['shots_all'] = {
             'model': m_cul,
             'fit_xvals': {'x': cdf_xs},
@@ -294,6 +299,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         fr = self.fit_res['shots_all']
         bv = fr.best_values
 
+        # best values new
         bvn = deepcopy(bv)
         bvn['A_amplitude'] = 1
         bvn['B_amplitude'] = 1
@@ -363,8 +369,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         fr = self.fit_res['shots_all']
         bv = fr.params
-        self.proc_data_dict['residual_excitation'] = bv['B_spurious'].value
-        self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
+        self.proc_data_dict['residual_excitation'] = bv['A_spurious'].value
+        self.proc_data_dict['relaxation_events'] = bv['B_spurious'].value
 
         ###################################
         #  Save quantities of interest.   #
@@ -374,8 +380,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'F_d': self.proc_data_dict['F_discr'],
             'F_a': self.proc_data_dict['F_assignment_raw'],
             'residual_excitation': self.proc_data_dict['residual_excitation'],
-            'measurement_induced_relaxation':
-                self.proc_data_dict['measurement_induced_relaxation']
+            'relaxation_events':
+                self.proc_data_dict['relaxation_events']
         }
         self.qoi = self.proc_data_dict['quantities_of_interest']
 
@@ -737,6 +743,14 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 fit_text += '\n\n(Single quadrature data)'
 
             fit_text += '\n\nTotal shots: %d+%d' % (*self.proc_data_dict['nr_shots'],)
+            if self.predict_qubit_temp:
+                h = 6.62607004e-34
+                kb = 1.38064852e-23
+                res_exc = a_sp.value
+                effective_temp = h*6.42e9/(kb*np.log((1-res_exc)/res_exc))
+                fit_text += '\n\nQubit '+'$T_{eff}$'+\
+                    ' = {:.2f} mK\n@{:.0f}'.format(effective_temp*1e3,
+                                                  self.qubit_freq)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {
@@ -746,6 +760,661 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'plotfn': self.plot_text,
                     'box_props': 'fancy',
                     'text_string': fit_text,
+                }
+
+
+class Dispersive_shift_Analysis(ba.BaseDataAnalysis):
+    '''
+    Analisys for dispersive shift.
+    Designed to be used with <CCL_Transmon>.measure-dispersive_shift_pulsed
+    '''
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', do_fitting: bool = True,
+                 data_file_path: str=None,
+                 options_dict: dict=None, auto=True,
+                 **kw):
+        '''
+        Extract ground and excited state timestamps
+        '''
+        if (t_start is None) and (t_stop is None):
+            ground_ts = a_tools.return_last_n_timestamps(1, contains='Resonator_scan_off')
+            excited_ts= a_tools.return_last_n_timestamps(1, contains='Resonator_scan_on')
+        elif (t_start is None) ^ (t_stop is None):
+            raise ValueError('Must provide either none or both timestamps.')
+        else:
+            ground_ts = t_start # t_start is assigned to ground state
+            excited_ts= t_stop  # t_stop is assigned to excited state
+
+        super().__init__(t_start=ground_ts, t_stop=excited_ts,
+                         label='Resonator_scan', do_fitting=do_fitting,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         **kw)
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'sweep_points': 'sweep_points',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'
+                            }
+        self.numeric_params = []
+        #self.proc_data_dict = OrderedDict()
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        '''
+        Processing data
+        '''
+        # Frequencu sweep range in the ground/excited state
+        self.proc_data_dict['data_freqs_ground'] = \
+            self.raw_data_dict['sweep_points'][0]
+        self.proc_data_dict['data_freqs_excited'] = \
+            self.raw_data_dict['sweep_points'][1]
+
+        # S21 mag (transmission) in the ground/excited state
+        self.proc_data_dict['data_S21_ground'] = \
+            self.raw_data_dict['measured_values'][0][0]
+        self.proc_data_dict['data_S21_excited'] = \
+            self.raw_data_dict['measured_values'][1][0]
+
+        #self.proc_data_dict['f0_ground'] = self.raw_data_dict['f0'][0]
+
+        #############################
+        # Find resonator dips
+        #############################
+        pk_rep_ground = a_tools.peak_finder( \
+                            self.proc_data_dict['data_freqs_ground'],
+                            self.proc_data_dict['data_S21_ground'],
+                            window_len=5)
+        pk_rep_excited= a_tools.peak_finder( \
+                            self.proc_data_dict['data_freqs_excited'],
+                            self.proc_data_dict['data_S21_excited'],
+                            window_len=5)
+
+        min_idx_ground = np.argmin(pk_rep_ground['dip_values'])
+        min_idx_excited= np.argmin(pk_rep_excited['dip_values'])
+
+        min_freq_ground = pk_rep_ground['dips'][min_idx_ground]
+        min_freq_excited= pk_rep_excited['dips'][min_idx_excited]
+
+        min_S21_ground = pk_rep_ground['dip_values'][min_idx_ground]
+        min_S21_excited= pk_rep_excited['dip_values'][min_idx_excited]
+
+        dispersive_shift = min_freq_excited-min_freq_ground
+
+        self.proc_data_dict['Res_freq_ground'] = min_freq_ground
+        self.proc_data_dict['Res_freq_excited']= min_freq_excited
+        self.proc_data_dict['Res_S21_ground'] = min_S21_ground
+        self.proc_data_dict['Res_S21_excited']= min_S21_excited
+        self.proc_data_dict['quantities_of_interest'] = \
+            {'dispersive_shift': dispersive_shift}
+
+        self.qoi = self.proc_data_dict['quantities_of_interest']
+
+    def prepare_plots(self):
+
+
+        x_range = [min(self.proc_data_dict['data_freqs_ground'][0],
+                       self.proc_data_dict['data_freqs_excited'][0]) ,
+                   max(self.proc_data_dict['data_freqs_ground'][-1],
+                       self.proc_data_dict['data_freqs_excited'][-1])]
+
+        y_range = [0, max(max(self.proc_data_dict['data_S21_ground']),
+                          max(self.proc_data_dict['data_S21_excited']))]
+
+        x_label = self.raw_data_dict['xlabel'][0]
+        y_label = self.raw_data_dict['value_names'][0][0]
+
+        x_unit = self.raw_data_dict['xunit'][0][0]
+        y_unit = self.raw_data_dict['value_units'][0][0]
+
+        title = 'Transmission in the ground and excited state'
+
+        self.plot_dicts['S21_ground'] = {
+            'title': title,
+            'ax_id': 'Transmission_axis',
+            'xvals': self.proc_data_dict['data_freqs_ground'],
+            'yvals': self.proc_data_dict['data_S21_ground'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': x_label,
+            'xunit': x_unit,
+            'ylabel': y_label,
+            'yunit': y_unit,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'C0', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['S21_excited'] = {
+            'title': title,
+            'ax_id': 'Transmission_axis',
+            'xvals': self.proc_data_dict['data_freqs_excited'],
+            'yvals': self.proc_data_dict['data_S21_excited'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': x_label,
+            'xunit': x_unit,
+            'ylabel': y_label,
+            'yunit': y_unit,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'C1', 'alpha': 1},
+            'marker': ''
+            }
+
+        ####################################
+        # Plot arrow
+        ####################################
+        min_freq_ground = self.proc_data_dict['Res_freq_ground']
+        min_freq_excited= self.proc_data_dict['Res_freq_excited']
+        yval = y_range[1]/2
+        dispersive_shift = int((min_freq_excited-min_freq_ground)*1e-4)*1e-2
+        txt_str = r'$2_\chi/2\pi=$' + str(dispersive_shift) + ' MHz'
+
+        self.plot_dicts['Dispersive_shift_line'] = {
+            'ax_id': 'Transmission_axis',
+            'xvals': [min_freq_ground , min_freq_excited] ,
+            'yvals': [yval, yval] ,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['Dispersive_shift_vline'] = {
+            'ax_id': 'Transmission_axis',
+            'ymin': y_range[0],
+            'ymax': y_range[1],
+            'x': [min_freq_ground, min_freq_excited],
+            'xrange': x_range,
+            'yrange': y_range,
+            'plotfn': self.plot_vlines,
+            'line_kws': {'color': 'black', 'alpha': 0.5}
+            }
+
+        self.plot_dicts['Dispersive_shift_rmarker'] = {
+            'ax_id': 'Transmission_axis',
+            'xvals': [min_freq_ground] ,
+            'yvals': [yval] ,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': 5
+            }
+        self.plot_dicts['Dispersive_shift_lmarker'] = {
+            'ax_id': 'Transmission_axis',
+            'xvals': [min_freq_excited] ,
+            'yvals': [yval] ,
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': 4
+            }
+
+        self.plot_dicts['Dispersive_shift_text'] = {
+            'ax_id': 'Transmission_axis',
+            'plotfn': self.plot_text,
+            'xpos': .5,
+            'ypos': .5,
+            'horizontalalignment': 'center',
+            'verticalalignment': 'bottom',
+            'text_string': txt_str,
+            'box_props': dict(boxstyle='round', pad=.4,
+                              facecolor='white', alpha=0.)
+            }
+
+
+class RO_acquisition_delayAnalysis(ba.BaseDataAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', do_fitting: bool = True,
+                 data_file_path: str=None,
+                 qubit_name = '',
+                 options_dict: dict=None, auto=True,
+                 **kw):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label, do_fitting=do_fitting,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         **kw)
+
+        self.single_timestamp = True
+        self.qubit_name = qubit_name
+        self.params_dict = {'ro_pulse_length': '{}.ro_pulse_length'.format(self.qubit_name),
+                            'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'sweep_points': 'sweep_points',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'
+                            }
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        """
+        Processing data
+        """
+        self.Times = self.raw_data_dict['sweep_points']
+        self.I_data_UHF = self.raw_data_dict['measured_values'][0]
+        self.Q_data_UHF = self.raw_data_dict['measured_values'][1]
+        self.pulse_length = float(self.raw_data_dict['ro_pulse_length'.format(self.qubit_name)])
+
+        #######################################
+        # Determine the start of the pusle
+        #######################################
+        def get_pulse_start(x, y, tolerance=2):
+            '''
+            The start of the pulse is estimated in three steps:
+                1. Evaluate signal standard deviation in a certain interval as
+                   function of time: f(t).
+                2. Calculate the derivative of the aforementioned data: f'(t).
+                3. Evaluate when the derivative exceeds a threshold. This
+                   threshold is defined as max(f'(t))/5.
+            This approach is more tolerant to noisy signals.
+            '''
+            pulse_baseline = np.mean(y) # get pulse baseline
+            pulse_std      = np.std(y)  # get pulse standard deviation
+
+            nr_points_interval = 200        # number of points in the interval
+            aux = int(nr_points_interval/2)
+
+            iteration_idx = np.arange(-aux, len(y)+aux)     # mask for circular array
+            aux_list = [ y[i%len(y)] for i in iteration_idx] # circular array
+
+            # Calculate standard deviation for each interval
+            y_std = []
+            for i in range(len(y)):
+                interval = aux_list[i : i+nr_points_interval]
+                y_std.append( np.std(interval) )
+
+            y_std_derivative = np.gradient(y_std[:-aux])# calculate derivative
+            threshold = max(y_std_derivative)/5        # define threshold
+            start_index = np.where( y_std_derivative > threshold )[0][0] + aux
+
+            return start_index-tolerance
+
+        #######################################
+        # Determine the end of depletion
+        #######################################
+        def get_pulse_length(x, y):
+            '''
+            Similarly to get_pulse_start, the end of depletion is
+            set when the signal goes below 5% of its standard dev.
+            '''
+            pulse_baseline = np.mean(y)
+            threshold      = 0.05*np.std(y)
+            pulse_std = threshold+1
+            i = 0
+            while pulse_std > threshold:
+                pulse_std = np.std(y[i:]-pulse_baseline)
+                i += 1
+            end_index = i-1
+            return end_index
+
+        Amplitude_I = max(abs(self.I_data_UHF))
+        baseline_I = np.mean(self.I_data_UHF)
+        start_index_I = get_pulse_start(self.Times, self.I_data_UHF)
+        end_index_I = get_pulse_length(self.Times, self.I_data_UHF)
+
+        Amplitude_Q = max(abs(self.Q_data_UHF))
+        baseline_Q = np.mean(self.Q_data_UHF)
+        start_index_Q = get_pulse_start(self.Times, self.Q_data_UHF)
+        end_index_Q = get_pulse_length(self.Times, self.Q_data_UHF)
+
+        self.proc_data_dict['I_Amplitude'] = Amplitude_I
+        self.proc_data_dict['I_baseline'] = baseline_I
+        self.proc_data_dict['I_pulse_start_index'] = start_index_I
+        self.proc_data_dict['I_pulse_end_index'] = end_index_I
+        self.proc_data_dict['I_pulse_start'] = self.Times[start_index_I]
+        self.proc_data_dict['I_pulse_end'] = self.Times[end_index_I]
+
+        self.proc_data_dict['Q_Amplitude'] = Amplitude_Q
+        self.proc_data_dict['Q_baseline'] = baseline_Q
+        self.proc_data_dict['Q_pulse_start_index'] = start_index_Q
+        self.proc_data_dict['Q_pulse_end_index'] = end_index_Q
+        self.proc_data_dict['Q_pulse_start'] = self.Times[start_index_Q]
+        self.proc_data_dict['Q_pulse_end'] = self.Times[end_index_Q]
+
+    def prepare_plots(self):
+
+        I_start_line_x = [self.proc_data_dict['I_pulse_start'],
+                          self.proc_data_dict['I_pulse_start']]
+        I_pulse_line_x = [self.proc_data_dict['I_pulse_start']+self.pulse_length,
+                          self.proc_data_dict['I_pulse_start']+self.pulse_length]
+        I_end_line_x = [self.proc_data_dict['I_pulse_end'],
+                        self.proc_data_dict['I_pulse_end']]
+
+        Q_start_line_x = [self.proc_data_dict['Q_pulse_start'],
+                          self.proc_data_dict['Q_pulse_start']]
+        Q_pulse_line_x = [self.proc_data_dict['Q_pulse_start']+self.pulse_length,
+                           self.proc_data_dict['Q_pulse_start']+self.pulse_length]
+        Q_end_line_x = [self.proc_data_dict['Q_pulse_end'],
+                        self.proc_data_dict['Q_pulse_end']]
+
+        Amplitude = max(self.proc_data_dict['I_Amplitude'],
+                        self.proc_data_dict['Q_Amplitude'])
+        vline_y = np.array([1.1*Amplitude, -1.1*Amplitude])
+
+        x_range= [self.Times[0], self.Times[-1]]
+        y_range= [vline_y[1], vline_y[0]]
+
+        I_title = str(self.qubit_name)+' Measured transients $I_{quadrature}$'
+        Q_title = str(self.qubit_name)+' Measured transients $Q_{quadrature}$'
+
+        ##########################
+        # Transients
+        ##########################
+        self.plot_dicts['I_transients'] = {
+            'title': I_title,
+            'ax_id': 'I_axis',
+            'xvals': self.Times,
+            'yvals': self.I_data_UHF,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'C0', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['Q_transients'] = {
+            'title': Q_title,
+            'ax_id': 'Q_axis',
+            'xvals': self.Times,
+            'yvals': self.Q_data_UHF,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'line_kws': {'color': 'C0', 'alpha': 1},
+            'marker': ''
+            }
+
+        ##########################
+        # Vertical lines
+        ##########################
+        # I quadrature
+        self.plot_dicts['I_pulse_start'] = {
+            'ax_id': 'I_axis',
+            'xvals': I_start_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['I_pulse_end'] = {
+            'ax_id': 'I_axis',
+            'xvals': I_pulse_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['I_depletion_end'] = {
+            'ax_id': 'I_axis',
+            'xvals': I_end_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        # Q quadrature
+        self.plot_dicts['Q_pulse_start'] = {
+            'ax_id': 'Q_axis',
+            'xvals': Q_start_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['Q_pulse_end'] = {
+            'ax_id': 'Q_axis',
+            'xvals': Q_pulse_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        self.plot_dicts['Q_depletion_end'] = {
+            'ax_id': 'Q_axis',
+            'xvals': Q_end_line_x,
+            'yvals': vline_y,
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_line,
+            'linestyle': '--',
+            'line_kws': {'color': 'black', 'alpha': 1},
+            'marker': ''
+            }
+
+        ########################
+        # Plot pulse windows
+        ########################
+
+        I_pulse_bin = np.array([self.proc_data_dict['I_pulse_start'],
+                    self.proc_data_dict['I_pulse_start']+self.pulse_length])
+        I_depletion_bin = np.array([self.proc_data_dict['I_pulse_start']
+                        +self.pulse_length, self.proc_data_dict['I_pulse_end']])
+
+        Q_pulse_bin = np.array([self.proc_data_dict['Q_pulse_start'],
+                    self.proc_data_dict['Q_pulse_start']+self.pulse_length])
+        Q_depletion_bin = np.array([self.proc_data_dict['Q_pulse_start']
+                        +self.pulse_length, self.proc_data_dict['Q_pulse_end']])
+
+        self.plot_dicts['I_pulse_length'] = {
+            'ax_id': 'I_axis',
+            'xvals': I_pulse_bin,
+            'yvals': vline_y,
+            'xwidth': self.pulse_length,
+            'ywidth': self.proc_data_dict['I_Amplitude'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_bar,
+            'bar_kws': { 'alpha': .25, 'facecolor': 'C0'}
+            }
+
+        self.plot_dicts['I_pulse_depletion'] = {
+            'ax_id': 'I_axis',
+            'xvals': I_depletion_bin,
+            'yvals': vline_y,
+            'xwidth': self.pulse_length,
+            'ywidth': self.proc_data_dict['I_Amplitude'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'I Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_bar,
+            'bar_kws': { 'alpha': .25, 'facecolor': 'C1'}
+            }
+
+        self.plot_dicts['Q_pulse_length'] = {
+            'ax_id': 'Q_axis',
+            'xvals': Q_pulse_bin,
+            'yvals': vline_y,
+            'xwidth': self.pulse_length,
+            'ywidth': self.proc_data_dict['Q_Amplitude'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_bar,
+            'bar_kws': { 'alpha': .25, 'facecolor': 'C0'}
+            }
+
+        self.plot_dicts['Q_pulse_depletion'] = {
+            'ax_id': 'Q_axis',
+            'grid': True,
+            'grid_kws': {'alpha': .25, 'linestyle': '--'},
+            'xvals': Q_depletion_bin,
+            'yvals': vline_y,
+            'xwidth': self.pulse_length,
+            'ywidth': self.proc_data_dict['Q_Amplitude'],
+            'xrange': x_range,
+            'yrange': y_range,
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': 's',
+            'ylabel': 'Q Amplitude',
+            'yunit': 'V',
+            'plotfn': self.plot_bar,
+            'bar_kws': { 'alpha': .25, 'facecolor': 'C1'}
+            }
+
+
+class Readout_landspace_Analysis(sa.Basic2DInterpolatedAnalysis):
+    '''
+    Analysis for Readout landscapes using adaptive sampling.
+    Stores maximum fidelity parameters in quantities of interest dict as:
+        - <analysis_object>.qoi['Optimal_parameter_X']
+        - <analysis_object>.qoi['Optimal_parameter_Y']
+    '''
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 interp_method: str = 'linear',
+                 options_dict: dict=None, auto=True,
+                 **kw):
+
+        super().__init__(t_start = t_start, t_stop = t_stop,
+                         label = label,
+                         data_file_path = data_file_path,
+                         options_dict = options_dict,
+                         auto = auto,
+                         interp_method=interp_method,
+                         **kw)
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        super().process_data()
+
+        # Extract maximum interpolated fidelity
+        idx = [i for i, s in enumerate(self.proc_data_dict['value_names']) \
+                if 'F_a' in s][0]
+        X = self.proc_data_dict['x_int']
+        Y = self.proc_data_dict['y_int']
+        Z = self.proc_data_dict['interpolated_values'][idx]
+
+        max_idx = np.unravel_index(np.argmax(Z), (len(X),len(Y)) )
+        self.proc_data_dict['Max_F_a_idx'] = max_idx
+        self.proc_data_dict['Max_F_a'] = Z[max_idx[1],max_idx[0]]
+
+        self.proc_data_dict['quantities_of_interest'] = {
+            'Optimal_parameter_X': X[max_idx[1]],
+            'Optimal_parameter_Y': Y[max_idx[0]]
+            }
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        for i, val_name in enumerate(self.proc_data_dict['value_names']):
+
+            zlabel = '{} ({})'.format(val_name,
+                                      self.proc_data_dict['value_units'][i])
+            # Plot interpolated landscape
+            self.plot_dicts[val_name] = {
+                'ax_id': val_name,
+                'plotfn': a_tools.color_plot,
+                'x': self.proc_data_dict['x_int'],
+                'y': self.proc_data_dict['y_int'],
+                'z': self.proc_data_dict['interpolated_values'][i],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'x_unit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'y_unit': self.proc_data_dict['yunit'],
+                'zlabel': zlabel,
+                'title': '{}\n{}'.format(
+                    self.timestamp, self.proc_data_dict['measurementstring'])
+                }
+            # Plot sampled values
+            self.plot_dicts[val_name+str('_sampled_values')] = {
+                'ax_id': val_name,
+                'plotfn': scatter_pnts_overlay,
+                'x': self.proc_data_dict['x'],
+                'y': self.proc_data_dict['y'],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'x_unit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'y_unit': self.proc_data_dict['yunit'],
+                'alpha': .75,
+                'setlabel': 'Sampled points',
+                'do_legend': True
+                }
+            # Plot maximum fidelity point
+            self.plot_dicts[val_name+str('_max_fidelity')] = {
+                'ax_id': val_name,
+                'plotfn': self.plot_line,
+                'xvals': [self.proc_data_dict['x_int']\
+                            [self.proc_data_dict['Max_F_a_idx'][1]]],
+                'yvals': [self.proc_data_dict['y_int']\
+                            [self.proc_data_dict['Max_F_a_idx'][0]]],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'xunit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'yunit': self.proc_data_dict['yunit'],
+                'marker': 'x',
+                'linestyle': '',
+                'color': 'red',
+                'setlabel': 'Max fidelity',
+                'do_legend': True,
+                'legend_pos': 'upper right'
                 }
 
 
@@ -805,7 +1474,7 @@ class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):
         Responsible for creating the histograms based on the raw data
         """
         # Determine the shape of the data to extract wheter to rotate or not
-        nr_bins = self.options_dict.get('nr_bins', 100)
+        nr_bins = int(self.options_dict.get('nr_bins', 100))
 
         # self.proc_data_dict['shots_0'] = [''] * nr_expts
         # self.proc_data_dict['shots_1'] = [''] * nr_expts

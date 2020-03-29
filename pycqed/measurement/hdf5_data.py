@@ -253,16 +253,16 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
                                                  item)
         else:  # item either a group or a dataset
             if 'list_type' not in item.attrs:
-                data_dict[key] = item.value
+                data_dict[key] = item[()]  # changed deprecated item.value => item[()]
             elif item.attrs['list_type'] == 'str':
                 # lists of strings needs some special care, see also
                 # the writing part in the writing function above.
-                list_of_str = [x[0] for x in item.value]
+                list_of_str = [x[0] for x in item[()]]  # changed deprecated item.value => item[()]
                 data_dict[key] = list_of_str
             elif item.attrs['list_type'] == 'array':
-                data_dict[key] = list(item.value)
+                data_dict[key] = list(item[()])  # changed deprecated item.value => item[()]
             else:
-                data_dict[key] = list(item.value)
+                data_dict[key] = list(item[()])  # changed deprecated item.value => item[()]
     for key, item in h5_group.attrs.items():
         if isinstance(item, str):
             # Extracts "None" as an exception as h5py does not support
@@ -325,7 +325,7 @@ def extract_pars_from_datafile(filepath: str, param_spec: dict)-> dict:
         for par_name, par_spec in param_spec.items():
             entry = f[par_spec[0]]
             if par_spec[1].startswith('dset'):
-                param_dict[par_name] = entry.value
+                param_dict[par_name] = entry[()]
             elif par_spec[1].startswith('attr'):
                 param_dict[par_name] = entry.attrs[par_spec[1][5:]]
 

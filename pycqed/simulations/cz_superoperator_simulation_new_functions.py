@@ -59,12 +59,14 @@ def target_cond_phase(cond_phase=180):
 
 U_target = target_cond_phase()
 
-# otherwise average_gate_fidelity doesn't work
 U_target_diffdims = target_cond_phase()
-U_target_diffdims.dims = [
-    [n_levels_q0 * n_levels_q1],
-    [n_levels_q0 * n_levels_q1]
-]
+
+# As of qutip 4.5.0 this is not needed anymore
+# otherwise average_gate_fidelity doesn't work
+# U_target_diffdims.dims = [
+#     [n_levels_q0 * n_levels_q1],
+#     [n_levels_q0 * n_levels_q1]
+# ]
 
 
 '''
@@ -186,34 +188,34 @@ def coupled_transmons_hamiltonian_new(w_q0, w_q1, alpha_q0, alpha_q1, J):
     bdag = b.dag()
 
     H = w_q0 * n_q0 + w_q1 * n_q1 +  \
-        1/2*alpha_q0*(adag*adag*a*a) + 1/2*alpha_q1*(bdag*bdag*b*b) +\
-        J * (-1)*(adag*b+a*bdag)  # \
-        # + J * (basis_state(0,1,to_vector=False)*basis_state(1,0,to_vector=False).dag() + \
-        # basis_state(1,0,to_vector=False)*basis_state(0,1,to_vector=False).dag())
-        # (a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
-    H = H * (2*np.pi)
+        1 / 2 * alpha_q0 * (adag * adag * a * a) + 1 / 2 * alpha_q1 * (bdag * bdag * b * b) +\
+        J * (-1) * (adag * b + a * bdag)  # \
+    # + J * (basis_state(0,1,to_vector=False)*basis_state(1,0,to_vector=False).dag() + \
+    # basis_state(1,0,to_vector=False)*basis_state(0,1,to_vector=False).dag())
+    # (a.dag() - a) * (-b + b.dag())              # we use the RWA so that the energy of |00> is 0 and avoid ambiguities
+    H = H * (2 * np.pi)
     return H
 
 
 def calc_hamiltonian(amp, fluxlutman, fluxlutman_static, which_gate: str = 'NE'):
     # all inputs should be given in terms of frequencies, i.e. without the 2*np.pi factor
     # instead, the output H includes already that factor
-    w_q0=fluxlutman.calc_amp_to_freq(amp,'01', which_gate=which_gate)
-    w_q1=fluxlutman.calc_amp_to_freq(amp,'10', which_gate=which_gate)
-    alpha_q0=fluxlutman.calc_amp_to_freq(amp,'02', which_gate=which_gate)-2*w_q0
-    alpha_q1= fluxlutman_static.q_polycoeffs_anharm()[-1]
-    w_q0_intpoint=w_q1-alpha_q0
+    w_q0 = fluxlutman.calc_amp_to_freq(amp, '01', which_gate=which_gate)
+    w_q1 = fluxlutman.calc_amp_to_freq(amp, '10', which_gate=which_gate)
+    alpha_q0 = fluxlutman.calc_amp_to_freq(amp, '02', which_gate=which_gate) - 2 * w_q0
+    alpha_q1 = fluxlutman_static.q_polycoeffs_anharm()[-1]
+    w_q0_intpoint = w_q1 - alpha_q0
 
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
-    J=q_J2/np.sqrt(2)
-    bus_freq=fluxlutman.get('bus_freq_{}'.format(which_gate))
+    J = q_J2 / np.sqrt(2)
+    bus_freq = fluxlutman.get('bus_freq_{}'.format(which_gate))
 
-    delta_q1=w_q1-bus_freq
-    delta_q0_intpoint=(w_q0_intpoint)-bus_freq
-    delta_q0=(w_q0)-bus_freq
-    J_temp = J / ((delta_q1+delta_q0_intpoint)/(delta_q1*delta_q0_intpoint)) * ((delta_q1+delta_q0)/(delta_q1*delta_q0))
+    delta_q1 = w_q1 - bus_freq
+    delta_q0_intpoint = (w_q0_intpoint) - bus_freq
+    delta_q0 = (w_q0) - bus_freq
+    J_temp = J / ((delta_q1 + delta_q0_intpoint) / (delta_q1 * delta_q0_intpoint)) * ((delta_q1 + delta_q0) / (delta_q1 * delta_q0))
 
-    H=coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=J_temp)
+    H = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0, alpha_q1=alpha_q1, J=J_temp)
     return H
 
 
@@ -858,7 +860,6 @@ def shift_due_to_fluxbias_q0(fluxlutman,amp_final,fluxbias_q0,sim_control_CZ, wh
     return amp_final
 
 
-
 def return_jump_operators(sim_control_CZ, amp_final, fluxlutman, which_gate: str = 'NE'):
 
     T1_q0 = sim_control_CZ.T1_q0()
@@ -866,16 +867,14 @@ def return_jump_operators(sim_control_CZ, amp_final, fluxlutman, which_gate: str
     T2_q0_amplitude_dependent = sim_control_CZ.T2_q0_amplitude_dependent()
     T2_q1 = sim_control_CZ.T2_q1()
 
-
     # time-independent jump operators on q1
     if T2_q1 != 0:                                        # we use 0 to mean that it is infinite
-        if T1_q1 != 0:                                    # if it's 0 it means that we want to simulate onle T_phi instead of T_2
+        if T1_q1 != 0:                                    # if it's 0 it means that we want to simulate only T_phi instead of T_2
             Tphi01_q1 = Tphi_from_T1andT2(T1_q1,T2_q1)
         else:
             Tphi01_q1 = T2_q1
     else:
         Tphi01_q1 = 0
-
 
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
@@ -906,12 +905,12 @@ def return_jump_operators(sim_control_CZ, amp_final, fluxlutman, which_gate: str
     else:
         Tphi01_q0_vec = []
 
-    c_ops = c_ops_amplitudedependent(T1_q0 * sim_control_CZ.T2_scaling(),T1_q1 * sim_control_CZ.T2_scaling(),
-                                    Tphi01_q0_vec * sim_control_CZ.T2_scaling(),Tphi01_q1 * sim_control_CZ.T2_scaling())
+    c_ops = c_ops_amplitudedependent(T1_q0 * sim_control_CZ.T2_scaling(), T1_q1 * sim_control_CZ.T2_scaling(),
+                                    Tphi01_q0_vec * sim_control_CZ.T2_scaling(), Tphi01_q1 * sim_control_CZ.T2_scaling())
     return c_ops
 
 
-def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxlutman_static, fluxbias_q1, amp, sim_step, intervals_list=None, which_gate: str = 'NE'):
+def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxlutman_static, fluxbias_q1, amp, sim_step=None, intervals_list=None, which_gate: str = 'NE'):
     """
     Calculates the propagator (either unitary or superoperator)
 
@@ -934,9 +933,9 @@ def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxlutman_static, flu
     if intervals_list is None:
         intervals_list = np.zeros(np.size(amp)) + sim_step
 
-    H_0 = calc_hamiltonian(0,fluxlutman,fluxlutman_static, which_gate=which_gate)
+    H_0 = calc_hamiltonian(0, fluxlutman, fluxlutman_static, which_gate=which_gate)
     if sim_control_CZ.dressed_compsub():
-        S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[n_levels_q1, n_levels_q0], [n_levels_q1, n_levels_q0]])
+        S = qtp.Qobj(matrix_change_of_variables(H_0), dims=[[n_levels_q1, n_levels_q0], [n_levels_q1, n_levels_q0]])
     else:
         S = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))       # line here to quickly switch off the use of S
 
@@ -944,41 +943,45 @@ def time_evolution_new(c_ops, sim_control_CZ, fluxlutman, fluxlutman_static, flu
     if sim_control_CZ.sigma_q1() != 0:
         w_q1_sweetspot = sim_control_CZ.w_q1_sweetspot()
         if w_q1 > w_q1_sweetspot:
-            log.warning('operating frequency of q1 should be lower than its sweet spot frequency.')
+            log.warning('Operating frequency of q1 should be lower than its sweet spot frequency.')
             w_q1 = w_q1_sweetspot
 
-        w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(f_pulse=w_q1,omega_0=w_q1_sweetspot,fluxbias=fluxbias_q1,positive_branch=True)
+        w_q1_biased = shift_due_to_fluxbias_q0_singlefrequency(
+            f_pulse=w_q1,
+            omega_0=w_q1_sweetspot,
+            fluxbias=fluxbias_q1,
+            positive_branch=True)
     else:
-    	w_q1_biased = w_q1
+        w_q1_biased = w_q1
 
     log.debug('Changing fluxlutman q_freq_10_{} value to {}'.format(which_gate, w_q1_biased))
     fluxlutman.set('q_freq_10_{}'.format(which_gate), w_q1_biased)     # we insert the change to w_q1 in this way because then J1 is also tuned appropriately
 
-
-    exp_L_total=1
+    exp_L_total = 1
     # tt = 0
     for i in range(len(amp)):
-        H=calc_hamiltonian(amp[i],fluxlutman,fluxlutman_static, which_gate=which_gate)
-        H=S.dag()*H*S
-        S_H = qtp.tensor(qtp.qeye(n_levels_q1),qtp.qeye(n_levels_q0))  #qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])
-                                                   # Alternative for collapse operators that follow the basis of H
-                                                   # We do not believe that this would be the correct model.
+        H = calc_hamiltonian(amp[i], fluxlutman, fluxlutman_static, which_gate=which_gate)
+        H = S.dag() * H * S
+        # qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])
+        # Alternative for collapse operators that follow the basis of H
+        # We do not believe that this would be the correct model.
+        S_H = qtp.tensor(qtp.qeye(n_levels_q1), qtp.qeye(n_levels_q0))
 
         if c_ops != []:
-            c_ops_temp=[]
+            c_ops_temp = []
             for c in range(len(c_ops)):
                 S_Hdag = S_H.dag()
-                if isinstance(c_ops[c],list):
+                if isinstance(c_ops[c], list):
                     c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_Hdag)    # c_ops are already in the H_0 basis
                 else:
                     c_ops_temp.append(S_H * c_ops[c] * S_Hdag)
 
             # t1 = time.time()
-            liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*intervals_list[i]).expm()
+            liouville_exp_t = (qtp.liouvillian(H, c_ops_temp) * intervals_list[i]).expm()
             # tt += time.time() - t1
         else:
-            liouville_exp_t=(-1j*H*intervals_list[i]).expm()
-        exp_L_total=liouville_exp_t*exp_L_total
+            liouville_exp_t = (-1j * H * intervals_list[i]).expm()
+        exp_L_total = liouville_exp_t * exp_L_total
 
     # log.warning('\n expm: {}\n'.format(tt))
 
@@ -1005,15 +1008,15 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, fl
     L1 = leakage_from_superoperator(U_final)
     population_02_state = calc_population_02_state(U_final)
     L2 = seepage_from_superoperator(U_final)
-    avgatefid = pro_avfid_superoperator_phasecorrected(U_final,phases)
-    avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
-    coherent_leakage11 = np.abs(U_final[index_in_vector_of_dm_matrix_element([1,1],[0,2]),index_in_vector_of_dm_matrix_element([1,1],[1,1])])
-    #print('avgatefid_compsubspace',avgatefid_compsubspace)
+    avgatefid = pro_avfid_superoperator_phasecorrected(U_final, phases)
+    avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final, L1, phases)     # leakage has to be taken into account, see Woods & Gambetta
+    coherent_leakage11 = np.abs(U_final[index_in_vector_of_dm_matrix_element([1, 1], [0, 2]), index_in_vector_of_dm_matrix_element([1, 1], [1, 1])])
+    # print('avgatefid_compsubspace',avgatefid_compsubspace)
     offset_difference, missing_fraction = offset_difference_and_missing_fraction(U_final)
 
-    population_transfer_12_21 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[1,2]],states_out=[[2,1]])
+    population_transfer_12_21 = average_population_transfer_subspace_to_subspace(U_final, states_in=[[1, 2]], states_out=[[2,1]])
     if n_levels_q0 >= 4:
-        population_transfer_12_03 = average_population_transfer_subspace_to_subspace(U_final,states_in=[[1,2]],states_out=[[0,3]])
+        population_transfer_12_03 = average_population_transfer_subspace_to_subspace(U_final, states_in=[[1, 2]], states_out=[[0,3]])
     else:
         population_transfer_12_03 = 0
 
@@ -1021,26 +1024,26 @@ def simulate_quantities_of_interest_superoperator_new(U, t_final, fluxlutman, fl
                                                         alpha_q0=fluxlutman.q_polycoeffs_anharm()[-1], alpha_q1=fluxlutman_static.q_polycoeffs_anharm()[-1], J=0)  # old wrong way
     U_final_new = rotating_frame_transformation_propagator_new(U_final, t_final, H_rotatingframe)
 
-    avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new,L1)
+    avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_new, L1)
     # NOTE: a single qubit phase off by 30 degrees costs 5.5% fidelity
     # We now correct only for the phase of qubit left (q1), in the rotating frame
-    avgatefid_compsubspace_pc_onlystaticqubit = pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U_final_new,L1,phases)
+    avgatefid_compsubspace_pc_onlystaticqubit = pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U_final_new, L1, phases)
 
     phases = phases_from_superoperator(U_final_new)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
-    phase_q0 = (phases[1]-phases[0]) % 360
-    phase_q1 = (phases[2]-phases[0]) % 360
-    cond_phase02 = (phases[4]-2*phase_q0+phases[0]) % 360
-    cond_phase12 = (phases[6]-2*phase_q0-phase_q1+phases[0]) % 360
-    cond_phase21 = (phases[7]-phase_q0-2*phase_q1+phases[0]) % 360
+    phase_q0 = (phases[1] - phases[0]) % 360
+    phase_q1 = (phases[2] - phases[0]) % 360
+    cond_phase02 = (phases[4] - 2 * phase_q0 + phases[0]) % 360
+    cond_phase12 = (phases[6] - 2 * phase_q0 - phase_q1 + phases[0]) % 360
+    cond_phase21 = (phases[7] - phase_q0 - 2 * phase_q1 + phases[0]) % 360
     if n_levels_q0 >= 4:
-        cond_phase03 = (phases[8]-3*phase_q0+phases[0]) % 360
+        cond_phase03 = (phases[8] - 3 * phase_q0 + phases[0]) % 360
     else:
         cond_phase03 = 0
-    cond_phase20 = (phases[5]-2*phase_q1+phases[0]) % 360
-    #print(cond_phase20+cond_phase02+phases[-1])
+    cond_phase20 = (phases[5] - 2 * phase_q1 + phases[0]) % 360
+    # print(cond_phase20+cond_phase02+phases[-1])
 
-    phase_diff_12_02 = (phases[6]-phases[4]-phase_q1) % 360
-    phase_diff_21_20 = (phases[7]-phases[5]-phase_q0) % 360
+    phase_diff_12_02 = (phases[6] - phases[4] - phase_q1) % 360
+    phase_diff_21_20 = (phases[7] - phases[5] - phase_q0) % 360
 
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid,
             'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1,

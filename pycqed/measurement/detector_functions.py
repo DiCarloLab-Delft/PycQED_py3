@@ -125,7 +125,7 @@ class Multi_Detector(Detector_Function):
         detectors     (list):
             a list of detectors to combine.
         det_idx_prefix(bool):
-            if True suffixes the value names with
+            if True prefixes the value names with
         detector_labels (list):
             if not None, will be used instead instead of
             "det{idx}_" as a prefix for the different channels
@@ -142,6 +142,8 @@ class Multi_Detector(Detector_Function):
                     else:
                         val_name = detector_labels[i] + \
                             ' ' + detector_value_name
+                else:
+                    val_name = detector_value_name
                 self.value_names.append(val_name)
             for detector_value_unit in detector.value_units:
                 self.value_units.append(detector_value_unit)
@@ -329,7 +331,7 @@ class Dummy_Detector_Hard(Hard_Detector):
         x = self.sweep_points
         noise = self.noise * (np.random.rand(2, len(x)) - .5)
         data = np.array([np.sin(x / np.pi),
-                         np.cos(x/np.pi)])
+                         np.cos(x / np.pi)])
         data += noise
         time.sleep(self.delay)
         # Counter used in test suite to test how many times data was acquired.
@@ -1645,13 +1647,14 @@ class UHFQC_spectroscopy_detector(Soft_Detector):
                  AWG=None, channels=(0, 1),
                  nr_averages=1024, integration_length=4096, **kw):
         super().__init__()
+        # FIXME: code commented out, some __init__ parameters no longer used
         #UHFQC=UHFQC, AWG=AWG, channels=channels,
         # nr_averages=nr_averages, nr_samples=nr_samples, **kw
         self.UHFQC = UHFQC
         self.ro_freq_mod = ro_freq_mod
 
     def acquire_data_point(self):
-        RESULT_LENGTH = 1600
+        RESULT_LENGTH = 1600  # FIXME: hardcoded
         vals = self.UHFQC.acquisition(
             samples=RESULT_LENGTH, acquisition_time=0.010, timeout=10)
         a = max(np.abs(fft.fft(vals[0][1:int(RESULT_LENGTH/2)])))
@@ -1843,8 +1846,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
+        if len(data_raw[next(iter(data_raw))])>1:
+            print('[DEBUG UHF SWF] SHOULD HAVE HAD AN ERROR')
+        # data = np.array([data_raw[key]
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
+        log.debug('[UHF detector] RAW shape',[data_raw[key]
+                         for key in sorted(data_raw.keys())])
+        log.debug('[UHF detector] shape 1',data.shape)
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -2217,6 +2226,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
+        # data = np.array([data_raw[key][-1]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC

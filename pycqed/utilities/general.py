@@ -7,8 +7,7 @@ import h5py
 import string
 import json
 import datetime
-# from pycqed.measurement import hdf5_data as h5d
-from pycqed.measurement.hdf5_data import read_dict_from_hdf5, RepresentsInt
+from pycqed.measurement.hdf5_data import read_dict_from_hdf5
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
 import pycqed as pq
@@ -19,9 +18,10 @@ import logging
 import subprocess
 from functools import reduce  # forward compatibility for Python 3
 import operator
-import string
 from contextlib import ContextDecorator
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
+from IPython.core.ultratb import AutoFormattedTB
+from collections.abc import Iterable
 
 
 try:
@@ -214,9 +214,9 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
     return True
 
 
-def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
-                                     label: str='', filepath: str=None,
-                                     timestamp: str=None):
+def load_settings_onto_instrument_v2(instrument, load_from_instr: str = None,
+                                     label: str = '', filepath: str = None,
+                                     timestamp: str = None, ignore_pars: set = None):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
     function. By default uses the last hdf5 file in the datadirectory.
@@ -283,7 +283,8 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
         try:
             if (hasattr(instrument.parameters[parname], 'set') and
                     (par['value'] is not None)):
-                instrument.set(parname, par['value'])
+                if ignore_pars is None or parname not in ignore_pars:
+                    instrument.set(parname, par['value'])
         except Exception as e:
             print('Could not set parameter: "{}" to "{}" '
                   'for instrument "{}"'.format(parname, par['value'],
@@ -709,3 +710,87 @@ def delete_keys_from_dict(dictionary: dict, keys: set):
             else:
                 modified_dict[key] = value
     return modified_dict
+
+
+def _flatten_gen(l):
+    """
+    Return a generator of a completely flattened list `l`
+    From: https://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists
+    """
+    for el in l:
+        if isinstance(el, Iterable) and not isinstance(el, (str, bytes)):
+            yield from _flatten_gen(el)
+        else:
+            yield el
+
+
+def flatten(l):
+    """
+    Flattens an arbitrary deth and lenghts lists and/or tuples into a
+    completely flat list.
+    Useful for preserving types.
+
+    E.g. flatten([[123, 2], [4., 6.], 9, 'bla']) => [123, 2, 4.0, 6.0, 9, 'bla']
+    """
+    return list(_flatten_gen(l))
+
+
+def get_module_name(obj, level=-1):
+    """
+    Get the module or submodule name of `obj`
+    By default return the outermost level
+    """
+    return obj.__module__.split(".")[level]
+
+# Handy things to print the traceback of exceptions
+
+
+# initialize the formatter for making the tracebacks into strings
+# mode = 'Plain' # for printing like in the interactive python traceback
+# TODO: Not sure if this line needs to be run in the highest level
+# python file in order to get a full traceback
+itb = AutoFormattedTB(mode='Verbose', tb_offset=None)
+
+
+def print_exception():
+    """
+    Prints the output of get_formatted_exception()
+    """
+    # This should print the same output, not sure when nesting code
+    # itb()
+    print(get_formatted_exception())
+
+
+def get_formatted_exception():
+    """
+    Retunr the last exception in a beautiful rainbow with extra sugar
+    and a cherry on top
+    Extra sugar = it tries to detect all variables on the line that
+    triggered the exception and includes them in the traceback
+
+    Typical usecase: You set a for loop or sequential independent jobs
+    that will take a lot of time and if one fails you still want the
+    rest to run and when you come back you also want to know why did it
+    fail. Just doing a print(exception) is useless, same for a full
+    traceback.
+
+    Example:
+        for job in list_of_long_jobs:
+            try:
+                job()
+            except Exception:
+                log.error(get_formatted_exception())
+                print('Thank you Victor!')
+
+    Inspired from https://stackoverflow.com/questions/40110540/jupyter-magic-to-handle-notebook-exceptions
+    """
+    # Not sure if using sys.exc_info() is a good idea but it works
+    # Maybe using logging in a more fancy ways is an alternative
+    # See https://stackoverflow.com/questions/3702675/how-to-print-the-full-traceback-without-halting-the-program
+    # for more opinions
+    etype, evalue, tb = sys.exc_info()
+
+    stb = itb.structured_traceback(etype, evalue, tb)
+    sstb = itb.stb2text(stb)
+
+    return sstb

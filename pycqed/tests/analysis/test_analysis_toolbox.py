@@ -30,7 +30,7 @@ def test_get_datafilepath_from_timestamp():
     data_fp = a_tools.get_datafilepath_from_timestamp(timestamp)
     print(data_fp)
     assert data_fp == os.path.join(
-        datadir, '20170412/183928_Rabi-n1_q9/183928_Rabi-n1_q9.hdf5')
+        datadir, '20170412', '183928_Rabi-n1_q9', '183928_Rabi-n1_q9.hdf5')
 
 
 def test_get_datafilepath_from_timestamp_raises_no_data():
