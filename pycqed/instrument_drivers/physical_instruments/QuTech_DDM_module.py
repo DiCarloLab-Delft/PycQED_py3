@@ -487,7 +487,7 @@ class DDMq(SCPI):
             time.sleep(1.0/FINISH_BIT_CHECK_FERQUENTION_HZ)
         self._displayInAvgErrors("Input Average", ch)
         self.write('qutech:inputavg{:d}:data? '.format(ch))
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         inputavg = np.frombuffer(binBlock, dtype=np.float32)
         return inputavg
 
@@ -507,7 +507,7 @@ class DDMq(SCPI):
             sys.stdout.flush()
         self._displayQBitErrors("TV Mode", ch_pair, wNr)
         self.write('qutech:tvmode{:d}:data{:d}? '.format(ch_pair, wNr))
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
         return tvmodedata
 
@@ -527,7 +527,7 @@ class DDMq(SCPI):
             sys.stdout.flush()
         self._displayQBitErrors("Correlation", 1, 1)
         self.write('qutech:correlation:data? ')
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         tvmodedata = np.frombuffer(binBlock, dtype=np.float32)
         return tvmodedata
 
@@ -543,11 +543,11 @@ class DDMq(SCPI):
 
         # write binblock
         hdr = 'qutech:wint:data {:d}, {:d},'.format(ch, wNr)
-        self.bin_block_write(binBlock, hdr)
+        self.binBlockWrite(binBlock, hdr)
 
     def _getWeightData(self, ch, wNr):
         self.write('qutech:wint{:d}:data{:d}? '.format(ch, wNr))
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         weightdata = np.frombuffer(binBlock, dtype=np.int8)
         return weightdata
 
@@ -568,7 +568,7 @@ class DDMq(SCPI):
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
 
         self.write('qutech:qstate{:d}:data{:d}:counter? '.format(ch_pair, wNr))
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         qstatecnt = np.frombuffer(binBlock, dtype=np.float32)
         return qstatecnt
 
@@ -588,7 +588,7 @@ class DDMq(SCPI):
             sys.stdout.flush()
         self._displayQBitErrors("TV Mode - Qbit state", ch_pair, wNr)
         self.write('qutech:qstate{:d}:data{:d}:average? '.format(ch_pair, wNr))
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         qstateavg = np.frombuffer(binBlock, dtype=np.float32)
         return qstateavg
 
@@ -609,7 +609,7 @@ class DDMq(SCPI):
             sys.stdout.flush()
         self._displayQBitErrors("Logging", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:int? '.format(ch_pair, wNr))
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         intlogging = np.frombuffer(binBlock, dtype=np.float32)
         return intlogging
 
@@ -630,7 +630,7 @@ class DDMq(SCPI):
             sys.stdout.flush()
         self._displayQBitErrors("Logging - Qbit state", ch_pair, wNr)
         self.write('qutech:logging{:d}:data{:d}:qstate? '.format(ch_pair, wNr))
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         qstatelogging = np.frombuffer(binBlock, dtype=np.float32)
         return qstatelogging
 
@@ -749,7 +749,7 @@ class DDMq(SCPI):
         self._displayQBitErrors("Error Fract", ch_pair, wNr)
 
         self.write('qutech:errorfraction{:d}:data{:d}? '.format(ch_pair, wNr))
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         errfractioncnt = np.frombuffer(binBlock, dtype=np.int32)
         print('NoErrorCounterReg    = {:d}'.format(errfractioncnt[0]))
         print('SingleErrorCounterReg= {:d}'.format(errfractioncnt[1]))
@@ -808,7 +808,7 @@ class DDMq(SCPI):
         self._displayQBitErrors("Two Bit Pattern Counter", 1, 1)
 
         self.write('qutech:twoBitPattern:data? ')
-        binBlock = self.bin_block_read()
+        binBlock = self.binBlockRead()
         errfractioncnt = np.frombuffer(binBlock, dtype=np.int32)
         print('NoErrorCounterReg    = {:d}'.format(errfractioncnt[0]))
         print('SingleErrorCounterReg= {:d}'.format(errfractioncnt[1]))
