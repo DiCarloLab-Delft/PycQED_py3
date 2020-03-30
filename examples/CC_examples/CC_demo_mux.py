@@ -38,6 +38,9 @@ log.setLevel(logging.DEBUG)
 
 log.debug('connecting to UHFQA')
 uhfqa0 = ZI_UHFQC.UHFQC('uhfqa0', device=dev_uhfqa, nr_integration_channels=9)
+if 0:  # restart, based on zishell_NH.py
+    uhfqa0. seti('/' + dev_uhfqa + '/raw/system/restart', 1)
+    raise RuntimeError("restarting UHF, observe LabOne")
 uhfqa0.load_default_settings(upload_sequence=False)
 
 log.debug('connecting to CC')
@@ -178,7 +181,7 @@ if 1:  # test of Distributed Shared Memory
         # program:  CC feedback test program
         .DEF    numIter     4
         .DEF    uhfLatency  11                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
-        .DEF    smWait      2                       # plus another 2 makes 4 total: 80 ns
+        .DEF    smWait      3                       # plus another 2 makes 4 total: 80 ns
         .DEF    wait        100
         .DEF    smAddr      S16
         .DEF    mux         0                       # SM[3:0] := I[3:0]
@@ -218,7 +221,7 @@ if 1:  # test of Distributed Shared Memory
             cc.debug_set_ccio_trace_on(slot, cc.TRACE_CCIO_BP_OUT)
         cc.assemble_and_start(prog)
 
-        # FIXME: wait for CC to finish, then ask UHFQA how many patterns it generated
+        # FIXME: wait for CC to finish, then ask UHFQA how many patterns it generated and stop it
 
 
 if 0:

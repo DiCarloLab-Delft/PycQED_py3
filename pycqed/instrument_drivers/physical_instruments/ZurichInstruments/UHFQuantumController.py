@@ -1273,20 +1273,21 @@ setUserReg(4, err_cnt);"""
 
         # setting the acquisition delay samples
         sequence = f"""
-            cvar i = 0;
-            const length = {len(dio_out_vect)};
+        cvar i = 0;
+        const length = {len(dio_out_vect)};
         """
         sequence = sequence + _array2vect(dio_out_vect, "dio_out_vect")
         # starting the loop
         sequence = sequence + """
-            setDIO(2048); // FIXME: workaround because we cannot use setDIO(0), still required in UHF firmware:65939
-            for (i = 0; i < length; i = i + 1) {
-              var dio_out =  dio_out_vect[i];
-              waitDIOTrigger();
-              setDIO(dio_out);
-              wait(3);      // ~20 ns pulse time
-              setDIO(2048);
-            }
+        setDIO(2048); // FIXME: workaround because we cannot use setDIO(0), still required in UHF firmware:65939
+        for (i = 0; i < length; i = i + 1) {
+          var dio_out =  dio_out_vect[i];
+          waitDIOTrigger();
+          setDIO(dio_out);
+          wait(3);      // ~20 ns pulse time
+          //wait(6);      // FIXME
+          setDIO(2048);
+        }
         """
 
         # Define the behavior of our program
