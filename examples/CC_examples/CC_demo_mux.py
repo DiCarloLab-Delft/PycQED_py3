@@ -148,18 +148,7 @@ if 1:  # test of Distributed Shared Memory
         #cw_list = [3, 2, 1, 0]
         cw_list = [7, 6, 5, 4]
         cw_array = np.array(cw_list, dtype=int).flatten()
-        if 0:  # FIXME
-            uhfqa0.awg_sequence_acquisition_and_DIO_RED_test(
-                dio_out_vect=cw_array * 2 + 1  # shift codeword, add Data Valid
-            )
-            uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}",
-                       2)  # high time ~35 ns, results in spurious trigger on CC
-            # uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}", 1)    # high time ~30 ns, results in spurious trigger on CC
-            # uhfqa0.set(f"awgs_0_userregs_{uhfqa0.USER_REG_WAIT_DLY}", 0)  # high time ~25 ns, gives SEQ_IN_EMPTY on CC
-        else:
-            uhfqa0.awg_sequence_test_pattern(
-                dio_out_vect=cw_array * 2 + 1  # shift codeword, add Data Valid
-                )
+        uhfqa0.awg_sequence_test_pattern(dio_out_vect=cw_array * 2 + 1)  # shift codeword, add Data Valid
 
         if 1:  # FIXME: remove duplicates of load_default_settings
             # Prepare AWG_Seq as driver of DIO and set DIO output direction
