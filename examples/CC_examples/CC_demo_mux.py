@@ -97,12 +97,13 @@ if 1:   # DIO calibration
             expected_sequence = []
 
             uhfqa0.dios_0_mode(uhfqa0.DIOS_0_MODE_AWG_SEQ) # FIXME: changes value set by load_default_settings()
-            uhfqa0.configure_awg_from_string(0, program)
+            uhfqa0.configure_awg_from_string(0, program2)
             uhfqa0.seti('awgs/0/enable', 1)
             uhfqa0.start()  # FIXME?
 
 
             log.debug('sending UHFQA trigger program to CC')
+            # FIXME: does not match with program2
             prog = inspect.cleandoc("""
             # program: UHFQA trigger program
             .DEF    duration    1
@@ -122,9 +123,14 @@ if 1:   # DIO calibration
                 else:
                     cc.debug_marker_out(cc_slot_uhfqa0, cc.UHFQA_TRIG)  # watch TRIG to check downstream period/frequency
             cc.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=cc_slot_uhfqa0)
+
+            dio_rd_index = cc.debug_get_ccio_reg(cc_slot_uhfqa0, SYS_ST_OPER_DIO_RD_INDEX)
             log.info(f'DIO calibration condition = 0x{cc.debug_get_ccio_reg(cc_slot_uhfqa0, SYS_ST_QUES_DIOCAL_COND):x} (0=OK)')
-            log.info(f'DIO read index = {cc.debug_get_ccio_reg(cc_slot_uhfqa0, SYS_ST_OPER_DIO_RD_INDEX)}')
+            log.info(f'DIO read index = {dio_rd_index}')
             log.info(f'DIO margin = {cc.debug_get_ccio_reg(cc_slot_uhfqa0, SYS_ST_OPER_DIO_MARGIN)}')
+            if dio_rd_index<0:
+                cc.debug_marker_in(cc_slot_uhfqa0, cc.UHFQA_DV)  # watch DV to check upstream period/frequency
+                raise RuntimeError("DIO calibration failed. FIXME: try setting UHF clock to internal")
 
             if 1:  # disable to allow scope measurements
                 cc.stop()
@@ -142,7 +148,7 @@ if 1:  # test of Distributed Shared Memory
         #cw_list = [3, 2, 1, 0]
         cw_list = [7, 6, 5, 4]
         cw_array = np.array(cw_list, dtype=int).flatten()
-        if 1:  # FIXME
+        if 0:  # FIXME
             uhfqa0.awg_sequence_acquisition_and_DIO_RED_test(
                 dio_out_vect=cw_array * 2 + 1  # shift codeword, add Data Valid
             )
@@ -183,7 +189,7 @@ if 1:  # test of Distributed Shared Memory
         # program:  CC feedback test program
         .DEF    numIter     4
         .DEF    uhfLatency  11                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
-        .DEF    smWait      4                       # plus another 2 makes 4 total: 80 ns
+        .DEF    smWait      2                       # plus another 2 makes 4 total: 80 ns
         .DEF    wait        100
         .DEF    smAddr      S16
         .DEF    mux         0                       # SM[3:0] := I[3:0]
