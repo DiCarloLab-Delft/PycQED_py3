@@ -142,7 +142,7 @@ if 1:  # test of Distributed Shared Memory
         #cw_list = [3, 2, 1, 0]
         cw_list = [7, 6, 5, 4]
         cw_array = np.array(cw_list, dtype=int).flatten()
-        if 0:  # FIXME
+        if 1:  # FIXME
             uhfqa0.awg_sequence_acquisition_and_DIO_RED_test(
                 dio_out_vect=cw_array * 2 + 1  # shift codeword, add Data Valid
             )
@@ -183,7 +183,7 @@ if 1:  # test of Distributed Shared Memory
         # program:  CC feedback test program
         .DEF    numIter     4
         .DEF    uhfLatency  11                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
-        .DEF    smWait      2                       # plus another 2 makes 4 total: 80 ns
+        .DEF    smWait      4                       # plus another 2 makes 4 total: 80 ns
         .DEF    wait        100
         .DEF    smAddr      S16
         .DEF    mux         0                       # SM[3:0] := I[3:0]
