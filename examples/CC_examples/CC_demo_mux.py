@@ -7,6 +7,7 @@ import CC_logging
 import logging
 import sys
 import inspect
+import time
 import numpy as np
 
 from pycqed.instrument_drivers.library.Transport import IPTransport
@@ -181,8 +182,9 @@ if 1:  # test of Distributed Shared Memory
         # program:  CC feedback test program
         .DEF    numIter     4
         .DEF    uhfLatency  11                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
-        .DEF    smWait      3                       # plus another 2 makes 4 total: 80 ns
-        .DEF    wait        100
+        #.DEF    smWait      2                       # plus another 2 makes 4 total: 80 ns
+        .DEF    smWait      3                       # FIXME: extra margin
+        .DEF    wait        10
         .DEF    smAddr      S16
         .DEF    mux         0                       # SM[3:0] := I[3:0]
         .DEF    lut         0                       # 4 times CW=1 conditional on SM[3:0]
@@ -197,6 +199,7 @@ if 1:  # test of Distributed Shared Memory
         [{uhf}] seq_sw_sm   $smAddr
         [{awg}] seq_wait    2                       # balance UHF duration
                 seq_wait    $smWait                 # wait for data distribution
+        #[{awg}] seq_sw_sm   $smAddr                 # debug
         [{awg}] seq_out_sm  $smAddr,$lut,1
         [{uhf}] seq_wait    1
                 seq_wait    $wait
@@ -221,6 +224,8 @@ if 1:  # test of Distributed Shared Memory
             cc.debug_set_ccio_trace_on(slot, cc.TRACE_CCIO_BP_OUT)
         cc.assemble_and_start(prog)
 
+        time.sleep(1)
+        print(cc.debug_get_ccio_trace(cc_slot_awg))
         # FIXME: wait for CC to finish, then ask UHFQA how many patterns it generated and stop it
 
 

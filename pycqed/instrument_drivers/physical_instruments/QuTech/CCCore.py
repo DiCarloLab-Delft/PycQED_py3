@@ -75,6 +75,12 @@ class CCCore(SCPIBase):
         bin_block = program_string.encode('ascii')
         self.bin_block_write(bin_block, hdr)
 
+    def get_sequence_program_assemble(self) -> str:
+        """
+        download sequence program string
+        """
+        return self._ask_bin('QUTech:SEQuence:PROGram:ASSEMble?').decode('utf-8', 'ignore')
+
     def get_assembler_success(self) -> int:
         return self._ask_int('QUTech:SEQuence:PROGram:ASSEMble:SUCCESS?')
 
@@ -118,6 +124,9 @@ class CCCore(SCPIBase):
 
     def debug_set_ccio_trace_on(self, ccio: int, tu_idx: int) -> None:
         self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:TRACE{tu_idx}:ON')
+
+    def debug_get_ccio_trace(self, ccio: int) -> str:
+        return self._ask_bin(f'QUTech:DEBUG:CCIO{ccio}:TRACE?').decode('utf-8', 'ignore')
 
     def start(self) -> None:
         self._transport.write('awgcontrol:run:immediate')
