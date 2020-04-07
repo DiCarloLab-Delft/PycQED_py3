@@ -189,7 +189,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             sampling_rate=self.sampling_rate(), delay=0)
 
     def _gen_park(self):
-        return self.park_amp()*np.ones(int(self.park_length()*self.sampling_rate()))
+        if self.park_double_sided():
+            # phase = (Det(A_pos)+Det(A_neg))/2*length
+            # Det(A_neg) = Det(A_pos)
+            pulse_pos = self.park_amp()*np.ones(int(self.park_length()*self.sampling_rate()/2))
+            pulse_neg = self.park_amp_minus()*np.ones(int(self.park_length()*self.sampling_rate()/2))
+            return np.concatenate((pulse_pos,pulse_neg))
+        else:
+            # phase = Det(A)*length
+            return self.park_amp()*np.ones(int(self.park_length()*self.sampling_rate()))
+
 
     def _add_qubit_parameters(self):
         """
@@ -267,6 +276,54 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                initial_value=False,
                                vals=vals.Bool(),
                                parameter_class=ManualParameter)
+            self.add_parameter('cz_scale_factor_%s'%this_cz, unit='',
+                               label='Amp. scale factor',
+                               initial_value=1,
+                               vals=vals.Numbers(0,10),
+                               parameter_class=ManualParameter)
+
+            # parameters for wait_step
+            self.add_parameter(
+                'czd_wait_step_length_%s' % this_cz,
+                docstring='Length control for waiting step leakage interference',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=10e-9,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'czd_wait_step_height_%s' % this_cz,
+                docstring='Step height control for waiting step leakage interference',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=0,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'czd_wait_step_max_%s' % this_cz,
+                docstring='Max step height control for waiting step leakage interference',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=np.pi/200,
+                parameter_class=ManualParameter)
+
+            # parameters for adiabatic phase_corr
+            self.add_parameter(
+                'cz_phase_corr_buffer_%s' % this_cz,
+                docstring='Buffer between adiabatic pulse and phase_corr',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=0,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'cz_phase_corr_max_amp_%s' % this_cz,
+                docstring='Max step height control for Adiabatic-shaped phase_corr',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=np.pi/200,
+                parameter_class=ManualParameter)
+            self.add_parameter('cz_phase_corr_l1_%s' % this_cz,
+                               vals=vals.Numbers(),
+                               initial_value=0,
+                               parameter_class=ManualParameter)
+            self.add_parameter('cz_phase_corr_l2_%s' % this_cz,
+                               vals=vals.Numbers(),
+                               initial_value=0,
+                               parameter_class=ManualParameter)
+
 
             self.add_parameter(
                 'czd_net_integral_%s' % this_cz,
@@ -292,6 +349,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                vals=vals.Numbers(0.5e-9, 500e-9),
                                unit='s', initial_value=35e-9,
                                parameter_class=ManualParameter)
+            self.add_parameter('cz_lambda_1_%s' % this_cz,
+                               vals=vals.Numbers(),
+                               initial_value=0,
+                               parameter_class=ManualParameter)
             self.add_parameter('cz_lambda_2_%s' % this_cz,
                                vals=vals.Numbers(),
                                initial_value=0,
@@ -305,6 +366,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                unit='deg',
                                initial_value=80,
                                parameter_class=ManualParameter)
+            self.add_parameter(
+                'czd_lambda_1_%s' % this_cz,
+                docstring='lambda_1 parameter of the negative part of the cz pulse'
+                ' if set to np.nan will default to the value of the main parameter',
+                vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+                initial_value=np.nan,
+                parameter_class=ManualParameter)
             self.add_parameter(
                 'czd_lambda_2_%s' % this_cz,
                 docstring='lambda_2 parameter of the negative part of the cz pulse'
@@ -362,6 +430,27 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                'of the net-zero pulse is close to zero.',
                                parameter_class=ManualParameter)
 
+        # CODEWORD 5: Parking
+        self.add_parameter('park_length', unit='s',
+                           label='Parking pulse length',
+                           initial_value=40e-9,
+                           vals=vals.Numbers(0, 100e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('park_amp', initial_value=0,
+                           # units is part of the total range of AWG8
+                           label='Parking pulse amplitude',
+                           unit='dac value', vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('park_amp_minus', initial_value=0,
+                           # units is part of the total range of AWG8
+                           label='Parking pulse amplitude for negative (Net-Zero) pulse',
+                           unit='dac value', vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('park_double_sided',
+                           initial_value=False,
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter)
+
         # CODEWORD 6: SQUARE
         self.add_parameter('sq_amp', initial_value=.5,
                            # units is part of the total range of AWG8
@@ -374,19 +463,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Numbers(0, 100e-6),
                            parameter_class=ManualParameter)
 
-        # CODEWORD 1: Idling
-        self.add_parameter('park_length', unit='s',
-                           label='Parking pulse length',
-                           initial_value=40e-9,
-                           vals=vals.Numbers(0, 100e-6),
-                           parameter_class=ManualParameter)
-        self.add_parameter('park_amp', initial_value=0,
-                           # units is part of the total range of AWG8
-                           label='Parking pulse amplitude',
-                           unit='dac value', vals=vals.Numbers(),
-                           parameter_class=ManualParameter)
-
-        # CODEWORD 7: CUSTOM
+        # CODEWORD 8: CUSTOM
 
         self.add_parameter(
             'custom_wf',
@@ -417,13 +494,39 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             - The net-integral (if net-zero) is set to 'czd_net_integral'
             - The amplitude of the cosine is set to 'cz_phase_corr_amp'
         """
+
         is_double_sided = self.get('czd_double_sided_%s' % which_gate)
         disable_cz_only_z = self.get('disable_cz_only_z_%s' % which_gate)
         cz_integral = self.get('czd_net_integral_%s' % which_gate)
         corr_len = self.get('cz_phase_corr_length_%s' % which_gate)
         corr_amp = self.get('cz_phase_corr_amp_%s' % which_gate)
-
         corr_samples = int(corr_len*self.sampling_rate())
+
+        corr_max_amp = self.get('cz_phase_corr_max_amp_%s' % which_gate)
+        buffer_before = self.get('cz_phase_corr_buffer_%s' % which_gate)
+
+        q_J2 = self.get('q_J2_%s' % which_gate)
+        czd_signs = self.get('czd_signs_%s' % which_gate)
+        phase_corr_l1 = self.get('cz_phase_corr_l1_%s' % which_gate)
+        phase_corr_l2 = self.get('cz_phase_corr_l2_%s' % which_gate)
+
+        dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
+
+        cw_idx = self._get_cw_from_wf_name('cz_%s'%which_gate)
+        #print(self.LutMap()[cw_idx]['type'])
+        if self.LutMap()[cw_idx]['type'] == 'cz':
+            state_B = '02'
+        else:
+            #print('picked 20 for {}'.format(which_gate))
+            state_B = '20'
+        eps_i = self.calc_amp_to_eps(0, state_A='11',
+                                     state_B=state_B,
+                                     which_gate=which_gate)
+        # Beware theta in radian!
+        theta_i = wfl.eps_to_theta(eps_i, g=q_J2)
+
+        nr_samples_buffer = int(np.round(buffer_before * self.sampling_rate()))
+        buffer_vec = np.zeros(nr_samples_buffer)
 
         # First the offset to guarantee net-zero integral
         if is_double_sided and not np.isnan(cz_integral):
@@ -436,12 +539,39 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 log.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
                     np.max(corr_pulse)))
         else:
-            corr_pulse = np.zeros(corr_samples)
+            corr_pulse = np.zeros(corr_samples+nr_samples_buffer)
 
         # Now the sinusoidal step for phase acquisition
         if is_double_sided:
-            corr_pulse += phase_corr_sine_series([corr_amp],
-                                                 corr_samples)
+            signs = czd_signs
+            theta_f = theta_i + corr_max_amp*corr_amp
+            phase_corr_theta = wfl.martinis_flux_pulse_v2(
+                corr_len/2, theta_i=theta_i,
+                theta_f=theta_f,
+                lambda_1=phase_corr_l1,
+                lambda_2=phase_corr_l2, lambda_3=0,
+                apply_wait_time=False,
+                theta_f_must_be_above=False,
+                sampling_rate=self.sampling_rate())
+            phase_corr_eps = wfl.theta_to_eps(phase_corr_theta, g=q_J2)
+            phase_corr_v_pos = self.calc_eps_to_amp(copy(phase_corr_eps),
+                                            state_A='11',
+                                            state_B=state_B,
+                                            positive_branch=(signs[0] == '+'),
+                                            which_gate=which_gate)
+            phase_corr_v_neg = self.calc_eps_to_amp(copy(phase_corr_eps),
+                                            state_A='11', state_B=state_B,
+                                            positive_branch=(signs[1] == '+'),
+                                            which_gate=which_gate)
+
+            if nr_samples_buffer>0:
+                list_components = (dac_scalefactor*buffer_vec,
+                                   dac_scalefactor*phase_corr_v_pos,
+                                   dac_scalefactor*phase_corr_v_neg)
+            else:
+                list_components = (dac_scalefactor*phase_corr_v_pos,
+                                   dac_scalefactor*phase_corr_v_neg)
+            corr_pulse += np.concatenate(list_components)
         else:
             corr_pulse += phase_corr_sine_series_half([corr_amp],
                                                       corr_samples)
@@ -476,17 +606,25 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         is_double_sided = self.get('czd_double_sided_%s' % which_gate)
         cz_length = self.get('cz_length_%s' % which_gate)
         cz_theta_f = self.get('cz_theta_f_%s' % which_gate)
+        cz_lambda_1 = self.get('cz_lambda_1_%s' % which_gate)
         cz_lambda_2 = self.get('cz_lambda_2_%s' % which_gate)
         cz_lambda_3 = self.get('cz_lambda_3_%s' % which_gate)
         q_J2 = self.get('q_J2_%s' % which_gate)
         czd_signs = self.get('czd_signs_%s' % which_gate)
 
         czd_theta_f = self.get('czd_theta_f_%s' % which_gate)
+        czd_lambda_1 = self.get('czd_lambda_1_%s' % which_gate)
         czd_lambda_2 = self.get('czd_lambda_2_%s' % which_gate)
         czd_lambda_3 = self.get('czd_lambda_3_%s' % which_gate)
 
         czd_amp_ratio = self.get('czd_amp_ratio_%s' % which_gate)
         czd_amp_offset = self.get('czd_amp_offset_%s' % which_gate)
+        scale_factor = self.get('cz_scale_factor_%s' % which_gate)
+
+        # change for wait_step
+        step_length = self.get('czd_wait_step_length_%s' % which_gate)
+        step_height = self.get('czd_wait_step_height_%s' % which_gate)
+        step_max = self.get('czd_wait_step_max_%s' % which_gate)
 
         dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
         eps_i = self.calc_amp_to_eps(0, state_A='11',
@@ -496,14 +634,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         theta_i = wfl.eps_to_theta(eps_i, g=q_J2)
 
         if not is_double_sided:
-            CZ_theta = wfl.martinis_flux_pulse(
+            CZ_theta = wfl.martinis_flux_pulse_v2(
                 cz_length, theta_i=theta_i,
                 theta_f=np.deg2rad(cz_theta_f),
+                lambda_1=cz_lambda_1,
                 lambda_2=cz_lambda_2, lambda_3=cz_lambda_3,
                 sampling_rate=self.sampling_rate())
             CZ_eps = wfl.theta_to_eps(CZ_theta, g=q_J2)
             CZ_amp = self.calc_eps_to_amp(CZ_eps, state_A='11',
                                           state_B='02',
+                                          positive_branch=True,
                                           which_gate=which_gate)
 
             # convert amplitude in V to amplitude in awg dac value
@@ -518,10 +658,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             length_ratio = self.calc_net_zero_length_ratio(
                 which_gate=which_gate)
 
-            CZ_theta_A = wfl.martinis_flux_pulse(
+            CZ_theta_A = wfl.martinis_flux_pulse_v2(
                 cz_length*length_ratio, theta_i=theta_i,
                 theta_f=np.deg2rad(cz_theta_f),
+                lambda_1=cz_lambda_1,
                 lambda_2=cz_lambda_2, lambda_3=cz_lambda_3,
+                # change for wait_step
+                step_length=step_length/2, step_height=step_height,
+                step_max=step_max, step_first=False,
                 sampling_rate=self.sampling_rate())
             CZ_eps_A = wfl.theta_to_eps(CZ_theta_A, g=q_J2)
 
@@ -541,6 +685,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             else:
                 d_theta_f = cz_theta_f
 
+            if not np.isnan(czd_lambda_1):
+                d_lambda_1 = czd_lambda_1
+            else:
+                d_lambda_1 = cz_lambda_1
             if not np.isnan(czd_lambda_2):
                 d_lambda_2 = czd_lambda_2
             else:
@@ -550,13 +698,30 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             else:
                 d_lambda_3 = cz_lambda_3
 
-            CZ_theta_B = wfl.martinis_flux_pulse(
+            CZ_theta_B = wfl.martinis_flux_pulse_v2(
                 cz_length*(1-length_ratio), theta_i=theta_i,
                 theta_f=np.deg2rad(d_theta_f),
+                lambda_1=d_lambda_1,
                 lambda_2=d_lambda_2, lambda_3=d_lambda_3,
+                # change for wait_step
+                step_length=step_length/2, step_height=step_height,
+                step_max=step_max, step_first=True,
                 sampling_rate=self.sampling_rate())
             CZ_eps_B = wfl.theta_to_eps(CZ_theta_B, g=q_J2)
             CZ_amp_B = self.calc_eps_to_amp(CZ_eps_B,
+                                            state_A='11', state_B='02',
+                                            positive_branch=(signs[1] == '+'),
+                                            which_gate=which_gate)
+
+            nr_samples_step = int(np.round(step_length * self.sampling_rate())//2)
+            step = np.ones(nr_samples_step)*step_max*step_height + theta_i
+            step_eps = wfl.theta_to_eps(np.clip(step,theta_i,np.pi), g=q_J2)
+
+            step_pos_amp = self.calc_eps_to_amp(step_eps, state_A='11',
+                                            state_B='02',
+                                            positive_branch=(signs[0] == '+'),
+                                            which_gate=which_gate)
+            step_neg_amp = self.calc_eps_to_amp(step_eps,
                                             state_A='11', state_B='02',
                                             positive_branch=(signs[1] == '+'),
                                             which_gate=which_gate)
@@ -567,9 +732,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             # Combine both halves of the double sided CZ gate
             amp_rat = czd_amp_ratio
             waveform = np.concatenate(
-                [CZ_A, amp_rat*CZ_B + czd_amp_offset])
+                [CZ_A,
+                 dac_scalefactor*step_pos_amp,
+                 dac_scalefactor*step_neg_amp,
+                 amp_rat*CZ_B + czd_amp_offset])
 
-            return waveform
+            return scale_factor*waveform
 
     def calc_amp_to_eps(self, amp: float,
                         state_A: str = '01',
@@ -704,6 +872,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             polycoeffs += 2 * self.q_polycoeffs_freq_01_det()
             polycoeffs += self.q_polycoeffs_anharm()
             polycoeffs[2] += 2 * self.q_freq_01()
+        elif state == '20':
+            polycoeffs += self.q_polycoeffs_anharm()
+            polycoeffs[2] += 2 * freq_10
         elif state == '10':
             polycoeffs[2] += freq_10
         elif state == '11':
@@ -1192,7 +1363,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     #################################
 
     def plot_cz_trajectory(self, axs=None, show=True,
-                           extra_plot_samples: int = 50, which_gate='NE'):
+                           extra_plot_samples: int = 50, which_gate='NE',
+                           plot_distortions=True, state_leak='02'):
         """
         Plots the cz trajectory in frequency space.
         """
@@ -1211,7 +1383,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         CZ_amp = dac_amps*self.get_dac_val_to_amp_scalefactor()
         CZ_eps = self.calc_amp_to_eps(
-            CZ_amp, '11', '02', which_gate=which_gate)
+            CZ_amp, '11', state_leak, which_gate=which_gate)
         CZ_theta = wfl.eps_to_theta(CZ_eps, q_J2)
 
         axs[0].plot(t, np.rad2deg(CZ_theta), marker='.')
@@ -1228,9 +1400,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         set_ylabel(axs[2], r'Amp.', 'V')
         # axs[2].set_ylim(-1, 1)
         axs[2].axhline(0, lw=.2, color='grey')
-        CZ_amp_pred = self.distort_waveform(CZ_amp)[:len(CZ_amp)]
-        axs[2].plot(t, CZ_amp_pred, marker='.')
-        axs[2].fill_between(t, CZ_amp_pred, color='C1', alpha=.3)
+        if plot_distortions:
+            CZ_amp_pred = self.distort_waveform(CZ_amp)[:len(CZ_amp)]
+            axs[2].plot(t, CZ_amp_pred, marker='.')
+            axs[2].fill_between(t, CZ_amp_pred, color='C1', alpha=.3)
         if show:
             plt.show()
         return axs
@@ -1268,6 +1441,11 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         freqs = self.calc_amp_to_freq(amps, state='11', which_gate=which_gate)
         ax.plot(amps, freqs, label='$f_{11}$')
         ax.text(0, self.calc_amp_to_freq(0, state='11', which_gate=which_gate), '11', color='C3',
+                ha='left', va='bottom', clip_on=True)
+
+        freqs = self.calc_amp_to_freq(amps, state='20', which_gate=which_gate)
+        ax.plot(amps, freqs, label='$f_{20}$')
+        ax.text(0, self.calc_amp_to_freq(0, state='20', which_gate=which_gate), '20', color='C4',
                 ha='left', va='bottom', clip_on=True)
 
         # 2. Annotating feature of interest
@@ -1308,8 +1486,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         set_ylabel(ax, 'Frequency', 'Hz')
         ax.set_xlim(-2.5, 2.5)
 
-        ax.set_ylim(0, self.calc_amp_to_freq(
-            0, state='02', which_gate=which_gate)*1.1)
+        ax.set_ylim(0, np.max([self.calc_amp_to_freq(
+                                  0, state='02', which_gate=which_gate),
+                               self.calc_amp_to_freq(
+                                  0, state='20', which_gate=which_gate)])*1.1)
 
         # 4. Add a twin x-axis to denote scale in dac amplitude
         dac_val_axis = ax.twiny()
@@ -1531,7 +1711,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             target_cond_phase=target_cond_phase
         )
         print('Adaptive sampling finished.')
-        # print(coha.get_readable_optimals(optimal_end=2))
 
         eval_opt_pvs = list(coha.proc_data_dict['optimal_pars_values'])
         eval_opt_mvs = list(coha.proc_data_dict['optimal_measured_values'])

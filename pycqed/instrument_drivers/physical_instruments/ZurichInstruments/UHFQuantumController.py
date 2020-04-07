@@ -1714,10 +1714,11 @@ while (1) {
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False, repetitions=1):
         log.info('Calibrating DIO delays')
         if verbose: print("Calibrating DIO delays")
-        if feedline is None:
-            raise ziUHFQCDIOCalibrationError('No feedline specified for calibration')
 
         CC_model = CC.IDN()['model']
+        if feedline is None and 'CCL' in CC_model:
+            raise ziUHFQCDIOCalibrationError('No feedline specified for calibration')
+
         if 'QCC' in CC_model:
             self._prepare_QCC_dio_calibration(
                 QCC=CC, verbose=verbose)
@@ -1742,17 +1743,22 @@ while (1) {
         if len(valid_delays) == 0:
             raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
 
-        min_valid_delay = min(valid_delays)
-        # Heuristics to get the 'best' delay in a sequence
-        if (min_valid_delay+1) in valid_delays and (min_valid_delay+2) in valid_delays:
-            min_valid_delay = min_valid_delay + 1
+        subseq = [[]]
+        for e in valid_delays:
+            if not subseq[-1] or subseq[-1][-1] == e - 1:
+                subseq[-1].append(e)
+            else:
+                subseq.append([e])
+
+        subseq = max(subseq, key=len)
+        delay = len(subseq)//2 + subseq[0]
 
         # Print information
         if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+        if verbose: print("  Setting delay to {}".format(delay))
 
         # And configure the delays
-        self._set_dio_calibration_delay(min_valid_delay)
+        self._set_dio_calibration_delay(delay)
 
         # Clear all detected errors (caused by DIO timing calibration)
         self.clear_errors()

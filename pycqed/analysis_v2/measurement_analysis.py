@@ -43,8 +43,8 @@ reload(rba)
 # import pycqed.analysis_v2.gate_set_tomography_analysis as gsa
 # reload(gsa)
 
-import pycqed.analysis_v2.fluxing_analysis as fla
-reload(fla)
+# import pycqed.analysis_v2.fluxing_analysis as fla
+# reload(fla)
 
 import pycqed.analysis_v2.timing_cal_analysis as ta
 reload(ta)

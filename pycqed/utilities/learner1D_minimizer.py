@@ -15,6 +15,7 @@ from functools import partial
 import logging
 import operator
 import random
+from pycqed.utilities.general import get_module_name
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +39,9 @@ class Learner1D_Minimizer(Learner1D):
     """
 
     def __init__(self, func, bounds, loss_per_interval=None):
+        # Sanity check that can save hours of debugging...
+        assert bounds[1] > bounds[0]
+
         super().__init__(func, bounds, loss_per_interval)
         # Keep the orignal learner behaviour but pass extra arguments to
         # the provided input loss function
@@ -64,9 +68,16 @@ class Learner1D_Minimizer(Learner1D):
                 self.max_no_improve_in_local = (
                     input_loss_per_interval.max_no_improve_in_local
                 )
-                assert self.max_no_improve_in_local > 2
+                assert self.max_no_improve_in_local >= 2
             else:
-                self.max_no_improve_in_local = 2
+                self.max_no_improve_in_local = 4
+
+            if hasattr(input_loss_per_interval, "update_losses_after_no_improv"):
+                self.update_losses_after_no_improv = (
+                    input_loss_per_interval.update_losses_after_no_improv
+                )
+            else:
+                self.update_losses_after_no_improv = True
 
             self.last_min = np.inf
 
@@ -81,6 +92,25 @@ class Learner1D_Minimizer(Learner1D):
         # This happens in `adaptive.Learner1D.tell`
         self._recompute_losses_factor = 1
 
+    def _recompute_all_losses(self):
+        """
+        This is the equivalent fucntion that exists in LearnernND for this
+        purpuse.
+
+        It is just a copy paste of a few lines from the `Learner1D.tell`
+
+        It is used to recompute losses when the `Learner1D_Minimizer` is "done"
+        with sampling a local minimum.
+        """
+
+        # NB: We are not updating the scale here as the `tell` method does
+        # because we assume this method will be called only after sampling
+        # `max_no_improve_in_local` points in the local minimum
+
+        for interval in reversed(self.losses):
+            self._update_interpolated_loss_in_interval(*interval)
+
+
 # ######################################################################
 # Utilities for adaptive.learner.learner1D
 # ######################################################################
@@ -91,6 +121,14 @@ def mk_res_loss_func(
 ):
     min_distance_orig = min_distance
     max_distance_orig = max_distance
+
+    # Wrappers to make it work with the default loss of `adaptive` package
+    if get_module_name(default_loss_func, level=0) == "adaptive":
+        def _default_loss_func(xs, values, *args, **kw):
+            return default_loss_func(xs, values)
+    else:
+        def _default_loss_func(xs, values, *args, **kw):
+            return default_loss_func(xs, values, *args, **kw)
 
     def func(xs, values, *args, **kw):
         if dist_is_norm:
@@ -110,7 +148,7 @@ def mk_res_loss_func(
             # on the distance between them
             loss = np.inf
         else:
-            loss = default_loss_func(xs, values, *args, **kw)
+            loss = _default_loss_func(xs, values, *args, **kw)
         return loss
 
     if not dist_is_norm:
@@ -128,9 +166,9 @@ def mk_non_uniform_res_loss_func(
 ):
     """
     This function is intended to allow for specifying the min and max
-    simplex volumes in a more user friendly and not precise way.
+    interval size in a more user friendly and not precise way.
     For a more precise way use the mk_res_loss_func to specify the
-    simplex volume limits directly
+    interval size limits directly
     """
     # Learner1D normalizes the parameter space to unity
     normalized_domain_size = 1.0
@@ -139,8 +177,10 @@ def mk_non_uniform_res_loss_func(
     min_distance = uniform_resolution * res_bounds[0]
     max_distance = uniform_resolution * res_bounds[1]
     func = mk_res_loss_func(
-        default_loss_func, min_distance=min_distance, max_distance=max_distance,
-        dist_is_norm=True
+        default_loss_func,
+        min_distance=min_distance,
+        max_distance=max_distance,
+        dist_is_norm=True,
     )
 
     # Preserve loss function atribute in case a loss function from
@@ -148,6 +188,7 @@ def mk_non_uniform_res_loss_func(
     if hasattr(default_loss_func, "nth_neighbors"):
         func.nth_neighbors = default_loss_func.nth_neighbors
     return func
+
 
 # ######################################################################
 # Loss and goal functions to be used with the Learner1D_Minimizer
@@ -158,19 +199,41 @@ def mk_minimization_loss(
     threshold: float = None,
     converge_at_local: bool = False,
     randomize_global_search: bool = False,
+    interval_weight: float = 5.0,
 ):
+    assert interval_weight >= 0.0 and interval_weight <= 1000.0
     compare_op_start = operator.le if converge_at_local else operator.lt
+
+    # `w` controls how "square" is the resulting function
+    # more "square" => x needs to be lower in order for the interval_factor
+    # to be lower
+    w = interval_weight / 1000.0
+    with np.errstate(divide="ignore"):
+        A = np.divide(1.0, np.arctan(np.divide(1.0, w)))
+
+    def interval_factor(vol):
+        with np.errstate(divide="ignore"):
+            out = A * np.arctan(np.divide(vol, w))
+        return out
+
+    w_not = 1.0 - w
+    with np.errstate(divide="ignore"):
+        A_not = np.divide(1.0, np.arctan(np.divide(1.0, w_not)))
+
+    def close_to_optimal_factor(scale, dist):
+        with np.errstate(divide="ignore"):
+            out = A_not * np.arctan(np.divide(dist, scale * w_not))
+        return out
 
     def func(xs, values, learner, *args, **kw):
         threshold_is_None = threshold is None
         comp_threshold = learner.moving_threshold if threshold_is_None else threshold
-        compare_op = compare_op_start if learner.compare_op is None else learner.compare_op
+        compare_op = (
+            compare_op_start if learner.compare_op is None else learner.compare_op
+        )
 
         # `dist` is normalised 0 <= dist <= 1 because xs are scaled
         dist = np.abs(xs[0] - xs[1])
-        if not learner._scale[1]:
-            # In case the function landscape is constant so far
-            return dist
 
         # learner._scale[1] makes sure it is the biggest loss and is a
         # finite value such that `dist` can be added
@@ -181,6 +244,10 @@ def mk_minimization_loss(
         dist_best_val_in_interval = (
             learner._bbox[1][1] - np.min(values) * learner._scale[1]
         )
+
+        if dist_best_val_in_interval == 0.0:
+            # In case the function landscape is constant so far
+            return dist
 
         values = np.array(values)
         scaled_threshold = comp_threshold / learner._scale[1]
@@ -216,7 +283,7 @@ def mk_minimization_loss(
 
             # Big loss => interesting point => difference from maximum function
             # value gives high loss
-            loss = dist_best_val_in_interval * dist
+            loss = close_to_optimal_factor(learner._scale[1], dist_best_val_in_interval) * interval_factor(dist)
 
         if randomize_global_search:
             # In case the learner is not working well some biased random
@@ -237,7 +304,9 @@ def mk_minimization_loss_func(
     dist_is_norm=False,
     converge_at_local=False,
     randomize_global_search=False,
-    max_no_improve_in_local=4
+    max_no_improve_in_local=4,
+    update_losses_after_no_improv=True,
+    interval_weight=50.,
 ):
     """
     If you don't specify the threshold you must make use of
@@ -252,6 +321,7 @@ def mk_minimization_loss_func(
         threshold=threshold,
         converge_at_local=converge_at_local,
         randomize_global_search=randomize_global_search,
+        interval_weight=interval_weight
     )
 
     func = mk_res_loss_func(
@@ -269,6 +339,7 @@ def mk_minimization_loss_func(
     func.converge_at_local = converge_at_local
     func.max_no_improve_in_local = max_no_improve_in_local
     func.converge_below = converge_below
+    func.update_losses_after_no_improv = update_losses_after_no_improv
     return func
 
 
@@ -295,29 +366,40 @@ def mk_minimization_goal_func():
                 if found_new_min:
                     learner.moving_threshold = learner.last_min
                     # learner.second_min = learner.last_min
-                    learner.no_improve_count = 2
+                    learner.no_improve_count = 1
                     learner.sampling_local_minima = True
 
                 if learner.sampling_local_minima:
-                    if (
-                        learner.no_improve_count >= learner.max_no_improve_in_local
-                        and not found_new_min
-                    ):
-                        # "Getting out of the minima"
+                    if learner.no_improve_count >= learner.max_no_improve_in_local:
+                        # We decide to "get out of the local minimum"
                         learner.sampling_local_minima = False
                         # Reset count to minimum
                         learner.no_improve_count = 0
+                        if learner.update_losses_after_no_improv:
+                            # Update the threshold so that _recompute_all_losses
+                            # has the desired effect
+                            learner.moving_threshold = learner._bbox[1][0]
+
+                            # Force update all losses such that the learner stops
+                            # sampling points in the local minimum
+
+                            # This has some computation overhead but should not
+                            # happen too often as finding a new minimum is not
+                            # expected to happen many times
+
+                            # NB: this method does not exist in the original
+                            # `Learner1D`
+                            learner._recompute_all_losses()
                     else:
-                        # We increase by two and not 1 to put emphasis on the
-                        # fact that two segments will receive maximum
-                        # priority when a new min is found
-                        learner.no_improve_count += 2
+                        learner.no_improve_count += 1
                 else:
                     # We are back in global search
                     # Now we can move the `moving_threshold` to latest minimum
                     learner.moving_threshold = learner._bbox[1][0]
-            if (learner.converge_below is not None and
-                    learner.converge_below > learner._bbox[1][0]):
+            if (
+                learner.converge_below is not None
+                and learner.converge_below > learner._bbox[1][0]
+            ):
                 learner.compare_op = operator.le
 
             # Keep track of the last iteration best minimum to be used in the

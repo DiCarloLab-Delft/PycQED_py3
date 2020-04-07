@@ -13,7 +13,8 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter, Parameter
 
 from pycqed.analysis import multiplexed_RO_analysis as mra
-from pycqed.measurement import detector_functions as det
+from pycqed.measurement import detector_functions_timings_fix as det
+reload(det)
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import tomography as tomo
@@ -230,44 +231,20 @@ class DeviceCCL(Instrument):
                            vals=vals.Numbers())
 
         self.add_parameter('dio_map',
-                           docstring='Returns the map between DIO'
-                           ' channel number and functionality',
-                           get_cmd=self._get_dio_map)
+                           docstring='The map between DIO'
+                           ' channel number and functionality (ro_x, mw_x, flux_x).',
+                           initial_value=None,
+                           set_cmd=self._set_dio_map,
+                           vals=vals.Dict()
+                           )
 
-    def _get_dio_map(self):
-        # FIXME: assumes single mapping for instrument
-        cc = self.instr_CC.get_instr()
-        if isinstance(cc, CCL):
-            dio_map = {'ro_0': 1,
-                       'ro_1': 2,
-                       'flux_0': 3,
-                       'mw_0': 4,
-                       'mw_1': 5}
-        elif isinstance(cc, QCC):
-            dio_map = {'ro_0': 1,
-                       'ro_1': 2,
-                       'ro_2': 3,
-                       'mw_0': 4,
-                       'mw_1': 5,
-                       'flux_0': 6,
-                       'flux_1': 7,
-                       'flux_2': 8,
-                       'mw_2': 9,
-                       'mw_3': 10,
-                       'mw_4': 11
-                       }
-        elif isinstance(cc, QuTechCC):
-            # NB: we number from 0 in accordance with QuTechCC driver (which adheres to hardware slot numbering)
-            # NB: slot 5 contains VSM interface
-            dio_map = {'ro_0': 0,
-                       'ro_1': 1,
-                       'mw_0': 2,
-                       'mw_1': 3,
-                       'flux_0': 4
-                       }
-        else:
-            return ValueError('CC type not recognized')
-        return dio_map
+    def _set_dio_map(self, dio_map_dict):
+        allowed_keys = {'ro_', 'mw_', 'flux_'}
+        for key in dio_map_dict:
+            assert np.any([a_key in key and len(key) > len(a_key) for a_key in allowed_keys]), ("Key `{}` must start with:"
+            " `{}`!".format(key, list(allowed_keys)))
+        return dio_map_dict
+
 
     def _grab_instruments_from_qb(self):
         """
@@ -310,7 +287,7 @@ class DeviceCCL(Instrument):
                                      # ('mw_3', self.tim_mw_latency_3()),
                                      # ('mw_4', self.tim_mw_latency_4())]
                                      ])
-        elif isinstance(cc, QCC):
+        else:
             latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
                                      ('ro_1', self.tim_ro_latency_1()),
                                      ('ro_2', self.tim_ro_latency_2()),
@@ -323,49 +300,43 @@ class DeviceCCL(Instrument):
                                      ('mw_3', self.tim_mw_latency_3()),
                                      ('mw_4', self.tim_mw_latency_4())]
                                     )
-        elif isinstance(cc, QuTechCC):
-            latencies = OrderedDict([('ro_0', self.tim_ro_latency_0()),
-                                     ('ro_1', self.tim_ro_latency_1()),
-                                     # ('ro_2', self.tim_ro_latency_2()),
-                                     ('mw_0', self.tim_mw_latency_0()),
-                                     ('mw_1', self.tim_mw_latency_1()),
-                                     ('flux_0', self.tim_flux_latency_0())]
-                                     # ('flux_1', self.tim_flux_latency_1()),
-                                     # ('flux_2', self.tim_flux_latency_2()),
-                                     # ('mw_2', self.tim_mw_latency_2()),
-                                     # ('mw_3', self.tim_mw_latency_3()),
-                                     # ('mw_4', self.tim_mw_latency_4())]
-                                    )
-        else:
-            raise NotImplementedError("Central Controller not specified to prepare for timing")
+
+        # NB: Mind that here number precision matters a lot!
+        # Tripple check everything if any changes are to be made
 
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
         # calibrating)
-
         lowest_value = min(latencies.values())
         for key, val in latencies.items():
-            latencies[key] = val - lowest_value
+            # Align to minimum and change to ns to avoid number precision problems
+            # The individual multiplications are on purpose
+            latencies[key] = val * 1e9 - lowest_value * 1e9
+
+        # Only apply fine latencies above 1 ps (HDAWG8 minum fine delay)
+        ns_tol = 1e-3
 
         # ensuring that RO latency is a multiple of 20 ns as the UHFQC does
         # not have a fine timing control.
-        ro_latency_modulo_20 = latencies['ro_0'] % 20e-9
-        for key, val in latencies.items():
-            latencies[key] = val + (20e-9 - ro_latency_modulo_20) % 20e-9
+        ro_latency_modulo_20 = latencies['ro_0'] % 20
+        # `% 20` is for the case ro_latency_modulo_20 == 20ns
+        correction_for_multiple = (20 - ro_latency_modulo_20) % 20
+        if correction_for_multiple >= ns_tol:  # at least one 1 ps
+            # Only apply corrections if they are significant
+            for key, val in latencies.items():
+                latencies[key] = val + correction_for_multiple
 
         # Setting the latencies in the CCL
-        CC = self.instr_CC.get_instr()
-        dio_map = self.dio_map()
-
-        # FIXME: seen to cause strange inconsistencies in MUX SSRO, should be
-        #       fixed when calibration microwaves and timing
         # Iterate over keys in dio_map as this ensures only relevant
         # timing setting are set.
-        for lat_key, dio_ch in dio_map.items():
+        for lat_key, dio_ch in self.dio_map().items():
             lat = latencies[lat_key]
-            lat_coarse = int(lat*1e9 // 20)  # Convert to CC dio value
-            lat_fine = int(lat*1e9 % 20)*1e-9
-            CC.set('dio{}_out_delay'.format(dio_ch), lat_coarse)
+            lat_coarse = int(np.round(lat) // 20)  # Convert to CC dio value
+            lat_fine = lat % 20
+            lat_fine = lat_fine * 1e-9 if lat_fine <= 20 - ns_tol else 0
+            log.debug('Setting `dio{}_out_delay` for `{}` to `{}`. (lat_fine: {:4g})'.format(
+                dio_ch, lat_key, lat_coarse, lat_fine))
+            cc.set('dio{}_out_delay'.format(dio_ch), lat_coarse)
 
             # RO devices do not support fine delay setting.
             if 'mw' in lat_key or 'flux' in lat_key:
@@ -378,6 +349,8 @@ class DeviceCCL(Instrument):
                         # All channels are set globally from the device object.
                         AWG.stop()
                         for i in range(8):  # assumes the AWG is an HDAWG
+                            log.debug("Setting `sigouts_{}_delay` to {:4g}"
+                                " in {}".format(i, lat_fine, AWG.name))
                             AWG.set('sigouts_{}_delay'.format(i), lat_fine)
                         AWG.start()
                         ch_not_ready = 8
@@ -560,27 +533,6 @@ class DeviceCCL(Instrument):
                     log.warning('No optimal weights defined for'
                                 ' {}, not updating weights'.format(qb_name))
                 else:
-
-                    # FIXME!: Dirty hack because of qusurf issue #63, adds
-                    # delay samples in the optimized weights
-                    opt_WI = qb.ro_acq_weight_func_I()
-                    opt_WQ = qb.ro_acq_weight_func_Q()
-                    del_sampl = qb.ro_acq_weight_func_delay_samples_hack()
-                    if del_sampl > 0:
-                        zeros = np.zeros(abs(del_sampl))
-                        opt_WI = np.concatenate(
-                            [opt_WI[abs(del_sampl):], zeros])
-                        opt_WQ = np.concatenate(
-                            [opt_WQ[abs(del_sampl):], zeros])
-                    elif del_sampl < 0:
-                        zeros = np.zeros(abs(del_sampl))
-                        opt_WI = np.concatenate(
-                            [zeros, opt_WI[:-abs(del_sampl)]])
-                        opt_WQ = np.concatenate(
-                            [zeros, opt_WQ[:-abs(del_sampl)]])
-                    else:
-                        pass
-
                     acq_instr.set('qas_0_integration_weights_{}_real'.format(
                                   qb.ro_acq_weight_chI()), opt_WI)
                     acq_instr.set('qas_0_integration_weights_{}_imag'.format(
@@ -671,7 +623,10 @@ class DeviceCCL(Instrument):
                 [resonators_in_lm[ro_lm.name]]
             log.info('Setting resonator combinations for {} to {}'.format(
                 ro_lm.name, resonator_combs))
-            ro_lm.resonator_combinations(resonator_combs)
+
+            # FIXME: temporary fix so device object doesnt mess with 
+            #       the resonator combinations. Better strategy should be implemented
+            #ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
     def get_correlation_detector(self, qubits: list,
@@ -708,6 +663,7 @@ class DeviceCCL(Instrument):
                              'Corr ({}, {})'.format(qubits[0], qubits[1])]
         else:
             # This should raise a ValueError but exists for legacy reasons.
+            # WARNING DEBUG HACK
             d = self.get_int_avg_det(qubits=qubits,
                                      single_int_avg=single_int_avg,
                                      seg_per_point=seg_per_point,
@@ -718,13 +674,13 @@ class DeviceCCL(Instrument):
     def get_int_logging_detector(self, qubits=None,
                                  result_logging_mode='raw'):
 
-        # if self.ro_acq_weight_type() == 'SSB':
-        #     result_logging_mode = 'raw'
-        # elif self.ro_acq_weight_type() == 'optimal':
-        #     # lin_trans includes
-        #     result_logging_mode = 'lin_trans'
-        #     if self.ro_acq_digitized():
-        #         result_logging_mode = 'digitized'
+        if self.ro_acq_weight_type() == 'SSB':
+            result_logging_mode = 'raw'
+        elif self.ro_acq_weight_type() == 'optimal':
+            # lin_trans includes
+            result_logging_mode = 'lin_trans'
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
 
         log.info('Setting result logging mode to {}'.format(
             result_logging_mode))
@@ -829,6 +785,7 @@ class DeviceCCL(Instrument):
 
         int_avg_dets = []
         for i, acq_instr_name in enumerate(acq_ch_map.keys()):
+            # The master detector is the one that holds the CC object
             if i == 0:
                 CC = self.instr_CC.get_instr()
             else:
@@ -914,6 +871,8 @@ class DeviceCCL(Instrument):
             q2: int = None, q3: int = None,
             flux_codeword='cz',
             flux_codeword_park=None,
+            parked_qubit_seq='ground',
+            reduced_swp_points=False,
             prepare_for_timedomain=True, MC=None,
             CZ_disabled: bool = False,
             wait_time_ns: int = 0, label='',
@@ -958,9 +917,29 @@ class DeviceCCL(Instrument):
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        assert q0 in self.qubits()
+        assert q1 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+        list_qubits_used = [q0, q1]
+        if q2 is None:
+            q2idx = None
+        else:
+            q2idx = self.find_instrument(q2).cfg_qubit_nr()
+            list_qubits_used.append(q2)
+        if q3 is None:
+            q3idx = None
+        else:
+            q3idx = self.find_instrument(q3).cfg_qubit_nr()
+            list_qubits_used.append(q3)
+
+
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0, q1])
-            for q in [q0, q1]:
+            self.prepare_for_timedomain(qubits=list_qubits_used)
+            for q in [q0, q1]:  #only on the CZ qubits we add the ef pulses
                 # This can be
                 mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
 
@@ -972,23 +951,12 @@ class DeviceCCL(Instrument):
                 mw_lutman.load_waveforms_onto_AWG_lookuptable(
                     regenerate_waveforms=True)
 
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-        assert q0 in self.qubits()
-        assert q1 in self.qubits()
-        q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q1idx = self.find_instrument(q1).cfg_qubit_nr()
-        if q2 is None:
-            q2idx = None
-        else:
-            q2idx = self.find_instrument(q2).cfg_qubit_nr()
-        if q3 is None:
-            q3idx = None
-        else:
-            q3idx = self.find_instrument(q3).cfg_qubit_nr()
 
         # These are hardcoded angles in the mw_lutman for the AWG8
-        angles = np.arange(0, 341, 20)
+        if reduced_swp_points:
+            angles = np.arange(0, 341, 40)
+        else:
+            angles = np.arange(0, 341, 20)
 
         p = mqo.conditional_oscillation_seq(
             q0idx, q1idx, q2idx, q3idx,
@@ -996,7 +964,8 @@ class DeviceCCL(Instrument):
             CZ_disabled=CZ_disabled,
             angles=angles, wait_time_after=wait_time_ns,
             flux_codeword=flux_codeword,
-            flux_codeword_park=flux_codeword_park)
+            flux_codeword_park=flux_codeword_park,
+            parked_qubit_seq=parked_qubit_seq)
 
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
@@ -1004,8 +973,13 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
 
-        MC.set_detector_function(
-            self.get_correlation_detector(qubits=[q0, q1]))
+        if (q2 is not None) and (q3 is None):
+            MC.set_detector_function(
+                self.get_int_avg_det(qubits=[q0,q1,q2]))
+        else:
+            MC.set_detector_function(
+                self.get_correlation_detector(qubits=[q0, q1]))
+
         MC.run('conditional_oscillation_{}_{}_{}{}'.format(q0, q1,
                                                            self.msmt_suffix, label),
                disable_snapshot_metadata=disable_metadata)
@@ -1460,82 +1434,159 @@ class DeviceCCL(Instrument):
             a = ma2.Multiplexed_Readout_Analysis()
         return a
 
+    #def measure_ssro_multi_qubit(
+    #        self, qubits: list, nr_shots_per_case: int = 2**13,  # 8192
+    #        prepare_for_timedomain: bool = True,
+    #        result_logging_mode='raw',
+    #        initialize: bool = False, analyze=True, shots_per_meas: int = 2**16,
+    #        label='Mux_SSRO',
+    #        MC=None):
+    #    """
+    #    Perform a simultaneous ssro experiment on multiple qubits.
+#
+    #    Args:
+    #        qubits (list of str)
+    #            list of qubit names
+    #        nr_shots_per_case (int):
+    #            total number of measurements for each case under consideration
+    #                e.g., n*|00> , n*|01>, n*|10> , n*|11> for two qubits
+#
+    #        shots_per_meas (int):
+    #            number of single shot measurements per single
+    #            acquisition with UHFQC
+#
+    #    """
+    #    log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
+    #        self.name, qubits))
+#
+    #    # off and on, not including post selection init measurements yet
+    #    nr_cases = 2**len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+    #    nr_shots = nr_shots_per_case*nr_cases
+
+    #    if prepare_for_timedomain:
+    #        self.prepare_for_timedomain(qubits)
+    #    if MC is None:
+    #        MC = self.instr_MC.get_instr()
+#
+    #    qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
+    #                  for qn in qubits]
+    #    
+    #    p = mqo.multi_qubit_off_on(qubit_idxs,
+    #                               initialize=initialize,
+    #                               second_excited_state=False,
+    #                               platf_cfg=self.cfg_openql_platform_fn())
+    #    s = swf.OpenQL_Sweep(openql_program=p,
+    #                         CCL=self.instr_CC.get_instr())
+#
+    #    # right is LSQ
+    #    d = self.get_int_logging_detector(qubits,
+    #                                      result_logging_mode=result_logging_mode)
+#
+    #    # This assumes qubit names do not contain spaces
+    #    det_qubits = [v.split()[-1] for v in d.value_names]
+    #    if qubits != det_qubits:
+    #        # this occurs because the detector groups qubits per feedline.
+    #        # If you do not pay attention, this will mess up the analysis of
+    #        # this experiment.
+    #        raise ValueError('Detector qubits do not match order specified')
+#
+    #    shots_per_meas = int(np.floor(
+    #        np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
+#
+    #    d.set_child_attr('nr_shots', shots_per_meas)
+#
+    #    old_soft_avg = MC.soft_avg()
+    #    old_live_plot_enabled = MC.live_plot_enabled()
+    #    MC.soft_avg(1)
+    #    MC.live_plot_enabled(False)
+#
+    #    MC.set_sweep_function(s)
+    #    MC.set_sweep_points(np.arange(nr_shots))
+    #    MC.set_detector_function(d)
+    #    MC.run('{}_{}_{}'.format(label, qubits, self.msmt_suffix))
+#
+    #    MC.soft_avg(old_soft_avg)
+    #    MC.live_plot_enabled(old_live_plot_enabled)
+    #    if analyze:
+    #        a = ma2.Multiplexed_Readout_Analysis(label=label)
+    #    return
+    
+
     def measure_ssro_multi_qubit(
-            self, qubits: list, nr_shots_per_case: int = 2**13,  # 8192
-            prepare_for_timedomain: bool = True,
-            result_logging_mode='raw',
-            initialize: bool = False, analyze=True, shots_per_meas: int = 2**16,
-            label='Mux_SSRO',
-            MC=None):
+        self,
+        qubits: list,
+        nr_shots_per_case: int = 2 ** 13,  # 8192
+        prepare_for_timedomain: bool = True,
+        result_logging_mode="raw",
+        initialize: bool = False,
+        analyze=True,
+        shots_per_meas: int = 2 ** 16,
+        label="Mux_SSRO",
+        MC=None,
+    ):
         """
         Perform a simultaneous ssro experiment on multiple qubits.
-
         Args:
             qubits (list of str)
                 list of qubit names
             nr_shots_per_case (int):
                 total number of measurements for each case under consideration
                     e.g., n*|00> , n*|01>, n*|10> , n*|11> for two qubits
-
             shots_per_meas (int):
                 number of single shot measurements per single
                 acquisition with UHFQC
-
         """
-        log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
-            self.name, qubits))
-
+        log.info("{}.measure_ssro_multi_qubit for qubits{}".format(self.name, qubits))
         # off and on, not including post selection init measurements yet
-        nr_cases = 2**len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
-        nr_shots = nr_shots_per_case*nr_cases
-
+        nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        nr_shots = nr_shots_per_case * nr_cases
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
         if MC is None:
             MC = self.instr_MC.get_instr()
-
-        qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
-                      for qn in qubits]
-
-        p = mqo.multi_qubit_off_on(qubit_idxs,
-                                   initialize=initialize,
-                                   second_excited_state=False,
-                                   platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-
+        qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr() for qn in qubits]
+        p = mqo.multi_qubit_off_on(
+            qubit_idxs,
+            initialize=initialize,
+            second_excited_state=False,
+            platf_cfg=self.cfg_openql_platform_fn(),
+        )
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         # right is LSQ
-        d = self.get_int_logging_detector(qubits,
-                                          result_logging_mode=result_logging_mode)
-
+        d = self.get_int_logging_detector(
+            qubits, result_logging_mode=result_logging_mode
+        )
         # This assumes qubit names do not contain spaces
         det_qubits = [v.split()[-1] for v in d.value_names]
         if qubits != det_qubits:
             # this occurs because the detector groups qubits per feedline.
             # If you do not pay attention, this will mess up the analysis of
             # this experiment.
-            raise ValueError('Detector qubits do not match order specified. QUBITS = {}; DETECTORS = {}'.format(qubits,det_qubits))
-
-        shots_per_meas = int(np.floor(
-            np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
-
-        d.set_child_attr('nr_shots', shots_per_meas)
-
+            raise ValueError("Detector qubits do not match order specified")
+        shots_per_meas = int(
+            np.floor(np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases
+        )
+        d.set_child_attr("nr_shots", shots_per_meas)
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
-
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run('{}_{}_{}'.format(label, qubits, self.msmt_suffix))
-
+        MC.run("{}_{}_{}".format(label, qubits, self.msmt_suffix))
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
-            a = ma2.Multiplexed_Readout_Analysis(label=label)
+            if initialize == True:
+                thresholds = [self.find_instrument(qubit).ro_acq_threshold() for qubit in qubits]
+                ma2.Multiplexed_Readout_Analysis(label=label,
+                                                 post_selection=True,
+                                                 post_selec_thresholds=thresholds)
+            else:
+                a = ma2.Multiplexed_Readout_Analysis(label=label)
         return
+
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
@@ -1661,8 +1712,10 @@ class DeviceCCL(Instrument):
                         prepare_for_timedomain=True, MC=None,
                         freq_tone=6e9, pow_tone=-10, spec_tone=False,
                         measure_parked_qubit=False,
+                        start_buffer=40e-9,end_buffer=40e-9,
                         target_qubit_sequence: str = 'ramsey',
-                        waveform_name='square'):
+                        waveform_name='square',
+                        analyze=True):
         """
         Measure a chevron patter of esulting from swapping of the excitations
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
@@ -1738,10 +1791,10 @@ class DeviceCCL(Instrument):
             q_park_idx = self.find_instrument(q_park).cfg_qubit_nr()
             fl_lutman_park = self.find_instrument(
                 q_park).instr_LutMan_Flux.get_instr()
-            if fl_lutman_park.sq_amp() < .1:
+            if fl_lutman_park.park_amp() < .1:
                 # This can cause weird behaviour if not paid attention to.
                 log.warning('Square amp for park pulse < 0.1')
-            if fl_lutman_park.sq_length() < np.max(lengths):
+            if fl_lutman_park.park_length() < np.max(lengths):
                 log.warning('Square length shorter than max Chevron length')
         else:
             q_park_idx = None
@@ -1754,8 +1807,9 @@ class DeviceCCL(Instrument):
             length_par = fl_lutman.sq_length
             flux_cw = 6
         elif 'cz' in waveform_name:
-            length_par = fl_lutman.cz_length
             flux_cw = fl_lutman._get_cw_from_wf_name(waveform_name)
+            which_gate = waveform_name[-2:]
+            length_par = fl_lutman.parameters['cz_length_{}'.format(which_gate)]
         else:
             raise ValueError('Waveform shape not understood')
 
@@ -1779,11 +1833,12 @@ class DeviceCCL(Instrument):
                 awg_nr, ch_pair)]
 
         sw = swf.FLsweep(fl_lutman, length_par,
-                         waveform_name=waveform_name)
+                         waveform_name=waveform_name,
+                         amp_for_generation=abs(amp_par.get()))
 
         p = mqo.Chevron(q0idx, q_specidx, q_park_idx,
-                        buffer_time=40e-9,
-                        buffer_time2=max(lengths)+40e-9,
+                        buffer_time=start_buffer,
+                        buffer_time2=max(lengths)+end_buffer,
                         flux_cw=flux_cw,
                         measure_parked_qubit=measure_parked_qubit,
                         platf_cfg=self.cfg_openql_platform_fn(),
@@ -1816,18 +1871,21 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function_2D(sw)
         MC.set_detector_function(d)
 
+        label = 'Chevron {} {}'.format(q0, q_spec)
+
         if not adaptive_sampling:
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
 
-            MC.run('Chevron {} {}'.format(q0, q_spec), mode='2D')
-            ma.TwoD_Analysis()
+            MC.run(label, mode='2D')
         else:
             MC.set_adaptive_function_parameters(
                 {'adaptive_function': adaptive.Learner2D,
                  'goal': lambda l: l.npoints > adaptive_sampling_pts,
                  'bounds': (amps, lengths)})
-            MC.run('Chevron {} {}'.format(q0, q_spec), mode='adaptive')
+            MC.run(label + " adaptive", mode='adaptive')
+        if analyze:
+            ma2.Basic2DInterpolatedAnalysis()
 
     def measure_two_qubit_ramsey(self, q0: str, q_spec: str,
                                  times,
@@ -1968,18 +2026,24 @@ class DeviceCCL(Instrument):
                                  values_per_point_suffex=['cos', 'sin'],
                                  single_int_avg=True,
                                  always_prepare=True)
+        # WARNING: THIS IS A DEBUGING TO UNDERSTAND WHETHER THE DET OF DEV IS BROKEN
+        # d = self.find_instrument(q0).get_int_avg_det(values_per_point=2,
+        #                          values_per_point_suffex=['cos', 'sin'],
+        #                          single_int_avg=True,
+        #                          always_prepare=True)
         MC.set_detector_function(d)
         MC.run(label)
         ma2.Basic1DAnalysis()
 
     def measure_cryoscope_vs_amp(self, q0: str, amps,
-                                 flux_cw: str = 'fl_cw_06',
-                                 duration: float = 100e-9,
-                                 amp_parameter: str = 'channel',
-                                 MC=None,
-                                 label='Cryoscope',
-                                 max_delay: float = 'auto',
-                                 prepare_for_timedomain: bool = True):
+                                twoq_pair=None,
+                                duration: float = 100e-9,
+                                amp_parameter: str = 'channel',
+                                flux_cw: str = 'fl_cw_06',
+                                MC=None,
+                                label='Cryoscope',
+                                max_delay: float = 'auto',
+                                prepare_for_timedomain: bool = True):
         """
         Performs a cryoscope experiment to measure the shape of a flux pulse.
 
@@ -2021,7 +2085,6 @@ class DeviceCCL(Instrument):
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        fl_lutman.sq_length(duration)
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0])
@@ -2031,19 +2094,33 @@ class DeviceCCL(Instrument):
 
         if amp_parameter == 'channel':
             sw = fl_lutman.cfg_awg_channel_amplitude
+            fl_lutman.sq_length(duration)
 
         elif amp_parameter == 'dac':
             sw = swf.FLsweep(fl_lutman, fl_lutman.sq_amp,
                              waveform_name='square')
+            fl_lutman.sq_length(duration)
+
+        elif amp_parameter == 'dac_cz_park':
+            sw = swf.joint_HDAWG_lutman_parameters(name='park_amp',
+                                      parameter_1=fl_lutman.park_amp,
+                                      parameter_2=fl_lutman.park_amp_minus,
+                                      AWG=fl_lutman.AWG.get_instr(),
+                                      lutman=fl_lutman)
+            #sw = fl_lutman.cfg_awg_channel_amplitude
+            fl_lutman.park_length(duration)
 
         else:
             raise ValueError('amp_parameter "{}" should be either '
                              '"channel" or "dac"'.format(amp_parameter))
-
-        p = mqo.Cryoscope(q0idx, buffer_time1=0,
+        print(q0idx)
+        p = mqo.Cryoscope(q0idx, cc = self.instr_CC.get_instr().name,
+                          buffer_time1=0,
                           buffer_time2=max_delay,
                           flux_cw=flux_cw,
+                          twoq_pair=twoq_pair,
                           platf_cfg=self.cfg_openql_platform_fn())
+
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
@@ -2053,6 +2130,11 @@ class DeviceCCL(Instrument):
                                  values_per_point_suffex=['cos', 'sin'],
                                  single_int_avg=True,
                                  always_prepare=True)
+        # WARNING: THIS IS A DEBUGING TO UNDERSTAND WHETHER THE DET OF DEV IS BROKEN
+        # d = self.find_instrument(q0).get_int_avg_det(values_per_point=2,
+        #                          values_per_point_suffex=['cos', 'sin'],
+        #                          single_int_avg=True,
+        #                          always_prepare=True)
         MC.set_detector_function(d)
         MC.run(label)
         ma2.Basic1DAnalysis()
@@ -2060,6 +2142,8 @@ class DeviceCCL(Instrument):
     def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
                                MC=None,  label='timing_{}_{}',
                                qotheridx=2,
+                               pulse_length=40e-9,
+                               extra_buffer=0e-9,
                                prepare_for_timedomain: bool = True):
         """
         Measure the ramsey-like sequence with the 40 ns flux pulses played between
@@ -2088,15 +2172,16 @@ class DeviceCCL(Instrument):
             MC = self.instr_MC.get_instr()
 
         assert q0 in self.qubits()
+        self.prepare_for_timedomain(qubits=[q0])
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        fl_lutman.sq_length(40e-9)
+        fl_lutman.sq_length(pulse_length)
 
         CC = self.instr_CC.get_instr()
 
         # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns
         p = sqo.FluxTimingCalibration(q0idx,
-                                      times=[40e-9],
+                                      times=[extra_buffer],
                                       platf_cfg=self.cfg_openql_platform_fn(),
                                       flux_cw='fl_cw_06',
                                       qubit_other_idx=qotheridx,

@@ -113,7 +113,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
     p = oqh.create_program(program_name, platf_cfg)
 
     # attribute get's added to program to help finding the output files
-    p.filename = join(p.output_dir, p.name + '.qisa')  # FIXME: platform dependency
+    p.filename = join(p.output_dir, p.name + '.vq1asm')  # FIXME: platform dependency
 
     if not oqh.check_recompilation_needed(
             program_fn=p.filename, platf_cfg=platf_cfg, recompile=recompile):

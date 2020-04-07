@@ -804,6 +804,32 @@ class lutman_par(Soft_Sweep):
         self.LutMan.load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=True)
 
+class joint_HDAWG_lutman_parameters(Soft_Sweep):
+    """
+    Sweeps two parameteres toghether, assigning the same value
+    name is defined by user
+    label and units are grabbed from parameter_1
+    """
+
+    def __init__(self, name, parameter_1, parameter_2,
+                 AWG, lutman):
+        self.set_kw()
+        self.name = name
+        self.parameter_name = parameter_1.label
+        self.unit = parameter_1.unit
+        self.lm = lutman
+        self.AWG = AWG
+        self.sweep_control = 'soft'
+        self.parameter_1 = parameter_1
+        self.parameter_2 = parameter_2
+
+    def set_parameter(self, val):
+        self.parameter_1.set(val)
+        self.parameter_2.set(-val)
+        self.AWG.stop()
+        self.lm.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.AWG.start()
+
 
 class QWG_lutman_par_chunks(Soft_Sweep):
     '''
@@ -1144,7 +1170,7 @@ class FLsweep(Soft_Sweep):
     """
     Special sweep function for AWG8 and QWG flux pulses.
     """
-    def __init__(self, lm, par, waveform_name):
+    def __init__(self, lm, par, waveform_name, amp_for_generation = None):
         super().__init__()
         self.lm = lm
         self.par = par
@@ -1152,8 +1178,7 @@ class FLsweep(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
-
-
+        self.amp_for_generation = amp_for_generation
         self.AWG = self.lm.AWG.get_instr()
         self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
 
@@ -1165,12 +1190,15 @@ class FLsweep(Soft_Sweep):
             self.set_parameter_HDAWG(val)
 
     def set_parameter_HDAWG(self, val):
-
-
         self.par(val)
+        if self.amp_for_generation:
+            old_val_amp = self.lm.cfg_awg_channel_amplitude()
+            self.lm.cfg_awg_channel_amplitude(self.amp_for_generation)
         self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
                                                    regenerate_waveforms=True)
+        if self.amp_for_generation:
+            self.lm.cfg_awg_channel_amplitude(abs(old_val_amp))
         self.AWG.start()
         return
 

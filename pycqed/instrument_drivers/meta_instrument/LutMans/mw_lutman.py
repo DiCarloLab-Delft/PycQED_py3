@@ -4,7 +4,7 @@ from collections import Iterable, OrderedDict
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
-
+import time
 
 default_mw_lutmap = {
     0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
@@ -188,8 +188,11 @@ class Base_MW_LutMan(Base_LutMan):
         # lutmap is expected to obey lutmap mw schema
         for idx, waveform in self.LutMap().items():
             if waveform['type'] == 'ge':
-                if abs(waveform['theta']) == 90:
+                if waveform['theta'] == 90:
                     amp = self.mw_amp180()*self.mw_amp90_scale()
+                elif waveform['theta'] == -90:
+                    amp = -1 * self.mw_amp180()*self.mw_amp90_scale()
+
                 else:
                     amp = theta_to_amp(theta=waveform['theta'],
                                        amp180=self.mw_amp180())
@@ -494,6 +497,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             ch_pair = (awg_ch-1) % 2
             vals.append(
                 AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair)))
+        print(vals)
         assert vals[0] == vals[1]
         return vals[0]
 
