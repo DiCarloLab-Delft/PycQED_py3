@@ -891,6 +891,11 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         # The channel containing the data must be specified in the options dict
         ch_idx_spec = self.options_dict.get('ch_idx_spec', 0)
         ch_idx_osc = self.options_dict.get('ch_idx_osc', 1)
+
+        # Necessary for reading parked qubit
+        self.include_park = self.options_dict.get('include_park', False)
+        ch_idx_park = self.options_dict.get('ch_idx_park', 2)
+
         qoi['ch_idx_osc'] = ch_idx_osc
         qoi['ch_idx_spec'] = ch_idx_spec
 
@@ -902,6 +907,13 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             cal_points = [
                 [[-7, -6], [-5, -4], [-2, -1]],  # oscillating qubit
                 [[-7, -5], [-6, -4], [-3, -1]],  # spec qubits
+            ]
+        if self.cal_points == 'park':
+            # calibration point indices are when ignoring the f-state cal pts
+            cal_points = [
+                [[-9, -8], [-7, -6], [-4, -3]],  # oscillating qubit
+                [[-9, -7], [-8, -6], [-5, -3]],  # spec qubits
+                [[-2],[-1], []]                  # parked qubit
             ]
         elif self.cal_points == 'ge':
             # calibration point indices are when ignoring the f-state cal pts
@@ -959,6 +971,19 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                     SI, SX, V0, V1, V2)
                 # Leakage based on the average of the oscillation
                 qoi['leak_avg'] = P2[0]  # list with 1 elt...
+        if self.include_park:
+            if cal_points == 'park':
+                yvals_park = list(self.raw_data_dict['measured_values_ord_dict'].values())[
+                        ch_idx_park][0][:-9]
+                self.yvals_park = a_tools.normalize_data_v3(
+                            yvals_park,
+                            cal_zero_points=cal_points[ch_idx_park][0],
+                            cal_one_points=cal_points[ch_idx_park][1])
+            else:
+                yvals_park = list(self.raw_data_dict['measured_values_ord_dict'].values())[
+                        ch_idx_park][0][:-7]
+                self.yvals_park = yvals_park
+
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -1024,6 +1049,20 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         spec_off = ufloat(np.mean(self.proc_data_dict['yvals_spec_off'][:-3]),
                           sem(self.proc_data_dict['yvals_spec_off'][:-3]))
         qoi['missing_fraction'] = spec_on-spec_off
+
+        if self.include_park:
+            self.yvals_park_off = np.mean(self.yvals_park[::2])
+            self.yvals_park_on = np.mean(self.yvals_park[1::2])
+            self.yvals_park_avg = np.mean(self.yvals_park)
+        else:
+            self.yvals_park_off = np.nan
+            self.yvals_park_on = np.nan
+            self.yvals_park_avg = np.nan
+
+        qoi['park_off'] = self.yvals_park_off
+        qoi['park_on'] = self.yvals_park_on
+        qoi['park_avg'] = self.yvals_park_avg
+        qoi['park_on/off'] = self.yvals_park_on-self.yvals_park_off
 
     def prepare_plots(self):
         self._prepare_main_oscillation_figure()

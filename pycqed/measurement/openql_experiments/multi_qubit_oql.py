@@ -1402,7 +1402,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
             p.add_kernel(k)
     if add_cal_points:
-        p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1,
+        p = oqh.add_two_q_cal_points_special_cond_osc(p, q0=q0, q1=q1,
+                                     q2=q2,
                                      f_state_cal_pts=True,
                                      f_state_cal_pt_cw=31)
             # hardcoded requires ef pulses to be prepared
