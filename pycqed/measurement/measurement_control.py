@@ -36,7 +36,7 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 
 # SKOptLearner Notes
 # NB: This optimizer can be slow and is intended for very, very costly
-# functions compared to the computation time of the optiizer itself
+# functions compared to the computation time of the optimizer itself
 
 # NB2: One of the cool things is that it can do hyper-parameter
 # optimizations e.g. if the parameters are integers

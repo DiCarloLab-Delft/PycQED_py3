@@ -600,12 +600,12 @@ def avoided_crossing_freq_shift(flux, a, b, g):
 
     frequencies = np.zeros([len(flux), 2])
     for kk, fl_i in enumerate(flux):
-        f_1 = a*fl_i  +  b
+        f_1 = a * fl_i + b
         f_2 = 0
         matrix = [[f_1, g],
                   [g, f_2]]
         frequencies[kk, :] = np.linalg.eigvalsh(matrix)[:2]
-    result = frequencies[:, 1]- frequencies[:, 0]
+    result = frequencies[:, 1] - frequencies[:, 0]
     return result
 
 
