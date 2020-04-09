@@ -20,7 +20,10 @@ def unscale(points, xy_mean, xy_scale):
     return points * xy_scale + xy_mean
 
 
-def interpolate_heatmap(x, y, z, n: int = None, interp_method: str = "linear"):
+def interpolate_heatmap(
+    x, y, z, n: int = None, interp_method: str = "linear",
+    interp_grid_data: bool = True
+):
     """
     Args:
         x   (array): x data points
@@ -30,6 +33,9 @@ def interpolate_heatmap(x, y, z, n: int = None, interp_method: str = "linear"):
             grid
         interp_method {"linear", "nearest", "deg"} determines what interpolation
             method is used.
+        detect_grid (bool): Will make a few simple checks and not interpolate
+            the data is already on a grid. This is convenient to be able to use
+            same analysis
 
     Returns:
         x_grid : N*1 array of x-values of the interpolated grid
@@ -68,14 +74,24 @@ def interpolate_heatmap(x, y, z, n: int = None, interp_method: str = "linear"):
         # N.B. a factor 4 was added as there were to few points for uniform
         # grid otherwise.
         all_areas = areas(ip)
-        area_min = all_areas[all_areas > 0.].min()
+        area_min = all_areas[all_areas > 0.0].min()
         n = int(0.658 / np.sqrt(area_min)) * 4
         n = max(n, 10)
         if n > 500:
             logging.debug("n: {} larger than 500".format(n))
             n = 500
 
-    x_lin = y_lin = np.linspace(-0.5, 0.5, n)
+    unique_xs = np.unique(x)
+    num_unique_xs = len(unique_xs)
+    unique_ys = np.unique(y)
+    num_unique_ys = len(unique_ys)
+
+    if num_unique_xs * num_unique_ys == len(x) and not interp_grid_data:
+        # Data is already on a grid, don't create larger interpolation grid
+        x_lin = np.linspace(-0.5, 0.5, num_unique_xs)
+        y_lin = np.linspace(-0.5, 0.5, num_unique_ys)
+    else:
+        x_lin = y_lin = np.linspace(-0.5, 0.5, n)
 
     if interp_method == "linear":
         z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
@@ -103,8 +119,10 @@ def interpolate_heatmap(x, y, z, n: int = None, interp_method: str = "linear"):
         z_grid = (np.rad2deg(np.arctan2(newdata_sin, newdata_cos)) % 360).squeeze()
 
     # x and y grid points need to be rescaled from the linearly chosen points
-    points_grid = unscale(list(zip(x_lin, y_lin)), xy_mean=xy_mean, xy_scale=xy_scale)
-    x_grid = points_grid[:, 0]
-    y_grid = points_grid[:, 1]
+    x_grid = np.array([x_lin, np.full(len(x_lin), np.min(y_lin))]).T
+    x_grid = unscale(x_grid, xy_mean=xy_mean, xy_scale=xy_scale).T[0]
 
-    return x_grid, y_grid, (z_grid).T
+    y_grid = np.array([np.full(len(y_lin), np.min(x_lin)), y_lin]).T
+    y_grid = unscale(y_grid, xy_mean=xy_mean, xy_scale=xy_scale).T[1]
+
+    return x_grid, y_grid, z_grid.T
