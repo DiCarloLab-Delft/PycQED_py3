@@ -544,13 +544,31 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Pulse polarity inversion",
             )
             self.add_parameter(
-                "czv_fixed_amp_%s" % this_cz,
-                docstring="",
+                "czv_mirror_sqrs_%s" % this_cz,
+                docstring="Mirrors the two halves with respect to the point "
+                "of amplitude inversion between the two halves.",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=True,
+                label="Mirror squares",
+            )
+            self.add_parameter(
+                "czv_flip_wf_%s" % this_cz,
+                docstring="Flip the entire waveform, only has an effect when "
+                "`czv_mirror_sqrs_` is `False`",
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
                 initial_value=False,
-                label="",
+                label="Time-flipped waveform",
             )
+            # self.add_parameter(
+            #     "czv_fixed_amp_%s" % this_cz,
+            #     docstring="",
+            #     parameter_class=ManualParameter,
+            #     vals=vals.Bool(),
+            #     initial_value=False,
+            #     label="",
+            # )
             self.add_parameter(
                 "czv_correct_q_phase_%s" % this_cz,
                 docstring="",
