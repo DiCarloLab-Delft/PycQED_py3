@@ -1350,11 +1350,17 @@ def conditional_oscillation_seq(q0: int, q1: int,
             if (parked_qubit_seq=='ramsey') and (q2 is not None):
                 k.prepz(q2)
 
-            if case == 'excitation':
-                k.gate('rx180', [q1])
-            k.gate('rx90', [q0])
             if (parked_qubit_seq=='ramsey') and (q2 is not None):
+                if case == 'excitation':
+                    k.gate('rx180', [q0])
+                k.gate('i', [q1])
                 k.gate('rx90', [q2])
+            else:
+                k.gate('rx90', [q0])
+                if case == 'excitation':
+                    k.gate('rx180', [q1])
+                #k.gate('i', [q2])
+            ############################ CZ block ##############################
             if not CZ_disabled:
                 k.gate("wait", [], 0) # Empty list generates barrier for all qubits in platf. only works with 0.8.0
                 k.gate(flux_codeword, [q0, q1])
@@ -1378,19 +1384,24 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
             if wait_time_after > 0:
                 k.gate('wait', [q0,q1], wait_time_after)
+            ####################################################################
 
-            # hardcoded angles, must be uploaded to AWG
-            if angle == 90:
-                # special because the cw phase pulses go in mult of 20 deg
-                k.gate('ry90', [q0])
-            elif angle == 0:
-                k.gate('rx90', [q0])
-            else:
-                k.gate('cw_{:02}'.format(cw_idx), [q0])
-            if case == 'excitation':
-                k.gate('rx180', [q1])
             if (parked_qubit_seq=='ramsey') and (q2 is not None):
-                k.gate('rxm90', [q2])
+                k.gate('cw_{:02}'.format(cw_idx), [q2])
+                if case == 'excitation':
+                    k.gate('rx180', [q0])
+            else:
+                # hardcoded angles, must be uploaded to AWG
+                if angle == 90:
+                    # special because the cw phase pulses go in mult of 20 deg
+                    k.gate('ry90', [q0])
+                elif angle == 0:
+                    k.gate('rx90', [q0])
+                else:
+                    k.gate('cw_{:02}'.format(cw_idx), [q0])
+                if case == 'excitation':
+                    k.gate('rx180', [q1])
+
 
             k.measure(q0)
             k.measure(q1)
@@ -1414,6 +1425,10 @@ def conditional_oscillation_seq(q0: int, q1: int,
                        365, 366, 367]
     else:
         cal_pts_idx = []
+
+    if (q2 is not None) and (q3 is None):
+        # add parking cal points
+        cal_pts_idx += [368, 369]
 
     p.sweep_points = np.concatenate(
         [np.repeat(angles, len(cases)), cal_pts_idx])
@@ -2052,4 +2067,133 @@ def sliding_flux_pulses_seq(
     except TypeError:
         # openql-0.5 compatibility
         p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    return p
+
+def two_qubit_state_tomography(qubit_idxs,
+                               bell_state,
+                               product_state,
+                               platf_cfg,
+                               wait_after_flux: float=None,
+                               flux_codeword: str='cz'):
+
+    p = oqh.create_program("state_tomography_2Q_{}_{}_{}".format(product_state,qubit_idxs[0], qubit_idxs[1]), platf_cfg)
+
+    q0 = qubit_idxs[0]
+    q1 = qubit_idxs[1]
+
+    calibration_points = ['00', '01', '10', '11']
+    measurement_pre_rotations = ['II', 'IF', 'FI', 'FF']
+    bases = ['X', 'Y', 'Z']
+    ## Explain this ? 
+    bases_comb = [basis_0+basis_1 for basis_0 in bases for basis_1 in bases]
+    combinations = []
+    combinations += [b+'-'+c for b in bases_comb for c in measurement_pre_rotations]
+    combinations += calibration_points
+
+    state_strings = ['0', '1', '+', '-', 'i', 'j']
+    state_gate = ['i', 'rx180', 'ry90', 'rym90', 'rxm90', 'rx90']
+    product_gate = ['0', '0', '0', '0']
+        
+    for basis in bases_comb:
+        for pre_rot in measurement_pre_rotations: # tomographic pre-rotation
+            k = oqh.create_kernel('TFD_{}-basis_{}'.format(basis, pre_rot), p)
+            for q_idx in qubit_idxs:
+                k.prepz(q_idx)
+
+     # Choose a bell state and set the corresponding preparation pulses
+            if bell_state is not None: 
+                        #
+                # Q1 |0> --- P1 --o-- A1 -- R1 -- M
+                #                 |
+                # Q0 |0> --- P0 --o-- I  -- R0 -- M 
+                if bell_state == 0:  # |Phi_m>=|00>-|11>
+                    prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
+                elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
+                    prep_pulse_q0, prep_pulse_q1 = 'rym90', 'ry90'
+                elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
+                    prep_pulse_q0, prep_pulse_q1 = 'ry90', 'rym90'
+                elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
+                    prep_pulse_q0, prep_pulse_q1 = 'rym90', 'rym90'
+                else:
+                    raise ValueError('Bell state {} is not defined.'.format(bell_state))
+
+                # Recovery pulse is the same for all Bell states
+                after_pulse_q1 = 'rym90'
+                k.gate(prep_pulse_q0, [q0])
+                k.gate(prep_pulse_q1, [q1])
+                k.gate("wait", [],  0)# Empty list generates barrier for all qubits in platf. only works with 0.8.0
+                # k.gate('cz', [q0, q1])
+                k.gate(flux_codeword, [q0, q1])
+                k.gate("wait", [],  0)
+                # after-rotations
+                k.gate(after_pulse_q1, [q1])
+                # possibly wait
+                if wait_after_flux is not None:
+                    k.gate("wait", [q0, q1], round(wait_after_flux*1e9))
+                k.gate("wait", [],  0)
+
+            if product_state is not None: 
+                for i, string in enumerate(product_state):
+                    product_gate[i] = state_gate[state_strings.index(string)]
+                k.gate(product_gate[0], [q0])
+                k.gate(product_gate[1], [q1])
+                k.gate('wait', [], 0)
+
+            if (product_state is not None) and (bell_state is not None):
+                raise ValueError('Confusing requirements, both state {} and bell-state {}'.format(product_state,bell_state)) 
+
+            # tomographic pre-rotations
+            for rot_idx in range(2):
+                q_idx = qubit_idxs[rot_idx]
+                flip = pre_rot[rot_idx]
+                qubit_basis = basis[rot_idx]
+                # Basis rotations take the operator Z onto (Ri* Z Ri):
+                #              Z     -Z       X       -X       -Y       Y
+                # FLIPS        I      F       I        F        I       F
+                # BASIS        Z      Z       X        X        Y       Y
+                # tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
+                prerot_Z = 'i'
+                prerot_mZ = 'rx180'
+                prerot_X = 'rym90'
+                prerot_mX = 'ry90'
+                prerot_Y = 'rx90'
+                prerot_mY = 'rxm90'
+
+                if flip == 'I' and qubit_basis == 'Z':
+                    k.gate(prerot_Z, [q_idx])
+                elif flip == 'F' and qubit_basis == 'Z':
+                    k.gate(prerot_mZ, [q_idx])
+                elif flip == 'I' and qubit_basis == 'X':
+                    k.gate(prerot_X, [q_idx])
+                elif flip == 'F' and qubit_basis == 'X':
+                    k.gate(prerot_mX, [q_idx])
+                elif flip == 'I' and qubit_basis == 'Y':
+                    k.gate(prerot_Y, [q_idx])
+                elif flip == 'F' and qubit_basis == 'Y':
+                    k.gate(prerot_mY, [q_idx])
+                else:
+                    raise ValueError("flip {} and basis {} not understood".format(flip,basis))
+                    k.gate('i', [q_idx])
+            k.gate('wait', [], 0)
+            for q_idx in qubit_idxs:
+                k.measure(q_idx)
+            k.gate('wait', [], 0)
+            p.add_kernel(k)
+
+    for cal_pt in calibration_points:
+        k = oqh.create_kernel('Cal_{}'.format(cal_pt), p)
+        for q_idx in qubit_idxs:
+            k.prepz(q_idx)
+        k.gate('wait', [], 0)
+        for cal_idx, state in enumerate(cal_pt):
+            q_idx = qubit_idxs[cal_idx]
+            if state == '1':
+                k.gate('rx180', [q_idx])
+        k.gate('wait', [], 0) # barrier guarantees allignment
+        for q_idx in qubit_idxs:
+            k.measure(q_idx)
+        k.gate('wait', [], 0)
+        p.add_kernel(k)
+    p = oqh.compile(p)
+    p.combinations = combinations
     return p

@@ -26,6 +26,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
 
 
 log = logging.getLogger(__name__)
@@ -925,11 +926,13 @@ class DeviceCCL(Instrument):
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
         list_qubits_used = [q0, q1]
+        include_park = False
         if q2 is None:
             q2idx = None
         else:
             q2idx = self.find_instrument(q2).cfg_qubit_nr()
             list_qubits_used.append(q2)
+            include_park = True
         if q3 is None:
             q3idx = None
         else:
@@ -939,7 +942,7 @@ class DeviceCCL(Instrument):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=list_qubits_used)
-            for q in [q0, q1]:  #only on the CZ qubits we add the ef pulses
+            for q in list_qubits_used:  #only on the CZ qubits we add the ef pulses
                 # This can be
                 mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
 
@@ -983,10 +986,16 @@ class DeviceCCL(Instrument):
         MC.run('conditional_oscillation_{}_{}_{}{}'.format(q0, q1,
                                                            self.msmt_suffix, label),
                disable_snapshot_metadata=disable_metadata)
-
+        if include_park:
+            cal_points_used = 'park'
+        else:
+            cal_points_used = 'gef'
         a = ma2.Conditional_Oscillation_Analysis(
             options_dict={'ch_idx_osc': 0,
-                          'ch_idx_spec': 1},
+                          'ch_idx_spec': 1,
+                          'ch_idx_park': 2,
+                          'include_park':include_park},
+            cal_points=cal_points_used,
             extract_only=extract_only)
 
         return a
@@ -1433,6 +1442,61 @@ class DeviceCCL(Instrument):
             a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
             a = ma2.Multiplexed_Readout_Analysis()
         return a
+
+    def measure_state_tomography(self, qubits=['D2', 'X'],
+                                 MC=None,
+                                 bell_state: float=None,
+                                 product_state: float=None,
+                                 wait_after_flux: float=None,
+                                 prepare_for_timedomain: bool =False,
+                                 live_plot=False,
+                                 nr_shots_per_case=2**14,
+                                 shots_per_meas=2**16,
+                                 disable_snapshot_metadata: bool = False,
+                                 label='State_Tomography_',
+                                 flux_codeword="cz"):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits)
+
+        qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
+                      for qn in qubits]
+        p = mqo.two_qubit_state_tomography(qubit_idxs, bell_state=bell_state,
+                                           product_state=product_state,
+                                           wait_after_flux=wait_after_flux,
+                                           platf_cfg=self.cfg_openql_platform_fn(),
+                                           flux_codeword=flux_codeword)
+        # Special argument added to program
+        combinations = p.combinations
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.get_int_logging_detector(qubits)
+        nr_cases = len(combinations)
+        nr_shots = nr_shots_per_case*nr_cases
+        shots_per_meas = int(np.floor(
+            np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
+
+        # Ensures shots per measurement is a multiple of the number of cases
+        shots_per_meas -= shots_per_meas % nr_cases
+
+        d.set_child_attr('nr_shots', shots_per_meas)
+
+        MC.live_plot_enabled(live_plot)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(np.arange(nr_cases), nr_shots_per_case))
+        MC.set_detector_function(d)
+        MC.run('{}'.format(label),
+               exp_metadata={'combinations': combinations},
+               disable_snapshot_metadata=disable_snapshot_metadata)
+        # mra.Multiplexed_Readout_Analysis(extract_combinations=True, options_dict={'skip_cross_fidelity': True})
+        tomo_v2.Full_State_Tomography_2Q(label=label,
+                                         qubit_ro_channels=qubits, # channels we will want to use for tomo
+                                         correl_ro_channels=[qubits], # correlations we will want for the tomo
+                                         tomo_qubits_idx=qubits)
+
 
     #def measure_ssro_multi_qubit(
     #        self, qubits: list, nr_shots_per_case: int = 2**13,  # 8192
