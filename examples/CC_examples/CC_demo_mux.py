@@ -225,7 +225,8 @@ if 1:  # test of Distributed Shared Memory
         cc.assemble_and_start(prog)
 
         time.sleep(1)
-        print(cc.debug_get_ccio_trace(cc_slot_awg))
+        #print(cc.debug_get_ccio_trace(cc_slot_awg))
+        print('Trace data: ' + cc.debug_get_traces((1<<cc_slot_uhfqa0) + (1<<cc_slot_awg)))
         # FIXME: wait for CC to finish, then ask UHFQA how many patterns it generated and stop it
 
 

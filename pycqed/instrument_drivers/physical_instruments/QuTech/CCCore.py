@@ -128,6 +128,9 @@ class CCCore(SCPIBase):
     def debug_get_ccio_trace(self, ccio: int) -> str:
         return self._ask_bin(f'QUTech:DEBUG:CCIO{ccio}:TRACE?').decode('utf-8', 'ignore')
 
+    def debug_get_traces(self, ccio_mask: int) -> str:
+        return self._ask_bin(f'QUTech:DEBUG:TRACES? {ccio_mask}').decode('utf-8', 'ignore')
+
     def start(self) -> None:
         self._transport.write('awgcontrol:run:immediate')
 
