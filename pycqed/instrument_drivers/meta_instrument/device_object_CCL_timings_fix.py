@@ -1455,19 +1455,30 @@ class DeviceCCL(Instrument):
                                  disable_snapshot_metadata: bool = False,
                                  label='State_Tomography_',
                                  flux_codeword="cz"):
+        """
+        qubits notation is |q1,q0>
+
+        """
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
-
         qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
                       for qn in qubits]
+
+        if bell_state is not None:
+            state_prepared = bell_state
+        elif product_state is not None:
+            state_prepared = product_state
+        else:
+            raise ValueError('Both bell_state and product state requested')
+            
         p = mqo.two_qubit_state_tomography(qubit_idxs, bell_state=bell_state,
                                            product_state=product_state,
                                            wait_after_flux=wait_after_flux,
                                            platf_cfg=self.cfg_openql_platform_fn(),
                                            flux_codeword=flux_codeword)
-        # Special argument added to program
+    # Special argument added to program
         combinations = p.combinations
 
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -1488,11 +1499,12 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.tile(np.arange(nr_cases), nr_shots_per_case))
         MC.set_detector_function(d)
-        MC.run('{}'.format(label),
+        label_str = label+ '{}_{}_{}'.format(qubits[1],qubits[0],state_prepared)
+        MC.run('{}'.format(label_str),
                exp_metadata={'combinations': combinations},
                disable_snapshot_metadata=disable_snapshot_metadata)
         # mra.Multiplexed_Readout_Analysis(extract_combinations=True, options_dict={'skip_cross_fidelity': True})
-        tomo_v2.Full_State_Tomography_2Q(label=label,
+        tomo_v2.Full_State_Tomography_2Q(label=label_str,
                                          qubit_ro_channels=qubits, # channels we will want to use for tomo
                                          correl_ro_channels=[qubits], # correlations we will want for the tomo
                                          tomo_qubits_idx=qubits)

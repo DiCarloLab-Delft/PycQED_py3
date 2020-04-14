@@ -174,9 +174,9 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                     k.gate(g, [qubit_map[q]])
                                 elif isinstance(q, list):
                                     if sim_cz_qubits is None: 
-                                        k.gate("wait",  list(qubit_map.values()), 0)
+                                        k.gate("wait", [], 0)
                                         k.gate(flux_codeword, list(qubit_map.values()),) # fix for QCC
-                                        k.gate("wait",  list(qubit_map.values()), 0)
+                                        k.gate("wait", [], 0)
                                     else: 
                                         # A simultaneous CZ is applied to characterize cz gates that 
                                         # have been calibrated to be used in parallel. 
@@ -184,7 +184,6 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                         k.gate(flux_codeword, list(qubit_map.values()),) # fix for QCC
                                         k.gate(flux_codeword, sim_cz_qubits) # fix for QCC
                                         k.gate("wait",  list(qubit_map.values())+sim_cz_qubits, 0)
-
 
                         # FIXME: This hack is required to align multiplexed RO in openQL..
                         k.gate("wait",  list(qubit_map.values()), 0)

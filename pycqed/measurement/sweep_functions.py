@@ -804,6 +804,31 @@ class lutman_par(Soft_Sweep):
         self.LutMan.load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=True)
 
+
+class anharmonicity_sweep(Soft_Sweep):
+    """
+    Sweeps a LutMan parameter and uploads the waveforms to AWG (in real-time if
+    supported)
+    """
+
+    def __init__(self, qubit, amps):
+        self.set_kw()
+        self.name = qubit.anharmonicity.name
+        self.parameter_name = qubit.anharmonicity.label
+        self.unit = qubit.anharmonicity.unit
+        self.sweep_control = 'soft'
+        self.qubit = qubit
+        self.amps = amps
+
+    def set_parameter(self, val):
+        self.qubit.anharmonicity.set(val)
+        # _prep_mw_pulses will upload anharmonicity val to LutMan
+        self.qubit._prep_mw_pulses()
+        # and we regenerate the waveform with that new modulation
+        mw_lutman = self.qubit.instr_LutMan_MW.get_instr()
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=self.amps)
+
+
 class joint_HDAWG_lutman_parameters(Soft_Sweep):
     """
     Sweeps two parameteres toghether, assigning the same value

@@ -2078,8 +2078,8 @@ def two_qubit_state_tomography(qubit_idxs,
 
     p = oqh.create_program("state_tomography_2Q_{}_{}_{}".format(product_state,qubit_idxs[0], qubit_idxs[1]), platf_cfg)
 
-    q0 = qubit_idxs[0]
-    q1 = qubit_idxs[1]
+    q0 = qubit_idxs[-2] # MSQ = left-most
+    q1 = qubit_idxs[-1] # LSQ = right-most
 
     calibration_points = ['00', '01', '10', '11']
     measurement_pre_rotations = ['II', 'IF', 'FI', 'FF']
@@ -2100,7 +2100,7 @@ def two_qubit_state_tomography(qubit_idxs,
             for q_idx in qubit_idxs:
                 k.prepz(q_idx)
 
-     # Choose a bell state and set the corresponding preparation pulses
+            # Choose a bell state and set the corresponding preparation pulses
             if bell_state is not None: 
                         #
                 # Q1 |0> --- P1 --o-- A1 -- R1 -- M
@@ -2135,8 +2135,8 @@ def two_qubit_state_tomography(qubit_idxs,
             if product_state is not None: 
                 for i, string in enumerate(product_state):
                     product_gate[i] = state_gate[state_strings.index(string)]
-                k.gate(product_gate[0], [q0])
-                k.gate(product_gate[1], [q1])
+                k.gate(product_gate[0], [q1]) # MSQ = left-most
+                k.gate(product_gate[1], [q0]) # LSQ = right-most
                 k.gate('wait', [], 0)
 
             if (product_state is not None) and (bell_state is not None):

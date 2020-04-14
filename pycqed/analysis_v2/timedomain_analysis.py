@@ -972,17 +972,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 # Leakage based on the average of the oscillation
                 qoi['leak_avg'] = P2[0]  # list with 1 elt...
         if self.include_park:
-            if cal_points == 'park':
+            if self.cal_points == 'park':
                 yvals_park = list(self.raw_data_dict['measured_values_ord_dict'].values())[
-                        ch_idx_park][0][:-9]
+                        ch_idx_park][0]
                 self.yvals_park = a_tools.normalize_data_v3(
                             yvals_park,
                             cal_zero_points=cal_points[ch_idx_park][0],
                             cal_one_points=cal_points[ch_idx_park][1])
-            else:
-                yvals_park = list(self.raw_data_dict['measured_values_ord_dict'].values())[
-                        ch_idx_park][0][:-7]
-                self.yvals_park = yvals_park
+                self.proc_data_dict['yvals_park_off'] = self.yvals_park[::2]
+                self.proc_data_dict['yvals_park_on'] = self.yvals_park[1::2]
+                self.proc_data_dict['ylabel_park'] = self.raw_data_dict['value_names'][0][ch_idx_park]
 
 
     def prepare_fitting(self):
@@ -993,8 +992,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.fit_dicts['cos_fit_off'] = {
             'model': cos_mod0,
             'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
-            'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-4]},
-            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off'][:-4]}}
+            'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-5]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off'][:-5]}}
 
         cos_mod1 = lmfit.Model(fit_mods.CosFunc)
         cos_mod1.guess = fit_mods.Cos_guess.__get__(
@@ -1002,8 +1001,26 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.fit_dicts['cos_fit_on'] = {
             'model': cos_mod1,
             'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
-            'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-3]},
-            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-3]}}
+            'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-4]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-4]}}
+        if self.include_park:
+            cos_mod_park_0 = lmfit.Model(fit_mods.CosFunc)
+            cos_mod_park_0.guess = fit_mods.Cos_guess.__get__(
+                cos_mod_park_0, cos_mod_park_0.__class__)
+            self.fit_dicts['park_fit_off'] = {
+                'model': cos_mod_park_0,
+                'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
+                'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-5]},
+                'fit_yvals': {'data': self.proc_data_dict['yvals_park_off'][:-5]}}
+
+            cos_mod_park_1 = lmfit.Model(fit_mods.CosFunc)
+            cos_mod_park_1.guess = fit_mods.Cos_guess.__get__(
+                cos_mod_park_1, cos_mod_park_1.__class__)
+            self.fit_dicts['park_fit_on'] = {
+                'model': cos_mod_park_1,
+                'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
+                'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-4]},
+                'fit_yvals': {'data': self.proc_data_dict['yvals_park_on'][:-4]}}
 
     def analyze_fit_results(self):
         qoi = self.proc_data_dict['quantities_of_interest']
@@ -1051,22 +1068,28 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         qoi['missing_fraction'] = spec_on-spec_off
 
         if self.include_park:
-            self.yvals_park_off = np.mean(self.yvals_park[::2])
-            self.yvals_park_on = np.mean(self.yvals_park[1::2])
-            self.yvals_park_avg = np.mean(self.yvals_park)
+            fp_0 = self.fit_res['park_fit_off']
+            fp_1 = self.fit_res['park_fit_on']
+            park_phase_off=ufloat(np.rad2deg(fp_0.params['phase'].value),
+                                  np.rad2deg(fp_0.params['phase'].stderr if
+                                             fp_0.params['phase'].stderr is not None
+                                             else np.nan))
+            park_phase_on=ufloat(np.rad2deg(fp_1.params['phase'].value),
+                                 np.rad2deg(fp_1.params['phase'].stderr if
+                                            fp_1.params['phase'].stderr is not None
+                                            else np.nan))
         else:
-            self.yvals_park_off = np.nan
-            self.yvals_park_on = np.nan
-            self.yvals_park_avg = np.nan
+            park_phase_off = np.nan
+            park_phase_on = np.nan
 
-        qoi['park_off'] = self.yvals_park_off
-        qoi['park_on'] = self.yvals_park_on
-        qoi['park_avg'] = self.yvals_park_avg
-        qoi['park_on/off'] = self.yvals_park_on-self.yvals_park_off
+        qoi['park_phase_off'] = park_phase_off
+        qoi['park_phase_on'] = park_phase_on
 
     def prepare_plots(self):
         self._prepare_main_oscillation_figure()
         self._prepare_spectator_qubit_figure()
+        if self.include_park:
+            self._prepare_park_oscillation_figure()
 
     def _prepare_main_oscillation_figure(self):
         self.plot_dicts['main'] = {
@@ -1202,3 +1225,63 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'plot_kws': {
                     'y': y, 'color': 'C1', 'linestyle': 'dotted'}
             }
+
+    def _prepare_park_oscillation_figure(self):
+        self.plot_dicts['park'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['xvals_off'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_park_off'],
+            'ylabel': self.proc_data_dict['ylabel_park'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'CZ off',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'do_legend': True,
+            # 'yrange': (0,1),
+            'legend_pos': 'upper right'}
+
+        self.plot_dicts['on'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'park',
+            'xvals': self.proc_data_dict['xvals_on'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_park_on'],
+            'ylabel': self.proc_data_dict['ylabel_park'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'CZ on',
+            'do_legend': True,
+            'legend_pos': 'upper right'}
+
+        if self.do_fitting:
+            self.plot_dicts['park_fit_off'] = {
+                'ax_id': 'park',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['park_fit_off']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit CZ off',
+                'do_legend': True}
+            self.plot_dicts['park_fit_on'] = {
+                'ax_id': 'park',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['park_fit_on']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit CZ on',
+                'do_legend': True}
+
+            qoi = self.proc_data_dict['quantities_of_interest']
+            phase_message = (
+                'Phase off: {} deg\n'
+                'Phase on: {} deg\n\n'.format(
+                    qoi['park_phase_off'], qoi['park_phase_on']))
+            self.plot_dicts['phase_message'] = {
+                'ax_id': 'park',
+                'ypos': 0.9,
+                'xpos': 1.45,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'line_kws': {'alpha': 0},
+                'text_string': phase_message}
+

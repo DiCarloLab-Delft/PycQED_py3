@@ -3179,6 +3179,7 @@ class CCLight_Transmon(Qubit):
         # plotting really slows down SSRO (16k shots plotting is slow)
         old_plot_setting = MC.live_plot_enabled()
         MC.live_plot_enabled(False)
+
         if prepare:
             self.prepare_for_timedomain()
 
@@ -3191,6 +3192,7 @@ class CCLight_Transmon(Qubit):
 
         # digitization setting is reset here but the detector still uses
         # the disabled setting that was set above
+
         self.ro_acq_digitized(old_RO_digit)
 
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -3202,6 +3204,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
         d.nr_shots = np.min([shots_per_meas, nr_shots])
+
         MC.set_detector_function(d)
 
         MC.run('SSRO_{}{}'.format(label, self.msmt_suffix),
@@ -5355,7 +5358,8 @@ class CCLight_Transmon(Qubit):
                exp_metadata={'bins': sweep_points})
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
-            label='RB_', ignore_f_cal_pts=ignore_f_cal_pts)
+            label='RB_', ignore_f_cal_pts=ignore_f_cal_pts, 
+            rates_ch_idx = 0)
         return a
 
     def measure_randomized_benchmarking_old(self, nr_cliffords=2**np.arange(12),

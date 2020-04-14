@@ -1495,12 +1495,9 @@ class CBox_v3_single_integration_average_det(Soft_Detector):
         # import sys
         # tb.print_tb(sys.last_traceback)
         while not success:
-            print("acquiring")
-
             self.CBox.set('acquisition_mode', 'integration averaging mode')
             try:
                 data = self.CBox.get_integrated_avg_results()
-                print("detector function, data", data)
                 success = True
             except Exception as e:
                 log.warning(e)
@@ -2225,7 +2222,6 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.sync()
 
     def get_values(self, arm=True, is_single_detector = True):
-
         if is_single_detector:
             if self.AWG is not None:
                 self.AWG.stop()

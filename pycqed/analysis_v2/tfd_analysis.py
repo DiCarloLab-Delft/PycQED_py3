@@ -478,7 +478,7 @@ def tomo2dm(tomo_dict):
     dim = 2**num_qubits
     dm = np.zeros((dim,dim), dtype=np.complex128)
     for op, value in tomo_dict.items():
-        dm += value*operator(op)
+        dm += value*operator(op[::-1]) # -1 is to respect the LSQ-MSQ ordering
     return dm
 
 class Hamiltonian:

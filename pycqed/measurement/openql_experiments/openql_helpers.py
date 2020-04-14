@@ -285,7 +285,7 @@ def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
                        ['22']*reps_per_cal_pt)
         combinations += extra_combs
     if q2 is not None:
-        combinations += ["Park_0" + "Park_1"]
+        combinations += ["Park_0", "Park_1"]
 
     if (measured_qubits == None) and (q2 is None):
         measured_qubits = [q0, q1]
