@@ -106,7 +106,7 @@ def compute_betas_weight1(qubit_state_avg, matrix_B, num_qubits, cal_point_seg_s
                        format(2**(num_qubits-1-i), '#0{}b'.format(num_qubits+2))[2:]]
         op_id_list = [int(op, 2) for op in op_list_bin]
         op_idx_w1[i, :] = op_id_list
-        print(op_id_list,op_idx_w1)
+        # print(op_id_list,op_idx_w1)
 
         submatrix_B = matrix_B[op_id_list, :]
         inv_subB = np.linalg.pinv(submatrix_B).transpose()
