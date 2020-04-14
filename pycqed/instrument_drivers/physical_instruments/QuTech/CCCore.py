@@ -119,11 +119,29 @@ class CCCore(SCPIBase):
     def debug_set_ccio_trace_on(self, ccio: int, tu_idx: int) -> None:
         self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:TRACE{tu_idx}:ON')
 
-    def start(self) -> None:
-        self._transport.write('awgcontrol:run:immediate')
+    def start(self, block: bool = True) -> None:
+        """
+        start the CC sequencers
 
-    def stop(self) -> None:
+        :param block: call get_operation_complete to assure that the instrument has started before we return, which is a
+        common assumption throughout PycQED. This behaviour can be disabled to allow asynchronous operation, e.g. to
+        optimize starting a range of instruments.
+        """
+        self._transport.write('awgcontrol:run:immediate')
+        if block:
+            self.get_operation_complete()
+
+    def stop(self, block: bool = True) -> None:
+        """
+        stop the CC sequencers
+
+        :param block: call get_operation_complete to assure that the instrument has stopped before we return, which is a
+        common assumption throughout PycQED. This behaviour can be disabled to allow asynchronous operation, e.g. to
+        optimize stopping a range of instruments.
+        """
         self._transport.write('awgcontrol:stop:immediate')
+        if block:
+            self.get_operation_complete()
 
     ### status functions ###
     def get_status_questionable_frequency_condition(self) -> int:

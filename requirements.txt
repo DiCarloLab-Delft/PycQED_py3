@@ -23,3 +23,5 @@ scikit-learn
 qutechopenql
 zhinst
 plotly<3.8
+packaging
+qutip

@@ -608,13 +608,48 @@ def avoided_crossing_freq_shift(flux, a, b, g):
     result = frequencies[:, 1]- frequencies[:, 0]
     return result
 
+
 def resonator_flux(f_bare, g, A, f, t, sweetspot_cur):
     return f_bare - g/(A*np.sqrt(np.abs(np.cos(np.pi*f*(t-sweetspot_cur))))
                        - f_bare)
 
+
+def ChevronFunc(amp, amp_center_1, amp_center_2, J2, detuning_swt_spt, t):
+    """
+    NB: [2020-03-11] This model was not thoroughly tested, implemented for
+    chevron alignment were we care only about the center of the maxima
+
+    Assuming we start in |0>, this function returns the population in |1>
+
+    Args:
+        amp (a.u.): fluxc square pulse amplitude
+        amp_center_1 (a.u.): center of the chevron on one side of the flux arc
+        amp_center_2 (a.u.): idem
+        J2 (Hz): coupling of the interacting states
+        detuning_swt_spt (Hz): detuning from the interaction point at sweet spot
+            NB: not meaningful from a fit
+    """
+    # We approximate the bare detuning with a quadratic dependence on amp
+    detuning = detuning_swt_spt * (amp - amp_center_1) * (amp - amp_center_2)
+    d_sq = detuning ** 2
+    J2_sq = J2 ** 2
+    d4J_sq = d_sq + 4 * J2_sq
+    return (4 * J2_sq * np.sin(np.pi * np.sqrt(d4J_sq) * t) ** 2) / d4J_sq
+
+
+def ChevronInvertedFunc(amp, amp_center_1, amp_center_2, J2, detuning_swt_spt, t):
+    """
+    Assuming we start in |0>, this function returns the population in |0>
+
+    See `ChevronFunc` for details
+    """
+    return 1 - ChevronFunc(amp, amp_center_1, amp_center_2, J2, detuning_swt_spt, t)
+
 ######################
 # Residual functions #
 ######################
+
+
 def residual_complex_fcn(pars, cmp_fcn, x, y):
     """
     Residual of a complex function with complex results 'y' and
@@ -639,6 +674,8 @@ def residual_complex_fcn(pars, cmp_fcn, x, y):
 ####################
 # Guess functions  #
 ####################
+
+
 def exp_dec_guess(model, data, t, vary_n=False):
     """
     Assumes exponential decay in estimating the parameters
@@ -658,7 +695,6 @@ def exp_dec_guess(model, data, t, vary_n=False):
 
     params = model.make_params()
     return params
-
 
 
 def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
@@ -722,13 +758,12 @@ def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
     return guess_dict
 
 
-
 def hanger_func_complex_SI_Guess(data, f, fit_window=None):
-    ## This is complete garbage, just to get some return value
+    # This is complete garbage, just to get some return value
     xvals = f
     abs_data = np.abs(data)
     peaks = a_tools.peak_finder(xvals, abs_data)
-      # Search for peak
+    # Search for peak
     if peaks['dip'] is not None:    # look for dips first
         f0 = peaks['dip']
         amplitude_factor = -1.
@@ -776,7 +811,6 @@ def hanger_func_complex_SI_Guess(data, f, fit_window=None):
     return guess_dict
 
 
-
 def group_consecutives(vals, step=1):
     """Return list of consecutive lists of numbers from vals (number list)."""
     run = []
@@ -803,7 +837,7 @@ def arc_guess(freq, dac, dd=0.1):
     p = round(max(dd * len(dac), 1))
     f_small = np.average(np.sort(freq)[:p]) + np.std(np.sort(freq)[:p])
     f_big = np.average(np.sort(freq)[-p:]) - np.std(np.sort(freq)[-p:])
-    #print(f_small * 1e-9, f_big * 1e-9)
+    # print(f_small * 1e-9, f_big * 1e-9)
 
     fmax = np.max(freq)
     fmin = np.min(freq)
@@ -1174,20 +1208,45 @@ def ro_double_gauss_guess(model, data, x, fixed_p01 = False, fixed_p10 = False):
     return model.make_params()
 
 
-def sum_int(x,y):
+def ChevronGuess(model, data, amp, t, J2_hint=12.5e6, detuning_swt_spt_hint=1e9):
+
+    model.set_param_hint("J2", value=J2_hint, min=1e6, max=100e6)
+
+    model.set_param_hint(
+        "detuning_swt_spt", value=detuning_swt_spt_hint, min=1e5, max=100e9
+    )
+
+    p_neg = np.array(data)
+    p_neg[amp > 0] = 0.0
+    amp_center_1 = amp[np.argmax(p_neg)]
+    model.set_param_hint("amp_center_1", value=amp_center_1, min=-1000, max=1000)
+
+    p_pos = np.array(data)
+    p_pos[amp < 0] = 0.0
+    amp_center_2 = amp[np.argmax(p_pos)]
+    model.set_param_hint("amp_center_2", value=amp_center_2, min=-1000, max=1000)
+
+    model.set_param_hint("t", value=t, min=0.0, max=100e-6, vary=False)
+
+    return model.make_params()
+
+
+def sum_int(x, y):
     return np.cumsum(y[:-1]*(x[1:]-x[:-1]))
 
 #################################
 #     User defined Models       #
 #################################
+
 # NOTE: it is actually better to instantiate the model within your analysis
 # file, this prevents the model params having a memory.
 # A valid reason to define it here would beexp_dec_guess if you want to add a guess function
+
+
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 CosModel2 = lmfit.Model(CosFunc2)
 ResonatorArch = lmfit.Model(resonator_flux)
-
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
 ExpDecayModel.guess = exp_dec_guess  # todo: fix
@@ -1217,15 +1276,16 @@ DoubleGauss2D_model = (lmfit.Model(gaussian_2D, independent_vars=['x', 'y'],
                        lmfit.Model(gaussian_2D, independent_vars=['x', 'y'],
                                    prefix='B_'))
 DoubleGauss2D_model.guess = double_gauss_2D_guess
+
 ###################################
 # Models based on lmfit functions #
 ###################################
 
 LorentzModel = lmfit.Model(lmfit.models.lorentzian)
 Lorentz_w_background_Model = lmfit.models.LorentzianModel() + \
-                             lmfit.models.LinearModel()
+    lmfit.models.LinearModel()
 PolyBgHangerAmplitudeModel = (HangerAmplitudeModel *
-                              lmfit.models.PolynomialModel(degree=7))
+    lmfit.models.PolynomialModel(degree=7))
 
 DoubleGaussModel = (lmfit.models.GaussianModel(prefix='A_') +
                     lmfit.models.GaussianModel(prefix='B_'))

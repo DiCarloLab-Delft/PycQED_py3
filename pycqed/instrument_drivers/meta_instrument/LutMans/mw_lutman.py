@@ -1,6 +1,7 @@
 from .base_lutman import Base_LutMan, get_redundant_codewords, get_wf_idx_from_name
 import numpy as np
-from collections import Iterable, OrderedDict
+from collections.abc import Iterable
+from collections import OrderedDict
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
