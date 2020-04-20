@@ -72,7 +72,7 @@ def create_kernel(kname: str, program):
     return k
 
 
-def compile(p, quiet: bool = True):
+def compile(p, quiet: bool = False):
     """
     Wrapper around OpenQL Program.compile() method.
     """
