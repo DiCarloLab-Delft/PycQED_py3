@@ -19,7 +19,7 @@ from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr,\
 
 
 
-class Multiplexed_Readout_Analysis_2(ba.BaseDataAnalysis):
+class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     """
     Multiplexed readout analysis.
 
@@ -77,7 +77,8 @@ class Multiplexed_Readout_Analysis_2(ba.BaseDataAnalysis):
 
         Channels = self.raw_data_dict['value_names'] # Qubit UHF outputs
         nr_qubits = len(Channels)
-        combinations = ['{:05b}'.format(i) for i in range(2**nr_qubits)]
+        combinations = \
+            ['{:0{}b}'.format(i, nr_qubits) for i in range(2**nr_qubits)]
         raw_shots = self.raw_data_dict['data'][:, 1:]
         post_selection = self.post_selection
         qubit_labels = [ch[-2:].decode('utf-8').strip() for ch in Channels]
@@ -180,7 +181,7 @@ class Multiplexed_Readout_Analysis_2(ba.BaseDataAnalysis):
             ucumsum_1 = np.cumsum(ucounts_1)
             # merge |0> and |1> shot bins
             all_bins = np.unique(np.sort(np.concatenate((ubins_0, ubins_1))))
-            # interpolate cumsum for allbins
+            # interpolate cumsum for all bins
             int_cumsum_0 = np.interp(x=all_bins,xp=ubins_0,fp=ucumsum_0,left=0)
             int_cumsum_1 = np.interp(x=all_bins,xp=ubins_1,fp=ucumsum_1,left=0)
             norm_cumsum_0 = int_cumsum_0/np.max(int_cumsum_0)
