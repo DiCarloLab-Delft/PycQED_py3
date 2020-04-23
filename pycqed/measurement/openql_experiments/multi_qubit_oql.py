@@ -109,6 +109,52 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
 
     return p
 
+def single_qubit_off_on(qubits: list,
+                        qtarget,
+                        initialize: bool, 
+                        platf_cfg: str):
+
+    n_qubits = len(qubits)
+    comb_0 = '0'*n_qubits
+    comb_1 = comb_0[:qubits.index(qtarget)] + '1' + comb_0[qubits.index(qtarget)+1:]
+
+    combinations = [comb_0, comb_1]
+
+    p = oqh.create_program("single_qubit_off_on", platf_cfg)
+
+    for i, comb in enumerate(combinations):
+        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+
+        # 1. Prepare qubits in 0
+        for q in qubits:
+            k.prepz(q)
+
+        # 2. post-selection extra init readout
+        if initialize:
+            for q in qubits:
+                k.measure(q)
+            k.gate('wait', qubits, 0)
+
+        # 3. prepare desired state
+        for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
+            if state == '0':
+                pass
+            elif state == '1':
+                k.gate('rx180', [target_qubit])
+            elif state == '2':
+                k.gate('rx180', [target_qubit])
+                k.gate('rx12', [target_qubit])
+        # 4. measurement of all qubits
+        k.gate('wait', qubits, 0)
+        # Used to ensure timing is aligned
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+
+    return p
 
 def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
                                   target_qubit_excited: bool=False, wait_time=0,
@@ -2078,8 +2124,8 @@ def two_qubit_state_tomography(qubit_idxs,
 
     p = oqh.create_program("state_tomography_2Q_{}_{}_{}".format(product_state,qubit_idxs[0], qubit_idxs[1]), platf_cfg)
 
-    q0 = qubit_idxs[-2] # MSQ = left-most
-    q1 = qubit_idxs[-1] # LSQ = right-most
+    q1 = qubit_idxs[-2] # MSQ = left-most
+    q0 = qubit_idxs[-1] # LSQ = right-most
 
     calibration_points = ['00', '01', '10', '11']
     measurement_pre_rotations = ['II', 'IF', 'FI', 'FF']
@@ -2092,8 +2138,7 @@ def two_qubit_state_tomography(qubit_idxs,
 
     state_strings = ['0', '1', '+', '-', 'i', 'j']
     state_gate = ['i', 'rx180', 'ry90', 'rym90', 'rxm90', 'rx90']
-    product_gate = ['0', '0', '0', '0']
-        
+    product_gate = ['0', '0']
     for basis in bases_comb:
         for pre_rot in measurement_pre_rotations: # tomographic pre-rotation
             k = oqh.create_kernel('TFD_{}-basis_{}'.format(basis, pre_rot), p)
@@ -2135,8 +2180,8 @@ def two_qubit_state_tomography(qubit_idxs,
             if product_state is not None: 
                 for i, string in enumerate(product_state):
                     product_gate[i] = state_gate[state_strings.index(string)]
-                k.gate(product_gate[0], [q1]) # MSQ = left-most
-                k.gate(product_gate[1], [q0]) # LSQ = right-most
+                k.gate(product_gate[-1], [q0]) # LSQ = right-most ln. 2081
+                k.gate(product_gate[-2], [q1]) # MSQ = left-most ln. 2082
                 k.gate('wait', [], 0)
 
             if (product_state is not None) and (bell_state is not None):

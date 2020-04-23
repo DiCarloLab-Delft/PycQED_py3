@@ -18,7 +18,10 @@ default_mw_lutmap = {
     8  : {"name" : "spec"  , "type"  : "spec"}  ,
     9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0 , "type" : "ef"},
     10 : {"name" : "square", "type"  : "square"},
-
+    11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90, "type" : "ge"},
+    12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
+    13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
+    14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"}
 }
 
 valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square'}

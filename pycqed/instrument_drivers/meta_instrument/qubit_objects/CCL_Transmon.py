@@ -3399,7 +3399,7 @@ class CCLight_Transmon(Qubit):
 
             nested_MC.set_adaptive_function_parameters(
                 {'adaptive_function': LearnerND_Minimizer,
-                 'goal': lambda l: goal(l) or l.npoints > npoints,
+                 'goal': lambda l: goal(l) or l.npoints > n_points,
                  'loss_per_simplex': loss_per_simplex,
                  'bounds': [(10e-9, 400e-9), (0.01, 0.3)],
                  'minimize': False

@@ -308,11 +308,13 @@
   	"gate_decomposition": {
         // necessary to support measz cQASM operation, using measure operation
         "measz %0": ["measure %0"],
+        "prepx %0": ["prepz %0", "ry90 %0"],
+        "prepy %0": ["prepz %0", "rxm90 %0"],
 
         // gate decompositions for quantum inspire starmon-5
         "x %0": ["rx180 %0"],
         "y %0": ["ry180 %0"],
-        "h %0": ["ry90 %0", "ry180 %0"],
+        "h %0": ["ry90 %0", "rx180 %0"],
         "z %0": ["rx180 %0","ry180 %0"],
 
         "t %0": ["ry90 %0","rx45 %0","rym90 %0"],
@@ -321,19 +323,63 @@
         "s %0": ["ry90 %0","rx90 %0","rym90 %0"],
         "sdag %0": ["ry90 %0","rxm90 %0","rym90 %0"],
 
-        "cnot %0 %1": ["rym90 %1", "cz %0 %1", "ry90 %1"],
+        "swap q0 q2": ["rym90 q2", "barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "ry90 q2",
+                    "rym90 q0", "barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "ry90 q0",
+                    "rym90 q2", "barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "ry90 q2"],
+
+        "swap q2 q0": ["rym90 q2", "barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "ry90 q2",
+                    "rym90 q0", "barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "ry90 q0",
+                    "rym90 q2", "barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "ry90 q2"],
+
+        "swap q1 q2": [ "rym90 q2", "barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2", "ry90 q2",
+                    "rym90 q1", "barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2", "ry90 q1",
+                    "rym90 q2", "barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2", "ry90 q2"],
+
+        "swap q2 q1": [ "rym90 q2", "barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2", "ry90 q2",
+                    "rym90 q1", "barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2", "ry90 q1",
+                    "rym90 q2", "barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2", "ry90 q2"],
+
+        "swap q3 q2": ["rym90 q2", "barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4", "ry90 q2",
+                    "rym90 q3", "barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4", "ry90 q3",
+                    "rym90 q2", "barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4", "ry90 q2"],
+
+        "swap q2 q3": ["rym90 q2", "barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4", "ry90 q2",
+                    "rym90 q3", "barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4", "ry90 q3",
+                    "rym90 q2", "barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4", "ry90 q2"],
+
+        "swap q4 q2": ["rym90 q2", "barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4", "ry90 q2",
+                    "rym90 q4", "barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4", "ry90 q4",
+                    "rym90 q2", "barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4", "ry90 q2"],
+
+        "swap q2 q4": ["rym90 q2", "barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4", "ry90 q2",
+                    "rym90 q4", "barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4", "ry90 q4",
+                    "rym90 q2", "barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4", "ry90 q2"],
+
+
+        //"cnot %0 %1": ["rym90 %1", "cz %0 %1", "ry90 %1"],
+        "cnot q0 q2": ["rym90 q2", "barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "ry90 q2"],
+        "cnot q2 q0": ["rym90 q0", "barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "ry90 q0"],
+
+        "cnot q1 q2": ["rym90 q2", "barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2", "ry90 q2"],
+        "cnot q2 q1": ["rym90 q1", "barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2", "ry90 q1"],
+
+        "cnot q3 q2": ["rym90 q2", "barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4", "ry90 q2"],
+        "cnot q2 q3": ["rym90 q3", "barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4", "ry90 q3"],
+
+        "cnot q4 q2": ["rym90 q2", "barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4", "ry90 q2"],
+        "cnot q2 q4": ["rym90 q4", "barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4", "ry90 q4"],
         
-        "cz q0 q2": ["sf_cz_se q0", "sf_cz_nw q2"],
-        "cz q2 q0": ["sf_cz_se q0", "sf_cz_nw q2"],
+        "cz q0 q2": ["barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2"],
+        "cz q2 q0": ["barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2"],
 
-        "cz q1 q2": ["sf_cz_sw q1", "sf_cz_ne q2"],
-        "cz q2 q1": ["sf_cz_sw q1", "sf_cz_ne q2"],
+        "cz q1 q2": ["barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2"],
+        "cz q2 q1": ["barrier q1,q2", "sf_cz_sw q1", "sf_cz_ne q2", "barrier q1,q2"],
 
-        "cz q3 q2": ["sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4"],
-        "cz q2 q3": ["sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4"],
+        "cz q3 q2": ["barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4"],
+        "cz q2 q3": ["barrier q2,q3,q4", "sf_cz_sw q2", "sf_cz_ne q3", "sf_park q4", "barrier q2,q3,q4"],
 
-        "cz q4 q2": ["sf_cz_se q2", "sf_cz_nw q4", "sf_park q3"],
-        "cz q2 q4": ["sf_cz_se q2", "sf_cz_nw q4", "sf_park q3"],
+        "cz q4 q2": ["barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4"],
+        "cz q2 q4": ["barrier q2,q3,q4", "sf_cz_se q2", "sf_cz_nw q4", "sf_park q3", "barrier q2,q3,q4"],
 
         // To support other forms of writing the same gates
         "x180 %0": ["rx180 %0"],
@@ -452,6 +498,56 @@
                 "static_codeword_override": 4
             }
         },
+        "ry90 q0": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 4
+            }
+        },
+        "ry90 q1": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 4
+            }
+        },
+        "ry90 q2": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 4
+            }
+        },
+        "ry90 q3": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 4
+            }
+        },
+        "ry90 q4": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 4
+            }
+        },
         "rxm90": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
@@ -472,6 +568,57 @@
                 "static_codeword_override": 6
             }
         },
+        "rym90 q0": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "ym90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 6
+            }
+        },
+        "rym90 q1": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "ym90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 6
+            }
+        },
+        "rym90 q2": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "ym90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 6
+            }
+        },
+        "rym90 q3": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "ym90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 6
+            }
+        },
+        "rym90 q4": {
+            "duration": 20,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "ym90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": 6
+            }
+        },
+
 
         //////////////////////////////////////////
         // Custom operations for Quantum Inspire
@@ -520,41 +667,6 @@
             }
         },
         //////////////////////////////////////////
-
-        "cz": {
-            "duration": @FLUX_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "type": "flux",
-            "cc_light_instr": "cz",
-            "cc": {
-                "ref_signal": "two-qubit-flux",     // NB: reference, instead of defining "signal" here
-                "static_codeword_override": 1
-            }
-        },
-        "cz_park": {
-            "duration": @FLUX_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "type": "flux",
-            "cc_light_instr": "cz",
-            "cc": {
-                "signal": [
-                    {   "type": "flux",
-                        "operand_idx": 0,                                   // control
-                        "value": ["flux-0-{qubit}"]
-                    },
-                    {   "type": "flux",
-                        "operand_idx": 1,                                   // target
-                        "value": ["flux-1-{qubit}"]
-                    },
-                    {   "type": "flux",
-                        "operand_idx": 2,                                   // park
-                        "value": ["park_cz-{qubit}"]
-                    }
-                ],
-                "static_codeword_override": 0   // FIXME
-            }
-        },
-
 		// additions from 'CC-software-implementation.docx'
 		// flux pulses, see:
         // - https://github.com/QE-Lab/OpenQL/issues/176

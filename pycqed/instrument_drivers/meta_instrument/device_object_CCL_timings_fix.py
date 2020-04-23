@@ -1450,6 +1450,7 @@ class DeviceCCL(Instrument):
                                  wait_after_flux: float=None,
                                  prepare_for_timedomain: bool =False,
                                  live_plot=False,
+                                 hardware_digitized: bool = False,
                                  nr_shots_per_case=2**14,
                                  shots_per_meas=2**16,
                                  disable_snapshot_metadata: bool = False,
@@ -1499,15 +1500,20 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.tile(np.arange(nr_cases), nr_shots_per_case))
         MC.set_detector_function(d)
-        label_str = label+ '{}_{}_{}'.format(qubits[1],qubits[0],state_prepared)
+        label_str = label+ '{}_{}_{}'.format(qubits[0],qubits[1],state_prepared)
         MC.run('{}'.format(label_str),
                exp_metadata={'combinations': combinations},
                disable_snapshot_metadata=disable_snapshot_metadata)
         # mra.Multiplexed_Readout_Analysis(extract_combinations=True, options_dict={'skip_cross_fidelity': True})
-        tomo_v2.Full_State_Tomography_2Q(label=label_str,
-                                         qubit_ro_channels=qubits, # channels we will want to use for tomo
-                                         correl_ro_channels=[qubits], # correlations we will want for the tomo
-                                         tomo_qubits_idx=qubits)
+        a = tomo_v2.Full_State_Tomography_2Q(label=label_str,
+                                             target_bell=bell_state,
+                                             hardware_digitized=hardware_digitized,
+                                                                          # -1 is there because analysis
+                                                                          # analysis expects a list with [q0,q1,..,qN]
+                                             qubit_ro_channels=qubits, # channels we will want to use for tomo
+                                             correl_ro_channels=[qubits], # correlations we will want for the tomo
+                                             tomo_qubits_idx=qubits)
+        return a
 
 
     #def measure_ssro_multi_qubit(
@@ -1615,6 +1621,10 @@ class DeviceCCL(Instrument):
         log.info("{}.measure_ssro_multi_qubit for qubits{}".format(self.name, qubits))
         # off and on, not including post selection init measurements yet
         nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+
+        if initialize is True:
+            nr_shots_per_case = 2* nr_shots_per_case
+            
         nr_shots = nr_shots_per_case * nr_cases
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
@@ -1656,11 +1666,11 @@ class DeviceCCL(Instrument):
         if analyze:
             if initialize == True:
                 thresholds = [self.find_instrument(qubit).ro_acq_threshold() for qubit in qubits]
-                ma2.Multiplexed_Readout_Analysis(label=label,
+                ma2.Multiplexed_Readout_Analysis_2(label=label,
                                                  post_selection=True,
                                                  post_selec_thresholds=thresholds)
             else:
-                a = ma2.Multiplexed_Readout_Analysis(label=label)
+                a = ma2.Multiplexed_Readout_Analysis_2(label=label)
         return
 
 
@@ -3382,6 +3392,69 @@ class DeviceCCL(Instrument):
 
         self._dag = dag
         return dag
+
+    def measure_performance(self, number_of_repetitions: int = 1,
+                            post_selection: bool = True,
+                            qubit_pairs: list = [['QNW','QC'], ['QNE','QC'],
+                                                ['QC','QSW','QSE'], ['QC','QSE','QSW']]):
+
+        """
+        Routine runs readout, single-qubit and two-qubit metrics.
+
+        Parameters
+        ----------
+        number_of_repetitions : int
+            defines number of times the routine is repeated.
+        post_selection: bool
+            defines whether readout fidelities are measured with post-selection.
+        qubit_pairs: list
+            list of the qubit pairs for which 2-qubit metrics should be measured.
+            Each pair should be a list of 2 strings (3 strings, if a parking operation
+            is needed) of the respective qubit object names.
+
+        Returns
+        -------
+        succes: bool
+            True if performance metrics were run successfully, False if it failed.
+
+        """
+
+        for _ in range(0, number_of_repetitions):
+            try:
+                device.measure_ssro_multi_qubit(device.qubits(), initialize=post_selection)
+
+                for qubit in device.qubits():
+                    qubit_obj = device.find_instrument(qubit)
+                    qubit_obj.ro_acq_averages(4096)
+                    qubit_obj.measure_T1()
+                    qubit_obj.measure_ramsey()
+                    qubit_obj.measure_echo()
+                    qubit_obj.ro_acq_weight_type('SSB')
+                    qubit_obj.ro_soft_avg(3)
+                    qubit_obj.measure_allxy()
+                    qubit_obj.ro_soft_avg(1)
+                    qubit_obj.measure_single_qubit_randomized_benchmarking()
+                    qubit_obj.ro_acq_weight_type('optimal')
+                
+                device.ro_acq_weight_type('optimal')
+                for pair in qubit_pairs:
+                    device.measure_two_qubit_randomized_benchmarking(qubits=pair[:2],
+                                                                    MC=self.instr_MC.get_instr())
+                    device.measure_state_tomography(qubits=pair[:2], bell_state=0,
+                                                    prepare_for_timedomain=True, live_plot=False,
+                                                    nr_shots_per_case=2**10, shots_per_meas=2**14,
+                                                    label='State_Tomography_Bell_0')
+                    device.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+                    device.measure_conditional_oscillation(q0=pair[1], q1=pair[0])
+                    # in case of parked qubit, assess its parked phase as well
+                    if len(pair) == 3:
+                        device.measure_conditional_oscillation( q0=pair[0], q1=pair[1], q2=pair[2], 
+                                                                parked_qubit_seq='ramsey')
+            except KeyboardInterrupt:
+                print('Keyboard Interrupt')
+                break
+            except:
+                print("Exception encountered during measure_device_performance")
 
 
 def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
