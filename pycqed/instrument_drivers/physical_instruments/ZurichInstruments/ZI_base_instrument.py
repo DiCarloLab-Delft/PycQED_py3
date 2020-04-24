@@ -1338,7 +1338,7 @@ class ZI_base_instrument(Instrument):
             pass
         super().close()
 
-    def check_errors(self) -> None:
+    def check_errors(self, errors_to_ignore=None) -> None:
         raise NotImplementedError('Virtual method with no implementation!')
 
     def clear_errors(self) -> None:

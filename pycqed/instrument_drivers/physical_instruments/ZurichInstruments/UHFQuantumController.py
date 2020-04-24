@@ -885,7 +885,7 @@ setUserReg(4, err_cnt);"""
             self.unsubs(p)
         self.unsubs(self._get_full_path('auxins/0/sample'))
 
-    def check_errors(self) -> None:
+    def check_errors(self, errors_to_ignore=None) -> None:
         """
         Checks the instrument for errors. As the UHFQA does not yet support the same error
         stack as the HDAWG instruments we do the checks by reading specific nodes
@@ -1761,5 +1761,5 @@ while (1) {
         self._set_dio_calibration_delay(delay)
 
         # Clear all detected errors (caused by DIO timing calibration)
-        self.clear_errors()
+        self.check_errors(errors_to_ignore=['AWGDIOTIMING'])
 
