@@ -479,7 +479,8 @@ while (1) {
         self._dio_calibration_delay = value
 
         # And configure the delays
-        self.setd('raw/dios/0/delays/*', self._dio_calibration_delay)
+        for i in range(32):
+            self.setd('raw/dios/0/delays/' + str(i) + '/value', self._dio_calibration_delay)
 
     def _get_dio_calibration_delay(self):
         return self._dio_calibration_delay
