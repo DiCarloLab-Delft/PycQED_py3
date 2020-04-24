@@ -285,7 +285,7 @@ class DeviceCCL(Instrument):
         self.instr_CC(qb.instr_CC())
         self.cfg_openql_platform_fn(qb.cfg_openql_platform_fn())
 
-    def prepare_timing(self):
+    def prepare_timing_old_Ch(self):
         """
         Responsible for ensuring timing is configured correctly.
 
@@ -320,6 +320,9 @@ class DeviceCCL(Instrument):
         for key, val in latencies.items():
             latencies[key] = val - lowest_value
 
+        # Only apply fine latencies above 1 ps (HDAWG8 minum fine delay)
+        # ns_tol = 1e-3
+
         # ensuring that RO latency is a multiple of 20 ns as the UHFQC does
         # not have a fine timing control.
         ro_latency_modulo_20 = latencies['ro_0'] % 20e-9
@@ -327,8 +330,8 @@ class DeviceCCL(Instrument):
             latencies[key] = val + (20e-9 - ro_latency_modulo_20) % 20e-9
 
         # Setting the latencies in the CCL
-        CC = self.instr_CC.get_instr()
-        dio_map = self.dio_map()
+        # CC = self.instr_CC.get_instr()
+        # dio_map = self.dio_map()
 
         # Iterate over keys in dio_map as this ensures only relevant
         # timing setting are set.
@@ -368,6 +371,118 @@ class DeviceCCL(Instrument):
                     ch_not_ready = AWG.geti(
                             'sigouts/{}/busy'.format(indiv_ch))
                     check_keyboard_interrupt()
+
+    def prepare_timing(self):
+        """
+        Responsible for ensuring timing is configured correctly.
+
+        Takes parameters starting with `tim_` and uses them to set the correct
+        latencies on the DIO ports of the CCL or QCC.
+
+        N.B. latencies are set in multiples of 20ns in the DIO.
+        Latencies shorter than 20ns are set as channel delays in the AWGs.
+        These are set globally. If individual (per channel) setting of latency
+        is required in the future, we can add this.
+
+        """
+        # 2. Setting the latencies
+        cc = self.instr_CC.get_instr()
+        if isinstance(cc, CCL):
+            latencies = OrderedDict(
+                [
+                    ("ro_0", self.tim_ro_latency_0()),
+                    ("ro_1", self.tim_ro_latency_1()),
+                    # ('ro_2', self.tim_ro_latency_2()),
+                    ("mw_0", self.tim_mw_latency_0()),
+                    ("mw_1", self.tim_mw_latency_1()),
+                    ("flux_0", self.tim_flux_latency_0())
+                    # ('flux_1', self.tim_flux_latency_1()),
+                    # ('flux_2', self.tim_flux_latency_2()),
+                    # ('mw_2', self.tim_mw_latency_2()),
+                    # ('mw_3', self.tim_mw_latency_3()),
+                    # ('mw_4', self.tim_mw_latency_4())]
+                ]
+            )
+        else:
+            latencies = OrderedDict(
+                [
+                    ("ro_0", self.tim_ro_latency_0()),
+                    ("ro_1", self.tim_ro_latency_1()),
+                    ("ro_2", self.tim_ro_latency_2()),
+                    ("mw_0", self.tim_mw_latency_0()),
+                    ("mw_1", self.tim_mw_latency_1()),
+                    ("flux_0", self.tim_flux_latency_0()),
+                    ("flux_1", self.tim_flux_latency_1()),
+                    ("flux_2", self.tim_flux_latency_2()),
+                    ("mw_2", self.tim_mw_latency_2()),
+                    ("mw_3", self.tim_mw_latency_3()),
+                    ("mw_4", self.tim_mw_latency_4()),
+                ]
+            )
+
+        # NB: Mind that here number precision matters a lot!
+        # Tripple check everything if any changes are to be made
+
+        # Substract lowest value to ensure minimal latency is used.
+        # note that this also supports negative delays (which is useful for
+        # calibrating)
+        lowest_value = min(latencies.values())
+        for key, val in latencies.items():
+            # Align to minimum and change to ns to avoid number precision problems
+            # The individual multiplications are on purpose
+            latencies[key] = val * 1e9 - lowest_value * 1e9
+
+        # Only apply fine latencies above 1 ps (HDAWG8 minum fine delay)
+        ns_tol = 1e-3
+
+        # ensuring that RO latency is a multiple of 20 ns as the UHFQC does
+        # not have a fine timing control.
+        ro_latency_modulo_20 = latencies["ro_0"] % 20
+        # `% 20` is for the case ro_latency_modulo_20 == 20ns
+        correction_for_multiple = (20 - ro_latency_modulo_20) % 20
+        if correction_for_multiple >= ns_tol:  # at least one 1 ps
+            # Only apply corrections if they are significant
+            for key, val in latencies.items():
+                latencies[key] = val + correction_for_multiple
+
+        # Setting the latencies in the CCL
+        # Iterate over keys in dio_map as this ensures only relevant
+        # timing setting are set.
+        for lat_key, dio_ch in self.dio_map().items():
+            lat = latencies[lat_key]
+            lat_coarse = int(np.round(lat) // 20)  # Convert to CC dio value
+            lat_fine = lat % 20
+            lat_fine = lat_fine * 1e-9 if lat_fine <= 20 - ns_tol else 0
+            log.debug(
+                "Setting `dio{}_out_delay` for `{}` to `{}`. (lat_fine: {:4g})".format(
+                    dio_ch, lat_key, lat_coarse, lat_fine
+                )
+            )
+            cc.set("dio{}_out_delay".format(dio_ch), lat_coarse)
+
+            # RO devices do not support fine delay setting.
+            if "mw" in lat_key or "flux" in lat_key:
+                # Check name to prevent crash when instrument not specified
+                AWG_name = self.get("instr_AWG_{}".format(lat_key))
+                if AWG_name is not None:
+                    AWG = self.find_instrument(AWG_name)
+                    using_QWG = AWG.__class__.__name__ == "QuTech_AWG_Module"
+                    if not using_QWG:
+                        # All channels are set globally from the device object.
+                        AWG.stop()
+                        for i in range(8):  # assumes the AWG is an HDAWG
+                            log.debug(
+                                "Setting `sigouts_{}_delay` to {:4g}"
+                                " in {}".format(i, lat_fine, AWG.name)
+                            )
+                            AWG.set("sigouts_{}_delay".format(i), lat_fine)
+                        AWG.start()
+                        ch_not_ready = 8
+                        while ch_not_ready > 0:
+                            ch_not_ready = 0
+                            for i in range(8):
+                                ch_not_ready += AWG.geti("sigouts/{}/busy".format(i))
+                            check_keyboard_interrupt()
 
     def prepare_fluxing(self, qubits):
         for qb_name in qubits:
@@ -1426,10 +1541,14 @@ class DeviceCCL(Instrument):
         return a
 
     def measure_ssro_multi_qubit(
-            self, qubits: list, nr_shots_per_case: int = 2**13,  # 8192
+            self,
+            qubits: list,
+            nr_shots_per_case: int = 2**13,  # 8192
             prepare_for_timedomain: bool = True,
             result_logging_mode='raw',
-            initialize: bool = False, analyze=True, shots_per_meas: int = 2**16,
+            initialize: bool = False,
+            analyze=True,
+            shots_per_meas: int = 2**16,
             label='Mux_SSRO',
             MC=None):
         """
@@ -1450,9 +1569,16 @@ class DeviceCCL(Instrument):
         log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
             self.name, qubits))
 
+        # # off and on, not including post selection init measurements yet
+        # nr_cases = 2**len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        # nr_shots = nr_shots_per_case*nr_cases
+
         # off and on, not including post selection init measurements yet
-        nr_cases = 2**len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
-        nr_shots = nr_shots_per_case*nr_cases
+        nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        if initialize == True:
+            nr_shots = 2 * nr_shots_per_case * nr_cases
+        else:
+            nr_shots = nr_shots_per_case * nr_cases
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
@@ -1498,9 +1624,125 @@ class DeviceCCL(Instrument):
 
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
+
         if analyze:
-            a = ma2.Multiplexed_Readout_Analysis(label=label)
-        return a.proc_data_dict['quantities_of_interest']['trace']
+            if initialize == True:
+                thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
+                    for qubit in qubits]
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                            post_selection=True,
+                                            post_selec_thresholds=thresholds)
+                # Print fraction of discarded shots
+                #Dict = a.proc_data_dict['Post_selected_shots']
+                #key = next(iter(Dict))
+                #fraction=0
+                #for comb in Dict[key].keys():
+                #    fraction += len(Dict[key][comb])/(2**12 * 4)
+                #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
+            else:
+                a = ma2.Multiplexed_Readout_Analysis(label=label)
+            # Set thresholds
+            for i, qubit in enumerate(qubits):
+                label = a.raw_data_dict['value_names'][i]
+                threshold = a.qoi[label]['threshold_raw']
+                self.find_instrument(qubit).ro_acq_threshold(threshold)
+        return
+
+    def measure_ssro_single_qubit(
+            self,
+            qubits: list,
+            q_target: str,
+            nr_shots: int = 2**13,  # 8192
+            prepare_for_timedomain: bool = True,
+            result_logging_mode='raw',
+            initialize: bool = False,
+            analyze=True,
+            shots_per_meas: int = 2**16,
+            label='Mux_SSRO',
+            MC=None):
+        '''
+        '''
+
+        log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
+            self.name, qubits))
+
+        # off and on, not including post selection init measurements yet
+        nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        if initialize == True:
+            nr_shots = 4 * nr_shots
+        else:
+            nr_shots = 2 * nr_shots
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
+                      for qn in qubits]
+
+        p = mqo.multi_qubit_off_on(qubit_idxs,
+                                   initialize=initialize,
+                                   second_excited_state=False,
+                                   platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+
+        # right is LSQ
+        d = self.get_int_logging_detector(qubits,
+                                          result_logging_mode=result_logging_mode)
+
+        # This assumes qubit names do not contain spaces
+        det_qubits = [v.split()[-1] for v in d.value_names]
+        if (qubits != det_qubits) and (self.ro_acq_weight_type() == 'optimal'):
+            # this occurs because the detector groups qubits per feedline.
+            # If you do not pay attention, this will mess up the analysis of
+            # this experiment.
+            raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
+
+        shots_per_meas = int(np.floor(
+            np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
+
+        d.set_child_attr('nr_shots', shots_per_meas)
+
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        MC.run('{}_{}_{}'.format(label, q_target, self.msmt_suffix))
+
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+
+        if analyze:
+            if initialize == True:
+                thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
+                    for qubit in qubits]
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                            q_target = q_target,
+                                            post_selection=True,
+                                            post_selec_thresholds=thresholds)
+                # Print fraction of discarded shots
+                #Dict = a.proc_data_dict['Post_selected_shots']
+                #key = next(iter(Dict))
+                #fraction=0
+                #for comb in Dict[key].keys():
+                #    fraction += len(Dict[key][comb])/(2**12 * 4)
+                #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
+            else:
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                                     q_target = q_target)
+            # Set thresholds
+            for i, qubit in enumerate(qubits):
+                label = a.raw_data_dict['value_names'][i]
+                threshold = a.qoi[label]['threshold_raw']
+                self.find_instrument(qubit).ro_acq_threshold(threshold)
+        return
+
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
@@ -2063,7 +2305,7 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(q0)
+            self.prepare_for_timedomain([q0])
 
         assert q0 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
