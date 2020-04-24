@@ -71,26 +71,17 @@ Changelog:
 - removed unused parameters cfg_num_codewords and cfg_codeword_protocol from upload_codeword_program()
 - removed unused parameter default_dio_timing from _configure_codeword_protocol()
 
-20200214 WJV
-- removed unused parameter repetitions from _find_valid_delays()
-- also removed parameter repetitions from calibrate_CC_dio_protocol()
-- split off calibrate_dio_protocol() from calibrate_CC_dio_protocol() to allow standalone use
-
-20200217 WJV
-- moved DIO calibration helpers to their respective drivers
-- we now implement new interface CalInterface
-
 """
 
 import time
 import logging
 import numpy as np
 import re
-from typing import Tuple,List
+import os
+import pycqed
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
-import pycqed.instrument_drivers.library.DIO as DIO
 
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
@@ -114,7 +105,7 @@ class ziDIOCalibrationError(Exception):
 # Class
 ##########################################################################
 
-class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
+class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
     def __init__(self,
                  name: str,
@@ -159,10 +150,8 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
 
         for i in range(8):
             self._snapshot_whitelist.update({
-                'sigouts_{}_direct'.format(i),
-                'sigouts_{}_offset'.format(i),
-                'sigouts_{}_on'.format(i),
-                'sigouts_{}_range'.format(i)})
+                'sigouts_{}_direct'.format(i), 'sigouts_{}_offset'.format(i),
+                'sigouts_{}_on'.format(i) , 'sigouts_{}_range'.format(i)})
 
         self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
 
@@ -365,7 +354,7 @@ while (1) {
             # No special requirements regarding waveforms by default
             self._clear_readonly_waveforms(awg_nr)
 
-            if 0:
+            if 1:   # FIXME: new
                 num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
                 dio_mode_list = {
                     'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
@@ -382,14 +371,63 @@ while (1) {
                 shift = dio_mode['shift'][awg_nr]
                 self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
                 # FIXME: flux mode sets mask, using 6 bits=2channels
+                # FIXME: check _num_codewords against mode
+                # FIXME: derive amp vs direct mode from dio_mode_list
             else:
-                channels = [2*awg_nr, 2*awg_nr+1]
-                shift,mask = DIO.get_shift_and_mask(self.cfg_codeword_protocol(), channels)
-                self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
-                self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
+                # the mask determines how many bits will be used in the protocol
+                # e.g., mask 3 will mask the bits with bin(3) = 00000011 using
+                # only the 2 Least Significant Bits.
+                num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), num_codewords - 1)
 
-            # FIXME: check _num_codewords against mode
-            # FIXME: derive amp vs direct mode from dio_mode_list
+                # set mask and shift for codeword protocol
+                # N.B. The shift is applied before the mask
+                # The relevant bits can be selected by first shifting them
+                # and then masking them.
+
+                if self.cfg_codeword_protocol() == 'identical':
+                    # In the identical protocol all bits are used to trigger
+                    # the same codewords on all AWG's
+                    self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+
+                # NEW
+                # In the new mw protocol bits [0:7] -> CW0 and bits [23:16] -> CW1
+                elif self.cfg_codeword_protocol() == 'microwave':
+                    if awg_nr in [0, 1]:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                    elif awg_nr in [2, 3]:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+
+                # NEW
+                # In the NO-VSM mw protocol bits [0:6] -> CW0, bits [13, 7] -> CW1,
+                # bits [22:16] -> CW2 and bits [29:23] -> CW4
+                elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+                    if awg_nr == 0:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                    elif awg_nr == 1:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 7)
+                    elif awg_nr == 2:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+                    elif awg_nr == 3:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 23)
+
+                # NEW
+                # Proper use of flux AWG to allow independent triggering of flux
+                # bits[0:2] for awg0_ch0, bits[3:5] for awg0_ch1,
+                # bits[6:8] for awg0_ch2, bits[9:11] for awg0_ch3,
+                # bits[16:18] for awg0_ch4, bits[19:21] for awg0_ch5,
+                # bits[22:24] for awg0_ch6, bits[25:27] for awg0_ch7
+                elif self.cfg_codeword_protocol() == 'flux':
+                    self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
+
+                    if awg_nr == 0:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                    elif awg_nr == 1:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 6)
+                    elif awg_nr == 2:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 16)
+                    elif awg_nr == 3:
+                        self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 22)
 
         ####################################################
         # Turn on device
@@ -459,11 +497,11 @@ while (1) {
             cw[n] = (d & ((1 << 10)-1))
         return (ts, cw)
 
-    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5):
+    def _ensure_activity(self, awg_nr, mask_value=None, timeout=5, verbose=False):
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
-        log.debug(f"Testing DIO activity for AWG {awg_nr}")
+        if verbose: print("Testing DIO activity for AWG {}".format(awg_nr))
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
@@ -491,15 +529,15 @@ while (1) {
                 strb_activity |= (d & strb_mask)
 
             if cw_activity != cw_mask:
-                log.warning(f"Did not see all codeword bits toggle! Got 0x{cw_activity:08x}, expected 0x{cw_mask:08x}.")
+                print("Did not see all codeword bits toggle! Got 0x{:08x}, expected 0x{:08x}.".format(cw_activity, cw_mask))
                 valid = False
 
             if vld_polarity != 0 and vld_activity != vld_mask:
-                log.warning("Did not see valid bit toggle!")
+                print("Did not see valid bit toggle!")
                 valid = False
 
             if strb_slope != 0 and strb_activity != strb_mask:
-                log.warning("Did not see strobe bit toggle!")
+                print("Did not see valid bit toggle!")
                 valid = False
 
             if valid:
@@ -507,14 +545,14 @@ while (1) {
 
         return False
 
-    def _find_valid_delays(self, awgs_and_sequences):
+    def _find_valid_delays(self, awgs_and_sequences, repetitions=1, verbose=False):
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
-        log.debug("  Finding valid delays")
+        if verbose: print("  Finding valid delays")
         valid_delays= []
         for delay in range(16):
-            log.debug(f'   Testing delay {delay}')
+            if verbose: print('   Testing delay {}'.format(delay))
             self.setd('raw/dios/0/delays/*/value', delay)
             time.sleep(1)
             valid_sequence = True
@@ -526,8 +564,8 @@ while (1) {
                     for n, cw in enumerate(cws):
                         if n == 0:
                             if cw not in sequence:
-                                log.warning(f"Codeword {n} with value {cw} not in expected sequence {sequence}!")
-                                log.debug(f"Detected codeword sequence: {cws}")
+                                if verbose: print("WARNING: Codeword {} with value {} not in expected sequence {}!".format(n, cw, sequence))
+                                if verbose: print("Detected codeword sequence: {}".format(cws))
                                 valid_sequence = False
                                 break
                             else:
@@ -536,8 +574,8 @@ while (1) {
                             last_index = index
                             index = (index + 1) % len(sequence)
                             if cw != sequence[index]:
-                                log.warning("Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(n, cw, sequence[last_index], sequence))
-                                log.info(f"Detected codeword sequence: {cws}")
+                                if verbose: print("WARNING: Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(n, cw, sequence[last_index], sequence))
+                                if verbose: print("Detected codeword sequence: {}".format(cws))
                                 valid_sequence = False
                                 break
                 else:
@@ -548,10 +586,13 @@ while (1) {
 
         return set(valid_delays)
 
+<<<<<<< HEAD
     ##########################################################################
     # overrides for CalInterface interface
     ##########################################################################
 
+=======
+>>>>>>> develop
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
         """
         Prepares the appropriate program to calibrate DIO and returns
@@ -740,42 +781,36 @@ while (1) {
         return expected_sequence
 
 
-    # NB: based on UHFQuantumController.py::_prepare_HDAWG8_dio_calibration
-    # FIXME: also requires fiddling with DIO data direction
-    # FIXME: is this guaranteed to be synchronous to 10 MHz?
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+    def calibrate_CC_dio_protocol(self, CC, verbose=False, repetitions=1):
         """
-        Configures an HDAWG with a default program that generates data suitable for DIO calibration.
-        Also starts the HDAWG.
+        Calibrates the DIO communication between CC and HDAWG.
+        Arguments:
+            CC (instr) : an instance of a CCL or QCC
+            verbose (bool): if True prints to stdout
         """
-        program = '''
-        var A = 0xffff0000;
-        var B = 0x00000000;
 
-        while (1) {
-            setDIO(A);
-            wait(2);
-            setDIO(B);
-            wait(2);
-        }
-        '''
-        self.configure_awg_from_string(0, program)
-        self.seti('awgs/0/enable', 1)
+        CC_model = CC.IDN()['model']
+        if 'QCC' in CC_model:
+            expected_sequence = self._prepare_QCC_dio_calibration(
+                QCC=CC, verbose=verbose)
+        elif 'CCL' in CC_model:
+            expected_sequence = self._prepare_CCL_dio_calibration(
+                CCL=CC, verbose=verbose)
+        elif 'cc' in CC_model:
+            expected_sequence = self._prepare_CC_dio_calibration(
+                CC=CC, verbose=verbose)
+        else:
+            raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
-        dio_mask = 0x7fff0000
-        expected_sequence = []
-        return dio_mask,expected_sequence
-
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
-        # FIXME: UHF driver does not use expected_sequence, why the difference
+        # Make sure the configuration is up-to-date
         self.assure_ext_clock()
         self.upload_codeword_program()
 
         for awg, sequence in expected_sequence:
-            if not self._ensure_activity(awg, mask_value=dio_mask):
+            if not self._ensure_activity(awg, mask_value=np.bitwise_or.reduce(sequence), verbose=verbose):
                 raise ziDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
-        valid_delays = self._find_valid_delays(expected_sequence)
+        valid_delays = self._find_valid_delays(expected_sequence, repetitions, verbose=verbose)
         if len(valid_delays) == 0:
             raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
 
@@ -791,13 +826,19 @@ while (1) {
         delay = len(subseq)//2 + subseq[0]
 
         # Print information
+<<<<<<< HEAD
         log.info(f"Valid delays are {valid_delays}")
         log.info(f"Setting delay to {delay}")
+=======
+        if verbose: print("  Valid delays are {}".format(valid_delays))
+        if verbose: print("  Setting delay to {}".format(delay))
+>>>>>>> develop
 
         # And configure the delays
         self._set_dio_calibration_delay(delay)
 
         # If successful clear all errors and return True
+<<<<<<< HEAD
         self.clear_errors()  # FIXME: also clears errors not relating to DIO
 
     ##########################################################################
@@ -806,3 +847,7 @@ while (1) {
 
     def calibrate_CC_dio_protocol(self, CC, verbose=False) -> None:
         raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")
+=======
+        self.clear_errors()
+        return True
+>>>>>>> develop

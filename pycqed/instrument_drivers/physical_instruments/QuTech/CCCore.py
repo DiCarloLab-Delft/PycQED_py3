@@ -48,7 +48,7 @@ class CCCore(SCPIBase):
     def assemble(self, program_string: str) -> None:
         self.sequence_program_assemble(program_string)  # NB: takes ~1.1 s for RB with 2048 Cliffords (1 measurement only)
         if self.get_assembler_success() != 1:
-            sys.stderr.write('error log = {}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
+            sys.stderr.write('assembly error log:\n{}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
             raise RuntimeError('assembly failed')
 
     def assemble_and_start(self, program_string: str) -> None:
@@ -89,8 +89,8 @@ class CCCore(SCPIBase):
         # only possible if CC is stopped
         return self._ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
 
-    def calibrate_dio(self, ccio: int) -> None:
-        self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL')
+    def calibrate_dio(self, ccio: int, expected_bits: int) -> None:
+        self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL {expected_bits}')
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')
@@ -119,11 +119,29 @@ class CCCore(SCPIBase):
     def debug_set_ccio_trace_on(self, ccio: int, tu_idx: int) -> None:
         self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:TRACE{tu_idx}:ON')
 
-    def start(self) -> None:
-        self._transport.write('awgcontrol:run:immediate')
+    def start(self, block: bool = True) -> None:
+        """
+        start the CC sequencers
 
-    def stop(self) -> None:
+        :param block: call get_operation_complete to assure that the instrument has started before we return, which is a
+        common assumption throughout PycQED. This behaviour can be disabled to allow asynchronous operation, e.g. to
+        optimize starting a range of instruments.
+        """
+        self._transport.write('awgcontrol:run:immediate')
+        if block:
+            self.get_operation_complete()
+
+    def stop(self, block: bool = True) -> None:
+        """
+        stop the CC sequencers
+
+        :param block: call get_operation_complete to assure that the instrument has stopped before we return, which is a
+        common assumption throughout PycQED. This behaviour can be disabled to allow asynchronous operation, e.g. to
+        optimize stopping a range of instruments.
+        """
         self._transport.write('awgcontrol:stop:immediate')
+        if block:
+            self.get_operation_complete()
 
     ### status functions ###
     def get_status_questionable_frequency_condition(self) -> int:

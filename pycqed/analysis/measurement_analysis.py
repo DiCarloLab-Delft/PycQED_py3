@@ -21,7 +21,7 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.utilities.general import SafeFormatter, format_value_string
 from scipy.ndimage.filters import gaussian_filter
-import imp
+from importlib import reload
 import math
 
 # try:
@@ -59,7 +59,7 @@ from pycqed.analysis import composite_analysis as ca
 #     else:
 #         raise
 
-imp.reload(dm_tools)
+reload(dm_tools)
 
 sfmt = SafeFormatter()
 
@@ -10531,7 +10531,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
 
 # analysis functions
-def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True):
+def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True, sampling_rate=1.8e9):
     # predistortion_matrix = np.array(
     #     ((1,  np.tan(phi*2*np.pi/360)),
     #      (0, 1/alpha * 1/np.cos(phi*2*np.pi/360))))
@@ -10540,7 +10540,7 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
          (0, alpha * np.cos(phi * 2 * np.pi / 360))))
 
     trace_length = len(Ivals)
-    tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
+    tbase = np.arange(0, trace_length / sampling_rate, 1 / sampling_rate)
     if predistort:
         Ivals = Ivals - I_o
         Qvals = Qvals - Q_o

@@ -7,8 +7,7 @@ import h5py
 import string
 import json
 import datetime
-# from pycqed.measurement import hdf5_data as h5d
-from pycqed.measurement.hdf5_data import read_dict_from_hdf5, RepresentsInt
+from pycqed.measurement.hdf5_data import read_dict_from_hdf5
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
 import pycqed as pq
@@ -19,11 +18,10 @@ import logging
 import subprocess
 from functools import reduce  # forward compatibility for Python 3
 import operator
-import string
 from contextlib import ContextDecorator
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 from IPython.core.ultratb import AutoFormattedTB
-import collections
+from collections.abc import Iterable
 
 
 try:
@@ -720,7 +718,7 @@ def _flatten_gen(l):
     From: https://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists
     """
     for el in l:
-        if isinstance(el, collections.abc.Iterable) and not isinstance(el, (str, bytes)):
+        if isinstance(el, Iterable) and not isinstance(el, (str, bytes)):
             yield from _flatten_gen(el)
         else:
             yield el
@@ -735,6 +733,14 @@ def flatten(l):
     E.g. flatten([[123, 2], [4., 6.], 9, 'bla']) => [123, 2, 4.0, 6.0, 9, 'bla']
     """
     return list(_flatten_gen(l))
+
+
+def get_module_name(obj, level=-1):
+    """
+    Get the module or submodule name of `obj`
+    By default return the outermost level
+    """
+    return obj.__module__.split(".")[level]
 
 # Handy things to print the traceback of exceptions
 

@@ -6,6 +6,7 @@ import numpy as np
 #try:  # FIXME: hides import problems
 if 1:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+    from pycqed.measurement.openql_experiments import openql_helpers as oqh
     from openql import openql as ql
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
@@ -154,7 +155,7 @@ if 1:
     # NB: requires OpenQL with CC backend support
     ##########################################################################
 
-    if ql.get_version() > '0.8.0': # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
+    if oqh.is_compatible_openql_version_cc():
         class Test_single_qubit_seqs_CC(Test_single_qubit_seqs_CCL):
             def setUp(self):
                 curdir = os.path.dirname(__file__)
@@ -173,6 +174,7 @@ if 1:
             def test_fail(self):
                 pass
 
+# FIXME: disabled
 # except ImportError as e:
 #     class Test_single_qubit_seqs_CCL_import_error(unittest.TestCase):
 #

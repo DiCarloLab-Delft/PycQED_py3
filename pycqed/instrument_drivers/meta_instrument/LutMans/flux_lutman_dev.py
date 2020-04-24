@@ -431,7 +431,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 parameter_class=ManualParameter,
             )
             # #################################################################
-            # Development parameters for testing the  new CZ parameterization
+            # Development parameters for testing the Victory CZ gate
             # #################################################################
             self.add_parameter(
                 "czv_time_ramp_middle_%s" % this_cz,
@@ -439,8 +439,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "i.e. going form the interaction pnt on one side of the flux "
                 "arc to the interaction pnt on the other side.",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
-                initial_value=4 / 2.4e9,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=2 / 2.4e9,
                 unit="s",
                 label="Time ramp middle",
             )
@@ -448,30 +448,51 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "czv_time_ramp_outside_%s" % this_cz,
                 docstring="Time of the NZ pulse ramps at start and end",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
-                initial_value=2 / 2.4e9,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=1 / 2.4e9,
                 unit="s",
                 label="Time ramp outside",
             )
             self.add_parameter(
-                "czv_speed_limit_%s" % this_cz,
-                docstring="Minimum time required for the CZ gate for a "
-                "single sided square pulse with infinite slope.",
+                "czv_time_sum_sqrs_%s" % this_cz,
+                docstring="The sum of the duration of both squares."
+                "Each square part will have half of this duration."
+                "You should set it close to the speed limit (minimum "
+                "time required to perform a full swap, i.e. 11 -> 02 -> 11)",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
                 initial_value=7.777e-9,
                 unit="s",
-                label="Speed limit",
+                label="A + B",
             )
             self.add_parameter(
-                "czv_total_time_%s" % this_cz,
-                docstring="Total gate time",
+                "czv_time_at_sweetspot_%s" % this_cz,
+                docstring="Time between the two square parts.",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
-                initial_value=40e-9,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=0.,
                 unit="s",
-                label="Total gate time",
+                label="Time at sweet spot",
             )
+            self.add_parameter(
+                "czv_time_before_q_ph_corr_%s" % this_cz,
+                docstring="Time after main pulse before single qubit phase "
+                "correction.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=0.,
+                unit="s",
+                label="Time before correction",
+            )
+            # self.add_parameter(
+            #     "czv_total_time_%s" % this_cz,
+            #     docstring="Total gate time",
+            #     parameter_class=ManualParameter,
+            #     vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
+            #     initial_value=40e-9,
+            #     unit="s",
+            #     label="Total gate time",
+            # )
             self.add_parameter(
                 "czv_sq_amp_%s" % this_cz,
                 docstring="Amplitude of the square parts of the NZ pulse. "
@@ -481,6 +502,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 initial_value=1.0,
                 unit="a.u.",
                 label="Relative amp",
+            )
+            self.add_parameter(
+                "czv_dac_amp_at_11_02_%s" % this_cz,
+                docstring="Dac amplitude (in the case of HDAWG) at the 11-02 "
+                "interaction point. NB: the units might be different for some "
+                "other AWG that is distinct from the HDAWG",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 1.0),
+                initial_value=0.5,
+                unit="a.u.",
+                label="Dac amp at the interaction point",
             )
             self.add_parameter(
                 "czv_amp_q_ph_corr_%s" % this_cz,
@@ -512,7 +544,33 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Pulse polarity inversion",
             )
             self.add_parameter(
-                "czv_fixed_amp_%s" % this_cz,
+                "czv_mirror_sqrs_%s" % this_cz,
+                docstring="Mirrors the two halves with respect to the point "
+                "of amplitude inversion between the two halves.",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=True,
+                label="Mirror squares",
+            )
+            self.add_parameter(
+                "czv_flip_wf_%s" % this_cz,
+                docstring="Flip the entire waveform, only has an effect when "
+                "`czv_mirror_sqrs_` is `False`",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=False,
+                label="Time-flipped waveform",
+            )
+            # self.add_parameter(
+            #     "czv_fixed_amp_%s" % this_cz,
+            #     docstring="",
+            #     parameter_class=ManualParameter,
+            #     vals=vals.Bool(),
+            #     initial_value=False,
+            #     label="",
+            # )
+            self.add_parameter(
+                "czv_correct_q_phase_%s" % this_cz,
                 docstring="",
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
@@ -520,8 +578,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="",
             )
             self.add_parameter(
-                "czv_correct_q_phase_%s" % this_cz,
+                "czv_incl_q_phase_in_cz_%s" % this_cz,
                 docstring="",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=False,
+                label="",
+            )
+            self.add_parameter(
+                "czv_q_ph_corr_only_%s" % this_cz,
+                docstring="Set True to make the main cz pulse zero and keep "
+                "the single qubit phase corrections.\n"
+                "NB: To get the time alignment right, "
+                "you should set all the czv parameters in the lower freq "
+                "qubit as in the fluxlutman of the high freq qubit and set "
+                "this flag to True.", # this statement need confirmation yet
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
                 initial_value=False,
@@ -819,6 +890,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         polycoeffs_B = self.get_polycoeffs_state(state=state_B, which_gate=which_gate)
         polycoeffs = polycoeffs_B - polycoeffs_A
         return np.polyval(polycoeffs, amp)
+
+    def calc_eps_to_dac(
+        self,
+        eps,
+        state_A: str = "01",
+        state_B: str = "02",
+        which_gate: str = "NE",
+        positive_branch=True,
+    ):
+        """
+        See `calc_eps_to_amp`
+        """
+        return (self.calc_eps_to_amp(
+            eps, state_A, state_B, which_gate, positive_branch) *
+            self.get_amp_to_dac_val_scalefactor())
 
     def calc_eps_to_amp(
         self,
