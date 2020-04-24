@@ -734,6 +734,14 @@ def flatten(l):
     """
     return list(_flatten_gen(l))
 
+
+def get_module_name(obj, level=-1):
+    """
+    Get the module or submodule name of `obj`
+    By default return the outermost level
+    """
+    return obj.__module__.split(".")[level]
+
 # Handy things to print the traceback of exceptions
 
 

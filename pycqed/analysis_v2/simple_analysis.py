@@ -44,6 +44,7 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
         options_dict: dict = None,
         extract_only: bool = False,
         do_fitting: bool = True,
+        close_figs=True,
         auto=True,
     ):
         super().__init__(
@@ -54,6 +55,7 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
             options_dict=options_dict,
             extract_only=extract_only,
             do_fitting=do_fitting,
+            close_figs=close_figs,
         )
         # self.single_timestamp = False
         self.params_dict = {
@@ -101,12 +103,22 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
             else:
                 do_legend = True
 
-            self.plot_dicts[val_name] = {
+            if (len(np.shape(yvals)) == 1):
+                # Keep the data shaping to avoid non-geral constructions
+                # in the plotting below
+                xvals = [xvals]
+                yvals = [yvals]
+
+            # Sort points, necessary for adaptive sampling
+            arg_sort = np.argsort(xvals)
+
+            self.plot_dicts[val_name + "_line"] = {
+                "ax_id": val_name,
                 "plotfn": self.plot_line,
-                "xvals": xvals,
+                "xvals": [xval_i[argsort_i] for xval_i, argsort_i in zip(xvals, arg_sort)],
                 "xlabel": self.raw_data_dict["xlabel"][0],
                 "xunit": self.raw_data_dict["xunit"][0][0],
-                "yvals": yvals,
+                "yvals": [yval_i[argsort_i] for yval_i, argsort_i in zip(yvals, arg_sort)],
                 "ylabel": val_name,
                 "yrange": self.options_dict.get("yrange", None),
                 "xrange": self.options_dict.get("xrange", None),
@@ -122,6 +134,20 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
                 ),
                 "do_legend": do_legend,
                 "legend_pos": "upper right",
+                "marker": "",  # don't use markers
+                "linestyle": "-"
+            }
+
+            self.plot_dicts[val_name + "_scatter"] = {
+                "ax_id": val_name,
+                "plotfn": scatter_pnts_overlay,
+                "x": xvals,
+                "y": yvals,
+                "color": None,
+                "edgecolors": "black",
+                "marker": "o",
+                "c": [range(len(xval)) for xval in xvals],
+                "cmap": "plasma",
             }
 
 

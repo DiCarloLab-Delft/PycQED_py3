@@ -33,7 +33,8 @@ import pycqed.analysis_v2.simple_analysis as sa
 import scipy.cluster.hierarchy as hcluster
 
 from copy import deepcopy
-from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
+import pycqed.analysis.tools.plot_interpolation as plt_interp
+
 from pycqed.utilities import general as gen
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from datetime import datetime
@@ -708,7 +709,7 @@ def plot_chevron_center_on_1D_cut(
 
 class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
     """
-    Intended for the analysis of CZ tuneup (theta_f, lambda_2) heatmaps
+    Intended for the analysis of CZ tuneup heatmaps
     The data can be from an experiment or simulation
     """
 
@@ -732,6 +733,9 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         plt_optimal_values_max: int = np.inf,
         plt_clusters: bool = True,
         clims: dict = None,
+        # e.g. clims={'L1': [0, 0.3], "Cost func": [0., 100]},
+        L1_contour_levels: list = [1, 5, 10],
+        phase_contour_levels: list = [90, 180, 270],
         find_local_optimals: bool = True,
         phase_thr=5,
         L1_thr=0.5,
@@ -753,6 +757,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         generate_optima_hulls=False,
         plt_optimal_hulls=False,
         comparison_timestamp: str = None,
+        interp_grid_data: bool = False,
     ):
 
         self.plt_orig_pnts = plt_orig_pnts
@@ -771,6 +776,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         self._opt_are_interp = _opt_are_interp
 
         self.clims = clims
+        self.L1_contour_levels = L1_contour_levels
+        self.phase_contour_levels = phase_contour_levels
 
         self.find_local_optimals = find_local_optimals
         self.phase_thr = phase_thr
@@ -893,6 +900,9 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             save_qois=save_qois,
         )
         self.interp_method = interp_method
+        # Be able to also analyze linear 2D sweeps without interpolating
+        self.interp_grid_data = interp_grid_data
+
         if auto:
             self.run_analysis()
 
@@ -953,6 +963,9 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     "y": self.proc_data_dict["y"],
                 }
             unit = self.proc_data_dict["value_units"][i]
+            vmin = np.min(self.proc_data_dict["interpolated_values"][i])
+            vmax = np.max(self.proc_data_dict["interpolated_values"][i])
+
             if unit == "deg":
                 self.plot_dicts[val_name]["cbarticks"] = np.arange(0.0, 360.1, 45)
                 self.plot_dicts[val_name]["cmap_chosen"] = anglemap
@@ -962,8 +975,6 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             elif unit.startswith("∆ "):
                 self.plot_dicts[val_name]["cmap_chosen"] = "terrain"
                 # self.plot_dicts[val_name]['cmap_chosen'] = 'RdBu'
-                vmin = np.min(self.proc_data_dict["interpolated_values"][i])
-                vmax = np.max(self.proc_data_dict["interpolated_values"][i])
                 vcenter = 0
                 if vmin * vmax < 0:
                     divnorm = col.DivergingNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
@@ -976,6 +987,12 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
 
             if self.clims is not None and val_name in self.clims.keys():
                 self.plot_dicts[val_name]["clim"] = self.clims[val_name]
+                # Visual indicator when saturating the color range
+                clims = self.clims[val_name]
+                cbarextend = "min" if min(clims) > vmin else 'neither'
+                cbarextend = "max" if max(clims) < vmax else cbarextend
+                cbarextend = "both" if min(clims) > vmin and max(clims) < vmax else cbarextend
+                self.plot_dicts[val_name]["cbarextend"] = cbarextend
 
             if self.plt_contour_phase:
                 # Find index of Conditional Phase
@@ -994,8 +1011,9 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                         "z": z_cond_phase,
                         "colormap": anglemap,
                         "cyclic_data": True,
-                        "contour_levels": [90, 180, 270],
+                        "contour_levels": self.phase_contour_levels,
                         "vlim": (0, 360),
+                        # "linestyles": "-",
                     }
                 else:
                     log.warning("No data found named {}".format(self.cond_phase_names))
@@ -1014,7 +1032,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                         self.proc_data_dict["interpolated_values"][j].max(),
                     )
 
-                    contour_levels = np.array([1, 5, 10])
+                    contour_levels = np.array(self.L1_contour_levels)
                     # Leakage is estimated as (Missing fraction/2)
                     contour_levels = (
                         contour_levels
@@ -1032,7 +1050,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                         "contour_levels": contour_levels,
                         "vlim": vlim,
                         "colormap": "hot",
-                        "linestyles": "dashdot",
+                        "linestyles": "-",
+                        # "linestyles": "dashdot",
                     }
                 else:
                     log.warning("No data found named {}".format(self.L1_names))
@@ -1187,7 +1206,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         measured_vals = self.proc_data_dict["measured_values"]
         vlu = self.proc_data_dict["value_units"]
 
-        # Calculate comparison heastmaps
+        # Calculate comparison heatmaps
         if self.comparison_timestamp is not None:
             coha_comp = Conditional_Oscillation_Heatmap_Analysis(
                 t_start=self.comparison_timestamp, extract_only=True
@@ -1234,11 +1253,12 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             else:
                 interp_method = self.interp_method
 
-            x_int, y_int, z_int = interpolate_heatmap(
+            x_int, y_int, z_int = plt_interp.interpolate_heatmap(
                 self.proc_data_dict["x"],
                 self.proc_data_dict["y"],
                 self.proc_data_dict["measured_values"][i],
                 interp_method=interp_method,
+                interp_grid_data=self.interp_grid_data,
             )
             self.proc_data_dict["interpolated_values"].append(z_int)
 

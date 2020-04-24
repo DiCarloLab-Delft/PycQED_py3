@@ -726,7 +726,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Calibration points
         mocked_values = np.concatenate([mocked_values,
-                                        [low_lvl, low_lvl, high_lvl, high_lvl]])
+                                        low_lvl, low_lvl, high_lvl, high_lvl])
 
         # Add noise:
         mocked_values += np.random.normal(0,
@@ -867,7 +867,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         mocked_values = amplitude*np.exp(-(times[0:-4]/self.mock_T1()))+low_lvl
         mocked_values = np.concatenate(
-            [mocked_values, (low_lvl, low_lvl, high_lvl, high_lvl)])
+            [mocked_values, low_lvl, low_lvl, high_lvl, high_lvl])
 
         mocked_values = self.values_to_IQ(mocked_values)
 
@@ -909,7 +909,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         f_ro = self.ro_freq()
         h = 10**(power/20)*10e-3  # Lorentian baseline [V]
 
-        f0, dip = self.calculate_mock_resonator_response(power, f_ro,
+        f0, dip = self.calculate_mock_resonator_response(power, np.array([f_ro]),
                                                          excited=excited)
         signal = h + dip
 

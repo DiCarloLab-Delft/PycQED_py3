@@ -8,6 +8,7 @@
 """
 
 import numpy as np
+import math
 import logging
 
 log = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ def victor_waveform(
     ensure_end_at_zero=True,
     output_q_phase_corr=True
 ):
-    # NB: the ramps are extra time, they are NOT substracted from sq_length!
+    # NB: the ramps are extra time, they are NOT subtracted from time_sum_sqrs!
 
     amp_at_sweetspot = 0.0
 
@@ -30,51 +31,80 @@ def victor_waveform(
 
     sampling_rate = fluxlutman.sampling_rate()
 
-    # New parameters specific to this parameterization
     time_ramp_middle = fluxlutman.get("czv_time_ramp_middle_{}".format(which_gate))
+    time_ramp_middle = time_ramp_middle * sampling_rate  # avoid numerical issues
     time_ramp_outside = fluxlutman.get("czv_time_ramp_outside_{}".format(which_gate))
+    time_ramp_outside = time_ramp_outside * sampling_rate  # avoid numerical issues
     time_sum_sqrs = fluxlutman.get("czv_time_sum_sqrs_{}".format(which_gate))
+    time_sum_sqrs = time_sum_sqrs * sampling_rate  # avoid numerical issues
     time_before_q_ph_corr = fluxlutman.get("czv_time_before_q_ph_corr_{}".format(which_gate))
+    time_before_q_ph_corr = time_before_q_ph_corr * sampling_rate  # avoid numerical issues
     time_at_sweetspot = fluxlutman.get("czv_time_at_sweetspot_{}".format(which_gate))
+    time_at_sweetspot = time_at_sweetspot * sampling_rate  # avoid numerical issues
+    time_q_ph_corr = fluxlutman.get("czv_time_q_ph_corr_{}".format(which_gate))
+    time_q_ph_corr = time_q_ph_corr * sampling_rate  # avoid numerical issues
+
+    dt = 1
+
     invert_polarity = fluxlutman.get("czv_invert_polarity_{}".format(which_gate))
     # Normalized to the amplitude at the CZ interaction point
     norm_sq_amp = fluxlutman.get("czv_sq_amp_{}".format(which_gate))
-    time_q_ph_corr = fluxlutman.get("czv_time_q_ph_corr_{}".format(which_gate))
     amp_q_ph_corr = fluxlutman.get("czv_amp_q_ph_corr_{}".format(which_gate))
     q_ph_corr_only = fluxlutman.get("czv_q_ph_corr_only_{}".format(which_gate))
+    mirror_sqrs = fluxlutman.get("czv_mirror_sqrs_{}".format(which_gate))
+    flip_wf = fluxlutman.get("czv_flip_wf_{}".format(which_gate))
 
-    dt = 1 / sampling_rate
+    # This is to avoid numerical issues when the user would run sweeps with
+    # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
+    # instead of `time_at_swtspt = np.arange(0, 42, 2) / 2.4e9` and get
+    # bad results for specific combinations of parameters
+    time_at_sweetspot = to_int_if_close(time_at_sweetspot)
+    half_time_ramp_middle = to_int_if_close(time_ramp_middle / 2)
+    half_time_sq = to_int_if_close(time_sum_sqrs / 2)
+    half_time_q_ph_corr = to_int_if_close(time_q_ph_corr / 2)
+    half_time_at_swtspt = to_int_if_close(time_at_sweetspot / 2)
 
-    half_time_ramp_middle = time_ramp_middle / 2.0
-    half_time_sq = time_sum_sqrs / 2.0
-    half_time_q_ph_corr = time_q_ph_corr / 2.0
-    # half_time_at_swtspt = (
-    #     total_time - time_ramp_middle - 2 * time_ramp_outside - time_sum_sqrs
-    # ) / 2.0
-    half_time_at_swtspt = time_at_sweetspot / 2.0
+    if mirror_sqrs:
+        # if we mirror than the time at sweet-spot in between the two squares
+        # is shared between both halves of the pulse.
+        # This is equivalent to playing the second pulse in reverse order
+        # in time.
+        time_at_sweetspot_sym = half_time_at_swtspt
+    else:
+        # if not mirroring, we want to play the same pulse twice
+        # The time at sweet-spot in between the two squares is going to be
+        # part only of the second pulse
+        # When concatenating the two halves later in this function we remove
+        # the zeros at the beginning from the first pulse
+        time_at_sweetspot_sym = time_at_sweetspot
 
-    # if half_time_at_swtspt < 0:
-    #     raise ValueError(
-    #         "Total time is not enough to accomodate for speed "
-    #         "limit and pulse ramps!"
-    #     )
-
-    half_total_time = (
-        half_time_at_swtspt + half_time_ramp_middle + half_time_sq + time_ramp_outside
+    sampling_duration = (
+        time_at_sweetspot_sym + half_time_ramp_middle + half_time_sq + time_ramp_outside
     )
 
-    time = np.arange(0.0, half_total_time, dt)
+    time = np.arange(0, sampling_duration, dt)
 
-    t1 = half_time_at_swtspt
+    t1 = time_at_sweetspot_sym
     t2 = t1 + half_time_ramp_middle
     t3 = t2 + half_time_sq
+    t4 = t3 + time_ramp_outside
 
-    conditions = [time <= t1, time > t1, time >= t2, time > t3]
+    # The `=` in `>=` everywhere is intended to avoid edge cases of integer
+    # multiples of the sampling rate
+    conditions = [
+        time <= t1,  # time at sweet-spot
+        time >= t1,  # ramp middle
+        time >= t2,  # square part
+        time >= t3,  # ramp outside
+        time >= t4]  # back to sweet spot
+    # NB numerical issues may rise for specific combinations of time parameters
+    # Avoid setting the time of the ramps below the sampling resolution
     funcs = [
         lambda x: amp_at_sweetspot,
-        lambda x: (x - half_time_at_swtspt) * norm_sq_amp / half_time_ramp_middle,
+        lambda x: (x - time_at_sweetspot_sym) * norm_sq_amp / half_time_ramp_middle,
         lambda x: norm_sq_amp,
         lambda x: -(x - t3) * norm_sq_amp / time_ramp_outside + norm_sq_amp,
+        lambda x: amp_at_sweetspot
     ]
 
     half_NZ_amps = np.piecewise(time, conditions, funcs)
@@ -105,18 +135,33 @@ def victor_waveform(
             amps_q_phase_correction = np.full(
                 int(half_time_q_ph_corr / dt), amp_q_ph_corr
             )
-            # Ensure we end at zero
             amps_q_phase_correction = np.concatenate(
                 (amps_q_phase_correction, -amps_q_phase_correction))
 
-    amp = np.concatenate((np.flip(half_NZ_amps, 0), -half_NZ_amps[1:]))
+    if mirror_sqrs:
+        # `[1:]` makes sure the two pulses share the point in the middle
+        amp = np.concatenate((np.flip(half_NZ_amps, 0), - half_NZ_amps[1:]))
+    else:
+        # Remove zeros at the beginning
+        first_sqr_amps = np.array(half_NZ_amps)
+        keep = (first_sqr_amps == amp_at_sweetspot) * (time <= time_at_sweetspot_sym) ^ 1
+        first_sqr_amps = first_sqr_amps[np.where(keep)[0]]
+        # Remove last point if it is zero as this point will be shared with
+        # the first zero of the second square
+        first_sqr_amps = first_sqr_amps[:-1 if first_sqr_amps[-1] == 0 else None]
+
+        amp = np.concatenate((first_sqr_amps, - half_NZ_amps))
 
     len_base_wf = len(amp)
 
+    if flip_wf:
+        # when flipping we preserve polarity as well
+        amp = - np.flip(amp)
+
     if correct_q_phase and not incl_q_phase_in_cz and amp[-1] != amp_at_sweetspot:
-        # For this case we always add an extra pnt at zero so that the NZ
+        # For this case we always add an extra point at zero so that the NZ
         # effect preserved before starting the correction pulse
-        # This is also ncessary to relibly determine the main pulse length
+        # This is also necessary to reliably determine the main pulse length
         # when calling with `output_q_phase_corr=False`
         amp = np.concatenate((amp, [amp_at_sweetspot]))
         buffer_before_q_ph_corr = np.full(int(time_before_q_ph_corr / dt), amp_at_sweetspot)
@@ -127,7 +172,7 @@ def victor_waveform(
         amp = np.concatenate((amp, amps_q_phase_correction))
 
     cz_start_idx = 0
-    # Extra points for starting and finishing at the sweetspot
+    # Extra points for starting and finishing at the sweet-spot
     if ensure_start_at_zero and amp[0] != amp_at_sweetspot:
         cz_start_idx = 1
         amp = np.concatenate(([amp_at_sweetspot], amp))
@@ -171,13 +216,26 @@ def victor_waveform(
         intervals = time_interp[1:] - time_interp[:-1]
         intervals_list = np.concatenate((intervals, [np.min(intervals)]))
 
+        # import matplotlib.pyplot as plt
+        # plt.plot(time_interp, amp_interp, ".-")
+        # plt.show()
+
         return {
-            "time": time_interp,
+            "time": time_interp / sampling_rate,
             "amp": amp_interp,
-            "intervals_list": intervals_list,
+            "intervals_list": intervals_list / sampling_rate
         }
 
     if return_dict:
-        return {"time": tlist, "amp": amp}
+        return {"time": tlist / sampling_rate, "amp": amp}
 
     return amp
+
+
+# ######################################################################
+# Auxiliary tools
+# ######################################################################
+
+def to_int_if_close(value, abs_tol=1e-12, **kw):
+    is_close = math.isclose(int(value), value, abs_tol=abs_tol, **kw)
+    return int(value) if is_close else value
