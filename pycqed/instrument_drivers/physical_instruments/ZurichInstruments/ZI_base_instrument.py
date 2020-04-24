@@ -312,6 +312,7 @@ class MockDAQServer():
                            str(i) + '/imag'] = {'type': 'ZIVectorData', 'value': np.array([])}
                 self.nodes['/' + self.device + '/qas/0/result/data/' +
                            str(i) + '/wave'] = {'type': 'ZIVectorData', 'value': np.array([])}
+            self.nodes['/' + self.device + '/raw/dios/0/delay'] = {'type': 'Integer', 'value': 0}
         elif self.devtype == 'HDAWG8':
             self.nodes['/' + self.device +
                        '/features/options'] = {'type': 'String', 'value': 'PC\nME'}
@@ -323,6 +324,9 @@ class MockDAQServer():
                        '/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
             self.nodes['/' + self.device +
                        '/raw/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
+            for i in range(32):
+                self.nodes['/' + self.device +
+                        '/raw/dios/0/delays/' + str(i) + '/value'] = {'type': 'Integer', 'value': 0}
             for awg_nr in range(4):
                 for i in range(32):
                     self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
