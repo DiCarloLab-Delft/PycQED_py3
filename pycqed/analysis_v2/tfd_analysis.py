@@ -764,7 +764,7 @@ def plot_expectation_values_Gibbs(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'
     for i, op in enumerate(operators):
         ax.bar(i, full_dict[op], color=color_dict[i], align='center', zorder=1)
         if exact_dict is not None:
-            ax.bar(list(full_dict).index(op), exact_dict[op]*4, fill=False, linestyle='--', edgecolor='black', align='center', zorder = 2)
+            ax.bar(list(full_dict).index(op), exact_dict[op], fill=False, linestyle='--', edgecolor='black', align='center', zorder = 2)
         ax.set_xticks(np.arange(len(labels)))
         ax.set_xticklabels(labels, rotation=75)
     ax.set_ylabel('Expectation value')
