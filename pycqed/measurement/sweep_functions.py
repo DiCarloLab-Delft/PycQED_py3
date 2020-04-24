@@ -1270,3 +1270,17 @@ class tim_mw_latency_sweep(Soft_Sweep):
 
         time.sleep(.5)
         return val
+
+class tim_mw_latency_sweep_1D(Soft_Sweep):
+    def __init__(self,device):
+        super().__init__()
+        self.dev = device
+        self.name = 'MW latency'
+        self.parameter_name = 'MW latency'
+        self.unit = 's'
+
+    def set_parameter(self,val):
+        self.dev.tim_mw_latency_0(val)
+        self.dev.tim_mw_latency_1(val)
+        self.dev.prepare_timing()
+        return val

@@ -1888,6 +1888,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
     y_unit = kw.get('y_unit', y_unit)
     z_unit = kw.get('z_unit', z_unit)
     cbarticks = kw.get('cbarticks', None)
+    cbarextend = kw.get('cbarextend', 'neither')
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
@@ -1922,7 +1923,8 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
         if cax is None:
             ax_divider = make_axes_locatable(ax)
             cax = ax_divider.append_axes('right', size='5%', pad='2%')
-        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical', ticks=cbarticks)
+        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical',
+            ticks=cbarticks, extend=cbarextend)
         if zlabel is not None:
             set_cbarlabel(cbar, zlabel, unit=z_unit)
         return fig, ax, colormap, cbar

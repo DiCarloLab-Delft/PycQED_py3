@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 # ######################################################################
 
 """
-NB: Only tested with ND > 1 -> 1D
+NB: Only works with ND > 1 domain, and 1D image
 
 Possible things to improve
 - try resolution loss with the default losses of the adaptive package
@@ -63,7 +63,7 @@ def mk_non_uniform_res_loss_func(
 
 
 # ######################################################################
-# LearnerND wrappings to be able to acces all learner data
+# LearnerND wrappings to be able to access all learner data
 # ######################################################################
 
 
@@ -96,7 +96,7 @@ class LearnerND_Optimize(LearnerND):
 def mk_optimization_loss(minimize=True, use_grad=False):
     def func(simplex, values, value_scale, learner):
         # Assumes values is numpy array
-        # The learner evaluate fisrt the boundaries
+        # The learner evaluate first the boundaries
         # make sure the min max takes in account all data at the beggining
         # of the sampling
         if not learner.bounds_are_done:
@@ -169,7 +169,7 @@ def mk_optimize_res_loss_func(
 
 
 # ######################################################################
-# Below is the firs attempt, it works but the above one is more general
+# Below is the first attempt, it works but the above one is more general
 # ######################################################################
 
 

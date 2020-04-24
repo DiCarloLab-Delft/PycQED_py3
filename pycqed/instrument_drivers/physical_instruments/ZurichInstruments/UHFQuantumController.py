@@ -759,7 +759,7 @@ setUserReg(4, err_cnt);"""
     ##########################################################################
 
     def acquisition(self, samples=100, averages=1, acquisition_time=0.010, timeout=10,
-                    channels=(0, 1), mode='rl') -> None:
+                    channels=(0, 1), mode='rl') -> None:  # FIXME: wrong return type
         self.timeout(timeout)
         self.acquisition_initialize(samples, averages, channels, mode)
         data = self.acquisition_poll(samples, True, acquisition_time)
@@ -827,7 +827,7 @@ setUserReg(4, err_cnt);"""
         self.start()
 
     def acquisition_poll(self, samples, arm=True,
-                         acquisition_time=0.010) -> None:
+                         acquisition_time=0.010) -> None:  # FIXME: wrong return type
         """
         Polls the UHFQC for data.
 
@@ -1654,6 +1654,16 @@ setTrigger(0);
         else:
             raise ValueError('Invalid feedline {} selected for calibration.'.format(feedline))
 
+    def _prepare_CC_dio_calibration(self, CC, verbose=False):
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                                      '..', 'examples','CC_examples',
+                                      'uhfqc_calibration.vq1asm'))
+
+        # Set the DIO calibration mask to enable 9 bit measurement
+        self._dio_calibration_mask = 0x1ff
+        CC.eqasm_program(test_fp)
+        CC.start()
+
     def _prepare_QCC_dio_calibration(self, QCC, verbose=False):
         """Configures a QCC with a default program that generates data suitable for DIO calibration. Also starts the QCC."""
 
@@ -1717,9 +1727,7 @@ while (1) {
         elif 'HDAWG8' in CC_model:
             self._prepare_HDAWG8_dio_calibration(HDAWG=CC, verbose=verbose)
         elif 'cc' in CC_model:
-            # expected_sequence = self._prepare_CC_dio_calibration(
-            #     CC=CC, verbose=verbose)
-            return
+            self._prepare_CC_dio_calibration(CC=CC, verbose=verbose)
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
@@ -1734,17 +1742,22 @@ while (1) {
         if len(valid_delays) == 0:
             raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
 
-        min_valid_delay = min(valid_delays)
-        # Heuristics to get the 'best' delay in a sequence
-        if (min_valid_delay+1) in valid_delays and (min_valid_delay+2) in valid_delays:
-            min_valid_delay = min_valid_delay + 1
+        subseq = [[]]
+        for e in valid_delays:
+            if not subseq[-1] or subseq[-1][-1] == e - 1:
+                subseq[-1].append(e)
+            else:
+                subseq.append([e])
+
+        subseq = max(subseq, key=len)
+        delay = len(subseq)//2 + subseq[0]
 
         # Print information
         if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+        if verbose: print("  Setting delay to {}".format(delay))
 
         # And configure the delays
-        self._set_dio_calibration_delay(min_valid_delay)
+        self._set_dio_calibration_delay(delay)
 
         # Clear all detected errors (caused by DIO timing calibration)
         self.clear_errors()

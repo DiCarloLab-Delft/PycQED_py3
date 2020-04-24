@@ -426,8 +426,8 @@ class Qubit(Instrument):
 
         return True
 
-    def find_resonator_frequency_initial(self, start_freq=6.9e9, stop_freq=7.9e9,
-                                         npts=50001, use_min=False, MC=None,
+    def find_resonator_frequency_initial(self, start_freq=6.9e9, stop_freq=8.1e9,
+                                         npts=50001, use_min=True, MC=None,
                                          update=True, with_VNA=None,
                                          resonators=None, look_for_missing=True):
         """
@@ -557,7 +557,7 @@ class Qubit(Instrument):
         #                         res.freq = a.fit_results.params['f0'].value*1e9
         # return True
 
-    def measure_individual_resonators(self, with_VNA=False, use_min=False):
+    def measure_individual_resonators(self, with_VNA=False, use_min=True):
         """
         Specifically designed for use in automation, not recommended to use by
         hand!

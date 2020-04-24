@@ -2,12 +2,14 @@ import re
 import logging
 import numpy as np
 from os.path import join, dirname
-from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
+
+from pycqed.utilities.general import suppress_stdout
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import is_more_rencent
+
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform, CReg, Operation
 
@@ -82,13 +84,20 @@ def compile(p, quiet: bool = True):
         p.compile()
 
     # determine extension of generated file
-    if p.eqasm_compiler=='eqasm_backend_cc':
+    if p.eqasm_compiler=='eqasm_backend_cc':  # NB: field .eqasm_compiler is set by p.compile()
         ext = '.vq1asm' # CC
     else:
         ext = '.qisa' # CC-light, QCC
     # attribute is added to program to help finding the output files
     p.filename = join(p.output_dir, p.name + ext)
     return p
+
+
+def is_compatible_openql_version_cc() -> bool:
+    """
+    test whether OpenQL version is compatible with Central Controller
+    """
+    return ql.get_version() > '0.8.0'  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
 
 
 #############################################################################
@@ -179,7 +188,6 @@ def add_two_q_cal_points(p, q0: int, q1: int,
     if measured_qubits == None:
         measured_qubits = [q0, q1]
 
-
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
         k.prepz(q0)
@@ -261,14 +269,14 @@ def clocks_to_s(time, clock_cycle=20e-9):
     """
     Converts a time in clocks to a time in s
     """
-    return time*clock_cycle
+    return time * clock_cycle
 
 
 def infer_tqisa_filename(qisa_fn: str):
     """
     Get's the expected tqisa filename based on the qisa filename.
     """
-    return qisa_fn[:-4]+'tqisa'
+    return qisa_fn[:-4] + 'tqisa'
 
 
 def get_start_time(line: str):

@@ -178,7 +178,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
-            vals=validators.Enum('identical', 'microwave', 'new_novsm_microwave', 'novsm_microwave', 'flux'), docstring=(
+            vals=validators.Enum('identical', 'microwave', 'novsm_microwave', 'flux'), docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
@@ -359,7 +359,6 @@ while (1) {
                 dio_mode_list = {
                     'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
                     'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
-                    'new_novsm_microwave':  { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
                     'novsm_microwave':      { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
                     'flux':                 { 'mask': 0x3F, 'shift': [0,  6,  16, 22] },    # FIXME: mask for 2 channels
                 }
@@ -710,8 +709,8 @@ while (1) {
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)), \
                                  (1, list(staircase_sequence)), \
-                                 (2, list(reversed(staircase_sequence))), \
-                                 (3, list(reversed(staircase_sequence)))]
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(staircase_sequence))]
 
         elif self.cfg_codeword_protocol() == 'novsm_microwave':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
@@ -828,7 +827,15 @@ while (1) {
         if len(valid_delays) == 0:
             raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
 
-        min_valid_delay = min(valid_delays)
+        subseq = [[]]
+        for e in valid_delays:
+            if not subseq[-1] or subseq[-1][-1] == e - 1:
+                subseq[-1].append(e)
+            else:
+                subseq.append([e])
+
+        subseq = max(subseq, key=len)
+        delay = len(subseq)//2 + subseq[0]
 
         # subseq = [[]]
         # for e in valid_delays:
@@ -842,10 +849,10 @@ while (1) {
 
         # Print information
         if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+        if verbose: print("  Setting delay to {}".format(delay))
 
         # And configure the delays
-        self._set_dio_calibration_delay(min_valid_delay)
+        self._set_dio_calibration_delay(delay)
 
         # If successful clear all errors and return True
         self.clear_errors()

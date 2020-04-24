@@ -46,7 +46,7 @@ class Base_LutMan(Instrument):
             initial_value={}, vals=vals.Dict(),
             parameter_class=ManualParameter)
         self.add_parameter('sampling_rate', unit='Hz',
-                           vals=vals.Numbers(1, 1e10),
+                           vals=vals.Numbers(1, 100e10),
                            initial_value=1e9,
                            parameter_class=ManualParameter)
 

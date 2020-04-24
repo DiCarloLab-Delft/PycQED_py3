@@ -1,15 +1,12 @@
 #!/usr/bin/python
 
-### setup logging before all imports (before any logging is done as to prevent a default root logger)
-import CC_logging
-
 import logging
 import sys
 import math
 import numpy as np
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.library.Transport import IPTransport
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 # configure our logger
 log = logging.getLogger('demo_3')
@@ -214,14 +211,14 @@ log.debug('program generated: {} lines, {} bytes'.format(prog.count('\n'), len(p
 
 
 log.debug('connecting to CC')
-cc = QuTechCC('cc', IPTransport(ip))
+cc = CC('cc', IPTransport(ip))
 cc.reset()
 cc.clear_status()
 cc.status_preset()
 
 log.debug('uploading program to CC')
 cc.sequence_program_assemble(prog)
-if cc.get_assembler_error() != 0:
+if cc.get_assembler_success() != 1:
     sys.stderr.write('error log = {}\n'.format(cc.get_assembler_log()))  # FIXME: result is messy
     log.warning('assembly failed')
 else:

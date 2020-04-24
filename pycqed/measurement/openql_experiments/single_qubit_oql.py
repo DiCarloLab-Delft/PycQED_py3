@@ -91,9 +91,10 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     p = oqh.compile(p)
     return p
 
+
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
                            platf_cfg: str, trigger_idx: int,
-                           wait_time_ns: int = 0, cc: str='CCL'):
+                           wait_time_ns: int = 0, cc: str = 'CCL'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and uses the zeroth
@@ -105,15 +106,14 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
 
     nr_clocks = int(spec_pulse_length/20e-9)
     print('Adding {} [ns] to spec seq'.format(wait_time_ns))
-    if cc=='CCL':
+    if cc.upper() == 'CCL':
         spec_instr = 'spec'
-    elif cc=='QCC':
+    elif cc.upper() == 'QCC':
         spec_instr = 'sf_square'
-    elif cc=='CC':
+    elif cc.upper() == 'CC':
         spec_instr = 'spec'
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
-
 
     for i in range(nr_clocks):
         # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
@@ -121,12 +121,13 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         k.gate(spec_instr, [trigger_idx])
     if trigger_idx != qubit_idx:
         k.wait([trigger_idx, qubit_idx], 0)
-    k.wait([qubit_idx],wait_time_ns)
+    k.wait([qubit_idx], wait_time_ns)
     k.measure(qubit_idx)
     p.add_kernel(k)
 
     p = oqh.compile(p)
     return p
+
 
 def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
                        platf_cfg: str, trigger_idx: int):
@@ -154,9 +155,10 @@ def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
     p = oqh.compile(p)
     return p
 
+
 def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
-             equator: bool=False, cal_points: bool=True,
-             ax: str='x', angle: str='180'):
+             equator: bool = False, cal_points: bool = True,
+             ax: str = 'x', angle: str = '180'):
     """
     Generates a flipping sequence that performs multiple pi-pulses
     Basic sequence:
@@ -219,7 +221,7 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
     return p
 
 
-def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
+def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
     """
     Single qubit AllXY sequence.
     Writes output files to the directory specified in openql.
@@ -407,7 +409,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         k.gate('rx180', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
         #k.gate('rx90', [qubit_idx])
-        angle = (i*40)%360
+        angle = (i*40) % 360
         cw_idx = angle//20 + 9
         if angle == 0:
             k.gate('rx90', [qubit_idx])
@@ -515,7 +517,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str):
         on:  (RO) - prepz - x180 - RO
     Args:
         qubit_idx (int) :
-        pulse_comb (str): What pulses to play valid options are
+        pulse_comb (list): What pulses to play valid options are
             "off", "on", "off_on"
         initialize (bool): if True does an extra initial measurement to
             post select data.
@@ -651,10 +653,10 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
 
 def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
                             nr_cliffords, nr_seeds: int,
-                            net_clifford: int=0, restless: bool=False,
-                            program_name: str='randomized_benchmarking',
-                            cal_points: bool=True,
-                            double_curves: bool=False):
+                            net_clifford: int = 0, restless: bool = False,
+                            program_name: str = 'randomized_benchmarking',
+                            cal_points: bool = True,
+                            double_curves: bool = False):
     '''
     Input pars:
         qubit_idx:      int specifying the target qubit (starting at 0)
@@ -684,7 +686,7 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
     i = 0
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
-            k = oqh.create_kernel('RB_{}Cl_s{}'.format(n_cl, seed), p)
+            k = oqh.create_kernel('RB_{}Cl_s{}_{}'.format(n_cl, seed,j), p)
             if not restless:
                 k.prepz(qubit_idx)
             if cal_points and (j == (len(nr_cliffords)-4) or
@@ -712,7 +714,7 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
 
 
 def motzoi_XY(qubit_idx: int, platf_cfg: str,
-              program_name: str='motzoi_XY'):
+              program_name: str = 'motzoi_XY'):
     '''
     Sequence used for calibrating the motzoi parameter.
     Consists of yX and xY
@@ -762,9 +764,9 @@ def Ram_Z(qubit_name,
 
 
 def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
-                          flux_cw: str='fl_cw_02',
+                          flux_cw: str = 'fl_cw_02',
                           qubit_other_idx=0,
-                          cal_points: bool=True):
+                          cal_points: bool = True):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
@@ -773,18 +775,54 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
     # don't use last 4 points if calibration points are used
     if cal_points:
         times = times[:-4]
-    for i_t,t in enumerate(times):
+    for i_t, t in enumerate(times):
         t_nanoseconds = int(round(t/1e-9))
         k = oqh.create_kernel('pi_flux_pi_{}'.format(i_t), p)
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-        k.gate("wait", list(np.arange(17)), 0) #alignment workaround
+        k.gate("wait", [], 0)  # alignment workaround
         # k.gate(flux_cw, [2, 0])
         k.gate('sf_square', [qubit_idx])
         if t_nanoseconds > 10:
             # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
-            k.gate("wait", list(np.arange(17)), t_nanoseconds) #alignment workaround
+            k.gate("wait", [], t_nanoseconds)  # alignment workaround
+            # k.gate("wait", [qubit_idx], t_nanoseconds)
+        k.gate('rx90', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    if cal_points:
+        oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p = oqh.compile(p)
+    return p
+
+
+def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
+                         # flux_cw: str = 'fl_cw_02',
+                         qubit_other_idx=0,
+                         cal_points: bool = True):
+    """
+    A Ramsey sequence with varying waiting times `times`in between.
+    It calibrates the timing between spec and measurement pulse.
+    """
+    p = oqh.create_program('TimingCalibration1D', platf_cfg)
+
+    # don't use last 4 points if calibration points are used
+    if cal_points:
+        times = times[:-4]
+    for i_t, t in enumerate(times):
+        t_nanoseconds = int(round(t/1e-9))
+        k = oqh.create_kernel('pi_times_pi_{}'.format(i_t), p)
+        k.prepz(qubit_idx)
+        k.gate('rx90', [qubit_idx])
+        # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
+        k.gate("wait", [], 0)  # alignment workaround
+        # k.gate(flux_cw, [2, 0])
+        # k.gate('sf_square', [qubit_idx])
+        if t_nanoseconds > 10:
+            # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
+            k.gate("wait", [], t_nanoseconds)  # alignment workaround
             # k.gate("wait", [qubit_idx], t_nanoseconds)
         k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)
@@ -807,7 +845,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
 
-    for i_t,t in enumerate(times):
+    for i_t, t in enumerate(times):
 
         t_nanoseconds = int(round(t/1e-9))
         k = oqh.create_kernel("pi-flux-pi_{}".format(i_t), p)
@@ -899,8 +937,8 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
 def ef_rabi_seq(q0: int,
                 amps: list,
                 platf_cfg: str,
-                recovery_pulse: bool=True,
-                add_cal_points: bool=True):
+                recovery_pulse: bool = True,
+                add_cal_points: bool = True):
     """
     Sequence used to calibrate pulses for 2nd excited state (ef/12 transition)
 
@@ -923,7 +961,7 @@ def ef_rabi_seq(q0: int,
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = oqh.create_kernel("ef_A{}".format(int(abs(1000*amp))), p)
+        k = oqh.create_kernel("ef_A{}".format(int(abs(1000 * amp))), p)
         k.prepz(q0)
         k.gate('rx180', [q0])
         k.gate('cw_{:02}'.format(cw_idx), [q0])
@@ -932,13 +970,13 @@ def ef_rabi_seq(q0: int,
         k.measure(q0)
         p.add_kernel(k)
     if add_cal_points:
-        p = oqh.add_single_qubit_cal_points(p,  qubit_idx=q0)
+        p = oqh.add_single_qubit_cal_points(p, qubit_idx=q0)
 
     p = oqh.compile(p)
 
     if add_cal_points:
-        cal_pts_idx = [amps[-1]+.1, amps[-1]+.15,
-                       amps[-1]+.2, amps[-1]+.25]
+        cal_pts_idx = [amps[-1] + .1, amps[-1] + .15,
+                       amps[-1] + .2, amps[-1] + .25]
     else:
         cal_pts_idx = []
 

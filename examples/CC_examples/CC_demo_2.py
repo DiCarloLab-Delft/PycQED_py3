@@ -1,8 +1,5 @@
 #!/usr/bin/python
 
-### setup logging before all imports (before any logging is done as to prevent a default root logger)
-import CC_logging
-
 ### imports
 import sys
 import os
@@ -10,8 +7,8 @@ import logging
 import numpy as np
 from pathlib import Path
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.library.Transport import IPTransport
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import ZI_HDAWG8
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
@@ -19,9 +16,6 @@ from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO
 
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
-
-from qcodes import station
 
 # configure our logger
 log = logging.getLogger('demo_2')
@@ -149,7 +143,7 @@ for i, dev in enumerate(conf.ro):
     #station.add_component(instr.ro[i])
 
 log.debug('connecting to CC')
-instr.cc = QuTechCC('cc', IPTransport(conf.cc_ip))
+instr.cc = CC('cc', IPTransport(conf.cc_ip))
 instr.cc.reset()
 instr.cc.clear_status()
 instr.cc.status_preset()

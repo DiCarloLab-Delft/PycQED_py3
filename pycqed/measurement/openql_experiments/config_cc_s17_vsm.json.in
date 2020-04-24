@@ -130,9 +130,9 @@
 				"awg8-mw-vsm": {						  // the way the mode above should have been
 					"control_bits": [
 						[7,6,5,4,3,2,1,0],                // group 0
-						[15,14,13,12,11,10,9,8]           // group 1
+						[23,22,21,20,19,18,17,16]           // group 1
 					],
-					"trigger_bits": [31]
+					"trigger_bits": [31,15]
 				},
 				"awg8-mw-direct-iq": {				      // just I&Q to generate microwave without VSM. HDAWG8: "new_novsm_microwave"
 					"control_bits": [
@@ -141,7 +141,7 @@
 						[22,21,20,19,18,17,16],           // group 2. NB: starts at bit 16 so twin-QWG can also support it
 						[29,28,27,26,25,24,23]            // group 4
 					],
-					"trigger_bits": [31]
+					"trigger_bits": [31,15]
 				},
 				"awg8-flux": {							   // ZI_HDAWG8.py::cfg_codeword_protocol() == 'flux'
                     // NB: please note that internally one AWG unit handles 2 channels, which requires special handling of the waveforms
@@ -155,7 +155,7 @@
 						[24,23,22],
 						[27,26,25]                        // group 7
 					],
-					"trigger_bits": [31]
+					"trigger_bits": [31,15]
 				},
 				"awg8-flux-vector-8": {				       // single code word for 8 flux channels. FIXME: no official mode yet
 					"control_bits": [
