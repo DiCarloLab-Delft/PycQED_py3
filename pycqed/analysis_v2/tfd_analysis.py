@@ -730,7 +730,7 @@ class Gibbs_fidelity_analysis(ba.BaseDataAnalysis):
 
 def plot_expectation_values_Gibbs(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'], system_A_qubits=['X1','D3'],
                                   system_B_qubits=['D1', 'Z1'], gibbs_qubits=['X1','D3'], bases = ['Z','X','Y'], ax=None, T:float = None,
-                                  exact_dict:bool = True, non_zero_only=False, **kw):
+                                  exact_dict = None, plot_exact=True, non_zero_only=False, **kw):
     if ax is None:
         f, ax = plt.subplots(figsize=(12,5))
     else:
@@ -744,7 +744,8 @@ def plot_expectation_values_Gibbs(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'
         operators = [key for key in full_dict.keys() if np.round(full_dict[key], 3) != 0]
     else:
         operators = full_dict.keys()
-    exact_dict = {operator_string:hamiltonian.expectation_value(operator(operator_string), hamiltonian.thermal_gibbs_rho(T=T)) for operator_string in operators}
+    if exact_dict == None:
+        exact_dict = {operator_string:hamiltonian.expectation_value(operator(operator_string), hamiltonian.thermal_gibbs_rho(T=T)) for operator_string in operators}
     color_dict = dict()
     labels = [gibbs_qubits[0]+' '+gibbs_qubits[1]]
     color_dict[gibbs_qubits[0]+' '+gibbs_qubits[1]] = 'purple'
@@ -763,7 +764,7 @@ def plot_expectation_values_Gibbs(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'
             color_dict[i] = 'purple'
     for i, op in enumerate(operators):
         ax.bar(i, full_dict[op], color=color_dict[i], align='center', zorder=1)
-        if exact_dict is not None:
+        if plot_exact:
             ax.bar(list(full_dict).index(op), exact_dict[op], fill=False, linestyle='--', edgecolor='black', align='center', zorder = 2)
         ax.set_xticks(np.arange(len(labels)))
         ax.set_xticklabels(labels, rotation=75)
