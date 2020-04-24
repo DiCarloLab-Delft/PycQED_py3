@@ -439,8 +439,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "i.e. going form the interaction pnt on one side of the flux "
                 "arc to the interaction pnt on the other side.",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
-                initial_value=4 / 2.4e9,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=2 / 2.4e9,
                 unit="s",
                 label="Time ramp middle",
             )
@@ -448,8 +448,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "czv_time_ramp_outside_%s" % this_cz,
                 docstring="Time of the NZ pulse ramps at start and end",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
-                initial_value=2 / 2.4e9,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=1 / 2.4e9,
                 unit="s",
                 label="Time ramp outside",
             )
@@ -544,13 +544,31 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Pulse polarity inversion",
             )
             self.add_parameter(
-                "czv_fixed_amp_%s" % this_cz,
-                docstring="",
+                "czv_mirror_sqrs_%s" % this_cz,
+                docstring="Mirrors the two halves with respect to the point "
+                "of amplitude inversion between the two halves.",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=True,
+                label="Mirror squares",
+            )
+            self.add_parameter(
+                "czv_flip_wf_%s" % this_cz,
+                docstring="Flip the entire waveform, only has an effect when "
+                "`czv_mirror_sqrs_` is `False`",
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
                 initial_value=False,
-                label="",
+                label="Time-flipped waveform",
             )
+            # self.add_parameter(
+            #     "czv_fixed_amp_%s" % this_cz,
+            #     docstring="",
+            #     parameter_class=ManualParameter,
+            #     vals=vals.Bool(),
+            #     initial_value=False,
+            #     label="",
+            # )
             self.add_parameter(
                 "czv_correct_q_phase_%s" % this_cz,
                 docstring="",

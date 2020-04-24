@@ -28,9 +28,9 @@ class LearnerND_Minimizer(LearnerND):
     Does everything that the LearnerND does plus wraps it such that
     `mk_optimize_res_loss_func` can be used
 
-    It also accepts using loss fucntions made by
+    It also accepts using loss functions made by
     `mk_non_uniform_res_loss_func` and `mk_vol_limits_loss_func`
-    inluding providing one of the loss functions from
+    including providing one of the loss functions from
     adaptive.learner.learnerND
 
     The resolution loss function in this doc are built such that some
@@ -39,10 +39,10 @@ class LearnerND_Minimizer(LearnerND):
 
     def __init__(self, func, bounds, loss_per_simplex=None):
         super().__init__(func, bounds, loss_per_simplex)
-        # Keep the orignal learner behaviour but pass extra arguments to
+        # Keep the original learner behavior but pass extra arguments to
         # the provided input loss function
         if hasattr(self.loss_per_simplex, "needs_learner_access"):
-            # Save the loss fucntion that requires the learner instance
+            # Save the loss function that requires the learner instance
             input_loss_per_simplex = self.loss_per_simplex
             self.loss_per_simplex = partial(input_loss_per_simplex, learner=self)
 

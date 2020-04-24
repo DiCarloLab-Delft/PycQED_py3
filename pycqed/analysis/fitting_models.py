@@ -600,12 +600,12 @@ def avoided_crossing_freq_shift(flux, a, b, g):
 
     frequencies = np.zeros([len(flux), 2])
     for kk, fl_i in enumerate(flux):
-        f_1 = a*fl_i  +  b
+        f_1 = a * fl_i + b
         f_2 = 0
         matrix = [[f_1, g],
                   [g, f_2]]
         frequencies[kk, :] = np.linalg.eigvalsh(matrix)[:2]
-    result = frequencies[:, 1]- frequencies[:, 0]
+    result = frequencies[:, 1] - frequencies[:, 0]
     return result
 
 
@@ -621,8 +621,11 @@ def ChevronFunc(amp, amp_center_1, amp_center_2, J2, detuning_swt_spt, t):
 
     Assuming we start in |0>, this function returns the population in |1>
 
+    This model approximates the bare detuning with a quadratic dependence
+    on amp.
+
     Args:
-        amp (a.u.): fluxc square pulse amplitude
+        amp (a.u.): flux square pulse amplitude
         amp_center_1 (a.u.): center of the chevron on one side of the flux arc
         amp_center_2 (a.u.): idem
         J2 (Hz): coupling of the interacting states
