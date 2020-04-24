@@ -1344,6 +1344,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
             if case == 'excitation':
                 k.gate('rx180', [q1])
+                k.gate('i', [q0])
+                k.gate("wait", [], 0)
             k.gate('rx90', [q0])
             if not CZ_disabled:
                 k.gate("wait", [], 0) # Empty list generates barrier for all qubits in platf. only works with 0.8.0
@@ -1383,6 +1385,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 k.gate('cw_{:02}'.format(cw_idx), [q0])
             if case == 'excitation':
                 k.gate('rx180', [q1])
+                k.gate('i', [q0])
+                k.gate("wait", [], 0)
 
             k.measure(q0)
             k.measure(q1)

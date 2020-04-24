@@ -46,9 +46,6 @@ except ImportError:
     oqh = None
 
 
-
-
-
 class DeviceCCL(Instrument):
     """
     Device object for systems controlled using the
@@ -335,32 +332,42 @@ class DeviceCCL(Instrument):
 
         # Iterate over keys in dio_map as this ensures only relevant
         # timing setting are set.
-        for lat_key, dio_ch in dio_map.items():
-            lat = latencies[lat_key]
-            lat_coarse = int(lat*1e9 // 20)  # Convert to CC dio value
-            lat_fine = int(lat*1e9 % 20)*1e-9
-            CC.set('dio{}_out_delay'.format(dio_ch), lat_coarse)
 
-            # RO devices do not support fine delay setting.
-            # if 'mw' in lat_key or 'flux' in lat_key:
-            #     # Check name to prevent crash when instrument not specified
-            #     AWG_name = self.get('instr_AWG_{}'.format(lat_key))
-            #     if AWG_name is not None:
-            #         AWG = self.find_instrument(AWG_name)
-            #         using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
-            #         if not using_QWG:
-            #             # All channels are set globally from the device object.
-            #             AWG.stop()
-            #             for i in range(8):  # assumes the AWG is an HDAWG
-            #                 AWG.set('sigouts_{}_delay'.format(i), lat_fine)
-            #             AWG.start()
-            #             ch_not_ready = 8
-            #             while(ch_not_ready > 0):
-            #                 ch_not_ready = 0
-            #                 for i in range(8):
-            #                     ch_not_ready += AWG.geti(
-            #                         'sigouts/{}/busy'.format(i))
-            #                 check_keyboard_interrupt()
+        # RO devices do not support fine delay setting.
+        # if 'mw' in lat_key or 'flux' in lat_key:
+        #     # Check name to prevent crash when instrument not specified
+        #     AWG_name = self.get('instr_AWG_{}'.format(lat_key))
+        #     if AWG_name is not None:
+        #         AWG = self.find_instrument(AWG_name)
+        #         using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+        #         if not using_QWG:
+        #             # All channels are set globally from the device object.
+        #             AWG.stop()
+        #             for i in range(8):  # assumes the AWG is an HDAWG
+        #                 AWG.set('sigouts_{}_delay'.format(i), lat_fine)
+        #             AWG.start()
+        #             ch_not_ready = 8
+        #             while(ch_not_ready > 0):
+        #                 ch_not_ready = 0
+        #                 for i in range(8):
+        #                     ch_not_ready += AWG.geti(
+        #                         'sigouts/{}/busy'.format(i))
+        #                 check_keyboard_interrupt()
+        for q in self.qubits():
+            q_o = self.find_instrument(q)
+            if q_o.instr_LutMan_Flux.get_instr():
+                this_fl = q_o.instr_LutMan_Flux.get_instr()
+                AWG = this_fl.AWG.get_instr()
+                indiv_delay = this_fl.cfg_awg_channel_delay()
+                indiv_ch = this_fl.cfg_awg_channel()-1
+                AWG.stop()
+                AWG.set('sigouts_{}_delay'.format(indiv_ch), indiv_delay)
+                AWG.start()
+                ch_not_ready = True
+                while(ch_not_ready):
+                    ch_not_ready = AWG.geti(
+                            'sigouts/{}/busy'.format(indiv_ch))
+                    check_keyboard_interrupt()
 
     def prepare_fluxing(self, qubits):
         for qb_name in qubits:
@@ -2056,7 +2063,7 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
-            self.prepare_for_timedomain([q0])
+            self.prepare_for_timedomain(q0)
 
         assert q0 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()

@@ -83,7 +83,7 @@ class Gaussian_OptimizationAnalysis(ba.BaseDataAnalysis):
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
-        
+
         self.options_dict['save_figs'] = False
         self.minimize = minimize
         self.numeric_params = []
@@ -92,7 +92,7 @@ class Gaussian_OptimizationAnalysis(ba.BaseDataAnalysis):
             self.save_figures(savedir=self.raw_data_dict['folder'][-1], key_list=[list(self.figs)[-1]], tag_tstamp=None)
             for i, ts in enumerate(self.timestamps):
                 self.save_figures(savedir=self.raw_data_dict['folder'][i], key_list=[list(self.figs)[i]], tag_tstamp=None)
-    
+
     def extract_data(self):
         self.raw_data_dict = dict()
         self.raw_data_dict['timestamps'] = list()
@@ -107,7 +107,7 @@ class Gaussian_OptimizationAnalysis(ba.BaseDataAnalysis):
             # Parts added to be compatible with base analysis data requirements
             self.raw_data_dict['timestamps'].append(ts)
             self.raw_data_dict['folder'].append(os.path.split(data_fp)[0])
-        
+
     def process_data(self):
         self.proc_data_dict = dict()
         for ts in self.timestamps:
@@ -117,7 +117,7 @@ class Gaussian_OptimizationAnalysis(ba.BaseDataAnalysis):
             for i, func_name in enumerate(self.raw_data_dict[ts]['data_settings']['value_names']):
                 self.proc_data_dict[ts]['function_values'][func_name.decode("utf-8") ] = self.raw_data_dict[ts]['data'][:,i+len(self.raw_data_dict[ts]['data_settings']['sweep_parameter_names'])]
             for i, parameter in enumerate(self.raw_data_dict[ts]['data_settings']['sweep_parameter_names']):
-                self.proc_data_dict[ts]['parameter_values'][parameter.decode("utf-8") ] = self.raw_data_dict[ts]['data'][:,i] 
+                self.proc_data_dict[ts]['parameter_values'][parameter.decode("utf-8") ] = self.raw_data_dict[ts]['data'][:,i]
             self.proc_data_dict[ts]['function_units'] = [unit.decode("utf-8") for unit in list(self.raw_data_dict[ts]['data_settings']['value_units'])]
             self.proc_data_dict[ts]['parameter_units'] = [unit.decode("utf-8") for unit in list(self.raw_data_dict[ts]['data_settings']['sweep_parameter_units'])]
             if self.minimize:
@@ -185,8 +185,9 @@ def plot_gaussian_optimization(optimization_dict, ax=None, figsize=None, compare
                     median_range=max(int(len(x_val)*0.01),2)
                     opt_idx = np.where(y_val==optimization_dict[ts]['optimal_values'][functions[i]])[0][0]
                     axis.plot(x_val, np.array([np.median(y_val[max(k-median_range,0):k+median_range]) for k in range(len(x_val))]), zorder=3)
-                    axis.scatter(opt_idx, optimization_dict[ts]['optimal_values'][functions[i]], 
-                               color=axis.get_lines()[-1].get_color(), edgecolor='black', s=100, marker='*', zorder=4, label='{}_{}={}'.format(functions[i], label, round(optimization_dict[ts]['optimal_values'][functions[i]],2)))
+                    axis.scatter(opt_idx, optimization_dict[ts]['optimal_values'][functions[i]],
+                               color=axis.get_lines()[-1].get_color(), edgecolor='black', s=100,
+                               marker='*', zorder=4, label='{}_{}={}'.format(functions[i], label, round(optimization_dict[ts]['optimal_values'][functions[i]],2)))
                 axis.set_ylabel('{} ({})'.format(functions[i], optimization_dict[timestamps[-1]]['function_units'][i]))
             else:
                 y_val = optimization_dict['function_values'][functions[i]]
@@ -196,7 +197,7 @@ def plot_gaussian_optimization(optimization_dict, ax=None, figsize=None, compare
                 axis.plot(x_val, y_val, zorder=1)
                 axis.scatter(x_val, y_val, s=20, zorder=2)
                 axis.plot(x_val, np.array([np.median(y_val[max(k-median_range,0):k+median_range]) for k in range(len(x_val))]), zorder=3)
-                axis.scatter(opt_idx, optimization_dict['optimal_values'][functions[i]], 
+                axis.scatter(opt_idx, optimization_dict['optimal_values'][functions[i]],
                            color='yellow', edgecolor='black', s=100, marker='*', zorder=4, label='{}={}'.format(functions[i],round(optimization_dict['optimal_values'][functions[i]],2)))
                 axis.set_ylabel('{} ({})'.format(functions[i], optimization_dict['function_units'][i]))
             axis.set_xlabel('iterations (#)')
@@ -207,7 +208,7 @@ def plot_gaussian_optimization(optimization_dict, ax=None, figsize=None, compare
             axis.plot(x_val, y_val)
             axis.scatter(x_val, y_val, s=20, zorder=2)
             axis.plot(x_val, np.array([np.median(y_val[max(k-median_range,0):k+median_range]) for k in range(len(x_val))]), zorder=3)
-            axis.scatter(opt_idx, optimization_dict['optimal_parameters'][parameters[j]], 
+            axis.scatter(opt_idx, optimization_dict['optimal_parameters'][parameters[j]],
                        color='yellow', edgecolor='black', s=100, marker='*', zorder=4, label='{}={}'.format(parameters[j],round(optimization_dict['optimal_parameters'][parameters[j]],2)))
             axis.set_xlabel('iterations (#)')
             axis.set_ylabel('{} ({})'.format(parameters[j], optimization_dict['parameter_units'][j]))
