@@ -335,47 +335,6 @@ class DeviceCCL(Instrument):
             ), "Key `{}` must start with:" " `{}`!".format(key, list(allowed_keys))
         return dio_map_dict
 
-<<<<<<< HEAD
-    def _get_dio_map(self):
-        # FIXME: assumes single mapping for instrument
-        cc = self.instr_CC.get_instr()
-        if isinstance(cc, CCL):
-            dio_map = {'ro_0': 1,
-                       'ro_1': 2,
-                       'flux_0': 3,
-                       'mw_0': 4,
-                       'mw_1': 5}
-        elif isinstance(cc, QCC):
-            dio_map = {'ro_0': 1,
-                       'ro_1': 2,
-                       'ro_2': 3,
-                       'mw_0': 4,
-                       'mw_1': 5,
-                       'flux_0': 6,
-                       'flux_1': 7,
-                       'flux_2': 8,
-                       'mw_2': 9,
-                       'mw_3': 10,
-                       'mw_4': 11
-                       }
-        elif isinstance(cc, CC):
-            # NB: we number from 0 in accordance with CC driver (which adheres to hardware slot numbering)
-            # NB: slot 5 contains VSM interface
-            dio_map = {'ro_0': 0,
-                       'ro_1': 1,
-                       'ro_2': 2,
-                       'mw_0': 3,
-                       'mw_1': 4,
-                       'flux_0': 6,
-                       'flux_1': 7,
-                       'flux_2': 8,
-                       }
-        else:
-            return ValueError('CC type not recognized')
-        return dio_map
-
-=======
->>>>>>> develop
     def _grab_instruments_from_qb(self):
         """
         initialize instruments that should only exist once from the first
