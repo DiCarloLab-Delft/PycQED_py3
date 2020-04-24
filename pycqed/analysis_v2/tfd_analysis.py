@@ -410,7 +410,7 @@ def plot_TFD_versus_T(tomo_dict, operators=None, beta=False, ax=None, ax_dict=No
 
 
 """
-Fidelity analysis functions added 02-25-2020
+Fidelity analysis functions
 """
 
 
@@ -420,10 +420,10 @@ def operator(operator_string):
     Outputs an array of the crossproduct of the corresponding operators
     """
     #Pauli matrices
-    I=np.array([[1.,0],[0,1.]])/2
-    X=np.array([[0,1.],[1.,0]])/2
-    Y=np.array([[0,0+-1.j],[0+1.j,0]])/2
-    Z=np.array([[1,0],[0,-1]])/2
+    I=np.array([[1.,0],[0,1.]])/1
+    X=np.array([[0,1],[1,0]])/1
+    Y=np.array([[0,0+-1j],[0+1j,0]])/1
+    Z=np.array([[1,0],[0,-1]])/1
     full_operator=1
     for operator in operator_string:
         if operator == 'I':
@@ -442,9 +442,9 @@ def operator(operator_string):
     return full_operator
 
 def vec2dm(vec):
-    vec = vec.reshape(len(vec), 1)
-    vec_transpose = vec.reshape(1, len(vec))
-    rho = np.dot(vec, vec_transpose)
+    vec=vec.reshape(len(vec), 1)
+    vec_transpose=vec.reshape(1, len(vec))
+    rho = np.dot(vec,vec_transpose)
     return rho
 
 def vecs2mat(vec1,vec2):
@@ -457,42 +457,52 @@ def vecs2mat(vec1,vec2):
 
 def fidelity(rho_1, rho_2, trace_conserved = False):
     if trace_conserved:
-        if np.round(np.trace(rho_1), 3) !=1:
+        if np.round(np.trace(rho_1),3)!=1:
             raise ValueError('rho_1 unphysical, trace =/= 1, but ', np.trace(rho_1))
-        if np.round(np.trace(rho_2), 3) !=1:
+        if np.round(np.trace(rho_2),3)!=1:
             raise ValueError('rho_2 unphysical, trace =/= 1, but ', np.trace(rho_2))
-    sqrt_rho_1 = linalg.sqrtm(rho_1)
-    eig_vals = linalg.eig(np.dot(np.dot(sqrt_rho_1,rho_2),sqrt_rho_1))[0]
+    sqrt_rho_1=linalg.sqrtm(rho_1)
+    eig_vals=linalg.eig(np.dot(np.dot(sqrt_rho_1,rho_2),sqrt_rho_1))[0]
+    for e in eig_vals:
+        if round(e,6)<0:
+            print('### Negative eigen-value: {}'.format(e))
+#     print('### Minimal eigen-value: {}'.format(min(eig_vals)))
     pos_eig = [vals for vals in eig_vals if vals > 0]
     return float(np.sum(np.real(np.sqrt(pos_eig))))**2
 
 def trace_distance(rho_1, rho_2):
     """
-    To be constructed
+    Trace distance
     """
-    return
+    dif = rho_1 - rho_2
+    return 0.5*np.real_if_close(np.trace(linalg.sqrtm(np.transpose(np.conjugate(dif))@dif)))
 
+def purity(rho):
+    """
+    Implements purity Tr(rho^2)
+    """
+    return np.real_if_close(np.trace(np.dot(rho,rho)))
 def tomo2dm(tomo_dict):
     num_qubits = len(list(tomo_dict.keys())[0])
     dim = 2**num_qubits
-    dm = np.zeros((dim,dim), dtype=np.complex128)
+    dm = np.zeros((dim,dim), dtype=complex)
     for op, value in tomo_dict.items():
-        dm += value*operator(op)
+        dm += value*operator(op)/dim
     return dm
 
 class Hamiltonian:
     def __init__(self, hamiltonian=operator('ZZ')+operator('XI')+operator('IX')):
         self.hamiltonian = hamiltonian
         self.dim = len(hamiltonian)
-
+    
     def eigen_values(self):
-        eigen_values = np.linalg.eig(self.hamiltonian)[0]
+        eigen_values = np.linalg.eig(self.hamiltonian)[0] 
         return eigen_values
-
+    
     def eigen_vectors(self):
         eigen_vectors = np.linalg.eig(self.hamiltonian)[1]
         return eigen_vectors
-
+    
     def eigen_dict(self):
         eigen_dict=dict()
         eigen_values, eigen_vectors = np.linalg.eig(self.hamiltonian)
@@ -501,7 +511,7 @@ class Hamiltonian:
             eigen_dict[n].append(eigen_values[n])
             eigen_dict[n].append(eigen_vectors[:,n])
         return eigen_dict
-
+    
     def thermal_gibbs_rho(self, T):
         if np.round(T, 6) == 0:
             raise ValueError('Temperature can not be zero')
@@ -510,7 +520,7 @@ class Hamiltonian:
             vec = self.eigen_vectors()[:,n].reshape(self.dim,1)
             rho += np.exp(-self.eigen_values()[n]/T)*np.dot(vec,np.transpose(vec))
         return np.round(rho/np.trace(rho),6)
-
+    
     def TFD_state(self, T):
         if np.round(T, 6) == 0:
             raise ValueError('Temperature can not be zero')
@@ -520,13 +530,13 @@ class Hamiltonian:
             psi += np.exp(-self.eigen_values()[n]/(2*T))*np.kron(vec,vec)
         psi_norm=np.linalg.norm(psi)
         return np.transpose(psi)/psi_norm
-
+    
     def TFD_rho(self, T):
         vec=self.TFD_state(T).reshape(self.dim**2,1)
         vec_transpose=self.TFD_state(T).reshape(1,self.dim**2)
         rho = np.dot(vec,vec_transpose)
         return rho
-
+    
     def plot_non_zero_pauli_terms(self, pauli_dict,T):
         new_dict = pauli_dict.copy()
         pauli_set = ['I', 'X', 'Y', 'Z']
@@ -534,9 +544,9 @@ class Hamiltonian:
             PiPj = []
             for Pi in pauli_set:
                 for Pj in pauli_set:
-                    PiPj.append(Pi+Pj)
+                    PiPj.append(Pi+Pj) 
             for i, term in enumerate(PiPj):
-                if np.round(np.sum(np.abs(new_dict[term])),6) == 0:
+                if np.round(np.sum(np.abs(new_dict[term])),6) == 0:     
                     del new_dict[term]
         elif len(pauli_dict) == 256:
             PiPjPkPl = []
@@ -544,9 +554,9 @@ class Hamiltonian:
                 for Pj in pauli_set:
                     for Pk in pauli_set:
                         for Pl in pauli_set:
-                            PiPjPkPl.append(Pi+Pj+Pk+Pl)
+                            PiPjPkPl.append(Pi+Pj+Pk+Pl) 
             for i, term in enumerate(PiPjPkPl):
-                if np.round(np.sum(np.abs(new_dict[term])),6) == 0:
+                if np.round(np.sum(np.abs(new_dict[term])),6) == 0:     
                     del new_dict[term]
         else:
             raise ValueError('Not all pauli terms in dictionary')
@@ -556,12 +566,12 @@ class Hamiltonian:
         axs.legend()
         axs.set_ylabel('Pauli terms')
         axs.set_xlabel('1/T')
-
+    
     def expectation_value(self, operator, rho):
         if len(operator) != len(rho):
             raise ValueError('Operator and density matrix must be have same dimensions')
         return np.round(np.real(np.trace(np.dot(operator, rho))),6)
-
+    
     def pauli_vector_gibbs(self, T, plot=False):
         if self.dim != 4:
             raise ValueError('Only for 4x4 Hamiltonian')
@@ -575,12 +585,12 @@ class Hamiltonian:
                 if np.sqrt(np.size(T)) > 1:
                     for Ti in T:
                         pauli_dict[Pi+Pj].append(self.expectation_value(PiPj, self.thermal_gibbs_rho(Ti)))
-                else:
+                else:                    
                     pauli_dict[Pi+Pj].append(self.expectation_value(PiPj, self.thermal_gibbs_rho(T)))
         if plot:
             self.plot_non_zero_pauli_terms(pauli_dict, T)
         return pauli_dict
-
+    
     def pauli_vector_TFD(self, T, plot=False):
         if self.dim**2 != 16:
             raise ValueError('Only for 16x16 Hamiltonian')
@@ -596,7 +606,7 @@ class Hamiltonian:
                         if np.sqrt(np.size(T)) > 1:
                             for Ti in T:
                                 pauli_dict[Pi+Pj+Pk+Pl].append(self.expectation_value(PiPjPkPl, np.dot(self.TFD_state(Ti),np.transpose(self.TFD_state(Ti)))))
-                        else:
+                        else:                    
                             pauli_dict[Pi+Pj+Pk+Pl].append(self.expectation_value(PiPjPkPl, np.dot(self.TFD_state(Ti),np.transpose(self.TFD_state(T)))))
         if plot:
             self.plot_non_zero_pauli_terms(pauli_dict, T)
