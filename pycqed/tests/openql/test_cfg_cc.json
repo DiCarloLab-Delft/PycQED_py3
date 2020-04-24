@@ -191,7 +191,7 @@
 
             // Signal library that gate definitions can refer to.
             // Sub keys for "signals":
-            // - <key>                      a name which can be referred to from key 'instructions/<>/cc/signal_ref'
+            // - <key>                      a name which can be referred to from key 'instructions/<>/cc/ref_signal'
             // - <key>/*                    see 'instructions/<>/cc/signal'
             // NB: our JSON library does not yet support JSON pointers like:
             // "signal": {"$ref": "#/hardware_settings/eqasm_backend_cc/signals/single-qubit-mw"}
@@ -233,7 +233,7 @@
 				{
 					"name": "ro_0",
                     "qubits": [[6], [11], [], [], [], [], [], [], []],
-                    "ref_signals_type": "measure",
+                    "signal_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
 					"controller": {
@@ -245,7 +245,7 @@
 				{
 					"name": "ro_1",
                     "qubits": [[0], [1], [2], [3], [7], [8], [12], [13], [15]],
-                    "ref_signals_type": "measure",
+                    "signal_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
 					"controller": {
@@ -257,7 +257,7 @@
 				{
 					"name": "ro_2",
                     "qubits": [[4], [5], [9], [10], [14], [16], [], [], []],
-                    "ref_signals_type": "measure",
+                    "signal_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
 					"controller": {
@@ -275,7 +275,7 @@
                         [2, 8, 14],                                         // [freq L]
                         [1, 4, 6, 10, 12, 15]                               // [freq H]
                     ],
-                    "ref_signals_type": "mw",
+                    "signal_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-mw-vsm-hack",
 					"controller": {
@@ -290,7 +290,7 @@
                         [0, 5, 9, 13],                                      // [freq Mg]
                         [3, 7, 11, 16]                                      // [freq My]
                     ],
-                    "ref_signals_type": "mw",
+                    "signal_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-mw-vsm-hack",
 					"controller": {
@@ -309,7 +309,7 @@
                         [0], [5], [9], [13], [], [], [], [],                // [freq Mg]
                         [3], [7], [11], [16], [], [], [], []                // [freq My]
                     ],
-                    "ref_signals_type": "switch",
+                    "signal_type": "switch",
 					"ref_instrument_definition": "qutech-vsm",
                     "ref_control_mode": "vsm-32ch",
 					"controller": {
@@ -323,7 +323,7 @@
 				{
 					"name": "flux_0",
                     "qubits": [[0], [1], [2], [3], [4], [5], [6], [7]],
-                    "ref_signals_type": "flux",
+                    "signal_type": "flux",
 					"ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-flux",
 //                    "ref_control_mode": "awg8-flux-vector-8",
@@ -336,7 +336,7 @@
 				{
 					"name": "flux_1",
                     "qubits": [[8], [9], [10], [11], [12], [13], [14], [15]],
-                    "ref_signals_type": "flux",
+                    "signal_type": "flux",
 					"ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-flux",
 //                    "ref_control_mode": "awg8-flux-vector-8",
@@ -349,7 +349,7 @@
 				{
 					"name": "flux_2",
                     "qubits": [[16], [], [], [], [], [], [], []],
-                    "ref_signals_type": "flux",
+                    "signal_type": "flux",
 					"ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-flux",
 //                    "ref_control_mode": "awg8-flux-vector-8",
@@ -433,7 +433,7 @@
     //                                  * {instrumentName}
     //                                  * {instrumentGroup}
     //                                  * {qubit}
-    // - <key>/cc/signal_ref            reference to key 'signals/<value> instead of '<key>/cc/signal'
+    // - <key>/cc/ref_signal            reference to key 'signals/<value> instead of '<key>/cc/signal'
     //
     //
     // FIXME: allow AWG8 setPrecompClear with wave
@@ -447,7 +447,7 @@
             "type": "mw",
             "cc_light_instr": "i",
             "cc": {
-//                "signal_ref": "single-qubit-mw",
+//                "ref_signal": "single-qubit-mw",
                 "signal": [],   // no signal, to prevent conflicts with other gates (NB: will output nothing because VSM stays off)
                 "static_codeword_override": 0
             }
@@ -458,7 +458,7 @@
             "type": "mw",
             "cc_light_instr": "x",
             "cc": {
-                "signal_ref": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
+                "ref_signal": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
                 "static_codeword_override": 1
             }
         },
@@ -468,7 +468,7 @@
             "type": "mw",
             "cc_light_instr": "y",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 2
             }
         },
@@ -478,7 +478,7 @@
             "type": "mw",
             "cc_light_instr": "x90",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 3
             }
         },
@@ -488,7 +488,7 @@
             "type": "mw",
             "cc_light_instr": "y90",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 4
             }
         },
@@ -498,7 +498,7 @@
             "type": "mw",
             "cc_light_instr": "xm90",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 5
             }
         },
@@ -508,7 +508,7 @@
             "type": "mw",
             "cc_light_instr": "ym90",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 6
             }
         },
@@ -522,7 +522,7 @@
             "type": "flux",
             "cc_light_instr": "cz",
             "cc": {
-                "signal_ref": "two-qubit-flux",     // NB: reference, instead of defining "signal" here
+                "ref_signal": "two-qubit-flux",     // NB: reference, instead of defining "signal" here
                 "static_codeword_override": 1
             }
         },
@@ -590,7 +590,7 @@
 			"type": "readout",
 			"cc_light_instr": "prepz",
             "cc": {
-//                "signal_ref": "single-qubit-mw"
+//                "ref_signal": "single-qubit-mw"
                 "signal": [],    // FIXME: no signal, pycQED::test_multi_qubit_oql_CC.py fails otherwise on scheduling issues
                 "static_codeword_override": 0   // FIXME
             }
@@ -620,7 +620,7 @@
             "type": "mw",
             "cc_light_instr": "square",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 0
             }
         },
@@ -630,7 +630,7 @@
             "type": "mw",
             "cc_light_instr": "spec",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 0
             }
         },
@@ -640,7 +640,7 @@
             "type": "mw",
             "cc_light_instr": "rx12",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 0
             }
         },
@@ -651,7 +651,7 @@
             "type": "mw",
             "cc_light_instr": "cw_00",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 0
             }
         },
@@ -661,7 +661,7 @@
             "type": "mw",
             "cc_light_instr": "cw_01",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 1
             }
         },
@@ -671,7 +671,7 @@
             "type": "mw",
             "cc_light_instr": "cw_02",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 2
             }
         },
@@ -681,7 +681,7 @@
             "type": "mw",
             "cc_light_instr": "cw_03",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 3
             }
         },
@@ -691,7 +691,7 @@
             "type": "mw",
             "cc_light_instr": "cw_04",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 4
             }
         },
@@ -701,7 +701,7 @@
             "type": "mw",
             "cc_light_instr": "cw_05",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 5
             }
         },
@@ -711,7 +711,7 @@
             "type": "mw",
             "cc_light_instr": "cw_06",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 6
             }
         },
@@ -721,7 +721,7 @@
             "type": "mw",
             "cc_light_instr": "cw_07",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 7
             }
         },
@@ -731,7 +731,7 @@
             "type": "mw",
             "cc_light_instr": "cw_08",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 8
             }
         },
@@ -741,7 +741,7 @@
             "type": "mw",
             "cc_light_instr": "cw_09",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 9
             }
         },
@@ -751,7 +751,7 @@
             "type": "mw",
             "cc_light_instr": "cw_10",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 10
             }
         },
@@ -761,7 +761,7 @@
             "type": "mw",
             "cc_light_instr": "cw_11",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 11
             }
         },
@@ -771,7 +771,7 @@
             "type": "mw",
             "cc_light_instr": "cw_12",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 12
             }
         },
@@ -781,7 +781,7 @@
             "type": "mw",
             "cc_light_instr": "cw_13",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 13
             }
         },
@@ -791,7 +791,7 @@
             "type": "mw",
             "cc_light_instr": "cw_14",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 14
             }
         },
@@ -801,7 +801,7 @@
             "type": "mw",
             "cc_light_instr": "cw_15",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 15
             }
         },
@@ -811,7 +811,7 @@
             "type": "mw",
             "cc_light_instr": "cw_16",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 16
             }
         },
@@ -821,7 +821,7 @@
             "type": "mw",
             "cc_light_instr": "cw_17",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 17
             }
         },
@@ -831,7 +831,7 @@
             "type": "mw",
             "cc_light_instr": "cw_18",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 18
             }
         },
@@ -841,7 +841,7 @@
             "type": "mw",
             "cc_light_instr": "cw_109",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 19
             }
         },
@@ -851,7 +851,7 @@
             "type": "mw",
             "cc_light_instr": "cw_20",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 20
             }
         },
@@ -861,7 +861,7 @@
             "type": "mw",
             "cc_light_instr": "cw_21",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 21
             }
         },
@@ -871,7 +871,7 @@
             "type": "mw",
             "cc_light_instr": "cw_22",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 22
             }
         },
@@ -881,7 +881,7 @@
             "type": "mw",
             "cc_light_instr": "cw_23",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 23
             }
         },
@@ -891,7 +891,7 @@
             "type": "mw",
             "cc_light_instr": "cw_24",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 24
             }
         },
@@ -901,7 +901,7 @@
             "type": "mw",
             "cc_light_instr": "cw_25",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 25
             }
         },
@@ -911,7 +911,7 @@
             "type": "mw",
             "cc_light_instr": "cw_26",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 26
             }
         },
@@ -921,7 +921,7 @@
             "type": "mw",
             "cc_light_instr": "cw_27",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 27
             }
         },
@@ -931,7 +931,7 @@
             "type": "mw",
             "cc_light_instr": "cw_28",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 28
             }
         },
@@ -941,7 +941,7 @@
             "type": "mw",
             "cc_light_instr": "cw_29",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 29
             }
         },
@@ -951,7 +951,7 @@
             "type": "mw",
             "cc_light_instr": "cw_30",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 30
             }
         },
@@ -961,7 +961,7 @@
             "type": "mw",
             "cc_light_instr": "cw_31",
             "cc": {
-                "signal_ref": "single-qubit-mw",
+                "ref_signal": "single-qubit-mw",
                 "static_codeword_override": 31
             }
         },
@@ -973,7 +973,7 @@
             "type": "flux",
             "cc_light_instr": "fl_cw_00",
             "cc": {
-                "signal_ref": "two-qubit-flux",
+                "ref_signal": "two-qubit-flux",
                 "static_codeword_override": 0
             }
         },
@@ -983,7 +983,7 @@
             "type": "flux",
             "cc_light_instr": "fl_cw_01",
             "cc": {
-                "signal_ref": "two-qubit-flux",
+                "ref_signal": "two-qubit-flux",
                 "static_codeword_override": 1
             }
         },
@@ -993,7 +993,7 @@
             "type": "flux",
             "cc_light_instr": "fl_cw_02",
             "cc": {
-                "signal_ref": "two-qubit-flux",
+                "ref_signal": "two-qubit-flux",
                 "static_codeword_override": 2
             }
         },
@@ -1003,7 +1003,7 @@
             "type": "flux",
             "cc_light_instr": "fl_cw_03",
             "cc": {
-                "signal_ref": "two-qubit-flux",
+                "ref_signal": "two-qubit-flux",
                 "static_codeword_override": 3
             }
         },
@@ -1013,7 +1013,7 @@
             "type": "flux",
             "cc_light_instr": "fl_cw_04",
             "cc": {
-                "signal_ref": "two-qubit-flux",
+                "ref_signal": "two-qubit-flux",
                 "static_codeword_override": 4
             }
         },
@@ -1023,7 +1023,7 @@
             "type": "flux",
             "cc_light_instr": "fl_cw_05",
             "cc": {
-                "signal_ref": "two-qubit-flux",
+                "ref_signal": "two-qubit-flux",
                 "static_codeword_override": 5
             }
         },
@@ -1033,7 +1033,7 @@
             "type": "flux",
             "cc_light_instr": "fl_cw_06",
             "cc": {
-                "signal_ref": "two-qubit-flux",
+                "ref_signal": "two-qubit-flux",
                 "static_codeword_override": 6
             }
         },
@@ -1043,7 +1043,7 @@
             "type": "flux",
             "cc_light_instr": "fl_cw_07",
             "cc": {
-                "signal_ref": "two-qubit-flux",
+                "ref_signal": "two-qubit-flux",
                 "static_codeword_override": 7
             }
         }

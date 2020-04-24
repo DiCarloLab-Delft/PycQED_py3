@@ -2,10 +2,9 @@
 
 import logging
 import sys
-from random import randint
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.library.Transport import IPTransport
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 
 # parameter handling
@@ -26,7 +25,7 @@ log.setLevel(logging.DEBUG)
 
 
 print('connecting to CC')
-cc = QuTechCC('cc', IPTransport(ip))
+cc = CC('cc', IPTransport(ip))
 cc.reset()
 cc.clear_status()
 cc.status_preset()

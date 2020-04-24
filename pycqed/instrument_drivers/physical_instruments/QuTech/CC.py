@@ -1,8 +1,8 @@
 """
-    File:               QuTechCC.py
-    Author:             Wouter Vlothuizen, QuTech
-    Purpose:            Python control of Qutech Central Controller: adds application dependent stuff to QuTechCC_core
-    Notes:              use QuTechCC_core to talk to instrument, do not add knowledge of SCPI syntax here
+    File:       CC.py
+    Author:     Wouter Vlothuizen, QuTech
+    Purpose:    QCoDeS instrument driver for Qutech Central Controller: adds application dependent stuff to CCCore
+    Notes:      use CCCore to talk to instrument, do not add knowledge of SCPI syntax here
     Usage:
     Bugs:
     - _ccio_slots_driving_vsm not handled correctly
@@ -11,38 +11,28 @@
 """
 
 import logging
-from typing import List
-from .QuTechCC_core import QuTechCC_core
-from .Transport import Transport
+import numpy as np
+import inspect
+from typing import Tuple,List
+
+from .CCCore import CCCore
+from pycqed.instrument_drivers.library.Transport import Transport
+import pycqed.instrument_drivers.library.DIO as DIO
 
 from qcodes.utils import validators as vals
 from qcodes import Instrument
 
 log = logging.getLogger(__name__)
 
-_cc_prog_dio_cal_microwave = """
-# staircase program for HDAWG microwave mode, CW_1 31->1, CW_2 1->31
-.DEF        cw_31_01        0x80003E01      # TRIG=1(0x80000000), CW_1=31(0x00003E00), CW_2=1(0x00000001)
-.DEF        incr            0xFFFFFE01      # CW_1--, CW_2++
-.DEF        duration        4
-repeat:     move            $cw_31_01,R0
-            move            31,R1           # loop counter
-inner:      seq_out         R0,$duration
-            add             R0,$incr,R0
-            loop            R1,@inner
-            jmp             @repeat
-"""
 
-
-
-class QuTechCC(QuTechCC_core, Instrument):
+class CC(CCCore, Instrument, DIO.CalInterface):
     def __init__(self,
                  name: str,
                  transport: Transport,
                  num_ccio: int=9,
                  ccio_slots_driving_vsm: List[int] = None  # NB: default can not be '[]' because that is a mutable default argument
                  ) -> None:
-        super().__init__(name, transport) # calls QuTechCC_core
+        super().__init__(name, transport) # calls CCCore
         Instrument.__init__(self, name) # calls Instrument
 
         # user constants
@@ -168,11 +158,11 @@ class QuTechCC(QuTechCC_core, Instrument):
     def _eqasm_program(self, file_name: str) -> None:
         with open(file_name, 'r') as f:
             prog = f.read()
-        self.sequence_program_assemble(prog)
+        self.assemble(prog)
 
     # helper for parameter 'vsm_channel_delay{}'
     # NB: CC-light range max = 127*2.5 ns = 317.5 ns, our fine delay range is 48/1200 MHz = 40 ns, so we must also shift program
-    # NB: supports one VSM only, no intend to upgrade
+    # NB: supports one VSM only, no intend to upgrade that for now
     def _set_vsm_channel_delay(self, bit: int, cnt_in_2ns5_steps: int) -> None:
         delay_ns = cnt_in_2ns5_steps * 2.5
         cnt_in_20ns_steps = int(delay_ns // 20)
@@ -186,37 +176,132 @@ class QuTechCC(QuTechCC_core, Instrument):
         self.stop()
         self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)
         self.start()
+        # FIXME: assumes Q1 was running, and has valid program
+        # FIXME: stop/start can be removed when we switch to setSeqBarCnt
 
     ##########################################################################
-    # DIO calibration support for connected instruments
+    # overrides for CalInterface interface
+    # FIXME: move to CCCore? or CC_DIOCAL
     ##########################################################################
 
-    def output_dio_calibration_data(self, dio_mode, port=None):
-        if dio_mode == "microwave":
-            cc_prog = _cc_prog_dio_cal_microwave
-        elif dio_mode == "new_microwave":
-            # FIXME
-            pass
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        self.calibrate_dio(port, expected_bits=dio_mask)
+
+    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+        # default return values
+        expected_sequence = []
+        dio_mask = 0x00000000
+
+
+        if dio_mode == "microwave":  # 'new' QWG compatible microwave mode
+            # based on ElecPrj_CC:src/q1asm/qwg_staircase.q1asm
+            # FIXME: tests 5 of 8 bits only
+            cc_prog = """
+            ### DIO protocol definition:
+            # DIO           QWG             AWG8        note
+            # ------------- --------------- ----------- ------------------
+            # DIO[31]       TRIG_2          TRIG
+            # DIO[30]       TOGGLE_DS_2 	TOGGLE_DS   hardware generated
+            # DIO[23:16]    CW_2		    CW_2
+            # DIO[15]       TRIG_1          unused
+            # DIO[14]       TOGGLE_DS_1     unused
+            # DIO[7:0]      CW_1		    CW_1
+            #
+            
+            .DEF 		cw_31_01	0x801F8001          # TRIG_2, CW_2=31, TRIG_1, CW_1=1
+            .DEF 		incr		0xFFFF0001          # CW_2++, CW_1--: -0x00010000 + 0x00000001
+            .DEF		duration	4			        # 20 ns periods
+            .DEF 		loopCnt		31               	# 
+            
+            repeat:
+                    move		$cw_31_01,R0
+                    move		$loopCnt,R1               	# loop counter
+            inner:	seq_out		R0,$duration
+                    add		    R0,$incr,R0
+                    loop		R1,@inner
+                    jmp		    @repeat
+            """
+            sequence_length = 32
+            staircase_sequence = range(0, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence)),
+                                 (1, list(staircase_sequence)),
+                                 (2, list(staircase_sequence)),
+                                 (3, list(staircase_sequence))]
+            dio_mask = 0x80FF80FF  # TRIG=0x8000000, TRIG_1=0x00008000, CWs=0x00FF00FF
+
+
         elif dio_mode == "new_novsm_microwave":
-            # FIXME
-            pass
+            raise NotImplementedError  # FIXME
+
+
         elif dio_mode == "flux":
-            # FIXME
-            pass
+            # based on ZI_HDAWG8.py::_prepare_CC_dio_calibration_hdawg and examples/CC_examples/flux_calibration.vq1asm
+            #
+            cc_prog = """
+            # CC_BACKEND_VERSION 0.2.4
+            # OPENQL_VERSION 0.8.0
+            # Program: 'CW_RO_sequence'
+            # Note:    generated by OpenQL Central Controller backend
+            #
+            # synchronous start and latency compensation
+                            add             R63,1,R0                # R63 externally set by user, prevent 0 value which would wrap counter
+                            seq_bar         20                      # synchronization
+            syncLoop:       seq_out         0x00000000,1            # 20 ns delay
+                            loop            R0,@syncLoop            #
+            mainLoop:                                               #
+            ### Kernel: 'k_main'
+            ## Bundle 0: start_cycle=1, duration_in_cycles=300:
+             # READOUT: measure(q0)
+              # slot=1, instrument='ro_1', group=0': signal='[dummy]'
+             # last bundle of kernel, will pad outputs to match durations
+              # slot=1, instrument='ro_1': lastStartCycle=0, start_cycle=1, slotDurationInCycles=300
+            [1]             seq_out         0x00000000,301          # cycle 0-301: padding on 'ro_2'
+            [2]             seq_out         0x00000000,301          # cycle 0-301: padding on 'mw_0'
+            [3]             seq_out         0x00000000,301          # cycle 0-301: padding on 'flux_0'
+            [4]             seq_out         0x00000000,301          # cycle 0-301: padding on 'mw_1'
+            # sequence
+            [6]             seq_out         0x00000000,20           # 00000000000000000000000000000000
+            [6]             seq_out         0x82498249,2            # 10000010010010011000001001001001
+            [6]             seq_out         0x84928492,2            # 10000100100100101000010010010010
+            [6]             seq_out         0x86DB86DB,2            # 10000110110110111000011011011011
+            [6]             seq_out         0x89248924,2            # 10001001001001001000100100100100
+            [6]             seq_out         0x8B6D8B6D,2            # 10001011011011011000101101101101
+            [6]             seq_out         0x8DB68DB6,2            # 10001101101101101000110110110110
+            [6]             seq_out         0x8FFF8FFF,2            # 10001111111111111000111111111111
+            
+                            jmp             @mainLoop               # loop indefinitely
+            """
+
+            sequence_length = 8
+            staircase_sequence = np.arange(1, sequence_length)
+            # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
+            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))),
+                                 (1, list(staircase_sequence + (staircase_sequence << 3))),
+                                 (2, list(staircase_sequence + (staircase_sequence << 3))),
+                                 (3, list(staircase_sequence+ (staircase_sequence << 3)))]
+            dio_mask = 0x8FFF8FFF
+
+
+        elif dio_mode == "uhfqa":  # FIXME: no official mode yet
+            # Based on UHFQuantumController.py::_prepare_CC_dio_calibration_uhfqa and  and examples/CC_examples/uhfqc_calibration.vq1asm
+            cc_prog = inspect.cleandoc("""
+            mainLoop:   seq_out         0x03FF0000,1        # TRIG=0x00010000, CW[8:0]=0x03FE0000
+                        seq_out         0x00000000,10
+                        jmp             @mainLoop
+            """)
+
+            dio_mask = 0x03ff0000
         else:
             raise ValueError("unsupported DIO mode")
 
         log.debug(f"uploading DIO calibration program for mode '{dio_mode}' to CC")
-        self.sequence_program_assemble(cc_prog)
-        log.debug("printing CC errors")
-        err_cnt = self.get_system_error_count()
-        if err_cnt > 0:
-            log.warning('CC status after upload')
-        for i in range(err_cnt):
-            print(self.get_error())
-        self.start()
-        log.debug('starting CC')
+        self.assemble_and_start(cc_prog)
 
+        return dio_mask,expected_sequence
+
+##########################################################################
+# helpers
+##########################################################################
 
 # helpers for Instrument::add_parameter.set_cmd
 def _gen_set_func_1par(fun, par1):
@@ -242,4 +327,3 @@ def _gen_get_func_2par(fun, par1, par2):
     def get_func():
         return fun(par1, par2)
     return get_func
-

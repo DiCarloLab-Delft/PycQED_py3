@@ -2,12 +2,14 @@ import re
 import logging
 import numpy as np
 from os.path import join, dirname
-from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
+
+from pycqed.utilities.general import suppress_stdout
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import is_more_rencent
+
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform, CReg, Operation
 
@@ -82,13 +84,20 @@ def compile(p, quiet: bool = True):
         p.compile()
 
     # determine extension of generated file
-    if p.eqasm_compiler=='eqasm_backend_cc':
+    if p.eqasm_compiler=='eqasm_backend_cc':  # NB: field .eqasm_compiler is set by p.compile()
         ext = '.vq1asm' # CC
     else:
         ext = '.qisa' # CC-light, QCC
     # attribute is added to program to help finding the output files
     p.filename = join(p.output_dir, p.name + ext)
     return p
+
+
+def is_compatible_openql_version_cc() -> bool:
+    """
+    test whether OpenQL version is compatible with Central Controller
+    """
+    return ql.get_version() > '0.8.0'  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
 
 
 #############################################################################

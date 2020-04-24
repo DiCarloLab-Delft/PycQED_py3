@@ -4,7 +4,8 @@ Author:     Wouter Vlothuizen, TNO/QuTech,
             edited by Adriaan Rol, Gerco Versloot
 Purpose:    Instrument driver for Qutech QWG
 Usage:
-Notes:      It is possible to view the QWG log using ssh. To do this:
+Notes:      To be replaced by QuTech/QWG.py
+            It is possible to view the QWG log using ssh. To do this:
             - connect using ssh e.g., "ssh root@192.168.0.10"
             - view log using "tail -f /var/log/qwg.log"
 Bugs:
@@ -23,7 +24,9 @@ import logging
 import warnings
 import re
 import json
-from typing import List, Sequence, Dict
+from typing import Tuple, List, Sequence, Dict
+
+from pycqed.instrument_drivers.library.DIO import CalInterface
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
@@ -126,7 +129,7 @@ cw_protocols_mt = {
 # class
 ##########################################################################
 
-class QuTech_AWG_Module(SCPI):
+class QuTech_AWG_Module(SCPI, CalInterface):
     __doc__ = f"""
     Driver for a Qutech AWG Module (QWG) instrument. Will establish a connection to a module via ethernet.
     :param name: Name of the instrument  
@@ -309,6 +312,16 @@ class QuTech_AWG_Module(SCPI):
                     f'- Interboard detected: {self.dio_interboard()}'
 
         return info
+
+    ##########################################################################
+    # overrides for CalInterface interface
+    ##########################################################################
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        raise RuntimeError("not implemented")
+
+    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+        raise RuntimeError("not implemented")
 
     ##########################################################################
     # AWG5014 functions: WLIST (Waveform list)

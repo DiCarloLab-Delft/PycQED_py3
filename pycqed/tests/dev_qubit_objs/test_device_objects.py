@@ -14,17 +14,11 @@ import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
-from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import (
-    Dummy_Duplexer,
-)
-
-# from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
-# from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
-# from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
+from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
-from pycqed.instrument_drivers.physical_instruments.Transport import DummyTransport
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
+from pycqed.instrument_drivers.library.Transport import DummyTransport
 
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
@@ -75,11 +69,10 @@ class Test_Device_obj(unittest.TestCase):
             name="UHFQC_2", server="emulator", device="dev2111", interface="1GbE"
         )
 
-        self.CCL = dummy_CCL("CCL")
-        self.QCC = dummy_QCC("QCC")
-        self.CC = QuTechCC("CC", DummyTransport())
-        self.VSM = Dummy_Duplexer("VSM")
-
+        self.CCL = dummy_CCL('CCL')
+        self.QCC = dummy_QCC('QCC')
+        self.CC = CC('CC', DummyTransport())
+        self.VSM = Dummy_Duplexer('VSM')
         self.MC = measurement_control.MeasurementControl(
             "MC", live_plot_enabled=False, verbose=False
         )
