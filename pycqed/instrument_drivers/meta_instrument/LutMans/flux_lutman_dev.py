@@ -295,8 +295,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             label="Idling pulse length",
             initial_value=40e-9,
             vals=vals.Numbers(0, 100e-6),
-            parameter_class=ManualParameter,
-        )
+            parameter_class=ManualParameter)
+        self.add_parameter('cfg_awg_channel_delay', unit='s',
+                           label='HDAWG channel individual delay',
+                           initial_value=0e-9,
+                           vals=vals.Numbers(0, 30e-9),
+                           parameter_class=ManualParameter)
         # CODEWORDS 1-4: CZ
         for this_cz in ["NE", "NW", "SW", "SE"]:
             self.add_parameter(
@@ -311,6 +315,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Bool(),
                 parameter_class=ManualParameter,
             )
+            self.add_parameter('czd_initial_wait_%s' % this_cz,
+                               unit='s',
+                               initial_value=0e-9, vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
 
             self.add_parameter(
                 "czd_net_integral_%s" % this_cz,
@@ -761,6 +769,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         czd_amp_ratio = self.get("czd_amp_ratio_%s" % which_gate)
         czd_amp_offset = self.get("czd_amp_offset_%s" % which_gate)
+        initial_wait = self.get('czd_initial_wait_%s' % which_gate)
+        initial_wait_vec = np.zeros(int(initial_wait*self.sampling_rate()))
 
         dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
         eps_i = self.calc_amp_to_eps(
@@ -854,7 +864,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 CZ_B *= 0
             # Combine both halves of the double sided CZ gate
             amp_rat = czd_amp_ratio
-            waveform = np.concatenate([CZ_A, amp_rat * CZ_B + czd_amp_offset])
+            if initial_wait == 0:
+                list_wvf = [CZ_A, amp_rat*CZ_B + czd_amp_offset]
+            else:
+                list_wvf = [initial_wait_vec, CZ_A,
+                            amp_rat*CZ_B + czd_amp_offset,
+                            initial_wait_vec]
+            waveform = np.concatenate(list_wvf)
 
             return waveform
 
