@@ -1056,8 +1056,8 @@ class OptimizationAnalysis(MeasurementAnalysis):
             cbar = fig3.colorbar(sc, cax=cbar_ax)
             cbar.set_label('iteration (n)')
         else:
-            axarray.plot(self.sweep_points, self.measured_values[0],
-                         linestyle='--', c='k')
+            # axarray.plot(self.sweep_points, self.measured_values[0],
+            #              linestyle='--', c='k')
             sc = axarray.scatter(self.sweep_points, self.measured_values[0],
                                  c=np.arange(len(self.sweep_points)),
                                  cmap=cm, marker='o', lw=0.1)

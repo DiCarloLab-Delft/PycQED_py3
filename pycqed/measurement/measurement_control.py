@@ -593,7 +593,6 @@ class MeasurementControl(Instrument):
 
     def measure_hard(self):
         new_data = np.array(self.detector_function.get_values()).astype(np.float64).T
-
         ###########################
         # Shape determining block #
         ###########################

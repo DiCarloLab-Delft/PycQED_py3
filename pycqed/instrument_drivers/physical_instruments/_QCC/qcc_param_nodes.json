@@ -234,175 +234,11 @@
             }
         },
         {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitOne?",
-            "label": "Mrk Channel Selector",
-            "name": "dio1_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitOne {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitTwo?",
-            "label": "Mrk Channel Selector",
-            "name": "dio2_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitTwo {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitThree?",
-            "label": "Mrk Channel Selector",
-            "name": "dio3_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitThree {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitFour?",
-            "label": "Mrk Channel Selector",
-            "name": "dio4_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitFour {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitFive?",
-            "label": "Mrk Channel Selector",
-            "name": "dio5_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitFive {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitSix?",
-            "label": "Mrk Channel Selector",
-            "name": "dio6_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitSix {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitSeven?",
-            "label": "Mrk Channel Selector",
-            "name": "dio7_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitSeven {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitEight?",
-            "label": "Mrk Channel Selector",
-            "name": "dio8_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitEight {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitNine?",
-            "label": "Mrk Channel Selector",
-            "name": "dio9_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitNine {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitTen?",
-            "label": "Mrk Channel Selector",
-            "name": "dio10_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitTen {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter determines which bit of the DIO interface is followed in the MRK channel",
-            "get_cmd": "QUTech:DioMrkBitEleven?",
-            "label": "Mrk Channel Selector",
-            "name": "dio11_mrk_bit",
-            "set_cmd": "QUTech:DioMrkBitEleven {}",
-            "unit": "Bit Number",
-            "vals": {
-                "range": [
-                    0,
-                    31
-                ],
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter modifies the reset register of the QEC decoder submodule",
+            "docstring": "This parameter modifies the reset register of the QEC decoder submodule. Valid input: 1 = reset, 0 = idle",
             "get_cmd": "QUTech:QecCtrlReset?",
             "label": "Reset QEC Decoder",
-            "name": "qec_reset",
+            "name": "qec_submodule_control_reset",
+            "set_cmd": "QUTech:QecCtrlReset {}",
             "vals": {
                 "type": "Bool"
             }
@@ -411,7 +247,7 @@
             "docstring": "This parameter modifies the enable register of the processor. Valid input: 1 = reset, 0 = idle",
             "get_cmd": "QUTech:QecCtrlEnable?",
             "label": "Enable QEC Decoder",
-            "name": "qec_enable",
+            "name": "qec_submodule_control_enable",
             "set_cmd": "QUTech:QecCtrlEnable {}",
             "vals": {
                 "type": "Bool"
@@ -421,7 +257,7 @@
             "docstring": "This parameter modifies the initial values of ancilla qubit states for QEC. Decimal-encoded binary value representing one-hot encoding of ancilla qubit states.",
             "get_cmd": "QUTech:QecCtrlInitAQB?",
             "label": "Initialize QEC Decoder Ancillas",
-            "name": "qec_init_aqb",
+            "name": "qec_submodule_init_aqb",
             "set_cmd": "QUTech:QecCtrlInitAQB {}",
             "vals": {
                 "range": [
@@ -432,10 +268,20 @@
             }
         },
         {
+            "docstring": "This parameter modifies the data qubit readout type. Valid input: 0 = Z, 1 = X",
+            "get_cmd": "QUTech:QecCtrlDQbXZN?",
+            "label": "Data qubit readout type",
+            "name": "qec_submodule_dqb_xzn",
+            "set_cmd": "QUTech:QecCtrlDQbXZN {}",
+            "vals": {
+                "type": "Bool"
+            }
+        },
+        {
             "docstring": "This parameter determines all the outputs resulting from the QEC submodule.",
             "get_cmd": "QUTech:QecOutput?",
             "label": "QEC result readout",
-            "name": "qec_output",
+            "name": "qec_submodule_output",
             "vals": {
                 "type": "QECDataType"
             }
@@ -446,42 +292,6 @@
             "label": "No-VSM mode selector",
             "name": "no_vsm",
             "set_cmd": "QUTech:NoVSM {}",
-            "vals": {
-                "type": "Bool"
-            }
-        },
-        {
-            "docstring": "This parameter allows configuration of the software decoder framework.",
-            "label": "Configure Software QEC Decoder",
-            "name": "qec_blossomx_config",
-            "set_cmd": "QUTech:QecBlossom1Config {}",
-            "vals": {
-                "type": "QECDataType"
-            }
-        },
-        {
-            "docstring": "This parameter allows configuration of the software decoder framework.",
-            "label": "Configure Software QEC Decoder",
-            "name": "qec_blossomz_config",
-            "set_cmd": "QUTech:QecBlossom2Config {}",
-            "vals": {
-                "type": "QECDataType"
-            }
-        },
-        {
-            "docstring": "This parameter queries the status of the software decoder framework.",
-            "get_cmd": "QUTech:QecBlossomStatus?",
-            "label": "Status of Software QEC Decoder",
-            "name": "qec_blossom_status",
-            "vals": {
-                "type": "Non_Neg_Number"
-            }
-        },
-        {
-            "docstring": "This parameter queries any exceptions on the software decoder framework.",
-            "get_cmd": "QUTech:QecBlossomExcept?",
-            "label": "Exceptions on Software QEC Decoder",
-            "name": "qec_blossom_except",
             "vals": {
                 "type": "Bool"
             }
@@ -740,17 +550,32 @@
                 ],
                 "type": "Non_Neg_Number"
             }
+        },
+        {
+            "docstring": "It sets/gets the delay for VSM channel 17. Acceptable range is [0,127]. The unit is 2.5 ns.",
+            "get_cmd": "QUTech:VSMChannelDelay17?",
+            "label": "VSM Channel 17 delay",
+            "name": "vsm_channel_delay17",
+            "set_cmd": "QUTech:VSMChannelDelay17 {}",
+            "unit": "2.5 ns",
+            "vals": {
+                "range": [
+                    0,
+                    127
+                ],
+                "type": "Non_Neg_Number"
+            }
         }
     ],
     "version": {
-        "Embedded Software Build Time": "20191024-17:55:29",
+        "Embedded Software Build Time": "20190823-14:39:57",
         "Embedded Software Version": "0.2.0",
+        "Firmware": "0.2.0",
         "Firmware Build Time": "24/10/2016-13:27:47",
-        "Kernel Module Build Time": "20191024-13:53:41",
+        "Kernel Module Build Time": "20190823-14:40:10",
         "Kernel Module Version": "0.0.1",
-        "firmware": "0.2.0",
-        "model": "QCC",
-        "serial": "QCC1",
-        "vendor": "QuTech"
+        "Model": " QCC",
+        "Serial": "QCC1",
+        "Vendor": "QuTech"
     }
 }

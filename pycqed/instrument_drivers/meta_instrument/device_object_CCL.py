@@ -992,24 +992,18 @@ class DeviceCCL(Instrument):
     # Measurement methods
     ########################################################
 
-    def measure_conditional_oscillation(
-        self,
-        q0: str,
-        q1: str,
-        q2: int = None,
-        q3: int = None,
-        flux_codeword="cz",
-        flux_codeword_park=None,
-        reduced_swp_points=False,
-        prepare_for_timedomain=True,
-        MC=None,
-        CZ_disabled: bool = False,
-        wait_time_ns: int = 0,
-        label="",
-        verbose=True,
-        disable_metadata=False,
-        extract_only=False,
-    ):
+    def measure_conditional_oscillation(self,
+                                        q0: str, q1: str,
+                                        q2: int = None, q3: int = None,
+                                        flux_codeword="cz",
+                                        flux_codeword_park=None,
+                                        reduced_swp_points=False,
+                                        prepare_for_timedomain=True,
+                                        MC=None, CZ_disabled: bool = False,
+                                        wait_time_ns: int = 0,
+                                        label="", verbose=True,
+                                        disable_metadata=False,
+                                        extract_only=False):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
@@ -1555,11 +1549,10 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run(
-            "Residual_ZZ_{}_{}_{}{}".format(
-                q0, q_spectators, spectator_state, self.msmt_suffix
-            )
-        )
+        MC.run('Residual_ZZ_{}_{}_{}{}'.format(q0, q_spectators, spectator_state, self.msmt_suffix),
+               exp_metadata={'target_qubit': q0,
+                             'spectator_qubits': str(q_spectators),
+                             'spectator_state': spectator_state})
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
@@ -1648,17 +1641,16 @@ class DeviceCCL(Instrument):
         return a
 
     def measure_ssro_multi_qubit(
-        self,
-        qubits: list,
-        nr_shots_per_case: int = 2 ** 13,  # 8192
-        prepare_for_timedomain: bool = True,
-        result_logging_mode="raw",
-        initialize: bool = False,
-        analyze=True,
-        shots_per_meas: int = 2 ** 16,
-        label="Mux_SSRO",
-        MC=None,
-    ):
+            self,
+            qubits: list,
+            nr_shots_per_case: int = 2**13,  # 8192
+            prepare_for_timedomain: bool = True,
+            result_logging_mode='raw',
+            initialize: bool = False,
+            analyze=True,
+            shots_per_meas: int = 2**16,
+            label='Mux_SSRO',
+            MC=None):
         """
         Perform a simultaneous ssro experiment on multiple qubits.
 
@@ -1676,9 +1668,13 @@ class DeviceCCL(Instrument):
         """
         log.info("{}.measure_ssro_multi_qubit for qubits{}".format(self.name, qubits))
 
+        # # off and on, not including post selection init measurements yet
+        # nr_cases = 2**len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        # nr_shots = nr_shots_per_case*nr_cases
+
         # off and on, not including post selection init measurements yet
         nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
-        
+
         if initialize == True:
             nr_shots = 2 * nr_shots_per_case * nr_cases
         else:
@@ -1706,11 +1702,12 @@ class DeviceCCL(Instrument):
 
         # This assumes qubit names do not contain spaces
         det_qubits = [v.split()[-1] for v in d.value_names]
-        if qubits != det_qubits:
+        if (qubits != det_qubits) and (self.ro_acq_weight_type() == 'optimal'):
             # this occurs because the detector groups qubits per feedline.
             # If you do not pay attention, this will mess up the analysis of
             # this experiment.
-            raise ValueError("Detector qubits do not match order specified")
+            raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
+
 
         shots_per_meas = int(
             np.floor(np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases
@@ -1730,39 +1727,138 @@ class DeviceCCL(Instrument):
 
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
+
         if analyze:
             if initialize == True:
-                thresholds = [self.find_instrument(qubit).ro_acq_threshold() for qubit in qubits]
+                thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
+                    for qubit in qubits]
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
-                                                 post_selection=True,
-                                                 post_selec_thresholds=thresholds)
+                                            post_selection=True,
+                                            post_selec_thresholds=thresholds)
                 # Print fraction of discarded shots
-                Dict = a.proc_data_dict['post_selected_shots']
-                key = next(iter(Dict))
-                fraction=0
-                for comb in Dict[key].keys():
-                    fraction += len(Dict[key][comb])/(2**12 * 4)
-                print('Fraction of discarded results was {:.2f}'.format(1-fraction))
+                #Dict = a.proc_data_dict['Post_selected_shots']
+                #key = next(iter(Dict))
+                #fraction=0
+                #for comb in Dict[key].keys():
+                #    fraction += len(Dict[key][comb])/(2**12 * 4)
+                #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
             else:
                 a = ma2.Multiplexed_Readout_Analysis(label=label)
+            # Set thresholds
+            for i, qubit in enumerate(qubits):
+                label = a.raw_data_dict['value_names'][i]
+                threshold = a.qoi[label]['threshold_raw']
+                self.find_instrument(qubit).ro_acq_threshold(threshold)
         return
 
-    def measure_msmt_induced_dephasing_matrix(
-        self,
-        qubits: list,
-        analyze=True,
-        MC=None,
-        prepare_for_timedomain=True,
-        amps_rel=np.linspace(0, 1, 11),
-        verbose=True,
-        get_quantum_eff: bool = False,
-        dephasing_sequence="ramsey",
-        selected_target=None,
-        selected_measured=None,
-        target_qubit_excited=False,
-        extra_echo=False,
-        echo_delay=0e-9,
-    ):
+    def measure_ssro_single_qubit(
+            self,
+            qubits: list,
+            q_target: str,
+            nr_shots: int = 2**13,  # 8192
+            prepare_for_timedomain: bool = True,
+            result_logging_mode='raw',
+            initialize: bool = False,
+            analyze=True,
+            shots_per_meas: int = 2**16,
+            label='Mux_SSRO',
+            MC=None):
+        '''
+        '''
+
+        log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
+            self.name, qubits))
+
+        # off and on, not including post selection init measurements yet
+        nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        if initialize == True:
+            nr_shots = 4 * nr_shots
+        else:
+            nr_shots = 2 * nr_shots
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
+                      for qn in qubits]
+
+        p = mqo.multi_qubit_off_on(qubit_idxs,
+                                   initialize=initialize,
+                                   second_excited_state=False,
+                                   platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+
+        # right is LSQ
+        d = self.get_int_logging_detector(qubits,
+                                          result_logging_mode=result_logging_mode)
+
+        # This assumes qubit names do not contain spaces
+        det_qubits = [v.split()[-1] for v in d.value_names]
+        if (qubits != det_qubits) and (self.ro_acq_weight_type() == 'optimal'):
+            # this occurs because the detector groups qubits per feedline.
+            # If you do not pay attention, this will mess up the analysis of
+            # this experiment.
+            raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
+
+        shots_per_meas = int(np.floor(
+            np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
+
+        d.set_child_attr('nr_shots', shots_per_meas)
+
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        MC.run('{}_{}_{}'.format(label, q_target, self.msmt_suffix))
+
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+
+        if analyze:
+            if initialize == True:
+                thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
+                    for qubit in qubits]
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                            q_target = q_target,
+                                            post_selection=True,
+                                            post_selec_thresholds=thresholds)
+                # Print fraction of discarded shots
+                #Dict = a.proc_data_dict['Post_selected_shots']
+                #key = next(iter(Dict))
+                #fraction=0
+                #for comb in Dict[key].keys():
+                #    fraction += len(Dict[key][comb])/(2**12 * 4)
+                #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
+            else:
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                                     q_target = q_target)
+            # Set thresholds
+            for i, qubit in enumerate(qubits):
+                label = a.raw_data_dict['value_names'][i]
+                threshold = a.qoi[label]['threshold_raw']
+                self.find_instrument(qubit).ro_acq_threshold(threshold)
+        return
+
+
+    def measure_msmt_induced_dephasing_matrix(self, qubits: list,
+                                              analyze=True, MC=None,
+                                              prepare_for_timedomain=True,
+                                              amps_rel=np.linspace(0, 1, 11),
+                                              verbose=True,
+                                              get_quantum_eff: bool = False,
+                                              dephasing_sequence='ramsey',
+                                              selected_target=None,
+                                              selected_measured=None,
+                                              target_qubit_excited=False,
+                                              extra_echo=False,
+                                              echo_delay=0e-9):
         """
         Measures the msmt induced dephasing for readout the readout of qubits
         i on qubit j. Additionally measures the SNR as a function of amplitude
@@ -1864,14 +1960,11 @@ class DeviceCCL(Instrument):
                 "verbose": True,
             }
             qarr = qubits
-            labelpatt = "ro_amp_sweep_dephasing" + lpatt
-            ca = ma2.CrossDephasingAnalysis(
-                t_start=start,
-                t_stop=stop,
-                label_pattern=labelpatt,
-                qubit_labels=qarr,
-                options_dict=options_dict,
-            )
+            labelpatt = 'ro_amp_sweep_dephasing'+lpatt
+            ca = ma2.CrossDephasingAnalysis(t_start=start, t_stop=stop,
+                                            label_pattern=labelpatt,
+                                            qubit_labels=qarr,
+                                            options_dict=options_dict)
 
     def measure_chevron(
         self,
@@ -2056,7 +2149,6 @@ class DeviceCCL(Instrument):
         if not adaptive_sampling:
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
-
             MC.run(label, mode="2D")
             ma2.Basic2D_Analysis()
         else:
@@ -2544,8 +2636,7 @@ class DeviceCCL(Instrument):
             buffer_time1=0,
             buffer_time2=max_delay,
             flux_cw=flux_cw,
-            platf_cfg=self.cfg_openql_platform_fn(),
-        )
+            platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
@@ -2562,16 +2653,12 @@ class DeviceCCL(Instrument):
         MC.run(label)
         ma2.Basic1DAnalysis()
 
-    def measure_timing_diagram(
-        self,
-        q0,
-        flux_latencies,
-        microwave_latencies,
-        MC=None,
-        label="timing_{}_{}",
-        qotheridx=2,
-        prepare_for_timedomain: bool = True,
-    ):
+    def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
+                               MC=None,  label='timing_{}_{}',
+                               qotheridx=2,
+                               pulse_length=40e-9, flux_cw='fl_cw_06',
+                               extra_buffer=0e-9,
+                               prepare_for_timedomain: bool = True):
         """
         Measure the ramsey-like sequence with the 40 ns flux pulses played between
         the two pi/2. While playing this sequence the delay of flux and microwave pulses
@@ -2597,24 +2684,25 @@ class DeviceCCL(Instrument):
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain([q0])
 
         assert q0 in self.qubits()
         self.prepare_for_timedomain(qubits=[q0])
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        fl_lutman.sq_length(40e-9)
+        fl_lutman.sq_length(pulse_length)
 
         CC = self.instr_CC.get_instr()
 
         # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 80ns
-        p = sqo.FluxTimingCalibration(
-            q0idx,
-            times=[40e-9],
-            platf_cfg=self.cfg_openql_platform_fn(),
-            flux_cw="fl_cw_06",
-            qubit_other_idx=qotheridx,
-            cal_points=False,
-        )
+        p = sqo.FluxTimingCalibration(q0idx,
+                                      times=[extra_buffer],
+                                      platf_cfg=self.cfg_openql_platform_fn(),
+                                      flux_cw=flux_cw,
+                                      qubit_other_idx=qotheridx,
+                                      cal_points=False)
+
         CC.eqasm_program(p.filename)
 
         d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
@@ -2631,78 +2719,58 @@ class DeviceCCL(Instrument):
         MC.run_2D(label.format(self.name, q0))
 
         # This is the analysis that should be run but with custom delays
-        ma2.Timing_Cal_Flux_Fine(
-            ch_idx=0,
-            close_figs=False,
-            ro_latency=-100e-9,
-            flux_latency=0,
-            flux_pulse_duration=10e-9,
-            mw_pulse_separation=80e-9,
-        )
+        ma2.Timing_Cal_Flux_Fine(ch_idx=0, close_figs=False,
+                                 ro_latency=-100e-9,
+                                 flux_latency=0,
+                                 flux_pulse_duration=10e-9,
+                                 mw_pulse_separation=80e-9)
 
-    def measure_timing_diagram_1D(
-        self,
-        q0,
-        microwave_latencies,
-        MC=None,
-        label="timing_{}_{}",
-        qotheridx=2,
-        prepare_for_timedomain: bool = True,
-    ):
-        """
-        Measure timing diagram.
-
-        Args:
-            q0  (str)     :
-                name of the target qubit
-            microwave_latencies (array):
-                array of microwave latencies to set (in seconds)
-
-            label (str):
-                used to label the experiment
-
-            prepare_for_timedomain (bool):
-                calls self.prepare_for_timedomain on start
-        """
+    def measure_timing_1d_trace(self, q0, latencies, latency_type='flux',
+                                MC=None,  label='timing_{}_{}',
+                                qotheridx=2,
+                                buffer_time=40e-9,
+                                prepare_for_timedomain: bool = True):
+        mmt_label = label.format(self.name, q0)
         if MC is None:
             MC = self.instr_MC.get_instr()
-
         assert q0 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
-
+        self.prepare_for_timedomain([q0])
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman.sq_length(60e-9)
         CC = self.instr_CC.get_instr()
 
-        # Pi pulse + ro measurement
-        # p = sqo.single_elt_on(q0idx,
-        #                       platf_cfg=self.cfg_openql_platform_fn())
-        p = sqo.TimingCalibration_1D(
-            q0idx,
-            times=[40e-9],
-            platf_cfg=self.cfg_openql_platform_fn(),
-            # flux_cw='fl_cw_06',
-            qubit_other_idx=qotheridx,
-            cal_points=False,
-        )
+        # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 120ns
+        p = sqo.FluxTimingCalibration(q0idx,
+                                      times=[buffer_time],
+                                      platf_cfg=self.cfg_openql_platform_fn(),
+                                      flux_cw='fl_cw_06',
+                                      qubit_other_idx=qotheridx,
+                                      cal_points=False)
         CC.eqasm_program(p.filename)
 
         d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
         MC.set_detector_function(d)
 
-        s = swf.tim_mw_latency_sweep_1D(self)
+        if latency_type == 'flux':
+            s = swf.tim_flux_latency_sweep(self)
+        elif latency_type == 'mw':
+            s = swf.tim_mw_latency_sweep(self)
+        else:
+            raise ValueError('Latency type {} not understood.'.format(latency_type))
         MC.set_sweep_function(s)
-        MC.set_sweep_points(microwave_latencies)
-        MC.run(label.format(self.name, q0))
+        MC.set_sweep_points(latencies)
+        MC.run(mmt_label)
 
-    def measure_ramsey_with_flux_pulse(
-        self,
-        q0: str,
-        times,
-        MC=None,
-        label="Fluxed_ramsey",
-        prepare_for_timedomain: bool = True,
-        pulse_shape: str = "square",
-        sq_eps: float = None,
-    ):
+        ma2.Basic1DAnalysis(label=mmt_label)
+
+
+    def measure_ramsey_with_flux_pulse(self, q0: str, times,
+                                       MC=None,
+                                       label='Fluxed_ramsey',
+                                       prepare_for_timedomain: bool = True,
+                                       pulse_shape: str = 'square',
+                                       sq_eps: float = None):
         """
         Performs a cryoscope experiment to measure the shape of a flux pulse.
 

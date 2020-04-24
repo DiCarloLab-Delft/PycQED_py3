@@ -459,7 +459,8 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
         for i_s, q_s in enumerate(q_spectator_idx):
             k.gate(gate_spec[i_s], [q_s])
         k.gate("wait", all_qubits, wait_nanoseconds)
-        k.gate('rxm90', [q0])
+        # k.gate('rxm90', [q0])
+        k.gate('ry90', [q0])
         k.measure(q0)
         for q_s in q_spectator_idx:
             k.measure(q_s)
@@ -1341,6 +1342,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
             if case == 'excitation':
                 k.gate('rx180', [q1])
+                k.gate('i', [q0])
+                k.gate("wait", [], 0)
             k.gate('rx90', [q0])
             if not CZ_disabled:
                 k.gate("wait", [], 0) # Empty list generates barrier for all qubits in platf. only works with 0.8.0
@@ -1380,6 +1383,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 k.gate('cw_{:02}'.format(cw_idx), [q0])
             if case == 'excitation':
                 k.gate('rx180', [q1])
+                k.gate('i', [q0])
+                k.gate("wait", [], 0)
 
             k.measure(q0)
             k.measure(q1)
