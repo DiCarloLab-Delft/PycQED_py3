@@ -2342,23 +2342,24 @@ class DeviceCCL(Instrument):
             goal = l1dm.mk_min_threshold_goal_func(
                 max_pnts_beyond_threshold=max_pnts_beyond_threshold
             )
+            minimize = True
             loss = l1dm.mk_minimization_loss_func(
-                threshold=-minimizer_threshold, interval_weight=200.0
+                # Just in case it is ever changed to maximize
+                threshold= (-1) ** (minimize + 1) * minimizer_threshold, 
+                interval_weight=200.0
             )
             bounds = (np.min(amps), np.max(amps))
             # q0 is the one leaking in the first CZ interaction point
             # because |2> amplitude is generally unpredictable, we use the
             # population in qspec to ensure there will be a peak for the
             # adaptive sampler
-            par_indx = 1
-            minimize = True
+            par_idx = 1
             adaptive_pars_pos = {
                 "adaptive_function": l1dm.Learner1D_Minimizer,
                 "goal": lambda l: goal(l) or l.npoints > adaptive_num_pts_max,
                 "bounds": bounds,
                 "loss_per_interval": loss,
                 "minimize": minimize,
-                "par_indx": par_indx
             }
 
             adaptive_pars_neg = {
@@ -2368,7 +2369,6 @@ class DeviceCCL(Instrument):
                 "bounds": np.flip(-np.array(bounds), 0),
                 "loss_per_interval": loss,
                 "minimize": minimize,
-                "par_idx": par_indx
             }
 
             fluxcurrent_instr = self.find_instrument(q0).instr_FluxCtrl.get_instr()
@@ -2382,6 +2382,7 @@ class DeviceCCL(Instrument):
                 "multi_adaptive_single_dset": True,
                 "adaptive_pars_list": [adaptive_pars_pos, adaptive_pars_neg],
                 "extra_dims_sweep_pnts": flux_bias_par() + np.array(mv_bias_by),
+                "par_idx": par_idx,
             }
 
             MC.set_adaptive_function_parameters(adaptive_pars)
@@ -2394,7 +2395,7 @@ class DeviceCCL(Instrument):
                 label=label,
                 sq_pulse_duration=length_par(),
                 fit_threshold=minimizer_threshold,
-                fig_from=d.value_names[par_indx],
+                fit_from=d.value_names[par_idx],
                 peak_is_inverted=minimize,
             )
 
