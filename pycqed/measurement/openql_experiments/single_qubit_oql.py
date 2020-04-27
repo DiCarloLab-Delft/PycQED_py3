@@ -231,6 +231,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
         double_points:  if true repeats every element twice
+                        intended for evaluating the noise at larger time scales
     Returns:
         p:              OpenQL Program object containing
 
