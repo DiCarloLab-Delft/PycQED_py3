@@ -674,7 +674,7 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
             buffer_time, buffer_time2, flux_cw: int, platf_cfg: str,
             measure_parked_qubit: bool = False,
-            target_qubit_sequence: str='ramsey', cc: str='CCL'):
+            target_qubit_sequence: str = 'ramsey', cc: str = 'CCL'):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -706,8 +706,8 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
     """
     p = oqh.create_program("Chevron", platf_cfg)
 
-    buffer_nanoseconds = int(round(buffer_time/1e-9))
-    buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
+    buffer_nanoseconds = int(round(buffer_time / 1e-9))
+    buffer_nanoseconds2 = int(round(buffer_time2 / 1e-9))
     if flux_cw is None:
         flux_cw = 2
     flux_cw_name = _def_lm_flux[flux_cw]['name'].lower()
@@ -730,25 +730,25 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
 
     # For CCLight
-    if cc.upper()=='CCL':
-        k.gate("wait", [], 0) #alignment workaround
-        k.gate('fl_cw_{:02}'.format(flux_cw), [2,0])
+    if cc.upper() == 'CCL':
+        k.gate("wait", [], 0)  # alignment workaround
+        k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
         if qubit_idx_park is not None:
             k.gate('fl_cw_06', [qubit_idx_park]) # square pulse
-        k.gate("wait", [], 0) #alignment workaround
-    elif cc.upper()=='QCC' or cc.upper()=='CC':
-        k.gate("wait", [], 0) #alignment workaround
+        k.gate("wait", [], 0)  # alignment workaround
+    elif cc.upper() == 'QCC' or cc.upper() == 'CC':
+        k.gate("wait", [], 0)  # alignment workaround
         if qubit_idx_park is not None:
             k.gate('sf_square', [qubit_idx_park])
-        k.gate("wait", [], 20) #alignment workaround
+        k.gate("wait", [], 20)  # alignment workaround
         k.gate('sf_{}'.format(flux_cw_name), [qubit_idx])
-        k.gate("wait", [], 0) #alignment workaround
+        k.gate("wait", [], 0)  # alignment workaround
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
 
-
     if buffer_nanoseconds2 > 0:
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+
     k.gate('rx180', [qubit_idx])
     # k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
     k.measure(qubit_idx)
