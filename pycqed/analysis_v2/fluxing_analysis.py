@@ -742,7 +742,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         plt_contour_phase: bool = True,
         plt_contour_L1: bool = False,
         plt_optimal_values: bool = True,
-        plt_optimal_values_max: int = np.inf,
+        plt_optimal_values_max: int = 2,
         plt_clusters: bool = True,
         clims: dict = None,
         # e.g. clims={'L1': [0, 0.3], "Cost func": [0., 100]},
