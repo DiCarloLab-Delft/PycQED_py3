@@ -2162,7 +2162,7 @@ class DeviceCCL(Instrument):
             MC.run(label + " adaptive", mode="adaptive")
             ma2.Basic2DInterpolatedAnalysis()
 
-    def measure_chevron_1D_bias_sweep(
+    def measure_chevron_1D_bias_sweeps(
         self,
         q0: str,
         q_spec: str,
@@ -2174,22 +2174,23 @@ class DeviceCCL(Instrument):
         pow_tone=-10,
         spec_tone=False,
         measure_parked_qubit=False,
-        target_qubit_sequence: str = "ramsey",
+        target_qubit_sequence: str = "excited",
         waveform_name="square",
         adaptive_sampling=False,
-        adaptive_sampling_pts=None,
+        adaptive_num_pts_max=None,
         adaptive_sample_for_alignment=True,
         max_pnts_beyond_threshold=10,
-        minimizer_threshold=0.500,
+        minimizer_threshold=0.7,
         mv_bias_by=[-150e-6, 150e-6],
+        flux_buffer_time=40e-9,  # use multiples of 20 ns
     ):
         """
-        Measure a chevron patter of esulting from swapping of the excitations
+        Measure a chevron patter resulting from swapping of the excitations
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
         close to the interaction zone using (usually) a rectangular pulse.
         Meanwhile q1 is prepared in 0, 1 or superposition state. If it is in 0
-        state flipping between 01-10 can be observed. It if is in 1 state flipping
-        between 11-20 as well as 11-02 show up. In superpostion everything is visible.
+        state flipping between 10-01 can be observed. It if is in 1 state flipping
+        between 11-20 as well as 11-02 show up. In superposition everything is visible.
 
         Args:
             q0 (str):
@@ -2204,27 +2205,30 @@ class DeviceCCL(Instrument):
 
             amps (array):
                 amplitudes of the applied flux pulse controlled via the amplitude
-                of the correspnding AWG channel
+                of the corresponding AWG channel
 
             lengths (array):
                 durations of the applied flux pulses
 
             adaptive_sampling (bool):
-                indicates whether to adaptivelly probe
-                values of ampitude and duration, with points more dense where
+                indicates whether to adaptively probe
+                values of amplitude and duration, with points more dense where
                 the data has more fine features
 
-            adaptive_sampling_pts (int):
-                number of points to measur in the adaptive_sampling mode
+            adaptive_num_pts_max (int):
+                number of points to measure in the adaptive_sampling mode
 
             prepare_for_timedomain (bool):
                 should all instruments be reconfigured to
                 time domain measurements
 
-            target_qubit_sequence (str {"ground", "extited", "ramsey"}):
+            target_qubit_sequence (str {"ground", "excited", "ramsey"}):
                 specifies whether the spectator qubit should be
-                prepared in the 0 state ('ground'), 1 state ('extited') or
+                prepared in the 0 state ('ground'), 1 state ('excited') or
                 in superposition ('ramsey')
+
+            flux_buffer_time (float):
+                buffer time added before and after the flux pulse
 
         Circuit:
             q0    -x180-flux-x180-RO-
@@ -2248,7 +2252,7 @@ class DeviceCCL(Instrument):
             q_park_idx = self.find_instrument(q_park).cfg_qubit_nr()
             fl_lutman_park = self.find_instrument(q_park).instr_LutMan_Flux.get_instr()
             if fl_lutman_park.sq_amp() < 0.1:
-                # This can cause weird behaviour if not paid attention to.
+                # This can cause weird behavior if not paid attention to.
                 log.warning("Square amp for park pulse < 0.1")
         else:
             q_park_idx = None
@@ -2259,7 +2263,7 @@ class DeviceCCL(Instrument):
             length_par = fl_lutman.sq_length
             flux_cw = 6
         else:
-            raise ValueError("Waveform shape not understood")
+            raise ValueError("Waveform name not recognized.")
 
         if prepare_for_timedomain:
             if measure_parked_qubit:
@@ -2286,8 +2290,8 @@ class DeviceCCL(Instrument):
             q0idx,
             q_specidx,
             q_park_idx,
-            buffer_time=40e-9,
-            buffer_time2=length_par() + 40e-9,
+            buffer_time=flux_buffer_time,
+            buffer_time2=length_par() + flux_buffer_time,
             flux_cw=flux_cw,
             measure_parked_qubit=measure_parked_qubit,
             platf_cfg=self.cfg_openql_platform_fn(),
@@ -2325,33 +2329,46 @@ class DeviceCCL(Instrument):
         label = "Chevron {} {} [{:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
 
         if not adaptive_sampling:
+            # Just single 1D sweep
             MC.set_sweep_points(amps)
 
             MC.run(label, mode="1D")
             ma2.Basic1DAnalysis()
         elif adaptive_sample_for_alignment:
+            assert target_qubit_sequence == "excited", ("Chevron alignment "
+                "works only for the (first) CZ interaction point.")
+            # Adaptive sampling intended for the calibration of the flux bias
+            # (centering the chevron, and the qubit at the sweetspot)
             goal = l1dm.mk_min_threshold_goal_func(
                 max_pnts_beyond_threshold=max_pnts_beyond_threshold
             )
             loss = l1dm.mk_minimization_loss_func(
                 threshold=-minimizer_threshold, interval_weight=200.0
             )
-
+            bounds = (np.min(amps), np.max(amps))
+            # q0 is the one leaking in the first CZ interaction point
+            # because |2> amplitude is generally unpredictable, we use the
+            # population in qspec to ensure there will be a peak for the
+            # adaptive sampler
+            par_indx = 1
+            minimize = True
             adaptive_pars_pos = {
                 "adaptive_function": l1dm.Learner1D_Minimizer,
-                "goal": lambda l: goal(l) or l.npoints > adaptive_sampling_pts,
-                "bounds": amps,
+                "goal": lambda l: goal(l) or l.npoints > adaptive_num_pts_max,
+                "bounds": bounds,
                 "loss_per_interval": loss,
-                "minimize": False,
+                "minimize": minimize,
+                "par_indx": par_indx
             }
 
             adaptive_pars_neg = {
                 "adaptive_function": l1dm.Learner1D_Minimizer,
-                "goal": lambda l: goal(l) or l.npoints > adaptive_sampling_pts,
+                "goal": lambda l: goal(l) or l.npoints > adaptive_num_pts_max,
                 # NB: order of the bounds matters, mind negative numbers ordering
-                "bounds": np.flip(-np.array(amps), 0),
+                "bounds": np.flip(-np.array(bounds), 0),
                 "loss_per_interval": loss,
-                "minimize": False,
+                "minimize": minimize,
+                "par_idx": par_indx
             }
 
             fluxcurrent_instr = self.find_instrument(q0).instr_FluxCtrl.get_instr()
@@ -2377,13 +2394,16 @@ class DeviceCCL(Instrument):
                 label=label,
                 sq_pulse_duration=length_par(),
                 fit_threshold=minimizer_threshold,
+                fig_from=d.value_names[par_indx],
+                peak_is_inverted=minimize,
             )
 
         else:
+            # Default single 1D adaptive sampling
             adaptive_pars = {
                 "adaptive_function": adaptive.Learner1D,
-                "goal": lambda l: l.npoints > adaptive_sampling_pts,
-                "bounds": amps,
+                "goal": lambda l: l.npoints > adaptive_num_pts_max,
+                "bounds": (np.min(amps), np.max(amps)),
             }
             MC.set_adaptive_function_parameters(adaptive_pars)
             MC.run(label, mode="adaptive")
