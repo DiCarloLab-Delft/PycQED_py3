@@ -5649,7 +5649,7 @@ class AllXY_Analysis(TD_Analysis):
                                             xlabel=self.xlabel,
                                             ylabel=str(
                                                 self.value_names[i]),
-                                            save=False)
+                                            save=False, label="Measurement")
         ax1.set_ylim(min(self.corr_data) - .1, max(self.corr_data) + .1)
         if self.flip_axis:
             ylabel = r'$F$ $|0 \rangle$'
@@ -5660,8 +5660,8 @@ class AllXY_Analysis(TD_Analysis):
                                         fig=fig1, ax=ax1,
                                         xlabel='',
                                         ylabel=ylabel,
-                                        save=False)
-        ax1.plot(self.sweep_points, ideal_data)
+                                        save=False, label="Measurement")
+        ax1.plot(self.sweep_points, ideal_data, label="Ideal")
         labels = [item.get_text() for item in ax1.get_xticklabels()]
         if len(self.measured_values[0]) == 42:
             locs = np.arange(1, 42, 2)
@@ -5675,9 +5675,18 @@ class AllXY_Analysis(TD_Analysis):
         ax1.xaxis.set_ticks(locs)
         ax1.set_xticklabels(labels, rotation=60)
 
-        deviation_text = r'Deviation: %.5f' % self.deviation_total
-        ax1.text(1, 1.05, deviation_text, fontsize=11,
-                 bbox=self.box_props)
+        if kw.pop("plot_deviation", True):
+            deviation_text = r'Deviation: %.5f' % self.deviation_total
+            ax1.text(1, 1.05, deviation_text, fontsize=11,
+                     bbox=self.box_props)
+        legend_loc = "lower right"
+        if len(self.value_names) > 1:
+            [ax.legend(loc=legend_loc) for ax in axarray]
+        else:
+            axarray.legend(loc=legend_loc)
+
+        ax1.legend(loc=legend_loc)
+
         if not close_main_fig:
             # Hacked in here, good idea to only show the main fig but can
             # be optimized somehow
