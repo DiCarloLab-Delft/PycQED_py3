@@ -173,11 +173,13 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
     # helper for parameter 'dio{}_out_delay'
     def _set_dio_delay(self, ccio: int, cnt_in_20ns_steps: int) -> None:
-        self.stop()
-        self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)
-        self.start()
-        # FIXME: assumes Q1 was running, and has valid program
-        # FIXME: stop/start can be removed when we switch to setSeqBarCnt
+        if 1:
+            self.set_seqbar_cnt(ccio, cnt_in_20ns_steps)
+        else:
+            # FIXME: assumes Q1 was running, and has valid program
+            self.stop()
+            self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)
+            self.start()
 
     ##########################################################################
     # overrides for CalInterface interface

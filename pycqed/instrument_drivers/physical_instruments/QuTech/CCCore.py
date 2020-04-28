@@ -95,6 +95,10 @@ class CCCore(SCPIBase):
         # only possible if CC is stopped
         return self._ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
 
+    def set_seqbar_cnt(self, ccio: int, val: int) -> None:
+        # no need to stop CC
+        self._transport.write(f'QUTech:CCIO{ccio}:SEQBARcnt {val}')
+
     def calibrate_dio(self, ccio: int, expected_bits: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL {expected_bits}')
 
