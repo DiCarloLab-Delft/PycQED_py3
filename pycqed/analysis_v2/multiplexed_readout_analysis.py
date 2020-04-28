@@ -368,10 +368,22 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
             fr = self.fit_res['CDF_fit_{}'.format(ch)]
             bv = fr.params
+            # self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
+            #     bv['A_spurious'].value
+            # self.proc_data_dict['PDF_data'][ch]['relaxation_events'] = \
+            #     bv['B_spurious'].value
+            A_amp = bv['A_spurious'].value
+            A_sig = bv['A_sigma'].value
+            B_amp = bv['B_spurious'].value
+            B_sig = bv['B_sigma'].value
+
+            residual_excitation = A_amp*B_sig/((1-A_amp)*A_sig + A_amp*B_sig)
+            relaxation_events = B_amp*A_sig/((1-B_amp)*B_sig + B_amp*A_sig)
+
             self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
-                bv['A_spurious'].value
+                residual_excitation
             self.proc_data_dict['PDF_data'][ch]['relaxation_events'] = \
-                bv['B_spurious'].value
+                relaxation_events
 
             ###################################
             #  Save quantities of interest.   #
