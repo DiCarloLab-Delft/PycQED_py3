@@ -960,7 +960,7 @@ class MeasurementControl(Instrument):
                 )
                 self.curves.append(self.main_QtPlot.traces[-1])
 
-                if self.Learner_Minimizer_detected and yi == 0:
+                if self.Learner_Minimizer_detected and yi == self.par_idx:
                     self.main_QtPlot.add(
                         x=[0],
                         y=[0],
@@ -1028,7 +1028,7 @@ class MeasurementControl(Instrument):
                             self.curves[i]["config"]["x"] = x
                             self.curves[i]["config"]["y"] = y
                             i += 1
-                            if self.Learner_Minimizer_detected and y_ind == 0:
+                            if self.Learner_Minimizer_detected and y_ind == self.par_idx:
                                 min_x = np.min(x)
                                 max_x = np.max(x)
                                 threshold = (
@@ -1380,7 +1380,7 @@ class MeasurementControl(Instrument):
                 # We want to plot a line that indicates the moving threshold
                 # for the cost function when we use the `LearnerND_Minimizer` or
                 # the `Learner1D_Minimizer` samplers
-                if self.Learner_Minimizer_detected and j == 0:
+                if self.Learner_Minimizer_detected and j == self.par_idx:
                     iter_plotmon.add(
                         x=[0],
                         y=[0],
