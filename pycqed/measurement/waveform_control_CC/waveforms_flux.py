@@ -90,9 +90,9 @@ def martinis_flux_pulse(length: float,
     # Scaling factor for time-axis to get correct pulse length again
     scale = t[-1] / t_samples[-1]
     interp_wave = scipy.interpolate.interp1d(
-        t / scale, theta_wave_clipped, bounds_error=False,
+        # taus, theta_wave_clipped, bounds_error=False, # this line by-passes interpolation
+        t/scale, theta_wave_clipped, bounds_error=False, # this line enables interpolation
         fill_value='extrapolate')(t_samples)
-
     # Theta is returned in radians here
     return np.nan_to_num(interp_wave)
 

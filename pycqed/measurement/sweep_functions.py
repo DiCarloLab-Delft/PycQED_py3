@@ -1218,7 +1218,7 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.cc.start()
 
 class tim_flux_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'Flux latency'
@@ -1234,8 +1234,9 @@ class tim_flux_latency_sweep(Soft_Sweep):
         time.sleep(.5)
         return val
 
+
 class tim_ro_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'RO latency'
@@ -1247,13 +1248,12 @@ class tim_ro_latency_sweep(Soft_Sweep):
         self.dev.tim_ro_latency_1(val)
         self.dev.tim_ro_latency_2(val)
         self.dev.prepare_timing()
-
-
         time.sleep(.5)
         return val
 
+
 class tim_mw_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'MW latency'

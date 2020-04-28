@@ -25,6 +25,7 @@ from pycqed.analysis.fitting_models import (
     CosFunc,
     Cos_guess,
     avoided_crossing_freq_shift,
+    ChevronInvertedFunc,
     ChevronFunc,
     ChevronGuess,
 )
@@ -311,13 +312,15 @@ class Chevron_Alignment_Analysis(sa.Basic2DInterpolatedAnalysis):
         do_fitting: bool = True,
         auto: bool = True,
         save_qois: bool = True,
-        fit_from="",
-        fit_threshold=None,
-        sq_pulse_duration=None,
+        fit_from: str = "",
+        fit_threshold: float = None,
+        sq_pulse_duration: float = None,
+        peak_is_inverted: bool = True,
     ):
         self.fit_from = fit_from
         self.fit_threshold = fit_threshold
         self.sq_pulse_duration = sq_pulse_duration
+        self.peak_is_inverted = peak_is_inverted
 
         if do_fitting and sq_pulse_duration is None:
             log.error(
@@ -399,11 +402,13 @@ class Chevron_Alignment_Analysis(sa.Basic2DInterpolatedAnalysis):
         if self.fit_from != "":
             fit_from_idx = self.raw_data_dict["value_names"].index(self.fit_from)
         else:
-            fit_from_idx = 0
+            fit_from_idx = 1
             self.fit_from = self.raw_data_dict["value_names"][fit_from_idx]
 
         for i, bdict in enumerate(pdd["bias_1D_cuts"]):
-            chevron_model = lmfit.Model(ChevronFunc)
+            # Allow fitting the populations of both qubits
+            fit_func = ChevronInvertedFunc if self.peak_is_inverted else ChevronFunc
+            chevron_model = lmfit.Model(fit_func)
             chevron_model.guess = ChevronGuess
 
             fit_key = "chevron_fit_{}".format(i)
@@ -413,7 +418,12 @@ class Chevron_Alignment_Analysis(sa.Basic2DInterpolatedAnalysis):
             if self.fit_threshold is not None:
                 # For some cases the fit might not work well due to noise
                 # This is to fit above a threshold only
-                sel_idx = np.where(fit_yvals > self.fit_threshold)[0]
+                selection = (
+                    (fit_yvals < self.fit_threshold)
+                    if self.peak_is_inverted
+                    else (fit_yvals > self.fit_threshold)
+                )
+                sel_idx = np.where(selection)[0]
                 fit_yvals = fit_yvals[sel_idx]
                 fit_xvals = fit_xvals[sel_idx]
 
@@ -544,8 +554,12 @@ class Chevron_Alignment_Analysis(sa.Basic2DInterpolatedAnalysis):
                 "ax_col": 1,
             }
 
-            pd["all_bias_1D_cuts_" + self.fit_from]["fit_threshold"] = self.fit_threshold
-            pd["all_bias_1D_cuts_" + self.fit_from]["fit_threshold"] = self.fit_threshold
+            pd["all_bias_1D_cuts_" + self.fit_from][
+                "fit_threshold"
+            ] = self.fit_threshold
+            pd["all_bias_1D_cuts_" + self.fit_from][
+                "fit_threshold"
+            ] = self.fit_threshold
 
             center_L = pdd["chevron_centers_L"][i]
             center_R = pdd["chevron_centers_R"][i]
@@ -680,10 +694,8 @@ def plot_chevron_bias_1D_cuts(bias_1D_cuts_dicts, mv_indx, fig=None, ax=None, **
 
         if fit_threshold is not None:
             label = "Fit threshold"
-            ax[i][0].axhline(fit_threshold,
-                ls="--", color="green", label=label)
-            ax[i][1].axhline(fit_threshold,
-                ls="--", color="green", label=label)
+            ax[i][0].axhline(fit_threshold, ls="--", color="green", label=label)
+            ax[i][1].axhline(fit_threshold, ls="--", color="green", label=label)
 
     set_xlabel(ax[-1][0], xlabel, unit=x_unit)
     set_xlabel(ax[-1][1], xlabel, unit=x_unit)
@@ -730,7 +742,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         plt_contour_phase: bool = True,
         plt_contour_L1: bool = False,
         plt_optimal_values: bool = True,
-        plt_optimal_values_max: int = np.inf,
+        plt_optimal_values_max: int = 2,
         plt_clusters: bool = True,
         clims: dict = None,
         # e.g. clims={'L1': [0, 0.3], "Cost func": [0., 100]},
@@ -989,9 +1001,11 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                 self.plot_dicts[val_name]["clim"] = self.clims[val_name]
                 # Visual indicator when saturating the color range
                 clims = self.clims[val_name]
-                cbarextend = "min" if min(clims) > vmin else 'neither'
+                cbarextend = "min" if min(clims) > vmin else "neither"
                 cbarextend = "max" if max(clims) < vmax else cbarextend
-                cbarextend = "both" if min(clims) > vmin and max(clims) < vmax else cbarextend
+                cbarextend = (
+                    "both" if min(clims) > vmin and max(clims) < vmax else cbarextend
+                )
                 self.plot_dicts[val_name]["cbarextend"] = cbarextend
 
             if self.plt_contour_phase:
@@ -1517,9 +1531,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         x_int = self.proc_data_dict["x_int"]
         y_int = self.proc_data_dict["y_int"]
 
-        x_int_reshaped, y_int_reshaped = interp_to_1D_arr(
-            x_int=x_int, y_int=y_int
-        )
+        x_int_reshaped, y_int_reshaped = interp_to_1D_arr(x_int=x_int, y_int=y_int)
 
         sorted_hull_vertices = generate_optima_hull_vertices(
             x_arr=x_int_reshaped,
@@ -1534,7 +1546,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
 
         # We save this as a disctionary so that we don't have hdf5 issues
         self.proc_data_dict["hull_vertices"] = {
-            str(h_i): hull_vertices for h_i, hull_vertices in enumerate(sorted_hull_vertices)
+            str(h_i): hull_vertices
+            for h_i, hull_vertices in enumerate(sorted_hull_vertices)
         }
         log.debug("Hulls are sorted by increasing y value.")
 
@@ -1805,7 +1818,7 @@ def generate_optima_hull_vertices(
     phase_thr=5,
     L1_thr=np.inf,
     clustering_thr=0.1,
-    tolerances=[1, 2, 3]
+    tolerances=[1, 2, 3],
 ):
     """
     WARNING: OUTDATED

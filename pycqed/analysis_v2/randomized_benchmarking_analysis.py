@@ -208,7 +208,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         text_msg = 'Summary: \n'
         text_msg += format_value_string(r'$\epsilon_{{\mathrm{{simple}}}}$',
                                         fr_rb_simple['eps'], '\n')
-        text_msg += format_value_string(r'$\epsilon_{{X_1}}$',
+        text_msg += format_value_string(r'$\epsilon_{{\chi_1}}$',
                                         fr_rb['eps'], '\n')
         text_msg += format_value_string(r'$L_1$', fr_dec['L1'], '\n')
         text_msg += format_value_string(r'$L_2$', fr_dec['L2'], '\n')
@@ -1731,7 +1731,7 @@ def plot_rb_decay_woods_gambetta(ncl, M0, X1, ax, ax1, title='', **kw):
     ax.set_ylim(-.05, 1.05)
     ax1.set_ylim(min(min(.97*X1), .92), 1.01)
     ax.set_ylabel(r'$M_0$ probability')
-    ax1.set_ylabel(r'$X_1$ population')
+    ax1.set_ylabel(r'$\chi_1$ population')
     ax1.set_xlabel('Number of Cliffords')
     ax.set_title(title)
 
@@ -1767,12 +1767,12 @@ def plot_irb_decay_woods_gambetta(
     ax1.grid(axis='y')
 
     ax1.set_ylim(min(min(.97*X1_int), .92), 1.01)
-    ax1.set_ylabel(r'$X_1$ population')
+    ax1.set_ylabel(r'$\chi_1$ population')
     ax1.set_xlabel('Number of Cliffords')
     ax.set_title(title)
     ax.legend(loc=(1.05, .6))
 
-    collabels = ['$\epsilon_{X1}$ (%)', '$\epsilon$ (%)', 'L1 (%)']
+    collabels = ['$\epsilon_{\chi1}$ (%)', '$\epsilon$ (%)', 'L1 (%)']
     rowlabels = ['Ref. curve', 'Int. curve', 'CZ-int.', 'CZ-naive']
     table_data = [
         [qoi['eps_X1_ref']*100, qoi['eps_simple_ref']*100,

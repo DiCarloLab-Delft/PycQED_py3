@@ -231,6 +231,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
         double_points:  if true repeats every element twice
+                        intended for evaluating the noise at larger time scales
     Returns:
         p:              OpenQL Program object containing
 
@@ -765,7 +766,6 @@ def Ram_Z(qubit_name,
 
 def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
                           flux_cw: str = 'fl_cw_02',
-                          qubit_other_idx=0,
                           cal_points: bool = True):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
@@ -800,7 +800,6 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
 
 def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
                          # flux_cw: str = 'fl_cw_02',
-                         qubit_other_idx=0,
                          cal_points: bool = True):
     """
     A Ramsey sequence with varying waiting times `times`in between.
