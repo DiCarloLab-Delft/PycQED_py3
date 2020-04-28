@@ -2161,7 +2161,7 @@ class DeviceCCL(Instrument):
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
             MC.run(label, mode="2D")
-            ma2.Basic2D_Analysis()
+            ma.TwoD_Analysis()
         else:
             MC.set_adaptive_function_parameters(
                 {
