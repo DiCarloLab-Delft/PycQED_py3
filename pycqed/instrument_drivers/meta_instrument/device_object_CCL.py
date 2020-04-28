@@ -1775,6 +1775,26 @@ class DeviceCCL(Instrument):
             label='Mux_SSRO',
             MC=None):
         '''
+        Performs MUX single shot readout experiments of all possible
+        combinations of prepared states of <qubits>. Outputs analysis
+        of a single qubit <q_target>. This function is meant to
+        assess a particular qubit readout in the multiplexed context.
+
+        Args:
+            qubits: List of qubits adressed in the mux readout.
+
+            q_target: Qubit targeted in the analysis.
+
+            nr_shots: number of shots for each prepared state of
+            q_target. That is the experiment will include
+            <nr_shots> shots of the qubit prepared in the ground state
+            and <nr_shots> shots of the qubit prepared in the excited
+            state. The remaining qubits will be prepared such that the
+            experiment goes through all 2**n possible combinations of
+            computational states.
+
+            initialize: Include measurement post-selection by
+            initialization.
         '''
 
         log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
