@@ -992,18 +992,27 @@ class DeviceCCL(Instrument):
     # Measurement methods
     ########################################################
 
-    def measure_conditional_oscillation(self,
-                                        q0: str, q1: str,
-                                        q2: int = None, q3: int = None,
-                                        flux_codeword="cz",
-                                        flux_codeword_park=None,
-                                        reduced_swp_points=False,
-                                        prepare_for_timedomain=True,
-                                        MC=None, CZ_disabled: bool = False,
-                                        wait_time_ns: int = 0,
-                                        label="", verbose=True,
-                                        disable_metadata=False,
-                                        extract_only=False):
+    def measure_conditional_oscillation(
+        self,
+        q0: str,
+        q1: str,
+        q2: int = None,
+        q3: int = None,
+        flux_codeword="cz",
+        flux_codeword_park=None,
+        reduced_swp_points=False,
+        prepare_for_timedomain=True,
+        MC=None,
+        CZ_disabled: bool = False,
+        single_q_gates_replace: str = None,
+        q0_first_gate: str = "rx90",
+        cz_repetitions: int = 1,
+        wait_time_ns: int = 0,
+        label="",
+        verbose=True,
+        disable_metadata=False,
+        extract_only=False,
+    ):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
@@ -1087,6 +1096,8 @@ class DeviceCCL(Instrument):
             wait_time_after=wait_time_ns,
             flux_codeword=flux_codeword,
             flux_codeword_park=flux_codeword_park,
+            single_q_gates_replace=single_q_gates_replace,
+            cz_repetitions=cz_repetitions,
         )
 
         s = swf.OpenQL_Sweep(
