@@ -992,18 +992,27 @@ class DeviceCCL(Instrument):
     # Measurement methods
     ########################################################
 
-    def measure_conditional_oscillation(self,
-                                        q0: str, q1: str,
-                                        q2: int = None, q3: int = None,
-                                        flux_codeword="cz",
-                                        flux_codeword_park=None,
-                                        reduced_swp_points=False,
-                                        prepare_for_timedomain=True,
-                                        MC=None, CZ_disabled: bool = False,
-                                        wait_time_ns: int = 0,
-                                        label="", verbose=True,
-                                        disable_metadata=False,
-                                        extract_only=False):
+    def measure_conditional_oscillation(
+        self,
+        q0: str,
+        q1: str,
+        q2: int = None,
+        q3: int = None,
+        flux_codeword="cz",
+        flux_codeword_park=None,
+        reduced_swp_points=False,
+        prepare_for_timedomain=True,
+        MC=None,
+        CZ_disabled: bool = False,
+        single_q_gates_replace: str = None,
+        q0_first_gate: str = "rx90",
+        cz_repetitions: int = 1,
+        wait_time_ns: int = 0,
+        label="",
+        verbose=True,
+        disable_metadata=False,
+        extract_only=False,
+    ):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
@@ -1087,6 +1096,8 @@ class DeviceCCL(Instrument):
             wait_time_after=wait_time_ns,
             flux_codeword=flux_codeword,
             flux_codeword_park=flux_codeword_park,
+            single_q_gates_replace=single_q_gates_replace,
+            cz_repetitions=cz_repetitions,
         )
 
         s = swf.OpenQL_Sweep(
@@ -2150,7 +2161,7 @@ class DeviceCCL(Instrument):
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
             MC.run(label, mode="2D")
-            ma2.Basic2D_Analysis()
+            ma.TwoD_Analysis()
         else:
             MC.set_adaptive_function_parameters(
                 {
@@ -2176,6 +2187,7 @@ class DeviceCCL(Instrument):
         measure_parked_qubit=False,
         target_qubit_sequence: str = "excited",
         waveform_name="square",
+        sq_duration=None,
         adaptive_sampling=False,
         adaptive_num_pts_max=None,
         adaptive_sample_for_alignment=True,
@@ -2261,7 +2273,9 @@ class DeviceCCL(Instrument):
 
         if waveform_name == "square":
             length_par = fl_lutman.sq_length
-            flux_cw = 6
+            flux_cw = 6  # Hard-coded for now [2020-04-28]
+            if sq_duration is None:
+                raise ValueError("Square pulse duration must be specified.")
         else:
             raise ValueError("Waveform name not recognized.")
 
@@ -2301,6 +2315,7 @@ class DeviceCCL(Instrument):
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
         if measure_parked_qubit:
+            # NB not tested in this function yet [2020-04-27]
             d = self.get_int_avg_det(
                 qubits=[q0, q_spec, q_park],
                 single_int_avg=True,
@@ -2316,6 +2331,7 @@ class DeviceCCL(Instrument):
             )
 
         # if we want to add a spec tone
+        # NB: not tested [2020-04-27]
         if spec_tone:
             spec_source = self.find_instrument(q0).instr_spec_source.get_instr()
             spec_source.pulsemod_state(False)
@@ -2328,11 +2344,28 @@ class DeviceCCL(Instrument):
 
         label = "Chevron {} {} [{:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
 
+        old_sq_duration = length_par()
+        length_par(sq_duration)
+        old_amp_par = amp_par()
+
+        fluxcurrent_instr = self.find_instrument(q0).instr_FluxCtrl.get_instr()
+        flux_bias_par_name = "FBL_" + q0
+        flux_bias_par = fluxcurrent_instr[flux_bias_par_name]
+
+        flux_bias_old_val = flux_bias_par()
+
+        def restore_pars():
+            length_par(old_sq_duration)
+            amp_par(old_amp_par)
+            flux_bias_par(flux_bias_old_val)
+
         if not adaptive_sampling:
             # Just single 1D sweep
             MC.set_sweep_points(amps)
-
             MC.run(label, mode="1D")
+
+            restore_pars()
+
             ma2.Basic1DAnalysis()
         elif adaptive_sample_for_alignment:
             assert target_qubit_sequence == "excited", ("Chevron alignment "
@@ -2345,7 +2378,7 @@ class DeviceCCL(Instrument):
             minimize = True
             loss = l1dm.mk_minimization_loss_func(
                 # Just in case it is ever changed to maximize
-                threshold= (-1) ** (minimize + 1) * minimizer_threshold, 
+                threshold= (-1) ** (minimize + 1) * minimizer_threshold,
                 interval_weight=200.0
             )
             bounds = (np.min(amps), np.max(amps))
@@ -2371,12 +2404,6 @@ class DeviceCCL(Instrument):
                 "minimize": minimize,
             }
 
-            fluxcurrent_instr = self.find_instrument(q0).instr_FluxCtrl.get_instr()
-            flux_bias_par_name = "FBL_" + q0
-            flux_bias_par = fluxcurrent_instr[flux_bias_par_name]
-
-            flux_bias_old_val = flux_bias_par()
-
             MC.set_sweep_functions([amp_par, flux_bias_par])
             adaptive_pars = {
                 "multi_adaptive_single_dset": True,
@@ -2388,8 +2415,7 @@ class DeviceCCL(Instrument):
             MC.set_adaptive_function_parameters(adaptive_pars)
             MC.run(label, mode="adaptive")
 
-            # Restore old bias value
-            flux_bias_par(flux_bias_old_val)
+            restore_pars()
 
             ma2.Chevron_Alignment_Analysis(
                 label=label,
@@ -2408,6 +2434,9 @@ class DeviceCCL(Instrument):
             }
             MC.set_adaptive_function_parameters(adaptive_pars)
             MC.run(label, mode="adaptive")
+
+            restore_pars()
+
             ma2.Basic1DAnalysis()
 
     def measure_two_qubit_ramsey(
