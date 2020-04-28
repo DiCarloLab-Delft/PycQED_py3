@@ -83,7 +83,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             ['{:0{}b}'.format(i, nr_qubits) for i in range(2**nr_qubits)]
         raw_shots = self.raw_data_dict['data'][:, 1:]
         post_selection = self.post_selection
-        qubit_labels = [ch[-2:].decode('utf-8').strip() for ch in Channels]
+        qubit_labels = [ch.decode('utf-8').rsplit(' ', 1)[1] for ch in Channels]
         self.proc_data_dict['combinations'] = combinations
         self.proc_data_dict['qubit_labels'] = qubit_labels
 
@@ -396,7 +396,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
         Channels = self.raw_data_dict['value_names']
         nr_qubits = len(Channels)
-        qubit_labels = [ch[-2:].decode('utf-8').strip() for ch in Channels]
+        qubit_labels = self.proc_data_dict['qubit_labels']
         combinations = \
             ['{:0{}b}'.format(i, nr_qubits) for i in range(2**nr_qubits)]
         self.axs_dict = {}
