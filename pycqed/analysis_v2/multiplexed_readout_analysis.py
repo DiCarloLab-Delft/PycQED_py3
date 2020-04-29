@@ -92,7 +92,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         #############################################
         self.proc_data_dict['Shots'] = {ch : {} for ch in Channels}
 
-        if self.post_selection == True:
+        if post_selection == True:
             # Post-selected shots
             self.proc_data_dict['Post_selected_shots'] =\
                 {ch : {} for ch in Channels}
@@ -121,7 +121,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         #########################
         # Execute post_selection
         #########################
-        if self.post_selection == True:
+        if post_selection == True:
             for comb in combinations: # Loop over prepared states
                 Idxs = []
                 # For each prepared state one needs to eliminate every shot
@@ -151,18 +151,37 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['PDF_data'] = {ch : {} for ch in Channels}
         self.proc_data_dict['CDF_data'] = {ch : {} for ch in Channels}
         Shots_digitized = {ch : {} for ch in Channels}
+        if post_selection == True:
+            self.proc_data_dict['Post_Histogram_data'] = \
+                {ch : {} for ch in Channels}
+            self.proc_data_dict['Post_PDF_data'] = {ch : {} for ch in Channels}
+            self.proc_data_dict['Post_CDF_data'] = {ch : {} for ch in Channels}
+            Post_Shots_digitized = {ch : {} for ch in Channels}
+
         for i, ch in enumerate(Channels):
             hist_range = (np.amin(raw_shots[:, i]), np.amax(raw_shots[:, i]))
             Shots_0 = [] # used to store overall shots of a qubit
             Shots_1 = []
+            if post_selection == True:
+                Post_Shots_0 = [] # used to store overall shots of a qubit
+                Post_Shots_1 = []
 
             # Histograms
             for comb in combinations:
                 if post_selection == True:
                     shots = self.proc_data_dict['Post_selected_shots'][ch][comb]
-                else:
-                    shots = self.proc_data_dict['Shots'][ch][comb]
+                    # Hitogram data of each prepared_state
+                    counts, bin_edges = np.histogram(shots, bins=100,
+                                                     range=hist_range)
+                    bin_centers = (bin_edges[1:] + bin_edges[:-1])/2
+                    self.proc_data_dict['Post_Histogram_data'][ch][comb]=\
+                        (counts, bin_centers)
+                    if comb[i] == '0':
+                        Post_Shots_0 = np.concatenate((Post_Shots_0, shots))
+                    else:
+                        Post_Shots_1 = np.concatenate((Post_Shots_1, shots))
 
+                shots = self.proc_data_dict['Shots'][ch][comb]
                 # Hitogram data of each prepared_state
                 counts, bin_edges = np.histogram(shots, bins=100,
                                                  range=hist_range)
@@ -176,6 +195,32 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     Shots_1 = np.concatenate((Shots_1, shots))
 
             # Cumulative sums
+            if post_selection == True:
+                # bin data according to unique bins
+                ubins_0, ucounts_0 = np.unique(Post_Shots_0, return_counts=True)
+                ubins_1, ucounts_1 = np.unique(Post_Shots_1, return_counts=True)
+                ucumsum_0 = np.cumsum(ucounts_0)
+                ucumsum_1 = np.cumsum(ucounts_1)
+                # merge |0> and |1> shot bins
+                all_bins = np.unique(np.sort(np.concatenate((ubins_0, ubins_1))))
+                # interpolate cumsum for all bins
+                int_cumsum_0=np.interp(x=all_bins,xp=ubins_0,fp=ucumsum_0,left=0)
+                int_cumsum_1=np.interp(x=all_bins,xp=ubins_1,fp=ucumsum_1,left=0)
+                norm_cumsum_0 = int_cumsum_0/np.max(int_cumsum_0)
+                norm_cumsum_1 = int_cumsum_1/np.max(int_cumsum_1)
+                self.proc_data_dict['Post_CDF_data'][ch]['cumsum_x_ds']=all_bins
+                self.proc_data_dict['Post_CDF_data'][ch]['cumsum_y_ds'] = \
+                    [int_cumsum_0, int_cumsum_1]
+                self.proc_data_dict['Post_CDF_data'][ch]['cumsum_y_ds_n'] = \
+                    [norm_cumsum_0, norm_cumsum_1]
+                # Calculating threshold
+                F_vs_th = (1-(1-abs(norm_cumsum_0-norm_cumsum_1))/2)
+                opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
+                opt_idx = int(round(np.average(opt_idxs)))
+                self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_raw'] = \
+                    F_vs_th[opt_idx]
+                self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'] = \
+                    all_bins[opt_idx]
             # bin data according to unique bins
             ubins_0, ucounts_0 = np.unique(Shots_0, return_counts=True)
             ubins_1, ucounts_1 = np.unique(Shots_1, return_counts=True)
@@ -201,8 +246,18 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 F_vs_th[opt_idx]
             self.proc_data_dict['PDF_data'][ch]['threshold_raw'] = \
                 all_bins[opt_idx]
-
+            
             # Histogram of overall shots
+            if post_selection == True:
+                counts_0, bin_edges = np.histogram(Post_Shots_0, bins=100,
+                                                   range=hist_range)
+                counts_1, bin_edges = np.histogram(Post_Shots_1, bins=100,
+                                                   range=hist_range)
+                bin_centers = (bin_edges[1:] + bin_edges[:-1])/2
+                self.proc_data_dict['Post_PDF_data'][ch]['0'] = \
+                    (counts_0, bin_centers)
+                self.proc_data_dict['Post_PDF_data'][ch]['1'] = \
+                    (counts_1, bin_centers)
             counts_0, bin_edges = np.histogram(Shots_0, bins=100,
                                                range=hist_range)
             counts_1, bin_edges = np.histogram(Shots_1, bins=100,
@@ -217,14 +272,24 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             for comb in combinations:
                 if post_selection == True:
                     shots = self.proc_data_dict['Post_selected_shots'][ch][comb]
-                else:
-                    shots = self.proc_data_dict['Shots'][ch][comb]
+                    th = self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw']
+                    Post_Shots_digitized[ch][comb] = \
+                        np.array(shots > th, dtype=int)
+                shots = self.proc_data_dict['Shots'][ch][comb]
+                th = self.proc_data_dict['PDF_data'][ch]['threshold_raw']
                 Shots_digitized[ch][comb] = \
-                    np.array(shots > all_bins[opt_idx], dtype=int)
+                    np.array(shots > th, dtype=int)
 
         ##########################################
         # Calculate assignment probability matrix
         ##########################################
+        if post_selection == True:
+            ass_prob_matrix = calc_assignment_prob_matrix(combinations,
+                Post_Shots_digitized)
+            cross_fid_matrix = calc_cross_fidelity_matrix(combinations,
+                ass_prob_matrix)
+            self.proc_data_dict['Post_assignment_prob_matrix'] = ass_prob_matrix
+            self.proc_data_dict['Post_cross_fidelity_matrix'] = cross_fid_matrix
         assignment_prob_matrix = calc_assignment_prob_matrix(combinations,
             Shots_digitized)
         cross_fidelity_matrix = calc_cross_fidelity_matrix(combinations,
@@ -239,6 +304,25 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             ###################################
             # Histograms fit (PDF)
             ###################################
+            if self.post_selection == True:
+                bin_x = self.proc_data_dict['Post_PDF_data'][ch]['0'][1]
+                bin_xs = [bin_x, bin_x]
+                bin_ys = [self.proc_data_dict['Post_PDF_data'][ch]['0'][0],
+                          self.proc_data_dict['Post_PDF_data'][ch]['1'][0]]
+                m = lmfit.model.Model(ro_gauss)
+                m.guess = ro_double_gauss_guess.__get__(m, m.__class__)
+                params = m.guess(x=bin_xs, data=bin_ys,
+                         fixed_p01=self.options_dict.get('fixed_p01', False),
+                         fixed_p10=self.options_dict.get('fixed_p10', False))
+                post_res = m.fit(x=bin_xs, data=bin_ys, params=params)
+                self.fit_dicts['Post_PDF_fit_{}'.format(ch)] = {
+                    'model': m,
+                    'fit_xvals': {'x': bin_xs},
+                    'fit_yvals': {'data': bin_ys},
+                    'guessfn_pars':
+                        {'fixed_p01':self.options_dict.get('fixed_p01', False),
+                         'fixed_p10':self.options_dict.get('fixed_p10', False)},
+                }
             bin_x = self.proc_data_dict['PDF_data'][ch]['0'][1]
             bin_xs = [bin_x, bin_x]
             bin_ys = [self.proc_data_dict['PDF_data'][ch]['0'][0],
@@ -260,6 +344,24 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             ###################################
             #  Fit the CDF                    #
             ###################################
+            if self.post_selection == True:
+                m_cul = lmfit.model.Model(ro_CDF)
+                cdf_xs = self.proc_data_dict['Post_CDF_data'][ch]['cumsum_x_ds']
+                cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
+                cdf_ys = self.proc_data_dict['Post_CDF_data'][ch]['cumsum_y_ds']
+                cdf_ys = [np.array(cdf_ys[0]), np.array(cdf_ys[1])]
+
+                cum_params = post_res.params
+                cum_params['A_amplitude'].value = np.max(cdf_ys[0])
+                cum_params['A_amplitude'].vary = False
+                cum_params['B_amplitude'].value = np.max(cdf_ys[1])
+                cum_params['A_amplitude'].vary = False # FIXME: check if correct
+                self.fit_dicts['Post_CDF_fit_{}'.format(ch)] = {
+                    'model': m_cul,
+                    'fit_xvals': {'x': cdf_xs},
+                    'fit_yvals': {'data': cdf_ys},
+                    'guess_pars': cum_params,
+                }
             m_cul = lmfit.model.Model(ro_CDF)
             cdf_xs = self.proc_data_dict['CDF_data'][ch]['cumsum_x_ds']
             cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
@@ -286,37 +388,63 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         Channels = self.raw_data_dict['value_names']
         self.proc_data_dict['quantities_of_interest'] = \
             {ch : {} for ch in Channels}
+        if self.post_selection == True:
+            self.proc_data_dict['post_quantities_of_interest'] = \
+                {ch : {} for ch in Channels}
         self.qoi = {ch : {} for ch in Channels}
         for ch in Channels:
+            if self.post_selection == True:
+                # Create a CDF based on the fit functions of both fits.
+                post_fr = self.fit_res['Post_CDF_fit_{}'.format(ch)]
+                post_bv = post_fr.best_values
+                # best values new
+                post_bvn = copy.deepcopy(post_bv)
+                post_bvn['A_amplitude'] = 1
+                post_bvn['B_amplitude'] = 1
+                def CDF(x):
+                    return ro_CDF(x=x, **post_bvn)
+                def CDF_0(x):
+                    return CDF(x=[x, x])[0]
+                def CDF_1(x):
+                    return CDF(x=[x, x])[1]
+                def infid_vs_th(x):
+                    cdf = ro_CDF(x=[x, x], **post_bvn)
+                    return (1-np.abs(cdf[0] - cdf[1]))/2
+                self._CDF_0 = CDF_0
+                self._CDF_1 = CDF_1
+                self._infid_vs_th = infid_vs_th
+                post_thr_guess = (3*post_bv['B_center'] - post_bv['A_center'])/2
+                opt_fid = minimize(infid_vs_th, post_thr_guess)
+                # for some reason the fit sometimes returns a list of values
+                if isinstance(opt_fid['fun'], float):
+                    self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_fit']=\
+                        (1-opt_fid['fun'])
+                else:
+                    self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_fit']=\
+                        (1-opt_fid['fun'])[0]
+                self.proc_data_dict['Post_PDF_data'][ch]['threshold_fit']=\
+                    opt_fid['x'][0]
             # Create a CDF based on the fit functions of both fits.
             fr = self.fit_res['CDF_fit_{}'.format(ch)]
             bv = fr.best_values
-
             # best values new
             bvn = copy.deepcopy(bv)
             bvn['A_amplitude'] = 1
             bvn['B_amplitude'] = 1
-
             def CDF(x):
                 return ro_CDF(x=x, **bvn)
-
             def CDF_0(x):
                 return CDF(x=[x, x])[0]
-
             def CDF_1(x):
                 return CDF(x=[x, x])[1]
-
             def infid_vs_th(x):
                 cdf = ro_CDF(x=[x, x], **bvn)
                 return (1-np.abs(cdf[0] - cdf[1]))/2
-
             self._CDF_0 = CDF_0
             self._CDF_1 = CDF_1
             self._infid_vs_th = infid_vs_th
-
             thr_guess = (3*bv['B_center'] - bv['A_center'])/2
             opt_fid = minimize(infid_vs_th, thr_guess)
-
             # for some reason the fit sometimes returns a list of values
             if isinstance(opt_fid['fun'], float):
                 self.proc_data_dict['PDF_data'][ch]['F_assignment_fit'] = \
@@ -324,37 +452,72 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             else:
                 self.proc_data_dict['PDF_data'][ch]['F_assignment_fit'] = \
                     (1-opt_fid['fun'])[0]
-
             self.proc_data_dict['PDF_data'][ch]['threshold_fit'] = \
                 opt_fid['x'][0]
 
             # Calculate the fidelity of both
-
             ###########################################
             #  Extracting the discrimination fidelity #
             ###########################################
-
+            if self.post_selection == True:
+                def CDF_0_discr(x):
+                    return gaussianCDF(x, amplitude=1,
+                            mu=post_bv['A_center'], sigma=post_bv['A_sigma'])
+                def CDF_1_discr(x):
+                    return gaussianCDF(x, amplitude=1,
+                            mu=post_bv['B_center'], sigma=post_bv['B_sigma'])
+                def disc_infid_vs_th(x):
+                    cdf0 = gaussianCDF(x, amplitude=1, mu=post_bv['A_center'],
+                                       sigma=post_bv['A_sigma'])
+                    cdf1 = gaussianCDF(x, amplitude=1, mu=post_bv['B_center'],
+                                       sigma=post_bv['B_sigma'])
+                    return (1-np.abs(cdf0 - cdf1))/2
+                self._CDF_0_discr = CDF_0_discr
+                self._CDF_1_discr = CDF_1_discr
+                self._disc_infid_vs_th = disc_infid_vs_th
+                opt_fid_discr = minimize(disc_infid_vs_th, post_thr_guess)
+                # for some reason the fit sometimes returns a list of values
+                if isinstance(opt_fid_discr['fun'], float):
+                    self.proc_data_dict['Post_PDF_data'][ch]['F_discr'] = \
+                        (1-opt_fid_discr['fun'])
+                else:
+                    self.proc_data_dict['Post_PDF_data'][ch]['F_discr'] = \
+                        (1-opt_fid_discr['fun'])[0]
+                self.proc_data_dict['Post_PDF_data'][ch]['threshold_discr'] = \
+                    opt_fid_discr['x'][0]
+                post_fr = self.fit_res['Post_CDF_fit_{}'.format(ch)]
+                post_bv = post_fr.params
+                # self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
+                #     bv['A_spurious'].value
+                # self.proc_data_dict['PDF_data'][ch]['relaxation_events'] = \
+                #     bv['B_spurious'].value
+                A_amp = post_bv['A_spurious'].value
+                A_sig = post_bv['A_sigma'].value
+                B_amp = post_bv['B_spurious'].value
+                B_sig = post_bv['B_sigma'].value
+                residual_excitation=A_amp*B_sig/((1-A_amp)*A_sig + A_amp*B_sig)
+                relaxation_events = B_amp*A_sig/((1-B_amp)*B_sig + B_amp*A_sig)
+                self.proc_data_dict['Post_PDF_data'][ch]['residual_excitation']=\
+                    residual_excitation
+                self.proc_data_dict['Post_PDF_data'][ch]['relaxation_events']=\
+                    relaxation_events
+            # No post-selection
             def CDF_0_discr(x):
                 return gaussianCDF(x, amplitude=1,
                                    mu=bv['A_center'], sigma=bv['A_sigma'])
-
             def CDF_1_discr(x):
                 return gaussianCDF(x, amplitude=1,
                                    mu=bv['B_center'], sigma=bv['B_sigma'])
-
             def disc_infid_vs_th(x):
                 cdf0 = gaussianCDF(x, amplitude=1, mu=bv['A_center'],
                                    sigma=bv['A_sigma'])
                 cdf1 = gaussianCDF(x, amplitude=1, mu=bv['B_center'],
                                    sigma=bv['B_sigma'])
                 return (1-np.abs(cdf0 - cdf1))/2
-
             self._CDF_0_discr = CDF_0_discr
             self._CDF_1_discr = CDF_1_discr
             self._disc_infid_vs_th = disc_infid_vs_th
-
             opt_fid_discr = minimize(disc_infid_vs_th, thr_guess)
-
             # for some reason the fit sometimes returns a list of values
             if isinstance(opt_fid_discr['fun'], float):
                 self.proc_data_dict['PDF_data'][ch]['F_discr'] = \
@@ -362,10 +525,8 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             else:
                 self.proc_data_dict['PDF_data'][ch]['F_discr'] = \
                     (1-opt_fid_discr['fun'])[0]
-
             self.proc_data_dict['PDF_data'][ch]['threshold_discr'] =\
                 opt_fid_discr['x'][0]
-
             fr = self.fit_res['CDF_fit_{}'.format(ch)]
             bv = fr.params
             # self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
@@ -376,10 +537,8 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             A_sig = bv['A_sigma'].value
             B_amp = bv['B_spurious'].value
             B_sig = bv['B_sigma'].value
-
             residual_excitation = A_amp*B_sig/((1-A_amp)*A_sig + A_amp*B_sig)
             relaxation_events = B_amp*A_sig/((1-B_amp)*B_sig + B_amp*A_sig)
-
             self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
                 residual_excitation
             self.proc_data_dict['PDF_data'][ch]['relaxation_events'] = \
@@ -388,6 +547,23 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             ###################################
             #  Save quantities of interest.   #
             ###################################
+            if self.post_selection == True:
+                self.proc_data_dict['post_quantities_of_interest'][ch] = {
+                    'Post_SNR': \
+                self.fit_res['Post_CDF_fit_{}'.format(ch)].params['SNR'].value,
+                    'Post_F_d': \
+                self.proc_data_dict['Post_PDF_data'][ch]['F_discr'],
+                    'Post_F_a': \
+                self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_raw'],
+                    'Post_residual_excitation': \
+                self.proc_data_dict['Post_PDF_data'][ch]['residual_excitation'],
+                    'Post_relaxation_events':
+                self.proc_data_dict['Post_PDF_data'][ch]['relaxation_events'],
+                    'Post_threshold_raw': \
+                    self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'],
+                    'Post_threshold_discr': \
+                    self.proc_data_dict['Post_PDF_data'][ch]['threshold_discr']
+                }
             self.proc_data_dict['quantities_of_interest'][ch] = {
                 'SNR': \
                     self.fit_res['CDF_fit_{}'.format(ch)].params['SNR'].value,
@@ -403,7 +579,9 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     self.proc_data_dict['PDF_data'][ch]['threshold_discr']
             }
             self.qoi[ch] = self.proc_data_dict['quantities_of_interest'][ch]
-
+            if self.post_selection == True:
+                self.qoi[ch].update(self.proc_data_dict['post_quantities_of_interest'][ch])
+    
     def prepare_plots(self):
 
         Channels = self.raw_data_dict['value_names']
@@ -415,6 +593,29 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
         if self.q_target == None:
             # Run analysis for all qubits
+            if self.post_selection is True:
+                self.plot_dicts['assignment_probability_matrix_post'] = {
+                    'plotfn': plot_assignment_prob_matrix,
+                    'assignment_prob_matrix':
+                        self.proc_data_dict['Post_assignment_prob_matrix'],
+                    'combinations': self.proc_data_dict['combinations'],
+                    'valid_combinations': self.proc_data_dict['combinations'],
+                    'qubit_labels': qubit_labels,
+                    'plotsize': np.array(np.shape(\
+                    self.proc_data_dict['Post_assignment_prob_matrix'].T))*.8,
+                    'post_selection': True
+                    }
+                self.plot_dicts['cross_fid_matrix_post'] = {
+                    'plotfn': plot_cross_fid_matrix,
+                    'prob_matrix':
+                        self.proc_data_dict['Post_cross_fidelity_matrix'],
+                    'combinations': qubit_labels,
+                    'valid_combinations': qubit_labels,
+                    'qubit_labels': qubit_labels,
+                    'plotsize': np.array(np.shape(\
+                    self.proc_data_dict['Post_cross_fidelity_matrix'].T))*.8,
+                    'post_selection': True
+                    }
             self.plot_dicts['assignment_probability_matrix'] = {
                 'plotfn': plot_assignment_prob_matrix,
                 'assignment_prob_matrix':
@@ -438,10 +639,79 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             for i, ch in enumerate(Channels):
                 qubit_label = qubit_labels[i]
                 # Totalized shots
-                fig, axs = plt.subplots(ncols=3, figsize=(13,4), dpi=200)
+                if self.post_selection == True:
+                    fig, axs = plt.subplots(nrows=2, ncols=3, 
+                                            figsize=(13,8), dpi=200)
+                    axs = axs.ravel()
+                else:
+                    fig, axs = plt.subplots(ncols=3, figsize=(13,4), dpi=200)
                 fig.patch.set_alpha(0)
                 self.axs_dict['mux_ssro_totalshots_{}'.format(qubit_label)]=axs
                 self.figs['mux_ssro_totalshots_{}'.format(qubit_label)] = fig
+                if self.post_selection == True:
+                    self.plot_dicts['post_mux_ssro_totalshots_{}'.format(qubit_label)]={
+                        'plotfn': plot_single_qubit_histogram,
+                        'data': self.proc_data_dict['Post_PDF_data'][ch],
+                        'qubit_label': qubit_label,
+                        'ax_id': 'mux_ssro_totalshots_{}'.format(qubit_label),
+                        'para_hist' : \
+                        self.fit_res['Post_PDF_fit_{}'.format(ch)].best_values,
+                        'para_cdf' : \
+                        self.fit_res['Post_CDF_fit_{}'.format(ch)].best_values,
+                        'hist_data': \
+                        self.proc_data_dict['Post_Histogram_data'][ch],
+                        'qubit_idx': i,
+                        'value_name': ch,
+                        'combinations': combinations,
+                        'qubit_labels': qubit_labels,
+                        'threshold': \
+                        self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'],
+                        'timestamp': self.timestamp,
+                        'qoi': self.qoi[ch],
+                        'post_selection': True
+                    }
+                    self.plot_dicts['post_mux_ssro_cdf_{}'.format(qubit_label)]={
+                        'plotfn': plot_single_qubit_CDF,
+                        'data': self.proc_data_dict['Post_PDF_data'][ch],
+                        'qubit_label': qubit_label,
+                        'ax_id': 'mux_ssro_totalshots_{}'.format(qubit_label),
+                        'para_hist' : \
+                        self.fit_res['Post_PDF_fit_{}'.format(ch)].best_values,
+                        'para_cdf' : \
+                        self.fit_res['Post_CDF_fit_{}'.format(ch)].best_values,
+                        'hist_data': \
+                        self.proc_data_dict['Post_Histogram_data'][ch],
+                        'qubit_idx': i,
+                        'value_name': ch,
+                        'combinations': combinations,
+                        'qubit_labels': qubit_labels,
+                        'threshold': \
+                        self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'],
+                        'timestamp': self.timestamp,
+                        'qoi': self.qoi[ch],
+                        'post_selection': True
+                    }
+                    self.plot_dicts['post_mux_ssro_crosstalk_{}'.format(qubit_label)]={
+                        'plotfn': plot_single_qubit_crosstalk,
+                        'data': self.proc_data_dict['Post_PDF_data'][ch],
+                        'qubit_label': qubit_label,
+                        'ax_id': 'mux_ssro_totalshots_{}'.format(qubit_label),
+                        'para_hist' : \
+                        self.fit_res['Post_PDF_fit_{}'.format(ch)].best_values,
+                        'para_cdf' : \
+                        self.fit_res['Post_CDF_fit_{}'.format(ch)].best_values,
+                        'hist_data': \
+                        self.proc_data_dict['Post_Histogram_data'][ch],
+                        'qubit_idx': i,
+                        'value_name': ch,
+                        'combinations': combinations,
+                        'qubit_labels': qubit_labels,
+                        'threshold': \
+                        self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'],
+                        'timestamp': self.timestamp,
+                        'qoi': self.qoi[ch],
+                        'post_selection': True
+                    }
                 self.plot_dicts['mux_ssro_totalshots_{}'.format(qubit_label)]={
                     'plotfn': plot_single_qubit_histogram,
                     'data': self.proc_data_dict['PDF_data'][ch],
@@ -499,10 +769,87 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     'timestamp': self.timestamp,
                     'qoi': self.qoi[ch]
                 }
+
         else:
             # Run analysis on q_target only
             q_target_idx = qubit_labels.index(self.q_target)
             q_target_ch = Channels[q_target_idx]
+            if self.post_selection is True:
+                fig1, ax1 = plt.subplots(figsize=(5,4), dpi=200)
+                fig1.patch.set_alpha(0)
+                self.axs_dict['mux_ssro_histogram_{}_post'.format(self.q_target)]=ax1
+                self.figs['mux_ssro_histogram_{}_post'.format(self.q_target)]=fig1
+                self.plot_dicts['mux_ssro_histogram_{}_post'.format(self.q_target)]={
+                    'plotfn': plot_single_qubit_histogram,
+                    'data': self.proc_data_dict['Post_PDF_data'][q_target_ch],
+                    'qubit_label': self.q_target,
+                    'ax_id': 'mux_ssro_histogram_{}_post'.format(self.q_target),
+                    'para_hist' : \
+                    self.fit_res['Post_PDF_fit_{}'.format(q_target_ch)].best_values,
+                    'para_cdf' : \
+                    self.fit_res['Post_CDF_fit_{}'.format(q_target_ch)].best_values,
+                    'hist_data': \
+                    self.proc_data_dict['Post_Histogram_data'][q_target_ch],
+                    'qubit_idx': q_target_idx,
+                    'value_name': q_target_ch,
+                    'combinations': combinations,
+                    'qubit_labels': qubit_labels,
+                    'threshold': \
+                    self.proc_data_dict['Post_PDF_data'][q_target_ch]['threshold_raw'],
+                    'timestamp': self.timestamp,
+                    'qoi': self.qoi[q_target_ch],
+                    'post_selection':True
+                }
+                fig2, ax2 = plt.subplots(figsize=(5,4), dpi=200)
+                fig2.patch.set_alpha(0)
+                self.axs_dict['mux_ssro_cdf_{}_post'.format(self.q_target)]=ax2
+                self.figs['mux_ssro_cdf_{}_post'.format(self.q_target)]=fig2
+                self.plot_dicts['mux_ssro_cdf_{}_post'.format(self.q_target)]={
+                    'plotfn': plot_single_qubit_CDF,
+                    'data': self.proc_data_dict['Post_PDF_data'][q_target_ch],
+                    'qubit_label': self.q_target,
+                    'ax_id': 'mux_ssro_cdf_{}_post'.format(self.q_target),
+                    'para_hist' : \
+                    self.fit_res['Post_PDF_fit_{}'.format(q_target_ch)].best_values,
+                    'para_cdf' : \
+                    self.fit_res['Post_CDF_fit_{}'.format(q_target_ch)].best_values,
+                    'hist_data': \
+                    self.proc_data_dict['Post_Histogram_data'][q_target_ch],
+                    'qubit_idx': q_target_idx,
+                    'value_name': q_target_ch,
+                    'combinations': combinations,
+                    'qubit_labels': qubit_labels,
+                    'threshold': \
+                    self.proc_data_dict['Post_PDF_data'][q_target_ch]['threshold_raw'],
+                    'timestamp': self.timestamp,
+                    'qoi': self.qoi[q_target_ch],
+                    'post_selection': True
+                }
+                fig3, ax3 = plt.subplots(figsize=(5,4), dpi=200)
+                fig3.patch.set_alpha(0)
+                self.axs_dict['mux_ssro_crosstalk_{}_post'.format(self.q_target)]=ax3
+                self.figs['mux_ssro_crosstalk_{}_post'.format(self.q_target)]=fig3
+                self.plot_dicts['mux_ssro_crosstalk_{}_post'.format(self.q_target)]={
+                    'plotfn': plot_single_qubit_crosstalk,
+                    'data': self.proc_data_dict['Post_PDF_data'][q_target_ch],
+                    'qubit_label': self.q_target,
+                    'ax_id': 'mux_ssro_crosstalk_{}_post'.format(self.q_target),
+                    'para_hist' : \
+                    self.fit_res['Post_PDF_fit_{}'.format(q_target_ch)].best_values,
+                    'para_cdf' : \
+                    self.fit_res['Post_CDF_fit_{}'.format(q_target_ch)].best_values,
+                    'hist_data': \
+                    self.proc_data_dict['Post_Histogram_data'][q_target_ch],
+                    'qubit_idx': q_target_idx,
+                    'value_name': q_target_ch,
+                    'combinations': combinations,
+                    'qubit_labels': qubit_labels,
+                    'threshold': \
+                    self.proc_data_dict['Post_PDF_data'][q_target_ch]['threshold_raw'],
+                    'timestamp': self.timestamp,
+                    'qoi': self.qoi[q_target_ch],
+                    'post_selection':True
+                }
             fig1, ax1 = plt.subplots(figsize=(5,4), dpi=200)
             fig1.patch.set_alpha(0)
             self.axs_dict['mux_ssro_histogram_{}'.format(self.q_target)]=ax1
@@ -586,8 +933,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
 
 
-
-
 def calc_assignment_prob_matrix(combinations, digitized_data):
 
     assignment_prob_matrix = np.zeros((len(combinations), len(combinations)))
@@ -638,7 +983,7 @@ def calc_cross_fidelity_matrix(combinations,assignment_prob_matrix):
 def plot_assignment_prob_matrix(assignment_prob_matrix,
                                 combinations, qubit_labels, ax=None,
                                 valid_combinations=None,
-                                **kw):
+                                post_selection=False, **kw):
     if ax is None:
         figsize = np.array(np.shape(assignment_prob_matrix))*.7
         f, ax = plt.subplots(figsize=figsize)
@@ -686,14 +1031,19 @@ def plot_assignment_prob_matrix(assignment_prob_matrix,
     ax.xaxis.set_label_position('top')
 
     qubit_labels_str = ', '.join(qubit_labels)
-    ax.set_title('Assignment probability matrix\n qubits: [{}]'.format(
-        qubit_labels_str))
+    if post_selection is True:
+        txtstr = 'Post-selected assignment probability \
+            matrix\n qubits: [{}]'.format(qubit_labels_str)
+    else:
+        txtstr = 'Assignment probability matrix\n qubits: [{}]'.format(
+            qubit_labels_str)
+    ax.set_title(txtstr, fontsize=24)
 
 
 def plot_cross_fid_matrix(prob_matrix,
                           combinations, qubit_labels, ax=None,
                           valid_combinations=None,
-                          **kw):
+                          post_selection=False, **kw):
     if ax is None:
         figsize = np.array(np.shape(prob_matrix))*.7
         f, ax = plt.subplots(figsize=figsize)
@@ -747,20 +1097,27 @@ def plot_cross_fid_matrix(prob_matrix,
     ax.xaxis.set_label_position('top')
 
     qubit_labels_str = ', '.join(qubit_labels)
-    # ax.set_title(r'Cross fidelity $F_{ij}$')
+    if post_selection:
+        txtstr = 'Post-selected cross fidelity matrix'
+    else:
+        txtstr = 'Cross fidelity matrix'
+    ax.text(.5, 1.25, txtstr, transform=ax.transAxes, fontsize=15,
+            verticalalignment='top', horizontalalignment='center')
 
 def plot_single_qubit_histogram(data, ax, para_hist,
                                 para_cdf, timestamp,
                                 hist_data, combinations,
                                 qubit_idx, value_name,
                                 qubit_labels, threshold,
-                                qoi, **kw):
+                                qoi, post_selection=False,
+                                **kw):
     counts_0, bin_centers_0 = data['0']
     counts_1, bin_centers_1 = data['1']
     qubit_label = qubit_labels[qubit_idx]
     flag = False
     if type(ax) is np.ndarray:
-        ax = ax[0]
+        idx = int(3*post_selection)
+        ax = ax[idx]
         flag=True
     f = ax.get_figure()
     ########################################
@@ -789,21 +1146,32 @@ def plot_single_qubit_histogram(data, ax, para_hist,
     ax.set_title('Histogram of shots "'+qubit_label+'"')
     ax.legend(loc=0, fontsize=5)
     # Text box with quantities of interest
-    textstr = '\n'.join((
-        r'SNR    :       %.2f' % \
-            (qoi['SNR'], ),
-        r'$F_{assign}$  :    %.2f%%       p(g|$\pi$) : %.2f%%' % \
-            (qoi['F_a']*1e2, qoi['relaxation_events']*1e2, ),
-        r'$F_{discr}$    :    %.2f%%       p(e|$0$) : %.2f%%' % \
-            (qoi['F_d']*1e2,  qoi['residual_excitation']*1e2, )))
+    if post_selection is True:
+        textstr = '\n'.join((
+            r'SNR    :       %.2f' % \
+                (qoi['Post_SNR'], ),
+            r'$F_{assign}$  :    %.2f%%       p(g|$\pi$) : %.2f%%' % \
+                (qoi['Post_F_a']*1e2, qoi['Post_relaxation_events']*1e2, ),
+            r'$F_{discr}$    :    %.2f%%       p(e|$0$) : %.2f%%' % \
+                (qoi['Post_F_d']*1e2,  qoi['Post_residual_excitation']*1e2, ))) 
+    else:
+        textstr = '\n'.join((
+            r'SNR    :       %.2f' % \
+                (qoi['SNR'], ),
+            r'$F_{assign}$  :    %.2f%%       p(g|$\pi$) : %.2f%%' % \
+                (qoi['F_a']*1e2, qoi['relaxation_events']*1e2, ),
+            r'$F_{discr}$    :    %.2f%%       p(e|$0$) : %.2f%%' % \
+                (qoi['F_d']*1e2,  qoi['residual_excitation']*1e2, )))
     props = dict(boxstyle='round', facecolor='whitesmoke', alpha=1)
     ax.text(0.01, 1.35, textstr, transform=ax.transAxes, fontsize= 9,
            verticalalignment='top', bbox=props)
 
+    f.suptitle('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
     if flag == False:
         ax.legend(loc=0, fontsize=7)
-
-    f.suptitle('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
+        if post_selection is True:
+            f.suptitle('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp))
+    
     f.tight_layout()
 
 def plot_single_qubit_CDF(data, ax, para_hist,
@@ -811,16 +1179,21 @@ def plot_single_qubit_CDF(data, ax, para_hist,
                           hist_data, combinations,
                           qubit_idx, value_name,
                           qubit_labels, threshold,
-                          qoi, **kw):
+                          qoi, post_selection=False,
+                          **kw):
 
     counts_0, bin_centers_0 = data['0']
     counts_1, bin_centers_1 = data['1']
     qubit_label = qubit_labels[qubit_idx]
     flag = False
     if type(ax) is np.ndarray:
-        ax = ax[1]
+        idx = int(1+3*post_selection)
+        ax = ax[idx]
         flag = True
         ax.set_title('Cumulative sum of shots "{}"'.format(qubit_label))
+        if post_selection is True:
+            ax.text(.5, 1.3, 'Post-selected Shots', transform=ax.transAxes, 
+            fontsize= 20, verticalalignment='top', horizontalalignment='center')
     f = ax.get_figure()
     ########################################
     # Cumulative sum of shots
@@ -846,10 +1219,13 @@ def plot_single_qubit_CDF(data, ax, para_hist,
     ax.set_ylim(bottom=0)
     ax.set_xlabel('Effective voltage (V)')
     ax.set_ylabel('Fraction')
-    ax.legend(loc=0, fontsize=5)
+    ax.legend(loc=0, fontsize=5) 
 
     if flag == False:
-        ax.set_title('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
+        if post_selection:
+            ax.set_title('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp))
+        else:
+            ax.set_title('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
         ax.legend(loc=0, fontsize=7)
     f.tight_layout()
 
@@ -858,12 +1234,14 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
                                 hist_data, combinations,
                                 qubit_idx, value_name,
                                 qubit_labels, threshold,
-                                qoi, **kw):
+                                qoi, post_selection=False,
+                                 **kw):
 
     qubit_label = qubit_labels[qubit_idx]
     flag = False
     if type(ax) is np.ndarray:
-        ax = ax[2]
+        idx = int(2+3*post_selection)
+        ax = ax[idx]
         flag = True
         ax.set_title('Histogram vs Prepared state "'+qubit_label+'"')
 
@@ -901,11 +1279,14 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
     ax.set_xlabel(value_name.decode('utf-8'))
     ax.set_ylabel('Counts')
     l = ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
-        qubit_labels), prop={'size': 5})
-    l.get_title().set_fontsize('6')
+        qubit_labels), prop={'size': 4})
+    l.get_title().set_fontsize('5')
 
     if flag == False:
-        ax.set_title('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
+        if post_selection is True:
+            ax.set_title('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp))
+        else:
+            ax.set_title('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
         l = ax.legend(loc=(1.05, .01),
                       title='Prepared state\n{}'.format(qubit_labels),
                       prop={'size': 4})
