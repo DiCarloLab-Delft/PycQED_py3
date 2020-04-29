@@ -1775,6 +1775,26 @@ class DeviceCCL(Instrument):
             label='Mux_SSRO',
             MC=None):
         '''
+        Performs MUX single shot readout experiments of all possible
+        combinations of prepared states of <qubits>. Outputs analysis
+        of a single qubit <q_target>. This function is meant to
+        assess a particular qubit readout in the multiplexed context.
+
+        Args:
+            qubits: List of qubits adressed in the mux readout.
+
+            q_target: Qubit targeted in the analysis.
+
+            nr_shots: number of shots for each prepared state of
+            q_target. That is the experiment will include
+            <nr_shots> shots of the qubit prepared in the ground state
+            and <nr_shots> shots of the qubit prepared in the excited
+            state. The remaining qubits will be prepared such that the
+            experiment goes through all 2**n possible combinations of
+            computational states.
+
+            initialize: Include measurement post-selection by
+            initialization.
         '''
 
         log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
@@ -2192,7 +2212,9 @@ class DeviceCCL(Instrument):
         adaptive_num_pts_max=None,
         adaptive_sample_for_alignment=True,
         max_pnts_beyond_threshold=10,
-        minimizer_threshold=0.7,
+        minimizer_threshold=0.5,
+        par_idx=1,
+        peak_is_inverted=True,
         mv_bias_by=[-150e-6, 150e-6],
         flux_buffer_time=40e-9,  # use multiples of 20 ns
     ):
@@ -2342,8 +2364,6 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(amp_par)
         MC.set_detector_function(d)
 
-        label = "Chevron {} {} [{:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
-
         old_sq_duration = length_par()
         length_par(sq_duration)
         old_amp_par = amp_par()
@@ -2354,6 +2374,7 @@ class DeviceCCL(Instrument):
 
         flux_bias_old_val = flux_bias_par()
 
+        label = "Chevron {} {} [{:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
         def restore_pars():
             length_par(old_sq_duration)
             amp_par(old_amp_par)
@@ -2375,10 +2396,10 @@ class DeviceCCL(Instrument):
             goal = l1dm.mk_min_threshold_goal_func(
                 max_pnts_beyond_threshold=max_pnts_beyond_threshold
             )
-            minimize = True
+            minimize = peak_is_inverted
             loss = l1dm.mk_minimization_loss_func(
                 # Just in case it is ever changed to maximize
-                threshold= (-1) ** (minimize + 1) * minimizer_threshold,
+                threshold=(-1) ** (minimize + 1) * minimizer_threshold,
                 interval_weight=200.0
             )
             bounds = (np.min(amps), np.max(amps))
@@ -2386,7 +2407,7 @@ class DeviceCCL(Instrument):
             # because |2> amplitude is generally unpredictable, we use the
             # population in qspec to ensure there will be a peak for the
             # adaptive sampler
-            par_idx = 1
+            # par_idx = 1 # Moved to method's arguments
             adaptive_pars_pos = {
                 "adaptive_function": l1dm.Learner1D_Minimizer,
                 "goal": lambda l: goal(l) or l.npoints > adaptive_num_pts_max,
