@@ -1664,7 +1664,6 @@ setTrigger(0);
 
         # Print information
         log.info(f"{self.devname}: Valid delays are {valid_delays}")
-        log.info(f"{self.devname}: Setting delay to {delay}")
 
         # And configure the delays
         self._set_dio_calibration_delay(delay)
