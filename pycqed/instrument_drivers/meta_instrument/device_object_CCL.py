@@ -2374,7 +2374,7 @@ class DeviceCCL(Instrument):
 
         flux_bias_old_val = flux_bias_par()
 
-        label = "Chevron {} {} [{:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
+        label = "Chevron {} {} [cut @ {:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
 
         def restore_pars():
             length_par(old_sq_duration)
