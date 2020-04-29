@@ -190,18 +190,20 @@ if 1:  # test of Distributed Shared Memory
         .DEF    lut         0                       # 4 times CW=1 conditional on SM[3:0]
 
                 seq_bar     1                       # synchronize processors so markers make sense
-                #seq_out     0x0,1                   # no action, but does show on trace unit if enabled (so does seq_bar?)
                 move        $numIter,R0
         loop:   
         [{uhf}] seq_out     0x00010000,$uhfLatency  # trigger UHFQA
         [{awg}] seq_wait    $uhfLatency             # balance UHF duration
+
         [{uhf}] seq_in_sm   $smAddr,$mux,0          # 0=byte
         [{uhf}] seq_sw_sm   $smAddr
         [{awg}] seq_wait    2                       # balance UHF duration
+
                 seq_wait    $smWait                 # wait for data distribution
-        #[{awg}] seq_sw_sm   $smAddr                 # debug
+
         [{awg}] seq_out_sm  $smAddr,$lut,1
         [{uhf}] seq_wait    1
+
                 seq_wait    $wait
                 loop        R0,@loop
                 stop

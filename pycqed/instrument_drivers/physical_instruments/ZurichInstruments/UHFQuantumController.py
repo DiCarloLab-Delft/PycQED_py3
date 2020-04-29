@@ -226,7 +226,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
         if source == 1:
             return
 
-        print('Switching to external clock. This could take a while!')
+        log.info(f"{self.devname}: Switching to external clock.")
         while True:
             self.system_extclk(1)
             timeout = 10
@@ -237,12 +237,12 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                     break
                 else:                       # sync failed
                     timeout -= 0.1
-                    print('X', end='')
+                    #print('X', end='')
             if self.system_extclk() != 1:
-                print(' Switching to external clock failed. Trying again.')
+                log.warning(f"{self.devname}: Switching to external clock failed. Trying again.")
             else:
                 break
-        print('\nDone')
+        log.info(f"{self.devname}: Switching to external clock done.")
 
     def load_default_settings(self, upload_sequence=True) -> None:
         # standard configurations adapted from Haendbaek's notebook
@@ -1582,7 +1582,7 @@ setTrigger(0);
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
-        log.debug("{self.devname}:  Finding valid delays")
+        log.debug("{self.devname}: Finding valid delays")
 
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
@@ -1599,10 +1599,10 @@ setTrigger(0);
         log.debug(f"{self.devname}:   Using a mask value of 0x{combined_mask:08x}")
 
         valid_delays= []
-        for delay in range(16):
+        for delay in range(12):  # NB: 16 steps are available, but 2 periods of 20 ns should suffice
             log.debug(f'{self.devname}:    Testing delay {delay}')
-            self.setd('raw/dios/0/delay', delay)
-            time.sleep(1)
+            self.setd('raw/dios/0/delay', delay)  # in 1/300 MHz = 3.33 ns steps
+            time.sleep(0.5)
             valid_sequence = True
             for awg in [0]:
                 error_timing = self.geti('raw/dios/0/error/timing')
@@ -1640,6 +1640,7 @@ setTrigger(0);
         return dio_mask,expected_sequence
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        log.info(f"{self.devname}: Calibrating DIO protocol")
         self.assure_ext_clock()
 
         for awg in [0]:
