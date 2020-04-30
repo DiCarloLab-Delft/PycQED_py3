@@ -1588,7 +1588,7 @@ class CCLight_Transmon(Qubit):
         return frequency_sweet_spot
 
     def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
-                                    mode='pulsed_marked', update=True):
+                                    mode='pulsed_marked', update=True, power_12=10):
         """
         Finds an estimate of the anharmonicity by doing a spectroscopy around
         150 MHz below the qubit frequency.
@@ -1609,7 +1609,7 @@ class CCLight_Transmon(Qubit):
             freqs = np.arange(freq_center-1/2*freq_range, self.freq_qubit()+1/2*freq_range,
                               0.5e6)
         old_spec_pow = self.spec_pow()
-        self.spec_pow(self.spec_pow()+10)
+        self.spec_pow(self.spec_pow()+power_12)
 
         self.measure_spectroscopy(freqs=freqs, mode=mode, analyze=False)
 
@@ -5437,7 +5437,8 @@ class CCLight_Transmon(Qubit):
         p = sqo.ef_rabi_seq(
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
-            platf_cfg=self.cfg_openql_platform_fn())
+            platf_cfg=self.cfg_openql_platform_fn(),
+            add_cal_points = True)
 
         s = swf.OpenQL_Sweep(openql_program=p,
                              parameter_name='Pulse amp',
