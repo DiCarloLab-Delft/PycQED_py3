@@ -2434,7 +2434,8 @@ class DeviceCCL(Instrument):
 
         flux_bias_old_val = flux_bias_par()
 
-        label = "Chevron {} {} [{:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
+        label = "Chevron {} {} [cut @ {:4g} ns]".format(q0, q_spec, length_par() / 1e-9)
+
         def restore_pars():
             length_par(old_sq_duration)
             amp_par(old_amp_par)
@@ -2498,13 +2499,15 @@ class DeviceCCL(Instrument):
 
             restore_pars()
 
-            ma2.Chevron_Alignment_Analysis(
+            a = ma2.Chevron_Alignment_Analysis(
                 label=label,
                 sq_pulse_duration=length_par(),
                 fit_threshold=minimizer_threshold,
                 fit_from=d.value_names[par_idx],
                 peak_is_inverted=minimize,
             )
+
+            return a
 
         else:
             # Default single 1D adaptive sampling

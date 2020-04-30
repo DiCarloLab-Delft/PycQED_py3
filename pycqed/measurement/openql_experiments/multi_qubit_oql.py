@@ -110,6 +110,70 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
     return p
 
 
+def targeted_off_on(qubits: list,
+                    q_target: str,
+                    pulse_comb:str,
+                    platf_cfg: str):
+    """
+    Performs an 'off_on' sequence on the qubits specified.
+        off: prepz -      - RO
+        on:  prepz - x180 - RO
+
+    Will cycle through all combinations of computational states of every
+    qubit in <qubits> except the target qubit. The target qubit will be
+    initialized according to <pulse_comb>. 'Off' initializes the qubit in
+    the ground state and 'On' initializes the qubit in the excited state.
+
+    Args:
+        qubits (list) : list of integers denoting the qubits to use
+        q_target (str) : targeted qubit.
+        pulse_comb (str) : prepared state of target qubit.
+        platf_cfg (str) : filepath of OpenQL platform config file
+    """
+
+    nr_qubits = len(qubits)
+    idx = qubits.index(q_target)
+
+    combinations = ['{:0{}b}'.format(i, nr_qubits-1) for i in range(2**(nr_qubits-1))]
+    for i, comb in enumerate(combinations):
+        comb = list(comb)#
+        if 'on' in pulse_comb.lower(): 
+            comb.insert(idx, '1')
+        elif 'off' in pulse_comb.lower():
+            comb.insert(idx, '0')
+        else:
+            raise ValueError()
+        combinations[i] = ''.join(comb)
+
+    p = oqh.create_program("Targeted_off_on", platf_cfg)
+
+    for i, comb in enumerate(combinations):
+        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+
+        # 1. Prepare qubits in 0
+        for q in qubits:
+            k.prepz(q)
+
+        # 2. prepare desired state
+        for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
+            if state == '0':
+                pass
+            elif state == '1':
+                k.gate('rx180', [target_qubit])
+
+        # 3. measurement of all qubits
+        k.gate('wait', qubits, 0)
+        # Used to ensure timing is aligned
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+
+    return p
+
+
 def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
                                   target_qubit_excited: bool=False, wait_time=0,
                                   extra_echo=False):
@@ -1299,6 +1363,9 @@ def conditional_oscillation_seq(q0: int, q1: int,
                                 q2: int=None, q3: int=None,
                                 platf_cfg: str=None,
                                 CZ_disabled: bool=False,
+                                single_q_gates_replace: str = None,
+                                cz_repetitions: int = 1,
+                                q0_first_gate: str = "rx90",
                                 angles=np.arange(0, 360, 20),
                                 wait_time_after: int=0,
                                 add_cal_points: bool=True,
@@ -1326,6 +1393,11 @@ def conditional_oscillation_seq(q0: int, q1: int,
             optionally park qubits q2 (and q3) with either a 'park' pulse
             (single qubit operation on q2) or a 'cz' pulse on q2-q3.
         CZ_disabled (bool): disable CZ gate
+        single_q_gates_replace (str): codeword to replace all single qubit
+            gate except the ones used for calibration
+            Main usescase is debugging and using "I"
+        cz_repetitions (int): how many cz gates to apply consecutively
+        q0_first_gate (str): defines the initial state of q0 before applying cz
         angles      (array): angles of the recovery pulse
         wait_time_after   (int): wait time in ns after triggering all flux
             pulses
@@ -1343,51 +1415,59 @@ def conditional_oscillation_seq(q0: int, q1: int,
             k.prepz(q1)
 
             if case == 'excitation':
-                k.gate('rx180', [q1])
-                # k.gate('i', [q0])
-                # k.gate("wait", [], 0)
-            k.gate('rx90', [q0])
-            if not CZ_disabled:
-                k.gate("wait", [], 0) # Empty list generates barrier for all qubits in platf. only works with 0.8.0
-                k.gate(flux_codeword, [q0, q1])
+                gate = 'rx180' if single_q_gates_replace is None else single_q_gates_replace
+                k.gate(gate, [q1])
 
-                # sometimes we want to move another qubit out of the way using
-                # a pulse.
-                if flux_codeword_park == 'cz':
-                    k.gate(flux_codeword_park, [q2, q3])
-                elif flux_codeword_park == 'park':
-                    k.gate(flux_codeword_park, [q2])
-                    if q3 is not None:
-                        raise ValueError("Expected q3 to be None")
-                elif flux_codeword_park is None:
-                    pass
+            gate = q0_first_gate if single_q_gates_replace is None else single_q_gates_replace
+            k.gate(gate, [q0])
+
+            for dummy_i in range(cz_repetitions):
+                if not CZ_disabled:
+                    k.gate("wait", [], 0) # Empty list generates barrier for all qubits in platf. only works with 0.8.0
+                    # k.gate("fl_cw_03", [q0, q1])
+                    # k.gate( "sf_cz_sw", [q1])
+                    # k.gate("sf_cz_ne", [q0])
+                    k.gate(flux_codeword, [q0, q1])
+
+                    # sometimes we want to move another qubit out of the way using
+                    # a pulse.
+                    if flux_codeword_park == 'cz':
+                        k.gate(flux_codeword_park, [q2, q3])
+                    elif flux_codeword_park == 'park':
+                        k.gate(flux_codeword_park, [q2])
+                        if q3 is not None:
+                            raise ValueError("Expected q3 to be None")
+                    elif flux_codeword_park is None:
+                        pass   
+                    else:
+                        raise ValueError(
+                            'flux_codeword_park "{}" not allowed'.format(
+                                flux_codeword_park))
+
+                    k.gate("wait", [], 0) #alignment workaround
                 else:
-                    raise ValueError(
-                        'flux_codeword_park "{}" not allowed'.format(
-                            flux_codeword_park))
-
-                k.gate("wait", [], 0) #alignment workaround
-            else:
-                k.gate("wait", [], 0) #alignment workaround
-                k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
-                k.gate("wait", [], 0) #alignment workaround
+                    k.gate("wait", [], 0) #alignment workaround
+                    k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
+                    k.gate("wait", [], 0) #alignment workaround
 
             if wait_time_after > 0:
                 k.gate('wait', [q0,q1], wait_time_after)
 
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
+                gate = 'rx90' if single_q_gates_replace is None else single_q_gates_replace
                 # special because the cw phase pulses go in mult of 20 deg
-                k.gate('ry90', [q0])
+                k.gate(gate, [q0])
             elif angle == 0:
-                k.gate('rx90', [q0])
+                gate = 'rx90' if single_q_gates_replace is None else single_q_gates_replace
+                k.gate(gate, [q0])
             else:
-                k.gate('cw_{:02}'.format(cw_idx), [q0])
+                gate = 'cw_{:02}'.format(cw_idx) if single_q_gates_replace is None else single_q_gates_replace
+                k.gate(gate, [q0])
             if case == 'excitation':
-                k.gate('rx180', [q1])
-                k.gate('i', [q0])
-                k.gate("wait", [], 0)
-
+                gate = 'rx180' if single_q_gates_replace is None else single_q_gates_replace
+                k.gate(gate, [q1])
+            
             k.measure(q0)
             k.measure(q1)
             # Implements a barrier to align timings
