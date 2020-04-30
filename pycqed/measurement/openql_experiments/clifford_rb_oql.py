@@ -141,12 +141,13 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
         for j, n_cl in enumerate(nr_cliffords):
             for interleaving_cl in interleaving_cliffords:
                 if not simultaneous_single_qubit_RB:
-                    cl_seq = rb.randomized_benchmarking_sequence(
-                        n_cl, number_of_qubits=number_of_qubits,
-                        desired_net_cl=None,  # net_clifford,
-                        max_clifford_idx=max_clifford_idx,
-                        interleaving_cl=interleaving_cl
-                    )
+                    for net_clifford in net_cliffords:
+                        cl_seq = rb.randomized_benchmarking_sequence(
+                            n_cl, number_of_qubits=number_of_qubits,
+                            desired_net_cl=net_clifford,
+                            max_clifford_idx=max_clifford_idx,
+                            interleaving_cl=interleaving_cl
+                        )
                     net_cl_seq = rb.calculate_net_clifford(cl_seq, Cl)
                     cl_seq_decomposed = []
                     for cl in cl_seq:
