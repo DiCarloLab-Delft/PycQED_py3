@@ -1938,6 +1938,75 @@ class DeviceCCL(Instrument):
         return
 
 
+    def measure_transients(self,
+                           qubits: list,
+                           q_target: str,
+                           cases: list = ['off', 'on'],
+                           MC=None,
+                           prepare_for_timedomain: bool = True,
+                           analyze: bool = True):
+        '''
+        Documentation.
+        '''
+
+        # Ensure all qubits use same acquisition instrument
+        instruments = [self.find_instrument(q).instr_acquisition() for q in qubits]
+        if instruments[1:] != instruments[:-1]:
+            raise ValueError("All qubits must have common acquisition instrument")
+
+        qubits_nr = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        q_target_nr = self.find_instrument(q_target).cfg_qubit_nr()
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits)
+
+        p = mqo.targeted_off_on(
+                    qubits=qubits_nr,
+                    q_target=q_target_nr,
+                    pulse_comb='on',
+                    platf_cfg=self.cfg_openql_platform_fn()
+                )
+
+        analysis = [None for case in cases]
+        for i, pulse_comb in enumerate(cases):
+            if 'off' in pulse_comb.lower():
+                self.find_instrument(q_target).instr_LO_mw.get_instr().off()
+            elif 'on' in pulse_comb.lower():
+                self.find_instrument(q_target).instr_LO_mw.get_instr().on()
+            else:
+                raise ValueError(
+                    "pulse_comb {} not understood: Only 'on' and 'off' allowed.".
+                    format(pulse_comb))
+
+            s = swf.OpenQL_Sweep(openql_program=p,
+                                 parameter_name='Transient time', unit='s',
+                                 CCL=self.instr_CC.get_instr())
+
+            if 'UHFQC' in instruments[0]:
+                sampling_rate = 1.8e9
+            else:
+                raise NotImplementedError()
+            nr_samples = self.ro_acq_integration_length()*sampling_rate
+
+            d = det.UHFQC_input_average_detector(
+                            UHFQC=self.find_instrument(instruments[0]),
+                            AWG=self.instr_CC.get_instr(),
+                            nr_averages=self.ro_acq_averages(),
+                            nr_samples=int(nr_samples))
+
+            MC.set_sweep_function(s)
+            MC.set_sweep_points(np.arange(nr_samples)/sampling_rate)
+            MC.set_detector_function(d)
+            MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb,
+                                                    self.msmt_suffix))
+            if analyze:
+                analysis[i] = ma2.mra.Multiplexed_Transient_Analysis(
+                    q_target='{}_{}'.format(q_target, pulse_comb))
+        return analysis
+
+
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
                                               prepare_for_timedomain=True,

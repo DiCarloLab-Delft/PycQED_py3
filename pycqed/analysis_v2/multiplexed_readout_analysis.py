@@ -246,7 +246,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 F_vs_th[opt_idx]
             self.proc_data_dict['PDF_data'][ch]['threshold_raw'] = \
                 all_bins[opt_idx]
-            
+
             # Histogram of overall shots
             if post_selection == True:
                 counts_0, bin_edges = np.histogram(Post_Shots_0, bins=100,
@@ -581,7 +581,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             self.qoi[ch] = self.proc_data_dict['quantities_of_interest'][ch]
             if self.post_selection == True:
                 self.qoi[ch].update(self.proc_data_dict['post_quantities_of_interest'][ch])
-    
+
     def prepare_plots(self):
 
         Channels = self.raw_data_dict['value_names']
@@ -640,7 +640,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 qubit_label = qubit_labels[i]
                 # Totalized shots
                 if self.post_selection == True:
-                    fig, axs = plt.subplots(nrows=2, ncols=3, 
+                    fig, axs = plt.subplots(nrows=2, ncols=3,
                                             figsize=(13,8), dpi=200)
                     axs = axs.ravel()
                 else:
@@ -932,6 +932,96 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
 
+class Multiplexed_Transient_Analysis(ba.BaseDataAnalysis):
+    """
+    Mux transient analysis.
+    """
+
+    def __init__(self, q_target: str,
+                 t_start: str = None, t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, extract_only: bool = False,
+                 auto=True):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+
+        self.q_target = q_target
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+
+        self.proc_data_dict['Time_data'] = self.raw_data_dict['data'][:, 0]
+        self.proc_data_dict['Channel_0_data'] = self.raw_data_dict['data'][:, 1]
+        self.proc_data_dict['Channel_1_data'] = self.raw_data_dict['data'][:, 2]
+
+
+    def prepare_plots(self):
+
+        self.axs_dict = {}
+        fig, axs = plt.subplots(nrows=2, sharex='col', figsize=(7, 5), dpi=200)
+        fig.patch.set_alpha(0)
+        self.axs_dict['MUX_transients'] = axs
+        self.figs['MUX_transients'] = fig
+        self.plot_dicts['MUX_transients'] = {
+            'plotfn': plot_transients,
+            'time_data': self.proc_data_dict['Time_data'],
+            'data_ch_0': self.proc_data_dict['Channel_0_data'],
+            'data_ch_1': self.proc_data_dict['Channel_1_data'],
+            'qubit_label': self.q_target,
+            'timestamp': self.timestamp
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+
+def plot_transients(time_data,
+                    data_ch_0, data_ch_1,
+                    qubit_label,
+                    timestamp,
+                    ax, **kw):
+    fig = ax[0].get_figure()
+
+    ax[0].plot(time_data, data_ch_0, 'C0-')
+    ax[0].set_xlim(left=0, right=time_data[-1])
+    set_ylabel(ax[0], 'Channel_0 amplitude', 'a.u.')
+
+    ax[1].plot(time_data, data_ch_1, 'C1-')
+    set_ylabel(ax[1], 'Channel_1 amplitude', 'a.u.')
+    set_xlabel(ax[1], 'Time', 's')
+
+    fig.suptitle('Mux_transients_{}'.format(qubit_label), y=1.05)
+    fig.tight_layout()
+
+
 
 def calc_assignment_prob_matrix(combinations, digitized_data):
 
@@ -949,7 +1039,7 @@ def calc_assignment_prob_matrix(combinations, digitized_data):
 
     return assignment_prob_matrix
 
-def calc_cross_fidelity_matrix(combinations,assignment_prob_matrix):
+def calc_cross_fidelity_matrix(combinations, assignment_prob_matrix):
 
     n = int(np.log2(len(combinations)))
     crossFidMat = np.zeros((n, n))
@@ -1032,8 +1122,7 @@ def plot_assignment_prob_matrix(assignment_prob_matrix,
 
     qubit_labels_str = ', '.join(qubit_labels)
     if post_selection is True:
-        txtstr = 'Post-selected assignment probability \
-            matrix\n qubits: [{}]'.format(qubit_labels_str)
+        txtstr = 'Post-selected assignment probability matrix\n qubits: [{}]'.format(qubit_labels_str)
     else:
         txtstr = 'Assignment probability matrix\n qubits: [{}]'.format(
             qubit_labels_str)
@@ -1153,7 +1242,7 @@ def plot_single_qubit_histogram(data, ax, para_hist,
             r'$F_{assign}$  :    %.2f%%       p(g|$\pi$) : %.2f%%' % \
                 (qoi['Post_F_a']*1e2, qoi['Post_relaxation_events']*1e2, ),
             r'$F_{discr}$    :    %.2f%%       p(e|$0$) : %.2f%%' % \
-                (qoi['Post_F_d']*1e2,  qoi['Post_residual_excitation']*1e2, ))) 
+                (qoi['Post_F_d']*1e2,  qoi['Post_residual_excitation']*1e2, )))
     else:
         textstr = '\n'.join((
             r'SNR    :       %.2f' % \
@@ -1171,7 +1260,7 @@ def plot_single_qubit_histogram(data, ax, para_hist,
         ax.legend(loc=0, fontsize=7)
         if post_selection is True:
             f.suptitle('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp))
-    
+
     f.tight_layout()
 
 def plot_single_qubit_CDF(data, ax, para_hist,
@@ -1192,7 +1281,7 @@ def plot_single_qubit_CDF(data, ax, para_hist,
         flag = True
         ax.set_title('Cumulative sum of shots "{}"'.format(qubit_label))
         if post_selection is True:
-            ax.text(.5, 1.3, 'Post-selected Shots', transform=ax.transAxes, 
+            ax.text(.5, 1.3, 'Post-selected Shots', transform=ax.transAxes,
             fontsize= 20, verticalalignment='top', horizontalalignment='center')
     f = ax.get_figure()
     ########################################
@@ -1219,7 +1308,7 @@ def plot_single_qubit_CDF(data, ax, para_hist,
     ax.set_ylim(bottom=0)
     ax.set_xlabel('Effective voltage (V)')
     ax.set_ylabel('Fraction')
-    ax.legend(loc=0, fontsize=5) 
+    ax.legend(loc=0, fontsize=5)
 
     if flag == False:
         if post_selection:

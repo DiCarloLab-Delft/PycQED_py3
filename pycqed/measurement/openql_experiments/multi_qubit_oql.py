@@ -111,7 +111,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
 
 
 def targeted_off_on(qubits: list,
-                    q_target: str,
+                    q_target: int,
                     pulse_comb:str,
                     platf_cfg: str):
     """
@@ -137,7 +137,7 @@ def targeted_off_on(qubits: list,
     combinations = ['{:0{}b}'.format(i, nr_qubits-1) for i in range(2**(nr_qubits-1))]
     for i, comb in enumerate(combinations):
         comb = list(comb)#
-        if 'on' in pulse_comb.lower(): 
+        if 'on' in pulse_comb.lower():
             comb.insert(idx, '1')
         elif 'off' in pulse_comb.lower():
             comb.insert(idx, '0')
@@ -1438,7 +1438,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
                         if q3 is not None:
                             raise ValueError("Expected q3 to be None")
                     elif flux_codeword_park is None:
-                        pass   
+                        pass
                     else:
                         raise ValueError(
                             'flux_codeword_park "{}" not allowed'.format(
@@ -1467,7 +1467,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
             if case == 'excitation':
                 gate = 'rx180' if single_q_gates_replace is None else single_q_gates_replace
                 k.gate(gate, [q1])
-            
+
             k.measure(q0)
             k.measure(q1)
             # Implements a barrier to align timings
