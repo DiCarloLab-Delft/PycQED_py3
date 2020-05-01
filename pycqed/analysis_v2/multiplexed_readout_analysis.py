@@ -246,7 +246,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 F_vs_th[opt_idx]
             self.proc_data_dict['PDF_data'][ch]['threshold_raw'] = \
                 all_bins[opt_idx]
-            
+
             # Histogram of overall shots
             if post_selection == True:
                 counts_0, bin_edges = np.histogram(Post_Shots_0, bins=100,
@@ -581,7 +581,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             self.qoi[ch] = self.proc_data_dict['quantities_of_interest'][ch]
             if self.post_selection == True:
                 self.qoi[ch].update(self.proc_data_dict['post_quantities_of_interest'][ch])
-    
+
     def prepare_plots(self):
 
         Channels = self.raw_data_dict['value_names']
@@ -640,7 +640,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 qubit_label = qubit_labels[i]
                 # Totalized shots
                 if self.post_selection == True:
-                    fig, axs = plt.subplots(nrows=2, ncols=3, 
+                    fig, axs = plt.subplots(nrows=2, ncols=3,
                                             figsize=(13,8), dpi=200)
                     axs = axs.ravel()
                 else:
@@ -1032,8 +1032,7 @@ def plot_assignment_prob_matrix(assignment_prob_matrix,
 
     qubit_labels_str = ', '.join(qubit_labels)
     if post_selection is True:
-        txtstr = 'Post-selected assignment probability \
-            matrix\n qubits: [{}]'.format(qubit_labels_str)
+        txtstr = 'Post-selected assignment probability matrix\n qubits: [{}]'.format(qubit_labels_str)
     else:
         txtstr = 'Assignment probability matrix\n qubits: [{}]'.format(
             qubit_labels_str)
@@ -1153,7 +1152,7 @@ def plot_single_qubit_histogram(data, ax, para_hist,
             r'$F_{assign}$  :    %.2f%%       p(g|$\pi$) : %.2f%%' % \
                 (qoi['Post_F_a']*1e2, qoi['Post_relaxation_events']*1e2, ),
             r'$F_{discr}$    :    %.2f%%       p(e|$0$) : %.2f%%' % \
-                (qoi['Post_F_d']*1e2,  qoi['Post_residual_excitation']*1e2, ))) 
+                (qoi['Post_F_d']*1e2,  qoi['Post_residual_excitation']*1e2, )))
     else:
         textstr = '\n'.join((
             r'SNR    :       %.2f' % \
@@ -1171,7 +1170,7 @@ def plot_single_qubit_histogram(data, ax, para_hist,
         ax.legend(loc=0, fontsize=7)
         if post_selection is True:
             f.suptitle('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp))
-    
+
     f.tight_layout()
 
 def plot_single_qubit_CDF(data, ax, para_hist,
@@ -1192,7 +1191,7 @@ def plot_single_qubit_CDF(data, ax, para_hist,
         flag = True
         ax.set_title('Cumulative sum of shots "{}"'.format(qubit_label))
         if post_selection is True:
-            ax.text(.5, 1.3, 'Post-selected Shots', transform=ax.transAxes, 
+            ax.text(.5, 1.3, 'Post-selected Shots', transform=ax.transAxes,
             fontsize= 20, verticalalignment='top', horizontalalignment='center')
     f = ax.get_figure()
     ########################################
@@ -1219,7 +1218,7 @@ def plot_single_qubit_CDF(data, ax, para_hist,
     ax.set_ylim(bottom=0)
     ax.set_xlabel('Effective voltage (V)')
     ax.set_ylabel('Fraction')
-    ax.legend(loc=0, fontsize=5) 
+    ax.legend(loc=0, fontsize=5)
 
     if flag == False:
         if post_selection:
