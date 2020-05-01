@@ -28,8 +28,11 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
     QuTech_AWG_Module,
 )
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
-from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
-from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
+import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
+
+
+# from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
+# from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 
 from pycqed.utilities import learner1D_minimizer as l1dm
 
@@ -1173,6 +1176,7 @@ class DeviceCCL(Instrument):
         label="",
         shots_logging: bool = False,
         shots_per_meas=2 ** 16,
+        flux_codeword="cz"
     ):
         """
         Prepares and performs a tomography of the one of the bell states, indicated
@@ -1216,6 +1220,7 @@ class DeviceCCL(Instrument):
             q1idx,
             wait_after_flux=wait_after_flux,
             platf_cfg=self.cfg_openql_platform_fn(),
+            flux_codeword=flux_codeword
         )
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
@@ -1234,6 +1239,7 @@ class DeviceCCL(Instrument):
                     single_shots=False,
                     q0_label=q0,
                     q1_label=q1,
+
                 )
                 return a
 
@@ -1650,6 +1656,60 @@ class DeviceCCL(Instrument):
             a = mra.two_qubit_ssro_fidelity("SSRO_{}_{}".format(q1, q0))
             a = ma2.Multiplexed_Readout_Analysis()
         return a
+
+    def measure_state_tomography(self, qubits=['D2', 'X'],
+                                 MC=None,
+                                 bell_state: float=None,
+                                 product_state: float=None,
+                                 wait_after_flux: float=None,
+                                 prepare_for_timedomain: bool =False,
+                                 live_plot=False,
+                                 nr_shots_per_case=2**14,
+                                 shots_per_meas=2**16,
+                                 disable_snapshot_metadata: bool = False,
+                                 label='State_Tomography_',
+                                 flux_codeword="cz"):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits)
+
+        qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
+                      for qn in qubits]
+        p = mqo.two_qubit_state_tomography(qubit_idxs, bell_state=bell_state,
+                                           product_state=product_state,
+                                           wait_after_flux=wait_after_flux,
+                                           platf_cfg=self.cfg_openql_platform_fn(),
+                                           flux_codeword=flux_codeword)
+        # Special argument added to program
+        combinations = p.combinations
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.get_int_logging_detector(qubits)
+        nr_cases = len(combinations)
+        nr_shots = nr_shots_per_case*nr_cases
+        shots_per_meas = int(np.floor(
+            np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
+
+        # Ensures shots per measurement is a multiple of the number of cases
+        shots_per_meas -= shots_per_meas % nr_cases
+
+        d.set_child_attr('nr_shots', shots_per_meas)
+
+        MC.live_plot_enabled(live_plot)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(np.arange(nr_cases), nr_shots_per_case))
+        MC.set_detector_function(d)
+        MC.run('{}'.format(label),
+               exp_metadata={'combinations': combinations},
+               disable_snapshot_metadata=disable_snapshot_metadata)
+        # mra.Multiplexed_Readout_Analysis(extract_combinations=True, options_dict={'skip_cross_fidelity': True})
+        tomo_v2.Full_State_Tomography_2Q(label=label,
+                                         qubit_ro_channels=qubits, # channels we will want to use for tomo
+                                         correl_ro_channels=[qubits], # correlations we will want for the tomo
+                                         tomo_qubits_idx=qubits)
 
     def measure_ssro_multi_qubit(
             self,
@@ -3370,7 +3430,7 @@ class DeviceCCL(Instrument):
         self.ro_acq_weight_type("SSB")
         self.ro_acq_digitized(False)
 
-        self.prepare_for_timedomain()
+        self.prepare_for_timedomain(qubits=qubits)
 
         MC.soft_avg(1)
         # set back the settings
