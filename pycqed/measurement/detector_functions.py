@@ -237,10 +237,25 @@ class Multi_Detector_UHF(Multi_Detector):
 
     def get_values(self):
         values_list = []
+
+        # Since master (holding cc object) is first in self.detectors,
+        self.detectors[0].AWG.stop()
+        self.detectors[0].AWG.get_operation_complete()
+
+        # Prepare and arm
         for detector in self.detectors:
+            # Prepare gets called by MC, don't call it here
+            # detector.prepare()
             detector.arm()
+            detector.UHFQC.sync()
+
+        # Run (both in parallel and implicitly)
+        self.detectors[0].AWG.start()
+        self.detectors[0].AWG.get_operation_complete()
+
+        # Get data
         for detector in self.detectors:
-            new_values = detector.get_values(arm=False)
+            new_values = detector.get_values(arm=False, is_single_detector=False)
             values_list.append(new_values)
         values = np.concatenate(values_list)
         return values
@@ -1829,31 +1844,35 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
 
-    def get_values(self, arm=True):
-        if self.always_prepare:
-            self.prepare()
+    def get_values(self, arm=True, is_single_detector=True):
+        if is_single_detector:
+            if self.always_prepare:
+                self.prepare()
 
-        if self.AWG is not None:
-            self.AWG.stop()
+            if self.AWG is not None:
+                self.AWG.stop()
+                self.AWG.get_operation_complete()
 
-        if arm:
-            self.arm()
+            if arm:
+                self.arm()
+                self.UHFQC.sync()
 
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
+            # starting AWG
+            if self.AWG is not None:
+                self.AWG.start()
+                self.AWG.get_operation_complete()
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
-        if len(data_raw[next(iter(data_raw))])>1:
-            print('[DEBUG UHF SWF] SHOULD HAVE HAD AN ERROR')
+        # if len(data_raw[next(iter(data_raw))])>1:
+        #     print('[DEBUG UHF SWF] SHOULD HAVE HAD AN ERROR')
         # data = np.array([data_raw[key]
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
-        log.debug('[UHF detector] RAW shape',[data_raw[key]
-                         for key in sorted(data_raw.keys())])
-        log.debug('[UHF detector] shape 1',data.shape)
+        # log.debug('[UHF detector] RAW shape',[data_raw[key]
+        #                  for key in sorted(data_raw.keys())])
+        # log.debug('[UHF detector] shape 1',data.shape)
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -2207,20 +2226,23 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # UHFQC internal readout counters reset as part of the call to acquisition_initialize
         self.UHFQC.acquisition_arm()
 
-    def get_values(self, arm=True):
-        if self.always_prepare:
-            # NB sweep_points argument not used in self.prepare
-            self.prepare()
+    def get_values(self, arm=True, is_single_detector=True):
+        if is_single_detector:
+            if self.always_prepare:
+                self.prepare()
 
-        if self.AWG is not None:
-            self.AWG.stop()
+            if self.AWG is not None:
+                self.AWG.stop()
+                self.AWG.get_operation_complete()
 
-        if arm:
-            self.arm()
+            if arm:
+                self.arm()
+                self.UHFQC.sync()
 
-        # starting AWG
-        if self.AWG is not None:
-            self.AWG.start()
+            # starting AWG
+            if self.AWG is not None:
+                self.AWG.start()
+                self.AWG.get_operation_complete()
 
         # Get the data
         data_raw = self.UHFQC.acquisition_poll(
