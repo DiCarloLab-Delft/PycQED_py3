@@ -1,6 +1,7 @@
 import os
 import matplotlib.pylab as pl
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 from collections import OrderedDict
@@ -1003,24 +1004,142 @@ class Multiplexed_Transient_Analysis(ba.BaseDataAnalysis):
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
 
-def plot_transients(time_data,
-                    data_ch_0, data_ch_1,
-                    qubit_label,
-                    timestamp,
-                    ax, **kw):
-    fig = ax[0].get_figure()
+class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
+    """
+    Mux transient analysis.
+    """
 
-    ax[0].plot(time_data, data_ch_0, 'C0-')
-    ax[0].set_xlim(left=0, right=time_data[-1])
-    set_ylabel(ax[0], 'Channel_0 amplitude', 'a.u.')
+    def __init__(self, q_target: str,
+                 IF: float, pulse_duration: float,
+                 A_ground, A_excited,
+                 t_start: str = None, t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, extract_only: bool = False,
+                 auto=True):
 
-    ax[1].plot(time_data, data_ch_1, 'C1-')
-    set_ylabel(ax[1], 'Channel_1 amplitude', 'a.u.')
-    set_xlabel(ax[1], 'Time', 's')
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
 
-    fig.suptitle('Mux_transients_{}'.format(qubit_label), y=1.05)
-    fig.tight_layout()
+        self.q_target = q_target
+        self.IF = IF
+        self.pulse_duration= pulse_duration
+        self.A_ground = A_ground
+        self.A_excited= A_excited
+        if auto:
+            self.run_analysis()
 
+    def extract_data(self):
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict={}
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        
+        Time = self.A_ground.proc_data_dict['Time_data']
+
+        I_e = self.A_excited.proc_data_dict['Channel_0_data']
+        I_g = self.A_ground.proc_data_dict['Channel_0_data']
+
+        Q_e = self.A_excited.proc_data_dict['Channel_1_data']
+        Q_g = self.A_ground.proc_data_dict['Channel_1_data']
+
+        pulse_start = Time[get_pulse_start(Time, Q_g)]
+        pulse_stop  = pulse_start+self.pulse_duration
+
+        W_I = I_e - I_g
+        W_Q = Q_e - Q_g
+
+        C = W_I + 1j*W_Q
+
+        dW_I = np.real(np.exp(-1j*2*np.pi*self.IF*Time)*C)
+        dW_Q = np.imag(np.exp(-1j*2*np.pi*self.IF*Time)*C)
+
+        ps_I = np.abs(np.fft.fft(W_I))**2
+        ps_Q = np.abs(np.fft.fft(W_Q))**2
+        time_step = Time[1]
+        Freqs = np.fft.fftfreq(W_I.size, time_step)
+        idx = np.argsort(Freqs)
+        Freqs = Freqs[idx]
+        ps_I = ps_I[idx]
+        ps_Q = ps_Q[idx]
+
+        self.proc_data_dict['Time'] = Time
+        self.proc_data_dict['I_e'] = I_e
+        self.proc_data_dict['I_g'] = I_g
+        self.proc_data_dict['Q_e'] = Q_e
+        self.proc_data_dict['Q_g'] = Q_g
+        self.proc_data_dict['W_I'] = W_I
+        self.proc_data_dict['W_Q'] = W_Q
+        self.proc_data_dict['dW_I'] = dW_I
+        self.proc_data_dict['dW_Q'] = dW_Q
+        self.proc_data_dict['Freqs'] = Freqs
+        self.proc_data_dict['ps_I'] = ps_I
+        self.proc_data_dict['ps_Q'] = ps_Q
+        self.proc_data_dict['pulse_start'] = pulse_start
+        self.proc_data_dict['pulse_stop'] = pulse_stop
+
+        self.qoi = {}
+        self.qoi = {'W_I': W_I,
+                    'W_Q': W_Q}
+
+    def prepare_plots(self):
+
+        self.axs_dict = {}
+        
+        fig, axs = plt.subplots(ncols=2, nrows=2, sharex='col', sharey='row', figsize=(9,5))
+        axs = axs.flatten()
+        fig.patch.set_alpha(0)
+        self.axs_dict['MUX_transients_combined'] = axs
+        self.figs['MUX_transients_combined'] = fig
+        self.plot_dicts['MUX_transients_combined'] = {
+            'plotfn': plot_mux_transients_optimal,
+            'Time': self.proc_data_dict['Time'],
+            'I_g': self.proc_data_dict['I_g'],
+            'I_e': self.proc_data_dict['I_e'],
+            'Q_g': self.proc_data_dict['Q_g'],
+            'Q_e': self.proc_data_dict['Q_e'],
+            'pulse_start': self.proc_data_dict['pulse_start'],
+            'pulse_stop': self.proc_data_dict['pulse_stop'],
+            'qubit_label': self.q_target
+        }
+        # Set up axis grid
+        fig, axs = plt.subplots(ncols=2, nrows=3, sharex='col', sharey='row', figsize=(9, 7))
+        axs = axs.flatten()
+        gs = GridSpec(3, 2)
+        [ax.remove() for ax in axs[-2:]]
+        axs[4] = fig.add_subplot(gs[2,0:])
+        fig.patch.set_alpha(0)
+        self.axs_dict['MUX_optimal_weights'] = axs
+        self.figs['MUX_optimal_weights'] = fig
+        self.plot_dicts['MUX_optimal_weights'] = {
+            'plotfn': plot_mux_weights,
+            'Time': self.proc_data_dict['Time'],
+            'W_I': self.proc_data_dict['W_I'],
+            'W_Q': self.proc_data_dict['W_Q'],
+            'dW_I': self.proc_data_dict['dW_I'],
+            'dW_Q': self.proc_data_dict['dW_Q'],
+            'Freqs': self.proc_data_dict['Freqs'],
+            'ps_I': self.proc_data_dict['ps_I'],
+            'ps_Q': self.proc_data_dict['ps_Q'],
+            'pulse_start': self.proc_data_dict['pulse_start'],
+            'pulse_stop': self.proc_data_dict['pulse_stop'],
+            'IF': self.IF,
+            'qubit_label': self.q_target
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
 
 def calc_assignment_prob_matrix(combinations, digitized_data):
@@ -1383,7 +1502,142 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
 
     f.tight_layout()
 
+def get_pulse_start(x, y, tolerance=2):
+    '''
+    The start of the pulse is estimated in three steps:
+        1. Evaluate signal standard deviation in a certain interval as
+           function of time: f(t).
+        2. Calculate the derivative of the aforementioned data: f'(t).
+        3. Evaluate when the derivative exceeds a threshold. This
+           threshold is defined as max(f'(t))/5.
+    This approach is more tolerant to noisy signals.
+    '''
+    pulse_baseline = np.mean(y) # get pulse baseline
+    pulse_std      = np.std(y)  # get pulse standard deviation
 
+    nr_points_interval = 5        # number of points in the interval
+    aux = int(nr_points_interval/2)
+
+    iteration_idx = np.arange(-aux, len(y)+aux)     # mask for circular array
+    aux_list = [ y[i%len(y)] for i in iteration_idx] # circular array
+
+    # Calculate standard deviation for each interval
+    y_std = []
+    for i in range(len(y)):
+        interval = aux_list[i : i+nr_points_interval]
+        y_std.append( np.std(interval) )
+
+    y_std_derivative = np.gradient(y_std[:-aux])# calculate derivative
+    threshold = max(y_std_derivative)/10        # define threshold
+    start_index = np.where( y_std_derivative > threshold )[0][0] + aux
+
+    return start_index-tolerance
+
+def plot_transients(time_data,
+                    data_ch_0, data_ch_1,
+                    qubit_label,
+                    timestamp,
+                    ax, **kw):
+    fig = ax[0].get_figure()
+
+    ax[0].plot(time_data, data_ch_0, 'C0-')
+    ax[0].set_xlim(left=0, right=time_data[-1])
+    set_ylabel(ax[0], 'Channel_0 amplitude', 'a.u.')
+
+    ax[1].plot(time_data, data_ch_1, 'C1-')
+    set_ylabel(ax[1], 'Channel_1 amplitude', 'a.u.')
+    set_xlabel(ax[1], 'Time', 's')
+
+    fig.suptitle('Mux_transients_{}'.format(qubit_label), y=1.05)
+    fig.tight_layout()
+
+def plot_mux_weights(Time,
+                     W_I, W_Q,
+                     dW_I, dW_Q,
+                     ps_I, ps_Q,
+                     pulse_start, pulse_stop,
+                     IF, Freqs,
+                     qubit_label,
+                     ax, **kw):
+
+    fig = ax[0].get_figure()
+
+    for axis in ax[:4]:
+        axis.axvspan(pulse_start, pulse_stop, alpha=0.15, color='yellow')
+        axis.axvline(pulse_start, ls='--', color='black', linewidth=1)
+        axis.axvline(pulse_stop, ls='--', color='black', linewidth=1)
+
+    ax[0].plot(Time, W_I, 'forestgreen', linewidth=1)
+    ax[2].plot(Time, dW_I, 'forestgreen', linewidth=1)
+    ax[1].plot(Time, W_Q, 'darkseagreen', linewidth=1)
+    ax[3].plot(Time, dW_Q, 'darkseagreen', linewidth=1)
+
+    ax[0].set_xlim(left=0, right=Time[-1])
+    ax[1].set_xlim(left=0, right=Time[-1])
+
+    ax[0].set_title('Channel 0')
+    ax[1].set_title('Channel 1')
+    ax[2].set_title('Channel 0 (demodulated)')
+    ax[3].set_title('Channel 1 (demodulated)')
+    set_xlabel(ax[2], 'Time', 's')
+    set_xlabel(ax[3], 'Time', 's')
+    set_ylabel(ax[0], 'Amplitude', 'a.u.')
+    set_ylabel(ax[2], 'Amplitude', 'a.u.')
+
+    ax[4].axvline(IF, ls='--', color='black', linewidth=1, label='IF = {:0.1f} MHz'.format(IF*1e-6))
+    ax[4].plot(Freqs, ps_I, linewidth=1, color='forestgreen', label='Channel 0')
+    ax[4].plot(Freqs, ps_Q, linewidth=1, color='darkseagreen', label='Channel 1')
+
+    ax[4].set_xlim(0, Freqs[-1])
+    ax[4].legend()
+    ax[4].set_title('Power spectrum')
+    set_xlabel(ax[4], 'Frequency', 'Hz')
+    set_ylabel(ax[4], 'S($f$)', 'a.u.')
+
+    fig.suptitle('Optimal integration weights {}'.format(qubit_label),
+                 y=1.05, fontsize=16)
+
+    fig.tight_layout()
+
+
+def plot_mux_transients_optimal(Time,
+                                I_g, I_e,
+                                Q_g, Q_e,
+                                pulse_start, pulse_stop,
+                                qubit_label,
+                                ax, **kw):
+
+    fig = ax[0].get_figure()
+
+    for axis in ax:
+        axis.axvline(pulse_start, ls='--', color='black', linewidth=1)
+        axis.axvline(pulse_stop, ls='--', color='black', linewidth=1)
+        axis.axvspan(pulse_start, pulse_stop, alpha=0.15, color='yellow')
+        
+    ax[0].plot(Time, I_g, 'C0', linewidth=1, label='ground')
+    ax[2].plot(Time, I_e, 'indianred', linewidth=1, label='excited')
+    ax[1].plot(Time, Q_g, 'C0', linewidth=1, label='ground')
+    ax[3].plot(Time, Q_e, 'indianred', linewidth=1, label='excited')
+
+    ax[0].set_xlim(left=0, right=Time[-1])
+    ax[1].set_xlim(left=0, right=Time[-1])
+
+    ax[0].set_title('Channel 0')
+    ax[1].set_title('Channel 1')
+    set_xlabel(ax[2], 'Time', 's')
+    set_xlabel(ax[3], 'Time', 's')
+    set_ylabel(ax[0], 'Amplitude', 'a.u.')
+    set_ylabel(ax[2], 'Amplitude', 'a.u.')
+
+    ax[0].legend()
+    ax[1].legend()
+    ax[2].legend()
+    ax[3].legend()
+
+    fig.suptitle('Multiplexed transients {}'.format(qubit_label),
+                 y=1.05, fontsize=16)
+
+    fig.tight_layout()
 
 
 

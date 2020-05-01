@@ -1937,7 +1937,6 @@ class DeviceCCL(Instrument):
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
         return
 
-
     def measure_transients(self,
                            qubits: list,
                            q_target: str,
@@ -2005,7 +2004,6 @@ class DeviceCCL(Instrument):
                 analysis[i] = ma2.mra.Multiplexed_Transient_Analysis(
                     q_target='{}_{}'.format(q_target, pulse_comb))
         return analysis
-
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
