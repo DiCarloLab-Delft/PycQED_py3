@@ -240,7 +240,6 @@ class Multi_Detector_UHF(Multi_Detector):
 
         # Since master (holding cc object) is first in self.detectors,
         self.detectors[0].AWG.stop()
-        self.detectors[0].AWG.get_operation_complete()
 
         # Prepare and arm
         for detector in self.detectors:
@@ -251,7 +250,6 @@ class Multi_Detector_UHF(Multi_Detector):
 
         # Run (both in parallel and implicitly)
         self.detectors[0].AWG.start()
-        self.detectors[0].AWG.get_operation_complete()
 
         # Get data
         for detector in self.detectors:
@@ -1851,7 +1849,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
             if self.AWG is not None:
                 self.AWG.stop()
-                self.AWG.get_operation_complete()
 
             if arm:
                 self.arm()
@@ -1860,7 +1857,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             # starting AWG
             if self.AWG is not None:
                 self.AWG.start()
-                self.AWG.get_operation_complete()
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
@@ -2233,7 +2229,6 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
             if self.AWG is not None:
                 self.AWG.stop()
-                self.AWG.get_operation_complete()
 
             if arm:
                 self.arm()
@@ -2242,7 +2237,6 @@ class UHFQC_integration_logging_det(Hard_Detector):
             # starting AWG
             if self.AWG is not None:
                 self.AWG.start()
-                self.AWG.get_operation_complete()
 
         # Get the data
         data_raw = self.UHFQC.acquisition_poll(

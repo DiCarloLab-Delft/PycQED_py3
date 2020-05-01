@@ -7,6 +7,8 @@ import logging
 
 log = logging.getLogger(__name__)
 
+log.error("`learnerND_optimize` is deprecated! Use `learnernND_minimize`.")
+
 # ######################################################################
 # Loss function utilities for adaptive.learner.learnerND
 # ######################################################################
