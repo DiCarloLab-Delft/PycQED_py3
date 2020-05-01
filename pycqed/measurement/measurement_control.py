@@ -2,7 +2,7 @@ import types
 import logging
 import time
 import numpy as np
-import collections
+from collections.abc import Iterable
 import operator
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
@@ -49,7 +49,8 @@ from adaptive.learner import SKOptLearner
 from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
 from pycqed.utilities.learnerND_optimize import LearnerND_Optimize
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer
-from pycqed.utilities.learner_utils import evaluate_X
+import pycqed.utilities.learner_utils as lu
+from . import measurement_control_helpers as mch
 
 from skopt import Optimizer  # imported for checking types
 
@@ -402,9 +403,9 @@ class MeasurementControl(Instrument):
         self.get_measurement_preparetime()
 
         # ######################################################################
-        # BEGIN loop of pnts in extra dims
+        # BEGIN loop of points in extra dims
         # ######################################################################
-        # Used to (re)initialize the plot monitor only betwen the iterations
+        # Used to (re)initialize the plot monitor only between the iterations
         # of this for loop
         last_i_af_pars = -1
 
@@ -416,9 +417,10 @@ class MeasurementControl(Instrument):
 
             for i_af_pars, af_pars in enumerate(af_pars_list):
                 # We detect the type of adaptive function here so that the right
-                # adaptive plot monitor is initialized
+                # adaptive plot monitor is initialized and configured
                 self.Learner_Minimizer_detected = False
                 self.CMA_detected = False
+
                 # Used to update plots specific to this type of optimizers
                 module_name = get_module_name(af_pars.get("adaptive_function", self))
                 self.Learner_Minimizer_detected = (
@@ -461,7 +463,9 @@ class MeasurementControl(Instrument):
 
                 if is_subclass(self.adaptive_function, BaseLearner):
                     Learner = self.adaptive_function
-                    # Pass the rigth parameters two each type of learner
+                    mch.scale_bounds(af_pars=af_pars, x_scale=self.x_scale)
+
+                    # Pass the right parameters two each type of learner
                     if issubclass(Learner, Learner1D):
                         self.learner = Learner(
                             opt_func,
@@ -505,7 +509,7 @@ class MeasurementControl(Instrument):
 
                     if "X0" in af_pars:
                         # Teach the learner the initial point if provided
-                        evaluate_X(self.learner, af_pars["X0"])
+                        lu.evaluate_X(self.learner, af_pars["X0"], x_scale=self.x_scale)
 
                     # N.B. the runner that is used is not an `adaptive.Runner` object
                     # rather it is the `adaptive.runner.simple` function. This
@@ -579,7 +583,7 @@ class MeasurementControl(Instrument):
             # ##################################################################
 
         # ######################################################################
-        # END loop of pnts in extra dims
+        # END loop of points in extra dims
         # ######################################################################
 
         for sweep_function in self.sweep_functions:
@@ -758,6 +762,8 @@ class MeasurementControl(Instrument):
             if self.x_scale is not None:
                 x_ = np.array(x, dtype=np.float64)
                 scale_ = np.array(self.x_scale, dtype=np.float64)
+                # NB this division here might interfere with measurements
+                # that involve integer values in `x`
                 x = type(x)(x_ / scale_)
 
             vals = self.measurement_function(x)
@@ -768,7 +774,7 @@ class MeasurementControl(Instrument):
                 vals = np.array(vals)[:, 0]
 
             # to check if vals is an array with multiple values
-            if isinstance(vals, collections.abc.Iterable):
+            if isinstance(vals, Iterable):
                 vals = vals[self.par_idx]
 
             if self.mode == "adaptive":
