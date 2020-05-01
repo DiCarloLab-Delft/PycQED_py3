@@ -1943,7 +1943,8 @@ class DeviceCCL(Instrument):
                            q_target: str,
                            cases: list = ['off', 'on'],
                            MC=None,
-                           prepare_for_timedomain: bool = True):
+                           prepare_for_timedomain: bool = True,
+                           analyze: bool = True):
         '''
         Documentation.
         '''
@@ -1968,9 +1969,10 @@ class DeviceCCL(Instrument):
                     platf_cfg=self.cfg_openql_platform_fn()
                 )
 
+        analysis = [None for case in cases]
         for i, pulse_comb in enumerate(cases):
             if 'off' in pulse_comb.lower():
-                self.find_instrument(q_target).instr_LO_mw.get_instr().off()# Needs testing
+                self.find_instrument(q_target).instr_LO_mw.get_instr().off()
             elif 'on' in pulse_comb.lower():
                 self.find_instrument(q_target).instr_LO_mw.get_instr().on()
             else:
@@ -1999,6 +2001,10 @@ class DeviceCCL(Instrument):
             MC.set_detector_function(d)
             MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb,
                                                     self.msmt_suffix))
+            if analyze:
+                analysis[i] = ma2.mra.Multiplexed_Transient_Analysis(
+                    q_target='{}_{}'.format(q_target, pulse_comb))
+        return analysis
 
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
