@@ -197,7 +197,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             if waveform["type"] == "cz":
                 self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
             elif waveform["type"] == "idle_z":
-                self._wave_dict[wave_name] = self._gen_idle_z(which_gate=which_gate)
+                # self._wave_dict[wave_name] = self._gen_idle_z(which_gate=which_gate)
+                # WARNING: temporary modification for testing the Victory CZ
+                # The pulse itself has all parameters necessary for the correction
+                self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
 
     def _gen_i(self):
         return np.zeros(int(self.idle_pulse_length() * self.sampling_rate()))
