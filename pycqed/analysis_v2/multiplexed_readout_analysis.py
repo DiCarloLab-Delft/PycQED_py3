@@ -486,7 +486,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                         (1-opt_fid_discr['fun'])[0]
                 self.proc_data_dict['Post_PDF_data'][ch]['threshold_discr'] = \
                     opt_fid_discr['x'][0]
-                post_fr = self.fit_res['Post_CDF_fit_{}'.format(ch)]
+                post_fr = self.fit_res['Post_PDF_fit_{}'.format(ch)]
                 post_bv = post_fr.params
                 # self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
                 #     bv['A_spurious'].value
@@ -528,7 +528,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     (1-opt_fid_discr['fun'])[0]
             self.proc_data_dict['PDF_data'][ch]['threshold_discr'] =\
                 opt_fid_discr['x'][0]
-            fr = self.fit_res['CDF_fit_{}'.format(ch)]
+            fr = self.fit_res['PDF_fit_{}'.format(ch)]
             bv = fr.params
             # self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
             #     bv['A_spurious'].value
@@ -1113,7 +1113,7 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
             'qubit_label': self.q_target
         }
         # Set up axis grid
-        fig, axs = plt.subplots(ncols=2, nrows=3, sharex='col', sharey='row', figsize=(9, 7))
+        fig, axs = plt.subplots(ncols=2, nrows=3, sharey='row', figsize=(9, 7))
         axs = axs.flatten()
         gs = GridSpec(3, 2)
         [ax.remove() for ax in axs[-2:]]
@@ -1578,11 +1578,15 @@ def plot_mux_weights(Time,
 
     ax[0].set_xlim(left=0, right=Time[-1])
     ax[1].set_xlim(left=0, right=Time[-1])
+    ax[2].set_xlim(left=0, right=Time[-1])
+    ax[3].set_xlim(left=0, right=Time[-1])
 
     ax[0].set_title('Channel 0')
     ax[1].set_title('Channel 1')
     ax[2].set_title('Channel 0 (demodulated)')
     ax[3].set_title('Channel 1 (demodulated)')
+    set_xlabel(ax[0], 'Time', 's')
+    set_xlabel(ax[1], 'Time', 's')
     set_xlabel(ax[2], 'Time', 's')
     set_xlabel(ax[3], 'Time', 's')
     set_ylabel(ax[0], 'Amplitude', 'a.u.')
@@ -1625,9 +1629,13 @@ def plot_mux_transients_optimal(Time,
 
     ax[0].set_xlim(left=0, right=Time[-1])
     ax[1].set_xlim(left=0, right=Time[-1])
+    ax[2].set_xlim(left=0, right=Time[-1])
+    ax[3].set_xlim(left=0, right=Time[-1])
 
     ax[0].set_title('Channel 0')
     ax[1].set_title('Channel 1')
+    set_xlabel(ax[0], 'Time', 's')
+    set_xlabel(ax[1], 'Time', 's')
     set_xlabel(ax[2], 'Time', 's')
     set_xlabel(ax[3], 'Time', 's')
     set_ylabel(ax[0], 'Amplitude', 'a.u.')
