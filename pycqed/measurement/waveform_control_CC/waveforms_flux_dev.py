@@ -54,6 +54,14 @@ def victor_waveform(
     mirror_sqrs = fluxlutman.get("czv_mirror_sqrs_{}".format(which_gate))
     flip_wf = fluxlutman.get("czv_flip_wf_{}".format(which_gate))
 
+    if norm_sq_amp == 0.0:
+        # This is somewhat special case and should not actually be used
+        # but leads to some undesired behavior
+        # The way to achieve the zero amplitude for the main pulse is to
+        # to set `czv_q_ph_corr_only_{}` to True
+        norm_sq_amp = 1.0  # arbitrary amplitude
+        q_ph_corr_only = True
+
     # This is to avoid numerical issues when the user would run sweeps with
     # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
     # instead of `time_at_swtspt = np.arange(0, 42, 2) / 2.4e9` and get
@@ -158,12 +166,14 @@ def victor_waveform(
         # when flipping we preserve polarity as well
         amp = - np.flip(amp)
 
-    if correct_q_phase and not incl_q_phase_in_cz and amp[-1] != amp_at_sweetspot:
+    if correct_q_phase and not incl_q_phase_in_cz:
         # For this case we always add an extra point at zero so that the NZ
-        # effect preserved before starting the correction pulse
+        # effect is preserved before starting the correction pulse
         # This is also necessary to reliably determine the main pulse length
         # when calling with `output_q_phase_corr=False`
-        amp = np.concatenate((amp, [amp_at_sweetspot]))
+        if amp[-1] != amp_at_sweetspot:
+            amp = np.concatenate((amp, [amp_at_sweetspot]))
+
         buffer_before_q_ph_corr = np.full(int(time_before_q_ph_corr / dt), amp_at_sweetspot)
         if len(buffer_before_q_ph_corr) > 0:
             amp = np.concatenate((amp, buffer_before_q_ph_corr))
@@ -203,7 +213,7 @@ def victor_waveform(
         amp_interp = np.interp(time_interp, tlist, amp)
 
         if sim_ctrl_cz.optimize_const_amp():
-            # For simulations we skip simulating every single pnt if they have
+            # For simulations we skip simulating every single point if they have
             # same amplitude (eigen space does not change)
             keep = (amp_interp[:-2] == amp_interp[1:-1]) * (
                 amp_interp[2:] == amp_interp[1:-1]
