@@ -1040,7 +1040,7 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
 
     def process_data(self):
-        
+
         Time = self.A_ground.proc_data_dict['Time_data']
 
         I_e = self.A_excited.proc_data_dict['Channel_0_data']
@@ -1054,6 +1054,10 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
 
         W_I = I_e - I_g
         W_Q = Q_e - Q_g
+
+        #normalize weights
+        W_I = W_I/np.max(W_I)
+        W_Q = W_Q/np.max(W_Q)
 
         C = W_I + 1j*W_Q
 
@@ -1091,7 +1095,7 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
     def prepare_plots(self):
 
         self.axs_dict = {}
-        
+
         fig, axs = plt.subplots(ncols=2, nrows=2, sharex='col', sharey='row', figsize=(9,5))
         axs = axs.flatten()
         fig.patch.set_alpha(0)
@@ -1540,11 +1544,11 @@ def plot_transients(time_data,
                     ax, **kw):
     fig = ax[0].get_figure()
 
-    ax[0].plot(time_data, data_ch_0, 'C0-')
+    ax[0].plot(time_data, data_ch_0, '-', color='C0', linewidth=1)
     ax[0].set_xlim(left=0, right=time_data[-1])
     set_ylabel(ax[0], 'Channel_0 amplitude', 'a.u.')
 
-    ax[1].plot(time_data, data_ch_1, 'C1-')
+    ax[1].plot(time_data, data_ch_1, '-', color='indianred', linewidth=1)
     set_ylabel(ax[1], 'Channel_1 amplitude', 'a.u.')
     set_xlabel(ax[1], 'Time', 's')
 
@@ -1584,7 +1588,7 @@ def plot_mux_weights(Time,
     set_ylabel(ax[0], 'Amplitude', 'a.u.')
     set_ylabel(ax[2], 'Amplitude', 'a.u.')
 
-    ax[4].axvline(IF, ls='--', color='black', linewidth=1, label='IF = {:0.1f} MHz'.format(IF*1e-6))
+    ax[4].axvline(abs(IF), ls='--', color='black', linewidth=1, label='IF = {:0.1f} MHz'.format(IF*1e-6))
     ax[4].plot(Freqs, ps_I, linewidth=1, color='forestgreen', label='Channel 0')
     ax[4].plot(Freqs, ps_Q, linewidth=1, color='darkseagreen', label='Channel 1')
 
@@ -1613,7 +1617,7 @@ def plot_mux_transients_optimal(Time,
         axis.axvline(pulse_start, ls='--', color='black', linewidth=1)
         axis.axvline(pulse_stop, ls='--', color='black', linewidth=1)
         axis.axvspan(pulse_start, pulse_stop, alpha=0.15, color='yellow')
-        
+
     ax[0].plot(Time, I_g, 'C0', linewidth=1, label='ground')
     ax[2].plot(Time, I_e, 'indianred', linewidth=1, label='excited')
     ax[1].plot(Time, Q_g, 'C0', linewidth=1, label='ground')

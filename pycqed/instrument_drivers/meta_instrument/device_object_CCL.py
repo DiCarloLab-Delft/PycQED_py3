@@ -320,9 +320,10 @@ class DeviceCCL(Instrument):
             "        'flux_0': 6,\n"
             "        'flux_1': 7,\n"
             "        'flux_2': 8,\n"
-            "        'mw_2': 9,\n"
-            "        'mw_3': 10,\n"
-            "        'mw_4': 11\n"
+            "        'flux_3': 9,\n"
+            "        'mw_2': 10,\n"
+            "        'mw_3': 11\n"
+            "        'mw_4': 12\n"
             "    }\n"
             "Tip: run `device.dio_map?` to print the docstringof this parameter",
             initial_value=None,
@@ -1935,7 +1936,7 @@ class DeviceCCL(Instrument):
                 label = a.raw_data_dict['value_names'][i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
-        return
+            return a.qoi
 
     def measure_transients(self,
                            qubits: list,
@@ -1947,7 +1948,8 @@ class DeviceCCL(Instrument):
         '''
         Documentation.
         '''
-
+        if q_target not in qubits:
+            raise ValueError("q_target must be included in qubits.")
         # Ensure all qubits use same acquisition instrument
         instruments = [self.find_instrument(q).instr_acquisition() for q in qubits]
         if instruments[1:] != instruments[:-1]:
@@ -2001,9 +2003,67 @@ class DeviceCCL(Instrument):
             MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb,
                                                     self.msmt_suffix))
             if analyze:
-                analysis[i] = ma2.mra.Multiplexed_Transient_Analysis(
+                analysis[i] = ma2.Multiplexed_Transient_Analysis(
                     q_target='{}_{}'.format(q_target, pulse_comb))
         return analysis
+
+    def calibrate_optimal_weights_mux(self,
+                                      qubits: list,
+                                      q_target: str,
+                                      update=True,
+                                      verify=True,
+                                      averages=2**15
+                                      ):
+
+        """
+        Measures the multiplexed readout transients of <qubits> for <q_target>
+        in ground and excited state. After that, it calculates optimal
+        integration weights that are used to weigh measuremet traces to maximize
+        the SNR.
+
+        Args:
+            qubits (list):
+                List of strings specifying qubits included in the multiplexed
+                readout signal.
+            q_target (str):
+                ()
+            verify (bool):
+                indicates whether to run measure_ssro at the end of the routine
+                to find the new SNR and readout fidelities with optimized weights
+            update (bool):
+                specifies whether to update the weights in the qubit object
+        """
+        if q_target not in qubits:
+            raise ValueError("q_target must be included in qubits.")
+
+        # Ensure that enough averages are used to get accurate weights
+        old_avg = self.ro_acq_averages()
+        self.ro_acq_averages(averages)
+
+        Q_target = self.find_instrument(q_target)
+        # Transient analysis
+        A = self.measure_transients(qubits=qubits, q_target=q_target,
+                                    cases=['on', 'off'])
+        #return parameters
+        self.ro_acq_averages(old_avg)
+
+        # Optimal weights
+        B = ma2.Multiplexed_Weights_Analysis(q_target=q_target,
+                                             IF=Q_target.ro_freq_mod(),
+                                             pulse_duration=Q_target.ro_pulse_length(),
+                                             A_ground=A[1], A_excited=A[0])
+
+        if update:
+            Q_target.ro_acq_weight_func_I(B.qoi['W_I'])
+            Q_target.ro_acq_weight_func_Q(B.qoi['W_Q'])
+            Q_target.ro_acq_weight_type('optimal')
+
+            if verify:
+                Q_target._prep_ro_integration_weights()
+                Q_target._prep_ro_instantiate_detectors()
+                ssro_dict= self.measure_ssro_single_qubit(qubits=qubits,
+                                                          q_target=q_target)
+            return ssro_dict
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
@@ -2517,8 +2577,6 @@ class DeviceCCL(Instrument):
 
             ma2.Basic1DAnalysis()
         elif adaptive_sample_for_alignment:
-            assert target_qubit_sequence == "excited", ("Chevron alignment "
-                "works only for the (first) CZ interaction point.")
             # Adaptive sampling intended for the calibration of the flux bias
             # (centering the chevron, and the qubit at the sweetspot)
             goal = l1dm.mk_min_threshold_goal_func(
