@@ -1719,6 +1719,27 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return ax
 
+    # Here for convenience, no need to be a method
+    def plot_cz_waveforms(self, qubits: list, which_gate_list: list):
+        """
+        Plots the cz waveforms from several flux lutamns, mainly for
+        verification, time alignment and debugging
+        """
+        flux_lm_list = [
+            self.find_instrument("flux_lm_{}".format(qubit))
+            for qubit in qubits
+        ]
+
+        for flux_lm, which_gate, qubit in zip(flux_lm_list, which_gate_list, qubits):
+            flux_lm.generate_standard_waveforms()
+            waveform_name = "cz_{}".format(which_gate)
+            plt.plot(
+                flux_lm._wave_dict[waveform_name],
+                label=waveform_name + " " + qubit
+            )
+        plt.legend()
+        plt.show()
+
     #################################
     #  Simulation methods           #
     #################################
@@ -2159,6 +2180,58 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             print(best_mv_res)
             # Returning same shapes as above for uniformity
             return [best_par_res], [best_mv_res]
+
+    # Here for convenience, no need to be a method
+    def align_vcz_q_phase_corr_with(
+        self,
+        this_which_gate: str,
+        that_qubit: str,
+        that_which_gate: str,
+        allow_any_comb: bool = False
+    ):
+        """
+        Copies all the relevant parameters from the other flux_lm such
+        that the beginning of the corrections match on both. By coping all the
+        parameters of the waveform we ensure that the waveform will be generated in
+        the exact way regarding timing at the individual sample points level.
+        """
+        that_flux_lm = self.find_instrument("flux_lm_{}".format(that_qubit))
+
+        opt_1 = (this_which_gate == "NE") and (that_which_gate == "SW")
+        opt_2 = (this_which_gate == "NW") and (that_which_gate == "SE")
+        if not (opt_1 or opt_2):
+            # To avoid stupid mistakes
+            msg = "Are you sure you wanted to match `{} {}` with `{} {}`?".format(
+                self.name, this_which_gate, that_flux_lm.name, that_which_gate
+            )
+            log.error(msg)
+            if not allow_any_comb:
+                log.error("Aborting copying parameters!")
+                return
+
+        par_names = {
+            "czv_time_at_sweetspot_{}",
+            "czv_time_sum_sqrs_{}",
+            "czv_time_ramp_middle_{}",
+            "czv_time_ramp_outside_{}",
+            "czv_time_before_q_ph_corr_{}",
+            "czv_sq_amp_{}",
+            "czv_mirror_sqrs_{}",
+            "czv_flip_wf_{}",
+            "czv_incl_q_phase_in_cz_{}",
+            "czv_time_q_ph_corr_{}"
+        }
+        # Copy all relevant parameters
+        for par_name in par_names:
+            par_val = that_flux_lm.get(par_name.format(that_which_gate))
+            self.set(par_name.format(this_which_gate), par_val)
+
+        # It is assumed `self` is the low freq. qubit
+        self.set("czv_q_ph_corr_only_{}".format(that_which_gate), True)
+        self.set("czv_correct_q_phase_{}".format(this_which_gate), True)
+
+        for flux_lm in [self, that_flux_lm]:
+            flux_lm.generate_standard_waveforms()
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
