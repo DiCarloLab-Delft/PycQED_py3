@@ -124,6 +124,9 @@ def victor_waveform(
     incl_q_phase_in_cz = fluxlutman.get("czv_incl_q_phase_in_cz_{}".format(which_gate))
     if correct_q_phase:
         if incl_q_phase_in_cz:
+            if not mirror_sqrs:
+                raise NotImplementedError("Pulse must be symmetrical. "
+                    "Double check the pulse parameters!")
             # Insert extra square part to correct single qubit phase
             if amp_q_ph_corr < norm_amp_sq:
                 # When the correction amplitude is smaller then the main
@@ -195,8 +198,9 @@ def victor_waveform(
         if len(buffer_before_q_ph_corr) > 0:
             amp = np.concatenate((amp, buffer_before_q_ph_corr))
 
-    if correct_q_phase and output_q_phase_corr:
-        amp = np.concatenate((amp, amps_q_phase_correction))
+        # Concatenate the actual correction
+        if output_q_phase_corr:
+            amp = np.concatenate((amp, amps_q_phase_correction))
 
     cz_start_idx = 0
     # Extra points for starting and finishing at the sweet-spot
