@@ -27,7 +27,7 @@ def victor_waveform(
 
     amp_at_sweetspot = 0.0
 
-    amp_at_int_11_02 = fluxlutman.get("czv_dac_amp_at_11_02_{}".format(which_gate))
+    amp_at_int_11_02 = fluxlutman.get("czv_amp_dac_at_11_02_{}".format(which_gate))
 
     sampling_rate = fluxlutman.sampling_rate()
 
@@ -43,23 +43,26 @@ def victor_waveform(
     time_at_sweetspot = time_at_sweetspot * sampling_rate  # avoid numerical issues
     time_q_ph_corr = fluxlutman.get("czv_time_q_ph_corr_{}".format(which_gate))
     time_q_ph_corr = time_q_ph_corr * sampling_rate  # avoid numerical issues
+    time_step = fluxlutman.get("czv_time_step_{}".format(which_gate))
+    time_step = time_step * sampling_rate  # avoid numerical issues
 
     dt = 1
 
     invert_polarity = fluxlutman.get("czv_invert_polarity_{}".format(which_gate))
     # Normalized to the amplitude at the CZ interaction point
-    norm_sq_amp = fluxlutman.get("czv_sq_amp_{}".format(which_gate))
+    norm_amp_sq = fluxlutman.get("czv_amp_sq_{}".format(which_gate))
     amp_q_ph_corr = fluxlutman.get("czv_amp_q_ph_corr_{}".format(which_gate))
+    amp_step = fluxlutman.get("czv_amp_step_{}".format(which_gate))
     q_ph_corr_only = fluxlutman.get("czv_q_ph_corr_only_{}".format(which_gate))
     mirror_sqrs = fluxlutman.get("czv_mirror_sqrs_{}".format(which_gate))
     flip_wf = fluxlutman.get("czv_flip_wf_{}".format(which_gate))
 
-    if norm_sq_amp == 0.0:
+    if norm_amp_sq == 0.0:
         # This is somewhat special case and should not actually be used
         # but leads to some undesired behavior
         # The way to achieve the zero amplitude for the main pulse is to
         # to set `czv_q_ph_corr_only_{}` to True
-        norm_sq_amp = 1.0  # arbitrary amplitude
+        norm_amp_sq = 1.0  # arbitrary amplitude
         q_ph_corr_only = True
 
     # This is to avoid numerical issues when the user would run sweeps with
@@ -109,9 +112,9 @@ def victor_waveform(
     # Avoid setting the time of the ramps below the sampling resolution
     funcs = [
         lambda x: amp_at_sweetspot,
-        lambda x: (x - time_at_sweetspot_sym) * norm_sq_amp / half_time_ramp_middle,
-        lambda x: norm_sq_amp,
-        lambda x: -(x - t3) * norm_sq_amp / time_ramp_outside + norm_sq_amp,
+        lambda x: (x - time_at_sweetspot_sym) * norm_amp_sq / half_time_ramp_middle,
+        lambda x: norm_amp_sq,
+        lambda x: -(x - t3) * norm_amp_sq / time_ramp_outside + norm_amp_sq,
         lambda x: amp_at_sweetspot
     ]
 
@@ -121,11 +124,14 @@ def victor_waveform(
     incl_q_phase_in_cz = fluxlutman.get("czv_incl_q_phase_in_cz_{}".format(which_gate))
     if correct_q_phase:
         if incl_q_phase_in_cz:
+            if not mirror_sqrs:
+                raise NotImplementedError("Pulse must be symmetrical. "
+                    "Double check the pulse parameters!")
             # Insert extra square part to correct single qubit phase
-            if amp_q_ph_corr < norm_sq_amp:
+            if amp_q_ph_corr < norm_amp_sq:
                 # When the correction amplitude is smaller then the main
                 # square amplitude we insert the correction at the right
-                # saple point such that the pulse amplitude does not decrease
+                # sample point such that the pulse amplitude does not decrease
                 # ever before the main square part
                 insert_idx = np.where(half_NZ_amps >= amp_q_ph_corr)[0][-1] + 1
             else:
@@ -133,8 +139,8 @@ def victor_waveform(
                 # we insert the correction before the main square pulse after
                 # the ramp up
                 # The goal of using this feature would be to require less
-                # sample points to correct for single qubit phase
-                insert_idx = np.where(half_NZ_amps == norm_sq_amp)[0][-1] + 1
+                # sample points to correct for single qubit phase (maybe)
+                insert_idx = np.where(half_NZ_amps == norm_amp_sq)[0][-1] + 1
             amps_q_phase_correction = np.full(
                 int(half_time_q_ph_corr / dt), amp_q_ph_corr
             )
@@ -145,6 +151,20 @@ def victor_waveform(
             )
             amps_q_phase_correction = np.concatenate(
                 (amps_q_phase_correction, -amps_q_phase_correction))
+
+    # This is intended to replicate a new parameter explored in the CZ of
+    # Quantum Inspire
+    if time_step > 0.0:
+        if not mirror_sqrs:
+            log.error("Extra step in between the squares implemented only for "
+            "symmetrical pulses. Double check the pulse parameters!")
+        else:
+            # Insert at the first point that is higher than the step amplitude
+            # or just before the main square
+            where = (half_NZ_amps > amp_step) | (half_NZ_amps == norm_amp_sq)
+            insert_idx = np.where(where)[0][0]
+            step_amps = np.full(int(time_step / dt), amp_step)
+            half_NZ_amps = np.insert(half_NZ_amps, insert_idx, step_amps)
 
     if mirror_sqrs:
         # `[1:]` makes sure the two pulses share the point in the middle
@@ -178,8 +198,9 @@ def victor_waveform(
         if len(buffer_before_q_ph_corr) > 0:
             amp = np.concatenate((amp, buffer_before_q_ph_corr))
 
-    if correct_q_phase and output_q_phase_corr:
-        amp = np.concatenate((amp, amps_q_phase_correction))
+        # Concatenate the actual correction
+        if output_q_phase_corr:
+            amp = np.concatenate((amp, amps_q_phase_correction))
 
     cz_start_idx = 0
     # Extra points for starting and finishing at the sweet-spot

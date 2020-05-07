@@ -466,7 +466,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
                 initial_value=7.777e-9,
                 unit="s",
-                label="A + B",
+                label="Sum dur. squares",
             )
             self.add_parameter(
                 "czv_time_at_sweetspot_%s" % this_cz,
@@ -487,17 +487,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 unit="s",
                 label="Time before correction",
             )
-            # self.add_parameter(
-            #     "czv_total_time_%s" % this_cz,
-            #     docstring="Total gate time",
-            #     parameter_class=ManualParameter,
-            #     vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
-            #     initial_value=40e-9,
-            #     unit="s",
-            #     label="Total gate time",
-            # )
             self.add_parameter(
-                "czv_sq_amp_%s" % this_cz,
+                "czv_amp_sq_%s" % this_cz,
                 docstring="Amplitude of the square parts of the NZ pulse. "
                 "1.0 means qubit detuned to the 11-02 interaction point.",
                 parameter_class=ManualParameter,
@@ -507,10 +498,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Relative amp",
             )
             self.add_parameter(
-                "czv_dac_amp_at_11_02_%s" % this_cz,
+                "czv_amp_dac_at_11_02_%s" % this_cz,
                 docstring="Dac amplitude (in the case of HDAWG) at the 11-02 "
                 "interaction point. NB: the units might be different for some "
-                "other AWG that is distinct from the HDAWG",
+                "other AWG that is distinct from the HDAWG.",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(0.0, 1.0),
                 initial_value=0.5,
@@ -536,7 +527,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(0.0, 500e-9),
                 initial_value=0.,
                 unit="s",
-                label="Amp phase correction",
+                label="Time phase correction",
             )
             self.add_parameter(
                 "czv_invert_polarity_%s" % this_cz,
@@ -564,21 +555,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 initial_value=False,
                 label="Time-flipped waveform",
             )
-            # self.add_parameter(
-            #     "czv_fixed_amp_%s" % this_cz,
-            #     docstring="",
-            #     parameter_class=ManualParameter,
-            #     vals=vals.Bool(),
-            #     initial_value=False,
-            #     label="",
-            # )
             self.add_parameter(
                 "czv_correct_q_phase_%s" % this_cz,
                 docstring="",
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
                 initial_value=False,
-                label="",
+                label="Correct single Q phase?",
             )
             self.add_parameter(
                 "czv_incl_q_phase_in_cz_%s" % this_cz,
@@ -599,8 +582,31 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
                 initial_value=False,
-                label="",
+                label="Set main pulse to zero?",
             )
+            # Parameters equivalent to the new ones added to Quantum Inspire
+            self.add_parameter(
+                "czv_time_step_%s" % this_cz,
+                docstring="Duration of each of the steps inserted after first "
+                "half NZ and just before the second half.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 500.0e-9),
+                initial_value=0.0,
+                unit="s",
+                label="Time step",
+            )
+            self.add_parameter(
+                "czv_amp_step_%s" % this_cz,
+                docstring="Amplitude of the steps inserted after first "
+                "half NZ and just before the second half. "
+                "1.0 means qubit detuned to the 11-02 interaction point.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 10.0),
+                initial_value=0.5,
+                unit="a.u.",
+                label="Step relative. amp",
+            )
+
             # #################################################################
             # END new CZ parameterization
             # #################################################################
@@ -1737,7 +1743,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             flux_lm.generate_standard_waveforms()
             waveform_name = "cz_{}".format(which_gate)
             plt.plot(
-                flux_lm._wave_dict[waveform_name],
+                flux_lm._wave_dict[waveform_name], ".-",
                 label=waveform_name + " " + qubit
             )
         plt.legend()
@@ -2218,11 +2224,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             "czv_time_ramp_middle_{}",
             "czv_time_ramp_outside_{}",
             "czv_time_before_q_ph_corr_{}",
-            "czv_sq_amp_{}",
+            "czv_time_q_ph_corr_{}",
+            "czv_time_step_{}",  # To be removed if not used in final VCZ
+            "czv_amp_sq_{}",
+            "czv_amp_step_{}",  # To be removed if not used in final VCZ
             "czv_mirror_sqrs_{}",
             "czv_flip_wf_{}",
             "czv_incl_q_phase_in_cz_{}",
-            "czv_time_q_ph_corr_{}"
         }
         # Copy all relevant parameters
         for par_name in par_names:
