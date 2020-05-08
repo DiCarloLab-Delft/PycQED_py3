@@ -65,8 +65,6 @@ from pycqed.analysis_v2.readout_analysis import (
 
 from pycqed.analysis_v2.multiplexed_readout_analysis import \
     Multiplexed_Readout_Analysis
-from pycqed.analysis_v2.multiplexed_readout_analysis import \
-    Multiplexed_Readout_Analysis_2
 
 from pycqed.analysis_v2.syndrome_analysis import (
     Single_Qubit_RoundsToEvent_Analysis, One_Qubit_Paritycheck_Analysis)

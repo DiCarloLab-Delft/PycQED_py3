@@ -1393,7 +1393,10 @@ def conditional_oscillation_seq(q0: int, q1: int,
             k = oqh.create_kernel("{}_{}".format(case, angle), p)
             k.prepz(q0)
             k.prepz(q1)
+            #k.gate('waitz', [q0])
+            #k.gate('waitz', [q1])
             if (parked_qubit_seq=='ramsey') and (q2 is not None):
+                #k.gate('waitz', [q2])
                 k.prepz(q2)
 
             if (parked_qubit_seq=='ramsey') and (q2 is not None):

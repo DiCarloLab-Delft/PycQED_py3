@@ -28,6 +28,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
 from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
 
+from pycqed_scripts.experiments.Quantum_Inspire import clean_functions as cf
 
 log = logging.getLogger(__name__)
 
@@ -36,16 +37,19 @@ try:
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
     from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
     from pycqed.measurement.openql_experiments import openql_helpers as oqh
+    from pycqed.measurement import cz_cost_functions as czcf
     reload(sqo)
     reload(mqo)
     reload(cl_oql)
     reload(oqh)
+    reload(czcf)
 except ImportError:
     log.warning('Could not import OpenQL')
     mqo = None
     sqo = None
     cl_oql = None
     oqh = None
+    czcf = None
 
 
 class DeviceCCL(Instrument):
@@ -939,13 +943,11 @@ class DeviceCCL(Instrument):
             q3idx = self.find_instrument(q3).cfg_qubit_nr()
             list_qubits_used.append(q3)
 
-
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=list_qubits_used)
             for q in list_qubits_used:  #only on the CZ qubits we add the ef pulses
-                # This can be
                 mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
-
+    
                 lm = mw_lutman.LutMap()
                 # we hardcode the X on the ef transition to CW 31 here.
                 lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
@@ -953,7 +955,6 @@ class DeviceCCL(Instrument):
                 mw_lutman.load_phase_pulses_to_AWG_lookuptable()
                 mw_lutman.load_waveforms_onto_AWG_lookuptable(
                     regenerate_waveforms=True)
-
 
         # These are hardcoded angles in the mw_lutman for the AWG8
         if reduced_swp_points:
@@ -1666,11 +1667,111 @@ class DeviceCCL(Instrument):
         if analyze:
             if initialize == True:
                 thresholds = [self.find_instrument(qubit).ro_acq_threshold() for qubit in qubits]
-                ma2.Multiplexed_Readout_Analysis_2(label=label,
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
                                                  post_selection=True,
                                                  post_selec_thresholds=thresholds)
             else:
-                a = ma2.Multiplexed_Readout_Analysis_2(label=label)
+                a = ma2.Multiplexed_Readout_Analysis(label=label)
+
+            for i, qubit in enumerate(qubits):
+                label = a.raw_data_dict['value_names'][i]
+                threshold = a.qoi[label]['threshold_raw']
+                self.find_instrument(qubit).ro_acq_threshold(threshold)            
+        return
+
+    def measure_ssro_single_qubit(
+            self,
+            qubits: list,
+            q_target: str,
+            nr_shots: int = 2**13,  # 8192
+            prepare_for_timedomain: bool = True,
+            result_logging_mode='raw',
+            initialize: bool = False,
+            analyze=True,
+            shots_per_meas: int = 2**16,
+            label='Mux_SSRO',
+            MC=None):
+        '''
+        '''
+
+        log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
+            self.name, qubits))
+
+        # off and on, not including post selection init measurements yet
+        nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        if initialize == True:
+            nr_shots = 4 * nr_shots
+        else:
+            nr_shots = 2 * nr_shots
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
+                      for qn in qubits]
+
+        p = mqo.multi_qubit_off_on(qubit_idxs,
+                                   initialize=initialize,
+                                   second_excited_state=False,
+                                   platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+
+        # right is LSQ
+        d = self.get_int_logging_detector(qubits,
+                                          result_logging_mode=result_logging_mode)
+
+        # This assumes qubit names do not contain spaces
+        det_qubits = [v.split()[-1] for v in d.value_names]
+        if (qubits != det_qubits) and (self.ro_acq_weight_type() == 'optimal'):
+            # this occurs because the detector groups qubits per feedline.
+            # If you do not pay attention, this will mess up the analysis of
+            # this experiment.
+            raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
+
+        shots_per_meas = int(np.floor(
+            np.min([shots_per_meas, nr_shots])/nr_cases)*nr_cases)
+
+        d.set_child_attr('nr_shots', shots_per_meas)
+
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        MC.run('{}_{}_{}'.format(label, q_target, self.msmt_suffix))
+
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+
+        if analyze:
+            if initialize == True:
+                thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
+                    for qubit in qubits]
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                            q_target = q_target,
+                                            post_selection=True,
+                                            post_selec_thresholds=thresholds)
+                # Print fraction of discarded shots
+                #Dict = a.proc_data_dict['Post_selected_shots']
+                #key = next(iter(Dict))
+                #fraction=0
+                #for comb in Dict[key].keys():
+                #    fraction += len(Dict[key][comb])/(2**12 * 4)
+                #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
+            else:
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                                     q_target = q_target)
+            # Set thresholds
+            for i, qubit in enumerate(qubits):
+                label = a.raw_data_dict['value_names'][i]
+                threshold = a.qoi[label]['threshold_raw']
+                self.find_instrument(qubit).ro_acq_threshold(threshold)
         return
 
 
@@ -3394,9 +3495,12 @@ class DeviceCCL(Instrument):
         return dag
 
     def measure_performance(self, number_of_repetitions: int = 1,
-                            post_selection: bool = True,
+                            post_selection: bool = False,
                             qubit_pairs: list = [['QNW','QC'], ['QNE','QC'],
-                                                ['QC','QSW','QSE'], ['QC','QSE','QSW']]):
+                                                ['QC','QSW','QSE'], ['QC','QSE','QSW']],
+                            do_cond_osc: bool = True,
+                            do_1q: bool = True, do_2q: bool = True,
+                            do_ro: bool = True):
 
         """
         Routine runs readout, single-qubit and two-qubit metrics.
@@ -3421,40 +3525,211 @@ class DeviceCCL(Instrument):
 
         for _ in range(0, number_of_repetitions):
             try:
-                device.measure_ssro_multi_qubit(device.qubits(), initialize=post_selection)
+                if do_ro: 
+                    self.measure_ssro_multi_qubit(self.qubits(), initialize=post_selection)
 
-                for qubit in device.qubits():
-                    qubit_obj = device.find_instrument(qubit)
-                    qubit_obj.ro_acq_averages(4096)
-                    qubit_obj.measure_T1()
-                    qubit_obj.measure_ramsey()
-                    qubit_obj.measure_echo()
-                    qubit_obj.ro_acq_weight_type('SSB')
-                    qubit_obj.ro_soft_avg(3)
-                    qubit_obj.measure_allxy()
-                    qubit_obj.ro_soft_avg(1)
-                    qubit_obj.measure_single_qubit_randomized_benchmarking()
-                    qubit_obj.ro_acq_weight_type('optimal')
+                if do_1q:
+                    for qubit in self.qubits():
+                        qubit_obj = self.find_instrument(qubit)
+                        qubit_obj.ro_acq_averages(4096)
+                        qubit_obj.measure_T1()
+                        qubit_obj.measure_ramsey()
+                        qubit_obj.measure_echo()
+                        qubit_obj.ro_acq_weight_type('SSB')
+                        qubit_obj.ro_soft_avg(3)
+                        qubit_obj.measure_allxy()
+                        qubit_obj.ro_soft_avg(1)
+                        qubit_obj.measure_single_qubit_randomized_benchmarking()
+                        qubit_obj.ro_acq_weight_type('optimal')
                 
-                device.ro_acq_weight_type('optimal')
-                for pair in qubit_pairs:
-                    device.measure_two_qubit_randomized_benchmarking(qubits=pair[:2],
-                                                                    MC=self.instr_MC.get_instr())
-                    device.measure_state_tomography(qubits=pair[:2], bell_state=0,
-                                                    prepare_for_timedomain=True, live_plot=False,
-                                                    nr_shots_per_case=2**10, shots_per_meas=2**14,
-                                                    label='State_Tomography_Bell_0')
-                    device.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
-                    device.measure_conditional_oscillation(q0=pair[1], q1=pair[0])
-                    # in case of parked qubit, assess its parked phase as well
-                    if len(pair) == 3:
-                        device.measure_conditional_oscillation( q0=pair[0], q1=pair[1], q2=pair[2], 
-                                                                parked_qubit_seq='ramsey')
+                self.ro_acq_weight_type('optimal')
+                if do_2q:
+                    for pair in qubit_pairs:
+                        self.measure_two_qubit_randomized_benchmarking(qubits=pair[:2],
+                                                                        MC=self.instr_MC.get_instr())
+                        self.measure_state_tomography(qubits=pair[:2], bell_state=0,
+                                                        prepare_for_timedomain=True, live_plot=False,
+                                                        nr_shots_per_case=2**10, shots_per_meas=2**14,
+                                                        label='State_Tomography_Bell_0')
+                        
+                        if do_cond_osc:
+                            self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+                            self.measure_conditional_oscillation(q0=pair[1], q1=pair[0])
+                            # in case of parked qubit, assess its parked phase as well
+                            if len(pair) == 3:
+                                self.measure_conditional_oscillation( q0=pair[0], q1=pair[1], q2=pair[2], 
+                                                                    parked_qubit_seq='ramsey')
             except KeyboardInterrupt:
                 print('Keyboard Interrupt')
                 break
             except:
                 print("Exception encountered during measure_device_performance")
+
+
+    def calibrate_phases(self, phase_offset_park: float = 0.003,
+            phase_offset_sq: float = 0.05, do_park_cal: bool = True, do_sq_cal: bool = True,
+            operation_pairs: list = [(['QNW','QC'],'SE'), (['QNE','QC'],'SW'),
+                                    (['QC','QSW','QSE'],'SW'), (['QC','QSE','QSW'],'SE')]):    
+        
+        # First, fix parking phases
+        # Set 'qubits': [q0.name, q1.name, q2.name] and 'parked_qubit_seq': 'ramsey'
+        if do_park_cal:
+            for operation_tuple in operation_pairs:
+                pair, gate = operation_tuple
+                if len(pair) != 3: continue
+    
+                q0 = self.find_instrument(pair[0]) # ramsey qubit (we make this be the fluxed one)
+                q1 = self.find_instrument(pair[1]) # control qubit
+                q2 = self.find_instrument(pair[2]) # parked qubit
+    
+                cf.counter_param(0)
+                flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
+                nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
+                mc = self.instr_MC.get_instr()
+    
+                parked_seq = 'ramsey'
+                conv_cost_det = det.Function_Detector( get_function=czcf.conventional_CZ_cost_func,
+                        msmt_kw={'device': self, 'FL_LutMan_QR': flux_lm,
+                            'MC': mc, 'waveform_name': 'cz_{}'.format(gate),
+                            'qubits': [q0.name, q1.name, q2.name],
+                            'parked_qubit_seq': parked_seq},
+                        value_names=['Cost function value',
+                            'Conditional phase', 'offset difference', 'missing fraction',
+                            'Q0 phase', 'Park Phase OFF', 'Park Phase ON'],
+                        result_keys=['cost_function_val',
+                            'delta_phi', 'offset_difference', 'missing_fraction',
+                            'single_qubit_phase_0', 'park_phase_off', 'park_phase_on'],
+                        value_units=['a.u.', 'deg', '%', '%', 'deg', 'deg', 'deg'])
+    
+                park_flux_lm = q2.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
+    
+                # 1D Scan of phase corrections after flux pulse 
+                value_min = park_flux_lm.park_amp() - phase_offset_park
+                value_max = park_flux_lm.park_amp() + phase_offset_park
+                sw = swf.joint_HDAWG_lutman_parameters(name='park_amp',
+                                                    parameter_1=park_flux_lm.park_amp,
+                                                    parameter_2=park_flux_lm.park_amp_minus,
+                                                    AWG=park_flux_lm.AWG.get_instr(),
+                                                    lutman=park_flux_lm)
+                
+                nested_mc.set_sweep_function(sw)
+                nested_mc.set_sweep_points(np.linspace(value_min, value_max, 10))
+                label = '1D_park_phase_corr_{}_{}_{}'.format(q0.name,q1.name,q2.name)
+                nested_mc.set_detector_function(conv_cost_det)
+                result = nested_mc.run(label)
+    
+                # Use ch_to_analyze as 5 for parking phase
+                a_obj = ma2.Crossing_Analysis(label=label,
+                                            options_dict={'ch_idx': 5, 'target_crossing': 0})
+                crossed_value = a_obj.proc_data_dict['root']
+                park_flux_lm.park_amp(crossed_value)
+                park_flux_lm.park_amp_minus(-crossed_value)
+
+        # Then, fix single-qubit phases
+        # Set 'qubits': [q0.name, q1.name] and 'parked_qubit_seq': 'ground'
+        if do_sq_cal:
+            for operation_tuple in operation_pairs:
+                # For each qubit pair, calibrate both individually (requires inversion of arguments)
+                for reverse in [False, True]:
+                    pair, gate = operation_tuple
+                    parked_seq = 'ground'
+    
+                    if reverse:
+                        q0 = self.find_instrument(pair[1]) # ramsey qubit (we make this be the fluxed one)
+                        q1 = self.find_instrument(pair[0]) # control qubit
+                        if gate=='NE': gate='SW' 
+                        elif gate=='NW': gate = 'SE'
+                        elif gate=='SW': gate = 'NE'
+                        elif gate=='SE': gate = 'NW'
+                    else:
+                        q0 = self.find_instrument(pair[0]) # ramsey qubit (we make this be the fluxed one)
+                        q1 = self.find_instrument(pair[1]) # control qubit
+                        gate = gate
+            
+                    q2 = None
+                    cf.counter_param(0)
+                    flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
+                    nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
+                    mc = self.instr_MC.get_instr()
+            
+                    conv_cost_det = det.Function_Detector( get_function=czcf.conventional_CZ_cost_func,
+                                    msmt_kw={'device': self, 'FL_LutMan_QR': flux_lm,
+                                        'MC': mc,'waveform_name': 'cz_{}'.format(gate),
+                                        'qubits': [q0.name, q1.name], 'parked_qubit_seq': parked_seq},
+                                    value_names=['Cost function value',
+                                        'Conditional phase', 'offset difference', 'missing fraction',
+                                        'Q0 phase', 'Park Phase OFF', 'Park Phase ON'],
+                                    result_keys=['cost_function_val',
+                                        'delta_phi', 'offset_difference', 'missing_fraction',
+                                        'single_qubit_phase_0', 'park_phase_off', 'park_phase_on'],
+                                    value_units=['a.u.', 'deg', '%', '%', 'deg', 'deg', 'deg'])
+            
+                    # 1D Scan of phase corrections after flux pulse 
+                    #value_min = flux_lm.cz_phase_corr_amp_SW()-phase_offset
+                    value_min = getattr(flux_lm, 'cz_phase_corr_amp_' + gate )()-phase_offset_sq
+                    #value_max = flux_lm.cz_phase_corr_amp_SW()+phase_offset
+                    value_max = getattr(flux_lm, 'cz_phase_corr_amp_' + gate )()+phase_offset_sq
+            
+                    label = 'CZ_1D_sweep_phase_corr_{}'.format(gate)
+                    nested_mc.set_sweep_function(getattr(flux_lm, 'cz_phase_corr_amp_' + gate ))
+                    nested_mc.set_sweep_points(np.linspace(value_min, value_max, 10))
+                    nested_mc.set_detector_function(conv_cost_det)
+                    result = nested_mc.run(label)
+            
+                    # Use ch_to_analyze as 4 for single qubit phases ('Q0 phase')
+                    a_obj = ma2.Crossing_Analysis(label=label,
+                                                  options_dict={'ch_idx': 4, 'target_crossing': 0})
+                    crossed_value = a_obj.proc_data_dict['root']
+                    getattr(flux_lm, 'cz_phase_corr_amp_' + gate )(crossed_value)
+
+
+    def calibrate_cz_thetas(self, phase_offset: float = 1,
+            operation_pairs: list = [(['QNW','QC'],'SE'), (['QNE','QC'],'SW'),
+                                    (['QC','QSW','QSE'],'SW'), (['QC','QSE','QSW'],'SE')]):    
+
+        # Set 'qubits': [q0.name, q1.name] and 'parked_qubit_seq': 'ground'
+        for operation_tuple in operation_pairs:
+            pair, gate = operation_tuple
+            parked_seq = 'ground'
+    
+            q0 = self.find_instrument(pair[0]) # ramsey qubit (we make this be the fluxed one)
+            q1 = self.find_instrument(pair[1]) # control qubit
+            q2 = None
+            gate = gate
+        
+            cf.counter_param(0)
+            flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
+            nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
+            mc = self.instr_MC.get_instr()
+        
+            conv_cost_det = det.Function_Detector( get_function=czcf.conventional_CZ_cost_func,
+                            msmt_kw={'device': self, 'FL_LutMan_QR': flux_lm,
+                                'MC': mc,'waveform_name': 'cz_{}'.format(gate),
+                                'qubits': [q0.name, q1.name], 'parked_qubit_seq': parked_seq},
+                            value_names=['Cost function value',
+                                'Conditional phase', 'offset difference', 'missing fraction',
+                                'Q0 phase', 'Park Phase OFF', 'Park Phase ON'],
+                            result_keys=['cost_function_val',
+                                'delta_phi', 'offset_difference', 'missing_fraction',
+                                'single_qubit_phase_0', 'park_phase_off', 'park_phase_on'],
+                            value_units=['a.u.', 'deg', '%', '%', 'deg', 'deg', 'deg'])
+        
+            # 1D Scan of phase corrections after flux pulse 
+            value_min = getattr(flux_lm, 'cz_theta_f_' + gate )()-phase_offset
+            #value_max = flux_lm.cz_phase_corr_amp_SW()+phase_offset
+            value_max = getattr(flux_lm, 'cz_theta_f_' + gate )()+phase_offset
+        
+            label = 'CZ_1D_sweep_theta_{}'.format(gate)
+            nested_mc.set_sweep_function(getattr(flux_lm, 'cz_theta_f_' + gate ))
+            nested_mc.set_sweep_points(np.linspace(value_min, value_max, 10))
+            nested_mc.set_detector_function(conv_cost_det)
+            result = nested_mc.run(label)
+        
+            # Use ch_to_analyze as 4 for single qubit phases ('Q0 phase')
+            a_obj = ma2.Crossing_Analysis(label=label,
+                                          options_dict={'ch_idx': 1, 'target_crossing': 180})
+            crossed_value = a_obj.proc_data_dict['root']
+            getattr(flux_lm, 'cz_theta_f_' + gate )(crossed_value)
 
 
 def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
