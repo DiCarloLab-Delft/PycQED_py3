@@ -2269,7 +2269,6 @@ def multi_qubit_Depletion(qubits: list, platf_cfg: str,
     specified qubits:
 
     |q0> - RO <--wait--> P0 - P1 - RO
-
     |q1> - RO <--time--> P0 - P1 - RO
      .
      .
