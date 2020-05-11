@@ -379,8 +379,8 @@ def two_qubit_tomo_cardinal(q0: int, q1: int, cardinal: int,  platf_cfg: str):
 
 def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
                     sequence_type='sequential',
-                    replace_q1_pulses_X180: bool=False,
-                    double_points: bool=False):
+                    replace_q1_pulses_with: str = None,
+                    repetitions: int = 1):
     """
     AllXY sequence on two qubits.
     Has the option of replacing pulses on q1 with pi pulses
@@ -391,7 +391,7 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
             options are: sequential | interleaved | simultaneous | sandwiched
                        q0|q0|q1|q1   q0|q1|q0|q1     q01|q01       q1|q0|q0|q1
             describes the order of the AllXY pulses
-        replace_q1_pulses_X180 (bool) : if True replaces all pulses on q1 with
+        replace_q1_pulses_with (bool) : if True replaces all pulses on q1 with
             X180 pulses.
 
         double_points (bool) : if True measures each point in the AllXY twice
@@ -410,17 +410,14 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
                           ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
                           ['ry90', 'ry90']]
 
-    pulse_combinations_tiled = pulse_combinations + pulse_combinations
-    if double_points:
-        pulse_combinations = [val for val in pulse_combinations
-                              for _ in (0, 1)]
+    pulse_combinations_q0 = np.repeat(pulse_combinations, repetitions, axis=0)
 
-    pulse_combinations_q0 = pulse_combinations
-    pulse_combinations_q1 = pulse_combinations_tiled
-
-    if replace_q1_pulses_X180:
-        pulse_combinations_q1 = [['rx180']*2 for val in pulse_combinations]
-
+    if replace_q1_pulses_with is not None:
+        # pulse_combinations_q1 = [[replace_q1_pulses_with]*2 for val in pulse_combinations]
+        pulse_combinations_q1 = np.repeat(
+            [[replace_q1_pulses_with]*2], len(pulse_combinations_q0), axis=0)
+    else:
+        pulse_combinations_q1 = np.tile(pulse_combinations, [repetitions, 1])
     i = 0
     for pulse_comb_q0, pulse_comb_q1 in zip(pulse_combinations_q0,
                                             pulse_combinations_q1):
@@ -1379,8 +1376,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
     q1 is the spectator qubit
 
     Timing of the sequence:
-    q0:   --   X90  C-Phase  (second C-Phase) Rphi90    RO
-    q1: (X180)  --  C-Phase     --            (X180)    RO
+    q0:   --   X90  C-Phase  (second C-Phase) Rphi90      --       RO
+    q1: (X180)  --  C-Phase     --                       (X180)    RO
 
     Args:
         q0, q1      (str): names of the addressed qubits
@@ -1417,6 +1414,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
             if case == 'excitation':
                 gate = 'rx180' if single_q_gates_replace is None else single_q_gates_replace
                 k.gate(gate, [q1])
+                # k.gate('i', [q0])
+                # k.gate("wait", [], 0)
 
             gate = q0_first_gate if single_q_gates_replace is None else single_q_gates_replace
             k.gate(gate, [q0])
@@ -1458,15 +1457,20 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 gate = 'rx90' if single_q_gates_replace is None else single_q_gates_replace
                 # special because the cw phase pulses go in mult of 20 deg
                 k.gate(gate, [q0])
+
             elif angle == 0:
                 gate = 'rx90' if single_q_gates_replace is None else single_q_gates_replace
                 k.gate(gate, [q0])
+
             else:
                 gate = 'cw_{:02}'.format(cw_idx) if single_q_gates_replace is None else single_q_gates_replace
                 k.gate(gate, [q0])
+
             if case == 'excitation':
                 gate = 'rx180' if single_q_gates_replace is None else single_q_gates_replace
                 k.gate(gate, [q1])
+                # k.gate('i', [q0])
+                # k.gate("wait", [], 0)
 
             k.measure(q0)
             k.measure(q1)
@@ -2142,7 +2146,7 @@ def two_qubit_state_tomography(qubit_idxs,
     calibration_points = ['00', '01', '10', '11']
     measurement_pre_rotations = ['II', 'IF', 'FI', 'FF']
     bases = ['X', 'Y', 'Z']
-    ## Explain this ? 
+    ## Explain this ?
     bases_comb = [basis_0+basis_1 for basis_0 in bases for basis_1 in bases]
     combinations = []
     combinations += [b+'-'+c for b in bases_comb for c in measurement_pre_rotations]
@@ -2151,7 +2155,7 @@ def two_qubit_state_tomography(qubit_idxs,
     state_strings = ['0', '1', '+', '-', 'i', 'j']
     state_gate = ['i', 'rx180', 'ry90', 'rym90', 'rxm90', 'rx90']
     product_gate = ['0', '0', '0', '0']
-        
+
     for basis in bases_comb:
         for pre_rot in measurement_pre_rotations: # tomographic pre-rotation
             k = oqh.create_kernel('TFD_{}-basis_{}'.format(basis, pre_rot), p)
@@ -2159,11 +2163,11 @@ def two_qubit_state_tomography(qubit_idxs,
                 k.prepz(q_idx)
 
      # Choose a bell state and set the corresponding preparation pulses
-            if bell_state is not None: 
+            if bell_state is not None:
                         #
                 # Q1 |0> --- P1 --o-- A1 -- R1 -- M
                 #                 |
-                # Q0 |0> --- P0 --o-- I  -- R0 -- M 
+                # Q0 |0> --- P0 --o-- I  -- R0 -- M
                 if bell_state == 0:  # |Phi_m>=|00>-|11>
                     prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
                 elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
@@ -2190,7 +2194,7 @@ def two_qubit_state_tomography(qubit_idxs,
                     k.gate("wait", [q0, q1], round(wait_after_flux*1e9))
                 k.gate("wait", [],  0)
 
-            if product_state is not None: 
+            if product_state is not None:
                 for i, string in enumerate(product_state):
                     product_gate[i] = state_gate[state_strings.index(string)]
                 k.gate(product_gate[0], [q0])
@@ -2198,7 +2202,7 @@ def two_qubit_state_tomography(qubit_idxs,
                 k.gate('wait', [], 0)
 
             if (product_state is not None) and (bell_state is not None):
-                raise ValueError('Confusing requirements, both state {} and bell-state {}'.format(product_state,bell_state)) 
+                raise ValueError('Confusing requirements, both state {} and bell-state {}'.format(product_state,bell_state))
 
             # tomographic pre-rotations
             for rot_idx in range(2):
@@ -2255,3 +2259,155 @@ def two_qubit_state_tomography(qubit_idxs,
     p = oqh.compile(p)
     p.combinations = combinations
     return p
+
+
+def multi_qubit_Depletion(qubits: list, platf_cfg: str,
+                          time: float):
+    """
+
+    Performs a measurement pulse and wait time followed by a simultaneous ALLXY on the
+    specified qubits:
+
+    |q0> - RO <--wait--> P0 - P1 - RO
+
+    |q1> - RO <--time--> P0 - P1 - RO
+     .
+     .
+     .
+
+     args:
+        qubits : List of qubits numbers.
+        time   : wait time (s) after readout pulse.
+    """
+
+    p = oqh.create_program('multi_qubit_Depletion', platf_cfg)
+
+    pulse_combinations = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+                          ['rx180', 'ry180'], ['ry180', 'rx180'],
+                          ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+                          ['ry90', 'rx90'], ['rx90', 'ry180'],
+                          ['ry90', 'rx180'],
+                          ['rx180', 'ry90'], ['ry180', 'rx90'],
+                          ['rx90', 'rx180'],
+                          ['rx180', 'rx90'], ['ry90', 'ry180'],
+                          ['ry180', 'ry90'],
+                          ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+                          ['ry90', 'ry90']]
+
+    for i, pulse_comb in enumerate(pulse_combinations):
+        for j in range(2): #double points
+            k = oqh.create_kernel('Depletion_{}_{}'.format(j, i), p)
+            for qubit in qubits:
+                k.prepz(qubit)
+                k.measure(qubit)
+
+            wait_nanoseconds = int(round(time/1e-9))
+            for qubit in qubits:
+                k.gate("wait", [qubit], wait_nanoseconds)
+
+            if sequence_type == 'simultaneous':
+                for qubit in qubits:
+                    k.gate(pulse_comb[0], [qubit])
+                    k.gate(pulse_comb[1], [qubit])
+                    k.measure(qubit)
+
+            p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+def two_qubit_Depletion(q0: int, q1: int, platf_cfg: str,
+                        time: float,
+                        sequence_type='sequential',
+                        double_points: bool=False):
+    """
+
+    """
+    p = oqh.create_program('two_qubit_Depletion', platf_cfg)
+
+    pulse_combinations = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+                          ['rx180', 'ry180'], ['ry180', 'rx180'],
+                          ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+                          ['ry90', 'rx90'], ['rx90', 'ry180'],
+                          ['ry90', 'rx180'],
+                          ['rx180', 'ry90'], ['ry180', 'rx90'],
+                          ['rx90', 'rx180'],
+                          ['rx180', 'rx90'], ['ry90', 'ry180'],
+                          ['ry180', 'ry90'],
+                          ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+                          ['ry90', 'ry90']]
+
+    pulse_combinations_tiled = pulse_combinations + pulse_combinations
+    if double_points:
+        pulse_combinations = [val for val in pulse_combinations
+                              for _ in (0, 1)]
+
+    pulse_combinations_q0 = pulse_combinations
+    pulse_combinations_q1 = pulse_combinations_tiled
+
+    i = 0
+    for pulse_comb_q0, pulse_comb_q1 in zip(pulse_combinations_q0,
+                                            pulse_combinations_q1):
+        i += 1
+        k = oqh.create_kernel('AllXY_{}'.format(i), p)
+        k.prepz(q0)
+        k.prepz(q1)
+        k.measure(q0)
+        k.measure(q1)
+
+        wait_nanoseconds = int(round(time/1e-9))
+        k.gate("wait", [q0], wait_nanoseconds)
+        k.gate("wait", [q1], wait_nanoseconds)
+        # N.B. The identity gates are there to ensure proper timing
+        if sequence_type == 'interleaved':
+            k.gate(pulse_comb_q0[0], [q0])
+            k.gate('i', [q1])
+
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[0], [q1])
+
+            k.gate(pulse_comb_q0[1], [q0])
+            k.gate('i', [q1])
+
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[1], [q1])
+
+        elif sequence_type == 'sandwiched':
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[0], [q1])
+
+            k.gate(pulse_comb_q0[0], [q0])
+            k.gate('i', [q1])
+            k.gate(pulse_comb_q0[1], [q0])
+            k.gate('i', [q1])
+
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[1], [q1])
+
+        elif sequence_type == 'sequential':
+            k.gate(pulse_comb_q0[0], [q0])
+            k.gate('i', [q1])
+            k.gate(pulse_comb_q0[1], [q0])
+            k.gate('i', [q1])
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[0], [q1])
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[1], [q1])
+
+        elif sequence_type == 'simultaneous':
+            k.gate(pulse_comb_q0[0], [q0])
+            k.gate(pulse_comb_q1[0], [q1])
+            k.gate(pulse_comb_q0[1], [q0])
+            k.gate(pulse_comb_q1[1], [q1])
+        else:
+            raise ValueError("sequence_type {} ".format(sequence_type) +
+                             "['interleaved', 'simultaneous', " +
+                             "'sequential', 'sandwiched']")
+        k.measure(q0)
+        k.measure(q1)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+

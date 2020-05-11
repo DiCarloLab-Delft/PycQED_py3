@@ -179,7 +179,7 @@ class DeviceCCL(Instrument):
         self.add_parameter(
             "ro_acq_weight_type",
             initial_value="SSB",
-            vals=vals.Enum("SSB", "optimal"),
+            vals=vals.Enum("SSB", "optimal","optimal IQ"),
             docstring=ro_acq_docstr,
             parameter_class=ManualParameter,
         )
@@ -622,7 +622,7 @@ class DeviceCCL(Instrument):
                     weight_function_Q=qb.ro_acq_weight_chQ(),
                 )
 
-        elif self.ro_acq_weight_type() == "optimal":
+        elif 'optimal' in self.ro_acq_weight_type():
             log.info("using optimal weights")
             for qb_name in qubits:
                 qb = self.find_instrument(qb_name)
@@ -653,6 +653,15 @@ class DeviceCCL(Instrument):
                     acq_instr.set(
                         "qas_0_rotations_{}".format(qb.ro_acq_weight_chI()), 1.0 - 1.0j
                     )
+                    if self.ro_acq_weight_type() == 'optimal IQ':
+                        print('setting the optimal Q')
+                        acq_instr.set('qas_0_integration_weights_{}_real'.format(
+                            qb.ro_acq_weight_chQ()), opt_WQ)
+                        acq_instr.set('qas_0_integration_weights_{}_imag'.format(
+                            qb.ro_acq_weight_chQ()), opt_WI)
+                        acq_instr.set('qas_0_rotations_{}'.format(
+                            qb.ro_acq_weight_chQ()), 1.0 + 1.0j)
+
                 if self.ro_acq_digitized():
                     # Update the RO theshold
                     if (
@@ -796,7 +805,7 @@ class DeviceCCL(Instrument):
 
         if self.ro_acq_weight_type() == "SSB":
             result_logging_mode = "raw"
-        elif self.ro_acq_weight_type() == "optimal":
+        elif 'optimal' in self.ro_acq_weight_type():
             # lin_trans includes
             result_logging_mode = "lin_trans"
             if self.ro_acq_digitized():
@@ -804,7 +813,7 @@ class DeviceCCL(Instrument):
 
         log.info("Setting result logging mode to {}".format(result_logging_mode))
 
-        if self.ro_acq_weight_type() == "SSB":
+        if self.ro_acq_weight_type() != "optimal":
             acq_ch_map = _acq_ch_map_to_IQ_ch_map(self._acq_ch_map)
         else:
             acq_ch_map = self._acq_ch_map
@@ -896,7 +905,7 @@ class DeviceCCL(Instrument):
 
         if self.ro_acq_weight_type() == "SSB":
             result_logging_mode = "raw"
-        elif self.ro_acq_weight_type() == "optimal":
+        elif 'optimal' in self.ro_acq_weight_type():
             # lin_trans includes
             result_logging_mode = "lin_trans"
             if self.ro_acq_digitized():
@@ -904,7 +913,7 @@ class DeviceCCL(Instrument):
 
         log.info("Setting result logging mode to {}".format(result_logging_mode))
 
-        if self.ro_acq_weight_type() == "SSB":
+        if self.ro_acq_weight_type() != "optimal":
             acq_ch_map = _acq_ch_map_to_IQ_ch_map(self._acq_ch_map)
         else:
             acq_ch_map = self._acq_ch_map
@@ -1265,12 +1274,13 @@ class DeviceCCL(Instrument):
         q0: str,
         q1: str,
         sequence_type="sequential",
-        replace_q1_pulses_X180: bool = False,
+        replace_q1_pulses_with: str = None,
+        repetitions: int = 2,
         analyze: bool = True,
         close_fig: bool = True,
         detector: str = "correl",
         prepare_for_timedomain: bool = True,
-        MC=None,
+        MC=None
     ):
         """
         Perform AllXY measurement simultaneously of two qubits (c.f. measure_allxy
@@ -1288,6 +1298,11 @@ class DeviceCCL(Instrument):
 
             q1 (str):
                 second quibit to perform allxy measurement on
+
+            replace_q1_pulses_with (str):
+                replaces all gates for q1 with the specified gate
+                main use case: replace with "i" or "rx180" for crosstalks
+                assessments
 
             sequence_type (str) : Describes the timing/order of the pulses.
                 options are: sequential | interleaved | simultaneous | sandwiched
@@ -1310,8 +1325,8 @@ class DeviceCCL(Instrument):
             q1idx,
             platf_cfg=self.cfg_openql_platform_fn(),
             sequence_type=sequence_type,
-            replace_q1_pulses_X180=replace_q1_pulses_X180,
-            double_points=True,
+            replace_q1_pulses_with=replace_q1_pulses_with,
+            repetitions=repetitions,
         )
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
@@ -1320,13 +1335,56 @@ class DeviceCCL(Instrument):
         elif detector == "int_avg":
             d = self.get_int_avg_det(qubits=[q0, q1])
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(42))
+        MC.set_sweep_points(np.arange(21 * repetitions))
         MC.set_detector_function(d)
-        MC.run("TwoQubitAllXY_{}_{}{}".format(q0, q1, self.msmt_suffix))
+        MC.run("TwoQubitAllXY_{}_{}_{}_q1_repl={}{}".format(
+            q0, q1, sequence_type, replace_q1_pulses_with,
+            self.msmt_suffix))
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
             a = ma2.Basic1DAnalysis()
         return a
+
+    def measure_two_qubit_allXY_crosstalk(
+        self, q0: str,
+        q1: str,
+        q1_replace_cases: list = [
+            None, "i", "rx180", "rx180", "rx180"
+        ],
+        sequence_type_cases: list = [
+            'sequential', 'sequential', 'sequential', 'simultaneous', 'sandwiched'
+        ],
+        repetitions: int = 1,
+        **kw
+    ):
+        timestamps = []
+        legend_labels = []
+
+        for seq_type, q1_replace in zip(sequence_type_cases, q1_replace_cases):
+            a = self.measure_two_qubit_allxy(
+                q0=q0,
+                q1=q1,
+                replace_q1_pulses_with=q1_replace,
+                sequence_type=seq_type,
+                repetitions=repetitions,
+                **kw)
+            timestamps.append(a.timestamps[0])
+            legend_labels.append("{}, {} replace: {}".format(seq_type, q1, q1_replace))
+
+        a_full = ma2.Basic1DAnalysis(
+            t_start=timestamps[0],
+            t_stop=timestamps[-1],
+            legend_labels=legend_labels,
+            hide_pnts=True)
+
+        # This one is to compare only the specific sequences we are after
+        a_seq = ma2.Basic1DAnalysis(
+            t_start=timestamps[-3],
+            t_stop=timestamps[-1],
+            legend_labels=legend_labels,
+            hide_pnts=True)
+
+        return a_full, a_seq
 
     def measure_single_qubit_parity(
         self,
@@ -2959,7 +3017,7 @@ class DeviceCCL(Instrument):
                                       times=[extra_buffer],
                                       platf_cfg=self.cfg_openql_platform_fn(),
                                       flux_cw=flux_cw,
-                                      qubit_other_idx=qotheridx,
+                                      # qubit_other_idx=qotheridx,
                                       cal_points=False)
 
         CC.eqasm_program(p.filename)
@@ -3338,7 +3396,7 @@ class DeviceCCL(Instrument):
         # 2-state readout and postprocessing
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        self.ro_acq_weight_type("SSB")
+        # self.ro_acq_weight_type("SSB")
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
@@ -3850,7 +3908,7 @@ class DeviceCCL(Instrument):
         # 2-state readout and postprocessing
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        self.ro_acq_weight_type("SSB")
+        # self.ro_acq_weight_type("SSB")
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
@@ -3950,7 +4008,7 @@ class DeviceCCL(Instrument):
         )
         # N.B. if interleaving cliffords are used, this won't work
         # FIXME: write a proper analysis for simultaneous RB
-        # ma2.RandomizedBenchmarking_TwoQubit_Analysis()
+        ma2.RandomizedBenchmarking_TwoQubit_Analysis()
 
     ########################################################
     # Calibration methods
