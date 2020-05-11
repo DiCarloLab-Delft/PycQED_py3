@@ -2255,3 +2255,169 @@ def two_qubit_state_tomography(qubit_idxs,
     p = oqh.compile(p)
     p.combinations = combinations
     return p
+
+
+def multi_qubit_Depletion(qubits: list, platf_cfg: str,
+                          time: float):
+    """
+
+    Performs a measurement pulse and wait time followed by a simultaneous ALLXY on the
+    specified qubits:
+    
+    |q0> - RO <--wait--> P0 - P1 - RO 
+    
+    |q1> - RO <--time--> P0 - P1 - RO
+     .
+     .
+     .
+
+     args: 
+        qubits : List of qubits numbers.
+        time   : wait time (s) after readout pulse.
+    """
+
+    p = oqh.create_program('multi_qubit_Depletion', platf_cfg)
+
+    pulse_combinations = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+                          ['rx180', 'ry180'], ['ry180', 'rx180'],
+                          ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+                          ['ry90', 'rx90'], ['rx90', 'ry180'],
+                          ['ry90', 'rx180'],
+                          ['rx180', 'ry90'], ['ry180', 'rx90'],
+                          ['rx90', 'rx180'],
+                          ['rx180', 'rx90'], ['ry90', 'ry180'],
+                          ['ry180', 'ry90'],
+                          ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+                          ['ry90', 'ry90']]
+
+    for i, pulse_comb in enumerate(pulse_combinations):
+        for j in range(2): #double points
+            k = oqh.create_kernel('Depletion_{}_{}'.format(j, i), p)
+            for qubit in qubits:
+                k.prepz(qubit)
+                k.measure(qubit)
+
+            wait_nanoseconds = int(round(time/1e-9))
+            for qubit in qubits:
+                k.gate("wait", [qubit], wait_nanoseconds)
+
+            if sequence_type == 'simultaneous':
+                for qubit in qubits:
+                    k.gate(pulse_comb[0], [qubit])
+                    k.gate(pulse_comb[1], [qubit])
+                    k.measure(qubit)
+            
+            p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+def two_qubit_Depletion(q0: int, q1: int, platf_cfg: str,
+                        time: float,
+                        sequence_type='sequential',
+                        double_points: bool=False):
+    """
+    AllXY sequence on two qubits.
+    Has the option of replacing pulses on q1 with pi pulses
+
+    Args:
+        q0, q1         (str) : target qubits for the sequence
+        sequence_type  (str) : Describes the timing/order of the pulses.
+            options are: sequential | interleaved | simultaneous | sandwiched
+                       q0|q0|q1|q1   q0|q1|q0|q1     q01|q01       q1|q0|q0|q1
+            describes the order of the AllXY pulses
+        replace_q1_pulses_X180 (bool) : if True replaces all pulses on q1 with
+            X180 pulses.
+
+        double_points (bool) : if True measures each point in the AllXY twice
+    """
+    p = oqh.create_program('two_qubit_Depletion', platf_cfg)
+
+    pulse_combinations = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+                          ['rx180', 'ry180'], ['ry180', 'rx180'],
+                          ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+                          ['ry90', 'rx90'], ['rx90', 'ry180'],
+                          ['ry90', 'rx180'],
+                          ['rx180', 'ry90'], ['ry180', 'rx90'],
+                          ['rx90', 'rx180'],
+                          ['rx180', 'rx90'], ['ry90', 'ry180'],
+                          ['ry180', 'ry90'],
+                          ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+                          ['ry90', 'ry90']]
+
+    pulse_combinations_tiled = pulse_combinations + pulse_combinations
+    if double_points:
+        pulse_combinations = [val for val in pulse_combinations
+                              for _ in (0, 1)]
+
+    pulse_combinations_q0 = pulse_combinations
+    pulse_combinations_q1 = pulse_combinations_tiled
+
+    i = 0
+    for pulse_comb_q0, pulse_comb_q1 in zip(pulse_combinations_q0,
+                                            pulse_combinations_q1):
+        i += 1
+        k = oqh.create_kernel('AllXY_{}'.format(i), p)
+        k.prepz(q0)
+        k.prepz(q1)
+        k.measure(q0)
+        k.measure(q1)
+
+        wait_nanoseconds = int(round(time/1e-9))
+        k.gate("wait", [q0], wait_nanoseconds)
+        k.gate("wait", [q1], wait_nanoseconds)
+        # N.B. The identity gates are there to ensure proper timing
+        if sequence_type == 'interleaved':
+            k.gate(pulse_comb_q0[0], [q0])
+            k.gate('i', [q1])
+
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[0], [q1])
+
+            k.gate(pulse_comb_q0[1], [q0])
+            k.gate('i', [q1])
+
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[1], [q1])
+
+        elif sequence_type == 'sandwiched':
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[0], [q1])
+
+            k.gate(pulse_comb_q0[0], [q0])
+            k.gate('i', [q1])
+            k.gate(pulse_comb_q0[1], [q0])
+            k.gate('i', [q1])
+
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[1], [q1])
+
+        elif sequence_type == 'sequential':
+            k.gate(pulse_comb_q0[0], [q0])
+            k.gate('i', [q1])
+            k.gate(pulse_comb_q0[1], [q0])
+            k.gate('i', [q1])
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[0], [q1])
+            k.gate('i', [q0])
+            k.gate(pulse_comb_q1[1], [q1])
+
+        elif sequence_type == 'simultaneous':
+            k.gate(pulse_comb_q0[0], [q0])
+            k.gate(pulse_comb_q1[0], [q1])
+            k.gate(pulse_comb_q0[1], [q0])
+            k.gate(pulse_comb_q1[1], [q1])
+        else:
+            raise ValueError("sequence_type {} ".format(sequence_type) +
+                             "['interleaved', 'simultaneous', " +
+                             "'sequential', 'sandwiched']")
+        k.measure(q0)
+        k.measure(q1)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+
