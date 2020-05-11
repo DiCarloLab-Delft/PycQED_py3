@@ -66,6 +66,6 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data',
                  'Thijs_Desktop': r'\\TUD277620\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'LaVespa': r'D:\Experiments\18031_Intel_resonators',
-                 'LaAprilia_1' : r'D:\\Experiments\\1812_CZsims\\data',
+                 'LaAprilia_1' : r'D:\\Experiments\\20200415_Chimera_Surface_4\\Data',
                  'PaganiMeas':r'D:\\Experiments\\1903_S7_VIO_W29_C4\\data',
                  }
