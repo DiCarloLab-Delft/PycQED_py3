@@ -1805,6 +1805,7 @@ class DeviceCCL(Instrument):
                 thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
                     for qubit in qubits]
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                            nr_qubits=len(qubits),
                                             post_selection=True,
                                             post_selec_thresholds=thresholds)
                 # Print fraction of discarded shots
@@ -1815,7 +1816,8 @@ class DeviceCCL(Instrument):
                 #    fraction += len(Dict[key][comb])/(2**12 * 4)
                 #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
             else:
-                a = ma2.Multiplexed_Readout_Analysis(label=label)
+                a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                            nr_qubits=len(qubits))
             # Set thresholds
             for i, qubit in enumerate(qubits):
                 label = a.raw_data_dict['value_names'][i]
@@ -1918,6 +1920,7 @@ class DeviceCCL(Instrument):
                 thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
                     for qubit in qubits]
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                            nr_qubits=len(qubits),
                                             q_target = q_target,
                                             post_selection=True,
                                             post_selec_thresholds=thresholds)
@@ -1930,6 +1933,7 @@ class DeviceCCL(Instrument):
                 #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
             else:
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                                     nr_qubits=len(qubits),
                                                      q_target = q_target)
             # Set thresholds
             for i, qubit in enumerate(qubits):

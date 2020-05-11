@@ -33,7 +33,8 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     using post-selection.
     """
 
-    def __init__(self, t_start: str = None, t_stop: str = None,
+    def __init__(self, nr_qubits: int, 
+                 t_start: str = None, t_stop: str = None,
                  label: str = '',
                  options_dict: dict = None, extract_only: bool = False,
                  extract_combinations: bool = False,
@@ -47,6 +48,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                          options_dict=options_dict,
                          extract_only=extract_only)
 
+        self.nr_qubits = nr_qubits
         self.extract_combinations = extract_combinations
         self.post_selection = post_selection
         self.post_selec_thresholds = post_selec_thresholds
@@ -77,14 +79,26 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     def process_data(self):
 
         self.proc_data_dict = {}
+        nr_qubits = self.nr_qubits
 
-        Channels = self.raw_data_dict['value_names'] # Qubit UHF outputs
-        nr_qubits = len(Channels)
+        # Data in single quadrature
+        if len(self.raw_data_dict['value_names']) == nr_qubits:
+            self.Channels = self.raw_data_dict['value_names']
+            Channels = self.Channels
+            raw_shots = self.raw_data_dict['data'][:, 1:]
+            qubit_labels = [ch.decode('utf-8').rsplit(' ', 1)[1] for ch in Channels]
+        # Data in two quadratures
+        elif len(self.raw_data_dict['value_names']) == 2*nr_qubits:
+            self.Channels = self.raw_data_dict['value_names'][::2]
+            Channels = self.Channels
+            raw_shots = self.raw_data_dict['data'][:, 1::2]
+            qubit_labels = [ch.decode('utf-8').rsplit(' ', 2)[1] for ch in Channels]
+        else:
+            raise ValueError('Number of qudratures is not the same for all qubits')
+
         combinations = \
-            ['{:0{}b}'.format(i, nr_qubits) for i in range(2**nr_qubits)]
-        raw_shots = self.raw_data_dict['data'][:, 1:]
+            ['{:0{}b}'.format(i, nr_qubits) for i in range(2**nr_qubits)]        
         post_selection = self.post_selection
-        qubit_labels = [ch.decode('utf-8').rsplit(' ', 1)[1] for ch in Channels]
         self.proc_data_dict['combinations'] = combinations
         self.proc_data_dict['qubit_labels'] = qubit_labels
 
@@ -299,7 +313,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['cross_fidelity_matrix'] = cross_fidelity_matrix
 
     def prepare_fitting(self):
-        Channels = self.raw_data_dict['value_names']
+        Channels = self.Channels
         self.fit_dicts = OrderedDict()
         for ch in Channels:
             ###################################
@@ -386,7 +400,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         This code was taken from single shot readout analysis and adapted to
         mux readout (April 2020).
         '''
-        Channels = self.raw_data_dict['value_names']
+        Channels = self.Channels
         self.proc_data_dict['quantities_of_interest'] = \
             {ch : {} for ch in Channels}
         if self.post_selection == True:
@@ -488,10 +502,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     opt_fid_discr['x'][0]
                 post_fr = self.fit_res['Post_PDF_fit_{}'.format(ch)]
                 post_bv = post_fr.params
-                # self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
-                #     bv['A_spurious'].value
-                # self.proc_data_dict['PDF_data'][ch]['relaxation_events'] = \
-                #     bv['B_spurious'].value
                 A_amp = post_bv['A_spurious'].value
                 A_sig = post_bv['A_sigma'].value
                 B_amp = post_bv['B_spurious'].value
@@ -530,10 +540,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 opt_fid_discr['x'][0]
             fr = self.fit_res['PDF_fit_{}'.format(ch)]
             bv = fr.params
-            # self.proc_data_dict['PDF_data'][ch]['residual_excitation'] = \
-            #     bv['A_spurious'].value
-            # self.proc_data_dict['PDF_data'][ch]['relaxation_events'] = \
-            #     bv['B_spurious'].value
             A_amp = bv['A_spurious'].value
             A_sig = bv['A_sigma'].value
             B_amp = bv['B_spurious'].value
@@ -585,8 +591,8 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
 
-        Channels = self.raw_data_dict['value_names']
-        nr_qubits = len(Channels)
+        Channels = self.Channels
+        nr_qubits = self.nr_qubits
         qubit_labels = self.proc_data_dict['qubit_labels']
         combinations = \
             ['{:0{}b}'.format(i, nr_qubits) for i in range(2**nr_qubits)]
