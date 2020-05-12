@@ -308,9 +308,11 @@
   	"gate_decomposition": {
         // necessary to support measz cQASM operation, using measure operation
         "measz %0": ["measure %0"],
+        //"measy %0": ["rx90","measure %0"],
+        //"measx %0": ["rym90","measure %0"],
         //"prepz %0": ["prepz %0", "measure %0"],
-        "prepy %0": ["prepz %0", "ry90 %0"],
-        "prepx %0": ["prepz %0", "rxm90 %0"],
+        "prepy %0": ["prepz %0", "rxm90 %0"],
+        "prepx %0": ["prepz %0", "ry90 %0"],
 
         // gate decompositions for quantum inspire starmon-5
         "x %0": ["rx180 %0"],
