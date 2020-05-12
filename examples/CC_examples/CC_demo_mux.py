@@ -59,6 +59,38 @@ if 1:   # DIO calibration
             receiver_port=cc_slot_uhfqa0,
             sender_dio_mode='uhfqa'
         )
+    else:
+        log.warning('setting hardcoded DIO delay on OHFQA')
+        uhfqa0._set_dio_calibration_delay(5)  # FIXME: improves attainable latency?
+        """
+            scope CC latency measurements:
+            
+            delay   CC DIO read index   latency
+            0       5                   188 ns
+            4       5                   169 ns
+            5       5                   162/169 ns
+            6       5                   169 ns
+            10      5                   ---
+            
+            toggled CLK source to INT, and back:
+            0       -
+            
+            again:
+            0       12                  197 ns
+            4       12                  178 ns
+            5       12                  178 ns
+            6       12                  178 ns
+            
+            again:
+            0       11                  199 ns
+            5       11                  179 ns
+            
+            again:
+            5       10                  179 ns
+            
+            again:
+            5       9                   160 ns
+        """
 
     if 1:
         log.debug('calibration DIO: UHFQA to CC')
@@ -70,28 +102,14 @@ if 1:   # DIO calibration
             )
         else: # inspired by calibrate, but with CC program to trigger UHFQA
             log.debug('sending triggered upstream DIO calibration program to UHFQA')
-            program = inspect.cleandoc("""
-            // program: triggered upstream DIO calibration program
-            var A = 0x000003FF; // DV=0x0001, RSLT[8:0]=0x03FE
-            var B = 0x00000000;
-        
-            while (1) {
-                waitDIOTrigger();
-                setDIO(A);      // seems to take 4.44 ns
-                //wait(2);      // documentation: 4.44 ns periods, measured high time 14.8...15.6 ns, depending on trigger rate
-                wait(3);        // ~18 ns high time
-                setDIO(B);
-            }
-            """)
-
-            program2 = inspect.cleandoc("""
+            uhfqa_prog = inspect.cleandoc("""
             // program: triggered upstream DIO calibration program
             const period = 18;          // 18*4.44 ns = 80 ns, NB: 40 ns is not attainable
             const n1 = 3;               // ~20 ns high time
             const n2 = period-n1-2-1;   // penalties: 2*setDIO, 1*loop
             waitDIOTrigger();
             while (1) {
-                setDIO(0x000003FF);      // DV=0x0001, RSLT[8:0]=0x03FE.
+                setDIO(0x000003FF);     // DV=0x0001, RSLT[8:0]=0x03FE.
                 wait(n1);        
                 setDIO(0x00000000);
                 wait(n2);
@@ -101,23 +119,22 @@ if 1:   # DIO calibration
             expected_sequence = []
 
             uhfqa0.dios_0_mode(uhfqa0.DIOS_0_MODE_AWG_SEQ) # FIXME: changes value set by load_default_settings()
-            uhfqa0.configure_awg_from_string(0, program2)
+            uhfqa0.configure_awg_from_string(0, uhfqa_prog)
             uhfqa0.seti('awgs/0/enable', 1)
             uhfqa0.start()  # FIXME?
 
 
             log.debug('sending UHFQA trigger program to CC')
-            # FIXME: does not match with program2
-            prog = inspect.cleandoc("""
+            # FIXME: does not match with uhfqa_prog, which requires single trigger
+            cc_prog = inspect.cleandoc("""
             # program: UHFQA trigger program
-            .DEF    duration    1
             .DEF    wait        9
             
-            loop:   seq_out     0x03FF0000,$duration      # NB: TRIG=0x00010000, CW[8:0]=0x03FE0000
+            loop:   seq_out     0x03FF0000,1            # NB: TRIG=0x00010000, CW[8:0]=0x03FE0000
                     seq_out     0x0,$wait
                     jmp         @loop
             """)
-            cc.assemble_and_start(prog)
+            cc.assemble_and_start(cc_prog)
 
 
             log.debug('calibrating DIO protocol on CC')
@@ -158,14 +175,6 @@ if 1:  # test of Distributed Shared Memory
             # Prepare AWG_Seq as driver of DIO and set DIO output direction
             uhfqa0.dios_0_mode(uhfqa0.DIOS_0_MODE_AWG_SEQ)  # FIXME: change from default
 
-    #        uhfqa0.dios_0_drive(3)
-
-            # Determine trigger and strobe bits from DIO
-    #        uhfqa0.awgs_0_dio_valid_index(16)
-    #        uhfqa0.awgs_0_dio_valid_polarity(0)
-    #?        uhfqa0.awgs_0_dio_strobe_index(16)
-    #?       uhfqa0.awgs_0_dio_strobe_slope(1)
-
             # Initialize UHF for consecutive triggering and enable it
             uhfqa0.awgs_0_single(0)
             uhfqa0.awgs_0_enable(1)  # ?
@@ -180,14 +189,21 @@ if 1:  # test of Distributed Shared Memory
         awg = cc_slot_awg
         prog = inspect.cleandoc(f"""
         # program:  CC feedback test program
+        
+        # constants:
         .DEF    numIter     4
-        .DEF    uhfLatency  11                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
-        #.DEF    smWait      2                       # plus another 2 makes 4 total: 80 ns
-        .DEF    smWait      3                       # FIXME: extra margin
-        .DEF    wait        10
         .DEF    smAddr      S16
         .DEF    mux         0                       # SM[3:0] := I[3:0]
-        .DEF    lut         0                       # 4 times CW=1 conditional on SM[3:0]
+        .DEF    pl          0                       # 4 times CW=1 conditional on SM[3:0]
+
+        # timing constants:
+        .DEF    uhfLatency  10                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
+        #.DEF    smWait      2                       # plus another 2 makes 4 total: 80 ns
+        .DEF    smWait      3                       # FIXME: extra margin
+        .DEF    iterWait    11                      # wait between iterations
+
+        # instruction set constants:
+        .DEF    byte        0                       # size parameter for seq_in_sm
 
                 seq_bar     1                       # synchronize processors so markers make sense
                 move        $numIter,R0
@@ -195,28 +211,47 @@ if 1:  # test of Distributed Shared Memory
         [{uhf}] seq_out     0x00010000,$uhfLatency  # trigger UHFQA
         [{awg}] seq_wait    $uhfLatency             # balance UHF duration
 
-        [{uhf}] seq_in_sm   $smAddr,$mux,0          # 0=byte
-        [{uhf}] seq_sw_sm   $smAddr
+        [{uhf}] seq_in_sm   $smAddr,$mux,$byte
+        [{uhf}] seq_sw_sm   $smAddr                 # output to ARM SW for debugging
         [{awg}] seq_wait    2                       # balance UHF duration
 
                 seq_wait    $smWait                 # wait for data distribution
 
-        [{awg}] seq_out_sm  $smAddr,$lut,1
+        [{awg}] seq_out_sm  $smAddr,$pl,1
         [{uhf}] seq_wait    1
 
-                seq_wait    $wait
+                seq_wait    $iterWait
                 loop        R0,@loop
                 stop
         """)
 
-        if 1:
-            cc.debug_marker_in(cc_slot_uhfqa0, cc.UHFQA_DV)  # watch DV to check upstream period/frequency
-            if 1:
-                cc.debug_marker_out(cc_slot_awg, cc.UHFQA_TRIG)  # watch TRIG, so we can see TRIG to DV latency
-            else:
-                cc.debug_marker_out(cc_slot_awg, 22) # FIXME: hack because we look at output meant for AWG on a -DIFF interface
-        else:
-            cc.debug_marker_out(cc_slot_uhfqa0, cc.UHFQA_TRIG)  # watch TRIG to check downstream period/frequency
+
+        codeFragmentMux = """
+        .DEF    smAddr      S16
+        .DEF    mux         0                       # SM[3:0] := I[3:0]
+        .DEF    byte        0                       # size parameter for seq_in_sm
+
+        [{uhf}] seq_in_sm   $smAddr,$mux,$byte
+        """
+
+        codeFragmentPl = """
+        .DEF    smAddr      S16
+        .DEF    pl          0                       # 4 times CW=1 conditional on SM[3:0]
+
+        [{awg}] seq_out_sm  $smAddr,$pl,1
+        """
+
+
+        # watch UHF
+        cc.debug_marker_in(cc_slot_uhfqa0, cc.UHFQA_DV)
+        # cc.debug_marker_out(cc_slot_uhfqa0, cc.UHFQA_TRIG)
+
+        # watch AWG
+        # FIXME: we currently use a CC-CONN-DIO (non differenential), and no connected AWG. As a result, we can only
+        # watch bits [31:16], and HDAWG_TRIG is overriden by TOGGLE_DS
+        #cc.debug_marker_out(cc_slot_awg, cc.UHFQA_TRIG)  #
+        #cc.debug_marker_out(cc_slot_awg, cc.HDAWG_TRIG)  #
+        cc.debug_marker_out(cc_slot_awg, 23) # NB: always one with our data
 
         cc.stop()   # prevent tracing previous program
         for slot in [cc_slot_uhfqa0, cc_slot_awg]:

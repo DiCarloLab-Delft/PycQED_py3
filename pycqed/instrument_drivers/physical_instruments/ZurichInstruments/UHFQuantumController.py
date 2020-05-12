@@ -1285,7 +1285,6 @@ setUserReg(4, err_cnt);"""
           waitDIOTrigger();
           setDIO(dio_out);
           wait(3);      // ~20 ns pulse time
-          //wait(6);      // FIXME
           setDIO(2048);
         }
         """
