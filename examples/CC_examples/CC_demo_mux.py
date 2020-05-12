@@ -198,8 +198,8 @@ if 1:  # test of Distributed Shared Memory
 
         # timing constants:
         .DEF    uhfLatency  10                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
-        #.DEF    smWait      2                       # plus another 2 makes 4 total: 80 ns
-        .DEF    smWait      3                       # FIXME: extra margin
+        .DEF    smWait      2                       # plus another 2 makes 4 total: 80 ns
+        #.DEF    smWait      3                       # FIXME: extra margin
         .DEF    iterWait    11                      # wait between iterations
 
         # instruction set constants:
