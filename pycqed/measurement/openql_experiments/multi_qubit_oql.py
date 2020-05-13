@@ -1357,18 +1357,19 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
 
 
 def conditional_oscillation_seq(q0: int, q1: int,
-                                q2: int=None, q3: int=None,
-                                platf_cfg: str=None,
-                                CZ_disabled: bool=False,
+                                q2: int = None, q3: int = None,
+                                platf_cfg: str = None,
+                                CZ_disabled: bool = False,
                                 single_q_gates_replace: str = None,
                                 cz_repetitions: int = 1,
                                 q0_first_gate: str = "rx90",
                                 angles=np.arange(0, 360, 20),
-                                wait_time_after: int=0,
-                                add_cal_points: bool=True,
-                                cases: list=('no_excitation', 'excitation'),
-                                flux_codeword: str='cz',
-                                flux_codeword_park: str=None):
+                                wait_time_before_flux: int = 0,
+                                wait_time_after: int = 0,
+                                add_cal_points: bool = True,
+                                cases: list = ('no_excitation', 'excitation'),
+                                flux_codeword: str = 'cz',
+                                flux_codeword_park: str = None):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -1376,8 +1377,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
     q1 is the spectator qubit
 
     Timing of the sequence:
-    q0:   --   X90  C-Phase  (second C-Phase) Rphi90      --       RO
-    q1: (X180)  --  C-Phase     --                       (X180)    RO
+    q0:   --   X90  C-Phase  (second C-Phase) Rphi90   RO
+    q1: (X180)  --  C-Phase     --            (X180)   RO
 
     Args:
         q0, q1      (str): names of the addressed qubits

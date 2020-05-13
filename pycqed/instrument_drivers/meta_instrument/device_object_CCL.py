@@ -3024,6 +3024,7 @@ class DeviceCCL(Instrument):
                                       times=[extra_buffer],
                                       platf_cfg=self.cfg_openql_platform_fn(),
                                       flux_cw=flux_cw,
+                                      mw_gate=mw_gate,
                                       # qubit_other_idx=qotheridx,
                                       cal_points=False)
 
