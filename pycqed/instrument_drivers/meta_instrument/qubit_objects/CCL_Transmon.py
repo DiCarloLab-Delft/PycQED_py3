@@ -1,4 +1,3 @@
-
 import time
 import logging
 import numpy as np
@@ -491,7 +490,9 @@ class CCLight_Transmon(Qubit):
             AWG = lutman.find_instrument(lutman.AWG())
             if self._using_QWG():
                 logging.warning(
-                    'CCL transmon is using QWG. mw_fine_delay not supported.')
+                    'CCL transmon is using QWG. mw_fine_delay not supported!'
+                    'Adding zeros to waveforms. Intended for delays msmt only!')
+                lutman.pulse_delay(val)
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_Q()-1), val)
