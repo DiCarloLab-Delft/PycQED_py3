@@ -2979,6 +2979,7 @@ class DeviceCCL(Instrument):
     def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
                                MC=None,  label='timing_{}_{}',
                                qotheridx=2,
+                               mw_gate="rx90",
                                pulse_length=40e-9, flux_cw='fl_cw_06',
                                extra_buffer=0e-9,
                                prepare_for_timedomain: bool = True):
