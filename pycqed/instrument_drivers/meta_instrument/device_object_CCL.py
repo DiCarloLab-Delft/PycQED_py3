@@ -1020,6 +1020,7 @@ class DeviceCCL(Instrument):
         single_q_gates_replace: str = None,
         q0_first_gate: str = "rx90",
         cz_repetitions: int = 1,
+        wait_time_before_flux_ns: int = 0,
         wait_time_ns: int = 0,
         label="",
         verbose=True,
@@ -1106,6 +1107,7 @@ class DeviceCCL(Instrument):
             platf_cfg=self.cfg_openql_platform_fn(),
             CZ_disabled=CZ_disabled,
             angles=angles,
+            wait_time_before_flux=wait_time_before_flux_ns,
             wait_time_after=wait_time_ns,
             flux_codeword=flux_codeword,
             flux_codeword_park=flux_codeword_park,
@@ -2977,6 +2979,7 @@ class DeviceCCL(Instrument):
     def measure_timing_diagram(self, q0, flux_latencies, microwave_latencies,
                                MC=None,  label='timing_{}_{}',
                                qotheridx=2,
+                               mw_gate="rx90",
                                pulse_length=40e-9, flux_cw='fl_cw_06',
                                extra_buffer=0e-9,
                                prepare_for_timedomain: bool = True):
@@ -3021,6 +3024,7 @@ class DeviceCCL(Instrument):
                                       times=[extra_buffer],
                                       platf_cfg=self.cfg_openql_platform_fn(),
                                       flux_cw=flux_cw,
+                                      mw_gate=mw_gate,
                                       # qubit_other_idx=qotheridx,
                                       cal_points=False)
 

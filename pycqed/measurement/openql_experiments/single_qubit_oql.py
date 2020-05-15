@@ -766,7 +766,8 @@ def Ram_Z(qubit_name,
 
 def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
                           flux_cw: str = 'fl_cw_02',
-                          cal_points: bool = True):
+                          cal_points: bool = True,
+                          mw_gate: str = "rx90"):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
@@ -779,7 +780,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         t_nanoseconds = int(round(t/1e-9))
         k = oqh.create_kernel('pi_flux_pi_{}'.format(i_t), p)
         k.prepz(qubit_idx)
-        k.gate('rx90', [qubit_idx])
+        k.gate(mw_gate, [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         k.gate("wait", [], 0)  # alignment workaround
         # k.gate(flux_cw, [2, 0])
@@ -788,7 +789,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
             # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
             k.gate("wait", [], t_nanoseconds)  # alignment workaround
             # k.gate("wait", [qubit_idx], t_nanoseconds)
-        k.gate('rx90', [qubit_idx])
+        k.gate(mw_gate, [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
 
