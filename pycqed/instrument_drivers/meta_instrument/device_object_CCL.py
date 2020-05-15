@@ -3052,9 +3052,9 @@ class DeviceCCL(Instrument):
 
     def measure_timing_1d_trace(self, q0, latencies, latency_type='flux',
                                 MC=None,  label='timing_{}_{}',
-                                qotheridx=2,
                                 buffer_time=40e-9,
-                                prepare_for_timedomain: bool = True):
+                                prepare_for_timedomain: bool = True,
+                                mw_gate: str = "rx90", sq_length: float = 60e-9):
         mmt_label = label.format(self.name, q0)
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3062,7 +3062,7 @@ class DeviceCCL(Instrument):
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         self.prepare_for_timedomain([q0])
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        fl_lutman.sq_length(60e-9)
+        fl_lutman.sq_length(sq_length)
         CC = self.instr_CC.get_instr()
 
         # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 120ns
@@ -3070,8 +3070,8 @@ class DeviceCCL(Instrument):
                                       times=[buffer_time],
                                       platf_cfg=self.cfg_openql_platform_fn(),
                                       flux_cw='fl_cw_06',
-                                      qubit_other_idx=qotheridx,
-                                      cal_points=False)
+                                      cal_points=False,
+                                      mw_gate=mw_gate)
         CC.eqasm_program(p.filename)
 
         d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
@@ -3087,7 +3087,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(latencies)
         MC.run(mmt_label)
 
-        ma2.Basic1DAnalysis(label=mmt_label)
+        a_obj = ma2.Basic1DAnalysis(label=mmt_label)
+        return a_obj
 
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
