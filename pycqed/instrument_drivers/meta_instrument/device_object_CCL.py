@@ -990,7 +990,7 @@ class DeviceCCL(Instrument):
                 list of qubit names that have to be prepared
         """
         self.prepare_readout(qubits=qubits)
-        if self.find_instrument(qubits[0]).instr_LutMan_Flux() != None:
+        if self.find_instrument(qubits[0]).instr_LutMan_Flux() is not None:
             self.prepare_fluxing(qubits=qubits)
         self.prepare_timing()
 
