@@ -33,7 +33,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     using post-selection.
     """
 
-    def __init__(self, nr_qubits: int, 
+    def __init__(self, nr_qubits: int,
                  t_start: str = None, t_stop: str = None,
                  label: str = '',
                  options_dict: dict = None, extract_only: bool = False,
@@ -97,7 +97,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             raise ValueError('Number of qudratures is not the same for all qubits')
 
         combinations = \
-            ['{:0{}b}'.format(i, nr_qubits) for i in range(2**nr_qubits)]        
+            ['{:0{}b}'.format(i, nr_qubits) for i in range(2**nr_qubits)]
         post_selection = self.post_selection
         self.proc_data_dict['combinations'] = combinations
         self.proc_data_dict['qubit_labels'] = qubit_labels
@@ -1543,6 +1543,7 @@ def get_pulse_start(x, y, tolerance=2):
 
     return start_index-tolerance
 
+
 def plot_transients(time_data,
                     data_ch_0, data_ch_1,
                     qubit_label,
@@ -1558,8 +1559,10 @@ def plot_transients(time_data,
     set_ylabel(ax[1], 'Channel_1 amplitude', 'a.u.')
     set_xlabel(ax[1], 'Time', 's')
 
-    fig.suptitle('Mux_transients_{}'.format(qubit_label), y=1.05)
+    fig.suptitle('{} Mux_transients_{}'.format(timestamp, qubit_label),
+        y=1.05)
     fig.tight_layout()
+
 
 def plot_mux_weights(Time,
                      W_I, W_Q,
