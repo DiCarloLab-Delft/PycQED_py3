@@ -58,7 +58,9 @@ def interp_2D_contour(c_pnts, interp_method: str = "slinear"):
     return interpolator
 
 
-def simplify_2D_path(path, angle_thr: float = 7.0, cumulative: bool = True):
+def simplify_2D_path(
+    path, angle_thr: float = 3.0, cumulative: bool = True, normalize: bool = True
+):
     """
     Removes redundant points along a 2D path according to a threshold angle
     between consecutive segments.
@@ -70,11 +72,12 @@ def simplify_2D_path(path, angle_thr: float = 7.0, cumulative: bool = True):
             - applied after normalizing points along each dimensions
             - points that deviate from a straight line more than
                 `angle_thr` will be included in the output path
-        cumulative (bool): if true the `angle_thr` is conidered cumulative
-            along the path. Gives beter results.
+        cumulative (bool): if true the `angle_thr` is considered cumulative
+            along the path. Gives better results.
+        normalize (bool): see `path_angles_2D`
 
     """
-    angles = np.fromiter(path_angles_2D(path, normalize=True), dtype=np.float64)
+    angles = np.fromiter(path_angles_2D(path, normalize=normalize), dtype=np.float64)
     dif_from_180 = angles - 180
 
     if cumulative:
