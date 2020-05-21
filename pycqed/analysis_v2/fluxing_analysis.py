@@ -46,6 +46,7 @@ from pycqed.analysis_v2.tools.plotting import (
     contour_overlay,
     annotate_pnts,
 )
+from pycqed.analysis_v2.tools import contours2d as c2d
 
 import logging
 
@@ -742,7 +743,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         plt_contour_phase: bool = True,
         plt_contour_L1: bool = False,
         plt_optimal_values: bool = True,
-        plt_optimal_values_max: int = 2,
+        plt_optimal_values_max: int = 1,
         plt_clusters: bool = True,
         clims: dict = None,
         # e.g. clims={'L1': [0, 0.3], "Cost func": [0., 100]},
@@ -755,10 +756,6 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         cluster_from_interp: bool = True,
         _opt_are_interp: bool = True,
         sort_clusters_by: str = "cost",
-        rescore_spiked_optimals: bool = False,
-        plt_optimal_waveforms_all: bool = False,
-        plt_optimal_waveforms: bool = False,
-        waveform_flux_lm_name: str = None,
         target_cond_phase: float = 180.0,
         single_q_phase_offset: bool = False,
         calc_L1_from_missing_frac: bool = True,
@@ -766,10 +763,11 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         hull_clustering_thr=0.1,
         hull_phase_thr=5,
         hull_L1_thr=5,
-        generate_optima_hulls=False,
-        plt_optimal_hulls=False,
+        gen_optima_hulls=True,
+        plt_optimal_hulls=True,
         comparison_timestamp: str = None,
         interp_grid_data: bool = False,
+        save_cond_phase_contours: list = [180],
     ):
 
         self.plt_orig_pnts = plt_orig_pnts
@@ -802,11 +800,6 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         self.sort_clusters_by = sort_clusters_by
         assert sort_clusters_by in {"cost", "L1_av_around"}
 
-        self.rescore_spiked_optimals = rescore_spiked_optimals
-        self.plt_optimal_waveforms = plt_optimal_waveforms
-        self.plt_optimal_waveforms_all = plt_optimal_waveforms_all
-        self.waveform_flux_lm_name = waveform_flux_lm_name
-
         self.target_cond_phase = target_cond_phase
         # Used when applying Pi pulses to check if both single qubits
         # have the same phase as in the ideal case
@@ -824,18 +817,15 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         self.hull_clustering_thr = hull_clustering_thr
         self.hull_phase_thr = hull_phase_thr
         self.hull_L1_thr = hull_L1_thr
-        self.generate_optima_hulls = generate_optima_hulls
+        self.gen_optima_hulls = gen_optima_hulls
         self.plt_optimal_hulls = plt_optimal_hulls
 
-        self._generate_waveform = False
-        if (
-            plt_optimal_waveforms
-            or plt_optimal_waveforms_all
-            or rescore_spiked_optimals
-        ):
-            self._generate_waveform = True
-            assert waveform_flux_lm_name is not None
+        self.interp_method = interp_method
+        # Be able to also analyze linear 2D sweeps without interpolating
+        self.interp_grid_data = interp_grid_data
+        self.save_cond_phase_contours = save_cond_phase_contours
 
+        # FIXME this is overkill, using .upper() and .lower() would simplify
         cost_func_Names = {
             "Cost func",
             "Cost func.",
@@ -911,9 +901,6 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             do_fitting=do_fitting,
             save_qois=save_qois,
         )
-        self.interp_method = interp_method
-        # Be able to also analyze linear 2D sweeps without interpolating
-        self.interp_grid_data = interp_grid_data
 
         if auto:
             self.run_analysis()
@@ -1070,14 +1057,15 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                 else:
                     log.warning("No data found named {}".format(self.L1_names))
 
-            if self.plt_optimal_hulls and self.generate_optima_hulls:
+            if self.plt_optimal_hulls and self.gen_optima_hulls:
                 sorted_hull_vertices = self.proc_data_dict["hull_vertices"]
                 for hull_i, hull_vertices in sorted_hull_vertices.items():
                     vertices_x, vertices_y = np.transpose(hull_vertices)
-                    # vertices_x = hull_vertices["vertices_x"]
+
                     # Close the start and end of the line
-                    x_vals = np.concatenate((vertices_x, vertices_x[-1:]))
-                    y_vals = np.concatenate((vertices_y, vertices_y[-1:]))
+                    x_vals = np.concatenate((vertices_x, vertices_x[:1]))
+                    y_vals = np.concatenate((vertices_y, vertices_y[:1]))
+
                     self.plot_dicts[val_name + "_hull_{}".format(hull_i)] = {
                         "ax_id": val_name,
                         "plotfn": self.plot_line,
@@ -1129,51 +1117,71 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     "y": self.proc_data_dict["y_optimal"],
                 }
 
-        if self.plt_optimal_waveforms_all and found_optimals:
-            try:
-                # Plot all together for comparison
-                ax_id = "waveform_optimal_all"
-                self.plot_dicts[ax_id] = {
-                    "ax_id": ax_id,
+        # Extra plot to easily identify the location of the optimal hulls
+        # and cond. phase contours
+        sorted_hull_vertices = self.proc_data_dict["hull_vertices"]
+        if self.gen_optima_hulls and len(sorted_hull_vertices):
+            for hull_id, hull_vertices in sorted_hull_vertices.items():
+                vertices_x, vertices_y = np.transpose(hull_vertices)
+
+                # Close the start and end of the line
+                x_vals = np.concatenate((vertices_x, vertices_x[:1]))
+                y_vals = np.concatenate((vertices_y, vertices_y[:1]))
+
+                self.plot_dicts["hull_" + hull_id] = {
+                    "ax_id": "hull_and_contours",
                     "plotfn": self.plot_line,
-                    "yvals": self.proc_data_dict["optimal_waveforms"],
-                    "xvals": self.proc_data_dict["optimal_waveforms_time"],
-                    "xlabel": "t",
-                    "x_unit": "s",
-                    "title": "{}\n{}\nOptimal waveforms".format(
+                    "xvals": x_vals,
+                    "xlabel": self.raw_data_dict["xlabel"],
+                    "xunit": self.raw_data_dict["xunit"],
+
+                    "yvals": y_vals,
+                    "ylabel": self.raw_data_dict["ylabel"],
+                    "yunit": self.raw_data_dict["yunit"],
+
+                    "yrange": self.options_dict.get("yrange", None),
+                    "xrange": self.options_dict.get("xrange", None),
+
+                    "setlabel": "hull #" + hull_id,
+                    "title": "{}\n{}".format(
                         self.timestamp, self.proc_data_dict["measurementstring"]
                     ),
-                    "marker": ".",
                     "do_legend": True,
-                    "legend_ncol": 2,
+                    "legend_pos": "best",
+                    "marker": "",  # don't use markers
+                    "linestyle": "-"
                 }
-            except Exception as e:
-                log.error("Could not plot all waveforms.")
-                log.error(e)
-        if self.plt_optimal_waveforms and found_optimals:
-            try:
-                # Plot individual waveforms
-                for opt_id, optimal_waveform in enumerate(
-                    self.proc_data_dict["optimal_waveforms"]
-                ):
-                    ax_id = "waveform_optimal_{}".format(opt_id)
-                    self.plot_dicts[ax_id] = {
-                        "ax_id": ax_id,
+
+        if len(self.save_cond_phase_contours):
+            c_dict = self.proc_data_dict["cond_phase_contours"]
+            for level, contours in c_dict.items():
+                for contour_id, contour in contours.items():
+                    x_vals, y_vals = np.transpose(contour)
+
+                    self.plot_dicts["contour_" + level + "_" + contour_id] = {
+                        "ax_id": "hull_and_contours",
                         "plotfn": self.plot_line,
-                        "yvals": self.proc_data_dict["optimal_waveforms"][opt_id],
-                        "xvals": self.proc_data_dict["optimal_waveforms_time"][opt_id],
-                        "xlabel": "t",
-                        "x_unit": "s",
-                        "title": "{}\n{}\nOptimal #{} waveform".format(
-                            self.timestamp,
-                            self.proc_data_dict["measurementstring"],
-                            opt_id,
+                        "xvals": x_vals,
+                        "xlabel": self.raw_data_dict["xlabel"],
+                        "xunit": self.raw_data_dict["xunit"],
+
+                        "yvals": y_vals,
+                        "ylabel": self.raw_data_dict["ylabel"],
+                        "yunit": self.raw_data_dict["yunit"],
+
+                        "yrange": self.options_dict.get("yrange", None),
+                        "xrange": self.options_dict.get("xrange", None),
+
+                        "setlabel": "contour " + level + " #" + contour_id,
+                        "title": "{}\n{}".format(
+                            self.timestamp, self.proc_data_dict["measurementstring"]
                         ),
-                        "marker": ".",
+                        "do_legend": True,
+                        "legend_pos": "best",
+                        "legend_ncol": 2,
+                        "marker": "",  # don't use markers
+                        "linestyle": "--"
                     }
-            except Exception as e:
-                log.error("Error plotting a waveform.")
-                log.error(e)
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
@@ -1195,7 +1203,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                 (self.proc_data_dict["measured_values"], (phase_q1 - phase_q0) % 360)
             )
 
-        # Calculate L1 from missing fraction and/or offset differece if available
+        # Calculate L1 from missing fraction and/or offset difference if available
         vln_set = set(self.proc_data_dict["value_names"])
         for names, do_calc in [
             (self.ms_names, self.calc_L1_from_missing_frac),
@@ -1355,86 +1363,6 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             x_arr = self.proc_data_dict["x"]
             y_arr = self.proc_data_dict["y"]
 
-        # Generate waveforms for best optimal_pnts
-        if self._generate_waveform:
-            try:
-                timestamp = self.raw_data_dict["timestamps"][0]
-                # In case the code breaks and the dummy fluxlutman is not closed
-                # We give it a "random" time based name
-                time_string = datetime.now().strftime("%Y%d%m_%H%M%S_%f")
-                fluxlutman = flm.HDAWG_Flux_LutMan(
-                    "flux_lm_auto_{}".format(time_string)
-                )
-                ignore_pars = {"AWG", "instr_distortion_kernel", "instr_partner_lutman"}
-                if self.waveform_flux_lm_name is None:
-                    waveform_flux_lm_name = "flux_lm"
-                else:
-                    waveform_flux_lm_name = self.waveform_flux_lm_name
-                gen.load_settings_onto_instrument_v2(
-                    fluxlutman,
-                    load_from_instr=waveform_flux_lm_name,
-                    timestamp=timestamp,
-                    ignore_pars=ignore_pars,
-                )
-                x_par_name = self.proc_data_dict["xlabel"]
-                y_par_name = self.proc_data_dict["ylabel"]
-                # Maybe there is a better way to figure out which gate was simulated
-                which_gates = {"NE", "SE", "NW", "SW"}
-                which_gate = x_par_name[-2:]
-                if which_gate not in which_gates:
-                    which_gate = y_par_name[-2:]
-                # We don't simulate this
-                fluxlutman.set("cz_phase_corr_length_{}".format(which_gate), 0)
-                waveforms = []
-                times = []
-                spiked_optimals = []
-
-                for ii in range(np.size(optimal_idxs)):
-                    fluxlutman.set(x_par_name, x_arr[optimal_idxs][ii])
-                    fluxlutman.set(y_par_name, y_arr[optimal_idxs][ii])
-
-                    fluxlutman.generate_standard_waveforms()
-                    waveform = fluxlutman._gen_cz(which_gate=which_gate)
-                    waveforms.append(waveform)
-                    time = np.cumsum(
-                        np.full(np.size(waveform), 1 / fluxlutman.sampling_rate())
-                    )
-                    times.append(time)
-                    # NB: it is assumed 'No AWG present, returning unity scale factor.'
-                    # NB2: this sorting very empirical
-                    waveform_max = np.max(waveform)
-
-                    # spiked_optimals.append(0)  # switch to this line to ignore spikes downscoring
-                    spiked_optimals.append(
-                        np.any(waveform > 1.25)
-                        * (waveform_max - np.average(np.abs(waveform)))
-                        / waveform_max
-                    )
-
-                # Change to np format for compatibility with hdf5
-                waveforms = np.array(waveforms)
-                times = np.array(times)
-                spiked_optimals = np.array(spiked_optimals)
-                fluxlutman.close()
-
-            except Exception as e:
-                log.warning("Could not generate optimal wave forms.")
-                log.warning(e)
-
-            if self.rescore_spiked_optimals:
-
-                sort_indxs = np.argsort(spiked_optimals)
-                optimal_idxs = np.array(optimal_idxs)[sort_indxs]
-
-                clusters_by_indx = np.array(clusters_by_indx)[sort_indxs]
-                waveforms = np.array(waveforms)[sort_indxs]
-                times = np.array(times)[sort_indxs]
-                spiked_optimals = np.array(spiked_optimals)[sort_indxs]
-            # Add qoi in the proc_data_dict
-            self.proc_data_dict["optimal_waveforms"] = waveforms
-            self.proc_data_dict["optimal_waveforms_time"] = times
-            self.proc_data_dict["spiked_optimals"] = spiked_optimals
-
         clusters_pnts_x = np.array([])
         clusters_pnts_y = np.array([])
         clusters_pnts_colors = np.array([])
@@ -1480,8 +1408,11 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict["optimal_measured_values"] = optimal_measured_values
         self.proc_data_dict["optimal_measured_units"] = optimal_measured_units
 
-        if self.generate_optima_hulls:
-            self._proc_data_hulls()
+        if self.gen_optima_hulls:
+            self._proc_hulls()
+
+        if len(self.save_cond_phase_contours):
+            self._proc_cond_phase_contours(angle_thr=0.5)
 
         # Save quantities of interest
         save_these = {
@@ -1489,13 +1420,12 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             "optimal_pars_units",
             "optimal_measured_values",
             "optimal_measured_units",
-            "spiked_optimals",
-            "optimal_waveforms",
-            "optimal_waveforms_time",
             "clusters_pnts_y",
             "clusters_pnts_x",
             "clusters_pnts_colors",
             "hull_vertices",
+            "cond_phase_contours",
+            "cond_phase_contours_orig",
         }
         pdd = self.proc_data_dict
         quantities_of_interest = dict()
@@ -1506,27 +1436,33 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         if bool(quantities_of_interest):
             self.proc_data_dict["quantities_of_interest"] = quantities_of_interest
 
-    def _proc_data_hulls(self):
+    def _proc_hulls(self):
         # Must be at the end of the main process_data
 
         vln = self.proc_data_dict["value_names"]
 
         interp_vals = self.proc_data_dict["interpolated_values"]
 
-        where = [(name in self.cost_func_Names) for name in vln]
-        cost_func_indxs = np.where(where)[0][0]
-        cost_func = interp_vals[cost_func_indxs]
-        cost_func = interp_to_1D_arr(z_int=cost_func)
+        # where = [(name in self.cost_func_Names) for name in vln]
+        # cost_func_indxs = np.where(where)[0][0]
+        # cost_func = interp_vals[cost_func_indxs]
+        # cost_func = interp_to_1D_arr(z_int=cost_func)
 
         where = [(name in self.cond_phase_names) for name in vln]
         cond_phase_indx = np.where(where)[0][0]
         cond_phase_arr = interp_vals[cond_phase_indx]
         cond_phase_arr = interp_to_1D_arr(z_int=cond_phase_arr)
 
+        # Avoid runtime errors
+        cond_phase_arr[np.isnan(cond_phase_arr)] = 359.0
+
         where = [(name in self.L1_names) for name in vln]
         L1_indx = np.where(where)[0][0]
         L1_arr = interp_vals[L1_indx]
         L1_arr = interp_to_1D_arr(z_int=L1_arr)
+
+        # Avoid runtime errors
+        L1_arr[np.isnan(L1_arr)] = 100
 
         x_int = self.proc_data_dict["x_int"]
         y_int = self.proc_data_dict["y_int"]
@@ -1544,12 +1480,62 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             L1_thr=self.hull_L1_thr,
         )
 
-        # We save this as a disctionary so that we don't have hdf5 issues
+        # We save this as a dictionary so that we don't have hdf5 issues
         self.proc_data_dict["hull_vertices"] = {
             str(h_i): hull_vertices
             for h_i, hull_vertices in enumerate(sorted_hull_vertices)
         }
         log.debug("Hulls are sorted by increasing y value.")
+
+    def _proc_cond_phase_contours(self, angle_thr: float = 0.5):
+        """
+        Increasing `angle_thr` will make the contours' paths more coarse
+        but more simple
+        """
+        # get the interpolated cond. phase data (if any)
+        vln = self.proc_data_dict["value_names"]
+        interp_vals = self.proc_data_dict["interpolated_values"]
+        x_int = self.proc_data_dict["x_int"]
+        y_int = self.proc_data_dict["y_int"]
+
+        where = [(name in self.cond_phase_names) for name in vln]
+        cond_phase_indx = np.where(where)[0][0]
+        cond_phase_int = interp_vals[cond_phase_indx]
+
+        c_dict = OrderedDict()
+        c_dict_orig = OrderedDict()
+
+        if len(cond_phase_int):
+            # use the contours function to generate them
+            levels_list = self.save_cond_phase_contours
+            contours = contour_overlay(
+                x_int,
+                y_int,
+                cond_phase_int,
+                contour_levels=levels_list,
+                cyclic_data=True,
+                vlim=(0, 360),
+            )
+            for i, level in enumerate(levels_list):
+                # Just saving in more friendly format
+                # Each entry in the `c_dict` is a dict of 2D arrays for
+                # disjoint contours for the same `level`
+                same_level_dict = OrderedDict()
+                same_level_dict_orig = OrderedDict()
+                for j, c in enumerate(contours[i]):
+                    # To save in hdf5 several unpredictably shaped np.arrays
+                    # we need a dictionary format here
+                    same_level_dict_orig[str(j)] = c
+                    same_level_dict[str(j)] = c2d.simplify_2D_path(c, angle_thr)
+
+                c_dict[str(level)] = same_level_dict
+                c_dict_orig[str(level)] = same_level_dict_orig
+
+        else:
+            log.debug("Conditional phase data for contours not found.")
+
+        self.proc_data_dict["cond_phase_contours"] = c_dict
+        self.proc_data_dict["cond_phase_contours_orig"] = c_dict_orig
 
     def plot_text(self, pdict, axs):
         """
@@ -1604,17 +1590,11 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             opt_are_interp = self._opt_are_interp
 
         optimals_max = len(optimal_pars_values)
-        spiked = (
-            self.proc_data_dict["spiked_optimals"]
-            if "spiked_optimals" in self.proc_data_dict
-            else np.full(optimals_max, False)
-        )
+
         string = ""
         for opt_idx in range(optimal_start, int(min(optimal_end + 1, optimals_max))):
             string += "========================\n"
-            string += "Optimal #{}{}\n".format(
-                opt_idx, "[Spiked]" if spiked[opt_idx] else ""
-            )
+            string += "Optimal #{}\n".format(opt_idx)
             string += "========================\n"
             for pv_name, pv_value in optimal_pars_values[opt_idx].items():
                 string += "{} = {:.{sig_digits}g} {}\n".format(
@@ -1821,7 +1801,7 @@ def generate_optima_hull_vertices(
     tolerances=[1, 2, 3],
 ):
     """
-    WARNING: OUTDATED
+    WARNING: docstring
 
     Args:
     target_phase: unit = deg
@@ -1856,6 +1836,7 @@ def generate_optima_hull_vertices(
         phase_thr *= tol
         L1_thr *= tol
         cond_phase_dev_f = multi_targets_phase_offset(target_phase, 2 * target_phase)
+
         cond_phase_abs_diff = cond_phase_dev_f(cond_phase_arr)
         sel = cond_phase_abs_diff <= phase_thr
         sel = sel * (L1_arr <= L1_thr)
@@ -1915,9 +1896,16 @@ def generate_optima_hull_vertices(
     # Generate the list of vertices for each optimal hull
     for cluster_by_indx in clusters_by_indx:
         pnts_for_hull = x_y[cluster_by_indx]
-        hull = ConvexHull(pnts_for_hull)
-
-        sorted_hull_vertices.append(hull.points[hull.vertices])
+        try:
+            hull = ConvexHull(pnts_for_hull)
+            vertices = hull.points[hull.vertices]
+            angle_thr = 5.0
+            # Remove redundant points that deviate little from a straight line
+            simplified_hull = c2d.simplify_2D_path(vertices, angle_thr)
+            sorted_hull_vertices.append(simplified_hull)
+        except Exception as e:
+            # There might not be enough points for a hull
+            log.debug(e)
 
     return sorted_hull_vertices
 
