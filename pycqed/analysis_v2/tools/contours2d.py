@@ -3,6 +3,7 @@ Contains tools for manipulation of 2D contours
 """
 import numpy as np
 from scipy.interpolate import interp1d
+from scipy.spatial import Delaunay
 import logging
 
 log = logging.getLogger(__name__)
@@ -45,17 +46,37 @@ def path_angles_2D(pnts, normalize: bool = None, degrees: bool = True):
 def interp_2D_contour(c_pnts, interp_method: str = "slinear"):
     """
     Returns and `interp1d` along a 2D contour path according to `interp_method`
+
+    Args:
+        pnt (array): shape = (len(pnts), 2)
+        interp_method (str): see `kind` argument of `scipy.interpolate.interp1d`
     """
     assert interp_method in {"slinear", "quadratic", "cubic"}
 
     # Linear length along the line:
     distance = np.cumsum(np.sqrt(np.sum(np.diff(c_pnts, axis=0) ** 2, axis=1)))
-    # Normalize
+    # Normalize to [0, 1] range
     distance = np.insert(distance, 0, 0) / distance[-1]
 
     interpolator = interp1d(distance, c_pnts, kind=interp_method, axis=0)
 
     return interpolator
+
+
+def interp_pnts_along_2D_contour(c_pnts, num_pnts: int, interp_method: str = "slinear"):
+    """
+    Returns a list of 2D pnts interpolated along the segments of a 2D
+    contour specified by `c_pnts`
+
+    Args:
+        pnt (array): shape = (len(pnts), 2)
+        num_pnts (int): number of equidistant points to be generated
+            along the normalized path of the contour
+        interp_method (str): see `interp_2D_contour`
+    """
+    interp = interp_2D_contour(c_pnts, interp_method)
+    pnts = interp(np.linspace(0, 1, num_pnts))
+    return pnts
 
 
 def simplify_2D_path(
@@ -98,3 +119,29 @@ def simplify_2D_path(
     path_out = np.concatenate(([path[0]], path[where_incl[0] + 1], [path[-1]]))
 
     return path_out
+
+
+def in_hull(p, hull):
+    """
+    Test if points in `p` are in `hull`
+
+    `p` should be a `NxK` coordinates of `N` points in `K` dimensions
+    `hull` is either a scipy.spatial.Delaunay object or the `MxK` array of the
+    coordinates of `M` points in `K`dimensions for which Delaunay triangulation
+    will be computed
+
+    From: https://stackoverflow.com/questions/16750618/whats-an-efficient-way-to-find-if-a-point-lies-in-the-convex-hull-of-a-point-cl
+    """
+    if not isinstance(hull, Delaunay):
+        hull = Delaunay(hull)
+
+    return hull.find_simplex(p) >= 0
+
+
+def pnts_in_hull(pnts, hull):
+    """
+    Return the points in `pnts` that are also contained inside the hull
+    """
+    where = np.where(in_hull(pnts, hull))
+    pnts_inside = pnts[where]
+    return pnts_inside
