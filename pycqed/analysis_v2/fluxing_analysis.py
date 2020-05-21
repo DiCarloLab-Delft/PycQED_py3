@@ -763,8 +763,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         hull_clustering_thr=0.1,
         hull_phase_thr=5,
         hull_L1_thr=5,
-        gen_optima_hulls=False,
-        plt_optimal_hulls=False,
+        gen_optima_hulls=True,
+        plt_optimal_hulls=True,
         comparison_timestamp: str = None,
         interp_grid_data: bool = False,
         save_cond_phase_contours: list = [180],
@@ -1117,6 +1117,72 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     "y": self.proc_data_dict["y_optimal"],
                 }
 
+        # Extra plot to easily identify the location of the optimal hulls
+        # and cond. phase contours
+        sorted_hull_vertices = self.proc_data_dict["hull_vertices"]
+        if self.gen_optima_hulls and len(sorted_hull_vertices):
+            for hull_id, hull_vertices in sorted_hull_vertices.items():
+                vertices_x, vertices_y = np.transpose(hull_vertices)
+
+                # Close the start and end of the line
+                x_vals = np.concatenate((vertices_x, vertices_x[:1]))
+                y_vals = np.concatenate((vertices_y, vertices_y[:1]))
+
+                self.plot_dicts["hull_" + hull_id] = {
+                    "ax_id": "hull_and_contours",
+                    "plotfn": self.plot_line,
+                    "xvals": x_vals,
+                    "xlabel": self.raw_data_dict["xlabel"],
+                    "xunit": self.raw_data_dict["xunit"],
+
+                    "yvals": y_vals,
+                    "ylabel": self.raw_data_dict["ylabel"],
+                    "yunit": self.raw_data_dict["yunit"],
+
+                    "yrange": self.options_dict.get("yrange", None),
+                    "xrange": self.options_dict.get("xrange", None),
+
+                    "setlabel": "hull #" + hull_id,
+                    "title": "{}\n{}".format(
+                        self.timestamp, self.proc_data_dict["measurementstring"]
+                    ),
+                    "do_legend": True,
+                    "legend_pos": "best",
+                    "marker": "",  # don't use markers
+                    "linestyle": "-"
+                }
+
+        if len(self.save_cond_phase_contours):
+            c_dict = self.proc_data_dict["cond_phase_contours"]
+            for level, contours in c_dict.items():
+                for contour_id, contour in contours.items():
+                    x_vals, y_vals = np.transpose(contour)
+
+                    self.plot_dicts["contour_" + level + "_" + contour_id] = {
+                        "ax_id": "hull_and_contours",
+                        "plotfn": self.plot_line,
+                        "xvals": x_vals,
+                        "xlabel": self.raw_data_dict["xlabel"],
+                        "xunit": self.raw_data_dict["xunit"],
+
+                        "yvals": y_vals,
+                        "ylabel": self.raw_data_dict["ylabel"],
+                        "yunit": self.raw_data_dict["yunit"],
+
+                        "yrange": self.options_dict.get("yrange", None),
+                        "xrange": self.options_dict.get("xrange", None),
+
+                        "setlabel": "contour " + level + " #" + contour_id,
+                        "title": "{}\n{}".format(
+                            self.timestamp, self.proc_data_dict["measurementstring"]
+                        ),
+                        "do_legend": True,
+                        "legend_pos": "best",
+                        "legend_ncol": 2,
+                        "marker": "",  # don't use markers
+                        "linestyle": "--"
+                    }
+
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
         phase_q0_name = "phase_q0"
@@ -1346,7 +1412,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             self._proc_hulls()
 
         if len(self.save_cond_phase_contours):
-            self._proc_cond_phase_contours()
+            self._proc_cond_phase_contours(angle_thr=0.5)
 
         # Save quantities of interest
         save_these = {
@@ -1359,6 +1425,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             "clusters_pnts_colors",
             "hull_vertices",
             "cond_phase_contours",
+            "cond_phase_contours_orig",
         }
         pdd = self.proc_data_dict
         quantities_of_interest = dict()
@@ -1376,20 +1443,26 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
 
         interp_vals = self.proc_data_dict["interpolated_values"]
 
-        where = [(name in self.cost_func_Names) for name in vln]
-        cost_func_indxs = np.where(where)[0][0]
-        cost_func = interp_vals[cost_func_indxs]
-        cost_func = interp_to_1D_arr(z_int=cost_func)
+        # where = [(name in self.cost_func_Names) for name in vln]
+        # cost_func_indxs = np.where(where)[0][0]
+        # cost_func = interp_vals[cost_func_indxs]
+        # cost_func = interp_to_1D_arr(z_int=cost_func)
 
         where = [(name in self.cond_phase_names) for name in vln]
         cond_phase_indx = np.where(where)[0][0]
         cond_phase_arr = interp_vals[cond_phase_indx]
         cond_phase_arr = interp_to_1D_arr(z_int=cond_phase_arr)
 
+        # Avoid runtime errors
+        cond_phase_arr[np.isnan(cond_phase_arr)] = 359.0
+
         where = [(name in self.L1_names) for name in vln]
         L1_indx = np.where(where)[0][0]
         L1_arr = interp_vals[L1_indx]
         L1_arr = interp_to_1D_arr(z_int=L1_arr)
+
+        # Avoid runtime errors
+        L1_arr[np.isnan(L1_arr)] = 100
 
         x_int = self.proc_data_dict["x_int"]
         y_int = self.proc_data_dict["y_int"]
@@ -1414,7 +1487,11 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         }
         log.debug("Hulls are sorted by increasing y value.")
 
-    def _proc_cond_phase_contours(self):
+    def _proc_cond_phase_contours(self, angle_thr: float = 0.5):
+        """
+        Increasing `angle_thr` will make the contours' paths more coarse
+        but more simple
+        """
         # get the interpolated cond. phase data (if any)
         vln = self.proc_data_dict["value_names"]
         interp_vals = self.proc_data_dict["interpolated_values"]
@@ -1425,10 +1502,12 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         cond_phase_indx = np.where(where)[0][0]
         cond_phase_int = interp_vals[cond_phase_indx]
 
+        c_dict = OrderedDict()
+        c_dict_orig = OrderedDict()
+
         if len(cond_phase_int):
             # use the contours function to generate them
             levels_list = self.save_cond_phase_contours
-            c_dict = OrderedDict()
             contours = contour_overlay(
                 x_int,
                 y_int,
@@ -1441,18 +1520,22 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                 # Just saving in more friendly format
                 # Each entry in the `c_dict` is a dict of 2D arrays for
                 # disjoint contours for the same `level`
-                angle_thr = 5  # deg, maybe should be an argument
                 same_level_dict = OrderedDict()
+                same_level_dict_orig = OrderedDict()
                 for j, c in enumerate(contours[i]):
                     # To save in hdf5 several unpredictably shaped np.arrays
                     # we need a dictionary format here
+                    same_level_dict_orig[str(j)] = c
                     same_level_dict[str(j)] = c2d.simplify_2D_path(c, angle_thr)
 
                 c_dict[str(level)] = same_level_dict
+                c_dict_orig[str(level)] = same_level_dict_orig
 
-            self.proc_data_dict["cond_phase_contours"] = c_dict
         else:
             log.debug("Conditional phase data for contours not found.")
+
+        self.proc_data_dict["cond_phase_contours"] = c_dict
+        self.proc_data_dict["cond_phase_contours_orig"] = c_dict_orig
 
     def plot_text(self, pdict, axs):
         """
@@ -1753,6 +1836,7 @@ def generate_optima_hull_vertices(
         phase_thr *= tol
         L1_thr *= tol
         cond_phase_dev_f = multi_targets_phase_offset(target_phase, 2 * target_phase)
+
         cond_phase_abs_diff = cond_phase_dev_f(cond_phase_arr)
         sel = cond_phase_abs_diff <= phase_thr
         sel = sel * (L1_arr <= L1_thr)
@@ -1815,7 +1899,7 @@ def generate_optima_hull_vertices(
         try:
             hull = ConvexHull(pnts_for_hull)
             vertices = hull.points[hull.vertices]
-            angle_thr = 3.0
+            angle_thr = 5.0
             # Remove redundant points that deviate little from a straight line
             simplified_hull = c2d.simplify_2D_path(vertices, angle_thr)
             sorted_hull_vertices.append(simplified_hull)
