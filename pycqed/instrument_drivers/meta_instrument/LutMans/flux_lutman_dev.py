@@ -607,6 +607,33 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Step relative. amp",
             )
 
+            for specificity in ["coarse", "fine"]:
+                self.add_parameter(
+                    "czv_{}_optimal_hull_{}".format(specificity, this_cz),
+                    initial_value=np.array([]),
+                    label="{} hull".format(specificity),
+                    docstring=(
+                        "Stores the boundary points of a optimal region 2D region "
+                        "generated from a landscape. Intended for data points "
+                        "(x, y) = (`czv_amp_sq_XX`, `czv_time_at_sweetspot_`)"
+                    ),
+                    parameter_class=ManualParameter,
+                    vals=vals.Arrays(),
+                )
+                self.add_parameter(
+                    "czv_{}_cond_phase_contour_{}".format(specificity, this_cz),
+                    initial_value=np.array([]),
+                    label="{} hull".format(specificity),
+                    docstring=(
+                        "Stores the points for an optimal conditional phase "
+                        "contour generated from a landscape. Intended for data points "
+                        "(x, y) = (`czv_amp_sq_XX`, `czv_time_at_sweetspot_`) "
+                        "typically for the 180 deg cond. phase."
+                    ),
+                    parameter_class=ManualParameter,
+                    vals=vals.Arrays(),
+                )
+
             # #################################################################
             # END new CZ parameterization
             # #################################################################
