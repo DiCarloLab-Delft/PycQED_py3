@@ -12,34 +12,50 @@ from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
     cmap_to_alpha, cmap_first_to_alpha
 
-class Residual_Crosstalk(ba.BaseDataAnalysis):
+class Residual_ZZ_Analysis(ba.BaseDataAnalysis):
     """
     Residual crosstalk analysis.
-
     Produces residual crosstalk matrix from multiple crosstalk measurements.
     Arguments:
             t_start & t_stop: the first and last timestamps of a sequence of
             residual ZZ measurement. The residual ZZ measurement is defined as
             the function 'residual_coupling_sequence' in repository ./pycqed/measurement/openql_experiments/multi_qubit_oql.py
+            
             qubits: list of qubit names that are involved in the experiment as
             either Echo/Target qubit or Spectator/Control qubit. Echo/Target qubit is the qubit
             that performs the echo sequence, while the Spectator/Control qubit is the qubit
             that is excited halfway during that sequence. 
+            
+            manual_dict: dict containing keys 'spectator_qubit', 'target_qubit' and 'spectator_states' with corresponding list 
+            of spectator qubits list of strings, target qubit name string and spectator state string in order of timestamps. Otherwise tries to extract target_qubit, spectator_qubits and spectator_state 
+            from Experimental Metadata in hd5 file. 
+            e.g. manual_dict={'target_qubit':  ['D4', 'D4', 'D4', 
+                                                 'X', 'X', 'X', 
+                                                 'Z2', 'Z2', 'Z2', 
+                                                 'D2', 'D2', 'D2'],
+                            'spectator_qubits': ["['X', 'Z2', 'D2']", "['X', 'Z2', 'D2']", "['X', 'Z2', 'D2']", 
+                                                 "['D4', 'Z2', 'D2']", "['D4', 'Z2', 'D2']", "['D4', 'Z2', 'D2']", 
+                                                 "['D4', 'X', 'D2']", "['D4', 'X', 'D2']", "['D4', 'X', 'D2']", 
+                                                 "['D4', 'X', 'Z2']", "['D4', 'X', 'Z2']", "['D4', 'X', 'Z2']"],
+                            'spectator_state': ['001', '010', '100', 
+                                                 '001', '010', '100', 
+                                                 '001', '010', '100', 
+                                                 '001', '010', '100']}
     """
 
     def __init__(self, qubits: list = None, t_start: str = None, t_stop: str = None,
-                 label: str = '', extract_only: bool = False,
+                 label: str = '', extract_only: bool = False, manual_dict: dict = None,
                  options_dict: dict = None, 
                  auto=True):
         """
         Inherits from BaseDataAnalysis.
-
         """
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict)
         self.qubits = qubits
+        self.manual_dict = manual_dict
         if auto:
             self.run_analysis()
         
@@ -48,16 +64,25 @@ class Residual_Crosstalk(ba.BaseDataAnalysis):
         self.timestamps = a_tools.get_timestamps_in_range(
             self.t_start, self.t_stop,
             label=self.labels)
-        for ts in self.timestamps:
+        for i, ts in enumerate(self.timestamps):
             data_fp = get_datafilepath_from_timestamp(ts)
-            param_spec = {
-                'data': ('Experimental Data/Data', 'dset'),
-                'target_qubit':  ('Experimental Data/Experimental Metadata', 'attr:target_qubit'),
-                'spectator_qubits':  ('Experimental Data/Experimental Metadata', 'attr:spectator_qubits'),
-                'spectator_state':  ('Experimental Data/Experimental Metadata', 'attr:spectator_state')}
-            self.raw_data_dict[ts] = h5d.extract_pars_from_datafile(
-                data_fp, param_spec)
-        
+            if self.manual_dict:
+                param_spec = {'data': ('Experimental Data/Data', 'dset')}
+                self.raw_data_dict[ts] = h5d.extract_pars_from_datafile(data_fp, param_spec)
+                self.raw_data_dict[ts]['target_qubit'] = self.manual_dict['target_qubit'][i]
+                self.raw_data_dict[ts]['spectator_qubits'] = self.manual_dict['spectator_qubits'][i]
+                self.raw_data_dict[ts]['spectator_state'] = self.manual_dict['spectator_state'][i]
+            else:
+                try:
+                    param_spec = {
+                        'data': ('Experimental Data/Data', 'dset'),
+                        'target_qubit':  ('Experimental Data/Experimental Metadata', 'attr:target_qubit'),
+                        'spectator_qubits':  ('Experimental Data/Experimental Metadata', 'attr:spectator_qubits'),
+                        'spectator_state':  ('Experimental Data/Experimental Metadata', 'attr:spectator_state')}
+                    self.raw_data_dict[ts] = h5d.extract_pars_from_datafile(data_fp, param_spec)
+                except:
+                    print('No Metadata found for timestamp {}'.format(ts))
+            
         # Parts added to be compatible with base analysis data requirements
         self.raw_data_dict['timestamps'] = self.timestamps
         self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
@@ -89,7 +114,7 @@ class Residual_Crosstalk(ba.BaseDataAnalysis):
                 if np.std(y)/np.mean(y) < 0.1:
                     print('No oscillation found for {},{}'.format(target_qubit, active_spectator))
                     frequency = 0
-                residual_ZZ_matrix[self.qubits.index(target_qubit), self.qubits.index(active_spectator)] = frequency
+                residual_ZZ_matrix[self.qubits.index(target_qubit), self.qubits.index(active_spectator)] = 2*frequency
                 ts_dict[ts]['frequency'] = frequency
                 ts_dict[ts]['fit_res'] = fit_res
                 ts_dict[ts]['spectator'] = active_spectator
@@ -138,7 +163,6 @@ def fit_residual_coupling_oscillation(x, y, **kw):
     Fit damped oscillator for the residual ZZ measurement defined as
     the function 'residual_coupling_sequence' in repository 
     ./pycqed/measurement/openql_experiments/multi_qubit_oql.py
-
     """
     average = np.mean(y)
     ft_of_data = np.fft.fft(y)
@@ -194,7 +218,6 @@ def plot_residual_coupling_fit(fit_res, ax, row, column, frequency, ts):
                 row, column: row and column of ax within corresponding Matplotlib figure.
                 frequency: frequency found in the fitting result.
                 ts: timestamp used to acquire data for fitting.
-
     """
     y_data = fit_res.data
     y_fit = fit_res.best_fit
