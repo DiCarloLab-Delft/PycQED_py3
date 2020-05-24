@@ -518,9 +518,9 @@ class MeasurementControl(Instrument):
                         X0 = af_pars["X0Y0"]["X0"]
                         Y0 = af_pars["X0Y0"]["Y0"]
 
-                        # For convenience we allows the user to specify a single Y0
-                        # value that will be the image of all the points in the X0
-                        # domain points
+                        # For convenience we allows the user to specify a
+                        # single Y0 value that will be the image for all the
+                        # domain points in X0
                         if not isinstance(Y0, Iterable) or len(Y0) < len(X0):
                             Y0 = np.repeat([Y0], len(X0), axis=0)
 
