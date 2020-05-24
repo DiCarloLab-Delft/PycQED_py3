@@ -43,27 +43,58 @@ def path_angles_2D(pnts, normalize: bool = None, degrees: bool = True):
     return angles
 
 
-def interp_2D_contour(c_pnts, interp_method: str = "slinear"):
+def interp_2D_contour(
+    c_pnts,
+    interp_method: str = "slinear",
+    normalize_pnts_before_dist: bool = True,
+    normalize_interp_domain: bool = True,
+):
     """
     Returns and `interp1d` along a 2D contour path according to `interp_method`
 
     Args:
         pnt (array): shape = (len(pnts), 2)
         interp_method (str): see `kind` argument of `scipy.interpolate.interp1d`
+        normalize_pnts_before_dist (bool): normalizes each dimension (min, max)
+            to (0, 1) range for the purpose of calculating the distance along
+            the path, heterogeneous scales in each dimensions might give
+            unexpected results if not using this option
+        normalize_interp_domain (bool): if `True` the returned interpolator
+            will accept distance along the path in the (0, 1) range
     """
     assert interp_method in {"slinear", "quadratic", "cubic"}
 
-    # Linear length along the line:
-    distance = np.cumsum(np.sqrt(np.sum(np.diff(c_pnts, axis=0) ** 2, axis=1)))
+    # Normalize input points before calculating distance to avoid numerical
+    # problems when the two dimensions have very different scales
+    if normalize_pnts_before_dist:
+        c_pnts_T = np.transpose(c_pnts)
+        pnts_for_dist = []
+        for pnts_dim in c_pnts_T:
+            min_val = pnts_dim.min()
+            pnts_for_dist.append((pnts_dim - min_val) / (pnts_dim.max() - min_val))
+        pnts_for_dist = np.transpose(pnts_for_dist)
+    else:
+        pnts_for_dist = c_pnts
+
+    # Linear length along the path on the 2D plane
+    distance = np.cumsum(np.sqrt(np.sum(np.diff(pnts_for_dist, axis=0) ** 2, axis=1)))
+    distance = np.insert(distance, 0, 0)
+
     # Normalize to [0, 1] range
-    distance = np.insert(distance, 0, 0) / distance[-1]
+    if normalize_interp_domain:
+        distance /= distance[-1]
 
     interpolator = interp1d(distance, c_pnts, kind=interp_method, axis=0)
 
     return interpolator
 
 
-def interp_pnts_along_2D_contour(c_pnts, num_pnts: int, interp_method: str = "slinear"):
+def interp_pnts_along_2D_contour(
+    c_pnts,
+    num_pnts: int,
+    interp_method: str = "slinear",
+    normalize_pnts_before_dist: bool = True,
+):
     """
     Returns a list of 2D pnts interpolated along the segments of a 2D
     contour specified by `c_pnts`
@@ -73,8 +104,11 @@ def interp_pnts_along_2D_contour(c_pnts, num_pnts: int, interp_method: str = "sl
         num_pnts (int): number of equidistant points to be generated
             along the normalized path of the contour
         interp_method (str): see `interp_2D_contour`
+        normalize_pnts_before_dist (str): see `interp_2D_contour`
     """
-    interp = interp_2D_contour(c_pnts, interp_method)
+    interp = interp_2D_contour(
+        c_pnts, interp_method, normalize_pnts_before_dist=normalize_pnts_before_dist
+    )
     pnts = interp(np.linspace(0, 1, num_pnts))
     return pnts
 
