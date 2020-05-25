@@ -1365,7 +1365,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
                                 q0_first_gate: str = "rx90",
                                 angles=np.arange(0, 360, 20),
                                 wait_time_before_flux: int = 0,
-                                wait_time_after: int = 0,
+                                wait_time_after_flux: int = 0,
                                 add_cal_points: bool = True,
                                 cases: list = ('no_excitation', 'excitation'),
                                 flux_codeword: str = 'cz',
@@ -1397,7 +1397,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
         cz_repetitions (int): how many cz gates to apply consecutively
         q0_first_gate (str): defines the initial state of q0 before applying cz
         angles      (array): angles of the recovery pulse
-        wait_time_after   (int): wait time in ns after triggering all flux
+        wait_time_after_flux   (int): wait time in ns after triggering all flux
             pulses
     '''
     p = oqh.create_program("conditional_oscillation_seq", platf_cfg)
@@ -1421,9 +1421,15 @@ def conditional_oscillation_seq(q0: int, q1: int,
             gate = q0_first_gate if single_q_gates_replace is None else single_q_gates_replace
             k.gate(gate, [q0])
 
+            k.gate('wait', [q1, q0], wait_time_before_flux)
+
+            # k.gate('i', [q0])
+            # k.gate('i', [q0])
+            # k.gate("wait", [], 0)
+
             for dummy_i in range(cz_repetitions):
                 if not CZ_disabled:
-                    k.gate("wait", [], 0) # Empty list generates barrier for all qubits in platf. only works with 0.8.0
+                    k.gate("wait", [], 0)  # Empty list generates barrier for all qubits in platf. only works with 0.8.0
                     # k.gate("fl_cw_03", [q0, q1])
                     # k.gate( "sf_cz_sw", [q1])
                     # k.gate("sf_cz_ne", [q0])
@@ -1450,8 +1456,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
                     k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
                     k.gate("wait", [], 0) #alignment workaround
 
-            if wait_time_after > 0:
-                k.gate('wait', [q0,q1], wait_time_after)
+            if wait_time_after_flux > 0:
+                k.gate('wait', [q0, q1], wait_time_after_flux)
 
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
@@ -1480,10 +1486,11 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
             p.add_kernel(k)
     if add_cal_points:
-        p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1,
-                                     f_state_cal_pts=True,
-                                     f_state_cal_pt_cw=31)
+        p = oqh.add_two_q_cal_points(
+            p, q0=q0, q1=q1,
+            f_state_cal_pts=True,
             # hardcoded requires ef pulses to be prepared
+            f_state_cal_pt_cw=31)
     p = oqh.compile(p)
 
     if add_cal_points:
