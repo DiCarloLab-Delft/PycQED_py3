@@ -2275,15 +2275,15 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         # It is assumed `self` is the low freq. qubit
         self.set("czv_q_ph_corr_only_{}".format(this_which_gate), True)
-        self.set("czv_correct_q_phase_{}".format(this_which_gate), True)
 
         for flux_lm in [self, that_flux_lm]:
             flux_lm.generate_standard_waveforms()
 
-        self.plot_cz_waveforms(
-            [self.name.split("_")[-1], that_qubit],
-            [this_which_gate, that_which_gate]
-        )
+        if plot_waveforms:
+            self.plot_cz_waveforms(
+                [self.name.split("_")[-1], that_qubit],
+                [this_which_gate, that_which_gate]
+            )
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
