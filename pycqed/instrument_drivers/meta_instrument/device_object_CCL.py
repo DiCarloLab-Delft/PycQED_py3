@@ -1840,7 +1840,6 @@ class DeviceCCL(Instrument):
             # this experiment.
             raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
 
-
         shots_per_meas = int(
             np.floor(np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases
         )
@@ -1862,25 +1861,28 @@ class DeviceCCL(Instrument):
 
         if analyze:
             if initialize:
-                thresholds = [self.find_instrument(qubit).ro_acq_threshold()
+                thresholds = [
+                    self.find_instrument(qubit).ro_acq_threshold()
                     for qubit in qubits]
-                a = ma2.Multiplexed_Readout_Analysis(label=label,
-                                            nr_qubits=len(qubits),
-                                            post_selection=True,
-                                            post_selec_thresholds=thresholds)
+                a = ma2.Multiplexed_Readout_Analysis(
+                    label=label,
+                    nr_qubits=len(qubits),
+                    post_selection=True,
+                    post_selec_thresholds=thresholds)
                 # Print fraction of discarded shots
-                #Dict = a.proc_data_dict['Post_selected_shots']
-                #key = next(iter(Dict))
-                #fraction=0
-                #for comb in Dict[key].keys():
+                # Dict = a.proc_data_dict['Post_selected_shots']
+                # key = next(iter(Dict))
+                # fraction=0
+                # for comb in Dict[key].keys():
                 #    fraction += len(Dict[key][comb])/(2**12 * 4)
-                #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
+                # print('Fraction of discarded results was {:.2f}'.format(1-fraction))
             else:
-                a = ma2.Multiplexed_Readout_Analysis(label=label,
-                                            nr_qubits=len(qubits))
+                a = ma2.Multiplexed_Readout_Analysis(
+                    label=label,
+                    nr_qubits=len(qubits))
             # Set thresholds
             for i, qubit in enumerate(qubits):
-                label = a.raw_data_dict['value_names'][i]
+                label = a.Channels[i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
         return
@@ -2000,7 +2002,7 @@ class DeviceCCL(Instrument):
                 label = a.raw_data_dict['value_names'][i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
-            return a.qoi
+            return a.qoi[a.Channels[np.where(q_target in qubits)[0][0]]]
 
     def measure_transients(self,
                            qubits: list,
