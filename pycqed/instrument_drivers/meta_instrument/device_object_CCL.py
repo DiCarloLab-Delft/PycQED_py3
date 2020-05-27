@@ -325,7 +325,7 @@ class DeviceCCL(Instrument):
             "        'mw_3': 11\n"
             "        'mw_4': 12\n"
             "    }\n"
-            "Tip: run `device.dio_map?` to print the docstringof this parameter",
+            "Tip: run `device.dio_map?` to print the docstring of this parameter",
             initial_value=None,
             set_cmd=self._set_dio_map,
             vals=vals.Dict(),
@@ -389,11 +389,11 @@ class DeviceCCL(Instrument):
                     ("ro_0", self.tim_ro_latency_0()),
                     ("ro_1", self.tim_ro_latency_1()),
                     ("ro_2", self.tim_ro_latency_2()),
-                    ("mw_0", self.tim_mw_latency_0()),
-                    ("mw_1", self.tim_mw_latency_1()),
                     ("flux_0", self.tim_flux_latency_0()),
                     ("flux_1", self.tim_flux_latency_1()),
                     ("flux_2", self.tim_flux_latency_2()),
+                    ("mw_0", self.tim_mw_latency_0()),
+                    ("mw_1", self.tim_mw_latency_1()),
                     ("mw_2", self.tim_mw_latency_2()),
                     ("mw_3", self.tim_mw_latency_3()),
                     ("mw_4", self.tim_mw_latency_4()),
@@ -403,7 +403,7 @@ class DeviceCCL(Instrument):
         # NB: Mind that here number precision matters a lot!
         # Tripple check everything if any changes are to be made
 
-        # Substract lowest value to ensure minimal latency is used.
+        # Subtract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
         # calibrating)
         lowest_value = min(latencies.values())
@@ -412,13 +412,13 @@ class DeviceCCL(Instrument):
             # The individual multiplications are on purpose
             latencies[key] = val * 1e9 - lowest_value * 1e9
 
-        # Only apply fine latencies above 1 ps (HDAWG8 minum fine delay)
+        # Only apply fine latencies above 1 ps (HDAWG8 minimum fine delay)
         ns_tol = 1e-3
 
         # ensuring that RO latency is a multiple of 20 ns as the UHFQC does
         # not have a fine timing control.
         ro_latency_modulo_20 = latencies["ro_0"] % 20
-        # `% 20` is for the case ro_latency_modulo_20 == 20ns
+        # `% 20` is for the case ro_latency_modulo_20 == 20 ns
         correction_for_multiple = (20 - ro_latency_modulo_20) % 20
         if correction_for_multiple >= ns_tol:  # at least one 1 ps
             # Only apply corrections if they are significant

@@ -13,8 +13,6 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.utilities.general import gen_sweep_pts
-from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
-    mk_optimize_res_loss_func
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
     mk_minimization_loss_func, mk_minimization_goal_func
 
@@ -232,7 +230,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter(
-            'ro_acq_delay',  unit='s',
+            'ro_acq_delay', unit='s',
             label='Readout acquisition delay',
             vals=vals.Numbers(min_value=0),
             initial_value=0,
@@ -243,7 +241,7 @@ class CCLight_Transmon(Qubit):
                        'acquisition is started after the pulse is send.'))
 
         self.add_parameter(
-            'ro_acq_mixer_phi',  unit='degree',
+            'ro_acq_mixer_phi', unit='degree',
             label='Readout mixer phi',
             vals=vals.Numbers(),
             initial_value=0,
@@ -252,7 +250,7 @@ class CCLight_Transmon(Qubit):
                        'real time'))
 
         self.add_parameter(
-            'ro_acq_mixer_alpha',  unit='',
+            'ro_acq_mixer_alpha', unit='',
             label='Readout mixer alpha',
             vals=vals.Numbers(min_value=0.8),
             initial_value=1,
@@ -261,7 +259,7 @@ class CCLight_Transmon(Qubit):
                        'real time'))
 
         self.add_parameter(
-            'ro_acq_input_average_length',  unit='s',
+            'ro_acq_input_average_length', unit='s',
             label='Readout acquisition delay',
             vals=vals.Numbers(min_value=0, max_value=4096/1.8e9),
             initial_value=4096/1.8e9,
@@ -306,10 +304,10 @@ class CCLight_Transmon(Qubit):
             initial_value=0,
             parameter_class=ManualParameter)
         self.add_parameter('ro_acq_integration_length_weigth_function', vals=vals.Numbers(
-            min_value=0, max_value=4096/1.8e9),
+            min_value=0, max_value=4096 / 1.8e9),
             docstring=(
             'sets weight function elements to 0 beyond this time'),
-            initial_value=4096/1.8e9,
+            initial_value=4096 / 1.8e9,
             parameter_class=ManualParameter)
 
         # self.add_parameter('cal_pt_zero',
@@ -489,9 +487,10 @@ class CCLight_Transmon(Qubit):
             lutman = self.find_instrument(self.instr_LutMan_MW())
             AWG = lutman.find_instrument(lutman.AWG())
             if self._using_QWG():
-                logging.warning(
-                    'CCL transmon is using QWG. mw_fine_delay not supported!'
-                    'Adding zeros to waveforms. Intended for delays msmt only!')
+                if val != 0.0:
+                    logging.warning(
+                        'CCL transmon is using QWG. mw_fine_delay not supported!'
+                        'Adding zeros to waveforms. Intended for delays measurement only!')
                 lutman.pulse_delay(val)
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
