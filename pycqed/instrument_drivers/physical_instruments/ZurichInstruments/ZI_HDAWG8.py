@@ -401,7 +401,7 @@ while (1) {
                 # NEW
                 # In the NO-VSM mw protocol bits [0:6] -> CW0, bits [13, 7] -> CW1,
                 # bits [22:16] -> CW2 and bits [29:23] -> CW4
-                elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+                elif self.cfg_codeword_protocol() == 'novsm_microwave':
                     if awg_nr == 0:
                         self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
                     elif awg_nr == 1:
@@ -640,7 +640,7 @@ while (1) {
                                  (3, list(reversed(staircase_sequence)))]
 
 
-        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+        elif self.cfg_codeword_protocol() == 'novsm_microwave':
 
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
                 '..','examples','QCC_example',
