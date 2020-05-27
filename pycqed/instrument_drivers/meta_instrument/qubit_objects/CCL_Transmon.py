@@ -5244,7 +5244,7 @@ class CCLight_Transmon(Qubit):
             self, nr_cliffords=2**np.arange(12), nr_seeds=100,
             MC=None,
             recompile: bool = 'as needed', prepare_for_timedomain: bool = True,
-            ignore_f_cal_pts: bool = False):
+            ignore_f_cal_pts: bool = False, ro_acq_weight_type: str = "optimal IQ"):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -5284,7 +5284,7 @@ class CCLight_Transmon(Qubit):
         # Settings that have to be changed....
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        self.ro_acq_weight_type('SSB')
+        self.ro_acq_weight_type(ro_acq_weight_type)
         self.ro_acq_digitized(False)
 
         if prepare_for_timedomain:
