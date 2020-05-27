@@ -1764,11 +1764,19 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         return ax
 
     # Here for convenience, no need to be a method
-    def plot_cz_waveforms(self, qubits: list, which_gate_list: list):
+    def plot_cz_waveforms(
+        self,
+        qubits: list,
+        which_gate_list: list,
+        ax=None,
+        show: bool = True
+    ):
         """
         Plots the cz waveforms from several flux lutamns, mainly for
         verification, time alignment and debugging
         """
+        if ax is None:
+            fig, ax = plt.subplots(1, 1)
         flux_lm_list = [
             self.find_instrument("flux_lm_{}".format(qubit))
             for qubit in qubits
@@ -1777,13 +1785,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         for flux_lm, which_gate, qubit in zip(flux_lm_list, which_gate_list, qubits):
             flux_lm.generate_standard_waveforms()
             waveform_name = "cz_{}".format(which_gate)
-            plt.plot(
+            ax.plot(
                 flux_lm._wave_dict[waveform_name], ".-",
                 label=waveform_name + " " + qubit
             )
-        plt.legend()
-        plt.show()
+        ax.legend()
+        fig = ax.get_figure()
 
+        if show:
+            fig.show()
+
+        return fig
     #################################
     #  Simulation methods           #
     #################################
@@ -2275,15 +2287,15 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         # It is assumed `self` is the low freq. qubit
         self.set("czv_q_ph_corr_only_{}".format(this_which_gate), True)
-        self.set("czv_correct_q_phase_{}".format(this_which_gate), True)
 
         for flux_lm in [self, that_flux_lm]:
             flux_lm.generate_standard_waveforms()
 
-        self.plot_cz_waveforms(
-            [self.name.split("_")[-1], that_qubit],
-            [this_which_gate, that_which_gate]
-        )
+        if plot_waveforms:
+            self.plot_cz_waveforms(
+                [self.name.split("_")[-1], that_qubit],
+                [this_which_gate, that_which_gate]
+            )
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):

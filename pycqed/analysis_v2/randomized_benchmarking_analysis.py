@@ -1217,8 +1217,8 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         # to the CZ gate
         try:
             qoi['L1_CZ_naive'] = 1-(1-qoi_base['L1'])**(1/1.5)
-            qoi['eps_CZ_simple_naive'] = 1-(1-qoi_base['eps_X1'])**(1/1.5)
-            qoi['eps_CZ_X1_naive'] = 1-(1-qoi_base['eps_simple'])**(1/1.5)
+            qoi['eps_CZ_simple_naive'] = 1-(1-qoi_base['eps_simple'])**(1/1.5)
+            qoi['eps_CZ_X1_naive'] = 1-(1-qoi_base['eps_X1'])**(1/1.5)
         except ValueError:
             # prevents the analysis from crashing if the fits are bad.
             qoi['L1_CZ_naive'] = ufloat(np.NaN, np.NaN)

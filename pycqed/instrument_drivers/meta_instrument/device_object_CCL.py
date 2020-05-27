@@ -1021,7 +1021,7 @@ class DeviceCCL(Instrument):
         q0_first_gate: str = "rx90",
         cz_repetitions: int = 1,
         wait_time_before_flux_ns: int = 0,
-        wait_time_ns: int = 0,
+        wait_time_after_flux_ns: int = 0,
         label="",
         verbose=True,
         disable_metadata=False,
@@ -1060,7 +1060,7 @@ class DeviceCCL(Instrument):
             CZ_disabled (bool):
                 execute the experiment with no flux pulse applied
 
-            wait_time_ns (int):
+            wait_time_after_flux_ns (int):
                 additional waiting time (in ns) after the flux pulse, before
                 the final afterrotations
         """
@@ -1108,7 +1108,7 @@ class DeviceCCL(Instrument):
             CZ_disabled=CZ_disabled,
             angles=angles,
             wait_time_before_flux=wait_time_before_flux_ns,
-            wait_time_after=wait_time_ns,
+            wait_time_after_flux=wait_time_after_flux_ns,
             flux_codeword=flux_codeword,
             flux_codeword_park=flux_codeword_park,
             single_q_gates_replace=single_q_gates_replace,
@@ -1126,8 +1126,8 @@ class DeviceCCL(Instrument):
 
         MC.set_detector_function(self.get_correlation_detector(qubits=[q0, q1]))
         MC.run(
-            "conditional_oscillation_{}_{}_{}{}".format(
-                q0, q1, self.msmt_suffix, label
+            "conditional_oscillation_{}_{}_x{}_{}{}".format(
+                q0, q1, cz_repetitions, self.msmt_suffix, label
             ),
             disable_snapshot_metadata=disable_metadata,
         )
@@ -1807,7 +1807,7 @@ class DeviceCCL(Instrument):
         # off and on, not including post selection init measurements yet
         nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
 
-        if initialize == True:
+        if initialize:
             nr_shots = 2 * nr_shots_per_case * nr_cases
         else:
             nr_shots = nr_shots_per_case * nr_cases
@@ -1840,7 +1840,6 @@ class DeviceCCL(Instrument):
             # this experiment.
             raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
 
-
         shots_per_meas = int(
             np.floor(np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases
         )
@@ -1861,26 +1860,29 @@ class DeviceCCL(Instrument):
         MC.live_plot_enabled(old_live_plot_enabled)
 
         if analyze:
-            if initialize == True:
-                thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
+            if initialize:
+                thresholds = [
+                    self.find_instrument(qubit).ro_acq_threshold()
                     for qubit in qubits]
-                a = ma2.Multiplexed_Readout_Analysis(label=label,
-                                            nr_qubits=len(qubits),
-                                            post_selection=True,
-                                            post_selec_thresholds=thresholds)
+                a = ma2.Multiplexed_Readout_Analysis(
+                    label=label,
+                    nr_qubits=len(qubits),
+                    post_selection=True,
+                    post_selec_thresholds=thresholds)
                 # Print fraction of discarded shots
-                #Dict = a.proc_data_dict['Post_selected_shots']
-                #key = next(iter(Dict))
-                #fraction=0
-                #for comb in Dict[key].keys():
+                # Dict = a.proc_data_dict['Post_selected_shots']
+                # key = next(iter(Dict))
+                # fraction=0
+                # for comb in Dict[key].keys():
                 #    fraction += len(Dict[key][comb])/(2**12 * 4)
-                #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
+                # print('Fraction of discarded results was {:.2f}'.format(1-fraction))
             else:
-                a = ma2.Multiplexed_Readout_Analysis(label=label,
-                                            nr_qubits=len(qubits))
+                a = ma2.Multiplexed_Readout_Analysis(
+                    label=label,
+                    nr_qubits=len(qubits))
             # Set thresholds
             for i, qubit in enumerate(qubits):
-                label = a.raw_data_dict['value_names'][i]
+                label = a.Channels[i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
         return
@@ -2000,7 +2002,7 @@ class DeviceCCL(Instrument):
                 label = a.raw_data_dict['value_names'][i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
-            return a.qoi
+            return a.qoi[a.Channels[np.where(q_target in qubits)[0][0]]]
 
     def measure_transients(self,
                            qubits: list,
@@ -3089,7 +3091,6 @@ class DeviceCCL(Instrument):
 
         a_obj = ma2.Basic1DAnalysis(label=mmt_label)
         return a_obj
-
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
                                        MC=None,
