@@ -303,6 +303,12 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         # CODEWORDS 1-4: CZ
         for this_cz in ["NE", "NW", "SW", "SE"]:
             self.add_parameter(
+                "cz_wf_generator_%s" % this_cz,
+                initial_value="vcz_dev_waveform",
+                vals=vals.Strings(),
+                parameter_class=ManualParameter,
+            )
+            self.add_parameter(
                 "czd_double_sided_%s" % this_cz,
                 initial_value=False,
                 vals=vals.Bool(),
@@ -314,7 +320,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Bool(),
                 parameter_class=ManualParameter,
             )
-
             self.add_parameter(
                 "czd_net_integral_%s" % this_cz,
                 docstring="Used determine what the integral of"
@@ -520,9 +525,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             )
             self.add_parameter(
                 "czv_time_q_ph_corr_%s" % this_cz,
-                docstring="Time of the single qubit phase correction on "
-                "one side of the NZ. NB: The full pulse will have two of this "
-                "one at the beginning and one at end of the pulse.",
+                docstring="Total time of the single qubit phase correction NZ pulse",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(0.0, 500e-9),
                 initial_value=0.,
@@ -615,7 +618,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                     docstring=(
                         "Stores the boundary points of a optimal region 2D region "
                         "generated from a landscape. Intended for data points "
-                        "(x, y) = (`czv_amp_sq_XX`, `czv_time_at_sweetspot_`)"
+                        "(x, y) = (`czv_amp_sq_XX`, `czv_time_at_sweetspot_XX`)"
                     ),
                     parameter_class=ManualParameter,
                     vals=vals.Arrays(),
@@ -623,11 +626,134 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 self.add_parameter(
                     "czv_{}_cond_phase_contour_{}".format(specificity, this_cz),
                     initial_value=np.array([]),
-                    label="{} hull".format(specificity),
+                    label="{} contour".format(specificity),
                     docstring=(
                         "Stores the points for an optimal conditional phase "
                         "contour generated from a landscape. Intended for data points "
-                        "(x, y) = (`czv_amp_sq_XX`, `czv_time_at_sweetspot_`) "
+                        "(x, y) = (`czv_amp_sq_XX`, `czv_time_at_sweetspot_XX`) "
+                        "typically for the 180 deg cond. phase."
+                    ),
+                    parameter_class=ManualParameter,
+                    vals=vals.Arrays(),
+                )
+
+            # #################################################################
+            # Parameters for the "simplified" VCZ
+            # #################################################################
+
+            self.add_parameter(
+                "vcz_amp_dac_at_11_02_%s" % this_cz,
+                docstring="Dac amplitude (in the case of HDAWG) at the 11-02 "
+                "interaction point. NB: the units might be different for some "
+                "other AWG that is distinct from the HDAWG.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 1.0),
+                initial_value=0.5,
+                unit="a.u.",
+                label="Dac amp at the interaction point",
+            )
+            self.add_parameter(
+                "vcz_amp_sq_%s" % this_cz,
+                docstring="Amplitude of the square parts of the NZ pulse. "
+                "1.0 means qubit detuned to the 11-02 interaction point.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 10.0),
+                initial_value=1.0,
+                unit="a.u.",
+                label="Square relative amp",
+            )
+            self.add_parameter(
+                "vcz_amp_fine_%s" % this_cz,
+                docstring="Amplitude of the single sample point inserted at "
+                "the end of the first half of the NZ pulse and at the "
+                "beginning of the second half. "
+                "1.0 means same amplitude as `sq_amp_XX`.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 1.0),
+                initial_value=.5,
+                unit="a.u.",
+                label="Fine tuning amp",
+            )
+            self.add_parameter(
+                "vcz_amp_q_ph_corr_%s" % this_cz,
+                docstring="Amplitude at the squares of the NZ pulse for single "
+                "qubit phase correction.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 1.0),
+                initial_value=0.,
+                unit="a.u.",
+                label="Amp phase correction",
+            )
+            self.add_parameter(
+                "vcz_time_q_ph_corr_%s" % this_cz,
+                docstring="Total time of the single qubit phase correction NZ pulse.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0.0, 500e-9),
+                initial_value=0.,
+                unit="s",
+                label="Time phase correction",
+            )
+
+            self.add_parameter(
+                "vcz_correct_q_phase_%s" % this_cz,
+                docstring="",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=False,
+                label="Correct single Q phase?",
+            )
+            self.add_parameter(
+                "vcz_time_single_sq_%s" % this_cz,
+                docstring="Duration of each square. "
+                "You should set it close to half speed limit (minimum "
+                "time required to perform a full swap, i.e. 11 -> 02 -> 11)",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
+                initial_value=15.5555555e-9,
+                unit="s",
+                label="Sum dur. squares",
+            )
+            self.add_parameter(
+                "vcz_time_middle_%s" % this_cz,
+                docstring="Time between the two square parts.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=0.,
+                unit="s",
+                label="Time at sweet spot",
+            )
+            self.add_parameter(
+                "vcz_time_before_q_ph_corr_%s" % this_cz,
+                docstring="Time after main pulse before single qubit phase "
+                "correction.",
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(0., 500e-9),
+                initial_value=0.,
+                unit="s",
+                label="Time before correction",
+            )
+
+            for specificity in ["coarse", "fine"]:
+                self.add_parameter(
+                    "vcz_{}_optimal_hull_{}".format(specificity, this_cz),
+                    initial_value=np.array([]),
+                    label="{} hull".format(specificity),
+                    docstring=(
+                        "Stores the boundary points of a optimal region 2D region "
+                        "generated from a landscape. Intended for data points "
+                        "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`)"
+                    ),
+                    parameter_class=ManualParameter,
+                    vals=vals.Arrays(),
+                )
+                self.add_parameter(
+                    "vcz_{}_cond_phase_contour_{}".format(specificity, this_cz),
+                    initial_value=np.array([]),
+                    label="{} contour".format(specificity),
+                    docstring=(
+                        "Stores the points for an optimal conditional phase "
+                        "contour generated from a landscape. Intended for data points "
+                        "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`) "
                         "typically for the 180 deg cond. phase."
                     ),
                     parameter_class=ManualParameter,
@@ -756,23 +882,21 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             modified_wf = np.concatenate([base_wf, corr_pulse])
         return modified_wf
 
-    def _gen_cz(self, which_gate, regenerate_cz=True, use_victor_waveform=True):
+    def _gen_cz(self, which_gate, regenerate_cz=True):
         gate_str = "cz_%s" % which_gate
-        if regenerate_cz:
-            if use_victor_waveform:
-                self._wave_dict[gate_str] = wfl_dev.victor_waveform(self, which_gate=which_gate)
-            else:
-                self._wave_dict[gate_str] = self._gen_adiabatic_pulse(which_gate=which_gate)
 
-        # Commented out snippet is old (deprecated ) phase corr 19/6/2018 MAR
-        # phase_corr = self._gen_phase_corr(cz_offset_comp=True)
-        # # CZ with phase correction
-        # cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
-        if not use_victor_waveform:
+        wf_generator = getattr(self, self.get("cz_wf_generator_{}".format(which_gate)), None)
+
+        if wf_generator is not None:
+            if regenerate_cz:
+                self._wave_dict[gate_str] = wf_generator(which_gate=which_gate)
             cz_pulse = self._get_phase_corrected_pulse(
                 base_wf=self._wave_dict[gate_str], which_gate=which_gate
             )
         else:
+            wf_generator = getattr(wfl_dev, self.get("cz_wf_generator_{}".format(which_gate)))
+            if regenerate_cz:
+                self._wave_dict[gate_str] = wf_generator(self, which_gate=which_gate)
             cz_pulse = self._wave_dict[gate_str]
 
         return cz_pulse
@@ -1813,6 +1937,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "instr_sim_control_CZ_%s" % this_cz,
                 docstring="Noise and other parameters for CZ simulation.",
                 parameter_class=InstrumentRefParameter,
+            )
+            self.add_parameter(
+                "step_response_%s" % this_cz,
+                initial_value=np.array([]),
+                label="Step response",
+                docstring=(
+                    "Stores the normalized flux line step response. "
+                    "Intended for use in cz simulations with noise."
+                ),
+                parameter_class=ManualParameter,
+                vals=vals.Arrays(),
             )
 
     def sim_CZ(self, fluxlutman_static, which_gate=None, qois="all"):
