@@ -1167,7 +1167,7 @@ class FLsweep(Soft_Sweep):
     """
     Special sweep function for AWG8 and QWG flux pulses.
     """
-    def __init__(self, lm, par, waveform_name):
+    def __init__(self, lm, par, waveform_name, upload_waveforms_always: bool=True):
         super().__init__()
         self.lm = lm
         self.par = par
@@ -1175,35 +1175,37 @@ class FLsweep(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
-
+        self.upload_waveforms_always = upload_waveforms_always
 
         self.AWG = self.lm.AWG.get_instr()
         self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
 
-
     def set_parameter(self, val):
-        if self.awg_model_QWG:
-            self.set_parameter_QWG(val)
-        else:
-            self.set_parameter_HDAWG(val)
+        # Just in case there is some resolution or number precision differences
+        # when setting the value
+        old_par_val = self.par()
+        self.par(val)
+        updated_par_val = self.par()
+        if self.upload_waveforms_always or updated_par_val != old_par_val:
+            if self.awg_model_QWG:
+                self.set_parameter_QWG(val)
+            else:
+                self.set_parameter_HDAWG(val)
 
     def set_parameter_HDAWG(self, val):
-
-
-        self.par(val)
         self.AWG.stop()
-        self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
-                                                   regenerate_waveforms=True)
+        self.lm.load_waveform_onto_AWG_lookuptable(
+            self.waveform_name, regenerate_waveforms=True)
         self.AWG.start()
         return
 
     def set_parameter_QWG(self, val):
-        self.par(val)
         self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True,
             force_load_sequencer_program=True)
         self.AWG.start()
+        return
 
 
 class Nested_resonator_tracker(Soft_Sweep):
