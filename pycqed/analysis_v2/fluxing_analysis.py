@@ -1119,7 +1119,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
 
         # Extra plot to easily identify the location of the optimal hulls
         # and cond. phase contours
-        sorted_hull_vertices = self.proc_data_dict["hull_vertices"]
+        sorted_hull_vertices = self.proc_data_dict.get("hull_vertices", [])
         if self.gen_optima_hulls and len(sorted_hull_vertices):
             for hull_id, hull_vertices in sorted_hull_vertices.items():
                 vertices_x, vertices_y = np.transpose(hull_vertices)

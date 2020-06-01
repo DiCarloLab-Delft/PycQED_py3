@@ -14,7 +14,7 @@ import logging
 log = logging.getLogger(__name__)
 
 
-def victor_waveform(
+def vcz_dev_waveform(
     fluxlutman,
     which_gate: str,
     sim_ctrl_cz=None,
@@ -26,6 +26,9 @@ def victor_waveform(
     # NB: the ramps are extra time, they are NOT subtracted from time_sum_sqrs!
 
     amp_at_sweetspot = 0.0
+
+    if which_gate is None and sim_ctrl_cz is not None:
+        which_gate = sim_ctrl_cz.which_gate()
 
     amp_at_int_11_02 = fluxlutman.get("czv_amp_dac_at_11_02_{}".format(which_gate))
 
@@ -264,8 +267,127 @@ def victor_waveform(
 
 
 # ######################################################################
+# VCZ simplified
+# ######################################################################
+
+def vcz_simplified_waveform(
+    fluxlutman,
+    which_gate: str = None,
+    sim_ctrl_cz=None,
+    return_dict=False
+):
+
+    amp_at_sweetspot = 0.0
+    if which_gate is None and sim_ctrl_cz is not None:
+        which_gate = sim_ctrl_cz.which_gate()
+
+    amp_at_int_11_02 = fluxlutman.get("vcz_amp_dac_at_11_02_{}".format(which_gate))
+
+    sampling_rate = fluxlutman.sampling_rate()
+
+    time_sqr = fluxlutman.get("vcz_time_single_sq_{}".format(which_gate))
+    time_sqr = time_sqr * sampling_rate  # avoid numerical issues
+    time_before_q_ph_corr = fluxlutman.get("vcz_time_before_q_ph_corr_{}".format(which_gate))
+    time_before_q_ph_corr = time_before_q_ph_corr * sampling_rate  # avoid numerical issues
+    time_middle = fluxlutman.get("vcz_time_middle_{}".format(which_gate))
+    time_middle = time_middle * sampling_rate  # avoid numerical issues
+    time_q_ph_corr = fluxlutman.get("vcz_time_q_ph_corr_{}".format(which_gate))
+    time_q_ph_corr = time_q_ph_corr * sampling_rate  # avoid numerical issues
+
+    dt = 1
+
+    # Normalized to the amplitude at the CZ interaction point
+    norm_amp_sq = fluxlutman.get("vcz_amp_sq_{}".format(which_gate))
+    norm_amp_fine = fluxlutman.get("vcz_amp_fine_{}".format(which_gate))
+    amp_q_ph_corr = fluxlutman.get("vcz_amp_q_ph_corr_{}".format(which_gate))
+
+    correct_q_phase = fluxlutman.get("vcz_correct_q_phase_{}".format(which_gate))
+    # In case we might want to play only with the pulse length and/or the
+    # time in the middle
+    use_amp_fine = fluxlutman.get("vcz_use_amp_fine_{}".format(which_gate))
+
+    # This is to avoid numerical issues when the user would run sweeps with
+    # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
+    # instead of `time_at_swtspt = np.arange(0, 42, 2) / 2.4e9` and get
+    # bad results for specific combinations of parameters
+    time_middle = np.round(time_middle / dt) * dt
+    time_sqr = np.round(time_sqr / dt) * dt
+    half_time_q_ph_corr = np.round(time_q_ph_corr / 2 / dt) * dt
+
+    if use_amp_fine:
+        # such that this amp is in the range [0, 1]
+        slope_amp = np.array([norm_amp_fine * norm_amp_sq])
+    else:
+        slope_amp = np.array([])
+
+    sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
+    amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)
+    buffer_before_corr = np.full(int(time_before_q_ph_corr / dt), amp_at_sweetspot)
+    pos_q_ph_corr = np.full(int(half_time_q_ph_corr / dt), amp_q_ph_corr)
+
+    half_NZ_amps = np.concatenate((sq_amps, slope_amp))
+
+    amp = np.concatenate((
+        [amp_at_sweetspot],
+        half_NZ_amps,
+        amps_middle,
+        -half_NZ_amps[::-1],
+        [amp_at_sweetspot])
+    )
+
+    if correct_q_phase:
+        amps_corr = np.concatenate((
+            buffer_before_corr,
+            pos_q_ph_corr,
+            -pos_q_ph_corr))
+        if len(amps_corr):
+            amp = np.concatenate((
+                amp,
+                amps_corr,
+                [amp_at_sweetspot]))
+
+    amp = amp_at_int_11_02 * amp
+
+    tlist = np.cumsum(np.full(len(amp) - 1, dt))
+    tlist = np.concatenate(([0.0], tlist))  # Set first point to have t=0
+
+    # Extra processing in case we are generating waveform for simulations
+    if sim_ctrl_cz is not None:
+        dt_num = np.size(tlist) - 1
+        dt_num_interp = dt_num * sim_ctrl_cz.simstep_div() + 1
+
+        time_interp = np.linspace(tlist[0], tlist[-1], dt_num_interp)
+        amp_interp = np.interp(time_interp, tlist, amp)
+
+        if sim_ctrl_cz.optimize_const_amp():
+            # For simulations we skip simulating every single point if they have
+            # same amplitude (eigen space does not change)
+            keep = (amp_interp[:-2] == amp_interp[1:-1]) * (
+                amp_interp[2:] == amp_interp[1:-1]
+            )
+            keep = np.concatenate(([False], keep, [False]))
+            keep = np.logical_not(keep)
+            amp_interp = amp_interp[keep]
+            time_interp = time_interp[keep]
+
+        intervals = time_interp[1:] - time_interp[:-1]
+        intervals_list = np.concatenate((intervals, [np.min(intervals)]))
+
+        return {
+            "time": time_interp / sampling_rate,
+            "amp": amp_interp,
+            "intervals_list": intervals_list / sampling_rate
+        }
+
+    if return_dict:
+        return {"time": tlist / sampling_rate, "amp": amp}
+
+    return amp
+
+# ######################################################################
 # Auxiliary tools
 # ######################################################################
+
 
 def to_int_if_close(value, abs_tol=1e-12, **kw):
     is_close = math.isclose(int(value), value, abs_tol=abs_tol, **kw)
