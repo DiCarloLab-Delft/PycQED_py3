@@ -6,23 +6,24 @@ from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman_dev as
 
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ_v2 as scCZ_v2
 from pycqed.simulations import cz_superoperator_simulation_functions_v2 as czf_v2
-reload(scCZ_v2)
-reload(czf_v2)
+from pycqed.measurement.waveform_control_CC import waveforms_flux_dev as wfl_dev
 
 import numpy as np
 from pycqed.measurement import detector_functions as det
 import matplotlib.pyplot as plt
 from qcodes import Instrument
 
-from pycqed.measurement.waveform_control_CC import waveforms_flux_dev as wfl_dev
-
 from scipy.interpolate import interp1d
 import qutip as qtp
 import cma
 
-np.set_printoptions(threshold=np.inf)
-
 import logging
+
+reload(scCZ_v2)
+reload(czf_v2)
+reload(wfl_dev)
+
+np.set_printoptions(threshold=np.inf)
 log = logging.getLogger(__name__)
 
 
@@ -286,7 +287,12 @@ def compute_propagator(arglist):
         sim_step / subdivisions_of_simstep
     )  # waveform is generated according to sampling rate of AWG
 
-    wfd = getattr(wfl_dev, fluxlutman.cz_waveform_generator())(
+    wf_generator = getattr(
+        wfl_dev,
+        fluxlutman.get("cz_wf_generator_{}".format(which_gate))
+    )
+
+    wfd = wf_generator(
         fluxlutman=fluxlutman,
         sim_ctrl_cz=sim_control_CZ,
     )

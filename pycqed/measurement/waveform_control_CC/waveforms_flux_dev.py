@@ -27,6 +27,9 @@ def vcz_dev_waveform(
 
     amp_at_sweetspot = 0.0
 
+    if which_gate is None and sim_ctrl_cz is not None:
+        which_gate = sim_ctrl_cz.which_gate()
+
     amp_at_int_11_02 = fluxlutman.get("czv_amp_dac_at_11_02_{}".format(which_gate))
 
     sampling_rate = fluxlutman.sampling_rate()
@@ -269,12 +272,14 @@ def vcz_dev_waveform(
 
 def vcz_simplified_waveform(
     fluxlutman,
-    which_gate: str,
+    which_gate: str = None,
     sim_ctrl_cz=None,
     return_dict=False
 ):
 
     amp_at_sweetspot = 0.0
+    if which_gate is None and sim_ctrl_cz is not None:
+        which_gate = sim_ctrl_cz.which_gate()
 
     amp_at_int_11_02 = fluxlutman.get("vcz_amp_dac_at_11_02_{}".format(which_gate))
 
@@ -297,6 +302,9 @@ def vcz_simplified_waveform(
     amp_q_ph_corr = fluxlutman.get("vcz_amp_q_ph_corr_{}".format(which_gate))
 
     correct_q_phase = fluxlutman.get("vcz_correct_q_phase_{}".format(which_gate))
+    # In case we might want to play only with the pulse length and/or the
+    # time in the middle
+    use_amp_fine = fluxlutman.get("vcz_use_amp_fine_{}".format(which_gate))
 
     # This is to avoid numerical issues when the user would run sweeps with
     # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
@@ -306,8 +314,11 @@ def vcz_simplified_waveform(
     time_sqr = np.round(time_sqr / dt) * dt
     half_time_q_ph_corr = np.round(time_q_ph_corr / 2 / dt) * dt
 
-    # such that this amp is in the range [0, 1]
-    slope_amp = np.array([norm_amp_fine * norm_amp_sq])
+    if use_amp_fine:
+        # such that this amp is in the range [0, 1]
+        slope_amp = np.array([norm_amp_fine * norm_amp_sq])
+    else:
+        slope_amp = np.array([])
 
     sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
     amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)

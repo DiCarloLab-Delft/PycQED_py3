@@ -647,7 +647,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "interaction point. NB: the units might be different for some "
                 "other AWG that is distinct from the HDAWG.",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 1.0),
+                vals=vals.Numbers(0.0, 10.0),
                 initial_value=0.5,
                 unit="a.u.",
                 label="Dac amp at the interaction point",
@@ -675,6 +675,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Fine tuning amp",
             )
             self.add_parameter(
+                "vcz_use_amp_fine_%s" % this_cz,
+                docstring="",
+                parameter_class=ManualParameter,
+                vals=vals.Bool(),
+                initial_value=True,
+                label="Add extra point with amplitude `vcz_amp_fine_XX`?",
+            )
+            self.add_parameter(
                 "vcz_amp_q_ph_corr_%s" % this_cz,
                 docstring="Amplitude at the squares of the NZ pulse for single "
                 "qubit phase correction.",
@@ -693,7 +701,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 unit="s",
                 label="Time phase correction",
             )
-
             self.add_parameter(
                 "vcz_correct_q_phase_%s" % this_cz,
                 docstring="",
@@ -1938,17 +1945,18 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 docstring="Noise and other parameters for CZ simulation.",
                 parameter_class=InstrumentRefParameter,
             )
-            self.add_parameter(
-                "step_response_%s" % this_cz,
-                initial_value=np.array([]),
-                label="Step response",
-                docstring=(
-                    "Stores the normalized flux line step response. "
-                    "Intended for use in cz simulations with noise."
-                ),
-                parameter_class=ManualParameter,
-                vals=vals.Arrays(),
-            )
+
+        self.add_parameter(
+            "step_response",
+            initial_value=np.array([]),
+            label="Step response",
+            docstring=(
+                "Stores the normalized flux line step response. "
+                "Intended for use in cz simulations with noise."
+            ),
+            parameter_class=ManualParameter,
+            vals=vals.Arrays(),
+        )
 
     def sim_CZ(self, fluxlutman_static, which_gate=None, qois="all"):
         """
@@ -2373,7 +2381,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             return [best_par_res], [best_mv_res]
 
     # Here for convenience, no need to be a method
-    def align_vcz_q_phase_corr_with(
+    def align_czv_q_phase_corr_with(
         self,
         this_which_gate: str,
         that_qubit: str,

@@ -175,13 +175,21 @@ class SimControlCZ_v2(Instrument):
             vals=vals.Strings(),
             initial_value="lambda qoi: np.log10((1 - qoi['avgatefid_compsubspace_pc']) * (1 - 0.5) + qoi['L1'] * 0.5)",
         )
-
+        # Was used to simulate the "refocusing pulses"
         self.add_parameter(
             "double_cz_pi_pulses",
             docstring="If set to 'no_pi_pulses' or 'with_pi_pulses' will simulate two sequential CZs with or without Pi pulses simulated as an ideal superoperator multiplication.",
             parameter_class=ManualParameter,
             vals=vals.Strings(),
             initial_value="",  # Use empty string to evaluate to false
+        )
+
+        self.add_parameter(
+            "optimize_const_amp",
+            docstring="If true constant amplitude points in the pulse will be 'absorbed' to make simulation much faster",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value=True,
         )
 
         # for ramsey/Rabi simulations
