@@ -16,7 +16,8 @@ import copy
 import lmfit
 from scipy.optimize import minimize
 from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr,\
-     gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
+     gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess, \
+     ExpDecayFunc, exp_dec_guess
 
 
 
@@ -1152,6 +1153,505 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
 
+class Single_qubit_parity_analysis(ba.BaseDataAnalysis):
+    """
+    """
+
+    def __init__(self,
+                 q_A: str,
+                 q_D: str,
+                 initial_states: list = None,
+                 t_start: str = None, t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, extract_only: bool = False,
+                 post_selection: bool = False,
+                 post_selec_thresholds: list = None,
+                 auto=True):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+
+        self.post_selection = post_selection
+        self.post_selec_thresholds = post_selec_thresholds
+        self.q_A = q_A
+        self.q_D = q_D
+        if initial_states is None:
+            initial_states = ['0', '1']
+        self.initial_states = initial_states
+        self.do_fitting = True
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+
+        # Assign data to qubit 
+        for i, value_name in enumerate(self.raw_data_dict['value_names']):
+            if self.q_A in value_name.decode():
+                raw_shots_A = self.raw_data_dict['data'][:,i+1]
+            if self.q_D in value_name.decode():
+                raw_shots_D = self.raw_data_dict['data'][:,i+1]
+        # raw_shots_D = A1.raw_data_dict['data'][:,1]
+        # raw_shots_A = A1.raw_data_dict['data'][:,2]
+
+        # Sort pre-measurement from shots
+        if self.post_selection == True:
+            pre_meas_D = raw_shots_D[0::2].copy()
+            pre_meas_A = raw_shots_A[0::2].copy()
+            shots_D = raw_shots_D[1::2].copy()
+            shots_A = raw_shots_A[1::2].copy()
+        else:
+            shots_D = raw_shots_D[:].copy()
+            shots_A = raw_shots_A[:].copy()
+
+        # Sort 0 and 1 shots
+        shots_D_0 = shots_D[0::2]
+        shots_D_1 = shots_D[1::2]
+        shots_A_0 = shots_A[0::2]
+        shots_A_1 = shots_A[1::2]
+        if self.post_selection == True:
+            pre_meas_D_0 = pre_meas_D[0::2]
+            pre_meas_D_1 = pre_meas_D[1::2]
+            pre_meas_A_0 = pre_meas_A[0::2]
+            pre_meas_A_1 = pre_meas_A[1::2]
+
+        # Post_selection
+        if self.post_selection == True:
+            threshold_D = self.post_selec_thresholds[0] #6.5
+            threshold_A = self.post_selec_thresholds[1] #2.5
+
+            post_select_idxs_D_0 = [i for i in range(len(pre_meas_D_0)) if pre_meas_D_0[i]>threshold_D ]
+            post_select_idxs_A_0 = [i for i in range(len(pre_meas_A_0)) if pre_meas_A_0[i]>threshold_A ]
+            post_select_idxs_0 = np.unique(post_select_idxs_D_0+post_select_idxs_A_0)
+            shots_D_0[post_select_idxs_0] = np.nan # signal post-selection
+            shots_A_0[post_select_idxs_0] = np.nan #
+            shots_D_0 = shots_D_0[~np.isnan(shots_D_0)]
+            shots_A_0 = shots_A_0[~np.isnan(shots_A_0)]
+
+            post_select_idxs_D_1 = [i for i in range(len(pre_meas_D_1)) if pre_meas_D_1[i]>threshold_D ]
+            post_select_idxs_A_1 = [i for i in range(len(pre_meas_A_1)) if pre_meas_A_1[i]>threshold_A ]
+            post_select_idxs_1 = np.unique(post_select_idxs_D_1+post_select_idxs_A_1)
+            shots_D_1[post_select_idxs_1] = np.nan # signal post-selection
+            shots_A_1[post_select_idxs_1] = np.nan #
+            shots_D_1 = shots_D_1[~np.isnan(shots_D_1)]
+            shots_A_1 = shots_A_1[~np.isnan(shots_A_1)]
+
+        self.proc_data_dict['shots_D_0'] = shots_D_0
+        self.proc_data_dict['shots_D_1'] = shots_D_1
+        self.proc_data_dict['shots_A_0'] = shots_A_0
+        self.proc_data_dict['shots_A_1'] = shots_A_1
+
+        ####################
+        # Histogram data
+        ####################
+        hist_range_D = (np.amin(raw_shots_D), np.amax(raw_shots_D))
+        hist_range_A = (np.amin(raw_shots_A), np.amax(raw_shots_A))
+        counts_D_0, bin_edges_D = np.histogram(shots_D_0, bins=100, range=hist_range_D)
+        counts_D_1, bin_edges_D = np.histogram(shots_D_1, bins=100, range=hist_range_D)
+        counts_A_0, bin_edges_A = np.histogram(shots_A_0, bins=100, range=hist_range_A)
+        counts_A_1, bin_edges_A = np.histogram(shots_A_1, bins=100, range=hist_range_A)
+
+        bin_centers_A = (bin_edges_A[1:] + bin_edges_A[:-1])/2
+
+        self.proc_data_dict['PDF_data'] = {}
+        self.proc_data_dict['PDF_data']['bins'] = bin_centers_A
+        self.proc_data_dict['PDF_data']['counts_0'] = counts_A_0
+        self.proc_data_dict['PDF_data']['counts_1'] = counts_A_1
+
+        ####################
+        # Cumsum data 
+        ####################
+        # bin data according to unique bins
+        ubins_A_0, ucounts_A_0 = np.unique(shots_A_0, return_counts=True)
+        ubins_A_1, ucounts_A_1 = np.unique(shots_A_1, return_counts=True)
+        ucumsum_A_0 = np.cumsum(ucounts_A_0)
+        ucumsum_A_1 = np.cumsum(ucounts_A_1)
+        # merge |0> and |1> shot bins
+        all_bins_A = np.unique(np.sort(np.concatenate((ubins_A_0, ubins_A_1))))
+        # interpolate cumsum for all bins
+        int_cumsum_A_0 = np.interp(x=all_bins_A, xp=ubins_A_0, fp=ucumsum_A_0, left=0)
+        int_cumsum_A_1 = np.interp(x=all_bins_A, xp=ubins_A_1, fp=ucumsum_A_1, left=0)
+        norm_cumsum_A_0 = int_cumsum_A_0/np.max(int_cumsum_A_0)
+        norm_cumsum_A_1 = int_cumsum_A_1/np.max(int_cumsum_A_1)
+        # Calculating threshold
+        F_vs_th = (1-(1-abs(norm_cumsum_A_0-norm_cumsum_A_1))/2)
+        opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
+        opt_idx = int(round(np.average(opt_idxs)))
+
+        self.proc_data_dict['CDF_data'] = {}
+        self.proc_data_dict['CDF_data']['bins'] = all_bins_A
+        self.proc_data_dict['CDF_data']['counts_0'] = norm_cumsum_A_0
+        self.proc_data_dict['CDF_data']['counts_1'] = norm_cumsum_A_1
+
+        self.proc_data_dict['F_assignment_raw'] = F_vs_th[opt_idx]
+        self.proc_data_dict['threshold_raw'] = all_bins_A[opt_idx]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+
+        ###################################
+        # Histograms fit (PDF)
+        ###################################
+        bin_x = self.proc_data_dict['PDF_data']['bins']
+        bin_xs = [bin_x, bin_x]
+        bin_ys = [self.proc_data_dict['PDF_data']['counts_0'],
+                  self.proc_data_dict['PDF_data']['counts_1']]
+        m = lmfit.model.Model(ro_gauss)
+        m.guess = ro_double_gauss_guess.__get__(m, m.__class__)
+        params = m.guess(x=bin_xs, data=bin_ys,
+                 fixed_p01=self.options_dict.get('fixed_p01', False),
+                 fixed_p10=self.options_dict.get('fixed_p10', False))
+        res = m.fit(x=bin_xs, data=bin_ys, params=params)
+        self.fit_dicts['PDF_fit'] = {
+            'model': m,
+            'fit_xvals': {'x': bin_xs},
+            'fit_yvals': {'data': bin_ys},
+            'guessfn_pars':
+                {'fixed_p01': self.options_dict.get('fixed_p01', False),
+                 'fixed_p10': self.options_dict.get('fixed_p10', False)},
+        }
+        ###################################
+        #  Fit the CDF                    #
+        ###################################
+        m_cul = lmfit.model.Model(ro_CDF)
+        cdf_xs = self.proc_data_dict['CDF_data']['bins']
+        cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
+        cdf_ys = [self.proc_data_dict['CDF_data']['counts_0'],
+                  self.proc_data_dict['CDF_data']['counts_1']]
+
+        cum_params = res.params
+        cum_params['A_amplitude'].value = np.max(cdf_ys[0])
+        cum_params['A_amplitude'].vary = False
+        cum_params['B_amplitude'].value = np.max(cdf_ys[1])
+        cum_params['A_amplitude'].vary = False # FIXME: check if correct
+        self.fit_dicts['CDF_fit'] = {
+            'model': m_cul,
+            'fit_xvals': {'x': cdf_xs},
+            'fit_yvals': {'data': cdf_ys},
+            'guess_pars': cum_params,
+        }
+
+    def analyze_fit_results(self):
+        '''
+        This code was taken from single shot readout analysis and adapted to
+        mux readout (April 2020).
+        '''
+        self.proc_data_dict['quantities_of_interest'] = {}
+        self.qoi = {}
+        
+        # Create a CDF based on the fit functions of both fits.
+        fr = self.fit_res['CDF_fit']
+        bv = fr.best_values
+        # best values new
+        bvn = copy.deepcopy(bv)
+        bvn['A_amplitude'] = 1
+        bvn['B_amplitude'] = 1
+        def CDF(x):
+            return ro_CDF(x=x, **bvn)
+        def CDF_0(x):
+            return CDF(x=[x, x])[0]
+        def CDF_1(x):
+            return CDF(x=[x, x])[1]
+        def infid_vs_th(x):
+            cdf = ro_CDF(x=[x, x], **bvn)
+            return (1-np.abs(cdf[0] - cdf[1]))/2
+        self._CDF_0 = CDF_0
+        self._CDF_1 = CDF_1
+        self._infid_vs_th = infid_vs_th
+        thr_guess = (3*bv['B_center'] - bv['A_center'])/2
+        opt_fid = minimize(infid_vs_th, thr_guess)
+        # for some reason the fit sometimes returns a list of values
+        if isinstance(opt_fid['fun'], float):
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])
+        else:
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])[0]
+        self.proc_data_dict['threshold_fit'] = opt_fid['x'][0]
+
+        ###########################################
+        #  Extracting the discrimination fidelity #
+        ###########################################
+        # No post-selection
+        def CDF_0_discr(x):
+            return gaussianCDF(x, amplitude=1,
+                               mu=bv['A_center'], sigma=bv['A_sigma'])
+        def CDF_1_discr(x):
+            return gaussianCDF(x, amplitude=1,
+                               mu=bv['B_center'], sigma=bv['B_sigma'])
+        def disc_infid_vs_th(x):
+            cdf0 = gaussianCDF(x, amplitude=1, mu=bv['A_center'],
+                               sigma=bv['A_sigma'])
+            cdf1 = gaussianCDF(x, amplitude=1, mu=bv['B_center'],
+                               sigma=bv['B_sigma'])
+            return (1-np.abs(cdf0 - cdf1))/2
+        self._CDF_0_discr = CDF_0_discr
+        self._CDF_1_discr = CDF_1_discr
+        self._disc_infid_vs_th = disc_infid_vs_th
+        opt_fid_discr = minimize(disc_infid_vs_th, thr_guess)
+        # for some reason the fit sometimes returns a list of values
+        if isinstance(opt_fid_discr['fun'], float):
+            self.proc_data_dict['F_discr'] = (1-opt_fid_discr['fun'])
+        else:
+            self.proc_data_dict['F_discr'] = (1-opt_fid_discr['fun'])[0]
+        self.proc_data_dict['threshold_discr'] = opt_fid_discr['x'][0]
+        fr = self.fit_res['PDF_fit']
+        bv = fr.params
+        A_amp = bv['A_spurious'].value
+        A_sig = bv['A_sigma'].value
+        B_amp = bv['B_spurious'].value
+        B_sig = bv['B_sigma'].value
+        residual_excitation = A_amp*B_sig/((1-A_amp)*A_sig + A_amp*B_sig)
+        relaxation_events = B_amp*A_sig/((1-B_amp)*B_sig + B_amp*A_sig)
+        self.proc_data_dict['residual_excitation'] = residual_excitation
+        self.proc_data_dict['relaxation_events'] = relaxation_events
+
+        ###################################
+        #  Save quantities of interest.   #
+        ###################################
+        self.proc_data_dict['quantities_of_interest'] = {
+            'SNR': self.fit_res['CDF_fit'].params['SNR'].value,
+            'F_d': self.proc_data_dict['F_discr'],
+            'F_a': self.proc_data_dict['F_assignment_raw'],
+            'residual_excitation': self.proc_data_dict['residual_excitation'],
+            'relaxation_events': self.proc_data_dict['relaxation_events'],
+            'threshold_raw': self.proc_data_dict['threshold_raw'],
+            'threshold_discr': self.proc_data_dict['threshold_discr']
+        }
+        self.qoi = self.proc_data_dict['quantities_of_interest']
+        
+    def prepare_plots(self):
+
+        self.axs_dict = {}
+
+        fig, axs = plt.subplots(figsize=(7,5), dpi=200)
+        fig.patch.set_alpha(0)
+        self.axs_dict['Parity_check_{}'.format(self.q_A)]=axs
+        self.figs['Parity_check_{}'.format(self.q_A)] = fig
+        self.plot_dicts['Parity_check_hist'.format(self.q_A)]={
+            'plotfn': plot_single_parity_histogram,
+            'qubit_label_A': self.q_A,
+            'ax_id': 'Parity_check_{}'.format(self.q_A),
+            'para_hist' :  self.fit_res['PDF_fit'].best_values,
+            'Histogram_data': [self.proc_data_dict['PDF_data']['bins'], 
+                               self.proc_data_dict['PDF_data']['counts_0'], 
+                               self.proc_data_dict['PDF_data']['counts_1']],
+            'threshold':  self.proc_data_dict['threshold_raw'],
+            'timestamp': self.timestamp,
+            'qoi': self.qoi,
+            'initial_states': self.initial_states
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+class RTE_analysis(ba.BaseDataAnalysis):
+    """
+    """
+
+    def __init__(self,
+                 nr_measurements: int,
+                 cycles: int,
+                 shots_per_measurement: int,
+                 thresholds: list,
+                 initial_states: list = ['0', '1'],
+                 t_start: str = None, t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, extract_only: bool = False,
+                 auto=True):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+
+        self.nr_measurements = nr_measurements
+        self.cycles = cycles
+        self.shots_per_measurement = shots_per_measurement
+        self.initial_states = initial_states
+        self.thresholds = thresholds
+        self.do_fitting = True
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+
+        self.Channels = [ ch.decode() for ch in self.raw_data_dict['value_names'] ]
+        nr_states = len(self.initial_states)
+        
+        # self.proc_data_dict = { ch.decode() for ch in self.raw_data_dict['value_names']}
+
+        for q, ch in enumerate(self.Channels):
+            self.proc_data_dict[ch] = {}
+            
+            for j, state in enumerate(self.initial_states):
+                Fails = []
+                successful_runs = 0
+                mean_RTE = 0
+                self.proc_data_dict[ch][state] = {}
+
+                for i in range(self.shots_per_measurement):
+                    # Extract shots from single experiment
+                    raw_shots = self.raw_data_dict['data']\
+                        [i*self.nr_measurements*nr_states:(i+1)*self.nr_measurements*nr_states, q+1]\
+                        [self.nr_measurements*j:self.nr_measurements*j+self.cycles]
+                    # Digitize data
+                    shots = np.array([0 if s < self.thresholds[q] else 1 for s in raw_shots])
+                    if state is '0':
+                        shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining 
+                        # Detect errors
+                        error = shots_f[1:]-shots_f[:-1]
+
+                    elif state is '1':
+                        shots_f = (shots+1)%2
+                        shots_f = np.pad(shots_f, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining 
+                        # Detect errors
+                        error = shots_f[1:]-shots_f[:-1]
+
+                    elif state is 'pi':
+                        shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
+                        # Detect errors
+                        error = shots_f[:-1]+shots_f[1:]-1
+                        error[1:] *= np.array([error[i+1]*(error[i+1]-2*error[i]) for i in range(len(error)-1)])
+
+                    # Separating discrimination errors from qubit flips  
+                    measr = error[1:]-error[:-1]
+                    measr = np.array([0 if abs(s) < 2 else int(s/2) for s in measr])
+                    flipr = error.copy()
+                    flipr[1:]  -= measr 
+                    flipr[:-1] += measr
+                    
+                    # count errors
+                    nr_errors = np.sum(abs(error))
+                    # Get RTE
+                    RTE = next((i+1 for i, x in enumerate(error) if x), None) # All errors
+                    # RTE = next((i+1 for i, x in enumerate(measr) if x), None) # Errors due to misdiagnosis
+                    # RTE = next((i+1 for i, x in enumerate(flipr) if x), None) # Errors due to flips
+                    
+                    if RTE is None:
+                        successful_runs += 1/self.shots_per_measurement
+                        RTE = self.cycles+1
+                    Fails.append(RTE)
+
+                    # record mean RTE and avg error
+                    mean_RTE += RTE/self.shots_per_measurement
+                    # avgerror += nr_errors/self.shots_per_measurement
+                
+                counts, bin_edges = np.histogram(Fails, bins=self.cycles, range=(.5, self.cycles+.5), density=False)
+                bin_centers = (bin_edges[1:] + bin_edges[:-1])/2
+                
+                self.proc_data_dict[ch][state]['counts'] = counts/self.shots_per_measurement
+                self.proc_data_dict[ch]['bins'] = bin_centers
+                self.proc_data_dict[ch][state]['success'] = successful_runs
+                self.proc_data_dict[ch][state]['RTE'] = mean_RTE
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+
+        ###################################
+        # Histograms fit (PDF)
+        ###################################
+        for ch in self.Channels:
+            # self.fit_dicts[ch] = {}
+            for state in self.initial_states:
+                bin_x = self.proc_data_dict[ch]['bins'][1:]
+                bin_y = self.proc_data_dict[ch][state]['counts'][1:]
+                
+                m = lmfit.model.Model(ExpDecayFunc)
+                m.guess = exp_dec_guess.__get__(m, m.__class__)
+                params = m.guess(data=bin_y, t=bin_x, vary_off=False)
+                res = m.fit(t=bin_x, data=bin_y, params=params, vary_off=False)
+                self.fit_dicts['exp_fit_{}_{}'.format(ch, state)] = {
+                    'model': m,
+                    'fit_xvals': {'t': bin_x},
+                    'fit_yvals': {'data': bin_y},
+                    'guessfn_pars':{'vary_off': False}
+                }
+    
+    def analyze_fit_results(self):
+        for ch in self.Channels:
+            for state in self.initial_states:
+                fr = self.fit_res['exp_fit_{}_{}'.format(ch, state)]
+                self.proc_data_dict[ch][state]['fit_par'] = fr.best_values 
+
+    def prepare_plots(self):
+
+        self.axs_dict = {}
+
+        for i, ch in enumerate(self.Channels):
+            
+            fig, axs = plt.subplots(figsize=(7,3), dpi=200)
+            fig.patch.set_alpha(0)
+            self.axs_dict['RTE_{}'.format(ch)]=axs
+            self.figs['RTE_{}'.format(ch)] = fig
+            self.plot_dicts['RTE_{}'.format(ch)]={
+                'plotfn': plot_RTE_histogram,
+                'qubit_label': 'qubit {}'.format(i),
+                'ax_id': 'RTE_{}'.format(ch),
+                'initial_states' : self.initial_states,
+                'bin_centers': self.proc_data_dict[ch]['bins'],
+                'counts': [self.proc_data_dict[ch][state]['counts'] for state in self.initial_states],
+                'params': [self.proc_data_dict[ch][state]['fit_par'] for state in self.initial_states],
+                'success': [self.proc_data_dict[ch][state]['success'] for state in self.initial_states],
+                'RTE': [self.proc_data_dict[ch][state]['RTE'] for state in self.initial_states]
+            }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+
+######################################
+# Plotting functions
+######################################
+
+
 def calc_assignment_prob_matrix(combinations, digitized_data):
 
     assignment_prob_matrix = np.zeros((len(combinations), len(combinations)))
@@ -1660,7 +2160,108 @@ def plot_mux_transients_optimal(Time,
 
     fig.tight_layout()
 
+def plot_single_parity_histogram(Histogram_data: list,
+                                 para_hist: dict, 
+                                 threshold: float,
+                                 qubit_label_A: str,
+                                 qoi: dict,
+                                 timestamp: str,
+                                 initial_states: str,
+                                 ax, **kw):
+    fig = ax.get_figure()
+    
+    bin_centers = Histogram_data[0]
+    counts_0 = Histogram_data[1]
+    counts_1 = Histogram_data[2]
 
+    ax.bar(bin_centers, counts_0,
+           width=bin_centers[1]-bin_centers[0],
+           label=r'$|{}\rangle_{}$ shots'.format(initial_states[0], 'D'),
+           color='C0', edgecolor='C0', alpha=.4)
+    ax.bar(bin_centers, counts_1,
+           width=bin_centers[1]-bin_centers[0],\
+           label=r'$|{}\rangle_{}$ shots'.format(initial_states[1], 'D'),
+           color='C3', edgecolor='C3', alpha=.3)
+
+    x = np.linspace(bin_centers[0], bin_centers[-1], 150)
+
+    ro_g = ro_gauss(x=[x, x], **para_hist)
+    ax.plot(x, ro_g[0], color='C0', 
+        label=r'$|{}\rangle_{}$ fit'.format(initial_states[0], 'D'))
+    ax.plot(x, ro_g[1], color='C3', 
+        label=r'$|{}\rangle_{}$ fit'.format(initial_states[1], 'D'))
+    # Plot Threshold
+    ax.axvline(x=threshold, label=r'$\mathrm{threshold}$',
+               ls='--', linewidth=1., color='black', alpha=.5)
+
+    ax.set_xlim(left=bin_centers[0], right=bin_centers[-1])
+    ax.set_xlabel('Effective voltage (V)')
+    ax.set_ylabel('Counts')
+    ax.set_title('Histogram of shots "'+qubit_label_A+'"')
+    ax.legend(loc=0, fontsize=10)
+
+    textstr = '\n'.join((
+            r'SNR    :       %.2f' % \
+                (qoi['SNR'], ),
+            r'$F_{assign}$  :    %.2f%%' %\
+                (qoi['F_a']*1e2, ),
+            r'$F_{discr}$    :    %.2f%%' % \
+                (qoi['F_d']*1e2, ), '\n'
+            r'p(e|${}_D$)  :    %.2f%%'.format(initial_states[0]) % \
+                (qoi['residual_excitation']*1e2, ),
+            r'p(g|${}_D$)  :    %.2f%%'.format(initial_states[1]) % \
+                (qoi['relaxation_events']*1e2, )))
+    props = dict(boxstyle='round', facecolor='whitesmoke', alpha=1)
+    ax.text(1.025, .95, textstr, transform=ax.transAxes, fontsize= 15,
+           verticalalignment='top', bbox=props)
+
+    fig.suptitle('{} Qubit {} parity check'.format(timestamp, qubit_label_A),
+                 y=1.05, fontsize=16)
+
+def plot_RTE_histogram(qubit_label: str,
+                       initial_states: list,
+                       bin_centers, counts,
+                       params, success, RTE,
+                       ax = None, **kw):
+
+    for state in initial_states:
+        # bin_centers = A.proc_data_dict[ch][state]['bins']
+        # counts = A.proc_data_dict[ch][state]['counts']/shots_per_measurement
+        # params = A.proc_data_dict[ch][state]['fit params']
+        # success = A.proc_data_dict[ch][state]['success']
+        # RTE = A.proc_data_dict[ch][state]['RTE']
+
+        if '0' in state:    
+            ax.plot(bin_centers, ExpDecayFunc(bin_centers, **params[0]), 'C0', linewidth=1, alpha=.5)
+            res_exc = counts[0][0] - ExpDecayFunc(1, **params[0])
+            ax.plot(bin_centers, counts[0], 'C0v', markersize=4, label=r'prep $|0\rangle$')
+            
+        elif '1' in state:
+            ax.plot(bin_centers, ExpDecayFunc(bin_centers, **params[1]), 'C3', linewidth=1, alpha=.5)
+            ax.plot(bin_centers, counts[1], 'C3^', markersize=4, label=r'prep $|1\rangle$')
+
+    ax.set_yscale('log')
+    set_xlabel(ax, 'cycle number')
+    set_ylabel(ax, 'Error fraction')
+    ax.set_title('Qubit {} shots'.format(qubit_label))
+    ax.set_xlim(-2, len(bin_centers)+2)
+        
+    S = []
+    for i, state in enumerate(initial_states):
+        textstr = [r'$|{}\rangle$ successfull runs {:.2f}%'.format(state, success[i]*100)+'\n', 
+                   r'$|{}\rangle$ avg RTE {:.2f}'.format(state, RTE[i])+'\n',
+                   r'$\tau_{}$={:.2f} cycles'.format(state, params[i]['tau'])+'\n']
+        S.append(textstr)
+    S.append(['\n', '\n', '\nresidual exc : {:.2f}%'.format(res_exc*100)])
+    textstr = ''.join([val for pair in zip(*S) for val in pair])
+    props = dict(boxstyle='round', facecolor='whitesmoke', alpha=1)
+    ax.text(1.05, .98, textstr, transform=ax.transAxes, fontsize= 10,
+           verticalalignment='top', bbox=props)
+
+    ax.legend()
+    fig = ax.get_figure()
+    # fig.suptitle('Measurement time {} ns'.format(500), y=1.05)
+    fig.tight_layout()
 
 
 
