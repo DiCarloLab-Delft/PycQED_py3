@@ -1997,12 +1997,13 @@ class DeviceCCL(Instrument):
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
                                                      nr_qubits=len(qubits),
                                                      q_target = q_target)
+            q_ch = [ch for ch in a.Channels if q_target in ch.decode()][0]
             # Set thresholds
             for i, qubit in enumerate(qubits):
                 label = a.raw_data_dict['value_names'][i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
-            return a.qoi[a.Channels[np.where(q_target in qubits)[0][0]]]
+            return a.qoi[q_ch]
 
     def measure_transients(self,
                            qubits: list,
@@ -2259,6 +2260,7 @@ class DeviceCCL(Instrument):
         lengths=np.arange(5e-9, 51e-9, 5e-9),
         adaptive_sampling=False,
         adaptive_sampling_pts=None,
+        adaptive_pars: dict = None,
         prepare_for_timedomain=True,
         MC=None,
         freq_tone=6e9,
@@ -2428,7 +2430,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function_2D(sw)
         MC.set_detector_function(d)
 
-        label = "Chevron {} {}".format(q0, q_spec)
+        label = "Chevron {} {} {}".format(q0, q_spec, target_qubit_sequence)
 
         if not adaptive_sampling:
             MC.set_sweep_points(amps)
@@ -2436,13 +2438,13 @@ class DeviceCCL(Instrument):
             MC.run(label, mode="2D")
             ma.TwoD_Analysis()
         else:
-            MC.set_adaptive_function_parameters(
-                {
+            if adaptive_pars is None:
+                adaptive_pars = {
                     "adaptive_function": adaptive.Learner2D,
                     "goal": lambda l: l.npoints > adaptive_sampling_pts,
                     "bounds": (amps, lengths),
                 }
-            )
+            MC.set_adaptive_function_parameters(adaptive_pars)
             MC.run(label + " adaptive", mode="adaptive")
             ma2.Basic2DInterpolatedAnalysis()
 
