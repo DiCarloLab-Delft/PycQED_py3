@@ -2406,8 +2406,20 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             )
             log.error(msg)
             if not allow_any_comb:
-                log.error("Aborting copying parameters!")
-                return
+                raise Exception("Aborting copying parameters!")
+
+        that_gen_par_name = "cz_wf_generator_{}".format(that_which_gate)
+        this_gen_par_name = "cz_wf_generator_{}".format(this_which_gate)
+
+        that_wf_generator_name = that_flux_lm.get(that_gen_par_name)
+        this_wf_generator_name = self.get(this_gen_par_name)
+        if this_wf_generator_name != that_wf_generator_name:
+            raise Exception("Both waveform generators must be the same!")
+
+        this_f_is_for = "vcz_dev_waveform"
+        if that_wf_generator_name != this_f_is_for:
+            raise Exception("This alignment work only with `" + this_f_is_for + "` waveform generator! "
+                "Check `{}` and see also `align_vcz_q_phase_corr_with`".format(that_gen_par_name))
 
         par_names = {
             "czv_time_at_sweetspot_{}",
@@ -2438,6 +2450,72 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             self.plot_cz_waveforms(
                 [self.name.split("_")[-1], that_qubit],
                 [this_which_gate, that_which_gate]
+            )
+
+    # Here for convenience, no need to be a method
+    def align_vcz_q_phase_corr_with(
+        self,
+        this_which_gate: str,
+        that_qubit: str,
+        that_which_gate: str,
+        allow_any_comb: bool = False,
+        plot_waveforms: bool = True,
+        **plt_kw
+    ):
+        """
+        Copies all the relevant parameters from the other flux_lm such
+        that the beginning of the corrections match on both. By coping all the
+        parameters of the waveform we ensure that the waveform will be generated in
+        the exact way regarding timing at the individual sample points level.
+        """
+        that_flux_lm = self.find_instrument("flux_lm_{}".format(that_qubit))
+
+        opt_1 = (this_which_gate == "NE") and (that_which_gate == "SW")
+        opt_2 = (this_which_gate == "NW") and (that_which_gate == "SE")
+        if not (opt_1 or opt_2):
+            # To avoid stupid mistakes
+            msg = "Are you sure you wanted to match `{} {}` with `{} {}`?".format(
+                self.name, this_which_gate, that_flux_lm.name, that_which_gate
+            )
+            log.error(msg)
+            if not allow_any_comb:
+                raise Exception("Aborting copying parameters!")
+
+        that_gen_par_name = "cz_wf_generator_{}".format(that_which_gate)
+        this_gen_par_name = "cz_wf_generator_{}".format(this_which_gate)
+
+        that_wf_generator_name = that_flux_lm.get(that_gen_par_name)
+        this_wf_generator_name = self.get(this_gen_par_name)
+        if this_wf_generator_name != that_wf_generator_name:
+            raise Exception("Both waveform generators must be the same!")
+
+        this_f_is_for = "vcz_simplified_waveform"
+        if that_wf_generator_name != this_f_is_for:
+            raise Exception("This alignment work only with `" + this_f_is_for + "` waveform generator! "
+                "Check `{}` and see also `align_vcz_q_phase_corr_with`".format(that_gen_par_name))
+
+        par_names = {
+            "vcz_time_middle_{}",
+            "vcz_time_single_sq_{}",
+            "vcz_time_before_q_ph_corr_{}",
+            "vcz_use_amp_fine_{}"
+        }
+        # Copy all relevant parameters
+        for par_name in par_names:
+            par_val = that_flux_lm.get(par_name.format(that_which_gate))
+            self.set(par_name.format(this_which_gate), par_val)
+
+        # It is assumed `self` is the low freq. qubit
+        self.set("vcz_amp_sq_{}".format(this_which_gate), 0)
+
+        for flux_lm in [self, that_flux_lm]:
+            flux_lm.generate_standard_waveforms()
+
+        if plot_waveforms:
+            self.plot_cz_waveforms(
+                [self.name.split("_")[-1], that_qubit],
+                [this_which_gate, that_which_gate],
+                **plt_kw
             )
 
 
