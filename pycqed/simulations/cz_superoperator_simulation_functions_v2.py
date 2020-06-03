@@ -936,67 +936,37 @@ def distort_amplitude(fitted_stepresponse_ty, amp, tlist_new, sim_step_new):
 def shift_due_to_fluxbias_q0(
     fluxlutman, amp_final, fluxbias_q0, sim_control_CZ, which_gate: str = "NE"
 ):
-
-    if not fluxlutman.get("czd_double_sided_{}".format(which_gate)):
-        omega_0 = compute_sweetspot_frequency(
+    omega_0 = compute_sweetspot_frequency(
             [1, 0, 0], sim_control_CZ.w_q0_sweetspot()
         )
 
-        f_pulse = fluxlutman.calc_amp_to_freq(amp_final, "01", which_gate=which_gate)
-        f_pulse = np.clip(
-            f_pulse, a_min=None, a_max=omega_0
-        )  # necessary otherwise the sqrt below gives nan
+    f_pulse = fluxlutman.calc_amp_to_freq(amp_final, "01", which_gate=which_gate)
+    f_pulse = np.clip(
+        f_pulse, a_min=None, a_max=omega_0
+    )  # necessary otherwise the sqrt below gives nan
 
-        # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
-        f_pulse_final = shift_due_to_fluxbias_q0_singlefrequency(
-            f_pulse=f_pulse, omega_0=omega_0, fluxbias=fluxbias_q0, positive_branch=True
+    amp_final_new = []
+
+    for i in range(len(amp_final)):
+        amp = amp_final[i]
+
+        if amp >= 0:
+            positive_branch = True
+        else:
+            positive_branch = False
+
+        f_pulse_temp = shift_due_to_fluxbias_q0_singlefrequency(
+            f_pulse=f_pulse[i], omega_0=omega_0, fluxbias=fluxbias_q0, positive_branch=positive_branch
         )
-        f_pulse_final = np.clip(f_pulse_final, a_min=None, a_max=omega_0)
+        f_pulse_temp = np.clip(f_pulse_temp, a_min=None, a_max=omega_0)
 
-        amp_final = fluxlutman.calc_freq_to_amp(
-            f_pulse_final, state="01", which_gate=which_gate
-        )
-
-    else:
-        half_length = int(np.size(amp_final) / 2)
-        amp_A = amp_final[0:half_length]  # positive and negative parts
-        amp_B = amp_final[half_length:]
-
-        omega_0 = compute_sweetspot_frequency(
-            [1, 0, 0], sim_control_CZ.w_q0_sweetspot()
-        )
-
-        f_pulse_A = fluxlutman.calc_amp_to_freq(amp_A, "01", which_gate=which_gate)
-        f_pulse_A = np.clip(f_pulse_A, a_min=None, a_max=omega_0)
-
-        f_pulse_A = shift_due_to_fluxbias_q0_singlefrequency(
-            f_pulse=f_pulse_A,
-            omega_0=omega_0,
-            fluxbias=fluxbias_q0,
-            positive_branch=True,
-        )
-        f_pulse_A = np.clip(f_pulse_A, a_min=None, a_max=omega_0)
-        amp_A = fluxlutman.calc_freq_to_amp(
-            f_pulse_A, state="01", which_gate=which_gate
+        amp_final_temp = fluxlutman.calc_freq_to_amp(
+            f_pulse_temp, state="01", positive_branch=positive_branch, which_gate=which_gate
         )
 
-        f_pulse_B = fluxlutman.calc_amp_to_freq(amp_B, "01", which_gate=which_gate)
-        f_pulse_B = np.clip(f_pulse_B, a_min=None, a_max=omega_0)
+        amp_final_new.append(amp_final_temp)
 
-        f_pulse_B = shift_due_to_fluxbias_q0_singlefrequency(
-            f_pulse=f_pulse_B,
-            omega_0=omega_0,
-            fluxbias=fluxbias_q0,
-            positive_branch=False,
-        )
-        f_pulse_B = np.clip(f_pulse_B, a_min=None, a_max=omega_0)
-        amp_B = fluxlutman.calc_freq_to_amp(
-            f_pulse_B, state="01", positive_branch=False, which_gate=which_gate
-        )
-
-        amp_final = np.concatenate([amp_A, amp_B])
-
-    return amp_final
+    return np.array(amp_final_new)
 
 
 def return_jump_operators(
@@ -1031,12 +1001,8 @@ def return_jump_operators(
         sensitivity = calc_sensitivity(
             f_pulse_final, compute_sweetspot_frequency([1, 0, 0], omega_0)
         )
-        for i in range(len(sensitivity)):
-            if sensitivity[i] < 0.1:
-                sensitivity[i] = 0.1
-        inverse_sensitivity = 1 / sensitivity
-        T2_q0_vec = linear_with_offset(
-            inverse_sensitivity,
+        T2_q0_vec = 1/linear_with_offset(
+            sensitivity,
             T2_q0_amplitude_dependent[0],
             T2_q0_amplitude_dependent[1],
         )

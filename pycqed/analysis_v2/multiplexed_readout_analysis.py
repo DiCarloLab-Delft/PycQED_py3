@@ -1468,7 +1468,7 @@ class Single_qubit_parity_analysis(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
->>>>>>> origin/develop
+#>>>>>>> origin/develop
 class RTE_analysis(ba.BaseDataAnalysis):
     """
     """
