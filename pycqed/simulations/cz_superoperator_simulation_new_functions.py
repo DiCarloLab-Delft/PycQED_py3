@@ -890,7 +890,7 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
 def eval_freq_dep_t_phi_new(freq, freq_sweet, coeffs):
     freq = np.clip(freq, a_min=None, a_max=freq_sweet)
     sensitivity = get_flux_sensitivity(freq, freq_sweet)
-    sensitivity[sensitivity < 1e-3] = 1e-3
+    #sensitivity[sensitivity < 1e-3] = 1e-3
     deph_rate = linear_with_offset(sensitivity, coeffs)
     t_phi = 1 / deph_rate
     return t_phi
