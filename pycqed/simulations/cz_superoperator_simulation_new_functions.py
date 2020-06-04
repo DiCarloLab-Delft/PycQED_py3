@@ -52,7 +52,7 @@ def target_CZ():
 U_target = target_CZ()
 
 U_target_diffdims = target_CZ()     # otherwise average_gate_fidelity doesn't work
-U_target_diffdims.dims = [[n_levels_q0*n_levels_q1],[n_levels_q0*n_levels_q1]]
+#U_target_diffdims.dims = [[n_levels_q0*n_levels_q1],[n_levels_q0*n_levels_q1]]
 
 
 '''
@@ -948,7 +948,7 @@ def time_evolution_new(c_ops, noise_parameters_CZ, fluxlutman,
 
     #t0 = time.time()
 
-    normal_mode = False
+    normal_mode = True
 
     if normal_mode:
 
@@ -1902,7 +1902,7 @@ def average_population_transfer_subspace_to_subspace(U_superop,states_in,states_
         for indeces_list_out in states_out:
             state_out = basis_state(indeces_list_out[0],indeces_list_out[1])
 
-            sump += population_transfer(U_superop,state_in,state_out)
+            population_transfer(qtp.to_super(U_superop),state_in,state_out)
 
     sump/=len(states_in)
 
