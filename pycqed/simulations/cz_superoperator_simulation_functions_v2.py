@@ -1657,6 +1657,29 @@ def return_instrument_from_arglist(
     return fluxlutman, sim_control_CZ, fluxlutman_static
 
 
+def return_instrument_args_v2(instrument):
+
+    parameters = instrument.parameters
+
+    args = {}
+    for par in parameters.keys():
+        if par != 'cfg_awg_channel_range':
+            if par != 'cfg_awg_channel_amplitude':
+                args[par] = parameters[par].get()
+
+    return args
+
+
+def return_instrument_from_arglist_v2(instrument, args):
+    for key in args.keys():
+    	if key not in ['IDN', 'AWG', 'instr_distortion_kernel', 'instr_partner_lutman',
+    	'instr_sim_control_CZ_NE','instr_sim_control_CZ_NW','instr_sim_control_CZ_SW',
+    	'instr_sim_control_CZ_SE']:
+            attr = getattr(instrument, key)
+            attr(args[key])
+    return instrument
+
+
 def plot_spectrum(fluxlutman, fluxlutman_static, which_gate: str = "NE"):
     eig_vec = []
     amp_vec = np.arange(0, 1.5, 0.01)

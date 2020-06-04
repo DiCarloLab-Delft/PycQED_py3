@@ -42,9 +42,9 @@ def f_to_parallelize_v2(arglist):
         "sim_control_CZ_args"
     ]  # see function return_instrument_args in czf_v2
     number = arglist["number"]
-    adaptive_pars = arglist["adaptive_pars"]
+    additional_pars = arglist["additional_pars"]
     live_plot_enabled = arglist["live_plot_enabled"]
-    which_gate = arglist["which_gate"]
+    #which_gate = arglist["which_gate"]
 
     try:
         MC = Instrument.find_instrument("MC" + "{}".format(number))
@@ -62,16 +62,14 @@ def f_to_parallelize_v2(arglist):
     station.add_component(fluxlutman)
     fluxlutman_static = flm.HDAWG_Flux_LutMan("fluxlutman_static" + "{}".format(number))
     station.add_component(fluxlutman_static)
-    sim_control_CZ = scCZ_v2.SimControlCZ("sim_control_CZ" + "{}".format(number))
+    sim_control_CZ = scCZ_v2.SimControlCZ_v2("sim_control_CZ" + "{}".format(number))
     station.add_component(sim_control_CZ)
 
-    for key, val in fluxlutman_args.items():
-        fluxlutman.set(key, val)
-    for key, val in fluxlutman_static_args.items():
-        fluxlutman_static.set(key, val)
-    for key, val in sim_control_CZ_args.items():
-        sim_control_CZ.set(key, val)
+    fluxlutman = czf_v2.return_instrument_from_arglist_v2(fluxlutman, fluxlutman_args)
+    fluxlutman_static = czf_v2.return_instrument_from_arglist_v2(fluxlutman_static, fluxlutman_static_args)
+    sim_control_CZ = czf_v2.return_instrument_from_arglist_v2(sim_control_CZ, sim_control_CZ_args)
 
+    sim_control_CZ.set_cost_func()
     which_gate = sim_control_CZ.which_gate()
 
     d = Ramsey_experiment(
@@ -79,7 +77,7 @@ def f_to_parallelize_v2(arglist):
         fluxlutman_static=fluxlutman_static,
         sim_control_CZ=sim_control_CZ,
         fitted_stepresponse_ty=fitted_stepresponse_ty,
-        qois=adaptive_pars.get("qois", "all"),
+        qois="all",
     )
     MC.set_detector_function(d)
 
@@ -87,15 +85,15 @@ def f_to_parallelize_v2(arglist):
                      'sigma_q1': sim_control_CZ.sigma_q1(), 
                      'sigma_q0': sim_control_CZ.sigma_q0()}
 
-    if adaptive_pars["mode"] == "1D_ramsey":
-        MC.set_sweep_functions([fluxlutman["cz_length_{}".format(which_gate)]])
+    if additional_pars["mode"] == "1D_ramsey":
+        MC.set_sweep_functions([sim_control_CZ.scanning_time])
         MC.set_sweep_points(
-            np.arange(0, adaptive_pars['max_time'], adaptive_pars['time_step'])
+            np.arange(0, additional_pars['max_time'], additional_pars['time_step'])
         )
         if sim_control_CZ.cluster():
             dat = MC.run(
                 "1D ramsey_v2_cluster double sided {} - sigma_q0 {:.0f} - detuning {:.0f}".format(
-                    fluxlutman.czd_double_sided(),
+                    fluxlutman.get("czd_double_sided_{}".format(which_gate)),
                     sim_control_CZ.sigma_q0() * 1e6,
                     sim_control_CZ.detuning() / 1e6
                 ),
@@ -104,10 +102,10 @@ def f_to_parallelize_v2(arglist):
             )
 
         else:
-            if adaptive_pars["long_name"]:
+            if additional_pars["long_name"]:
                 dat = MC.run(
                     "1D ramsey_v2 double sided {} - sigma_q0 {:.0f} - detuning {:.0f}".format(
-                    fluxlutman.czd_double_sided(),
+                    fluxlutman.get("czd_double_sided_{}".format(which_gate)),
                     sim_control_CZ.sigma_q0() * 1e6,
                     sim_control_CZ.detuning() / 1e6
                 ),
@@ -138,7 +136,7 @@ def compute_propagator(arglist):
 
     which_gate = sim_control_CZ.which_gate()
 
-    sim_step = fluxlutman.get("cz_length_{}".format(which_gate))
+    sim_step = sim_control_CZ.get("scanning_time")
     subdivisions_of_simstep = 1
     sim_step_new = (
         sim_step / subdivisions_of_simstep
@@ -361,7 +359,7 @@ class Ramsey_experiment(det.Soft_Detector):
                 fluxlutman=self.fluxlutman,
                 fluxlutman_static=self.fluxlutman_static,
                 sim_control_CZ=self.sim_control_CZ,
-                which_gate=which_gate)
+                which_gate=self.sim_control_CZ.which_gate())
 
             quantities_of_interest = [qoi['population_higher_state'], qoi['population_lower_state']]
             qoi_vec=np.array(quantities_of_interest)
