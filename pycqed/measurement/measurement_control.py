@@ -52,7 +52,7 @@ class MeasurementControl(Instrument):
                  plotting_interval: float=3,
                  datadir: str=get_default_datadir(),
                  live_plot_enabled: bool=True, verbose: bool=True):
-        super().__init__(name=name, server_name=None)
+        super().__init__(name=name, name=None)
 
         self.add_parameter('datadir',
                            initial_value=datadir,
