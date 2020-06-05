@@ -209,6 +209,14 @@ class SimControlCZ_v2(Instrument):
             vals=vals.Strings(),
             initial_value="changeme",
         )
+        self.add_parameter(
+            "scanning_time",
+            unit="s",
+            docstring="time between the two pi/2 pulses",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=0,
+        )
 
         # for spectral tomo
 

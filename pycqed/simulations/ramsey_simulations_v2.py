@@ -8,8 +8,6 @@ from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ_v2 as s
 from pycqed.simulations import cz_superoperator_simulation_functions_v2 as czf_v2
 from pycqed.measurement.waveform_control_CC import waveforms_flux_dev as wfl_dev
 
-from pycqed.analysis_v2 import measurement_analysis as ma2
-
 import numpy as np
 from pycqed.measurement import detector_functions as det
 import matplotlib.pyplot as plt
@@ -44,10 +42,8 @@ def f_to_parallelize_v2(arglist):
         "sim_control_CZ_args"
     ]  # see function return_instrument_args in czf_v2
     number = arglist["number"]
-    adaptive_pars = arglist["adaptive_pars"]
     additional_pars = arglist["additional_pars"]
     live_plot_enabled = arglist["live_plot_enabled"]
-    exp_metadata = arglist["exp_metadata"]
     #which_gate = arglist["which_gate"]
 
     try:
@@ -76,77 +72,50 @@ def f_to_parallelize_v2(arglist):
     sim_control_CZ.set_cost_func()
     which_gate = sim_control_CZ.which_gate()
 
-    d = CZ_trajectory_superoperator(
+    d = Ramsey_experiment(
         fluxlutman=fluxlutman,
         fluxlutman_static=fluxlutman_static,
         sim_control_CZ=sim_control_CZ,
         fitted_stepresponse_ty=fitted_stepresponse_ty,
-        qois=additional_pars['qois'],
+        qois="all",
     )
     MC.set_detector_function(d)
 
-    if exp_metadata["mode"] == "adaptive":
-        MC.set_sweep_functions(
-            [
-                getattr(fluxlutman, "vcz_amp_sq_{}".format(which_gate)),
-                getattr(fluxlutman, "vcz_amp_fine_{}".format(which_gate)),
-            ]
+    exp_metadata = {'detuning': sim_control_CZ.detuning(), 
+                     'sigma_q1': sim_control_CZ.sigma_q1(), 
+                     'sigma_q0': sim_control_CZ.sigma_q0()}
+
+    if additional_pars["mode"] == "1D_ramsey":
+        MC.set_sweep_functions([sim_control_CZ.scanning_time])
+        MC.set_sweep_points(
+            np.arange(0, additional_pars['max_time'], additional_pars['time_step'])
         )
-
-        MC.set_adaptive_function_parameters(adaptive_pars)
-
         if sim_control_CZ.cluster():
             dat = MC.run(
-                additional_pars["label"]+"_cluster",
-                mode="adaptive",
+                "1D ramsey_v2_cluster double sided {} - sigma_q0 {:.0f} - detuning {:.0f}".format(
+                    fluxlutman.get("czd_double_sided_{}".format(which_gate)),
+                    sim_control_CZ.sigma_q0() * 1e6,
+                    sim_control_CZ.detuning() / 1e6
+                ),
+                mode="1D",
                 exp_metadata=exp_metadata,
             )
 
         else:
             if additional_pars["long_name"]:
                 dat = MC.run(
-                    additional_pars["label"],
-                    mode="adaptive",
-                    exp_metadata=exp_metadata,
+                    "1D ramsey_v2 double sided {} - sigma_q0 {:.0f} - detuning {:.0f}".format(
+                    fluxlutman.get("czd_double_sided_{}".format(which_gate)),
+                    sim_control_CZ.sigma_q0() * 1e6,
+                    sim_control_CZ.detuning() / 1e6
+                ),
+                mode="1D",
+                exp_metadata=exp_metadata,
                 )
             else:
                 dat = MC.run(
-                "2D_simulations_v2",
-                mode="adaptive",
-                exp_metadata=exp_metadata,
-            )
-
-    coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
-        label=additional_pars["label"],
-        close_figs=True,
-        extract_only=False,
-        plt_orig_pnts=True,
-        plt_contour_L1=True,
-        plt_contour_phase=True,
-        plt_optimal_values=True,
-        plt_optimal_values_max=1,
-        find_local_optimals=True,
-        plt_clusters=False,
-        cluster_from_interp=False,
-        # Saturate colors to limits of interest
-        clims={
-            'L1': [0, 5],
-            "Cost func": [0., 100]
-        },
-        target_cond_phase=180,
-        # Thse allow to select the best points
-        phase_thr=7,
-        L1_thr=.5,
-        clustering_thr=0.15,
-        # These allow to generate the boundaries of the optimal regions
-        # that can be used as boundaries for LearnerND/LearnerND_Minimizer
-        gen_optima_hulls=True,
-        plt_optimal_hulls=True,
-        hull_L1_thr=.5,
-        hull_phase_thr=7,
-        # In case we do linear sweeps
-        interp_grid_data=False
-    )
+                    "1D ramsey_v2", exp_metadata=exp_metadata, mode="1D"
+                )
 
     fluxlutman.close()
     fluxlutman_static.close()
@@ -166,84 +135,39 @@ def compute_propagator(arglist):
     sim_control_CZ = arglist["sim_control_CZ"]
 
     which_gate = sim_control_CZ.which_gate()
-    gates_num = int(sim_control_CZ.gates_num())  # repeat the same gate this number of times
-    gates_interval = sim_control_CZ.gates_interval()  # idle time between repeated gates
 
-    sim_step = 1 / fluxlutman.sampling_rate()
-    subdivisions_of_simstep = (
-        sim_control_CZ.simstep_div()
-    )  # 4 is a good one, corresponding to a time step of 0.1 ns
+    sim_step = sim_control_CZ.get("scanning_time")
+    subdivisions_of_simstep = 1
     sim_step_new = (
         sim_step / subdivisions_of_simstep
     )  # waveform is generated according to sampling rate of AWG
 
-    wf_generator = getattr(
-        wfl_dev,
-        fluxlutman.get("cz_wf_generator_{}".format(which_gate))
-    )
+    tlist = [0]
+    tlist_new = tlist
 
-    wfd = wf_generator(
-        fluxlutman=fluxlutman,
-        sim_ctrl_cz=sim_control_CZ,
-    )
-    intervals_list = wfd["intervals_list"]
-    amp = wfd["amp"]
 
-    tlist_new = wfd["time"]
+    freq = sim_control_CZ.w_q0_sweetspot() + sim_control_CZ.detuning()
+    amp = [fluxlutman.calc_freq_to_amp(freq)]
+
+
+    t_final = tlist_new[-1]+sim_step_new
+
 
     # Apply voltage scaling
     # [2020-05-30] probably not needed anymore
     amp = amp * sim_control_CZ.voltage_scaling_factor()
+    amp_final = amp
 
-    # Apply distortions
-    if sim_control_CZ.distortions():
-        amp_final = czf_v2.distort_amplitude(
-            fitted_stepresponse_ty=fitted_stepresponse_ty,
-            amp=amp,
-            tlist_new=tlist_new,
-            sim_step_new=sim_step_new,
-        )
+    ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
+    #   Since we assume the hamiltonian to be constant on each side of the pulse, we just need two time steps
+    if fluxlutman.get("czd_double_sided_{}".format(which_gate)):
+        amp_final=[amp_final[0],fluxlutman.calc_freq_to_amp(freq,positive_branch=False)]    # Echo-Z
     else:
-        amp_final = amp
-
-    # The fluxbias_q0 affects the pulse shape after the distortions have been taken into account
-    # [2020-05-30] the waveform generator includes corrections if desired
-    # WARNING: shift_due_to_fluxbias is not ready for waveforms that include the distortions
-    if sim_control_CZ.sigma_q0() != 0:
-        amp_final = czf_v2.shift_due_to_fluxbias_q0(
-            fluxlutman=fluxlutman,
-            amp_final=amp_final,
-            fluxbias_q0=fluxbias_q0,
-            sim_control_CZ=sim_control_CZ,
-            which_gate=which_gate,
-        )
-
-    if gates_num > 1:
-        if gates_interval > 0:
-            # This is intended to make the simulation faster by skipping
-            # all the amp = 0 steps, verified to encrease sim speed
-            # 4.7s/data point -> 4.0s/data point
-            # Errors in simulation outcomes are < 1e-10
-            actual_gates_interval = (
-                np.arange(0, gates_interval, sim_step_new)[-1] + sim_step_new
-            )
-
-            # We add an extra small step to ensure the amp signal goes to
-            # zero first
-            interval_append = np.concatenate(
-                ([sim_step_new, actual_gates_interval - sim_step_new], intervals_list)
-            )
-            amp_append = np.concatenate(([0, 0], amp_final))
-        else:
-            interval_append = intervals_list
-            amp_append = amp_final
-
-        # Append arbitrary number of same gate
-        for gate in range(gates_num - 1):
-            amp_final = np.append(amp_final, amp_append)
-            intervals_list = np.append(intervals_list, interval_append)
-
-    t_final = np.sum(intervals_list)  # actual overall gate length
+        amp_final=[amp_final[0],amp_final[0]]     # Ram-Z
+    sim_step_new=sim_step_new/2
+    amp_final = czf_v2.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,
+        amp_final=amp_final,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ,
+        which_gate=which_gate)
 
     # Obtain jump operators for Lindblad equation
     c_ops = czf_v2.return_jump_operators(
@@ -262,14 +186,17 @@ def compute_propagator(arglist):
         fluxbias_q1=fluxbias_q1,
         amp=amp_final,
         sim_step=sim_step_new,
-        intervals_list=intervals_list,
         which_gate=which_gate,
     )
+
+    # important to use amp and NOT amp_final here because the fluxbias is random and unknown to us.
+    U_final = czf_v2.rotating_frame_transformation_propagator_new(U=U_final, t=t_final,
+        H=czf_v2.calc_hamiltonian(amp[0],fluxlutman,fluxlutman_static,which_gate))
 
     return [U_final, t_final]
 
 
-class CZ_trajectory_superoperator(det.Soft_Detector):
+class Ramsey_experiment(det.Soft_Detector):
     def __init__(
         self,
         fluxlutman,
@@ -296,56 +223,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         super().__init__()
 
-        self.value_names = [
-            "Cost func",
-            "Cond phase",
-            "L1",
-            "L2",
-            "avgatefid_pc",
-            "avgatefid_compsubspace_pc",
-            "phase_q0",
-            "phase_q1",
-            "avgatefid_compsubspace",
-            "avgatefid_compsubspace_pc_onlystaticqubit",
-            "population_02_state",
-            "cond_phase02",
-            "coherent_leakage11",
-            "offset_difference",
-            "missing_fraction",
-            "12_21_population_transfer",
-            "12_03_population_transfer",
-            "phase_diff_12_02",
-            "phase_diff_21_20",
-            "cond_phase12",
-            "cond_phase21",
-            "cond_phase03",
-            "cond_phase20",
-        ]
-        self.value_units = [
-            "a.u.",
-            "deg",
-            "%",
-            "%",
-            "%",
-            "%",
-            "deg",
-            "deg",
-            "%",
-            "%",
-            "%",
-            "deg",
-            "%",
-            "%",
-            "%",
-            "%",
-            "%",
-            "deg",
-            "deg",
-            "deg",
-            "deg",
-            "deg",
-            "deg",
-        ]
+        self.value_names = ['population_higher_state','population_lower_state']
+        self.value_units = ['%', '%']
 
         self.qois = qois
         if self.qois != "all":
@@ -449,22 +328,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             t_final_vec = []
             for input_arglist in input_to_parallelize:
                 result_list = compute_propagator(input_arglist)
-                if self.sim_control_CZ.double_cz_pi_pulses() != "":
-                    # Experimenting with single qubit ideal pi pulses
-                    if self.sim_control_CZ.double_cz_pi_pulses() == "with_pi_pulses":
-                        pi_single_qubit = qtp.Qobj([[0, 1, 0], [1, 0, 0], [0, 0, 1]])
-                        # pi_pulse = qtp.tensor(pi_single_qubit, qtp.qeye(n_levels_q0))
-                        pi_op = qtp.tensor(pi_single_qubit, pi_single_qubit)
-                        # pi_super_op = qtp.to_super(pi_op)
-                        U_final = result_list[0]
-                        U_final = pi_op * U_final * pi_op * U_final
-                    elif self.sim_control_CZ.double_cz_pi_pulses() == "no_pi_pulses":
-                        U_final = result_list[0]
-                        U_final = U_final * U_final
-                    t_final = 2 * result_list[1]
-                else:
-                    U_final = result_list[0]
-                    t_final = result_list[1]
+                U_final = result_list[0]
+                t_final = result_list[1]
                 U_final_vec.append(U_final)
                 t_final_vec.append(t_final)
 
@@ -488,51 +353,15 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             )  # computing resulting average propagator
             # print(czf_v2.verify_CPTP(U_superop_average))
 
-            qoi = czf_v2.simulate_quantities_of_interest_superoperator_new(
-                U=U_superop_average,
-                t_final=t_final,
+            qoi = czf_v2.quantities_of_interest_ramsey(U=U_superop_average,
+                initial_state=self.sim_control_CZ.initial_state(),
                 fluxlutman=self.fluxlutman,
                 fluxlutman_static=self.fluxlutman_static,
-                which_gate=self.sim_control_CZ.which_gate(),
-            )
+                sim_control_CZ=self.sim_control_CZ,
+                which_gate=self.sim_control_CZ.which_gate())
 
-            # if we look only for the minimum avgatefid_pc in the heat maps,
-            # then we optimize the search via higher-order cost function
-            if self.sim_control_CZ.cost_func() is not None:
-                cost_func_val = self.sim_control_CZ.cost_func()(qoi)
-            elif self.sim_control_CZ.look_for_minimum():
-                cost_func_val = (
-                    np.log10(1 - qoi["avgatefid_compsubspace_pc"])
-                ) ** 4  # sign removed for even powers
-            else:
-                cost_func_val = -np.log10(1 - qoi["avgatefid_compsubspace_pc"])
-
-            quantities_of_interest = [
-                cost_func_val,
-                qoi["phi_cond"],
-                qoi["L1"] * 100,
-                qoi["L2"] * 100,
-                qoi["avgatefid_pc"] * 100,
-                qoi["avgatefid_compsubspace_pc"] * 100,
-                qoi["phase_q0"],
-                qoi["phase_q1"],
-                qoi["avgatefid_compsubspace"] * 100,
-                qoi["avgatefid_compsubspace_pc_onlystaticqubit"] * 100,
-                qoi["population_02_state"] * 100,
-                qoi["cond_phase02"],
-                qoi["coherent_leakage11"] * 100,
-                qoi["offset_difference"] * 100,
-                qoi["missing_fraction"] * 100,
-                qoi["population_transfer_12_21"] * 100,
-                qoi["population_transfer_12_03"] * 100,
-                qoi["phase_diff_12_02"],
-                qoi["phase_diff_21_20"],
-                qoi["cond_phase12"],
-                qoi["cond_phase21"],
-                qoi["cond_phase03"],
-                qoi["cond_phase20"],
-            ]
-            qoi_vec = np.array(quantities_of_interest)
+            quantities_of_interest = [qoi['population_higher_state'], qoi['population_lower_state']]
+            qoi_vec=np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
 
             # To study the effect of the coherence of leakage on repeated CZs (simpler than simulating a full RB experiment):
@@ -551,28 +380,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         return_values = [
             qoi_plot[0, 0],
-            qoi_plot[0, 1],
-            qoi_plot[0, 2],
-            qoi_plot[0, 3],
-            qoi_plot[0, 4],
-            qoi_plot[0, 5],
-            qoi_plot[0, 6],
-            qoi_plot[0, 7],
-            qoi_plot[0, 8],
-            qoi_plot[0, 9],
-            qoi_plot[0, 10],
-            qoi_plot[0, 11],
-            qoi_plot[0, 12],
-            qoi_plot[0, 13],
-            qoi_plot[0, 14],
-            qoi_plot[0, 15],
-            qoi_plot[0, 16],
-            qoi_plot[0, 17],
-            qoi_plot[0, 18],
-            qoi_plot[0, 19],
-            qoi_plot[0, 20],
-            qoi_plot[0, 21],
-            qoi_plot[0, 22],
+            qoi_plot[0, 1]
         ]
         if self.qois != "all":
             return np.array(return_values)[self.qoi_mask]

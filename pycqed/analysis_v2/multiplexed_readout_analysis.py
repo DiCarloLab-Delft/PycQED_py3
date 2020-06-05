@@ -1068,8 +1068,8 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
 
         C = W_I + 1j*W_Q
 
-        dW_I = np.real(np.exp(-1j*2*np.pi*self.IF*Time)*C)
-        dW_Q = np.imag(np.exp(-1j*2*np.pi*self.IF*Time)*C)
+        dW_I = np.real(np.exp(1j*2*np.pi*self.IF*Time)*C)
+        dW_Q = np.imag(np.exp(1j*2*np.pi*self.IF*Time)*C)
 
         ps_I = np.abs(np.fft.fft(W_I))**2
         ps_Q = np.abs(np.fft.fft(W_Q))**2
@@ -1205,7 +1205,7 @@ class Single_qubit_parity_analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
 
-        # Assign data to qubit 
+        # Assign data to qubit
         for i, value_name in enumerate(self.raw_data_dict['value_names']):
             if self.q_A in value_name.decode():
                 raw_shots_A = self.raw_data_dict['data'][:,i+1]
@@ -1279,7 +1279,7 @@ class Single_qubit_parity_analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['PDF_data']['counts_1'] = counts_A_1
 
         ####################
-        # Cumsum data 
+        # Cumsum data
         ####################
         # bin data according to unique bins
         ubins_A_0, ucounts_A_0 = np.unique(shots_A_0, return_counts=True)
@@ -1358,7 +1358,7 @@ class Single_qubit_parity_analysis(ba.BaseDataAnalysis):
         '''
         self.proc_data_dict['quantities_of_interest'] = {}
         self.qoi = {}
-        
+
         # Create a CDF based on the fit functions of both fits.
         fr = self.fit_res['CDF_fit']
         bv = fr.best_values
@@ -1437,7 +1437,7 @@ class Single_qubit_parity_analysis(ba.BaseDataAnalysis):
             'threshold_discr': self.proc_data_dict['threshold_discr']
         }
         self.qoi = self.proc_data_dict['quantities_of_interest']
-        
+
     def prepare_plots(self):
 
         self.axs_dict = {}
@@ -1451,8 +1451,8 @@ class Single_qubit_parity_analysis(ba.BaseDataAnalysis):
             'qubit_label_A': self.q_A,
             'ax_id': 'Parity_check_{}'.format(self.q_A),
             'para_hist' :  self.fit_res['PDF_fit'].best_values,
-            'Histogram_data': [self.proc_data_dict['PDF_data']['bins'], 
-                               self.proc_data_dict['PDF_data']['counts_0'], 
+            'Histogram_data': [self.proc_data_dict['PDF_data']['bins'],
+                               self.proc_data_dict['PDF_data']['counts_0'],
                                self.proc_data_dict['PDF_data']['counts_1']],
             'threshold':  self.proc_data_dict['threshold_raw'],
             'timestamp': self.timestamp,
@@ -1520,12 +1520,8 @@ class RTE_analysis(ba.BaseDataAnalysis):
 
         self.Channels = [ ch.decode() for ch in self.raw_data_dict['value_names'] ]
         nr_states = len(self.initial_states)
-        
-        # self.proc_data_dict = { ch.decode() for ch in self.raw_data_dict['value_names']}
-
         for q, ch in enumerate(self.Channels):
             self.proc_data_dict[ch] = {}
-            
             for j, state in enumerate(self.initial_states):
                 Fails = []
                 successful_runs = 0
@@ -1540,13 +1536,13 @@ class RTE_analysis(ba.BaseDataAnalysis):
                     # Digitize data
                     shots = np.array([0 if s < self.thresholds[q] else 1 for s in raw_shots])
                     if state is '0':
-                        shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining 
+                        shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = shots_f[1:]-shots_f[:-1]
 
                     elif state is '1':
                         shots_f = (shots+1)%2
-                        shots_f = np.pad(shots_f, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining 
+                        shots_f = np.pad(shots_f, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = shots_f[1:]-shots_f[:-1]
 
@@ -1556,20 +1552,20 @@ class RTE_analysis(ba.BaseDataAnalysis):
                         error = shots_f[:-1]+shots_f[1:]-1
                         error[1:] *= np.array([error[i+1]*(error[i+1]-2*error[i]) for i in range(len(error)-1)])
 
-                    # Separating discrimination errors from qubit flips  
+                    # Separating discrimination errors from qubit flips
                     measr = error[1:]-error[:-1]
                     measr = np.array([0 if abs(s) < 2 else int(s/2) for s in measr])
                     flipr = error.copy()
-                    flipr[1:]  -= measr 
+                    flipr[1:]  -= measr
                     flipr[:-1] += measr
-                    
+
                     # count errors
                     nr_errors = np.sum(abs(error))
                     # Get RTE
                     RTE = next((i+1 for i, x in enumerate(error) if x), None) # All errors
                     # RTE = next((i+1 for i, x in enumerate(measr) if x), None) # Errors due to misdiagnosis
                     # RTE = next((i+1 for i, x in enumerate(flipr) if x), None) # Errors due to flips
-                    
+
                     if RTE is None:
                         successful_runs += 1/self.shots_per_measurement
                         RTE = self.cycles+1
@@ -1578,10 +1574,10 @@ class RTE_analysis(ba.BaseDataAnalysis):
                     # record mean RTE and avg error
                     mean_RTE += RTE/self.shots_per_measurement
                     # avgerror += nr_errors/self.shots_per_measurement
-                
+
                 counts, bin_edges = np.histogram(Fails, bins=self.cycles, range=(.5, self.cycles+.5), density=False)
                 bin_centers = (bin_edges[1:] + bin_edges[:-1])/2
-                
+
                 self.proc_data_dict[ch][state]['counts'] = counts/self.shots_per_measurement
                 self.proc_data_dict[ch]['bins'] = bin_centers
                 self.proc_data_dict[ch][state]['success'] = successful_runs
@@ -1598,7 +1594,6 @@ class RTE_analysis(ba.BaseDataAnalysis):
             for state in self.initial_states:
                 bin_x = self.proc_data_dict[ch]['bins'][1:]
                 bin_y = self.proc_data_dict[ch][state]['counts'][1:]
-                
                 m = lmfit.model.Model(ExpDecayFunc)
                 m.guess = exp_dec_guess.__get__(m, m.__class__)
                 params = m.guess(data=bin_y, t=bin_x, vary_off=False)
@@ -1609,19 +1604,18 @@ class RTE_analysis(ba.BaseDataAnalysis):
                     'fit_yvals': {'data': bin_y},
                     'guessfn_pars':{'vary_off': False}
                 }
-    
+
     def analyze_fit_results(self):
         for ch in self.Channels:
             for state in self.initial_states:
                 fr = self.fit_res['exp_fit_{}_{}'.format(ch, state)]
-                self.proc_data_dict[ch][state]['fit_par'] = fr.best_values 
+                self.proc_data_dict[ch][state]['fit_par'] = fr.best_values
 
     def prepare_plots(self):
 
         self.axs_dict = {}
 
         for i, ch in enumerate(self.Channels):
-            
             fig, axs = plt.subplots(figsize=(7,3), dpi=200)
             fig.patch.set_alpha(0)
             self.axs_dict['RTE_{}'.format(ch)]=axs
@@ -1650,7 +1644,6 @@ class RTE_analysis(ba.BaseDataAnalysis):
 ######################################
 # Plotting functions
 ######################################
-
 
 def calc_assignment_prob_matrix(combinations, digitized_data):
 
@@ -2161,7 +2154,7 @@ def plot_mux_transients_optimal(Time,
     fig.tight_layout()
 
 def plot_single_parity_histogram(Histogram_data: list,
-                                 para_hist: dict, 
+                                 para_hist: dict,
                                  threshold: float,
                                  qubit_label_A: str,
                                  qoi: dict,
@@ -2169,7 +2162,7 @@ def plot_single_parity_histogram(Histogram_data: list,
                                  initial_states: str,
                                  ax, **kw):
     fig = ax.get_figure()
-    
+
     bin_centers = Histogram_data[0]
     counts_0 = Histogram_data[1]
     counts_1 = Histogram_data[2]
@@ -2186,9 +2179,9 @@ def plot_single_parity_histogram(Histogram_data: list,
     x = np.linspace(bin_centers[0], bin_centers[-1], 150)
 
     ro_g = ro_gauss(x=[x, x], **para_hist)
-    ax.plot(x, ro_g[0], color='C0', 
+    ax.plot(x, ro_g[0], color='C0',
         label=r'$|{}\rangle_{}$ fit'.format(initial_states[0], 'D'))
-    ax.plot(x, ro_g[1], color='C3', 
+    ax.plot(x, ro_g[1], color='C3',
         label=r'$|{}\rangle_{}$ fit'.format(initial_states[1], 'D'))
     # Plot Threshold
     ax.axvline(x=threshold, label=r'$\mathrm{threshold}$',
@@ -2225,17 +2218,12 @@ def plot_RTE_histogram(qubit_label: str,
                        ax = None, **kw):
 
     for state in initial_states:
-        # bin_centers = A.proc_data_dict[ch][state]['bins']
-        # counts = A.proc_data_dict[ch][state]['counts']/shots_per_measurement
-        # params = A.proc_data_dict[ch][state]['fit params']
-        # success = A.proc_data_dict[ch][state]['success']
-        # RTE = A.proc_data_dict[ch][state]['RTE']
 
-        if '0' in state:    
+        if '0' in state:
             ax.plot(bin_centers, ExpDecayFunc(bin_centers, **params[0]), 'C0', linewidth=1, alpha=.5)
             res_exc = counts[0][0] - ExpDecayFunc(1, **params[0])
             ax.plot(bin_centers, counts[0], 'C0v', markersize=4, label=r'prep $|0\rangle$')
-            
+
         elif '1' in state:
             ax.plot(bin_centers, ExpDecayFunc(bin_centers, **params[1]), 'C3', linewidth=1, alpha=.5)
             ax.plot(bin_centers, counts[1], 'C3^', markersize=4, label=r'prep $|1\rangle$')
@@ -2245,10 +2233,10 @@ def plot_RTE_histogram(qubit_label: str,
     set_ylabel(ax, 'Error fraction')
     ax.set_title('Qubit {} shots'.format(qubit_label))
     ax.set_xlim(-2, len(bin_centers)+2)
-        
+
     S = []
     for i, state in enumerate(initial_states):
-        textstr = [r'$|{}\rangle$ successfull runs {:.2f}%'.format(state, success[i]*100)+'\n', 
+        textstr = [r'$|{}\rangle$ successfull runs {:.2f}%'.format(state, success[i]*100)+'\n',
                    r'$|{}\rangle$ avg RTE {:.2f}'.format(state, RTE[i])+'\n',
                    r'$\tau_{}$={:.2f} cycles'.format(state, params[i]['tau'])+'\n']
         S.append(textstr)
