@@ -1387,6 +1387,10 @@ def calc_sensitivity(freq, freq_sweetspot):
     return freq_sweetspot * np.pi / 2 * np.sqrt(1 - (freq / freq_sweetspot) ** 4) / freq
 
 
+def calc_approximate_detuning_from_sensitivity(sensitivity, freq_sweetspot):
+	return freq_sweetspot * sensitivity**2 / np.pi**2
+
+
 def Tphi_from_T1andT2(T1, T2):
     return 1 / (-1 / (2 * T1) + 1 / T2)
 

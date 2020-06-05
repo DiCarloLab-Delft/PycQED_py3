@@ -8,6 +8,8 @@ from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ_v2 as s
 from pycqed.simulations import cz_superoperator_simulation_functions_v2 as czf_v2
 from pycqed.measurement.waveform_control_CC import waveforms_flux_dev as wfl_dev
 
+from pycqed.analysis_v2 import measurement_analysis as ma2
+
 import numpy as np
 from pycqed.measurement import detector_functions as det
 import matplotlib.pyplot as plt
@@ -27,7 +29,7 @@ np.set_printoptions(threshold=np.inf)
 log = logging.getLogger(__name__)
 
 
-def f_to_parallelize_new(arglist):
+def f_to_parallelize_v2(arglist):
     # cluster wants a list as an argument.
     # Below the various list items are assigned to their own variable
 
@@ -43,8 +45,10 @@ def f_to_parallelize_new(arglist):
     ]  # see function return_instrument_args in czf_v2
     number = arglist["number"]
     adaptive_pars = arglist["adaptive_pars"]
+    additional_pars = arglist["additional_pars"]
     live_plot_enabled = arglist["live_plot_enabled"]
-    which_gate = arglist["which_gate"]
+    exp_metadata = arglist["exp_metadata"]
+    #which_gate = arglist["which_gate"]
 
     try:
         MC = Instrument.find_instrument("MC" + "{}".format(number))
@@ -62,201 +66,87 @@ def f_to_parallelize_new(arglist):
     station.add_component(fluxlutman)
     fluxlutman_static = flm.HDAWG_Flux_LutMan("fluxlutman_static" + "{}".format(number))
     station.add_component(fluxlutman_static)
-    sim_control_CZ = scCZ_v2.SimControlCZ("sim_control_CZ" + "{}".format(number))
+    sim_control_CZ = scCZ_v2.SimControlCZ_v2("sim_control_CZ" + "{}".format(number))
     station.add_component(sim_control_CZ)
 
-    fluxlutman, sim_control_CZ, fluxlutman_static = czf_v2.return_instrument_from_arglist(
-        fluxlutman,
-        fluxlutman_args,
-        sim_control_CZ,
-        sim_control_CZ_args,
-        fluxlutman_static,
-        fluxlutman_static_args,
-        which_gate=which_gate,
-    )
+    fluxlutman = czf_v2.return_instrument_from_arglist_v2(fluxlutman, fluxlutman_args)
+    fluxlutman_static = czf_v2.return_instrument_from_arglist_v2(fluxlutman_static, fluxlutman_static_args)
+    sim_control_CZ = czf_v2.return_instrument_from_arglist_v2(sim_control_CZ, sim_control_CZ_args)
 
-    cz_lambda_2 = fluxlutman.get("cz_lambda_2_{}".format(which_gate))
-    cz_length = fluxlutman.get("cz_length_{}".format(which_gate))
-    cz_theta_f = fluxlutman.get("cz_theta_f_{}".format(which_gate))
-    czd_double_sided = fluxlutman.get("czd_double_sided_{}".format(which_gate))
+    sim_control_CZ.set_cost_func()
+    which_gate = sim_control_CZ.which_gate()
 
     d = CZ_trajectory_superoperator(
         fluxlutman=fluxlutman,
+        fluxlutman_static=fluxlutman_static,
         sim_control_CZ=sim_control_CZ,
         fitted_stepresponse_ty=fitted_stepresponse_ty,
-        qois=adaptive_pars.get("qois", "all"),
+        qois=additional_pars['qois'],
     )
     MC.set_detector_function(d)
 
-    exp_metadata = {
-        "double sided": czd_double_sided,
-        "length": cz_length,
-        "distortions": sim_control_CZ.distortions(),
-        "T2_scaling": sim_control_CZ.T2_scaling(),
-        "sigma_q1": sim_control_CZ.sigma_q1(),
-        "sigma_q0": sim_control_CZ.sigma_q0(),
-    }
-
-    if adaptive_pars["mode"] == "adaptive":
+    if exp_metadata["mode"] == "adaptive":
         MC.set_sweep_functions(
             [
-                fluxlutman["cz_theta_f_{}".format(which_gate)],
-                fluxlutman["cz_lambda_2_{}".format(which_gate)],
+                getattr(fluxlutman, "vcz_amp_sq_{}".format(which_gate)),
+                getattr(fluxlutman, "vcz_amp_fine_{}".format(which_gate)),
             ]
         )
-        if adaptive_pars["uniform"]:
-            loss_per_triangle = adaptive.learner.learner2D.uniform_loss
-        else:
-            loss_per_triangle = None
-        MC.set_adaptive_function_parameters(
-            {
-                "adaptive_function": adaptive.Learner2D,
-                "loss_per_triangle": loss_per_triangle,
-                "goal": lambda l: l.npoints > adaptive_pars["n_points"],
-                "bounds": [
-                    (adaptive_pars["theta_f_min"], adaptive_pars["theta_f_max"]),
-                    (adaptive_pars["lambda2_min"], adaptive_pars["lambda2_max"]),
-                ],
-            }
-        )
+
+        MC.set_adaptive_function_parameters(adaptive_pars)
 
         if sim_control_CZ.cluster():
             dat = MC.run(
-                "2D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}".format(
-                    czd_double_sided,
-                    cz_length * 1e9,
-                    sim_control_CZ.distortions(),
-                    sim_control_CZ.waiting_at_sweetspot(),
-                    sim_control_CZ.T2_scaling(),
-                    sim_control_CZ.sigma_q1() * 1e6,
-                    sim_control_CZ.sigma_q0() * 1e6,
-                ),
+                additional_pars["label"]+"_cluster",
                 mode="adaptive",
                 exp_metadata=exp_metadata,
             )
 
         else:
-            if adaptive_pars["long_name"]:
+            if additional_pars["long_name"]:
                 dat = MC.run(
-                    "2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}".format(
-                        czd_double_sided,
-                        cz_length * 1e9,
-                        sim_control_CZ.distortions(),
-                        sim_control_CZ.T2_scaling(),
-                        sim_control_CZ.sigma_q1() * 1e6,
-                        sim_control_CZ.sigma_q0() * 1e6,
-                    ),
+                    additional_pars["label"],
                     mode="adaptive",
                     exp_metadata=exp_metadata,
                 )
             else:
                 dat = MC.run(
-                    "2D simulation_new_2", exp_metadata=exp_metadata, mode="adaptive"
-                )
-
-    elif adaptive_pars["mode"] == "1D":
-        MC.MC.set_sweep_functions([fluxlutman["cz_theta_f_{}".format(which_gate)]])
-        MC.set_sweep_points(
-            np.linspace(
-                adaptive_pars["theta_f_min"],
-                adaptive_pars["theta_f_max"],
-                adaptive_pars["n_points"],
-            )
-        )
-        if sim_control_CZ.cluster():
-            dat = MC.run(
-                "1D simulation_new_cluster2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}".format(
-                    czd_double_sided,
-                    cz_length * 1e9,
-                    sim_control_CZ.distortions(),
-                    sim_control_CZ.T2_scaling(),
-                    sim_control_CZ.sigma_q1() * 1e6,
-                    sim_control_CZ.sigma_q0() * 1e6,
-                ),
-                mode="1D",
-                exp_metadata=exp_metadata,
-            )
-
-        else:
-            if adaptive_pars["long_name"]:
-                dat = MC.run(
-                    "1D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}".format(
-                        czd_double_sided,
-                        cz_length * 1e9,
-                        sim_control_CZ.distortions(),
-                        sim_control_CZ.T2_scaling(),
-                        sim_control_CZ.sigma_q1() * 1e6,
-                        sim_control_CZ.sigma_q0() * 1e6,
-                    ),
-                    mode="1D",
-                    exp_metadata=exp_metadata,
-                )
-            else:
-                dat = MC.run(
-                    "1D simulation_new_2", exp_metadata=exp_metadata, mode="1D"
-                )
-
-    if adaptive_pars["mode"] == "cma_optimizer":
-        MC.set_sweep_functions(
-            MC.set_sweep_functions(
-                [
-                    fluxlutman["cz_theta_f_{}".format(which_gate)],
-                    fluxlutman["cz_lambda_2_{}".format(which_gate)],
-                ]
-            )
-        )
-        if adaptive_pars["uniform"]:
-            loss_per_triangle = adaptive.learner.learner2D.uniform_loss
-        else:
-            loss_per_triangle = None
-        MC.set_adaptive_function_parameters(
-            {
-                "adaptive_function": cma.fmin,
-                "x0": adaptive_pars["x0"],
-                "sigma0": adaptive_pars["sigma0"],
-                # options for the CMA algorithm can be found using
-                # "cma.CMAOptions()"
-                "options": {
-                    "maxfevals": adaptive_pars["n_points"],  # maximum function cals
-                    # Scaling for individual sigma's
-                    "cma_stds": [5, 6, 3],
-                    "ftarget": 0.005,
-                },  # Target function value
-            }
-        )
-
-        if sim_control_CZ.cluster():
-            dat = MC.run(
-                "2D simulation_new_cluster2 double sided {} - length {:.1f} - waiting {:.2f} - T2_scaling {:.2f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}".format(
-                    czd_double_sided,
-                    cz_length * 1e9,
-                    sim_control_CZ.waiting_at_sweetspot(),
-                    sim_control_CZ.T2_scaling(),
-                    sim_control_CZ.sigma_q1() * 1e6,
-                    sim_control_CZ.sigma_q0() * 1e6,
-                ),
+                "2D_simulations_v2",
                 mode="adaptive",
                 exp_metadata=exp_metadata,
             )
 
-        else:
-            if adaptive_pars["long_name"]:
-                dat = MC.run(
-                    "2D simulation_new_2 double sided {} - length {:.1f} - distortions {} - T2_scaling {:.1f} - sigma_q1 {:.0f}, sigma_q0 {:.0f}".format(
-                        czd_double_sided,
-                        cz_length * 1e9,
-                        sim_control_CZ.distortions(),
-                        sim_control_CZ.T2_scaling(),
-                        sim_control_CZ.sigma_q1() * 1e6,
-                        sim_control_CZ.sigma_q0() * 1e6,
-                    ),
-                    mode="adaptive",
-                    exp_metadata=exp_metadata,
-                )
-            else:
-                dat = MC.run(
-                    "2D simulation_new_2", exp_metadata=exp_metadata, mode="adaptive"
-                )
+    coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
+        label=additional_pars["label"],
+        close_figs=True,
+        extract_only=False,
+        plt_orig_pnts=True,
+        plt_contour_L1=True,
+        plt_contour_phase=True,
+        plt_optimal_values=True,
+        plt_optimal_values_max=1,
+        find_local_optimals=True,
+        plt_clusters=False,
+        cluster_from_interp=False,
+        # Saturate colors to limits of interest
+        clims={
+            'L1': [0, 5],
+            "Cost func": [0., 100]
+        },
+        target_cond_phase=180,
+        # Thse allow to select the best points
+        phase_thr=7,
+        L1_thr=.5,
+        clustering_thr=0.15,
+        # These allow to generate the boundaries of the optimal regions
+        # that can be used as boundaries for LearnerND/LearnerND_Minimizer
+        gen_optima_hulls=True,
+        plt_optimal_hulls=True,
+        hull_L1_thr=.5,
+        hull_phase_thr=7,
+        # In case we do linear sweeps
+        interp_grid_data=False
+    )
 
     fluxlutman.close()
     fluxlutman_static.close()
