@@ -44,6 +44,7 @@ def f_to_parallelize_v2(arglist):
     number = arglist["number"]
     additional_pars = arglist["additional_pars"]
     live_plot_enabled = arglist["live_plot_enabled"]
+    exp_metadata = arglist["exp_metadata"]
     #which_gate = arglist["which_gate"]
 
     try:
@@ -80,10 +81,6 @@ def f_to_parallelize_v2(arglist):
         qois="all",
     )
     MC.set_detector_function(d)
-
-    exp_metadata = {'detuning': sim_control_CZ.detuning(), 
-                     'sigma_q1': sim_control_CZ.sigma_q1(), 
-                     'sigma_q0': sim_control_CZ.sigma_q0()}
 
     if additional_pars["mode"] == "1D_ramsey":
         MC.set_sweep_functions([sim_control_CZ.scanning_time])
