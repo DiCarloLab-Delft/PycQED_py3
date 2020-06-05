@@ -168,7 +168,6 @@ def compute_propagator(arglist):
     amp_final = czf_v2.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,
         amp_final=amp_final,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ,
         which_gate=which_gate)
-    f_pulse_final = fluxlutman.calc_amp_to_freq(amp_final)
 
     # Obtain jump operators for Lindblad equation
     c_ops = czf_v2.return_jump_operators(

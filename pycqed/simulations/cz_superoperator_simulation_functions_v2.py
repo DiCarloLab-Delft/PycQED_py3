@@ -999,16 +999,13 @@ def return_jump_operators(
         f_pulse_final = np.clip(f_pulse, a_min=None, a_max=omega_0)
 
         sensitivity = calc_sensitivity(
-            f_pulse_final, compute_sweetspot_frequency([1, 0, 0], omega_0)
+            f_pulse_final, omega_0
         )
         T2_q0_vec = 1/linear_with_offset(
             sensitivity,
             T2_q0_amplitude_dependent[0],
             T2_q0_amplitude_dependent[1],
         )
-        # for i in range(len(sensitivity)):    # manual fix for the TLS coupled at the sweetspot for Niels' Purcell device
-        #    if sensitivity[i] <= 0.2:
-        #        T2_q0_vec[i]=linear_with_offset(inverse_sensitivity[i],0,2e-6)
 
         # plot(x_plot_vec=[f_pulse_final/1e9],
         #                   y_plot_vec=[T2_q0_vec*1e6],
@@ -2191,8 +2188,8 @@ def calc_populations(U):
             ),
             "population_higher_state": np.real(
                 U_pi2_pulsed[
-                    index_in_vector_of_dm_matrix_element([0, 0], [0, 1]),
                     index_in_vector_of_dm_matrix_element([0, 0], [0, 0]),
+                    index_in_vector_of_dm_matrix_element([0, 1], [0, 1]),
                 ]
             ),
         }
@@ -2456,7 +2453,7 @@ def average_population_transfer_subspace_to_subspace(U_superop, states_in, state
         for indeces_list_out in states_out:
             state_out = basis_state(indeces_list_out[0], indeces_list_out[1])
 
-            sump += population_transfer(U_superop, state_in, state_out)
+            sump += population_transfer(qtp.to_super(U_superop), state_in, state_out)
 
     sump /= len(states_in)
 
