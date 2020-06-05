@@ -1,6 +1,6 @@
+import adaptive
 from pycqed.measurement import measurement_control as mc
 
-import adaptive
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
 
