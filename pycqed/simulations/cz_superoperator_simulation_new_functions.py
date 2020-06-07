@@ -12,7 +12,7 @@ np.set_printoptions(threshold=np.inf)
 # Hardcoded number of levels for the two transmons.
 # Currently only 3,3 or 4,3 are supported. The bottleneck is the function 
 # that changes to the dressed basis at sweet spot (matrix_change_of_variables)
-n_levels_q0 = 4
+n_levels_q0 = 3
 n_levels_q1 = 3
 
 
@@ -889,7 +889,7 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
 
 def eval_freq_dep_t_phi_new(freq, freq_sweet, coeffs):
     freq = np.clip(freq, a_min=None, a_max=freq_sweet)
-    sensitivity = get_flux_sensitivity(freq, freq_sweet)
+    sensitivity = get_flux_sensitivity_v2(freq, freq_sweet)
     #sensitivity[sensitivity < 1e-3] = 1e-3
     deph_rate = linear_with_offset(sensitivity, coeffs)
     t_phi = 1 / deph_rate
@@ -899,6 +899,11 @@ def get_flux_sensitivity(freq, freq_q_sweet, charge_energy=0):
     cur_freq = (freq + charge_energy)
     sweet_freq = (freq_q_sweet + charge_energy)
     return ((sweet_freq) ** 2 / cur_freq) * (np.pi / 2) * np.sqrt(1 - ((cur_freq / sweet_freq) ** 4))
+
+def get_flux_sensitivity_v2(freq, freq_q_sweet, charge_energy=0):
+    cur_freq = (freq + charge_energy)
+    sweet_freq = (freq_q_sweet + charge_energy)
+    return ((sweet_freq) / cur_freq) * (np.pi / 2) * np.sqrt(1 - ((cur_freq / sweet_freq) ** 4))
 
 def linear_with_offset(inv_sen, freq_dep_coeffs):
     coeff1, coeff2 = freq_dep_coeffs
