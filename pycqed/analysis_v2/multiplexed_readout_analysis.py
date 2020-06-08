@@ -1481,7 +1481,7 @@ class RTE_analysis(ba.BaseDataAnalysis):
                  t_start: str = None, t_stop: str = None,
                  label: str = '',
                  options_dict: dict = None, extract_only: bool = False,
-                 auto=True):
+                 auto=True, error_type: str = None):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
@@ -1493,6 +1493,13 @@ class RTE_analysis(ba.BaseDataAnalysis):
         self.shots_per_measurement = shots_per_measurement
         self.initial_states = initial_states
         self.thresholds = thresholds
+        if error_type is None:
+            self.error_type = 'all'
+        elif error_type is 'all' or error_type is 'meas' or error_type is 'flip':
+            self.error_type = error_type
+        else:
+            raise ValueError('Error type "{}" not supported.'.format(error_type))
+
         self.do_fitting = True
         if auto:
             self.run_analysis()
@@ -1534,27 +1541,27 @@ class RTE_analysis(ba.BaseDataAnalysis):
                         [i*self.nr_measurements*nr_states:(i+1)*self.nr_measurements*nr_states, q+1]\
                         [self.nr_measurements*j:self.nr_measurements*j+self.cycles]
                     # Digitize data
-                    shots = np.array([0 if s < self.thresholds[q] else 1 for s in raw_shots])
+                    shots = np.array([-1 if s < self.thresholds[q] else 1 for s in raw_shots])
                     if state is '0':
-                        shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
+                        shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
-                        error = shots_f[1:]-shots_f[:-1]
+                        error = (shots_f[1:]-shots_f[:-1])/2
 
                     elif state is '1':
-                        shots_f = (shots+1)%2
-                        shots_f = np.pad(shots_f, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
+                        shots_f = -1*shots
+                        shots_f = np.pad(shots_f, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
-                        error = shots_f[1:]-shots_f[:-1]
+                        error = (shots_f[1:]-shots_f[:-1])/2
 
                     elif state is 'pi':
-                        shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
+                        shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = shots_f[:-1]+shots_f[1:]-1
                         error[1:] *= np.array([error[i+1]*(error[i+1]-2*error[i]) for i in range(len(error)-1)])
 
                     # Separating discrimination errors from qubit flips
-                    measr = error[1:]-error[:-1]
-                    measr = np.array([0 if abs(s) < 2 else int(s/2) for s in measr])
+                    measr = (error[1:]-error[:-1])/2
+                    measr = np.array([s if abs(s) > .6 else 0 for s in measr])
                     flipr = error.copy()
                     flipr[1:]  -= measr
                     flipr[:-1] += measr
@@ -1562,9 +1569,12 @@ class RTE_analysis(ba.BaseDataAnalysis):
                     # count errors
                     nr_errors = np.sum(abs(error))
                     # Get RTE
-                    RTE = next((i+1 for i, x in enumerate(error) if x), None) # All errors
-                    # RTE = next((i+1 for i, x in enumerate(measr) if x), None) # Errors due to misdiagnosis
-                    # RTE = next((i+1 for i, x in enumerate(flipr) if x), None) # Errors due to flips
+                    if self.error_type is 'all':
+                        RTE = next((i+1 for i, x in enumerate(error) if x), None) # All errors
+                    elif self.error_type is 'meas':
+                        RTE = next((i+1 for i, x in enumerate(measr) if x), None) # Errors due to misdiagnosis
+                    elif self.error_type is 'flip':
+                        RTE = next((i+1 for i, x in enumerate(flipr) if x), None) # Errors due to flips
 
                     if RTE is None:
                         successful_runs += 1/self.shots_per_measurement
@@ -1573,7 +1583,6 @@ class RTE_analysis(ba.BaseDataAnalysis):
 
                     # record mean RTE and avg error
                     mean_RTE += RTE/self.shots_per_measurement
-                    # avgerror += nr_errors/self.shots_per_measurement
 
                 counts, bin_edges = np.histogram(Fails, bins=self.cycles, range=(.5, self.cycles+.5), density=False)
                 bin_centers = (bin_edges[1:] + bin_edges[:-1])/2
@@ -1582,6 +1591,76 @@ class RTE_analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict[ch]['bins'] = bin_centers
                 self.proc_data_dict[ch][state]['success'] = successful_runs
                 self.proc_data_dict[ch][state]['RTE'] = mean_RTE
+
+    # def process_data(self):
+
+    #     self.Channels = [ ch.decode() for ch in self.raw_data_dict['value_names'] ]
+    #     nr_states = len(self.initial_states)
+    #     for q, ch in enumerate(self.Channels):
+    #         self.proc_data_dict[ch] = {}
+    #         for j, state in enumerate(self.initial_states):
+    #             Fails = []
+    #             successful_runs = 0
+    #             mean_RTE = 0
+    #             self.proc_data_dict[ch][state] = {}
+
+    #             for i in range(self.shots_per_measurement):
+    #                 # Extract shots from single experiment
+    #                 raw_shots = self.raw_data_dict['data']\
+    #                     [i*self.nr_measurements*nr_states:(i+1)*self.nr_measurements*nr_states, q+1]\
+    #                     [self.nr_measurements*j:self.nr_measurements*j+self.cycles]
+    #                 # Digitize data
+    #                 shots = np.array([0 if s < self.thresholds[q] else 1 for s in raw_shots])
+    #                 if state is '0':
+    #                     shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
+    #                     # Detect errors
+    #                     error = shots_f[1:]-shots_f[:-1]
+
+    #                 elif state is '1':
+    #                     shots_f = (shots+1)%2
+    #                     shots_f = np.pad(shots_f, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
+    #                     # Detect errors
+    #                     error = shots_f[1:]-shots_f[:-1]
+
+    #                 elif state is 'pi':
+    #                     shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=0)[:-1] # introduce 0 in begining
+    #                     # Detect errors
+    #                     error = shots_f[:-1]+shots_f[1:]-1
+    #                     error[1:] *= np.array([error[i+1]*(error[i+1]-2*error[i]) for i in range(len(error)-1)])
+
+    #                 # Separating discrimination errors from qubit flips
+    #                 measr = error[1:]-error[:-1]
+    #                 measr = np.array([0 if abs(s) < 2 else int(s/2) for s in measr])
+    #                 flipr = error.copy()
+    #                 flipr[1:]  -= measr
+    #                 flipr[:-1] += measr
+
+    #                 # count errors
+    #                 nr_errors = np.sum(abs(error))
+    #                 # Get RTE
+    #                 if self.error_type is 'all':
+    #                     RTE = next((i+1 for i, x in enumerate(error) if x), None) # All errors
+    #                 elif self.error_type is 'meas':
+    #                     RTE = next((i+1 for i, x in enumerate(measr) if x), None) # Errors due to misdiagnosis
+    #                 elif self.error_type is 'flip':
+    #                     RTE = next((i+1 for i, x in enumerate(flipr) if x), None) # Errors due to flips
+
+    #                 if RTE is None:
+    #                     successful_runs += 1/self.shots_per_measurement
+    #                     RTE = self.cycles+1
+    #                 Fails.append(RTE)
+
+    #                 # record mean RTE and avg error
+    #                 mean_RTE += RTE/self.shots_per_measurement
+    #                 # avgerror += nr_errors/self.shots_per_measurement
+
+    #             counts, bin_edges = np.histogram(Fails, bins=self.cycles, range=(.5, self.cycles+.5), density=False)
+    #             bin_centers = (bin_edges[1:] + bin_edges[:-1])/2
+
+    #             self.proc_data_dict[ch][state]['counts'] = counts/self.shots_per_measurement
+    #             self.proc_data_dict[ch]['bins'] = bin_centers
+    #             self.proc_data_dict[ch][state]['success'] = successful_runs
+    #             self.proc_data_dict[ch][state]['RTE'] = mean_RTE
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -1597,7 +1676,8 @@ class RTE_analysis(ba.BaseDataAnalysis):
                 m = lmfit.model.Model(ExpDecayFunc)
                 m.guess = exp_dec_guess.__get__(m, m.__class__)
                 params = m.guess(data=bin_y, t=bin_x, vary_off=False)
-                res = m.fit(t=bin_x, data=bin_y, params=params, vary_off=False)
+                res = m.fit(t=bin_x, data=bin_y, params=params, vary_off=False,
+                            nan_policy = 'propagate')
                 self.fit_dicts['exp_fit_{}_{}'.format(ch, state)] = {
                     'model': m,
                     'fit_xvals': {'t': bin_x},
@@ -1616,20 +1696,25 @@ class RTE_analysis(ba.BaseDataAnalysis):
         self.axs_dict = {}
 
         for i, ch in enumerate(self.Channels):
+            qb_name = ch.split(' ')[-1]
+            if qb_name == 'I' or qb_name == 'Q':
+                label = ch.split(' ')[-2]
             fig, axs = plt.subplots(figsize=(7,3), dpi=200)
             fig.patch.set_alpha(0)
-            self.axs_dict['RTE_{}'.format(ch)]=axs
-            self.figs['RTE_{}'.format(ch)] = fig
-            self.plot_dicts['RTE_{}'.format(ch)]={
+            self.axs_dict['RTE_{}_{}_errors'.format(qb_name, self.error_type)]=axs
+            self.figs['RTE_{}_{}_errors'.format(qb_name, self.error_type)] = fig
+            self.plot_dicts['RTE_{}_{}_errors'.format(qb_name, self.error_type)]={
                 'plotfn': plot_RTE_histogram,
-                'qubit_label': 'qubit {}'.format(i),
-                'ax_id': 'RTE_{}'.format(ch),
+                'ax_id': 'RTE_{}_{}_errors'.format(qb_name, self.error_type),
                 'initial_states' : self.initial_states,
                 'bin_centers': self.proc_data_dict[ch]['bins'],
                 'counts': [self.proc_data_dict[ch][state]['counts'] for state in self.initial_states],
                 'params': [self.proc_data_dict[ch][state]['fit_par'] for state in self.initial_states],
                 'success': [self.proc_data_dict[ch][state]['success'] for state in self.initial_states],
-                'RTE': [self.proc_data_dict[ch][state]['RTE'] for state in self.initial_states]
+                'RTE': [self.proc_data_dict[ch][state]['RTE'] for state in self.initial_states],
+                'qubit_label': qb_name,
+                'error_type': self.error_type,
+                'timestamp': self.timestamp
             }
 
     def run_post_extract(self):
@@ -2215,6 +2300,7 @@ def plot_RTE_histogram(qubit_label: str,
                        initial_states: list,
                        bin_centers, counts,
                        params, success, RTE,
+                       error_type: str, timestamp,
                        ax = None, **kw):
 
     for state in initial_states:
@@ -2231,7 +2317,7 @@ def plot_RTE_histogram(qubit_label: str,
     ax.set_yscale('log')
     set_xlabel(ax, 'cycle number')
     set_ylabel(ax, 'Error fraction')
-    ax.set_title('Qubit {} shots'.format(qubit_label))
+    ax.set_title('Qubit {} {} errors'.format(qubit_label, error_type))
     ax.set_xlim(-2, len(bin_centers)+2)
 
     S = []
@@ -2248,7 +2334,7 @@ def plot_RTE_histogram(qubit_label: str,
 
     ax.legend()
     fig = ax.get_figure()
-    # fig.suptitle('Measurement time {} ns'.format(500), y=1.05)
+    fig.suptitle('{}'.format(timestamp), y=1.05)
     fig.tight_layout()
 
 

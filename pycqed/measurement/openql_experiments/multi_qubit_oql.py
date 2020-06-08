@@ -2420,7 +2420,8 @@ def two_qubit_Depletion(q0: int, q1: int, platf_cfg: str,
 
 def Two_qubit_RTE(QX:int , QZ:int, platf_cfg: str,
                   measurements:int, net='i', start_states:list = ['0'],
-                  ramsey_time: int = 120, echo:bool = False):
+                  ramsey_time_1: int = 120, ramsey_time_2: int = 120,
+                  echo:bool = False):
     """
 
     """
@@ -2443,12 +2444,12 @@ def Two_qubit_RTE(QX:int , QZ:int, platf_cfg: str,
           k.gate('i', [QZ])
           # CZ emulation
           if echo:
-            k.gate('wait', [QX, QZ], int((ramsey_time-20)/2) )
+            k.gate('wait', [QX, QZ], int((ramsey_time_1-20)/2) )
             k.gate('rx180', [QX])
             k.gate('i', [QZ])
-            k.gate('wait', [QX, QZ], int((ramsey_time-20)/2) )
+            k.gate('wait', [QX, QZ], int((ramsey_time_1-20)/2) )
           else:
-            k.gate('wait', [QX, QZ], ramsey_time)
+            k.gate('wait', [QX, QZ], ramsey_time_1)
           # intermidate sequential
           if net == 'pi' or echo == True:
               k.gate('rx90', [QX])
@@ -2459,12 +2460,12 @@ def Two_qubit_RTE(QX:int , QZ:int, platf_cfg: str,
           k.gate('rx90', [QZ])
           # CZ emulation
           if echo:
-            k.gate('wait', [QX, QZ], int((ramsey_time-20)/2) )
+            k.gate('wait', [QX, QZ], int((ramsey_time_2-20)/2) )
             k.gate('rx180', [QZ])
             k.gate('i', [QX])
-            k.gate('wait', [QX, QZ], int((ramsey_time-20)/2) )
+            k.gate('wait', [QX, QZ], int((ramsey_time_2-20)/2) )
           else:
-            k.gate('wait', [QX, QZ], ramsey_time)
+            k.gate('wait', [QX, QZ], ramsey_time_2)
           # Recovery pulse
           k.gate('i', [QX])
           if net == 'pi' or echo == True:
