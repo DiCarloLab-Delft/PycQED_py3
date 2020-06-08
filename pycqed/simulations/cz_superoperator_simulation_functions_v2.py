@@ -992,20 +992,37 @@ def return_jump_operators(
     # time-dependent jump operators on q0
     if T2_q0_amplitude_dependent[0] != -1:
 
-        omega_0 = compute_sweetspot_frequency(
-            [1, 0, 0], sim_control_CZ.w_q0_sweetspot()
-        )
-        f_pulse = fluxlutman.calc_amp_to_freq(amp_final, "01", which_gate=which_gate)
-        f_pulse_final = np.clip(f_pulse, a_min=None, a_max=omega_0)
+    	if sim_control_CZ.purcell_device():
+    		# sorry for including this
+    		# I use it only when comparing VCZ and NZ in the Purcell device
+    		f_pulse_final = fluxlutman.calc_amp_to_freq(amp_final, "01", which_gate=which_gate)
+    		f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot()))
+	        sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],sim_control_CZ.w_q0_sweetspot()))
+	        for i in range(len(sensitivity)):
+	            if sensitivity[i] < 0.1:
+	                sensitivity[i] = 0.1
+	        inverse_sensitivity = 1/sensitivity
+	        T2_q0_vec=linear_with_offset(inverse_sensitivity,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1])
+	        for i in range(len(sensitivity)):    # manual fix for the TLS coupled at the sweetspot for Niels' Purcell device
+	            if sensitivity[i] <= 0.2:
+	                T2_q0_vec[i]=linear_with_offset(inverse_sensitivity[i],0,2e-6)
 
-        sensitivity = calc_sensitivity(
-            f_pulse_final, omega_0
-        )
-        T2_q0_vec = 1/linear_with_offset(
-            sensitivity,
-            T2_q0_amplitude_dependent[0],
-            T2_q0_amplitude_dependent[1],
-        )
+	    else:
+
+	        omega_0 = compute_sweetspot_frequency(
+	            [1, 0, 0], sim_control_CZ.w_q0_sweetspot()
+	        )
+	        f_pulse = fluxlutman.calc_amp_to_freq(amp_final, "01", which_gate=which_gate)
+	        f_pulse_final = np.clip(f_pulse, a_min=None, a_max=omega_0)
+
+	        sensitivity = calc_sensitivity(
+	            f_pulse_final, omega_0
+	        )
+	        T2_q0_vec = 1/linear_with_offset(
+	            sensitivity,
+	            T2_q0_amplitude_dependent[0],
+	            T2_q0_amplitude_dependent[1],
+	        )
 
         # plot(x_plot_vec=[f_pulse_final/1e9],
         #                   y_plot_vec=[T2_q0_vec*1e6],

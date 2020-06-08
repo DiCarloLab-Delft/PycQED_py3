@@ -192,6 +192,22 @@ class SimControlCZ_v2(Instrument):
             initial_value=True,
         )
 
+        self.add_parameter(
+            "look_for_minimum",
+            docstring="FB: If cost_func=None, if this is False my old cost func is used, if it's True that cost func is used to power 4",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value=False,
+        )
+
+        self.add_parameter(
+            "purcell_device",
+            docstring="FB: parameter used to replicate the TLS present in the purcell device in the computation of T2_q0",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value=False,
+        )
+
         # for ramsey/Rabi simulations
 
         self.add_parameter(
