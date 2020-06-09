@@ -104,6 +104,12 @@ class NoiseParametersCZ(Instrument):
                            parameter_class=ManualParameter, initial_value=0,
                            vals=vals.Numbers())
 
+        self.add_parameter('purcell_device',
+                           label='option used to compute T2_vec as we used to',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(),
+                           initial_value=False)
+
 
         # for ramsey/Rabi simulations
 
