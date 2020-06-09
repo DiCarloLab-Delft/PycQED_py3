@@ -24,6 +24,137 @@ default_mw_lutmap = {
     14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"}
 }
 
+inspire_mw_lutmap = {
+    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0  , "type" : "ge"}, # I for CW compatibility
+    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0  , "type" : "ge"}, # rX180 for CW compatibility
+    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90 , "type" : "ge"}, # rY180 for CW compatibility
+    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0  , "type" : "ge"}, # rX90 for CW compatibility
+    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90 , "type" : "ge"}, # rY90 for CW compatibility
+    5  : {"name" : "rX270" , "theta" : 6        , "phi" : 0  , "type" : "ge"}, # (OK) rXm90 for CW compatibility
+    6  : {"name" : "rY270" , "theta" : 12       , "phi" : 90 , "type" : "ge"}, # (OK) rYm90 for CW compatibility
+    7  : {"name" : "rX5"   , "theta" : 18       , "phi" : 0  , "type" : "ge"},
+    8  : {"name" : "rX11"  , "theta" : 24       , "phi" : 0  , "type" : "ge"},
+    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0  , "type" : "ef"}, # rX12 for CW compatibility
+    10 : {"name" : "rX16"  , "theta" : 36       , "phi" : 0  , "type" : "ge"},
+    11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90 , "type" : "ge"}, # rY45 for CW compatibility
+    12 : {"name" : "rY315" , "theta" : 42       , "phi" : 90 , "type" : "ge"}, # (OK) rYm45 for CW compatibility
+    13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0  , "type" : "ge"}, # rX45 for CW compatibility
+    14 : {"name" : "rX315" , "theta" : 48       , "phi" : 0  , "type" : "ge"}, # (OK) rXm45 for CW compatibility
+    15 : {"name" : "rX22" , "theta" : 48       , "phi" : 0  , "type" : "ge"},
+    16 : {"name" : "rX28"  , "theta" : 54       , "phi" : 0  , "type" : "ge"},
+    17 : {"name" : "rX33"  , "theta" : 60       , "phi" : 0  , "type" : "ge"},
+    18 : {"name" : "rX39"  , "theta" : 66       , "phi" : 0  , "type" : "ge"},
+    19 : {"name" : "rX50"  , "theta" : 72       , "phi" : 0  , "type" : "ge"},
+    20 : {"name" : "rX56"  , "theta" : 78       , "phi" : 0  , "type" : "ge"},
+    21 : {"name" : "rX61"  , "theta" : 84       , "phi" : 0  , "type" : "ge"},
+    22 : {"name" : "rX67"  , "theta" : 96       , "phi" : 0  , "type" : "ge"},
+    23 : {"name" : "rX73"  , "theta" : 102      , "phi" : 0  , "type" : "ge"},
+    24 : {"name" : "rX78"  , "theta" : 108      , "phi" : 0  , "type" : "ge"},
+    25 : {"name" : "rX84"  , "theta" : 114      , "phi" : 0  , "type" : "ge"},
+    26 : {"name" : "rX95"  , "theta" : 120      , "phi" : 0  , "type" : "ge"},
+    27 : {"name" : "rX101" , "theta" : 126      , "phi" : 0  , "type" : "ge"},
+    28 : {"name" : "rX106" , "theta" : 132      , "phi" : 0  , "type" : "ge"},
+    29 : {"name" : "rX112" , "theta" : 138      , "phi" : 0  , "type" : "ge"},
+    30 : {"name" : "rX118" , "theta" : 144      , "phi" : 0  , "type" : "ge"},
+    31 : {"name" : "rX123" , "theta" : 150      , "phi" : 0  , "type" : "ge"},
+    32 : {"name" : "rX129" , "theta" : 156      , "phi" : 0  , "type" : "ge"},
+    33 : {"name" : "rX135" , "theta" : 162      , "phi" : 0  , "type" : "ge"},
+    34 : {"name" : "rX140" , "theta" : 168      , "phi" : 0  , "type" : "ge"},
+    35 : {"name" : "rX146" , "theta" : 174      , "phi" : 0  , "type" : "ge"},
+    36 : {"name" : "rX151" , "theta" : -174     , "phi" : 0  , "type" : "ge"},
+    37 : {"name" : "rX157" , "theta" : -168     , "phi" : 0  , "type" : "ge"},
+    38 : {"name" : "rX163" , "theta" : -162     , "phi" : 0  , "type" : "ge"},
+    39 : {"name" : "rX168" , "theta" : -156     , "phi" : 0  , "type" : "ge"},
+    40 : {"name" : "rX174" , "theta" : -150     , "phi" : 0  , "type" : "ge"},
+    41 : {"name" : "rX185" , "theta" : -144     , "phi" : 0  , "type" : "ge"},
+    42 : {"name" : "rX191" , "theta" : -138     , "phi" : 0  , "type" : "ge"},
+    43 : {"name" : "rX196" , "theta" : -132     , "phi" : 0  , "type" : "ge"},
+    44 : {"name" : "rX202" , "theta" : -126     , "phi" : 0  , "type" : "ge"},
+    45 : {"name" : "rX208" , "theta" : -120     , "phi" : 0  , "type" : "ge"},
+    46 : {"name" : "rX213" , "theta" : -114     , "phi" : 0  , "type" : "ge"},
+    47 : {"name" : "rX219" , "theta" : -108     , "phi" : 0  , "type" : "ge"},
+    48 : {"name" : "rX225" , "theta" : -102     , "phi" : 0  , "type" : "ge"},
+    49 : {"name" : "rX230" , "theta" : -96      , "phi" : 0  , "type" : "ge"},
+    50 : {"name" : "rX236" , "theta" : -90      , "phi" : 0  , "type" : "ge"},
+    51 : {"name" : "rX241" , "theta" : -84      , "phi" : 0  , "type" : "ge"},
+    52 : {"name" : "rX247" , "theta" : -78      , "phi" : 0  , "type" : "ge"},
+    53 : {"name" : "rX253" , "theta" : -72      , "phi" : 0  , "type" : "ge"},
+    54 : {"name" : "rX258" , "theta" : -66      , "phi" : 0  , "type" : "ge"},
+    55 : {"name" : "rX264" , "theta" : -60      , "phi" : 0  , "type" : "ge"},
+    56 : {"name" : "rX275" , "theta" : -54      , "phi" : 0  , "type" : "ge"},
+    57 : {"name" : "rX281" , "theta" : -48      , "phi" : 0  , "type" : "ge"},
+    58 : {"name" : "rX286" , "theta" : -45      , "phi" : 0  , "type" : "ge"},
+    59 : {"name" : "rX292" , "theta" : -42      , "phi" : 0  , "type" : "ge"},
+    60 : {"name" : "rX298" , "theta" : -36      , "phi" : 0  , "type" : "ge"},
+    61 : {"name" : "rX303" , "theta" : -30      , "phi" : 0  , "type" : "ge"},
+    62 : {"name" : "rX309" , "theta" : -24      , "phi" : 0  , "type" : "ge"},
+    63 : {"name" : "rX320" , "theta" : -18      , "phi" : 0  , "type" : "ge"},
+    64 : {"name" : "rX326" , "theta" : -12      , "phi" : 0  , "type" : "ge"},
+    65 : {"name" : "rX331" , "theta" : -6       , "phi" : 0  , "type" : "ge"},
+    66 : {"name" : "rX337" , "theta" : 6        , "phi" : 0  , "type" : "ge"},
+    67 : {"name" : "rX343" , "theta" : 12       , "phi" : 0  , "type" : "ge"},
+    68 : {"name" : "rX348" , "theta" : 18       , "phi" : 0  , "type" : "ge"},
+    69 : {"name" : "rX354" , "theta" : 24       , "phi" : 0  , "type" : "ge"},
+    70 : {"name" : "rY5"  , "theta" : 30        , "phi" : 90 , "type" : "ge"}
+    71 : {"name" : "rY11" , "theta" : 36        , "phi" : 90 , "type" : "ge"},
+    72 : {"name" : "rY16" , "theta" : 42        , "phi" : 90 , "type" : "ge"},
+    73 : {"name" : "rY22" , "theta" : 48        , "phi" : 90 , "type" : "ge"},
+    74 : {"name" : "rY28" , "theta" : 54        , "phi" : 90 , "type" : "ge"},
+    75 : {"name" : "rY33" , "theta" : 60        , "phi" : 90 , "type" : "ge"},
+    76 : {"name" : "rY39" , "theta" : 66        , "phi" : 90 , "type" : "ge"},
+    77 : {"name" : "rY50" , "theta" : 72        , "phi" : 90 , "type" : "ge"},
+    78 : {"name" : "rY56" , "theta" : 78        , "phi" : 90 , "type" : "ge"},
+    79 : {"name" : "rY61" , "theta" : 84        , "phi" : 90 , "type" : "ge"},
+    80 : {"name" : "rY67" , "theta" : 96        , "phi" : 90 , "type" : "ge"},
+    81 : {"name" : "rY73" , "theta" : 102       , "phi" : 90 , "type" : "ge"},
+    82 : {"name" : "rY78" , "theta" : 108       , "phi" : 90 , "type" : "ge"},
+    83 : {"name" : "rY84" , "theta" : 114       , "phi" : 90 , "type" : "ge"},
+    84 : {"name" : "rY95" , "theta" : 120       , "phi" : 90 , "type" : "ge"},
+    85 : {"name" : "rY101" , "theta" : 126      , "phi" : 90 , "type" : "ge"},
+    86 : {"name" : "rY106" , "theta" : 132      , "phi" : 90 , "type" : "ge"},
+    87 : {"name" : "rY112" , "theta" : 138      , "phi" : 90 , "type" : "ge"},
+    88 : {"name" : "rY118" , "theta" : 144      , "phi" : 90 , "type" : "ge"},
+    89 : {"name" : "rY123" , "theta" : 150      , "phi" : 90 , "type" : "ge"},
+    90 : {"name" : "rY129" , "theta" : 156      , "phi" : 90 , "type" : "ge"},
+    91 : {"name" : "rY135" , "theta" : 162      , "phi" : 90 , "type" : "ge"},
+    92 : {"name" : "rY140" , "theta" : 168      , "phi" : 90 , "type" : "ge"},
+    93 : {"name" : "rY146" , "theta" : 174      , "phi" : 90 , "type" : "ge"},
+    94 : {"name" : "rY151" , "theta" : -174     , "phi" : 90 , "type" : "ge"},
+    95 : {"name" : "rY157" , "theta" : -168     , "phi" : 90 , "type" : "ge"},
+    96 : {"name" : "rY163" , "theta" : -162     , "phi" : 90 , "type" : "ge"},
+    97 : {"name" : "rY168" , "theta" : -156     , "phi" : 90 , "type" : "ge"},
+    98 : {"name" : "rY174" , "theta" : -150     , "phi" : 90 , "type" : "ge"},
+    99 : {"name" : "rY185" , "theta" : -144     , "phi" : 90 , "type" : "ge"},
+    100: {"name" : "rY191" , "theta" : -138     , "phi" : 90 , "type" : "ge"},
+    101: {"name" : "rY196" , "theta" : -132     , "phi" : 90 , "type" : "ge"},
+    102: {"name" : "rY202" , "theta" : -126     , "phi" : 90 , "type" : "ge"},
+    103: {"name" : "rY208" , "theta" : -120     , "phi" : 90 , "type" : "ge"},
+    104: {"name" : "rY213" , "theta" : -114     , "phi" : 90 , "type" : "ge"},
+    105: {"name" : "rY219" , "theta" : -108     , "phi" : 90 , "type" : "ge"},
+    106: {"name" : "rY225" , "theta" : -102     , "phi" : 90 , "type" : "ge"},
+    107: {"name" : "rY230" , "theta" : -96      , "phi" : 90 , "type" : "ge"},
+    108: {"name" : "rY236" , "theta" : -90      , "phi" : 90 , "type" : "ge"},
+    109: {"name" : "rY241" , "theta" : -84      , "phi" : 90 , "type" : "ge"},
+    110: {"name" : "rY247" , "theta" : -78      , "phi" : 90 , "type" : "ge"},
+    111: {"name" : "rY253" , "theta" : -72      , "phi" : 90 , "type" : "ge"},
+    112: {"name" : "rY258" , "theta" : -66      , "phi" : 90 , "type" : "ge"},
+    113: {"name" : "rY264" , "theta" : -60      , "phi" : 90 , "type" : "ge"},
+    114: {"name" : "rY275" , "theta" : -54      , "phi" : 90 , "type" : "ge"},
+    115: {"name" : "rY281" , "theta" : -48      , "phi" : 90 , "type" : "ge"},
+    116: {"name" : "rY286" , "theta" : -45      , "phi" : 90 , "type" : "ge"},
+    117: {"name" : "rY292" , "theta" : -42      , "phi" : 90 , "type" : "ge"},
+    118: {"name" : "rY298" , "theta" : -36      , "phi" : 90 , "type" : "ge"},
+    119: {"name" : "rY303" , "theta" : -30      , "phi" : 90 , "type" : "ge"},
+    120: {"name" : "rY309" , "theta" : -24      , "phi" : 90 , "type" : "ge"},
+    121: {"name" : "rY320" , "theta" : -18      , "phi" : 90 , "type" : "ge"},
+    122: {"name" : "rY326" , "theta" : -12      , "phi" : 90 , "type" : "ge"},
+    123: {"name" : "rY331" , "theta" : -6       , "phi" : 90 , "type" : "ge"},
+    124: {"name" : "rY337" , "theta" : -6       , "phi" : 90 , "type" : "ge"}
+    125: {"name" : "rY343" , "theta" : -6       , "phi" : 90 , "type" : "ge"},
+    126: {"name" : "rY348" , "theta" : -6       , "phi" : 90 , "type" : "ge"},
+    127: {"name" : "rY354" , "theta" : -6       , "phi" : 90 , "type" : "ge"}
+}
+
 valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square'}
 
 # _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
@@ -89,6 +220,10 @@ class Base_MW_LutMan(Base_LutMan):
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
         self.LutMap(default_mw_lutmap.copy())
+
+    def set_inspire_lutmap(self):
+        """Set the default lutmap for standard microwave drive pulses."""
+        self.LutMap(inspire_mw_lutmap.copy())
 
     def codeword_idx_to_parnames(self, cw_idx: int):
         """Convert a codeword_idx to a list of par names for the waveform."""
