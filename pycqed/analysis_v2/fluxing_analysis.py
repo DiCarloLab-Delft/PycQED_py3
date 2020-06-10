@@ -1269,17 +1269,28 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     )
 
         self.proc_data_dict["interpolated_values"] = []
+        self.proc_data_dict["interpolators"] = []
+        interps = self.proc_data_dict["interpolators"]
         for i in range(len(self.proc_data_dict["value_names"])):
             if self.proc_data_dict["value_units"][i] == "deg":
                 interp_method = "deg"
             else:
                 interp_method = self.interp_method
 
-            x_int, y_int, z_int = plt_interp.interpolate_heatmap(
+            ip = plt_interp.HeatmapInterpolator(
                 self.proc_data_dict["x"],
                 self.proc_data_dict["y"],
                 self.proc_data_dict["measured_values"][i],
                 interp_method=interp_method,
+                rescale=True
+            )
+            interps.append(ip)
+
+            x_int, y_int, z_int = plt_interp.interpolate_heatmap(
+                x=self.proc_data_dict["x"],
+                y=self.proc_data_dict["y"],
+                ip=ip,
+                n=300,  # avoid calculation of areas
                 interp_grid_data=self.interp_grid_data,
             )
             self.proc_data_dict["interpolated_values"].append(z_int)
@@ -1412,7 +1423,10 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             self._proc_hulls()
 
         if len(self.save_cond_phase_contours):
-            self._proc_cond_phase_contours(angle_thr=0.5)
+            self._proc_cond_phase_contours(angle_thr=0.3)
+            self._proc_mv_along_contours()
+            if self.gen_optima_hulls:
+                self._proc_mv_along_contours_in_hulls()
 
         # Save quantities of interest
         save_these = {
@@ -1425,7 +1439,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             "clusters_pnts_colors",
             "hull_vertices",
             "cond_phase_contours",
-            "cond_phase_contours_orig",
+            "cond_phase_contours_simplified",
         }
         pdd = self.proc_data_dict
         quantities_of_interest = dict()
@@ -1534,8 +1548,54 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         else:
             log.debug("Conditional phase data for contours not found.")
 
-        self.proc_data_dict["cond_phase_contours"] = c_dict
-        self.proc_data_dict["cond_phase_contours_orig"] = c_dict_orig
+        self.proc_data_dict["cond_phase_contours_simplified"] = c_dict
+        self.proc_data_dict["cond_phase_contours"] = c_dict_orig
+
+    def _proc_mv_along_contours(self):
+        interpolators = self.proc_data_dict["interpolators"]
+        self.proc_data_dict["measured_values_along_contours"] = []
+        mvac = self.proc_data_dict["measured_values_along_contours"]
+        cpc = self.proc_data_dict["cond_phase_contours"]
+
+        for interp in interpolators:
+            mv_levels_dict = OrderedDict()
+            for level, cntrs_dict in cpc.items():
+                mv_cntrs_dict = OrderedDict()
+                for cntr_id, pnts in cntrs_dict.items():
+                    scaled_pnts = interp.scale(pnts)
+                    mv_cntrs_dict[cntr_id] = interp(*scaled_pnts.T)
+
+                mv_levels_dict[level] = mv_cntrs_dict
+
+            mvac.append(mv_levels_dict)
+
+    def _proc_mv_along_contours_in_hulls(self):
+        self.proc_data_dict["measured_values_along_contours_in_hulls"] = []
+
+        hvs = self.proc_data_dict["hull_vertices"]
+        mvach = self.proc_data_dict["measured_values_along_contours_in_hulls"]
+        cpc = self.proc_data_dict["cond_phase_contours"]
+
+        for i, mvac in enumerate(self.proc_data_dict["measured_values_along_contours"]):
+            hulls_dict = OrderedDict()
+            for hull_id, hv in hvs.items():
+                mv_levels_dict = OrderedDict()
+                for level, cntrs_dict in cpc.items():
+                    mv_cntrs_dict = OrderedDict()
+                    for cntr_id, pnts in cntrs_dict.items():
+                        where = np.where(c2d.in_hull(pnts, hv))
+                        if len(where[0]):
+                            # Only create entry if there are any pnts inside
+                            # the hull
+                            mv_cntrs_dict[cntr_id] = {
+                                "pnts": pnts[where],
+                                "vals": mvac[level][cntr_id][where],
+                            }
+                    mv_levels_dict[level] = mv_cntrs_dict
+
+                hulls_dict[hull_id] = mv_levels_dict
+
+            mvach.append(hulls_dict)
 
     def plot_text(self, pdict, axs):
         """
