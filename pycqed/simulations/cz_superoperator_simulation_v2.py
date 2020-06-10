@@ -116,37 +116,38 @@ def f_to_parallelize_v2(arglist):
                 exp_metadata=exp_metadata,
             )
 
-    coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
-        label=additional_pars["label"],
-        close_figs=True,
-        extract_only=False,
-        plt_orig_pnts=True,
-        plt_contour_L1=True,
-        plt_contour_phase=True,
-        plt_optimal_values=True,
-        plt_optimal_values_max=1,
-        find_local_optimals=True,
-        plt_clusters=False,
-        cluster_from_interp=False,
-        # Saturate colors to limits of interest
-        clims={
-            'L1': [0, 5],
-            "Cost func": [0., 100]
-        },
-        target_cond_phase=180,
-        # Thse allow to select the best points
-        phase_thr=7,
-        L1_thr=.5,
-        clustering_thr=0.15,
-        # These allow to generate the boundaries of the optimal regions
-        # that can be used as boundaries for LearnerND/LearnerND_Minimizer
-        gen_optima_hulls=True,
-        plt_optimal_hulls=True,
-        hull_L1_thr=.5,
-        hull_phase_thr=7,
-        # In case we do linear sweeps
-        interp_grid_data=False
-    )
+    if not sim_control_CZ.cluster():
+        coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
+            label=additional_pars["label"],
+            close_figs=True,
+            extract_only=False,
+            plt_orig_pnts=True,
+            plt_contour_L1=True,
+            plt_contour_phase=True,
+            plt_optimal_values=True,
+            plt_optimal_values_max=1,
+            find_local_optimals=True,
+            plt_clusters=False,
+            cluster_from_interp=False,
+            # Saturate colors to limits of interest
+            clims={
+                'L1': [0, 5],
+                "Cost func": [0., 100]
+            },
+            target_cond_phase=180,
+            # Thse allow to select the best points
+            phase_thr=7,
+            L1_thr=.5,
+            clustering_thr=0.15,
+            # These allow to generate the boundaries of the optimal regions
+            # that can be used as boundaries for LearnerND/LearnerND_Minimizer
+            gen_optima_hulls=True,
+            plt_optimal_hulls=True,
+            hull_L1_thr=.5,
+            hull_phase_thr=7,
+            # In case we do linear sweeps
+            interp_grid_data=False
+        )
 
     fluxlutman.close()
     fluxlutman_static.close()
