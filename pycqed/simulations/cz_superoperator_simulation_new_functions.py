@@ -872,7 +872,6 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         if noise_parameters_CZ.purcell_device():
             # sorry for including this
             # I use it only when comparing VCZ and NZ in the Purcell device
-            f_pulse_final = fluxlutman.calc_amp_to_freq(amp_final, "01", which_gate=which_gate)
             f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
             sensitivity = calc_sensitivity(f_pulse_final,compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
             for i in range(len(sensitivity)):
@@ -1380,7 +1379,8 @@ def return_instrument_args(fluxlutman,noise_parameters_CZ):
                                 'repetitions': noise_parameters_CZ.repetitions(),
                                 'time_series': noise_parameters_CZ.time_series(),
                                 'overrotation_sims': noise_parameters_CZ.overrotation_sims(),
-                                'axis_overrotation': noise_parameters_CZ.axis_overrotation()}
+                                'axis_overrotation': noise_parameters_CZ.axis_overrotation(),
+                                'purcell_device': noise_parameters_CZ.purcell_device()}
 
     return fluxlutman_args, noise_parameters_CZ_args
 
@@ -1426,6 +1426,7 @@ def return_instrument_from_arglist(fluxlutman,fluxlutman_args,noise_parameters_C
     noise_parameters_CZ.time_series(noise_parameters_CZ_args['time_series'])
     noise_parameters_CZ.overrotation_sims(noise_parameters_CZ_args['overrotation_sims'])
     noise_parameters_CZ.axis_overrotation(noise_parameters_CZ_args['axis_overrotation'])
+    noise_parameters_CZ.purcell_device(noise_parameters_CZ_args['purcell_device'])
 
     return fluxlutman, noise_parameters_CZ
 
