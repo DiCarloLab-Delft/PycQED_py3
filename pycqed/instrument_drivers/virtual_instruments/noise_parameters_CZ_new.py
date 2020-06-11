@@ -105,7 +105,7 @@ class NoiseParametersCZ(Instrument):
                            vals=vals.Numbers())
 
         self.add_parameter('purcell_device',
-                           label='option used to compute T2_vec as we used to',
+                           label="FB: should be set to True only when we want to use the old way of defining T2_q0_amplitude_dependent, so it could be that we simulate the purcell device but we set this parameter to False",,
                            parameter_class=ManualParameter,
                            vals=vals.Bool(),
                            initial_value=False)
