@@ -886,9 +886,14 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
         else:
 
             f_pulse_final = np.clip(f_pulse_final,a_min=None,a_max=compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()))
-            Tphi01_q0_vec = eval_freq_dep_t_phi_new(f_pulse_final, 
+            T2_q0_vec = eval_freq_dep_t2_new(f_pulse_final, 
                                                 compute_sweetspot_frequency([1,0,0],noise_parameters_CZ.w_q0_sweetspot()), 
                                                 T2_q0_amplitude_dependent)
+
+        if T1_q0 != 0:
+            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0, T2_q0_vec)
+        else:
+            Tphi01_q0_vec = T2_q0_vec
 
         # plot(x_plot_vec=[f_pulse_final/1e9],
         #                   y_plot_vec=[T2_q0_vec*1e6],
@@ -903,13 +908,13 @@ def return_jump_operators(noise_parameters_CZ, f_pulse_final, fluxlutman):
                                     Tphi01_q0_vec * noise_parameters_CZ.T2_scaling(),Tphi01_q1 * noise_parameters_CZ.T2_scaling())
     return c_ops
 
-def eval_freq_dep_t_phi_new(freq, freq_sweet, coeffs):
+def eval_freq_dep_t2_new(freq, freq_sweet, coeffs):
     freq = np.clip(freq, a_min=None, a_max=freq_sweet)
     sensitivity = get_flux_sensitivity_v2(freq, freq_sweet)
     #sensitivity[sensitivity < 1e-3] = 1e-3
     deph_rate = linear_with_offset(sensitivity, coeffs)
-    t_phi = 1 / deph_rate
-    return t_phi
+    t2 = 1 / deph_rate
+    return t2
 
 def get_flux_sensitivity(freq, freq_q_sweet, charge_energy=0):
     cur_freq = (freq + charge_energy)
