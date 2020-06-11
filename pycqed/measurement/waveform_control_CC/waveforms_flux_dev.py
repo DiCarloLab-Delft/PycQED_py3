@@ -1,7 +1,7 @@
 """
     File:               waveforms_flux_dev.py
     Author:             Victor Negîrneac
-    Purpose:            generate flux CZ gate waveforms
+    Purpose:            generate flux VCZ gate waveforms
     Prerequisites:
     Usage:
     Bugs:
