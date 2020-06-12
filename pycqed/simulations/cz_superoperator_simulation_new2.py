@@ -221,9 +221,11 @@ def compute_propagator(arglist):
         amp_final = amp
 
     # Uncomment to get plots of the distorted pulse.
-    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final],
-    #                          title='Pulse with distortions, absolute',
-    #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
+    # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9, np.array(tlist_new)*1e9],y_plot_vec=[fluxlutman.calc_amp_to_freq(amp, '01') / 1e9, 
+    #                                                                                    fluxlutman.calc_amp_to_freq(amp_final, '01') / 1e9],
+    #                          title='Pulse with and without distortions',
+    #                          xlabel='Time (ns)',ylabel='Frequency (GHz)',
+    #                          legend_labels = ['without', 'with'])
     # czf.plot(x_plot_vec=[np.array(tlist_new)*1e9],y_plot_vec=[amp_final-amp],
     #                          title='Pulse with distortions, difference',
     #                            xlabel='Time (ns)',ylabel='Amplitude (volts)')
