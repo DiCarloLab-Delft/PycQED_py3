@@ -2269,6 +2269,7 @@ class DeviceCCL(Instrument):
         measure_parked_qubit=False,
         target_qubit_sequence: str = "ramsey",
         waveform_name="square",
+        recover_q_spec: bool = False,
     ):
         """
         Measure a chevron patter of esulting from swapping of the excitations
@@ -2323,12 +2324,15 @@ class DeviceCCL(Instrument):
             pow_tone (float):
                 When spec_tone = True, controls the power of the spec source
 
+            recover_q_spec (bool):
+                applies the first gate of qspec at the end as well if `True`
+
         Circuit:
             q0    -x180-flux-x180-RO-
-            qspec --x90-----------RO- (target_qubit_sequence='ramsey')
+            qspec --x90-----(x90)-RO- (target_qubit_sequence='ramsey')
 
             q0    -x180-flux-x180-RO-
-            qspec -x180-----------RO- (target_qubit_sequence='excited')
+            qspec -x180----(x180)-RO- (target_qubit_sequence='excited')
 
             q0    -x180-flux-x180-RO-
             qspec ----------------RO- (target_qubit_sequence='ground')
@@ -2399,6 +2403,7 @@ class DeviceCCL(Instrument):
             platf_cfg=self.cfg_openql_platform_fn(),
             target_qubit_sequence=target_qubit_sequence,
             cc=self.instr_CC.get_instr().name,
+            recover_q_spec=recover_q_spec,
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
@@ -2668,15 +2673,21 @@ class DeviceCCL(Instrument):
                 "bounds": bounds,
                 "loss_per_interval": loss,
                 "minimize": minimize,
+                # A few uniform points to make more likely to find the peak
+                # Not working yet...
+                # "X0": np.linspace(np.min(bounds), np.max(bounds), 10)[1:-1]
             }
-
+            bounds_neg = np.flip(-np.array(bounds), 0)
             adaptive_pars_neg = {
                 "adaptive_function": l1dm.Learner1D_Minimizer,
                 "goal": lambda l: goal(l) or l.npoints > adaptive_num_pts_max,
                 # NB: order of the bounds matters, mind negative numbers ordering
-                "bounds": np.flip(-np.array(bounds), 0),
+                "bounds": bounds_neg,
                 "loss_per_interval": loss,
                 "minimize": minimize,
+                # A few uniform points to make more likely to find the peak
+                # Not working yet...
+                # X0": np.linspace(np.min(bounds_neg), np.max(bounds_neg), 10)[1:-1]
             }
 
             MC.set_sweep_functions([amp_par, flux_bias_par])
