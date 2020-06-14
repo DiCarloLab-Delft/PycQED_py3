@@ -202,7 +202,7 @@ class SimControlCZ_v2(Instrument):
 
         self.add_parameter(
             "purcell_device",
-            docstring="FB: parameter used to replicate the TLS present in the purcell device in the computation of T2_q0",
+            docstring="FB: should be set to True only when we want to use the old way of defining T2_q0_amplitude_dependent, so it could be that we simulate the purcell device but we set this parameter to False",
             parameter_class=ManualParameter,
             vals=vals.Bool(),
             initial_value=False,

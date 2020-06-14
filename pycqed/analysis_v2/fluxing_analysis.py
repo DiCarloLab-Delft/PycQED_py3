@@ -1134,14 +1134,11 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     "xvals": x_vals,
                     "xlabel": self.raw_data_dict["xlabel"],
                     "xunit": self.raw_data_dict["xunit"],
-
                     "yvals": y_vals,
                     "ylabel": self.raw_data_dict["ylabel"],
                     "yunit": self.raw_data_dict["yunit"],
-
                     "yrange": self.options_dict.get("yrange", None),
                     "xrange": self.options_dict.get("xrange", None),
-
                     "setlabel": "hull #" + hull_id,
                     "title": "{}\n{}".format(
                         self.timestamp, self.proc_data_dict["measurementstring"]
@@ -1149,11 +1146,15 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     "do_legend": True,
                     "legend_pos": "best",
                     "marker": "",  # don't use markers
-                    "linestyle": "-"
+                    "linestyle": "-",
+                    # Fixing the assigned color so that it can be matched on
+                    # other plots
+                    "color": "C" + str(int(hull_id) % 10),
                 }
 
         if len(self.save_cond_phase_contours):
             c_dict = self.proc_data_dict["cond_phase_contours"]
+            i = 0
             for level, contours in c_dict.items():
                 for contour_id, contour in contours.items():
                     x_vals, y_vals = np.transpose(contour)
@@ -1164,15 +1165,12 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                         "xvals": x_vals,
                         "xlabel": self.raw_data_dict["xlabel"],
                         "xunit": self.raw_data_dict["xunit"],
-
                         "yvals": y_vals,
                         "ylabel": self.raw_data_dict["ylabel"],
                         "yunit": self.raw_data_dict["yunit"],
-
                         "yrange": self.options_dict.get("yrange", None),
                         "xrange": self.options_dict.get("xrange", None),
-
-                        "setlabel": "contour " + level + " #" + contour_id,
+                        "setlabel": level + " #" + contour_id,
                         "title": "{}\n{}".format(
                             self.timestamp, self.proc_data_dict["measurementstring"]
                         ),
@@ -1180,8 +1178,131 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                         "legend_pos": "best",
                         "legend_ncol": 2,
                         "marker": "",  # don't use markers
-                        "linestyle": "--"
+                        "linestyle": "--",
+                        # Continuing the color cycle
+                        "color": "C" + str(len(sorted_hull_vertices) % 10 + i),
                     }
+                    i += 1
+
+        # Plotting all quantities along the raw contours of conditional phase
+        mvac = self.proc_data_dict.get("measured_values_along_contours", [])
+        for i, mv_levels_dict in enumerate(mvac):
+            # We iterate over all measured quantities and for each create a
+            # plot that has the measured quantity along all contours
+            j = 0
+            for level, cntrs_dict in mv_levels_dict.items():
+                for cntr_id, mvs in cntrs_dict.items():
+                    c_pnts = self.proc_data_dict["cond_phase_contours"][level][cntr_id]
+                    x_vals = c2d.distance_along_2D_contour(c_pnts, True, True)
+
+                    vln = self.proc_data_dict["value_names"][i]
+                    vlu = self.proc_data_dict["value_units"][i]
+                    plt_dict_label = "contour_" + vln + "_" + level + "_#" + cntr_id
+                    self.plot_dicts[plt_dict_label] = {
+                        "ax_id": "contours_" + vln,
+                        "plotfn": self.plot_line,
+                        "xvals": x_vals,
+                        "xlabel": "Normalized distance along contour",
+                        "xunit": "a.u.",
+                        "yvals": mvs,
+                        "ylabel": vln,
+                        "yunit": vlu,
+                        "setlabel": level + " #" + cntr_id,
+                        "title": "{}\n{}".format(
+                            self.timestamp, self.proc_data_dict["measurementstring"]
+                        ),
+                        "do_legend": True,
+                        "legend_pos": "best",
+                        "legend_ncol": 2,
+                        "marker": "",  # don't use markers
+                        "linestyle": "-",
+                        "color": "C" + str(len(sorted_hull_vertices) % 10 + j),
+                    }
+                    j += 1
+
+        # Plotting all quantities along the raw contours of conditional phase
+        # only inside hulls
+        mvac = self.proc_data_dict.get("measured_values_along_contours_in_hulls", [])
+        for i, hulls_dict in enumerate(mvac):
+            # We iterate over all measured quantities and for each create a
+            # plot that has the measured quantity along all contours
+            for hull_id, mv_levels_dict in hulls_dict.items():
+                j = 0
+                for level, cntrs_dict in mv_levels_dict.items():
+                    for cntr_id, c_dict in cntrs_dict.items():
+                        c_pnts = c_dict["pnts"]
+                        mvs = c_dict["vals"]
+                        if len(c_pnts):
+                            # Only do stuff if there are any point in the hull
+                            x_vals = c2d.distance_along_2D_contour(c_pnts, True, True)
+
+                            vln = self.proc_data_dict["value_names"][i]
+                            vlu = self.proc_data_dict["value_units"][i]
+                            plt_dict_label = (
+                                "contour_"
+                                + vln
+                                + "_hull_#"
+                                + hull_id
+                                + level
+                                + "_#"
+                                + cntr_id
+                            )
+                            self.plot_dicts[plt_dict_label] = {
+                                "ax_id": "contours_" + vln + "_in_hull",
+                                "plotfn": self.plot_line,
+                                "xvals": x_vals,
+                                "xlabel": "Normalized distance along contour",
+                                "xunit": "a.u.",
+                                "yvals": mvs,
+                                "ylabel": vln,
+                                "yunit": vlu,
+                                "setlabel": level + " #" + cntr_id,
+                                "title": "{}\n{}".format(
+                                    self.timestamp,
+                                    self.proc_data_dict["measurementstring"],
+                                ),
+                                "do_legend": True,
+                                "legend_pos": "best",
+                                "legend_ncol": 2,
+                                "marker": "",  # don't use markers
+                                "linestyle": "-",
+                                "color": "C" + str(len(sorted_hull_vertices) % 10 + j),
+                            }
+                            plt_dict_label = (
+                                "contour_"
+                                + vln
+                                + "_hull_#"
+                                + hull_id
+                                + level
+                                + "_#"
+                                + cntr_id
+                                + "_hull_color"
+                            )
+                            # We plot with the contour color so that things
+                            # can be matched with the contours on the 2D plot
+                            extra_pnts_idx = len(x_vals) // 3
+                            self.plot_dicts[plt_dict_label] = {
+                                "ax_id": "contours_" + vln + "_in_hull",
+                                "plotfn": self.plot_line,
+                                "xvals": x_vals[[0, extra_pnts_idx, -extra_pnts_idx, -1]],
+                                "xlabel": "Normalized distance along contour",
+                                "xunit": "a.u.",
+                                "yvals": mvs[[0, extra_pnts_idx, -extra_pnts_idx, -1]],
+                                "ylabel": vln,
+                                "yunit": vlu,
+                                "setlabel": "hull #" + hull_id,
+                                "title": "{}\n{}".format(
+                                    self.timestamp,
+                                    self.proc_data_dict["measurementstring"],
+                                ),
+                                "do_legend": True,
+                                "legend_pos": "best",
+                                "legend_ncol": 2,
+                                "marker": "o",  # don't use markers
+                                "linestyle": "",
+                                "color": "C" + str(int(hull_id) % 10),
+                            }
+                        j += 1
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
@@ -1269,17 +1390,28 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                     )
 
         self.proc_data_dict["interpolated_values"] = []
+        self.proc_data_dict["interpolators"] = []
+        interps = self.proc_data_dict["interpolators"]
         for i in range(len(self.proc_data_dict["value_names"])):
             if self.proc_data_dict["value_units"][i] == "deg":
                 interp_method = "deg"
             else:
                 interp_method = self.interp_method
 
-            x_int, y_int, z_int = plt_interp.interpolate_heatmap(
+            ip = plt_interp.HeatmapInterpolator(
                 self.proc_data_dict["x"],
                 self.proc_data_dict["y"],
                 self.proc_data_dict["measured_values"][i],
                 interp_method=interp_method,
+                rescale=True,
+            )
+            interps.append(ip)
+
+            x_int, y_int, z_int = plt_interp.interpolate_heatmap(
+                x=self.proc_data_dict["x"],
+                y=self.proc_data_dict["y"],
+                ip=ip,
+                n=300,  # avoid calculation of areas
                 interp_grid_data=self.interp_grid_data,
             )
             self.proc_data_dict["interpolated_values"].append(z_int)
@@ -1412,7 +1544,10 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             self._proc_hulls()
 
         if len(self.save_cond_phase_contours):
-            self._proc_cond_phase_contours(angle_thr=0.5)
+            self._proc_cond_phase_contours(angle_thr=0.3)
+            self._proc_mv_along_contours()
+            if self.gen_optima_hulls:
+                self._proc_mv_along_contours_in_hulls()
 
         # Save quantities of interest
         save_these = {
@@ -1425,7 +1560,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             "clusters_pnts_colors",
             "hull_vertices",
             "cond_phase_contours",
-            "cond_phase_contours_orig",
+            "cond_phase_contours_simplified",
         }
         pdd = self.proc_data_dict
         quantities_of_interest = dict()
@@ -1525,6 +1660,11 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                 for j, c in enumerate(contours[i]):
                     # To save in hdf5 several unpredictably shaped np.arrays
                     # we need a dictionary format here
+
+                    # By convention we will make the contours start left to
+                    # right on the x axis
+                    if c[0][0] > c[-1][0]:
+                        c = np.flip(c, axis=0)
                     same_level_dict_orig[str(j)] = c
                     same_level_dict[str(j)] = c2d.simplify_2D_path(c, angle_thr)
 
@@ -1534,8 +1674,53 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         else:
             log.debug("Conditional phase data for contours not found.")
 
-        self.proc_data_dict["cond_phase_contours"] = c_dict
-        self.proc_data_dict["cond_phase_contours_orig"] = c_dict_orig
+        self.proc_data_dict["cond_phase_contours_simplified"] = c_dict
+        self.proc_data_dict["cond_phase_contours"] = c_dict_orig
+
+    def _proc_mv_along_contours(self):
+        interpolators = self.proc_data_dict["interpolators"]
+        self.proc_data_dict["measured_values_along_contours"] = []
+        mvac = self.proc_data_dict["measured_values_along_contours"]
+        cpc = self.proc_data_dict["cond_phase_contours"]
+
+        for interp in interpolators:
+            mv_levels_dict = OrderedDict()
+            for level, cntrs_dict in cpc.items():
+                mv_cntrs_dict = OrderedDict()
+                for cntr_id, pnts in cntrs_dict.items():
+                    scaled_pnts = interp.scale(pnts)
+                    mv_cntrs_dict[cntr_id] = interp(*scaled_pnts.T)
+
+                mv_levels_dict[level] = mv_cntrs_dict
+
+            mvac.append(mv_levels_dict)
+
+    def _proc_mv_along_contours_in_hulls(self):
+        self.proc_data_dict["measured_values_along_contours_in_hulls"] = []
+
+        hvs = self.proc_data_dict["hull_vertices"]
+        mvach = self.proc_data_dict["measured_values_along_contours_in_hulls"]
+        cpc = self.proc_data_dict["cond_phase_contours"]
+
+        for i, mvac in enumerate(self.proc_data_dict["measured_values_along_contours"]):
+            hulls_dict = OrderedDict()
+            for hull_id, hv in hvs.items():
+                mv_levels_dict = OrderedDict()
+                for level, cntrs_dict in cpc.items():
+                    mv_cntrs_dict = OrderedDict()
+                    for cntr_id, pnts in cntrs_dict.items():
+                        where = np.where(c2d.in_hull(pnts, hv))
+                        # The empty entries are kept in here so that the color
+                        # matching between plots can be achieved
+                        mv_cntrs_dict[cntr_id] = {
+                            "pnts": pnts[where],
+                            "vals": mvac[level][cntr_id][where],
+                        }
+                    mv_levels_dict[level] = mv_cntrs_dict
+
+                hulls_dict[hull_id] = mv_levels_dict
+
+            mvach.append(hulls_dict)
 
     def plot_text(self, pdict, axs):
         """

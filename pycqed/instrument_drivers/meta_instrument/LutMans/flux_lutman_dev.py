@@ -500,18 +500,18 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(0.0, 10.0),
                 initial_value=1.0,
                 unit="a.u.",
-                label="Relative amp",
+                label="Relative amp.",
             )
             self.add_parameter(
                 "czv_amp_dac_at_11_02_%s" % this_cz,
-                docstring="Dac amplitude (in the case of HDAWG) at the 11-02 "
+                docstring="DAC amplitude (in the case of HDAWG) at the 11-02 "
                 "interaction point. NB: the units might be different for some "
                 "other AWG that is distinct from the HDAWG.",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(0.0, 1.0),
                 initial_value=0.5,
                 unit="a.u.",
-                label="Dac amp at the interaction point",
+                label="DAC amp at the interaction point",
             )
             self.add_parameter(
                 "czv_amp_q_ph_corr_%s" % this_cz,
@@ -607,7 +607,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(0.0, 10.0),
                 initial_value=0.5,
                 unit="a.u.",
-                label="Step relative. amp",
+                label="Step relative amp.",
             )
 
             for specificity in ["coarse", "fine"]:
@@ -643,14 +643,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
             self.add_parameter(
                 "vcz_amp_dac_at_11_02_%s" % this_cz,
-                docstring="Dac amplitude (in the case of HDAWG) at the 11-02 "
+                docstring="DAC amplitude (in the case of HDAWG) at the 11-02 "
                 "interaction point. NB: the units might be different for some "
                 "other AWG that is distinct from the HDAWG.",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(0.0, 10.0),
                 initial_value=0.5,
                 unit="a.u.",
-                label="Dac amp at the interaction point",
+                label="DAC amp. at the interaction point",
             )
             self.add_parameter(
                 "vcz_amp_sq_%s" % this_cz,
@@ -660,7 +660,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(0.0, 10.0),
                 initial_value=1.0,
                 unit="a.u.",
-                label="Square relative amp",
+                label="Square relative amp.",
             )
             self.add_parameter(
                 "vcz_amp_fine_%s" % this_cz,
@@ -672,7 +672,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(0.0, 1.0),
                 initial_value=.5,
                 unit="a.u.",
-                label="Fine tuning amp",
+                label="Fine tuning amp.",
             )
             self.add_parameter(
                 "vcz_use_amp_fine_%s" % this_cz,
@@ -690,7 +690,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(0.0, 1.0),
                 initial_value=0.,
                 unit="a.u.",
-                label="Amp phase correction",
+                label="Amp. phase correction",
             )
             self.add_parameter(
                 "vcz_time_q_ph_corr_%s" % this_cz,
@@ -718,7 +718,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
                 initial_value=15.5555555e-9,
                 unit="s",
-                label="Sum dur. squares",
+                label="Duration single square",
             )
             self.add_parameter(
                 "vcz_time_middle_%s" % this_cz,
@@ -727,7 +727,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Numbers(0., 500e-9),
                 initial_value=0.,
                 unit="s",
-                label="Time at sweet spot",
+                label="Time between squares",
             )
             self.add_parameter(
                 "vcz_time_before_q_ph_corr_%s" % this_cz,

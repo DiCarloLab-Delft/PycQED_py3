@@ -206,6 +206,11 @@ def compute_propagator(arglist):
         )
     else:
         amp_final = amp
+    # czf_v2.plot(x_plot_vec=[np.array(tlist_new)*1e9, np.array(tlist_new)*1e9],y_plot_vec=[fluxlutman.calc_amp_to_freq(amp, '01', which_gate=which_gate) / 1e9, 
+    #                                                                                    fluxlutman.calc_amp_to_freq(amp_final, '01', which_gate=which_gate) / 1e9],
+    #                          title='Pulse with and without distortions',
+    #                          xlabel='Time (ns)',ylabel='Frequency (GHz)',
+    #                          legend_labels = ['without', 'with'])
 
     # The fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     # [2020-05-30] the waveform generator includes corrections if desired
