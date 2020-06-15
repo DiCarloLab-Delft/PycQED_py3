@@ -996,7 +996,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                                  else np.nan))
         qoi['phi_0'] = phi0
         qoi['phi_1'] = phi1
-        qoi['phi_cond'] = (phi0-phi1) % 360
+        qoi['phi_cond'] = (phi0 - phi1) % 360
 
         qoi['osc_amp_0'] = ufloat(fr_0.params['amplitude'].value,
                                   fr_0.params['amplitude'].stderr if
@@ -1023,7 +1023,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                          sem(self.proc_data_dict['yvals_spec_on'][:-3]))
         spec_off = ufloat(np.mean(self.proc_data_dict['yvals_spec_off'][:-3]),
                           sem(self.proc_data_dict['yvals_spec_off'][:-3]))
-        qoi['missing_fraction'] = spec_on-spec_off
+        qoi['missing_fraction'] = spec_on - spec_off
 
     def prepare_plots(self):
         self._prepare_main_oscillation_figure()

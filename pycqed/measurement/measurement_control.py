@@ -507,8 +507,27 @@ class MeasurementControl(Instrument):
                             "Learner subclass type not supported."
                         )
 
+                    if "X0Y0" in af_pars:
+                        # Tell the learner points that are already evaluated
+                        # Typically to avoid evaluating the boundaries
+                        # Intended for `LearnerND` and derivatives there of
+                        # NB: this points don't show up in the `dset`. They are
+                        # stored only in the learner's memory
+                        # NB: Put a significant number of points (e.g. ~100) on
+                        # the boundaries to really avoid the learner going there
+                        X0 = af_pars["X0Y0"]["X0"]
+                        Y0 = af_pars["X0Y0"]["Y0"]
+
+                        # For convenience we allows the user to specify a
+                        # single Y0 value that will be the image for all the
+                        # domain points in X0
+                        if not isinstance(Y0, Iterable) or len(Y0) < len(X0):
+                            Y0 = np.repeat([Y0], len(X0), axis=0)
+
+                        lu.tell_X_Y(self.learner, X=X0, Y=Y0, x_scale=self.x_scale)
+
                     if "X0" in af_pars:
-                        # Teach the learner the initial point if provided
+                        # Tell the learner the initial points if provided
                         lu.evaluate_X(self.learner, af_pars["X0"], x_scale=self.x_scale)
 
                     # N.B. the runner that is used is not an `adaptive.Runner` object
@@ -1034,7 +1053,10 @@ class MeasurementControl(Instrument):
                             self.curves[i]["config"]["x"] = x
                             self.curves[i]["config"]["y"] = y
                             i += 1
-                            if self.Learner_Minimizer_detected and y_ind == self.par_idx:
+                            if (
+                                self.Learner_Minimizer_detected
+                                and y_ind == self.par_idx
+                            ):
                                 min_x = np.min(x)
                                 max_x = np.max(x)
                                 threshold = (

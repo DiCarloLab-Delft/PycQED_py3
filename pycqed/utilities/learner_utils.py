@@ -17,7 +17,7 @@ def evaluate_X(learner, X, x_scale=None):
     Evaluates the learner's sampling function at the given point
     or points.
     Can be used to evaluate some initial points that the learner will
-    remember before running the runner.
+    remember before running its own runner.
 
     Arguments:
         learner: (BaseLearner) an instance of the learner
@@ -53,12 +53,15 @@ def scale_X(X, x_scale=None):
 def tell_X_Y(learner, X, Y, x_scale=None):
     """
     NB: Telling the learner about two many points takes a significant
-    time. Beyond 1000 pnts expect several minutes
+    time. Beyond 1000 points expect several minutes
 
-    Evaluates the learner's sampling function at the given point
-    or points.
-    Can be used to evaluate some initial points that the learner will
-    remember before running the runner.
+    Tell the learner about the sampling function values at the given
+    point or points.
+    Can be used to avoid evaluating some initial points that the learner
+    will remember before running on its own.
+
+    Use case: avoid sampling the boundaries that the learner needs but
+    we are not interested in.
 
     Arguments:
         learner: (BaseLearner) an instance of the learner

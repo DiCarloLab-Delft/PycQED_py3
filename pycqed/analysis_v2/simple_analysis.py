@@ -44,11 +44,12 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
         options_dict: dict = None,
         extract_only: bool = False,
         do_fitting: bool = True,
-        close_figs=True,
-        auto=True,
-        hide_lines=False,
-        hide_pnts=False,
-        plt_sorted_x=True,
+        close_figs: bool = True,
+        auto: bool = True,
+        hide_lines: bool = False,
+        hide_pnts: bool = False,
+        plt_sorted_x: bool = True,
+        legend_labels: list = None
     ):
         super().__init__(
             t_start=t_start,
@@ -85,17 +86,20 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
         self.hide_pnts = hide_pnts
         self.hide_lines = hide_lines
 
+        # Set specific legend label when specifying  `t_start` and `t_stop`
+        self.legend_labels = legend_labels
+
         if auto:
             self.run_analysis()
 
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
-
-        setlabel = self.raw_data_dict.get("x2", self.timestamps)
+        labels = self.legend_labels if self.legend_labels is not None else self.timestamps
+        setlabel = self.raw_data_dict.get("x2", labels)
         if "x2" in self.options_dict.keys():
             legend_title = self.options_dict.get("x2_label", self.options_dict["x2"])
         else:
-            legend_title = "timestamp"
+            legend_title = "timestamp" if self.legend_labels is None else ""
 
         for i, val_name in enumerate(self.raw_data_dict["value_names"][0]):
 
@@ -144,7 +148,7 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
                         + self.raw_data_dict["measurementstring"][0]
                     ),
                     "do_legend": do_legend,
-                    "legend_pos": "upper right",
+                    "legend_pos": "best",
                     "marker": "",  # don't use markers
                     "linestyle": "-"
                 }

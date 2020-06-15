@@ -49,24 +49,32 @@ def scatter_pnts_overlay(
     return fig, ax
 
 
-def contour_overlay(x, y, z, colormap, transpose=False,
-                    contour_levels=[90, 180, 270], vlim=(0, 360), fig=None,
-                    linestyles='dashed',
-                    cyclic_data=False,
-                    ax=None, **kw):
+def contour_overlay(x, y, z, colormap="viridis",
+                    transpose: bool = False,
+                    contour_levels: list = [90, 180, 270],
+                    vlim: tuple = (0, 360),
+                    linestyles: str = 'dashed',
+                    cyclic_data: bool = False,
+                    return_contours_only: bool = False,
+                    ax=None, fig=None, **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     N.B. The contour overaly suffers from artifacts sometimes
+
     Args:
         x (array [shape: n*1]):     x data
         y (array [shape: m*1]):     y data
         z (array [shape: n*m]):     z data for the contour
         colormap (matplotlib.colors.Colormap or str): colormap to be used
-        unit (str): 'deg' is a special case
-        vlim (tuple(vmin, vmax)): required for the colormap nomalization
+        vlim (tuple(vmin, vmax)): required for the colormap nomalization and
+            for cyclic data
+        cyclic_data (bool): when `True` assumes z data is cyclic at the
+            boundaries specified by vlim and avoids contour artifacts
         fig (Object):
             figure object
     """
+    ax_fig_are_None = ax is None and fig is None
+
     if ax is None:
         fig, ax = plt.subplots()
 
@@ -96,7 +104,16 @@ def contour_overlay(x, y, z, colormap, transpose=False,
                    norm=norm, linestyles=linestyles)
     ax.clabel(c, fmt='%.1f', inline='True', fontsize=fontsize)
 
-    return fig, ax
+    if return_contours_only:
+        return fig, ax
+    else:
+        contours = c.allsegs
+        if ax_fig_are_None:
+            fig.clf()
+            plt.close(fig)
+            del fig
+            del ax
+        return contours
 
 
 def annotate_pnts(txt, x, y,
