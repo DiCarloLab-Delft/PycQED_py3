@@ -1088,10 +1088,10 @@ class QWGMultiDevices:
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
     Usually all methods are static
     """
-    from pycqed.instrument_drivers.physical_instruments import QuTech_QCC
+    from pycqed.instrument_drivers.physical_instruments import QuTech_CCL
 
     @staticmethod
-    def dio_calibration(cc: QuTech_QCC, qwgs: List[QuTech_AWG_Module],
+    def dio_calibration(cc, qwgs: List[QuTech_AWG_Module],
             verbose: bool = False):
         """
         Calibrate multiple QWG using a CCLight
@@ -1108,6 +1108,7 @@ class QWGMultiDevices:
         :param verbose: Print the DIO calibration rapport of all QWGs
         :return: None
         """
+        
         # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
         for qwg in qwgs:
             qwg.stop()
@@ -1121,15 +1122,15 @@ class QWGMultiDevices:
         _qwg_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '_QWG'))
 
-
-        qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
-            'QCC_DIO_Calibration.qisa')
-
-        cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
-
-        qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
-            'qcc_qisa_opcodes.qmap')
-
+        if "CCL" in cc.IDN()['model']:
+            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
+            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qisa_opcodes.qmap')
+            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QWG_DIO_Calibration.qisa')
+        else:
+            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
+            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qcc_qisa_opcodes.qmap')
+            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QCC_DIO_Calibration.qisa')
+    
         old_cs = cc.control_store()
         old_qisa_opcode = cc.qisa_opcode()
 
