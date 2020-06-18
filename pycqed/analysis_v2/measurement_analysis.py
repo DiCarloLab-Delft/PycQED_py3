@@ -45,7 +45,8 @@ reload(rba)
 
 # import pycqed.analysis_v2.fluxing_analysis as fla
 # reload(fla)
-
+import pycqed.analysis_v2.multiplexed_readout_analysis as mra
+reload(mra)
 import pycqed.analysis_v2.timing_cal_analysis as ta
 reload(ta)
 
@@ -64,7 +65,8 @@ from pycqed.analysis_v2.readout_analysis import (
     Dispersive_shift_Analysis, Readout_landspace_Analysis)
 
 from pycqed.analysis_v2.multiplexed_readout_analysis import \
-    Multiplexed_Readout_Analysis
+    Multiplexed_Readout_Analysis, Multiplexed_Transient_Analysis,\
+    Multiplexed_Weights_Analysis
 
 from pycqed.analysis_v2.syndrome_analysis import (
     Single_Qubit_RoundsToEvent_Analysis, One_Qubit_Paritycheck_Analysis)

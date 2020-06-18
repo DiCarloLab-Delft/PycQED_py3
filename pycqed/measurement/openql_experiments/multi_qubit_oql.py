@@ -156,6 +156,69 @@ def single_qubit_off_on(qubits: list,
 
     return p
 
+def targeted_off_on(qubits: list,
+                    q_target: int,
+                    pulse_comb:str,
+                    platf_cfg: str):
+    """
+    Performs an 'off_on' sequence on the qubits specified.
+        off: prepz -      - RO
+        on:  prepz - x180 - RO
+
+    Will cycle through all combinations of computational states of every
+    qubit in <qubits> except the target qubit. The target qubit will be
+    initialized according to <pulse_comb>. 'Off' initializes the qubit in
+    the ground state and 'On' initializes the qubit in the excited state.
+
+    Args:
+        qubits (list) : list of integers denoting the qubits to use
+        q_target (str) : targeted qubit.
+        pulse_comb (str) : prepared state of target qubit.
+        platf_cfg (str) : filepath of OpenQL platform config file
+    """
+
+    nr_qubits = len(qubits)
+    idx = qubits.index(q_target)
+
+    combinations = ['{:0{}b}'.format(i, nr_qubits-1) for i in range(2**(nr_qubits-1))]
+    for i, comb in enumerate(combinations):
+        comb = list(comb)#
+        if 'on' in pulse_comb.lower():
+            comb.insert(idx, '1')
+        elif 'off' in pulse_comb.lower():
+            comb.insert(idx, '0')
+        else:
+            raise ValueError()
+        combinations[i] = ''.join(comb)
+
+    p = oqh.create_program("Targeted_off_on", platf_cfg)
+
+    for i, comb in enumerate(combinations):
+        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+
+        # 1. Prepare qubits in 0
+        for q in qubits:
+            k.prepz(q)
+
+        # 2. prepare desired state
+        for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
+            if state == '0':
+                pass
+            elif state == '1':
+                k.gate('rx180', [target_qubit])
+
+        # 3. measurement of all qubits
+        k.gate('wait', qubits, 0)
+        # Used to ensure timing is aligned
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+
+    return p
+
 def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
                                   target_qubit_excited: bool=False, wait_time=0,
                                   extra_echo=False):

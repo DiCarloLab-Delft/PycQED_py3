@@ -856,6 +856,31 @@ class joint_HDAWG_lutman_parameters(Soft_Sweep):
         self.AWG.start()
 
 
+class RO_mod_freq_parameter(Soft_Sweep):
+    """
+    Sweeps two parameteres toghether, assigning the same value
+    name is defined by user
+    label and units are grabbed from parameter_1
+    """
+
+    def __init__(self, name, qubit, parameter):
+        self.set_kw()
+        self.name = name
+        self.parameter_name = parameter.label
+        self.unit = parameter.unit
+        self.sweep_control = 'soft'
+        self.qubit = qubit
+
+    def set_parameter(self, val):
+        # LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+        old_lo_freq = self.qubit.ro_freq.get() - self.qubit.ro_freq_mod.get()
+
+        # Parameter 1 will be qubit.ro_freq()
+        self.qubit.ro_freq.set(val)
+        # Parameter 2 will be qubit.ro_freq_mod()
+        self.qubit.ro_freq_mod.set(val - old_lo_freq)
+
+
 class QWG_lutman_par_chunks(Soft_Sweep):
     '''
     Sweep function that divides sweep points into chunks. Every chunk is

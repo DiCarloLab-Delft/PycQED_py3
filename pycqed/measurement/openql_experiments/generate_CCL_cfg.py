@@ -126,6 +126,7 @@ def generate_config(filename: str,
         },
 
         "gate_decomposition": {
+            "measz %0": ["measure %0"],
             "x %0": ["rx180 %0"],
             "y %0": ["ry180 %0"],
             "roty90 %0": ["ry90 %0"],

@@ -1668,16 +1668,18 @@ class DeviceCCL(Instrument):
             if initialize == True:
                 thresholds = [self.find_instrument(qubit).ro_acq_threshold() for qubit in qubits]
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                                 nr_qubits = len(qubits),
                                                  post_selection=True,
                                                  post_selec_thresholds=thresholds)
             else:
-                a = ma2.Multiplexed_Readout_Analysis(label=label)
+                a = ma2.Multiplexed_Readout_Analysis(label=label, nr_qubits = len(qubits))
 
             for i, qubit in enumerate(qubits):
                 label = a.raw_data_dict['value_names'][i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)            
-        return
+            return a
+
 
     def measure_ssro_single_qubit(
             self,
@@ -1754,6 +1756,7 @@ class DeviceCCL(Instrument):
                 thresholds = [self.find_instrument(qubit).ro_acq_threshold() \
                     for qubit in qubits]
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                            nr_qubits = len(qubits),
                                             q_target = q_target,
                                             post_selection=True,
                                             post_selec_thresholds=thresholds)
@@ -1766,13 +1769,145 @@ class DeviceCCL(Instrument):
                 #print('Fraction of discarded results was {:.2f}'.format(1-fraction))
             else:
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
+                                                     nr_qubits = len(qubits),
                                                      q_target = q_target)
+            q_ch = [ ch for ch in a.Channels if q_target in ch.decode() ][0]
             # Set thresholds
             for i, qubit in enumerate(qubits):
                 label = a.raw_data_dict['value_names'][i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
-        return
+        return a.qoi[q_ch]
+
+    def measure_transients(self,
+                           qubits: list,
+                           q_target: str,
+                           cases: list = ['off', 'on'],
+                           MC=None,
+                           prepare_for_timedomain: bool = True,
+                           analyze: bool = True):
+        '''
+        Documentation.
+        '''
+        if q_target not in qubits:
+            raise ValueError("q_target must be included in qubits.")
+        # Ensure all qubits use same acquisition instrument
+        instruments = [self.find_instrument(q).instr_acquisition() for q in qubits]
+        if instruments[1:] != instruments[:-1]:
+            raise ValueError("All qubits must have common acquisition instrument")
+
+        qubits_nr = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        q_target_nr = self.find_instrument(q_target).cfg_qubit_nr()
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits)
+
+        p = mqo.targeted_off_on(
+                    qubits=qubits_nr,
+                    q_target=q_target_nr,
+                    pulse_comb='on',
+                    platf_cfg=self.cfg_openql_platform_fn()
+                )
+
+        analysis = [None for case in cases]
+        for i, pulse_comb in enumerate(cases):
+            if 'off' in pulse_comb.lower():
+                self.find_instrument(q_target).instr_LO_mw.get_instr().off()
+            elif 'on' in pulse_comb.lower():
+                self.find_instrument(q_target).instr_LO_mw.get_instr().on()
+            else:
+                raise ValueError(
+                    "pulse_comb {} not understood: Only 'on' and 'off' allowed.".
+                    format(pulse_comb))
+
+            s = swf.OpenQL_Sweep(openql_program=p,
+                                 parameter_name='Transient time', unit='s',
+                                 CCL=self.instr_CC.get_instr())
+
+            if 'UHFQC' in instruments[0]:
+                sampling_rate = 1.8e9
+            else:
+                raise NotImplementedError()
+            nr_samples = self.ro_acq_integration_length()*sampling_rate
+
+            d = det.UHFQC_input_average_detector(
+                            UHFQC=self.find_instrument(instruments[0]),
+                            AWG=self.instr_CC.get_instr(),
+                            nr_averages=self.ro_acq_averages(),
+                            nr_samples=int(nr_samples))
+
+            MC.set_sweep_function(s)
+            MC.set_sweep_points(np.arange(nr_samples)/sampling_rate)
+            MC.set_detector_function(d)
+            MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb,
+                                                    self.msmt_suffix))
+            if analyze:
+                analysis[i] = ma2.Multiplexed_Transient_Analysis(
+                    q_target='{}_{}'.format(q_target, pulse_comb))
+        return analysis
+
+    def calibrate_optimal_weights_mux(self,
+                                      qubits: list,
+                                      q_target: str,
+                                      update=True,
+                                      verify=True,
+                                      averages=2**15
+                                      ):
+
+        """
+        Measures the multiplexed readout transients of <qubits> for <q_target>
+        in ground and excited state. After that, it calculates optimal
+        integration weights that are used to weigh measuremet traces to maximize
+        the SNR.
+
+        Args:
+            qubits (list):
+                List of strings specifying qubits included in the multiplexed
+                readout signal.
+            q_target (str):
+                ()
+            verify (bool):
+                indicates whether to run measure_ssro at the end of the routine
+                to find the new SNR and readout fidelities with optimized weights
+            update (bool):
+                specifies whether to update the weights in the qubit object
+        """
+        if q_target not in qubits:
+            raise ValueError("q_target must be included in qubits.")
+
+        # Ensure that enough averages are used to get accurate weights
+        old_avg = self.ro_acq_averages()
+        old_typ = self.ro_acq_weight_type()
+        self.ro_acq_averages(averages)
+        self.ro_acq_weight_type('SSB')
+
+        Q_target = self.find_instrument(q_target)
+        # Transient analysis
+        A = self.measure_transients(qubits=qubits, q_target=q_target,
+                                    cases=['on', 'off'])
+        #return parameters
+        self.ro_acq_averages(old_avg)
+        self.ro_acq_weight_type(old_typ)
+
+        # Optimal weights
+        B = ma2.Multiplexed_Weights_Analysis(q_target=q_target,
+                                             IF=Q_target.ro_freq_mod(),
+                                             pulse_duration=Q_target.ro_pulse_length(),
+                                             A_ground=A[1], A_excited=A[0])
+        self.ro_acq_weight_type('optimal')
+
+        if update:
+            Q_target.ro_acq_weight_func_I(B.qoi['W_I'])
+            Q_target.ro_acq_weight_func_Q(B.qoi['W_Q'])
+
+            if verify:
+                Q_target._prep_ro_integration_weights()
+                Q_target._prep_ro_instantiate_detectors()
+                ssro_dict= self.measure_ssro_single_qubit(qubits=qubits,
+                                                          q_target=q_target)
+            return ssro_dict
 
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
@@ -2853,9 +2988,11 @@ class DeviceCCL(Instrument):
             flux_codeword=flux_codeword, nr_seeds=nr_seeds,
             sim_cz_qubits=sim_cz_qubits)
 
-        ma2.InterleavedRandomizedBenchmarkingAnalysis(
+        a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
             ts_base=None, ts_int=None,
             label_base='icl[None]', label_int='icl[-4368]')
+
+        return a
 
     def measure_two_qubit_purity_benchmarking(
             self, qubits, MC,
