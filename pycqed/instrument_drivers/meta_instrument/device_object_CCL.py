@@ -2472,6 +2472,7 @@ class DeviceCCL(Instrument):
         adaptive_num_pts_max=None,
         adaptive_sample_for_alignment=True,
         max_pnts_beyond_threshold=10,
+        adaptive_num_pnts_uniform=0,
         minimizer_threshold=0.5,
         par_idx=1,
         peak_is_inverted=True,
@@ -2511,6 +2512,10 @@ class DeviceCCL(Instrument):
 
             adaptive_num_pts_max (int):
                 number of points to measure in the adaptive_sampling mode
+
+            adaptive_num_pnts_uniform (bool):
+                number of points to measure uniformly before giving control to
+                adaptive sampler. Only relevant for `adaptive_sample_for_alignment`
 
             prepare_for_timedomain (bool):
                 should all instruments be reconfigured to
@@ -2560,12 +2565,6 @@ class DeviceCCL(Instrument):
                 raise ValueError("Square pulse duration must be specified.")
         else:
             raise ValueError("Waveform name not recognized.")
-
-        if prepare_for_timedomain:
-            if measure_parked_qubit:
-                self.prepare_for_timedomain(qubits=[q0, q_spec, q_park])
-            else:
-                self.prepare_for_timedomain(qubits=[q0, q_spec])
 
         awg = fl_lutman.AWG.get_instr()
         using_QWG = isinstance(awg, QuTech_AWG_Module)
@@ -2625,6 +2624,7 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
 
         old_sq_duration = length_par()
+        # Assumes the waveforms will be generated below in the prepare_for_timedomain
         length_par(sq_duration)
         old_amp_par = amp_par()
 
@@ -2640,6 +2640,15 @@ class DeviceCCL(Instrument):
             length_par(old_sq_duration)
             amp_par(old_amp_par)
             flux_bias_par(flux_bias_old_val)
+
+        # Keep below the length_par
+        if prepare_for_timedomain:
+            if measure_parked_qubit:
+                self.prepare_for_timedomain(qubits=[q0, q_spec, q_park])
+            else:
+                self.prepare_for_timedomain(qubits=[q0, q_spec])
+        else:
+            log.warning("The flux waveform is not being uploaded!")
 
         if not adaptive_sampling:
             # Just single 1D sweep
@@ -2674,8 +2683,10 @@ class DeviceCCL(Instrument):
                 "loss_per_interval": loss,
                 "minimize": minimize,
                 # A few uniform points to make more likely to find the peak
-                # Not working yet...
-                # "X0": np.linspace(np.min(bounds), np.max(bounds), 10)[1:-1]
+                "X0": np.linspace(
+                    np.min(bounds),
+                    np.max(bounds),
+                    adaptive_num_pnts_uniform + 2)[1:-1]
             }
             bounds_neg = np.flip(-np.array(bounds), 0)
             adaptive_pars_neg = {
@@ -2686,8 +2697,10 @@ class DeviceCCL(Instrument):
                 "loss_per_interval": loss,
                 "minimize": minimize,
                 # A few uniform points to make more likely to find the peak
-                # Not working yet...
-                # X0": np.linspace(np.min(bounds_neg), np.max(bounds_neg), 10)[1:-1]
+                "X0": np.linspace(
+                    np.min(bounds_neg),
+                    np.max(bounds_neg),
+                    adaptive_num_pnts_uniform + 2)[1:-1]
             }
 
             MC.set_sweep_functions([amp_par, flux_bias_par])
