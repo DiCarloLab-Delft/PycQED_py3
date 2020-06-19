@@ -759,16 +759,19 @@ setUserReg(4, err_cnt);"""
     ##########################################################################
 
     def acquisition(self, samples=100, averages=1, acquisition_time=0.010, timeout=10,
-                    channels=(0, 1), mode='rl') -> None:  # FIXME: wrong return type
+                    channels=(0, 1), mode='rl', poll=True):
         self.timeout(timeout)
-        self.acquisition_initialize(samples, averages, channels, mode)
-        data = self.acquisition_poll(samples, True, acquisition_time)
+        self.acquisition_initialize(samples, averages, channels, mode, poll)
+        if poll:
+            data = self.acquisition_poll(samples, True, acquisition_time)
+        else:
+            data = self.acquisition_get(samples, True, acquisition_time)
         self.acquisition_finalize()
 
         return data
 
     def acquisition_initialize(self, samples, averages, channels=(0, 1),
-                               mode='rl') -> None:
+                               mode='rl', poll=True) -> None:
         # Define the channels to use and subscribe to them
         self._acquisition_nodes = []
 
@@ -789,7 +792,9 @@ setUserReg(4, err_cnt);"""
                 path = self._get_full_path(
                     'qas/0/result/data/{}/wave'.format(c))
                 self._acquisition_nodes.append(path)
-                self.subs(path)
+                if poll:
+                    self.subs(path)
+
             # Enable automatic readout
             self.qas_0_result_reset(1)
             self.qas_0_result_enable(1)
@@ -801,7 +806,9 @@ setUserReg(4, err_cnt);"""
                 path = self._get_full_path(
                     'qas/0/monitor/inputs/{}/wave'.format(c))
                 self._acquisition_nodes.append(path)
-                self.subs(path)
+                if poll:
+                    self.subs(path)
+
             # Enable automatic readout
             self.qas_0_monitor_reset(1)
             self.qas_0_monitor_enable(1)
@@ -816,7 +823,8 @@ setUserReg(4, err_cnt);"""
             raise ziUHFQCSeqCError(
                 'Trying to use a delay of {} using an AWG program that does not use \'wait_dly\'.'.format(self.wait_dly()))
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), self.wait_dly())
-        self.subs(self._get_full_path('auxins/0/sample'))
+        if poll:
+            self.subs(self._get_full_path('auxins/0/sample'))
 
         # Generate more dummy data
         self.auxins_0_averaging(8)
@@ -827,7 +835,7 @@ setUserReg(4, err_cnt);"""
         self.start()
 
     def acquisition_poll(self, samples, arm=True,
-                         acquisition_time=0.010) -> None:  # FIXME: wrong return type
+                         acquisition_time=0.010):
         """
         Polls the UHFQC for data.
 
@@ -835,7 +843,7 @@ setUserReg(4, err_cnt);"""
             samples (int): the expected number of samples
             arm    (bool): if true arms the acquisition, disable when you
                            need synchronous acquisition with some external dev
-            acquisition_time (float): time in sec between polls? # TODO check with Niels H
+            acquisition_time (float): time in sec between polls
             timeout (float): time in seconds before timeout Error is raised.
 
         """
@@ -878,12 +886,46 @@ setUserReg(4, err_cnt);"""
 
         return data
 
+    def acquisition_get(self, samples, arm=True,
+                         acquisition_time=0.010):
+        """
+        Waits for the UHFQC to finish a measurement then reads the data.
+
+        Args:
+            samples (int): the expected number of samples
+            arm    (bool): if true arms the acquisition, disable when you
+                           need synchronous acquisition with some external dev
+            acquisition_time (float): time in sec between polls
+            timeout (float): time in seconds before timeout Error is raised.
+
+        """
+        data = {k: [] for k, dummy in enumerate(self._acquisition_nodes)}
+
+        # Start acquisition
+        if arm:
+            self.acquisition_arm()
+            self.sync()
+
+        done = False
+        start = time.time()
+        while (time.time()-start) < self.timeout():
+            status = self.getdeep('awgs/0/sequencer/status')
+            if status['value'][0] == 0:
+                done = True
+                break
+
+        if not done:
+            self.acquisition_finalize()
+            raise TimeoutError("Error: Didn't get all results!")
+
+        for n, p in enumerate(self._acquisition_nodes):
+            data[n] = self.getv(p)
+
+        return data
+
     def acquisition_finalize(self) -> None:
         self.stop()
-
-        for p in self._acquisition_nodes:
-            self.unsubs(p)
-        self.unsubs(self._get_full_path('auxins/0/sample'))
+        self.unsubs()
 
     def check_errors(self) -> None:
         """
@@ -1273,6 +1315,26 @@ setTrigger(0);
 """
         # Reset delay
         self.wait_dly(0)
+        self._awg_needs_configuration[0] = True
+
+    def awg_debug_acquisition(self, dly=0):
+        self._reset_awg_program_features()
+        self._awg_program_features['avg_cnt']  = True
+        self._awg_program_features['loop_cnt'] = True
+        self._awg_program_features['wait_dly'] = True
+
+        self._awg_program[0] = awg_sequence_acquisition_preamble() + """
+repeat (avg_cnt) {
+  repeat (loop_cnt) {
+      setTrigger(ro_trig);
+      setTrigger(ro_arm);
+      wait(wait_dly);
+  }
+}
+setTrigger(0);
+"""
+        # Reset delay
+        self.wait_dly(dly)
         self._awg_needs_configuration[0] = True
 
     def awg_sequence_acquisition_and_pulse_SSB(
