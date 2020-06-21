@@ -2269,6 +2269,7 @@ class DeviceCCL(Instrument):
         measure_parked_qubit=False,
         target_qubit_sequence: str = "ramsey",
         waveform_name="square",
+        recover_q_spec: bool = False,
     ):
         """
         Measure a chevron patter of esulting from swapping of the excitations
@@ -2323,12 +2324,15 @@ class DeviceCCL(Instrument):
             pow_tone (float):
                 When spec_tone = True, controls the power of the spec source
 
+            recover_q_spec (bool):
+                applies the first gate of qspec at the end as well if `True`
+
         Circuit:
             q0    -x180-flux-x180-RO-
-            qspec --x90-----------RO- (target_qubit_sequence='ramsey')
+            qspec --x90-----(x90)-RO- (target_qubit_sequence='ramsey')
 
             q0    -x180-flux-x180-RO-
-            qspec -x180-----------RO- (target_qubit_sequence='excited')
+            qspec -x180----(x180)-RO- (target_qubit_sequence='excited')
 
             q0    -x180-flux-x180-RO-
             qspec ----------------RO- (target_qubit_sequence='ground')
@@ -2399,6 +2403,7 @@ class DeviceCCL(Instrument):
             platf_cfg=self.cfg_openql_platform_fn(),
             target_qubit_sequence=target_qubit_sequence,
             cc=self.instr_CC.get_instr().name,
+            recover_q_spec=recover_q_spec,
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
@@ -2467,6 +2472,7 @@ class DeviceCCL(Instrument):
         adaptive_num_pts_max=None,
         adaptive_sample_for_alignment=True,
         max_pnts_beyond_threshold=10,
+        adaptive_num_pnts_uniform=0,
         minimizer_threshold=0.5,
         par_idx=1,
         peak_is_inverted=True,
@@ -2506,6 +2512,10 @@ class DeviceCCL(Instrument):
 
             adaptive_num_pts_max (int):
                 number of points to measure in the adaptive_sampling mode
+
+            adaptive_num_pnts_uniform (bool):
+                number of points to measure uniformly before giving control to
+                adaptive sampler. Only relevant for `adaptive_sample_for_alignment`
 
             prepare_for_timedomain (bool):
                 should all instruments be reconfigured to
@@ -2555,12 +2565,6 @@ class DeviceCCL(Instrument):
                 raise ValueError("Square pulse duration must be specified.")
         else:
             raise ValueError("Waveform name not recognized.")
-
-        if prepare_for_timedomain:
-            if measure_parked_qubit:
-                self.prepare_for_timedomain(qubits=[q0, q_spec, q_park])
-            else:
-                self.prepare_for_timedomain(qubits=[q0, q_spec])
 
         awg = fl_lutman.AWG.get_instr()
         using_QWG = isinstance(awg, QuTech_AWG_Module)
@@ -2620,6 +2624,7 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
 
         old_sq_duration = length_par()
+        # Assumes the waveforms will be generated below in the prepare_for_timedomain
         length_par(sq_duration)
         old_amp_par = amp_par()
 
@@ -2635,6 +2640,15 @@ class DeviceCCL(Instrument):
             length_par(old_sq_duration)
             amp_par(old_amp_par)
             flux_bias_par(flux_bias_old_val)
+
+        # Keep below the length_par
+        if prepare_for_timedomain:
+            if measure_parked_qubit:
+                self.prepare_for_timedomain(qubits=[q0, q_spec, q_park])
+            else:
+                self.prepare_for_timedomain(qubits=[q0, q_spec])
+        else:
+            log.warning("The flux waveform is not being uploaded!")
 
         if not adaptive_sampling:
             # Just single 1D sweep
@@ -2668,15 +2682,25 @@ class DeviceCCL(Instrument):
                 "bounds": bounds,
                 "loss_per_interval": loss,
                 "minimize": minimize,
+                # A few uniform points to make more likely to find the peak
+                "X0": np.linspace(
+                    np.min(bounds),
+                    np.max(bounds),
+                    adaptive_num_pnts_uniform + 2)[1:-1]
             }
-
+            bounds_neg = np.flip(-np.array(bounds), 0)
             adaptive_pars_neg = {
                 "adaptive_function": l1dm.Learner1D_Minimizer,
                 "goal": lambda l: goal(l) or l.npoints > adaptive_num_pts_max,
                 # NB: order of the bounds matters, mind negative numbers ordering
-                "bounds": np.flip(-np.array(bounds), 0),
+                "bounds": bounds_neg,
                 "loss_per_interval": loss,
                 "minimize": minimize,
+                # A few uniform points to make more likely to find the peak
+                "X0": np.linspace(
+                    np.min(bounds_neg),
+                    np.max(bounds_neg),
+                    adaptive_num_pnts_uniform + 2)[1:-1]
             }
 
             MC.set_sweep_functions([amp_par, flux_bias_par])

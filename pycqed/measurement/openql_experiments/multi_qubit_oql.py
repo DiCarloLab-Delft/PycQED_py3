@@ -735,7 +735,8 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
             buffer_time, buffer_time2, flux_cw: int, platf_cfg: str,
             measure_parked_qubit: bool = False,
-            target_qubit_sequence: str = 'ramsey', cc: str = 'CCL'):
+            target_qubit_sequence: str = 'ramsey', cc: str = 'CCL',
+            recover_q_spec: bool = False):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -750,16 +751,18 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         target_qubit_sequence: selects whether to run a ramsey sequence on
             a target qubit ('ramsey'), keep it in gorund state ('ground')
             or excite it iat the beginning of the sequnce ('excited')
+        recover_q_spec (bool): applies the first gate of qspec at the end
+            as well if `True`
     Returns:
         p:              OpenQL Program object containing
 
 
     Circuit:
         q0    -x180-flux-x180-RO-
-        qspec --x90-----------RO- (target_qubit_sequence='ramsey')
+        qspec --x90-----(x90)-RO- (target_qubit_sequence='ramsey')
 
         q0    -x180-flux-x180-RO-
-        qspec -x180-----------RO- (target_qubit_sequence='excited')
+        qspec -x180----(x180)-RO- (target_qubit_sequence='excited')
 
         q0    -x180-flux-x180-RO-
         qspec ----------------RO- (target_qubit_sequence='ground')
@@ -777,14 +780,15 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
     k.prepz(qubit_idx)
     k.prepz(qubit_idx_spec)
 
-    if target_qubit_sequence == 'ramsey':
-        k.gate('rx90', [qubit_idx_spec])
-    elif target_qubit_sequence == 'excited':
-        k.gate('rx180', [qubit_idx_spec])
-    elif target_qubit_sequence == 'ground':
-        k.gate('i', [qubit_idx_spec])
-    else:
-        raise ValueError("target_qubit_sequence not recognized")
+    spec_gate_dict = {
+        "ramsey": "rx90",
+        "excited": "rx180",
+        "ground": "i"
+    }
+
+    spec_gate = spec_gate_dict[target_qubit_sequence]
+
+    k.gate(spec_gate, [qubit_idx_spec])
     k.gate('rx180', [qubit_idx])
 
     if buffer_nanoseconds > 0:
@@ -801,6 +805,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         k.gate("wait", [], 0)  # alignment workaround
         if qubit_idx_park is not None:
             k.gate('sf_square', [qubit_idx_park])
+        # FIX ME: Why is this wait 20 ns here??
         k.gate("wait", [], 20)  # alignment workaround
         k.gate('sf_{}'.format(flux_cw_name), [qubit_idx])
         k.gate("wait", [], 0)  # alignment workaround
@@ -811,7 +816,11 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
 
     k.gate('rx180', [qubit_idx])
-    # k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
+
+    if recover_q_spec:
+        k.gate(spec_gate, [qubit_idx_spec])
+
+    k.gate("wait", [], 0)  # alignment workaround
     k.measure(qubit_idx)
     k.measure(qubit_idx_spec)
     if (qubit_idx_park is not None) and measure_parked_qubit:

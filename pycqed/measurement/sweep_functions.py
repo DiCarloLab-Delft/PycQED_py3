@@ -7,6 +7,7 @@ from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
+from pycqed.analysis_v2.tools import contours2d as c2d
 
 
 class Sweep_function(object):
@@ -50,6 +51,7 @@ class Soft_Sweep(Sweep_function):
 
 ##############################################################################
 
+
 class Elapsed_Time_Sweep(Soft_Sweep):
     """
     A sweep function to do a measurement periodically.
@@ -66,7 +68,6 @@ class Elapsed_Time_Sweep(Soft_Sweep):
         self.unit = 's'
         self.as_fast_as_possible = as_fast_as_possible
         self.time_first_set = None
-
 
     def set_parameter(self, val):
         if self.time_first_set is None:
@@ -85,6 +86,7 @@ class Elapsed_Time_Sweep(Soft_Sweep):
             pass  # wait
         elapsed_time = time.time() - self.time_first_set
         return elapsed_time
+
 
 class Heterodyne_Frequency_Sweep(Soft_Sweep):
     """
@@ -171,6 +173,7 @@ class None_Sweep(Soft_Sweep):
         Set the parameter(s) to be sweeped. Differs per sweep function
         '''
         pass
+
 
 class None_Sweep_With_Parameter_Returned(Soft_Sweep):
 
@@ -440,6 +443,7 @@ class QASM_Sweep_v2(Hard_Sweep):
         if self.upload:
             self.CBox.load_instructions(qumis_fn)
         return self.compiler
+
 
 class anharmonicity_sweep(Soft_Sweep):
     """
@@ -951,6 +955,7 @@ class lutman_par_dB_attenuation_QWG(Soft_Sweep):
         self.LutMan.QWG.get_instr().start()
         self.LutMan.QWG.get_instr().getOperationComplete()
 
+
 class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, run=False, single=True,**kw):
@@ -985,7 +990,6 @@ class par_dB_attenuation_UHFQC_AWG_direct(Soft_Sweep):
     def set_parameter(self, val):
         UHFQC.awgs_0_outputs_1_amplitude(10**(val/20))
         UHFQC.awgs_0_outputs_0_amplitude(10**(val/20))
-
 
 
 class lutman_par_UHFQC_dig_trig(Soft_Sweep):
@@ -1091,6 +1095,7 @@ class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
+
 class UHFQC_pulse_dB_attenuation(Soft_Sweep):
 
     def __init__(self, UHFQC, IF, dig_trigger=True,**kw):
@@ -1103,11 +1108,11 @@ class UHFQC_pulse_dB_attenuation(Soft_Sweep):
         self.dig_trigger = dig_trigger
         self.IF = IF
 
-
     def set_parameter(self, val):
         self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.IF,RO_amp=10**(val/20),RO_pulse_length=2e-6,acquisition_delay=200e-9,dig_trigger=self.dig_trigger)
         time.sleep(1)
         #print('refreshed UHFQC')
+
 
 class multi_sweep_function(Soft_Sweep):
     '''
@@ -1242,6 +1247,7 @@ class Nested_resonator_tracker(Soft_Sweep):
         spec_source.on()
         self.cc.start()
 
+
 class tim_flux_latency_sweep(Soft_Sweep):
     def __init__(self, device):
         super().__init__()
@@ -1296,16 +1302,39 @@ class tim_mw_latency_sweep(Soft_Sweep):
         time.sleep(.5)
         return val
 
+
 class tim_mw_latency_sweep_1D(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'MW latency'
         self.parameter_name = 'MW latency'
         self.unit = 's'
 
-    def set_parameter(self,val):
+    def set_parameter(self, val):
         self.dev.tim_mw_latency_0(val)
         self.dev.tim_mw_latency_1(val)
         self.dev.prepare_timing()
+        return val
+
+
+class SweepAlong2DContour(Soft_Sweep):
+    """
+    Performs a sweep along a 2D contour by setting two parameters at the same
+    time
+    """
+    def __init__(self, par_A, par_B, contour_pnts, interp_kw: dict = {}):
+        super().__init__()
+        self.par_A = par_A
+        self.par_B = par_B
+        self.name = 'Contour sweep'
+        self.parameter_name = 'Contour sweep'
+        self.unit = 'a.u.'
+        self.interpolator = c2d.interp_2D_contour(contour_pnts, **interp_kw)
+
+    def set_parameter(self, val):
+        val_par_A, val_par_B = self.interpolator(val)
+        self.par_A(val_par_A)
+        self.par_B(val_par_B)
+
         return val

@@ -65,7 +65,7 @@ class LearnerND_Minimizer(LearnerND):
                 self.max_no_improve_in_local = (
                     input_loss_per_simplex.max_no_improve_in_local
                 )
-                assert self.max_no_improve_in_local >= 2
+                assert self.max_no_improve_in_local >= 1
             else:
                 self.max_no_improve_in_local = 7
 
