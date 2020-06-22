@@ -160,7 +160,7 @@ def compute_propagator(arglist):
 
 
     sim_step=1/fluxlutman.sampling_rate()
-    subdivisions_of_simstep=1                          # 4 is a good one, corresponding to a time step of 0.1 ns
+    subdivisions_of_simstep=4                          # 4 is a good one, corresponding to a time step of 0.1 ns
     sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
                                                        # but we can use a different step for simulating the time evolution
     tlist = np.arange(0, fluxlutman.cz_length(), sim_step)
