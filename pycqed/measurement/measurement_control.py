@@ -47,7 +47,6 @@ from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
 from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
-from pycqed.utilities.learnerND_optimize import LearnerND_Optimize
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer
 import pycqed.utilities.learner_utils as lu
 from . import measurement_control_helpers as mch
@@ -554,8 +553,7 @@ class MeasurementControl(Instrument):
                                 self.adaptive_function, self.learner
                             )
                         elif (
-                            issubclass(self.adaptive_function, LearnerND_Optimize)
-                            or issubclass(self.adaptive_function, Learner1D_Minimizer)
+                            issubclass(self.adaptive_function, Learner1D_Minimizer)
                             or issubclass(self.adaptive_function, LearnerND_Minimizer)
                         ):
                             # Because this is also an optimizer we save the result
@@ -2022,7 +2020,6 @@ class MeasurementControl(Instrument):
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
         elif (
             is_subclass(adaptive_function, Learner1D_Minimizer)
-            or is_subclass(adaptive_function, LearnerND_Optimize)
             or is_subclass(adaptive_function, LearnerND_Minimizer)
         ):
             # result = learner
@@ -2036,7 +2033,7 @@ class MeasurementControl(Instrument):
             xopt = X[opt_indx]
             res_dict = {
                 "xopt": np.array(xopt)
-                if is_subclass(adaptive_function, LearnerND_Optimize)
+                if is_subclass(adaptive_function, LearnerND_Minimizer)
                 or is_subclass(adaptive_function, Learner1D_Minimizer)
                 else xopt,
                 "fopt": Y[opt_indx],
