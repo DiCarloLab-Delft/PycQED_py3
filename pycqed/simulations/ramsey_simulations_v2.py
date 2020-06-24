@@ -2,11 +2,11 @@ from importlib import reload
 from pycqed.measurement import measurement_control as mc
 
 import adaptive
-from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman_dev as flm
+from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman_vcz as flm
 
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ_v2 as scCZ_v2
 from pycqed.simulations import cz_superoperator_simulation_functions_v2 as czf_v2
-from pycqed.measurement.waveform_control_CC import waveforms_flux_dev as wfl_dev
+from pycqed.measurement.waveform_control_CC import waveforms_flux_vcz as wfl_dev
 
 import numpy as np
 from pycqed.measurement import detector_functions as det
