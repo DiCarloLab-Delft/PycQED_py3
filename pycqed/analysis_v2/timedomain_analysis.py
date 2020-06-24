@@ -891,6 +891,11 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         # The channel containing the data must be specified in the options dict
         ch_idx_spec = self.options_dict.get('ch_idx_spec', 0)
         ch_idx_osc = self.options_dict.get('ch_idx_osc', 1)
+
+        # Necessary for reading parked qubit
+        self.include_park = self.options_dict.get('include_park', False)
+        ch_idx_park = self.options_dict.get('ch_idx_park', 2)
+
         qoi['ch_idx_osc'] = ch_idx_osc
         qoi['ch_idx_spec'] = ch_idx_spec
 
@@ -902,6 +907,13 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             cal_points = [
                 [[-7, -6], [-5, -4], [-2, -1]],  # oscillating qubit
                 [[-7, -5], [-6, -4], [-3, -1]],  # spec qubits
+            ]
+        if self.cal_points == 'park':
+            # calibration point indices are when ignoring the f-state cal pts
+            cal_points = [
+                [[-9, -8], [-7, -6], [-4, -3]],  # oscillating qubit
+                [[-9, -7], [-8, -6], [-5, -3]],  # spec qubits
+                [[-2],[-1], []]                  # parked qubit
             ]
         elif self.cal_points == 'ge':
             # calibration point indices are when ignoring the f-state cal pts
@@ -959,6 +971,18 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                     SI, SX, V0, V1, V2)
                 # Leakage based on the average of the oscillation
                 qoi['leak_avg'] = P2[0]  # list with 1 elt...
+        if self.include_park:
+            if self.cal_points == 'park':
+                yvals_park = list(self.raw_data_dict['measured_values_ord_dict'].values())[
+                        ch_idx_park][0]
+                self.yvals_park = a_tools.normalize_data_v3(
+                            yvals_park,
+                            cal_zero_points=cal_points[ch_idx_park][0],
+                            cal_one_points=cal_points[ch_idx_park][1])
+                self.proc_data_dict['yvals_park_off'] = self.yvals_park[::2]
+                self.proc_data_dict['yvals_park_on'] = self.yvals_park[1::2]
+                self.proc_data_dict['ylabel_park'] = self.raw_data_dict['value_names'][0][ch_idx_park]
+
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -968,8 +992,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.fit_dicts['cos_fit_off'] = {
             'model': cos_mod0,
             'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
-            'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-4]},
-            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off'][:-4]}}
+            'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-5]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off'][:-5]}}
 
         cos_mod1 = lmfit.Model(fit_mods.CosFunc)
         cos_mod1.guess = fit_mods.Cos_guess.__get__(
@@ -977,8 +1001,26 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.fit_dicts['cos_fit_on'] = {
             'model': cos_mod1,
             'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
-            'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-3]},
-            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-3]}}
+            'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-4]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-4]}}
+        if self.include_park:
+            cos_mod_park_0 = lmfit.Model(fit_mods.CosFunc)
+            cos_mod_park_0.guess = fit_mods.Cos_guess.__get__(
+                cos_mod_park_0, cos_mod_park_0.__class__)
+            self.fit_dicts['park_fit_off'] = {
+                'model': cos_mod_park_0,
+                'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
+                'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-5]},
+                'fit_yvals': {'data': self.proc_data_dict['yvals_park_off'][:-5]}}
+
+            cos_mod_park_1 = lmfit.Model(fit_mods.CosFunc)
+            cos_mod_park_1.guess = fit_mods.Cos_guess.__get__(
+                cos_mod_park_1, cos_mod_park_1.__class__)
+            self.fit_dicts['park_fit_on'] = {
+                'model': cos_mod_park_1,
+                'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
+                'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-4]},
+                'fit_yvals': {'data': self.proc_data_dict['yvals_park_on'][:-4]}}
 
     def analyze_fit_results(self):
         qoi = self.proc_data_dict['quantities_of_interest']
@@ -996,7 +1038,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                                  else np.nan))
         qoi['phi_0'] = phi0
         qoi['phi_1'] = phi1
-        qoi['phi_cond'] = (phi0 - phi1) % 360
+        qoi['phi_cond'] = (phi0-phi1) % 360
 
         qoi['osc_amp_0'] = ufloat(fr_0.params['amplitude'].value,
                                   fr_0.params['amplitude'].stderr if
@@ -1023,11 +1065,31 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                          sem(self.proc_data_dict['yvals_spec_on'][:-3]))
         spec_off = ufloat(np.mean(self.proc_data_dict['yvals_spec_off'][:-3]),
                           sem(self.proc_data_dict['yvals_spec_off'][:-3]))
-        qoi['missing_fraction'] = spec_on - spec_off
+        qoi['missing_fraction'] = spec_on-spec_off
+
+        if self.include_park:
+            fp_0 = self.fit_res['park_fit_off']
+            fp_1 = self.fit_res['park_fit_on']
+            park_phase_off=ufloat(np.rad2deg(fp_0.params['phase'].value),
+                                  np.rad2deg(fp_0.params['phase'].stderr if
+                                             fp_0.params['phase'].stderr is not None
+                                             else np.nan))
+            park_phase_on=ufloat(np.rad2deg(fp_1.params['phase'].value),
+                                 np.rad2deg(fp_1.params['phase'].stderr if
+                                            fp_1.params['phase'].stderr is not None
+                                            else np.nan))
+        else:
+            park_phase_off = ufloat(0,0)
+            park_phase_on = ufloat(0,0)
+
+        qoi['park_phase_off'] = park_phase_off
+        qoi['park_phase_on'] = park_phase_on
 
     def prepare_plots(self):
         self._prepare_main_oscillation_figure()
         self._prepare_spectator_qubit_figure()
+        if self.include_park:
+            self._prepare_park_oscillation_figure()
 
     def _prepare_main_oscillation_figure(self):
         self.plot_dicts['main'] = {
@@ -1163,3 +1225,194 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'plot_kws': {
                     'y': y, 'color': 'C1', 'linestyle': 'dotted'}
             }
+
+    def _prepare_park_oscillation_figure(self):
+        self.plot_dicts['park'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['xvals_off'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_park_off'],
+            'ylabel': self.proc_data_dict['ylabel_park'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'CZ off',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'do_legend': True,
+            # 'yrange': (0,1),
+            'legend_pos': 'upper right'}
+
+        self.plot_dicts['on'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'park',
+            'xvals': self.proc_data_dict['xvals_on'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_park_on'],
+            'ylabel': self.proc_data_dict['ylabel_park'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'CZ on',
+            'do_legend': True,
+            'legend_pos': 'upper right'}
+
+        if self.do_fitting:
+            self.plot_dicts['park_fit_off'] = {
+                'ax_id': 'park',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['park_fit_off']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit CZ off',
+                'do_legend': True}
+            self.plot_dicts['park_fit_on'] = {
+                'ax_id': 'park',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['park_fit_on']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit CZ on',
+                'do_legend': True}
+
+            qoi = self.proc_data_dict['quantities_of_interest']
+            phase_message = (
+                'Phase off: {} deg\n'
+                'Phase on: {} deg\n\n'.format(
+                    qoi['park_phase_off'], qoi['park_phase_on']))
+            self.plot_dicts['phase_message'] = {
+                'ax_id': 'park',
+                'ypos': 0.9,
+                'xpos': 1.45,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'line_kws': {'alpha': 0},
+                'text_string': phase_message}
+
+
+class Crossing_Analysis(Single_Qubit_TimeDomainAnalysis):
+    """
+    Analysis to extract the intercept of two parameters.
+
+    relevant options_dict parameters
+        ch_idx_A (int) specifies first channel for intercept
+        ch_idx_B (int) specifies second channel for intercept if same as first
+            it will assume data was taken interleaved.
+    """
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True,
+                 normalized_probability=False):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        self.single_timestamp = False
+
+        self.normalized_probability = normalized_probability
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xvals': 'sweep_points',
+                            'xunit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        """
+        selects the relevant acq channel based on "ch_idx_A" and "ch_idx_B"
+        specified in the options dict. If ch_idx_A and ch_idx_B are the same
+        it will unzip the data.
+        """
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+        # The channel containing the data must be specified in the options dict
+        ch_idx = self.options_dict.get('ch_idx', 5)
+
+        self.proc_data_dict['ylabel'] = self.raw_data_dict['value_names'][0][ch_idx]
+        self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][ch_idx]
+        self.proc_data_dict['xvals'] = self.raw_data_dict['xvals'][0]
+        self.proc_data_dict['yvals'] = list(self.raw_data_dict
+                                                       ['measured_values_ord_dict'].values())[ch_idx][0]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        self.fit_dicts['line_fit'] = {
+            'model': lmfit.models.PolynomialModel(degree=2),
+            'fit_xvals': {'x': self.proc_data_dict['xvals']},
+            'fit_yvals': {'data': np.unwrap(self.proc_data_dict['yvals'],360)}}
+
+    def analyze_fit_results(self):
+        # pack function
+        target_crossing = self.options_dict.get('target_crossing', 0)
+        fit_res = self.fit_dicts['line_fit']['fit_res']
+        c0 = fit_res.best_values['c0']-target_crossing # constant term
+        c1 = fit_res.best_values['c1'] # linear term
+        c2 = fit_res.best_values['c2'] # quadratic term
+        ######################################
+        # WARNING:
+        # NUMPY HANDLES A DIFFERENT CONVENTION FOR THE FUNCTIONS
+        # np.polynomial.polynomial.polyroots = [coeff 0, coeff x, coeff x**2,..]
+        # np.polyval; np.polyfit = [coeff x**N, x**N-1, ..., x, 0]
+        ######################################
+        poly_coeff = [c0, c1, c2]
+        roots = np.real_if_close(np.polynomial.polynomial.polyroots(poly_coeff))
+        # only keep roots within range
+        min_xrange = np.min(self.proc_data_dict['xvals'])
+        max_xrange = np.max(self.proc_data_dict['xvals'])
+        is_root_in_range = np.where(np.logical_and(roots>min_xrange,roots<max_xrange),
+                                    True,False)
+
+        # check whethere there is roots within range
+        roots_available_within_range = roots[is_root_in_range][0]
+        if roots_available_within_range>0: # sums Trues as 1, Falses as 0
+            self.proc_data_dict['root'] = roots[is_root_in_range][0] # selects first root available
+        elif roots_available_within_range<0:
+            self.proc_data_dict['root'] = roots[0] # selects first root available
+        else:
+            self.proc_data_dict['root'] = np.nan
+
+        self.proc_data_dict['intersect'] = [self.proc_data_dict['root'],
+                                            np.polyval(poly_coeff[::-1],self.proc_data_dict['root'])]
+
+    def prepare_plots(self):
+        pass
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['xvals'],
+            'xlabel': self.proc_data_dict['xlabel'][0],
+            'xunit': self.proc_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals'],
+            'ylabel': self.proc_data_dict['ylabel'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'A',
+            'title': (self.proc_data_dict['timestamps'][0] + ' \n' +
+                      self.proc_data_dict['measurementstring'][0]),
+            'do_legend': True,
+            'legend_pos': 'upper right'}
+
+        if self.do_fitting:
+            self.plot_dicts['line_fit'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['line_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit',
+                'do_legend': True}
+            self.plot_dicts['intercept_message'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_line,
+                'xvals': [self.proc_data_dict['intersect'][0]],
+                'yvals': [self.proc_data_dict['intersect'][1]],
+                'line_kws': {'alpha': .5, 'color': 'gray',
+                             'markersize': 15},
+                'marker': 'o',
+                'setlabel': 'Intercept: {:.3f}'.format(self.proc_data_dict['root']),
+                'do_legend': True}
+
+    def get_intersect(self):
+        return self.proc_data_dict['root']
+

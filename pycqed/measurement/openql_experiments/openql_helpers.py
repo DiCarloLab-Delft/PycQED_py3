@@ -1,15 +1,13 @@
 import re
 import logging
 import numpy as np
-from os.path import join, dirname
+from os.path import join, dirname, isfile
+from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
-
-from pycqed.utilities.general import suppress_stdout
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.utilities.general import is_more_rencent
-
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform, CReg, Operation
 
@@ -84,20 +82,13 @@ def compile(p, quiet: bool = True):
         p.compile()
 
     # determine extension of generated file
-    if p.eqasm_compiler=='eqasm_backend_cc':  # NB: field .eqasm_compiler is set by p.compile()
+    if p.eqasm_compiler=='eqasm_backend_cc':
         ext = '.vq1asm' # CC
     else:
         ext = '.qisa' # CC-light, QCC
     # attribute is added to program to help finding the output files
     p.filename = join(p.output_dir, p.name + ext)
     return p
-
-
-def is_compatible_openql_version_cc() -> bool:
-    """
-    test whether OpenQL version is compatible with Central Controller
-    """
-    return ql.get_version() > '0.8.0'  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
 
 
 #############################################################################
@@ -260,6 +251,85 @@ def add_multi_q_cal_points(p, qubits: list,
     return p
 
 
+def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
+                                            q2: int = None,
+                                            reps_per_cal_pt: int = 1,
+                                            f_state_cal_pts: bool = False,
+                                            f_state_cal_pt_cw: int = 31,
+                                            measured_qubits=None,
+                                            nr_of_interleaves=1):
+    """
+    Returns a list of kernels containing calibration points for two qubits
+
+    Args:
+        p               : OpenQL  program to add calibration points to
+        q0, q1          : ints of two qubits
+        reps_per_cal_pt : number of times to repeat each cal point
+        f_state_cal_pts : if True, add calibration points for the 2nd exc. state
+        f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
+        measured_qubits : selects which qubits to perform readout on
+            if measured_qubits == None, it will default to measuring the
+            qubits for which there are cal points.
+    Returns:
+        p
+    """
+    combinations = (["00"] * reps_per_cal_pt +
+                    ["01"] * reps_per_cal_pt +
+                    ["10"] * reps_per_cal_pt +
+                    ["11"] * reps_per_cal_pt)
+    if f_state_cal_pts:
+        extra_combs = (
+            ['02'] * reps_per_cal_pt +
+            ['20'] * reps_per_cal_pt +
+            ['22'] * reps_per_cal_pt)
+
+        combinations += extra_combs
+    if q2 is not None:
+        combinations += ["Park_0", "Park_1"]
+
+    if (measured_qubits is None) and (q2 is None):
+        measured_qubits = [q0, q1]
+    elif (measured_qubits is None):
+        measured_qubits = [q0, q1, q2]
+
+    for i, comb in enumerate(combinations):
+        k = create_kernel('cal{}_{}'.format(i, comb), p)
+        k.prepz(q0)
+        k.prepz(q1)
+        if q2 is not None:
+            k.prepz(q2)
+
+        if comb[0] == '0':
+            k.gate('i', [q0])
+        elif comb[0] == '1':
+            k.gate('rx180', [q0])
+        elif comb[0] == '2':
+            k.gate('rx180', [q0])
+            k.gate('cw_{:02}'.format(f_state_cal_pt_cw), [q0])
+
+        if comb[1] == '0':
+            k.gate('i', [q1])
+        elif comb[1] == '1':
+            k.gate('rx180', [q1])
+        elif comb[1] == '2':
+            k.gate('rx180', [q1])
+            k.gate('cw_{:02}'.format(f_state_cal_pt_cw), [q1])
+
+        if comb[0] == 'P' and comb[-1] == '0':
+            k.gate('i', [q2])
+        elif comb[0] == 'P' and comb[-1] == '1':
+            k.gate('rx180', [q2])
+
+        # Used to ensure timing is aligned
+        k.gate('wait', measured_qubits, 0)
+        for q in measured_qubits:
+            k.measure(q)
+        k.gate('wait', measured_qubits, 0)
+
+        p.add_kernel(k)
+
+    return p
+
 #############################################################################
 # File modifications
 #############################################################################
@@ -276,7 +346,7 @@ def infer_tqisa_filename(qisa_fn: str):
     """
     Get's the expected tqisa filename based on the qisa filename.
     """
-    return qisa_fn[:-4] + 'tqisa'
+    return qisa_fn[:-4]+'tqisa'
 
 
 def get_start_time(line: str):
@@ -573,17 +643,12 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
     if recompile == True:
         return True
     elif recompile == 'as needed':
-        try:
-            if is_more_rencent(program_fn, platf_cfg):
-                return False
-            else:
-                return True  # compilation is required
-        except FileNotFoundError:
-            # File doesn't exist means compilation is required
-            return True
-
+        if isfile(program_fn):
+            return False
+        else:
+            return True  # compilation is required
     elif recompile == False:  # if False
-        if is_more_rencent(program_fn, platf_cfg):
+        if isfile(program_fn):
             return False
         else:
             raise ValueError('OpenQL config has changed more recently '

@@ -728,6 +728,7 @@ class DeviceCCL(Instrument):
 
             ro_lm.set("M_length_R{}".format(res_nr), qb.ro_pulse_length())
             ro_lm.set("M_amp_R{}".format(res_nr), qb.ro_pulse_amp())
+            ro_lm.set("M_delay_R{}".format(res_nr), qb.ro_pulse_delay())
             ro_lm.set("M_phi_R{}".format(res_nr), qb.ro_pulse_phi())
             ro_lm.set("M_down_length0_R{}".format(res_nr), qb.ro_pulse_down_length0())
             ro_lm.set("M_down_amp0_R{}".format(res_nr), qb.ro_pulse_down_amp0())
@@ -1009,16 +1010,16 @@ class DeviceCCL(Instrument):
         self,
         q0: str,
         q1: str,
-        q2: int = None,
-        q3: int = None,
+        q2: str = None,
+        q3: str = None,
         flux_codeword="cz",
         flux_codeword_park=None,
+        parked_qubit_seq='ground',
         reduced_swp_points=False,
         prepare_for_timedomain=True,
         MC=None,
-        CZ_disabled: bool = False,
-        single_q_gates_replace: str = None,
-        q0_first_gate: str = "rx90",
+        disable_cz: bool = False,
+        disabled_cz_duration_ns: int = 60,
         cz_repetitions: int = 1,
         wait_time_before_flux_ns: int = 0,
         wait_time_after_flux_ns: int = 0,
@@ -1065,10 +1066,31 @@ class DeviceCCL(Instrument):
                 the final afterrotations
         """
 
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        assert q0 in self.qubits()
+        assert q1 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+        list_qubits_used = [q0, q1]
+
+        include_park = False
+        if q2 is None:
+            q2idx = None
+        else:
+            q2idx = self.find_instrument(q2).cfg_qubit_nr()
+            list_qubits_used.append(q2)
+            include_park = True
+
+        if q3 is None:
+            q3idx = None
+        else:
+            q3idx = self.find_instrument(q3).cfg_qubit_nr()
+            list_qubits_used.append(q3)
+
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=[q0, q1])
-            for q in [q0, q1]:
-                # This can be
+            self.prepare_for_timedomain(qubits=list_qubits_used)
+            for q in list_qubits_used:  # only on the CZ qubits we add the ef pulses
                 mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
 
                 lm = mw_lutman.LutMap()
@@ -1076,22 +1098,8 @@ class DeviceCCL(Instrument):
                 lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
                 # load_phase_pulses will also upload other waveforms
                 mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-                mw_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
-
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-        assert q0 in self.qubits()
-        assert q1 in self.qubits()
-        q0idx = self.find_instrument(q0).cfg_qubit_nr()
-        q1idx = self.find_instrument(q1).cfg_qubit_nr()
-        if q2 is None:
-            q2idx = None
-        else:
-            q2idx = self.find_instrument(q2).cfg_qubit_nr()
-        if q3 is None:
-            q3idx = None
-        else:
-            q3idx = self.find_instrument(q3).cfg_qubit_nr()
+                mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                    regenerate_waveforms=True)
 
         # These are hardcoded angles in the mw_lutman for the AWG8
         if reduced_swp_points:
@@ -1105,14 +1113,15 @@ class DeviceCCL(Instrument):
             q2idx,
             q3idx,
             platf_cfg=self.cfg_openql_platform_fn(),
-            CZ_disabled=CZ_disabled,
+            disable_cz=disable_cz,
+            disabled_cz_duration=disabled_cz_duration_ns,
             angles=angles,
             wait_time_before_flux=wait_time_before_flux_ns,
             wait_time_after_flux=wait_time_after_flux_ns,
             flux_codeword=flux_codeword,
             flux_codeword_park=flux_codeword_park,
-            single_q_gates_replace=single_q_gates_replace,
             cz_repetitions=cz_repetitions,
+            parked_qubit_seq=parked_qubit_seq
         )
 
         s = swf.OpenQL_Sweep(
@@ -1124,17 +1133,35 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
 
-        MC.set_detector_function(self.get_correlation_detector(qubits=[q0, q1]))
+        measured_qubits = [q0, q1]
+        if q2 is not None:
+            measured_qubits.append(q2)
+        if q3 is not None:
+            measured_qubits.append(q3)
+
+        MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))
+
         MC.run(
-            "conditional_oscillation_{}_{}_x{}_{}{}".format(
-                q0, q1, cz_repetitions, self.msmt_suffix, label
+            "conditional_oscillation_{}_{}_&_{}_{}_x{}_{}{}".format(
+                q0, q1, q2, q3, cz_repetitions, self.msmt_suffix, label
             ),
             disable_snapshot_metadata=disable_metadata,
         )
 
+        # [2020-06-24] parallel cz not supported (yet)
+
+        if include_park:
+            cal_points_used = 'park'
+        else:
+            cal_points_used = 'gef'
+
         a = ma2.Conditional_Oscillation_Analysis(
-            options_dict={"ch_idx_osc": 0, "ch_idx_spec": 1}, extract_only=extract_only
-        )
+            options_dict={'ch_idx_osc': 0,
+                          'ch_idx_spec': 1,
+                          'ch_idx_park': 2,
+                          'include_park': include_park},
+            cal_points=cal_points_used,
+            extract_only=extract_only)
 
         return a
 
