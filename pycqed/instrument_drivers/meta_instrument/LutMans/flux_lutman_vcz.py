@@ -183,8 +183,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         if self.park_double_sided():
             ones = np.ones(int(self.park_length() * self.sampling_rate() / 2))
             pulse_pos = self.park_amp() * ones
-            pulse_neg = self.park_amp_minus() * ones
-            return np.concatenate((pulse_pos, pulse_neg))
+            return np.concatenate((pulse_pos, - pulse_pos))
         else:
             return self.park_amp() * np.ones(
                 int(self.park_length() * self.sampling_rate())
@@ -300,15 +299,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             label="Parking pulse amp. pos.",
             docstring="Parking pulse amplitude if `park_double_sided` is `False`, "
             "or positive amplitude for Net-Zero",
-            unit="dac value",
-            vals=vals.Numbers(),
-            parameter_class=ManualParameter,
-        )
-        self.add_parameter(
-            "park_amp_minus",
-            initial_value=0,
-            label="Parking pulse amp. neg.",
-            docstring="Parking pulse amplitude for negative Net-Zero pulse",
             unit="dac value",
             vals=vals.Numbers(),
             parameter_class=ManualParameter,
