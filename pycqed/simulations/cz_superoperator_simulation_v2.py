@@ -2,11 +2,11 @@ from importlib import reload
 from pycqed.measurement import measurement_control as mc
 
 import adaptive
-from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman_dev as flm
+from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman_vcz as flm
 
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ_v2 as scCZ_v2
 from pycqed.simulations import cz_superoperator_simulation_functions_v2 as czf_v2
-from pycqed.measurement.waveform_control_CC import waveforms_flux_dev as wfl_dev
+from pycqed.measurement.waveform_control_CC import waveforms_vcz as wf_vcz
 
 from pycqed.analysis_v2 import measurement_analysis as ma2
 
@@ -23,7 +23,7 @@ import logging
 
 reload(scCZ_v2)
 reload(czf_v2)
-reload(wfl_dev)
+reload(wf_vcz)
 
 np.set_printoptions(threshold=np.inf)
 log = logging.getLogger(__name__)
@@ -179,7 +179,7 @@ def compute_propagator(arglist):
     )  # waveform is generated according to sampling rate of AWG
 
     wf_generator = getattr(
-        wfl_dev,
+        wf_vcz,
         fluxlutman.get("cz_wf_generator_{}".format(which_gate))
     )
 
@@ -196,6 +196,13 @@ def compute_propagator(arglist):
     # [2020-05-30] probably not needed anymore
     amp = amp * sim_control_CZ.voltage_scaling_factor()
 
+    # For fine tuning of the waiting in the middle for matching sim-exp or studying interference fringes
+    if sim_control_CZ.artificial_waiting_at_sweetspot() != 0 and not sim_control_CZ.get("optimize_const_amp"):
+        index_middle = np.where(amp[1:] == 0)[0][0] + 1
+        amp = np.insert(amp, index_middle, np.zeros(sim_control_CZ.artificial_waiting_at_sweetspot()))
+        intervals_list = np.insert(intervals_list, index_middle, np.zeros(sim_control_CZ.artificial_waiting_at_sweetspot()) + sim_step_new)
+        tlist_new = np.concatenate((tlist_new, np.arange(1, sim_control_CZ.artificial_waiting_at_sweetspot()+1)*sim_step_new + tlist_new[-1]))
+
     # Apply distortions
     if sim_control_CZ.distortions():
         amp_final = czf_v2.distort_amplitude(
@@ -206,7 +213,7 @@ def compute_propagator(arglist):
         )
     else:
         amp_final = amp
-    # czf_v2.plot(x_plot_vec=[np.array(tlist_new)*1e9, np.array(tlist_new)*1e9],y_plot_vec=[fluxlutman.calc_amp_to_freq(amp, '01', which_gate=which_gate) / 1e9, 
+    # czf_v2.plot(x_plot_vec=[np.array(tlist_new)*1e9, np.array(tlist_new)*1e9],y_plot_vec=[fluxlutman.calc_amp_to_freq(amp, '01', which_gate=which_gate) / 1e9,
     #                                                                                    fluxlutman.calc_amp_to_freq(amp_final, '01', which_gate=which_gate) / 1e9],
     #                          title='Pulse with and without distortions',
     #                          xlabel='Time (ns)',ylabel='Frequency (GHz)',

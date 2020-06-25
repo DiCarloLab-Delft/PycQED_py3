@@ -799,7 +799,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         k.gate("wait", [], 0)  # alignment workaround
         k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
         if qubit_idx_park is not None:
-            k.gate('fl_cw_06', [qubit_idx_park]) # square pulse
+            k.gate('fl_cw_06', [qubit_idx_park])  # square pulse
         k.gate("wait", [], 0)  # alignment workaround
     elif cc.upper() == 'QCC' or cc.upper() == 'CC':
         k.gate("wait", [], 0)  # alignment workaround
@@ -2427,66 +2427,67 @@ def two_qubit_Depletion(q0: int, q1: int, platf_cfg: str,
     p = oqh.compile(p)
     return p
 
-def Two_qubit_RTE(QX:int , QZ:int, platf_cfg: str,
-                  measurements:int, net='i', start_states:list = ['0'],
+
+def Two_qubit_RTE(QX: int , QZ: int, platf_cfg: str,
+                  measurements: int, net='i', start_states: list = ['0'],
                   ramsey_time_1: int = 120, ramsey_time_2: int = 120,
-                  echo:bool = False):
+                  echo: bool = False):
     """
 
     """
     p = oqh.create_program('RTE', platf_cfg)
 
     for state in start_states:
-      k = oqh.create_kernel('RTE start state {}'.format(state), p)
-      k.prepz(QX)
-      k.prepz(QZ)
-      if state == '1':
-          k.gate('rx180', [QX])
-          k.gate('rx180', [QZ])
-      k.gate('wait', [QX, QZ], 0)
-      ######################
-      # Parity check
-      ######################
-      for m in range(measurements):
-          # Superposition
-          k.gate('rx90', [QX])
-          k.gate('i', [QZ])
-          # CZ emulation
-          if echo:
-            k.gate('wait', [QX, QZ], int((ramsey_time_1-20)/2) )
+        k = oqh.create_kernel('RTE start state {}'.format(state), p)
+        k.prepz(QX)
+        k.prepz(QZ)
+        if state == '1':
             k.gate('rx180', [QX])
-            k.gate('i', [QZ])
-            k.gate('wait', [QX, QZ], int((ramsey_time_1-20)/2) )
-          else:
-            k.gate('wait', [QX, QZ], ramsey_time_1)
-          # intermidate sequential
-          if net == 'pi' or echo == True:
-              k.gate('rx90', [QX])
-          else:
-              k.gate('rxm90', [QX])
-          k.gate('i', [QZ])
-          k.gate('i', [QX])
-          k.gate('rx90', [QZ])
-          # CZ emulation
-          if echo:
-            k.gate('wait', [QX, QZ], int((ramsey_time_2-20)/2) )
             k.gate('rx180', [QZ])
+        k.gate('wait', [QX, QZ], 0)
+        ######################
+        # Parity check
+        ######################
+        for m in range(measurements):
+            # Superposition
+            k.gate('rx90', [QX])
+            k.gate('i', [QZ])
+            # CZ emulation
+            if echo:
+                k.gate('wait', [QX, QZ], int((ramsey_time_1-20)/2) )
+                k.gate('rx180', [QX])
+                k.gate('i', [QZ])
+                k.gate('wait', [QX, QZ], int((ramsey_time_1-20)/2) )
+            else:
+                k.gate('wait', [QX, QZ], ramsey_time_1)
+            # intermidate sequential
+            if net == 'pi' or echo:
+                k.gate('rx90', [QX])
+            else:
+                k.gate('rxm90', [QX])
+            k.gate('i', [QZ])
             k.gate('i', [QX])
-            k.gate('wait', [QX, QZ], int((ramsey_time_2-20)/2) )
-          else:
-            k.gate('wait', [QX, QZ], ramsey_time_2)
-          # Recovery pulse
-          k.gate('i', [QX])
-          if net == 'pi' or echo == True:
-              k.gate('rx90', [QZ])
-          else:
-              k.gate('rxm90', [QZ])
-          k.gate('wait', [QX, QZ], 0)
-          # Measurement
-          k.measure(QX)
-          k.measure(QZ)
+            k.gate('rx90', [QZ])
+            # CZ emulation
+            if echo:
+                k.gate('wait', [QX, QZ], int((ramsey_time_2-20)/2) )
+                k.gate('rx180', [QZ])
+                k.gate('i', [QX])
+                k.gate('wait', [QX, QZ], int((ramsey_time_2-20)/2) )
+            else:
+                k.gate('wait', [QX, QZ], ramsey_time_2)
+            # Recovery pulse
+            k.gate('i', [QX])
+            if net == 'pi' or echo:
+                k.gate('rx90', [QZ])
+            else:
+                k.gate('rxm90', [QZ])
+            k.gate('wait', [QX, QZ], 0)
+            # Measurement
+            k.measure(QX)
+            k.measure(QZ)
 
-      p.add_kernel(k)
+        p.add_kernel(k)
 
     p = oqh.compile(p)
     return p

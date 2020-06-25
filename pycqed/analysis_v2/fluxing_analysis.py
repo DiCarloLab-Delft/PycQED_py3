@@ -1650,6 +1650,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                 contour_levels=levels_list,
                 cyclic_data=True,
                 vlim=(0, 360),
+                return_contours_only=True
             )
             for i, level in enumerate(levels_list):
                 # Just saving in more friendly format
