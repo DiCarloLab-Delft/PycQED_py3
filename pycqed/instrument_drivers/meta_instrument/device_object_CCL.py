@@ -1014,7 +1014,7 @@ class DeviceCCL(Instrument):
         q3: str = None,
         flux_codeword="cz",
         flux_codeword_park=None,
-        parked_qubit_seq='ground',
+        parked_qubit_seq=None,
         downsample_swp_points=1,  # x2 and x3 available
         prepare_for_timedomain=True,
         MC=None,
@@ -1106,7 +1106,10 @@ class DeviceCCL(Instrument):
         # only x2 and x3 downsample_swp_points available
         angles = np.arange(0, 341, 20 * downsample_swp_points)
 
-        p, cal_states = mqo.conditional_oscillation_seq(
+        if parked_qubit_seq is None:
+            parked_qubit_seq = "ramsey" if q2 is not None else "ground"
+
+        p = mqo.conditional_oscillation_seq(
             q0idx,
             q1idx,
             q2idx,
@@ -1148,10 +1151,12 @@ class DeviceCCL(Instrument):
         )
 
         # [2020-06-24] parallel cz not supported (yet)
+        # should be implemented by just running the analysis twice with
+        # corresponding channels
+
         options_dict = {
             'ch_idx_osc': 0,
-            'ch_idx_spec': 1,
-            'cal_states': cal_states
+            'ch_idx_spec': 1
         }
 
         if q2 is not None:

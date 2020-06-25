@@ -1522,9 +1522,9 @@ def conditional_oscillation_seq(q0: int, q1: int,
             states = ["000", "010", "101", "111"]
 
         qubits = [q0, q1] if q2 is None else [q0, q1, q2]
-        cal_pnts_states = oqh.add_multi_q_cal_points(
+        oqh.add_multi_q_cal_points(
             p, qubits=qubits, f_state_cal_pt_cw=31,
-            combinations=states, return_comb=True)
+            combinations=states, return_comb=False)
 
     p = oqh.compile(p)
 
@@ -1537,13 +1537,10 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
     p.sweep_points = np.concatenate(
         [np.repeat(angles, len(cases)), cal_pts_idx])
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
-    try:
-        p.set_sweep_points(p.sweep_points)
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
-    return p, cal_pnts_states
+
+    p.set_sweep_points(p.sweep_points)
+
+    return p
 
 
 def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
