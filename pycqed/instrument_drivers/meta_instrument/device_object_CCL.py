@@ -1015,7 +1015,7 @@ class DeviceCCL(Instrument):
         flux_codeword="cz",
         flux_codeword_park=None,
         parked_qubit_seq='ground',
-        reduced_swp_points=False,
+        downsample_swp_points=1,  # x2 and x3 available
         prepare_for_timedomain=True,
         MC=None,
         disable_cz: bool = False,
@@ -1055,15 +1055,18 @@ class DeviceCCL(Instrument):
             flux_codeword_park (str):
                 optionally park qubits q2 (and q3) with either a 'park' pulse
                 (single qubit operation on q2) or a 'cz' pulse on q2-q3.
+                NB: depending on the CC configurations the parking can be
+                implicit in the main `cz`
             prepare_for_timedomain (bool):
                 should the insruments be reconfigured for time domain measurement
-
-            CZ_disabled (bool):
+            disable_cz (bool):
                 execute the experiment with no flux pulse applied
-
+            disabled_cz_duration_ns (int):
+                waiting time to emulate the flux pulse
             wait_time_after_flux_ns (int):
                 additional waiting time (in ns) after the flux pulse, before
                 the final afterrotations
+
         """
 
         if MC is None:
@@ -1074,13 +1077,11 @@ class DeviceCCL(Instrument):
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
         list_qubits_used = [q0, q1]
 
-        include_park = False
         if q2 is None:
             q2idx = None
         else:
             q2idx = self.find_instrument(q2).cfg_qubit_nr()
             list_qubits_used.append(q2)
-            include_park = True
 
         if q3 is None:
             q3idx = None
@@ -1102,12 +1103,10 @@ class DeviceCCL(Instrument):
                     regenerate_waveforms=True)
 
         # These are hardcoded angles in the mw_lutman for the AWG8
-        if reduced_swp_points:
-            angles = np.arange(0, 341, 40)
-        else:
-            angles = np.arange(0, 341, 20)
+        # only x2 and x3 downsample_swp_points available
+        angles = np.arange(0, 341, 20 * downsample_swp_points)
 
-        p = mqo.conditional_oscillation_seq(
+        p, cal_states = mqo.conditional_oscillation_seq(
             q0idx,
             q1idx,
             q2idx,
@@ -1149,18 +1148,17 @@ class DeviceCCL(Instrument):
         )
 
         # [2020-06-24] parallel cz not supported (yet)
+        options_dict = {
+            'ch_idx_osc': 0,
+            'ch_idx_spec': 1,
+            'cal_states': cal_states
+        }
 
-        if include_park:
-            cal_points_used = 'park'
-        else:
-            cal_points_used = 'gef'
+        if q2 is not None:
+            options_dict['ch_idx_park'] = 2
 
         a = ma2.Conditional_Oscillation_Analysis(
-            options_dict={'ch_idx_osc': 0,
-                          'ch_idx_spec': 1,
-                          'ch_idx_park': 2,
-                          'include_park': include_park},
-            cal_points=cal_points_used,
+            options_dict=options_dict,
             extract_only=extract_only)
 
         return a

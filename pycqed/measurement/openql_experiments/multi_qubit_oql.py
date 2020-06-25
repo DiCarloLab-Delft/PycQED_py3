@@ -1516,20 +1516,22 @@ def conditional_oscillation_seq(q0: int, q1: int,
             p.add_kernel(k)
 
     if add_cal_points:
-        p = oqh.add_two_q_cal_points_special_cond_osc(p, q0=q0, q1=q1,
-                                                      q2=q2,
-                                                      f_state_cal_pts=True,
-                                                      f_state_cal_pt_cw=31)
+        if q2 is None:
+            states = ["00", "01", "10", "11"]
+        else:
+            states = ["000", "010", "101", "111"]
+
+        qubits = [q0, q1] if q2 is None else [q0, q1, q2]
+        cal_pnts_states = oqh.add_multi_q_cal_points(
+            p, qubits=qubits, f_state_cal_pt_cw=31,
+            combinations=states, return_comb=True)
+
     p = oqh.compile(p)
 
     # [2020-06-24] parallel cz not supported (yet)
 
     if add_cal_points:
-        cal_pts_idx = [361, 362, 363, 364,
-                       365, 366, 367]
-        if q2 is not None and q3 is None:
-            # Two extra points for the parking qubit
-            cal_pts_idx += [368, 369]
+        cal_pts_idx = [361, 362, 363, 364]
     else:
         cal_pts_idx = []
 
@@ -1541,7 +1543,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
     except TypeError:
         # openql-0.5 compatibility
         p.set_sweep_points(p.sweep_points, len(p.sweep_points))
-    return p
+    return p, cal_pnts_states
 
 
 def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,

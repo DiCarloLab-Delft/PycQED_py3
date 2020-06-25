@@ -223,112 +223,55 @@ def add_two_q_cal_points(p, q0: int, q1: int,
 
 
 def add_multi_q_cal_points(p, qubits: list,
-                           combinations: list):
+        combinations: list = ["00", "01", "10", "11"],
+        reps_per_cal_pnt: int = 1,
+        f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+        measured_qubits=None, return_comb=False):
     """
-    Adds calibration points based on a list of state combinations
-    """
-    kernel_list = []
-    for i, comb in enumerate(combinations):
-        k = create_kernel('cal{}_{}'.format(i, comb), p)
-        for q in qubits:
-            k.prepz(q)
-
-        for j, q in enumerate(qubits):
-            if comb[j] == '1':
-                k.gate('rx180', [q])
-            elif comb[j] == '2':
-                k.gate('rx180', [q])
-                k.gate('rx12', [q])
-            else:
-                pass
-        # Used to ensure timing is aligned
-        k.gate('wait', qubits, 0)
-        for q in qubits:
-            k.measure(q)
-        k.gate('wait', qubits, 0)
-        kernel_list.append(k)
-        p.add_kernel(k)
-    return p
-
-
-def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
-                                            q2: int = None,
-                                            reps_per_cal_pt: int = 1,
-                                            f_state_cal_pts: bool = False,
-                                            f_state_cal_pt_cw: int = 31,
-                                            measured_qubits=None,
-                                            nr_of_interleaves=1):
-    """
-    Returns a list of kernels containing calibration points for two qubits
+    Add a list of kernels containing calibration points in the program `p`
 
     Args:
         p               : OpenQL  program to add calibration points to
-        q0, q1          : ints of two qubits
-        reps_per_cal_pt : number of times to repeat each cal point
-        f_state_cal_pts : if True, add calibration points for the 2nd exc. state
+        qubits          : list of int
+        combinations    : list with the target multi-qubit state
+            e.g. ["00", "01", "10", "11"] or
+            ["00", "01", "10", "11", "02", "20", "22"] or
+            ["000", "010", "101", "111"]
+        reps_per_cal_pnt : number of times to repeat each cal point
         f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
-        measured_qubits : selects which qubits to perform readout on
-            if measured_qubits == None, it will default to measuring the
-            qubits for which there are cal points.
     Returns:
         p
     """
-    combinations = (["00"] * reps_per_cal_pt +
-                    ["01"] * reps_per_cal_pt +
-                    ["10"] * reps_per_cal_pt +
-                    ["11"] * reps_per_cal_pt)
-    if f_state_cal_pts:
-        extra_combs = (
-            ['02'] * reps_per_cal_pt +
-            ['20'] * reps_per_cal_pt +
-            ['22'] * reps_per_cal_pt)
+    kernel_list = []  # Not sure if this is needed
+    comb_repetead = []
+    for state in combinations:
+        comb_repetead += [state] * reps_per_cal_pnt
 
-        combinations += extra_combs
-    if q2 is not None:
-        combinations += ["Park_0", "Park_1"]
-
-    if (measured_qubits is None) and (q2 is None):
-        measured_qubits = [q0, q1]
-    elif (measured_qubits is None):
-        measured_qubits = [q0, q1, q2]
+    state_to_gates = {
+        "0": ["i"],
+        "1": ["rx180"],
+        "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
+    }
 
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
-        k.prepz(q0)
-        k.prepz(q1)
-        if q2 is not None:
-            k.prepz(q2)
 
-        if comb[0] == '0':
-            k.gate('i', [q0])
-        elif comb[0] == '1':
-            k.gate('rx180', [q0])
-        elif comb[0] == '2':
-            k.gate('rx180', [q0])
-            k.gate('cw_{:02}'.format(f_state_cal_pt_cw), [q0])
+        for q_state, q in zip(comb, qubits):
+            k.prepz(q)
+            for gate in state_to_gates[q_state]:
+                k.gate(gate, [q])
+        k.gate("wait", [], 0)  # alignment
 
-        if comb[1] == '0':
-            k.gate('i', [q1])
-        elif comb[1] == '1':
-            k.gate('rx180', [q1])
-        elif comb[1] == '2':
-            k.gate('rx180', [q1])
-            k.gate('cw_{:02}'.format(f_state_cal_pt_cw), [q1])
-
-        if comb[0] == 'P' and comb[-1] == '0':
-            k.gate('i', [q2])
-        elif comb[0] == 'P' and comb[-1] == '1':
-            k.gate('rx180', [q2])
-
-        # Used to ensure timing is aligned
-        k.gate('wait', measured_qubits, 0)
         for q in measured_qubits:
             k.measure(q)
-        k.gate('wait', measured_qubits, 0)
-
+        k.gate('wait', [], 0)  # alignment
+        kernel_list.append(k)
         p.add_kernel(k)
 
-    return p
+    if return_comb:
+        return comb_repetead
+    else:
+        return p
 
 #############################################################################
 # File modifications
