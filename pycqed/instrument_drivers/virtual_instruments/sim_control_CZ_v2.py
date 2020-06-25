@@ -208,6 +208,14 @@ class SimControlCZ_v2(Instrument):
             initial_value=False,
         )
 
+        self.add_parameter(
+            "artificial_waiting_at_sweetspot",
+            docstring="FB: integer number of simstep_new in the middle of VCZ. Used for matching sim-exp",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=0,
+        )
+
         # for ramsey/Rabi simulations
 
         self.add_parameter(

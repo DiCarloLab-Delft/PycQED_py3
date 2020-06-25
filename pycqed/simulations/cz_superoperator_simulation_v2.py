@@ -196,6 +196,13 @@ def compute_propagator(arglist):
     # [2020-05-30] probably not needed anymore
     amp = amp * sim_control_CZ.voltage_scaling_factor()
 
+    # For fine tuning of the waiting in the middle for matching sim-exp or studying interference fringes
+    if sim_control_CZ.artificial_waiting_at_sweetspot() != 0 and not sim_control_CZ.get("optimize_const_amp"):
+        index_middle = np.where(amp[1:] == 0)[0][0] + 1
+        amp = np.insert(amp, index_middle, np.zeros(sim_control_CZ.artificial_waiting_at_sweetspot()))
+        intervals_list = np.insert(intervals_list, index_middle, np.zeros(sim_control_CZ.artificial_waiting_at_sweetspot()) + sim_step_new)
+        tlist_new = np.concatenate((tlist_new, np.arange(1, sim_control_CZ.artificial_waiting_at_sweetspot()+1)*sim_step_new + tlist_new[-1]))
+
     # Apply distortions
     if sim_control_CZ.distortions():
         amp_final = czf_v2.distort_amplitude(
