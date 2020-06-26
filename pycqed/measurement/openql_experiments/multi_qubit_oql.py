@@ -779,6 +779,8 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
     k = oqh.create_kernel("Chevron", p)
     k.prepz(qubit_idx)
     k.prepz(qubit_idx_spec)
+    if (qubit_idx_park is not None):
+        k.prepz(qubit_idx_park)
 
     spec_gate_dict = {
         "ramsey": "rx90",
@@ -805,8 +807,6 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         k.gate("wait", [], 0)  # alignment workaround
         if qubit_idx_park is not None:
             k.gate('sf_square', [qubit_idx_park])
-        # FIX ME: Why is this wait 20 ns here??
-        k.gate("wait", [], 20)  # alignment workaround
         k.gate('sf_{}'.format(flux_cw_name), [qubit_idx])
         k.gate("wait", [], 0)  # alignment workaround
     else:
