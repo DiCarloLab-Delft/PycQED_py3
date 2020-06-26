@@ -2620,21 +2620,12 @@ class DeviceCCL(Instrument):
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
+        qubits = [q0, q_spec]
         if measure_parked_qubit:
             # NB not tested in this function yet [2020-04-27]
-            d = self.get_int_avg_det(
-                qubits=[q0, q_spec, q_park],
-                single_int_avg=True,
-                seg_per_point=1,
-                always_prepare=True,
-            )
-        else:
-            d = self.get_correlation_detector(
-                qubits=[q0, q_spec],
-                single_int_avg=True,
-                seg_per_point=1,
-                always_prepare=True,
-            )
+            qubits.append(q_park)
+
+        d = self.get_int_avg_det(qubits=qubits)
 
         # if we want to add a spec tone
         # NB: not tested [2020-04-27]
