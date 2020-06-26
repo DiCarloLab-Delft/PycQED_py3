@@ -9,6 +9,7 @@ from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities.general import (
     dict_to_ordered_tuples,
     delete_keys_from_dict,
+    replace_types_with_str_in_dict,
     check_keyboard_interrupt,
     KeyboardFinish,
     flatten,
@@ -287,13 +288,13 @@ class MeasurementControl(Instrument):
                     if "bins" in exp_metadata.keys():
                         self.plotting_bins = exp_metadata["bins"]
 
-                if mode is not "adaptive":
+                if mode != "adaptive":
                     try:
                         # required for 2D plotting and data storing.
                         # try except because some swf get the sweep points in the
                         # prepare statement. This needs a proper fix
                         self.xlen = len(self.get_sweep_points())
-                    except:
+                    except Exception:
                         self.xlen = 1
                 if self.mode == "1D":
                     self.measure()
@@ -2073,7 +2074,10 @@ class MeasurementControl(Instrument):
                 "full_name",
                 "val_mapping",
             }
-            cleaned_snapshot = delete_keys_from_dict(snap, exclude_keys)
+            cleaned_snapshot = delete_keys_from_dict(
+                # complex values and lists are not supported in hdf5
+                # converting to string avoids annoying warnings
+                snap, keys=exclude_keys, types_to_str={list, complex})
 
             h5d.write_dict_to_hdf5(cleaned_snapshot, entry_point=snap_grp)
 

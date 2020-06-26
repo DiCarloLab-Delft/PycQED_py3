@@ -723,30 +723,37 @@ def ramp_values(
     callable(ramp_points[-1])
 
 
-def delete_keys_from_dict(dictionary: dict, keys: set):
+def delete_keys_from_dict(
+    dictionary: dict, keys: set = {}, types_to_str: set = {}
+):
     """
-    Delete keys from dictionary recursively.
+    Two recursive functionalities:
+        1. Delete keys from dictionary
+        2. Replace types with their string representation
 
     Args:
         dictionary (dict)
         keys (set)  a set of keys to strip from the dictionary.
+        types_to_str (set) a set of types to replace by its string representation
 
     Return:
         modified_dict (dict) a new dictionary that does not included the
-        blacklisted keys.
+        blacklisted keys and replaces the types_to_str with their `repr()`
 
     function based on "https://stackoverflow.com/questions/3405715/
     elegant-way-to-remove-fields-from-nested-dictionaries"
     """
     keys_set = set(keys)  # Just an optimization for the "if key in keys" lookup.
+    types_set = set(types_to_str)
 
     modified_dict = {}
     for key, value in dictionary.items():
         if key not in keys_set:
             if isinstance(value, MutableMapping):
-                modified_dict[key] = delete_keys_from_dict(value, keys_set)
+                modified_dict[key] = delete_keys_from_dict(
+                    value, keys=keys_set, types_to_str=types_to_str)
             else:
-                modified_dict[key] = value
+                modified_dict[key] = repr(value) if type(value) in types_set else value
     return modified_dict
 
 
