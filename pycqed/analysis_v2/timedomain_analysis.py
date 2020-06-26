@@ -1002,6 +1002,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "legend_pos": "upper right",
         }
 
+        self.plot_dicts[ax_id + "_cal_pnts"] = {
+            "plotfn": self.plot_line,
+            "ax_id": ax_id,
+            "xvals": self.proc_data_dict["xvals_cal"],
+            "yvals": self.proc_data_dict["yvals_osc_cal"],
+            "setlabel": "Calib.",
+            "do_legend": True,
+            "marker": "d",
+        }
+
         if self.do_fitting:
             self.plot_dicts[ax_id + "_cos_fit_off"] = {
                 "ax_id": ax_id,
@@ -1070,17 +1080,17 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "text_string": phase_message,
             }
 
-        self.plot_dicts[ax_id + "_cal_pnts"] = {
+        self.plot_dicts[ax_id + "_xlabels"] = {
             "ax_id": ax_id,
             "plotfn": self._plot_cal_pnts,
             "x_vals": self.proc_data_dict["xvals_cal"],
-            "y_vals": self.proc_data_dict["yvals_osc_cal"],
             "x_labels": self.proc_data_dict["cal_labels"]
         }
 
     def _prepare_spectator_qubit_figure(self):
         y_label = self.proc_data_dict["ylabel_spec"]
         ax_id = "spectator_qubit_" + y_label
+
         self.plot_dicts[ax_id] = {
             "plotfn": self.plot_line,
             "xvals": self.proc_data_dict["xvals"],
@@ -1113,6 +1123,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "legend_pos": "upper right",
         }
 
+        self.plot_dicts[ax_id + "_cal_pnts"] = {
+            "plotfn": self.plot_line,
+            "ax_id": ax_id,
+            "xvals": self.proc_data_dict["xvals_cal"],
+            "yvals": self.proc_data_dict["yvals_spec_cal"],
+            "setlabel": "Calib.",
+            "do_legend": True,
+            "marker": "d",
+        }
+
         if self.do_fitting:
             leak_msg = "Missing frac.: {} % ".format(
                 self.proc_data_dict["quantities_of_interest"]["missing_fraction"] * 100
@@ -1128,11 +1148,10 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "text_string": leak_msg,
             }
 
-        self.plot_dicts[ax_id + "_cal_pnts"] = {
+        self.plot_dicts[ax_id + "_xlabels"] = {
             "ax_id": ax_id,
             "plotfn": self._plot_cal_pnts,
             "x_vals": self.proc_data_dict["xvals_cal"],
-            "y_vals": self.proc_data_dict["yvals_spec_cal"],
             "x_labels": self.proc_data_dict["cal_labels"]
         }
 
@@ -1172,6 +1191,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "legend_pos": "upper right",
         }
 
+        self.plot_dicts[ax_id + "_cal_pnts"] = {
+            "plotfn": self.plot_line,
+            "ax_id": ax_id,
+            "xvals": self.proc_data_dict["xvals_cal"],
+            "yvals": self.proc_data_dict["yvals_park_cal"],
+            "setlabel": "Calib.",
+            "do_legend": True,
+            "marker": "d",
+        }
+
         if self.do_fitting:
             self.plot_dicts[ax_id + "_park_fit_off"] = {
                 "ax_id": ax_id,
@@ -1205,17 +1234,15 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "text_string": phase_message,
             }
 
-        self.plot_dicts[ax_id + "_cal_pnts"] = {
+        self.plot_dicts[ax_id + "_xlabels"] = {
             "ax_id": ax_id,
             "plotfn": self._plot_cal_pnts,
             "x_vals": self.proc_data_dict["xvals_cal"],
-            "y_vals": self.proc_data_dict["yvals_park_cal"],
             "x_labels": self.proc_data_dict["cal_labels"]
         }
 
-    def _plot_cal_pnts(self, ax, x_vals, y_vals, x_labels, **kw):
+    def _plot_cal_pnts(self, ax, x_vals, x_labels, **kw):
 
-        ax.plot(x_vals, y_vals, "-d")
         phi = np.arange(0, 360, 60)
         ax.set_xticks(np.concatenate((phi, x_vals)))
         deg_sign = u"\N{DEGREE SIGN}"
