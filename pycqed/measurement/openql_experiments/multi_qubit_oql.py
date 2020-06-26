@@ -1501,6 +1501,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
             for q in ramsey_qubits:
                 k.gate(phi_gate, [q])
 
+            k.gate('wait', [], 0)
+
             # #################################################################
             # Measurement
             # #################################################################
