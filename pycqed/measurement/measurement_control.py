@@ -207,6 +207,11 @@ class MeasurementControl(Instrument):
         self.Learner_Minimizer_detected = False
         self.CMA_detected = False
 
+        # Setting this to true adds 5s to each experiment
+        # If possible set to False as default but mind that for now many
+        # Analysis rely on the old snapshot
+        self.save_legacy_snapshot = True
+
     ##############################################
     # Functions used to control the measurements #
     ##############################################
@@ -2080,20 +2085,21 @@ class MeasurementControl(Instrument):
 
             h5d.write_dict_to_hdf5(cleaned_snapshot, entry_point=snap_grp)
 
-            # Below is old style saving of snapshot, exists for the sake of
-            # preserving deprecated functionality
-            set_grp = data_object.create_group("Instrument settings")
-            inslist = dict_to_ordered_tuples(self.station.components)
-            for (iname, ins) in inslist:
-                instrument_grp = set_grp.create_group(iname)
-                par_snap = ins.snapshot()["parameters"]
-                parameter_list = dict_to_ordered_tuples(par_snap)
-                for (p_name, p) in parameter_list:
-                    try:
-                        val = str(p["value"])
-                    except KeyError:
-                        val = ""
-                    instrument_grp.attrs[p_name] = str(val)
+            if self.save_legacy_snapshot:
+                # Below is old style saving of snapshot, exists for the sake of
+                # preserving deprecated functionality
+                set_grp = data_object.create_group("Instrument settings")
+                inslist = dict_to_ordered_tuples(self.station.components)
+                for (iname, ins) in inslist:
+                    instrument_grp = set_grp.create_group(iname)
+                    par_snap = ins.snapshot()["parameters"]
+                    parameter_list = dict_to_ordered_tuples(par_snap)
+                    for (p_name, p) in parameter_list:
+                        try:
+                            val = str(p["value"])
+                        except KeyError:
+                            val = ""
+                        instrument_grp.attrs[p_name] = str(val)
 
     def save_MC_metadata(self, data_object=None, *args):
         """
