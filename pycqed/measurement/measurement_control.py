@@ -9,7 +9,6 @@ from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities.general import (
     dict_to_ordered_tuples,
     delete_keys_from_dict,
-    replace_types_with_str_in_dict,
     check_keyboard_interrupt,
     KeyboardFinish,
     flatten,
