@@ -1378,7 +1378,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
                                 cases: list = ('no_excitation', 'excitation'),
                                 flux_codeword: str = 'cz',
                                 flux_codeword_park: str = None,
-                                parked_qubit_seq='ground'):
+                                parked_qubit_seq: str = 'ground',
+                                disable_parallel_single_q_gates: bool = False):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -1407,6 +1408,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
         wait_time_after_flux   (int): wait time in ns after triggering all flux
             pulses
     '''
+    assert parked_qubit_seq in {"ground", "ramsey"}
+
     p = oqh.create_program("conditional_oscillation_seq", platf_cfg)
 
     # These angles correspond to special pi/2 pulses in the lutman
@@ -1441,9 +1444,13 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 # implicit identities otherwise
                 for q in control_qubits:
                     k.gate("rx180", [q])
+                    if disable_parallel_single_q_gates:
+                        k.gate("wait", [], 0)
 
             for q in ramsey_qubits:
                 k.gate("rx90", [q])
+                if disable_parallel_single_q_gates:
+                    k.gate("wait", [], 0)
 
             k.gate("wait", [], 0)  # alignment workaround
 
@@ -1486,6 +1493,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
             if case == "excitation":
                 for q in control_qubits:
                     k.gate("rx180", [q])
+                    if disable_parallel_single_q_gates:
+                        k.gate("wait", [], 0)
 
             # cw_idx corresponds to special hardcoded angles in the lutman
             # special because the cw phase pulses go in mult of 20 deg
@@ -1500,6 +1509,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
             for q in ramsey_qubits:
                 k.gate(phi_gate, [q])
+                if disable_parallel_single_q_gates:
+                    k.gate("wait", [], 0)
 
             k.gate('wait', [], 0)
 
