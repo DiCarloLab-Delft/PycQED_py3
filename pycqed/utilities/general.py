@@ -304,7 +304,15 @@ def load_settings_onto_instrument_v2(
                 par["value"] is not None
             ):
                 if ignore_pars is None or parname not in ignore_pars:
-                    instrument.set(parname, par["value"])
+                    par_value = par["value"]
+                    if type(par_value) == str:
+                        try:
+                            instrument.parameters[parname].validate(par_value)
+                        except TypeError:
+                            # This detects that in the hdf5 file the parameter
+                            # was saved as string due to type incompatibility
+                            par_value = eval(par_value)
+                    instrument.set(parname, par_value)
         except Exception as e:
             print(
                 'Could not set parameter: "{}" to "{}" '
