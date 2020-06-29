@@ -17,7 +17,6 @@ import time
 import logging
 
 reload(wf_vcz)
-
 log = logging.getLogger(__name__)
 
 """

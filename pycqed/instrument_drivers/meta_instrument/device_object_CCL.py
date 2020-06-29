@@ -1023,6 +1023,7 @@ class DeviceCCL(Instrument):
         cz_repetitions: int = 1,
         wait_time_before_flux_ns: int = 0,
         wait_time_after_flux_ns: int = 0,
+        disable_parallel_single_q_gates: bool = False,
         label="",
         verbose=True,
         disable_metadata=False,
@@ -1123,7 +1124,8 @@ class DeviceCCL(Instrument):
             flux_codeword=flux_codeword,
             flux_codeword_park=flux_codeword_park,
             cz_repetitions=cz_repetitions,
-            parked_qubit_seq=parked_qubit_seq
+            parked_qubit_seq=parked_qubit_seq,
+            disable_parallel_single_q_gates=disable_parallel_single_q_gates
         )
 
         s = swf.OpenQL_Sweep(
@@ -1144,8 +1146,10 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))
 
         MC.run(
-            "conditional_oscillation_{}_{}_&_{}_{}_x{}_{}{}".format(
-                q0, q1, q2, q3, cz_repetitions, self.msmt_suffix, label
+            "conditional_oscillation_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}".format(
+                q0, q1, q2, q3, cz_repetitions,
+                wait_time_before_flux_ns, wait_time_after_flux_ns,
+                self.msmt_suffix, label,
             ),
             disable_snapshot_metadata=disable_metadata,
         )
