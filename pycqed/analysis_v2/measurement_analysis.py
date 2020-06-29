@@ -61,7 +61,7 @@ from pycqed.analysis_v2.simple_analysis import (
     Basic2DAnalysis, Basic2DInterpolatedAnalysis)
 from pycqed.analysis_v2.timedomain_analysis import (
     FlippingAnalysis, Intersect_Analysis,
-    Oscillation_Analysis,
+    Oscillation_Analysis, Crossing_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,
     Grovers_TwoQubitAllStates_Analysis)
 from pycqed.analysis_v2.readout_analysis import (
