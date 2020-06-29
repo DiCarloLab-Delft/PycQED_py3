@@ -1220,8 +1220,9 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             }
 
             qoi = self.proc_data_dict["quantities_of_interest"]
-            phase_message = "Phase off: {} deg\n" "Phase on: {} deg".format(
-                qoi["park_phase_off"], qoi["park_phase_on"]
+            phase_message = "Phase off: {} deg\n" "Phase on: {} deg\n" "Phase av.: {} deg".format(
+                qoi["park_phase_off"], qoi["park_phase_on"],
+                (qoi["park_phase_off"] + qoi["park_phase_on"]) / 2
             )
             self.plot_dicts[ax_id + "_phase_message"] = {
                 "ax_id": ax_id,
