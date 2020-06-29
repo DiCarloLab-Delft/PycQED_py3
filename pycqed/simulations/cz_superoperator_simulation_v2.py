@@ -131,7 +131,7 @@ def f_to_parallelize_v2(arglist):
             cluster_from_interp=False,
             # Saturate colors to limits of interest
             clims={
-                'L1': [0, 5],
+                'L1': [0, 15],
                 "Cost func": [0., 100]
             },
             target_cond_phase=180,
