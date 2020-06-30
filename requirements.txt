@@ -1,3 +1,11 @@
+
+# WARNING:
+# `qutip` is a requirement for `pycqed` but its installation has issues for the
+# CI (Continuous Integration) of github (i.e. automatic tests in github)
+# DO NOT ADD `qutip` in this file (even though it is needed)
+# If you are installing pycqed on your computer run
+# `pip install qutip` before you install pycqed
+
 qcodes
 adaptive>=0.10.0
 cma

@@ -1217,8 +1217,8 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         # to the CZ gate
         try:
             qoi['L1_CZ_naive'] = 1-(1-qoi_base['L1'])**(1/1.5)
-            qoi['eps_CZ_simple_naive'] = 1-(1-qoi_base['eps_X1'])**(1/1.5)
-            qoi['eps_CZ_X1_naive'] = 1-(1-qoi_base['eps_simple'])**(1/1.5)
+            qoi['eps_CZ_simple_naive'] = 1-(1-qoi_base['eps_simple'])**(1/1.5)
+            qoi['eps_CZ_X1_naive'] = 1-(1-qoi_base['eps_X1'])**(1/1.5)
         except ValueError:
             # prevents the analysis from crashing if the fits are bad.
             qoi['L1_CZ_naive'] = ufloat(np.NaN, np.NaN)
@@ -1770,9 +1770,9 @@ def plot_irb_decay_woods_gambetta(
     ax1.set_ylabel(r'$\chi_1$ population')
     ax1.set_xlabel('Number of Cliffords')
     ax.set_title(title)
-    ax.legend(loc=(1.05, .6))
+    ax.legend(loc="best")
 
-    collabels = ['$\epsilon_{\chi1}$ (%)', '$\epsilon$ (%)', 'L1 (%)']
+    collabels = [r'$\epsilon_{\chi1}~(\%)$', r'$\epsilon~(\%)$', r'$L_1~(\%)$']
     rowlabels = ['Ref. curve', 'Int. curve', 'CZ-int.', 'CZ-naive']
     table_data = [
         [qoi['eps_X1_ref']*100, qoi['eps_simple_ref']*100,
@@ -1781,11 +1781,21 @@ def plot_irb_decay_woods_gambetta(
         [qoi['eps_CZ_X1']*100, qoi['eps_CZ_simple']*100, qoi['L1_CZ']*100],
         [qoi['eps_CZ_X1_naive']*100, qoi['eps_CZ_simple_naive']*100,
             qoi['L1_CZ_naive']*100], ]
+
+    # Avoid too many digits when the uncertainty is np.nan
+    for i, row in enumerate(table_data):
+        for j, u_val in enumerate(row):
+            if np.isnan(u_val.n) and np.isnan(u_val.s):
+                table_data[i][j] = "nan+/-nan"
+            elif np.isnan(u_val.s):
+                # Keep 3 significant digits only
+                table_data[i][j] = "{:.3g}+/-nan".format(u_val.n)
+
     ax.table(cellText=table_data,
              colLabels=collabels,
              rowLabels=rowlabels,
              transform=ax1.transAxes,
-             bbox=(1.25, 0.05, .7, 1.4))
+             bbox=(0.2, -2.0, .7, 1.5))
 
 
 def interleaved_error(eps_int, eps_base):

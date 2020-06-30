@@ -3,17 +3,21 @@ from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.measurement.hdf5_data as h5d
 import numpy as np
 
+import logging
+
+log = logging.getLogger(__name__)
+
 # ######################################################################
 # Utilities for evaluating points before starting the runner
 # ######################################################################
 
 
-def evaluate_X(learner, X):
+def evaluate_X(learner, X, x_scale=None):
     """
     Evaluates the learner's sampling function at the given point
     or points.
     Can be used to evaluate some initial points that the learner will
-    remember before running the runner.
+    remember before running its own runner.
 
     Arguments:
         learner: (BaseLearner) an instance of the learner
@@ -24,22 +28,40 @@ def evaluate_X(learner, X):
     if type(X) is tuple or not isinstance(X, Iterable):
         # A single-variable domain single point or
         # a multi-variable domain single point is given
-        learner.tell(X, learner.function(X))
+        X_scaled = scale_X(X, x_scale)
+        learner.tell(X_scaled, learner.function(X_scaled))
     else:
         # Several points are to be evaluated
-        Y = [learner.function(Xi) for Xi in X]
-        learner.tell_many(X, Y)
+        X_scaled = [scale_X(Xi, x_scale) for Xi in X]
+        Y = (learner.function(Xi) for Xi in X_scaled)
+
+        learner.tell_many(X_scaled, Y)
 
 
-def tell_X_Y(learner, X, Y):
+def scale_X(X, x_scale=None):
+    if x_scale is not None:
+        if isinstance(X, Iterable):
+            X_scaled = tuple(xi * scale for xi, scale in zip(X, x_scale))
+        else:
+            X_scaled = X * x_scale
+    else:
+        X_scaled = X
+
+    return X_scaled
+
+
+def tell_X_Y(learner, X, Y, x_scale=None):
     """
     NB: Telling the learner about two many points takes a significant
-    time. Beyond 1000 pnts expect several minutes
+    time. Beyond 1000 points expect several minutes
 
-    Evaluates the learner's sampling function at the given point
-    or points.
-    Can be used to evaluate some initial points that the learner will
-    remember before running the runner.
+    Tell the learner about the sampling function values at the given
+    point or points.
+    Can be used to avoid evaluating some initial points that the learner
+    will remember before running on its own.
+
+    Use case: avoid sampling the boundaries that the learner needs but
+    we are not interested in.
 
     Arguments:
         learner: (BaseLearner) an instance of the learner
@@ -51,10 +73,12 @@ def tell_X_Y(learner, X, Y):
     if type(X) is tuple or not isinstance(X, Iterable):
         # A single-variable domain single point or
         # a multi-variable domain single point is given
-        learner.tell(X, Y)
+        X_scaled = scale_X(X, x_scale)
+        learner.tell(X_scaled, Y)
     else:
         # Several points are told to the learner
-        learner.tell_many(X, Y)
+        X_scaled = [scale_X(Xi, x_scale) for Xi in X]
+        learner.tell_many(X_scaled, Y)
 
 
 # ######################################################################
