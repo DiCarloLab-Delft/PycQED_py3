@@ -1347,9 +1347,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             }
 
             qoi = self.proc_data_dict["quantities_of_interest"]
+            # calate average of angles accounting for wrapping
+            angles = [qoi["park_phase_off"].n, qoi["park_phase_on"].n]
+            stderrs = [qoi["park_phase_off"].s, qoi["park_phase_on"].s]
+            av_sin = np.average(np.sin(np.deg2rad(angles)))
+            av_cos = np.average(np.cos(np.deg2rad(angles)))
+            phase_av = np.rad2deg(np.arctan2(av_sin, av_cos))
+
             phase_message = "Phase off: {} deg\n" "Phase on: {} deg\n" "Phase av.: {} deg".format(
                 qoi["park_phase_off"], qoi["park_phase_on"],
-                (qoi["park_phase_off"] + qoi["park_phase_on"]) / 2
+                ufloat(phase_av, np.max(stderrs))
             )
             self.plot_dicts[ax_id + "_phase_message"] = {
                 "ax_id": ax_id,
