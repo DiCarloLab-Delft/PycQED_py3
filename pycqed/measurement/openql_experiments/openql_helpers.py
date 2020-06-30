@@ -92,6 +92,12 @@ def compile(p, quiet: bool = False):
     return p
 
 
+def is_compatible_openql_version_cc() -> bool:
+    """
+    test whether OpenQL version is compatible with Central Controller
+    """
+    return ql.get_version() > '0.8.0'  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
+
 #############################################################################
 # Calibration points
 #############################################################################
