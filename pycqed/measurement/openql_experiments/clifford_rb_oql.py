@@ -12,6 +12,9 @@ from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import 
     TwoQubitClifford,
     common_cliffords,
 )
+import json
+from importlib import reload
+reload(rb)
 
 
 def randomized_benchmarking(
@@ -22,6 +25,7 @@ def randomized_benchmarking(
     net_cliffords: list = [0],
     max_clifford_idx: int = 11520,
     flux_codeword: str = "cz",
+    flux_allocated_duration_ns: int = None,
     simultaneous_single_qubit_RB=False,
     initialize: bool = True,
     interleaving_cliffords=[None],
@@ -78,6 +82,10 @@ def randomized_benchmarking(
                         it returns an empty OpenQL program object with
                         the intended filename that can be used to upload the
                         previously compiled file.
+        flux_allocated_duration_ns:
+                        Used to emulate an idling gate with the duration of the
+                        flux. If not specified will try to grab the duration
+                        from the openql cfg file.
 
     Returns:
         p:              OpenQL Program object
@@ -142,6 +150,17 @@ def randomized_benchmarking(
     else:
         raise NotImplementedError()
 
+    if 100_000 in interleaving_cliffords and flux_allocated_duration_ns is None:
+        # Try to get the flux duration from the cfg file
+        with open(platf_cfg) as json_file:
+            loaded_json = json.load(json_file)
+        try:
+            flux_allocated_duration_ns = (
+                loaded_json["instructions"]["sf_cz_se q0"]["duration"]
+            )
+        except KeyError:
+            raise ValueError("Could not find flux duration. Specify manually!")
+
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
             for interleaving_cl in interleaving_cliffords:
@@ -157,10 +176,13 @@ def randomized_benchmarking(
                     net_cl_seq = rb.calculate_net_clifford(cl_seq, Cl)
                     cl_seq_decomposed = []
                     for cl in cl_seq:
-                        # FIXME: hacking in exception for benchmarking only CZ
-                        # (not as a member of CNOT group)
-                        if cl == -4368:
+                        # benchmarking only CZ (not as a member of CNOT group)
+                        if cl == 104368:  # 104368 = 100_000 + CZ
                             cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
+                        # benchmarking only idling identity, with duration of cz
+                        # see below where wait-time is added
+                        elif cl == 100_000:
+                            cl_seq_decomposed.append([("I", ["q0", "q1"])])
                         else:
                             cl_seq_decomposed.append(Cl(cl).gate_decomposition)
                     for net_clifford in net_cliffords:
@@ -184,7 +206,12 @@ def randomized_benchmarking(
                                 if isinstance(q, str):
                                     k.gate(g, [qubit_map[q]])
                                 elif isinstance(q, list):
-                                    if sim_cz_qubits is None:
+                                    if g == "I":
+                                        # interleaving an idling with the length of the CZ
+                                        k.gate("wait", [], 0)  # alignment
+                                        k.gate("wait", [], flux_allocated_duration_ns)
+                                        k.gate("wait", [], 0)
+                                    elif sim_cz_qubits is None:
                                         # OpenQL alignment is necessary to ensure
                                         # parking flux pulse is played in parallel
                                         k.gate("wait", [], 0)
@@ -357,7 +384,7 @@ def character_benchmarking(
                 for cl in cl_seq[1:]:
                     # hacking in exception for benchmarking only CZ
                     # (not as a member of CNOT-like group)
-                    if cl == -4368:
+                    if cl == 104368:
                         cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
                     else:
                         cl_seq_decomposed.append(Cl(cl).gate_decomposition)
