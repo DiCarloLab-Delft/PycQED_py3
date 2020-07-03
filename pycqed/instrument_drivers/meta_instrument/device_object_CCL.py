@@ -3405,6 +3405,7 @@ class DeviceCCL(Instrument):
         recompile: bool = "as needed",
         cal_points=True,
         flux_codeword="cz",
+        flux_allocated_duration_ns: int = None,
         sim_cz_qubits: list = None,
     ):
         """
@@ -3451,6 +3452,9 @@ class DeviceCCL(Instrument):
                 instruction must be applied. This is for characterizing
                 CZ gates that are intended to be performed in parallel
                 with other CZ gates.
+            flux_allocated_duration_ns (list):
+                Duration in ns of the flux pulse used when interleaved gate is
+                [100_000], i.e. idle identity
         """
 
         # Settings that have to be preserved, change is required for
@@ -3497,6 +3501,7 @@ class DeviceCCL(Instrument):
                 nr_cliffords=nr_cliffords,
                 nr_seeds=1,
                 flux_codeword=flux_codeword,
+                flux_allocated_duration_ns=flux_allocated_duration_ns,
                 platf_cfg=self.cfg_openql_platform_fn(),
                 program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_netcl{}_{}_{}".format(
                     int(i),
@@ -3582,6 +3587,7 @@ class DeviceCCL(Instrument):
         nr_seeds=100,
         recompile: bool = "as needed",
         flux_codeword="cz",
+        flux_allocated_duration_ns: int = None,
         sim_cz_qubits: list = None,
         measure_idle_flux: bool = True,
     ):
@@ -3630,6 +3636,7 @@ class DeviceCCL(Instrument):
                 interleaving_cliffords=[100_000],
                 recompile=recompile,
                 flux_codeword=flux_codeword,
+                flux_allocated_duration_ns=flux_allocated_duration_ns,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
             )
