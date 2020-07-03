@@ -1,6 +1,7 @@
 import json
 from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _flux_lutmap
 
+
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
                     flux_pulse_duration: int=40,
@@ -227,6 +228,7 @@ def generate_config(filename: str,
 
             # Decomposition of two qubit flux interations as single-qubit flux
             # operations without parking pulses
+            # Implicit parking pulses added for Surface-4
             # Edge 0/24
             "cz q0, q2": ['sf_cz_ne q2', 'sf_cz_sw q0'],
             "cz q2, q0": ['sf_cz_ne q2', 'sf_cz_sw q0'],
