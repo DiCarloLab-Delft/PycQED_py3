@@ -3401,7 +3401,7 @@ class DeviceCCL(Instrument):
         ),
         nr_seeds=100,
         interleaving_cliffords=[None],
-        label="TwoQubit_RB_{}seeds_icl{}_{}_{}",
+        label="TwoQubit_RB_{}seeds_icl{}_{}_{}_{}",
         recompile: bool = "as needed",
         cal_points=True,
         flux_codeword="cz",
@@ -3455,7 +3455,7 @@ class DeviceCCL(Instrument):
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
-        old_weight_type = self.ro_acq_weight_type()
+        # old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
         # self.ro_acq_weight_type("SSB")
         self.ro_acq_digitized(False)
@@ -3465,7 +3465,7 @@ class DeviceCCL(Instrument):
         # The detector needs to be defined before setting back parameters
         d = self.get_int_logging_detector(qubits=qubits)
         # set back the settings
-        self.ro_acq_weight_type(old_weight_type)
+        # self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
         for q in qubits:
@@ -3560,8 +3560,13 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
 
         MC.set_detector_function(d)
-        MC.run(
-            label.format(nr_seeds, interleaving_cliffords, qubits[0], qubits[1]),
+        MC.run(label.format(
+            nr_seeds,
+            interleaving_cliffords,
+            qubits[0],
+            qubits[1],
+            flux_codeword
+            ),
             exp_metadata={"bins": sweep_points},
         )
         # N.B. if interleaving cliffords are used, this won't work
@@ -3578,6 +3583,7 @@ class DeviceCCL(Instrument):
         recompile: bool = "as needed",
         flux_codeword="cz",
         sim_cz_qubits: list = None,
+        measure_idle_flux: bool = True,
     ):
         """
         Perform two qubit interleaved randomized benchmarking with an
@@ -3601,7 +3607,7 @@ class DeviceCCL(Instrument):
             qubits=qubits,
             MC=MC,
             nr_cliffords=nr_cliffords,
-            interleaving_cliffords=[-4368],
+            interleaving_cliffords=[104368],
             recompile=recompile,
             flux_codeword=flux_codeword,
             nr_seeds=nr_seeds,
@@ -3609,8 +3615,30 @@ class DeviceCCL(Instrument):
         )
 
         ma2.InterleavedRandomizedBenchmarkingAnalysis(
-            ts_base=None, ts_int=None, label_base="icl[None]", label_int="icl[-4368]"
+            ts_base=None,
+            ts_int=None,
+            label_base="icl[None]",
+            label_int="icl[104368]"
         )
+
+        if measure_idle_flux:
+            # Perform two-qubit iRB with idle identity of same duration as CZ
+            self.measure_two_qubit_randomized_benchmarking(
+                qubits=qubits,
+                MC=MC,
+                nr_cliffords=nr_cliffords,
+                interleaving_cliffords=[100_000],
+                recompile=recompile,
+                flux_codeword=flux_codeword,
+                nr_seeds=nr_seeds,
+                sim_cz_qubits=sim_cz_qubits,
+            )
+            ma2.InterleavedRandomizedBenchmarkingAnalysis(
+                ts_base=None,
+                ts_int=None,
+                label_base="icl[None]",
+                label_int="icl[100000]"
+            )
 
     def measure_two_qubit_purity_benchmarking(
         self,
@@ -3623,7 +3651,8 @@ class DeviceCCL(Instrument):
         interleaving_cliffords=[None],
         label="TwoQubit_purityB_{}seeds_{}_{}",
         recompile: bool = "as needed",
-        cal_points=True,
+        cal_points: bool = True,
+        flux_codeword: str = "cz",
     ):
         """
         Measures two qubit purity (aka unitarity) benchmarking.
@@ -3669,16 +3698,18 @@ class DeviceCCL(Instrument):
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
-        old_weight_type = self.ro_acq_weight_type()
+        # old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        self.ro_acq_weight_type("SSB")
+        # [2020-07-02] 'optimal IQ' mode is the standard now,
+        # set it before running
+        # self.ro_acq_weight_type("SSB")
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
 
         MC.soft_avg(1)
         # set back the settings
-        self.ro_acq_weight_type(old_weight_type)
+        # self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
         for q in qubits:
@@ -3729,6 +3760,7 @@ class DeviceCCL(Instrument):
                 # (-Z)(-Z) (for f state calibration)
                 f_state_cal_pts=True,
                 recompile=recompile,
+                flux_codeword=flux_codeword,
             )
             p.sweep_points = sweep_points
             programs.append(p)
