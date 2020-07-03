@@ -30,11 +30,28 @@ def calculate_net_clifford(rb_clifford_indices,
     # Calculate the net clifford
     net_clifford = Clifford(0)  # assumes element 0 is the Identity
     for idx in rb_clifford_indices:
-        # hacking in exception for benchmarking only CZ
-        # (not as a member of CNOT group)
-        # abs is to remove the sign that is used to treat CZ ac CZ
-        # and not member of CNOT-like set of gates
-        cliff = Clifford(abs(idx))
+        # [2020-07-03 Victor] the `abs` below was to remove the sign that was
+        # used to treat CZ as CZ and not the member of CNOT-like set of gates
+        # Using negative sign convention (i.e. `-4368` for the interleaved CZ)
+        # was a bad choice because there is no such thing as negative zero and
+        # the clifford numer 0 is the identity that is necessary for
+        # benchmarking an idling identity with the same duration as the time
+        # allocated to the flux pulses
+        # cliff = Clifford(abs(idx))  # Deprecated!
+        assert idx > -1, (
+            "The convention for interleaved gates has changed! " +
+            "See notes in this function. " +
+            "You probably need to specify {}".format(abs(idx))
+        )
+
+        # In order to benchmark specific gates (and not cliffords), e.g. CZ but
+        # not as a member of the CNOT-like set of gates, or an identity with
+        # the same duration as the CZ we use, by convention, when specifying
+        # the interleaved gate, the index of the corresponding
+        # clifford + 100000, this is to keep it readable and bigger than the
+        # 11520 elements of the Two-qubit Clifford group C2
+        # corresponding clifford
+        cliff = Clifford(idx % 100_000)
         # order of operators applied in is right to left, therefore
         # the new operator is applied on the left side.
         net_clifford = cliff*net_clifford
@@ -81,8 +98,8 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
 
 
 def randomized_benchmarking_sequence_old(n_cl: int,
-                                         desired_net_cl: int =0,
-                                         seed: int=None):
+                                         desired_net_cl: int = 0,
+                                         seed: int = None):
     '''
     Generates a sequence of "n_cl" random single qubit Cliffords followed
     by a a recovery Clifford to make the net result correspond
@@ -128,7 +145,7 @@ def randomized_benchmarking_sequence(
         number_of_qubits: int = 1,
         max_clifford_idx: int = 11520,
         interleaving_cl: int = None,
-        seed: int=None):
+        seed: int = None):
     """
     Generates a randomized benchmarking sequence for the one or two qubit
     clifford group.
@@ -176,7 +193,7 @@ def randomized_benchmarking_sequence(
 
     # Add interleaving cliffords if applicable
     if interleaving_cl is not None:
-        rb_clif_ind_intl = np.empty(rb_clifford_indices.size*2, dtype=int)
+        rb_clif_ind_intl = np.empty(rb_clifford_indices.size * 2, dtype=int)
         rb_clif_ind_intl[0::2] = rb_clifford_indices
         rb_clif_ind_intl[1::2] = interleaving_cl
         rb_clifford_indices = rb_clif_ind_intl
@@ -187,7 +204,7 @@ def randomized_benchmarking_sequence(
 
         # determine the inverse of the sequence
         recovery_to_idx_clifford = net_clifford.get_inverse()
-        recovery_clifford = Cl(desired_net_cl)*recovery_to_idx_clifford
+        recovery_clifford = Cl(desired_net_cl) * recovery_to_idx_clifford
         rb_clifford_indices = np.append(rb_clifford_indices,
                                         recovery_clifford.idx)
     return rb_clifford_indices
