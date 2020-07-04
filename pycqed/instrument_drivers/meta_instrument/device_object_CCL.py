@@ -3530,7 +3530,7 @@ class DeviceCCL(Instrument):
             while not all_ready:
                 states = [res.ready() for res in rb_tasks]
                 all_ready = np.all(states)
-                print("Generated {}/{} RB programs in {:>7.1f}s".format(
+                print("Generated in parallel {}/{} RB programs in {:>7.1f}s".format(
                     np.sum(states), nr_seeds, time.time() - t0), end="\r")
 
                 # check for keyboard interrupt q because generating can be slow
@@ -3539,7 +3539,7 @@ class DeviceCCL(Instrument):
                 if not all_ready:
                     # Only check for end of compilation each 5s
                     time.sleep(5)
-
+            print("\nDone compiling RB sequences!")
         programs_filenames = [task.get() for task in rb_tasks]
 
         # to include calibration points
