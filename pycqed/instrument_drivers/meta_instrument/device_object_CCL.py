@@ -3409,7 +3409,8 @@ class DeviceCCL(Instrument):
         flux_allocated_duration_ns: int = None,
         sim_cz_qubits: list = None,
         compile_only: bool = False,
-        pool=None  # a multiprocessing.Pool()
+        pool=None,  # a multiprocessing.Pool()
+        rb_tasks=None  # used after called with `compile_only=True`
     ):
         """
         Measures two qubit randomized benchmarking, including
@@ -3448,7 +3449,7 @@ class DeviceCCL(Instrument):
                 specified in self.cfg_openql_platform_fn
 
             cal_points (bool):
-                should aclibration point (qubits in 0 and 1 states)
+                should calibration point (qubits in 0 and 1 states)
                 be included in the measurement
 
             flux_codeword (str):
@@ -3461,6 +3462,17 @@ class DeviceCCL(Instrument):
             flux_allocated_duration_ns (list):
                 Duration in ns of the flux pulse used when interleaved gate is
                 [100_000], i.e. idle identity
+            compilation_only (bool):
+                Compile only the RB sequences without measuring, intended for
+                parallelizing iRB sequences compilation with measurements
+            pool (multiprocessing.Pool):
+                Only relevant for `compilation_only=True`
+                Pool to which the compilation tasks will be assigned
+            rb_tasks (list):
+                Only relevant when running `compilation_only=True` previously,
+                saving the rb_tasks, waiting for them to finish then running
+                this method again and providing the `rb_tasks`.
+                See the interleaved RB for use case.
         """
 
         # Settings that have to be preserved, change is required for
@@ -3530,13 +3542,14 @@ class DeviceCCL(Instrument):
             rb_tasks = send_rb_tasks(pool)
             return rb_tasks
 
-        # Using `with ...:` makes sure the other processes will be terminated
-        # avoid starting too mane processes,
-        # nr_processes = None will start as many as the PC can handle
-        nr_processes = None if recompile else 1
-        with multiprocessing.Pool(nr_processes) as pool:
-            rb_tasks = send_rb_tasks(pool)
-            cl_oql.wait_for_rb_tasks(rb_tasks)
+        if rb_tasks is None:
+            # Using `with ...:` makes sure the other processes will be terminated
+            # avoid starting too mane processes,
+            # nr_processes = None will start as many as the PC can handle
+            nr_processes = None if recompile else 1
+            with multiprocessing.Pool(nr_processes) as pool:
+                rb_tasks = send_rb_tasks(pool)
+                cl_oql.wait_for_rb_tasks(rb_tasks)
 
         programs_filenames = [task.get() for task in rb_tasks]
 
@@ -3660,6 +3673,7 @@ class DeviceCCL(Instrument):
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    rb_tasks=rb_tasks_2Q,
                 )
 
                 # 5. Wait for [104368] compilation to finish
@@ -3690,6 +3704,7 @@ class DeviceCCL(Instrument):
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    rb_tasks=rb_tasks_CZ,
                 )
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
                     ts_base=None,
@@ -3712,6 +3727,7 @@ class DeviceCCL(Instrument):
                         flux_allocated_duration_ns=flux_allocated_duration_ns,
                         nr_seeds=nr_seeds,
                         sim_cz_qubits=sim_cz_qubits,
+                        rb_tasks=rb_tasks_I
                     )
                     ma2.InterleavedRandomizedBenchmarkingAnalysis(
                         ts_base=None,
