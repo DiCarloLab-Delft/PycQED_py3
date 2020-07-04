@@ -185,11 +185,12 @@ def randomized_benchmarking_sequence(
         raise NotImplementedError()
 
     # Generate a random sequence of Cliffords
-    if seed is None:
-        rb_clifford_indices = np.random.randint(0, group_size, int(n_cl))
-    if seed is not None:
-        rng_seed = np.random.RandomState(seed)
-        rb_clifford_indices = rng_seed.randint(0, group_size, int(n_cl))
+
+    # Even if no seed is provided make sure we pick a new state such that
+    # it is safe to run generate and compile the random sequences in
+    # parallel using multiprocess
+    rng_seed = np.random.RandomState(seed)
+    rb_clifford_indices = rng_seed.randint(0, group_size, int(n_cl))
 
     # Add interleaving cliffords if applicable
     if interleaving_cl is not None:

@@ -17,6 +17,24 @@ from importlib import reload
 reload(rb)
 
 
+def parallel_friendly_rb(rb_kw_dict):
+    """
+    A wrapper around `randomized_benchmarking` such that we collect only
+    the filenames of the resulting programs that can be communicated back to
+    the main process when parallelizing the compilation using the python
+    multiprocessing capabilities.
+    """
+    p = randomized_benchmarking(**rb_kw_dict)
+
+    # [2020-07-04]
+    # Before parallelizing RB sequences compilation this line was in the
+    # the measure RB methods of the device object
+    # It seemed to not be necessary, left it out
+    # p.sweep_points = sweep_points
+
+    return p.filename
+
+
 def randomized_benchmarking(
     qubits: list,
     platf_cfg: str,

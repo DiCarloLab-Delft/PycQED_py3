@@ -611,8 +611,26 @@ def load_range_of_oql_programs(programs, counter_param, CC):
     multiple OpenQL programs such as RB.
     """
     program = programs[counter_param()]
-    counter_param((counter_param()+1) % len(programs))
+    counter_param((counter_param() + 1) % len(programs))
     CC.eqasm_program(program.filename)
+
+
+def load_range_of_oql_programs_from_filenames(
+    programs_filenames: list, counter_param, CC
+):
+    """
+    This is a helper function for running an experiment that is spread over
+    multiple OpenQL programs such as RB.
+
+    [2020-07-04] this is a modification of the above function such that only
+    the filename is passed and not a OpenQL program, allowing for parallel
+    program compilations using the multiprocessing of python (only certain
+    types of data can be returned from the processing running the
+    compilations in parallel)
+    """
+    fn = programs_filenames[counter_param()]
+    counter_param((counter_param() + 1) % len(programs_filenames))
+    CC.eqasm_program(fn)
 
 
 def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
@@ -625,7 +643,7 @@ def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
     points in the detector.
     """
     program = programs[counter_param()]
-    counter_param((counter_param()+1) % len(programs))
+    counter_param((counter_param() + 1) % len(programs))
     CC.eqasm_program(program.filename)
 
     detector.nr_shots = len(program.sweep_points)

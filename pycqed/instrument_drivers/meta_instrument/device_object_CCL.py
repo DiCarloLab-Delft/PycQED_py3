@@ -6,6 +6,7 @@ import adaptive
 import networkx as nx
 import datetime
 from collections import OrderedDict
+import multiprocessing
 from importlib import reload
 
 from qcodes.instrument.base import Instrument
@@ -3412,6 +3413,9 @@ class DeviceCCL(Instrument):
         Measures two qubit randomized benchmarking, including
         the leakage estimate.
 
+        [2020-07-04 Victor] this method was updated to allow for parallel
+        compilation using all the cores of the measurement computer
+
         Refs:
         Knill PRA 77, 012307 (2008)
         Wood PRA 97, 032306 (2018)
@@ -3481,7 +3485,7 @@ class DeviceCCL(Instrument):
 
         programs = []
         t0 = time.time()
-        print("Generating {} RB programs".format(nr_seeds))
+
         qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
         if sim_cz_qubits is not None:
             sim_cz_qubits_idxs = [
@@ -3490,45 +3494,53 @@ class DeviceCCL(Instrument):
         else:
             sim_cz_qubits_idxs = None
 
-        for i in range(nr_seeds):
-            # check for keyboard interrupt q because generating can be slow
-            check_keyboard_interrupt()
-            sweep_points = np.concatenate([nr_cliffords, [nr_cliffords[-1] + 0.5] * 4])
+        sweep_points = np.concatenate([nr_cliffords, [nr_cliffords[-1] + 0.5] * 4])
+        net_cliffords = [0, 3 * 24 + 3]
 
-            net_cliffords = [0, 3 * 24 + 3]
-            p = cl_oql.randomized_benchmarking(
-                qubits=qubit_idxs,
-                nr_cliffords=nr_cliffords,
-                nr_seeds=1,
-                flux_codeword=flux_codeword,
-                flux_allocated_duration_ns=flux_allocated_duration_ns,
-                platf_cfg=self.cfg_openql_platform_fn(),
-                program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_netcl{}_{}_{}".format(
-                    int(i),
-                    list(map(int, nr_cliffords)),
-                    interleaving_cliffords,
-                    list(map(int, net_cliffords)),
-                    qubits[0],
-                    qubits[1],
-                ),
-                interleaving_cliffords=interleaving_cliffords,
-                cal_points=cal_points,
-                net_cliffords=net_cliffords,  # measures with and without inverting
-                f_state_cal_pts=True,
-                recompile=recompile,
-                sim_cz_qubits=sim_cz_qubits_idxs,
-            )
-            p.sweep_points = sweep_points
-            programs.append(p)
-            print(
-                "Generated {} RB programs in {:.1f}s".format(i + 1, time.time() - t0),
-                end="\r",
-            )
-        print(
-            "Succesfully generated {} RB programs in {:.1f}s".format(
-                nr_seeds, time.time() - t0
-            )
-        )
+        rb_tasks = []
+        # Using `with ...:` makes sure the other processes will be terminated
+        with multiprocessing.Pool() as pool:
+            for i in range(nr_seeds):
+                task_dict = dict(
+                    qubits=qubit_idxs,
+                    nr_cliffords=nr_cliffords,
+                    nr_seeds=1,
+                    flux_codeword=flux_codeword,
+                    flux_allocated_duration_ns=flux_allocated_duration_ns,
+                    platf_cfg=self.cfg_openql_platform_fn(),
+                    program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_netcl{}_{}_{}".format(
+                        int(i),
+                        list(map(int, nr_cliffords)),
+                        interleaving_cliffords,
+                        list(map(int, net_cliffords)),
+                        qubits[0],
+                        qubits[1],
+                    ),
+                    interleaving_cliffords=interleaving_cliffords,
+                    cal_points=cal_points,
+                    net_cliffords=net_cliffords,  # measures with and without inverting
+                    f_state_cal_pts=True,
+                    recompile=recompile,
+                    sim_cz_qubits=sim_cz_qubits_idxs,
+                )
+
+                rb_tasks.append(pool.apply_async(cl_oql.parallel_friendly_rb, [task_dict]))
+
+            all_ready = False
+            while not all_ready:
+                states = [res.ready() for res in rb_tasks]
+                all_ready = np.all(states)
+                print("Generated {}/{} RB programs in {:.1f}s".format(
+                    np.sum(states), nr_seeds, time.time() - t0), end="\r")
+
+                # check for keyboard interrupt q because generating can be slow
+                check_keyboard_interrupt()
+
+                if not all_ready:
+                    # Only check for end of compilation each 5s
+                    time.sleep(5)
+
+        programs_filenames = [task.get() for task in rb_tasks]
 
         # to include calibration points
         if cal_points:
@@ -3544,14 +3556,15 @@ class DeviceCCL(Instrument):
         counter_param = ManualParameter("name_ctr", initial_value=0)
         prepare_function_kwargs = {
             "counter_param": counter_param,
-            "programs": programs,
+            "programs_filenames": programs_filenames,
             "CC": self.instr_CC.get_instr(),
         }
 
         # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
         d.set_prepare_function(
-            oqh.load_range_of_oql_programs, prepare_function_kwargs, detectors="first"
+            oqh.load_range_of_oql_programs_from_filenames,
+            prepare_function_kwargs, detectors="first"
         )
         # d.nr_averages = 128
 
@@ -3570,8 +3583,7 @@ class DeviceCCL(Instrument):
             interleaving_cliffords,
             qubits[0],
             qubits[1],
-            flux_codeword
-            ),
+            flux_codeword),
             exp_metadata={"bins": sweep_points},
         )
         # N.B. if interleaving cliffords are used, this won't work
