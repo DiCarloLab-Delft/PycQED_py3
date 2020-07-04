@@ -3483,7 +3483,6 @@ class DeviceCCL(Instrument):
 
         MC.soft_avg(1)
 
-        programs = []
         t0 = time.time()
 
         qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
