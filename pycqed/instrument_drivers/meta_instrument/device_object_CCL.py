@@ -3496,7 +3496,7 @@ class DeviceCCL(Instrument):
         sweep_points = np.concatenate([nr_cliffords, [nr_cliffords[-1] + 0.5] * 4])
         net_cliffords = [0, 3 * 24 + 3]
 
-        def send_rb_tasks(pool):
+        def send_rb_tasks(pool_):
             rb_tasks = []
             for i in range(nr_seeds):
                 task_dict = dict(
@@ -3522,7 +3522,7 @@ class DeviceCCL(Instrument):
                     sim_cz_qubits=sim_cz_qubits_idxs,
                 )
 
-                rb_tasks.append(pool.apply_async(cl_oql.parallel_friendly_rb, [task_dict]))
+                rb_tasks.append(pool_.apply_async(cl_oql.parallel_friendly_rb, [task_dict]))
             return rb_tasks
 
         if compile_only:
