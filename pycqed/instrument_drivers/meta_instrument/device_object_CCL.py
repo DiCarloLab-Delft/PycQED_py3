@@ -3530,7 +3530,7 @@ class DeviceCCL(Instrument):
             while not all_ready:
                 states = [res.ready() for res in rb_tasks]
                 all_ready = np.all(states)
-                print("Generated {}/{} RB programs in {:.1f}s".format(
+                print("Generated {}/{} RB programs in {:>7.1f}s".format(
                     np.sum(states), nr_seeds, time.time() - t0), end="\r")
 
                 # check for keyboard interrupt q because generating can be slow
@@ -3784,11 +3784,11 @@ class DeviceCCL(Instrument):
             p.sweep_points = sweep_points
             programs.append(p)
             print(
-                "Generated {} PB programs in {:.1f}s".format(i + 1, time.time() - t0),
+                "Generated {} PB programs in {:>7.1f}s".format(i + 1, time.time() - t0),
                 end="\r",
             )
         print(
-            "Succesfully generated {} PB programs in {:.1f}s".format(
+            "Succesfully generated {} PB programs in {:>7.1f}s".format(
                 nr_seeds, time.time() - t0
             )
         )
@@ -3928,13 +3928,13 @@ class DeviceCCL(Instrument):
             p.sweep_points = sweep_points
             programs.append(p)
             print(
-                "Generated {} Character benchmarking programs in {:.1f}s".format(
+                "Generated {} Character benchmarking programs in {:>7.1f}s".format(
                     i + 1, time.time() - t0
                 ),
                 end="\r",
             )
         print(
-            "Succesfully generated {} Character benchmarking programs in {:.1f}s".format(
+            "Succesfully generated {} Character benchmarking programs in {:>7.1f}s".format(
                 nr_seeds, time.time() - t0
             )
         )
@@ -4071,11 +4071,11 @@ class DeviceCCL(Instrument):
             p.sweep_points = sweep_points
             programs.append(p)
             print(
-                "Generated {} RB programs in {:.1f}s".format(i + 1, time.time() - t0),
+                "Generated {} RB programs in {:>7.1f}s".format(i + 1, time.time() - t0),
                 end="\r",
             )
         print(
-            "Succesfully generated {} RB programs in {:.1f}s".format(
+            "Succesfully generated {} RB programs in {:>7.1f}s".format(
                 nr_seeds, time.time() - t0
             )
         )
