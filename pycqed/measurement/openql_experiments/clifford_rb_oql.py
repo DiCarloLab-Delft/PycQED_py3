@@ -13,6 +13,8 @@ from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import 
     common_cliffords,
 )
 import json
+import time
+from pycqed.utilities.general import check_keyboard_interrupt
 from importlib import reload
 reload(rb)
 
@@ -33,6 +35,28 @@ def parallel_friendly_rb(rb_kw_dict):
     # p.sweep_points = sweep_points
 
     return p.filename
+
+
+def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 5):
+    """
+    Blocks the main process till all tasks in `rb_tasks` are done
+    """
+    all_ready = False
+    t0 = time.time()
+    task_num = len(rb_tasks)
+    while not all_ready:
+        states = [res.ready() for res in rb_tasks]
+        all_ready = np.all(states)
+        print("Generated in parallel {}/{} RB programs. Elapsed {:>7.1f}s".format(
+            np.sum(states), task_num, time.time() - t0), end="\r")
+
+        # check for keyboard interrupt q because generating can be slow
+        check_keyboard_interrupt()
+
+        if not all_ready:
+            # Only check for end of compilation each 5s
+            time.sleep(refresh_rate)
+    print("\nDone compiling RB sequences!")
 
 
 def randomized_benchmarking(
