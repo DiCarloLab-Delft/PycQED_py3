@@ -3611,8 +3611,10 @@ class DeviceCCL(Instrument):
         amount of idle time on the experimental setup
         """
         if not iRB_kw["recompile"]:
-            log.error("iRB statistics are intended to be measured while " +
-                "recompiling the RB sequences!")
+            log.error(
+                "iRB statistics are intended to be measured while " +
+                "recompiling the RB sequences!"
+            )
 
         rounds_success = np.zeros(nr_iRB_runs)
         t0 = time.time()
@@ -3634,7 +3636,7 @@ class DeviceCCL(Instrument):
                 finally:
                     rounds_success[i] = 1 if round_successful else 0
         t1 = time.time()
-        good_rounds = np.sum(rounds_success)
+        good_rounds = int(np.sum(rounds_success))
         print("Performed {}/{} successful iRB measurements in {:>7.1f} s.".format(
             good_rounds, nr_iRB_runs, t1 - t0
         ))
