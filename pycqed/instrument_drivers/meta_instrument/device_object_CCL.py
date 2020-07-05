@@ -3477,9 +3477,9 @@ class DeviceCCL(Instrument):
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
-        # old_weight_type = self.ro_acq_weight_type()
+        old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        # self.ro_acq_weight_type("SSB")
+        self.ro_acq_weight_type("optimal IQ")
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
@@ -3487,7 +3487,7 @@ class DeviceCCL(Instrument):
         # The detector needs to be defined before setting back parameters
         d = self.get_int_logging_detector(qubits=qubits)
         # set back the settings
-        # self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
         for q in qubits:
