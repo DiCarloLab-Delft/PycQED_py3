@@ -221,7 +221,7 @@ class SimControlCZ_v2(Instrument):
             docstring="FB: timestamp of previously generated heatmap. Used for contour scans along the 180 deg line",
             parameter_class=ManualParameter,
             vals=vals.Strings(),
-            initial_value=None,
+            initial_value="",
         )
 
         self.add_parameter(
