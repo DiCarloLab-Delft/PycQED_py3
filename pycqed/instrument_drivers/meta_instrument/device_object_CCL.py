@@ -3618,7 +3618,8 @@ class DeviceCCL(Instrument):
 
         rounds_success = np.zeros(nr_iRB_runs)
         t0 = time.time()
-        with multiprocessing.Pool() as pool:
+        # `maxtasksperchild` is specified to free up the memory from time to time
+        with multiprocessing.Pool(maxtasksperchild=400) as pool:
             rb_tasks_2Q = None
             last_run = nr_iRB_runs - 1
             for i in range(nr_iRB_runs):
