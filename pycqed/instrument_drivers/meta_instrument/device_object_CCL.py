@@ -3896,6 +3896,138 @@ class DeviceCCL(Instrument):
                     label_int="icl[100000]"
                 )
 
+    def measure_single_qubit_randomized_benchmarking_parking(
+        self,
+        qubits: list,
+        nr_cliffords=2**np.arange(12),
+        nr_seeds: int = 100,
+        MC=None,
+        recompile: bool = 'as needed',
+        prepare_for_timedomain: bool = True,
+        ignore_f_cal_pts: bool = False,
+        ro_acq_weight_type: str = "optimal IQ",
+        flux_codeword: str = "cz",
+        rb_on_parked_qubit_only: bool = False,
+        interleaving_cliffords: list = [None],
+    ):
+        """
+        [2020-07-06 Victor] This is a modified copy of the same method from CCL_Transmon.
+        The modification is intended for measuring a single qubit RB on a qubit
+        that is parked during an interleaving CZ. There is a single qubit RB
+        going on in parallel on all 3 qubits. This should cover the most realistic
+        case for benchmarking the parking flux pulse.
+
+        Measures randomized benchmarking decay including second excited state
+        population.
+
+        For this it:
+            - stores single shots using `ro_acq_weight_type` weights (int. logging)
+            - uploads a pulse driving the ef/12 transition (should be calibr.)
+            - performs RB both with and without an extra pi-pulse
+            - Includes calibration poitns for 0, 1, and 2 (g,e, and f)
+            - analysis extracts fidelity and leakage/seepage
+
+        Refs:
+        Knill PRA 77, 012307 (2008)
+        Wood PRA 97, 032306 (2018)
+
+        Args:
+            nr_cliffords (array):
+                list of lengths of the clifford gate sequences
+
+            nr_seeds (int):
+                number of random sequences for each sequence length
+
+            recompile (bool, str {'as needed'}):
+                indicate whether to regenerate the sequences of clifford gates.
+                By default it checks whether the needed sequences were already
+                generated since the most recent change of OpenQL file
+                specified in self.cfg_openql_platform_fn
+        """
+
+        # because only 1 seed is uploaded each time
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        counter_param = ManualParameter('name_ctr', initial_value=0)
+        programs = []
+
+        # Settings that have to be preserved, change is required for
+        # 2-state readout and postprocessing
+        old_weight_type = self.ro_acq_weight_type()
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_weight_type(ro_acq_weight_type)
+        self.ro_acq_digitized(False)
+
+        self.prepare_for_timedomain(qubits=qubits)
+        MC.soft_avg(1)
+        # The detector needs to be defined before setting back parameters
+        d = self.get_int_logging_detector(qubits=qubits[-1])
+        # set back the settings
+        self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_digitized(old_digitized)
+
+        for q in qubits:
+            q_instr = self.find_instrument(q)
+            mw_lutman = q_instr.instr_LutMan_MW.get_instr()
+            mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        MC.soft_avg(1)
+
+        qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+
+        t0 = time.time()
+        net_cliffords = [0, 3]  # always measure double sided
+        print('Generating {} RB programs'.format(nr_seeds))
+        for i in range(nr_seeds):
+            p = cl_oql.randomized_benchmarking(
+                qubits=qubit_idxs,
+                nr_cliffords=nr_cliffords,
+                net_cliffords=net_cliffords,  # always measure double sided
+                nr_seeds=1,
+                platf_cfg=self.cfg_openql_platform_fn(),
+                program_name='RB_s{}_ncl{}_net{}_{}_{}_park_{}'.format(
+                    i, nr_cliffords, net_cliffords, *qubits),
+                recompile=recompile,
+                simultaneous_single_qubit_parking_RB=True,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+                flux_codeword=flux_codeword,
+                interleaving_cliffords=interleaving_cliffords)
+            programs.append(p)
+            print('Generated {} RB programs in {:.1f}s'.format(
+                i + 1, time.time() - t0), end='\r')
+        print('Successfully generated {} RB programs in {:.1f}s'.format(
+            nr_seeds, time.time() - t0))
+        prepare_function_kwargs = {
+            'counter_param': counter_param,
+            'programs': programs,
+            'CC': self.instr_CC.get_instr()}
+
+        # to include calibration points
+        sweep_points = np.append(
+            # repeat twice because of net clifford being 0 and 3
+            np.repeat(nr_cliffords, 2),
+            [nr_cliffords[-1] + .5] * 2 + [nr_cliffords[-1] + 1.5] * 2 +
+            [nr_cliffords[-1] + 2.5] * 2,
+        )
+
+        d.prepare_function = cl_oql.load_range_of_oql_programs
+        d.prepare_function_kwargs = prepare_function_kwargs
+        reps_per_seed = 4094 // len(sweep_points)
+        d.nr_shots = reps_per_seed * len(sweep_points)
+
+        s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
+        MC.set_detector_function(d)
+        MC.run('RB_{}_{}_park_{}_{}seeds'.format(qubits, nr_seeds) + self.msmt_suffix,
+               exp_metadata={'bins': sweep_points})
+
+        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
+            label='_park_', ignore_f_cal_pts=ignore_f_cal_pts)
+        return a
+
     def measure_two_qubit_purity_benchmarking(
         self,
         qubits,
