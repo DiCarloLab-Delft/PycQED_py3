@@ -949,8 +949,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                 "ylabel": self.proc_data_dict["ylabel"],
                 "y_unit": self.proc_data_dict["yunit"],
                 "zlabel": zlabel,
-                "title": "{}\n{}".format(
-                    self.timestamp, self.proc_data_dict["measurementstring"]
+                "title": "{}".format(
+                    self.timestamp
                 ),
             }
 
