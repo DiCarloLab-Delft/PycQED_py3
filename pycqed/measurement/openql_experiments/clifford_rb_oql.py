@@ -194,7 +194,7 @@ def randomized_benchmarking(
     elif len(qubits) == 3 and simultaneous_single_qubit_parking_RB:
         # In this case we want to benchmark the single qubit gates when
         # interleaving the a cz with parking
-        qubit_map = {"q0": qubits[0], "q1": qubits[1], "q2": qubits[1]}
+        qubit_map = {"q0": qubits[0], "q1": qubits[1], "q2": qubits[2]}
         Cl = SingleQubitClifford
         # at the end we will add calibration points only for the parking qubit
         number_of_qubits = 3
@@ -364,7 +364,7 @@ def randomized_benchmarking(
                             if cl == 200_000:
                                 # Only this gate will be applied
                                 # it is intended to include implicit parking
-                                cl_seq_decomposed.append([("cz", ["q0", "q1"])])
+                                cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
                             else:
                                 for q_str, cl_rb_seq in zip(rb_qubits, cl_rb_seq_all_q):
                                     cl_decomposed = Cl(cl_rb_seq[cl_i]).gate_decomposition
@@ -386,7 +386,8 @@ def randomized_benchmarking(
                                     k.gate("wait", [], 0)
 
                         k.gate("wait", [], 0)  # align RO
-                        k.measure(qubit_map["q2"])  # measure parking qubit only
+                        for qubit_idx in qubit_map.values():
+                            k.measure(qubit_idx)  # measure parking qubit only
                         k.gate("wait", [], 0)
                         p.add_kernel(k)
 
