@@ -1125,7 +1125,7 @@ class QWGMultiDevices:
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qisa_opcodes.qmap')
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QWG_DIO_Calibration.qisa')
-        elif "QCC" in in cc.IDN()['model']:
+        elif "QCC" in cc.IDN()['model']:
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qcc_qisa_opcodes.qmap')
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QCC_DIO_Calibration.qisa')
