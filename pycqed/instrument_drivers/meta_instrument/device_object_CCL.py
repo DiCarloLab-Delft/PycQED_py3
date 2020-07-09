@@ -3534,7 +3534,7 @@ class DeviceCCL(Instrument):
                 )
                 tasks_inputs.append(task_dict)
 
-            rb_tasks = pool_.starmap_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
 
             return rb_tasks
 
@@ -3648,8 +3648,8 @@ class DeviceCCL(Instrument):
                     rounds_success[i] = 1 if round_successful else 0
         t1 = time.time()
         good_rounds = int(np.sum(rounds_success))
-        print("Performed {}/{} successful iRB measurements in {:>7.1f} s.".format(
-            good_rounds, nr_iRB_runs, t1 - t0
+        print("Performed {}/{} successful iRB measurements in {:>7.1f} s ({:>7.1f} min.).".format(
+            good_rounds, nr_iRB_runs, t1 - t0, (t1 - t0) / 60
         ))
         if good_rounds < nr_iRB_runs:
             log.error("Not all iRB measurements were successful!")
@@ -4156,8 +4156,9 @@ class DeviceCCL(Instrument):
                     interleaving_cliffords=interleaving_cliffords
                 )
                 tasks_inputs.append(task_dict)
-
-            rb_tasks = pool_.starmap_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+            # pool.starmap_async can be used for positional arguments
+            # but we are using a wrapper
+            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
 
             return rb_tasks
 

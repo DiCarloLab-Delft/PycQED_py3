@@ -19,7 +19,7 @@ from importlib import reload
 reload(rb)
 
 
-def parallel_friendly_rb(**rb_kw_dict):
+def parallel_friendly_rb(rb_kw_dict):
     """
     A wrapper around `randomized_benchmarking` such that we collect only
     the filenames of the resulting programs that can be communicated back to
@@ -43,9 +43,8 @@ def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 5):
     """
     t0 = time.time()
     while not rb_tasks.ready():
-        tasks_left = rb_tasks._number_left
         print("{} RB programs left to compile. Elapsed {:>7.1f}s".format(
-            np.sum(tasks_left), time.time() - t0), end="\r")
+            np.sum(rb_tasks._number_left), time.time() - t0), end="\r")
 
         # check for keyboard interrupt q because generating can be slow
         check_keyboard_interrupt()
