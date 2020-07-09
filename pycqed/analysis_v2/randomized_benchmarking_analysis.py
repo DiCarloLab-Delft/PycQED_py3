@@ -18,6 +18,8 @@ from matplotlib.colors import ListedColormap
 from sklearn import linear_model
 from matplotlib import colors as c
 
+log = logging.getLogger(__name__)
+
 
 class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
     def __init__(
@@ -30,6 +32,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         close_figs=True,
         classification_method="rates",
         rates_ch_idx: int = 1,
+        second_quadrature_ch_idx: int = 0,
         ignore_f_cal_pts: bool = False,
         **kwargs
     ):
@@ -64,6 +67,14 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         # used to determine how to determine 2nd excited state population
         self.classification_method = classification_method
         self.rates_ch_idx = rates_ch_idx
+        # [2020-07-09 Victor] Adding here second quadrature to ensure plotting
+        # works when reading several qubits, not sure yet if either I or Q
+        # quadrature of the "optimal IQ" RO mode should be used for the rates_ch_idx!
+        self.second_quadrature_ch_idx = (
+            second_quadrature_ch_idx
+            if second_quadrature_ch_idx is not None
+            else rates_ch_idx - 1
+        )
         self.d1 = 2
         self.ignore_f_cal_pts = ignore_f_cal_pts
         if auto:
@@ -102,14 +113,24 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             self.raw_data_dict["cal_pts_two"] = OrderedDict()
             self.raw_data_dict["measured_values_I"] = OrderedDict()
             self.raw_data_dict["measured_values_X"] = OrderedDict()
-            for i, val_name in enumerate(a.value_names):
 
-                invalid_idxs = np.where(
-                    (a.measured_values[0] == 0) & (a.measured_values[1] == 0)
-                )[0]
-                a.measured_values[:, invalid_idxs] = np.array(
-                    [[np.nan] * len(invalid_idxs)] * 2
+            # [2020-07-08 Victor] don't know why is this here, seems like
+            # a nasty hack... will keep it to avoid braking some more stuff...
+            selection = a.measured_values[0] == 0
+            for i in range(1, len(a.measured_values)):
+                selection &= a.measured_values[i] == 0
+            invalid_idxs = np.where(selection)[0]
+
+            if len(invalid_idxs):
+                log.warning(
+                    "Found zero values at {} indices!".format(len(invalid_idxs))
                 )
+                log.warning(invalid_idxs[:10])
+                a.measured_values[:, invalid_idxs] = np.array(
+                    [[np.nan] * len(invalid_idxs)] * len(a.value_names)
+                )
+
+            for i, val_name in enumerate(a.value_names):
 
                 binned_yvals = np.reshape(
                     a.measured_values[i], (len(bins), -1), order="F"
@@ -138,7 +159,6 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                 self.raw_data_dict["measured_values_X"][val_name] = binned_yvals[
                     1:-6:2, :
                 ]
-
         else:
             bins = None
 
@@ -196,6 +216,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         leak_mod.set_param_hint("lambda_1", value=0.99, vary=True)
         leak_mod.set_param_hint("L1", expr="(1-A)*(1-lambda_1)")
         leak_mod.set_param_hint("L2", expr="A*(1-lambda_1)")
+
         leak_mod.set_param_hint("L1_cz", expr="1-(1-(1-A)*(1-lambda_1))**(1/1.5)")
         leak_mod.set_param_hint("L2_cz", expr="1-(1-(A*(1-lambda_1)))**(1/1.5)")
 
@@ -210,8 +231,8 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             lambda_1 = fit_res_leak.best_values["lambda_1"]
             L1 = fit_res_leak.params["L1"].value
         except Exception as e:
-            logging.warning("Fitting failed")
-            logging.warning(e)
+            log.warning("Fitting failed")
+            log.warning(e)
             lambda_1 = 1
             L1 = 0
             self.fit_res["leakage_decay"] = {}
@@ -306,23 +327,34 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             }
 
         fs = plt.rcParams["figure.figsize"]
+        # Here we assume the channel with loser index is the I quadrature
+        # and the other one is the Q quadrature
+        len_vln = len(val_names)
+        # `% len_vln` is for the case the provided indexes are negative
+        ch_idx_0 = min(
+            self.rates_ch_idx % len_vln, self.second_quadrature_ch_idx % len_vln
+        )
+        ch_idx_1 = max(
+            self.rates_ch_idx % len_vln, self.second_quadrature_ch_idx % len_vln
+        )
+
         self.plot_dicts["cal_points_hexbin"] = {
             "plotfn": plot_cal_points_hexbin,
             "shots_0": (
-                self.raw_data_dict["cal_pts_zero"][val_names[0]],
-                self.raw_data_dict["cal_pts_zero"][val_names[1]],
+                self.raw_data_dict["cal_pts_zero"][val_names[ch_idx_0]],
+                self.raw_data_dict["cal_pts_zero"][val_names[ch_idx_1]],
             ),
             "shots_1": (
-                self.raw_data_dict["cal_pts_one"][val_names[0]],
-                self.raw_data_dict["cal_pts_one"][val_names[1]],
+                self.raw_data_dict["cal_pts_one"][val_names[ch_idx_0]],
+                self.raw_data_dict["cal_pts_one"][val_names[ch_idx_1]],
             ),
             "shots_2": (
-                self.raw_data_dict["cal_pts_two"][val_names[0]],
-                self.raw_data_dict["cal_pts_two"][val_names[1]],
+                self.raw_data_dict["cal_pts_two"][val_names[ch_idx_0]],
+                self.raw_data_dict["cal_pts_two"][val_names[ch_idx_1]],
             ),
-            "xlabel": val_names[0],
+            "xlabel": val_names[ch_idx_0],
             "xunit": self.raw_data_dict["value_units"][0],
-            "ylabel": val_names[1],
+            "ylabel": val_names[ch_idx_1],
             "yunit": self.raw_data_dict["value_units"][1],
             "title": self.raw_data_dict["timestamp_string"]
             + "\n"
@@ -359,24 +391,25 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                 + "\n"
                 + "Population using rate equations ch{}".format(val_name),
             }
+
         self.plot_dicts["logres_decision_bound"] = {
             "plotfn": plot_classifier_decission_boundary,
             "classifier": self.proc_data_dict["classifier"],
             "shots_0": (
-                self.proc_data_dict["cal_pts_zero"][val_names[0]],
-                self.proc_data_dict["cal_pts_zero"][val_names[1]],
+                self.proc_data_dict["cal_pts_zero"][val_names[ch_idx_0]],
+                self.proc_data_dict["cal_pts_zero"][val_names[ch_idx_1]],
             ),
             "shots_1": (
-                self.proc_data_dict["cal_pts_one"][val_names[0]],
-                self.proc_data_dict["cal_pts_one"][val_names[1]],
+                self.proc_data_dict["cal_pts_one"][val_names[ch_idx_0]],
+                self.proc_data_dict["cal_pts_one"][val_names[ch_idx_1]],
             ),
             "shots_2": (
-                self.proc_data_dict["cal_pts_two"][val_names[0]],
-                self.proc_data_dict["cal_pts_two"][val_names[1]],
+                self.proc_data_dict["cal_pts_two"][val_names[ch_idx_0]],
+                self.proc_data_dict["cal_pts_two"][val_names[ch_idx_1]],
             ),
-            "xlabel": val_names[0],
+            "xlabel": val_names[ch_idx_0],
             "xunit": self.proc_data_dict["value_units"][0],
-            "ylabel": val_names[1],
+            "ylabel": val_names[ch_idx_1],
             "yunit": self.proc_data_dict["value_units"][1],
             "title": self.proc_data_dict["timestamp_string"]
             + "\n"
