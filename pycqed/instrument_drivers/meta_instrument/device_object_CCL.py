@@ -3508,7 +3508,7 @@ class DeviceCCL(Instrument):
         net_cliffords = [0, 3 * 24 + 3]
 
         def send_rb_tasks(pool_):
-            rb_tasks = []
+            tasks_inputs = []
             for i in range(nr_seeds):
                 task_dict = dict(
                     qubits=qubit_idxs,
@@ -3532,8 +3532,10 @@ class DeviceCCL(Instrument):
                     recompile=recompile,
                     sim_cz_qubits=sim_cz_qubits_idxs,
                 )
+                tasks_inputs.append(task_dict)
 
-                rb_tasks.append(pool_.apply_async(cl_oql.parallel_friendly_rb, [task_dict]))
+            rb_tasks = pool_.starmap_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+
             return rb_tasks
 
         if compile_only:
@@ -3550,7 +3552,7 @@ class DeviceCCL(Instrument):
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
-        programs_filenames = [task.get() for task in rb_tasks]
+        programs_filenames = rb_tasks.get()
 
         # to include calibration points
         if cal_points:
@@ -4136,7 +4138,7 @@ class DeviceCCL(Instrument):
         qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
 
         def send_rb_tasks(pool_):
-            rb_tasks = []
+            tasks_inputs = []
             for i in range(nr_seeds):
                 task_dict = dict(
                     qubits=qubit_idxs,
@@ -4153,14 +4155,10 @@ class DeviceCCL(Instrument):
                     flux_codeword=flux_codeword,
                     interleaving_cliffords=interleaving_cliffords
                 )
-            rb_tasks.append(pool_.apply_async(
-                cl_oql.parallel_friendly_rb, [task_dict])
-            )
-            return rb_tasks
+                tasks_inputs.append(task_dict)
 
-        if compile_only:
-            assert pool is not None
-            rb_tasks = send_rb_tasks(pool)
+            rb_tasks = pool_.starmap_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+
             return rb_tasks
 
         if compile_only:
@@ -4177,7 +4175,7 @@ class DeviceCCL(Instrument):
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
-        programs_filenames = [task.get() for task in rb_tasks]
+        programs_filenames = rb_tasks.get()
 
         # to include calibration points
         if cal_points:
