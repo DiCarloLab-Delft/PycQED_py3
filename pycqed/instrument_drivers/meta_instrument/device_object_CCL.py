@@ -1431,7 +1431,7 @@ class DeviceCCL(Instrument):
         initialization_msmt: bool = False,
         initial_states=["0", "1"],
         nr_shots: int = 4088 * 4,
-        flux_codeword: str = "fl_cw_01",
+        flux_codeword: str = "cz",
         analyze: bool = True,
         close_fig: bool = True,
         prepare_for_timedomain: bool = True,
@@ -1473,7 +1473,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        name = "Single_qubit_parity_{}_{}_{}".format(qD, qA, self.msmt_suffix)
+        name = "Single_qubit_parity_{}_{}_{}".format(qD, qA, number_of_repetitions)
         MC.run(name)
 
         MC.soft_avg(old_soft_avg)
@@ -1508,8 +1508,8 @@ class DeviceCCL(Instrument):
             ["1", "0"],
         ],  # nb: this groups even and odd
         # nr_shots: int=4088*4,
-        flux_codeword0: str = "fl_cw_03",
-        flux_codeword1: str = "fl_cw_01",
+        flux_codeword0: str = "cz",
+        flux_codeword1: str = "cz",
         analyze: bool = True,
         close_fig: bool = True,
         prepare_for_timedomain: bool = True,
