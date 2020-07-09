@@ -6,7 +6,7 @@ from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman_vcz as
 
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ_v2 as scCZ_v2
 from pycqed.simulations import cz_superoperator_simulation_functions_v2 as czf_v2
-from pycqed.measurement.waveform_control_CC import waveforms_flux_vcz as wfl_dev
+from pycqed.measurement.waveform_control_CC import waveforms_vcz as wfl_dev
 
 import numpy as np
 from pycqed.measurement import detector_functions as det
@@ -90,7 +90,7 @@ def f_to_parallelize_v2(arglist):
         if sim_control_CZ.cluster():
             dat = MC.run(
                 "1D ramsey_v2_cluster double sided {} - sigma_q0 {:.0f} - detuning {:.0f}".format(
-                    fluxlutman.get("czd_double_sided_{}".format(which_gate)),
+                    sim_control_CZ.get("czd_double_sided"),
                     sim_control_CZ.sigma_q0() * 1e6,
                     sim_control_CZ.detuning() / 1e6
                 ),
@@ -102,7 +102,7 @@ def f_to_parallelize_v2(arglist):
             if additional_pars["long_name"]:
                 dat = MC.run(
                     "1D ramsey_v2 double sided {} - sigma_q0 {:.0f} - detuning {:.0f}".format(
-                    fluxlutman.get("czd_double_sided_{}".format(which_gate)),
+                    sim_control_CZ.get("czd_double_sided"),
                     sim_control_CZ.sigma_q0() * 1e6,
                     sim_control_CZ.detuning() / 1e6
                 ),
@@ -157,7 +157,7 @@ def compute_propagator(arglist):
 
     ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     #   Since we assume the hamiltonian to be constant on each side of the pulse, we just need two time steps
-    if fluxlutman.get("czd_double_sided_{}".format(which_gate)):
+    if sim_control_CZ.get("czd_double_sided"):
         amp_final=[amp_final[0],fluxlutman.calc_freq_to_amp(freq,positive_branch=False)]    # Echo-Z
     else:
         amp_final=[amp_final[0],amp_final[0]]     # Ram-Z
