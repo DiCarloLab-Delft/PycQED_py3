@@ -257,6 +257,13 @@ class SimControlCZ_v2(Instrument):
             vals=vals.Numbers(),
             initial_value=0,
         )
+        self.add_parameter(
+            "czd_double_sided",
+            docstring="Ramsey or echo pulse. Used since it has been removed from fluxlutman",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value=False,
+        )
 
         # for spectral tomo
 
