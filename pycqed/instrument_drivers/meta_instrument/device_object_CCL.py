@@ -4194,7 +4194,7 @@ class DeviceCCL(Instrument):
         counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
             'counter_param': counter_param,
-            'programs': programs_filenames,
+            'programs_filenames': programs_filenames,
             'CC': self.instr_CC.get_instr()}
 
         # Using the first detector of the multi-detector as this is
@@ -4213,7 +4213,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
 
         MC.set_detector_function(d)
-        label = 'RB_{}_{}_park_{}_{}seeds_rb_park_only={}_{}'.format(
+        label = 'RB_{}_{}_park_{}_{}seeds_rb_park_only={}_icl{}'.format(
             *qubits, nr_seeds, rb_on_parked_qubit_only, interleaving_cliffords)
         # FIXME should include the indices in the exp_metadata and
         # use that in the analysis instead of being dependent on the
