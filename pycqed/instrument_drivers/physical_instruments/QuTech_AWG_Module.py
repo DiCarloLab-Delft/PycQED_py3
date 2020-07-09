@@ -1121,11 +1121,15 @@ class QWGMultiDevices:
         _qwg_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '_QWG'))
 
-        if "CCL" in cc.IDN()['model']:
+        # [2020-07-08] the "model" can be sometimes "Model"...
+        # this assumes there are no duplicate entries (e.g. upper/lower case)
+        case_insensitive_IDN_keys = {k.lower(): k for k in cc.IDN().keys()}
+
+        if "CCL" in cc.IDN()[case_insensitive_IDN_keys['model']]:
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qisa_opcodes.qmap')
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QWG_DIO_Calibration.qisa')
-        elif "QCC" in cc.IDN()['model']:
+        elif "QCC" in cc.IDN()[case_insensitive_IDN_keys['model']]:
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qcc_qisa_opcodes.qmap')
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QCC_DIO_Calibration.qisa')
