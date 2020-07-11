@@ -605,7 +605,7 @@ def filter_resonator_visibility(
 
         # Cut and apply 'highpass filter'
         llcut_f[:left] = [0] * left
-        llcut_f[-1 - right: -1] = [0] * right
+        llcut_f[-1 - right : -1] = [0] * right
 
         # Convert back to frequency domain
         llcut_if = np.fft.ifft(llcut_f)
@@ -675,12 +675,18 @@ def populations_using_rate_equations(
     P1 = []
     for i, (sI, sX) in enumerate(zip(SI, SX)):
         p0, p1 = np.dot(np.array([sI - V2, sX - V2]), M_inv)
-        p0, p1 = np.dot(M_inv, np.array([sI - V2, sX - V2]))
         P0.append(p0)
         P1.append(p1)
 
-    P0 = np.array(P0)
-    P1 = np.array(P1)
+    # [2020-07-09 Victor] added compatibility with inputing complex IQ
+    # voltages in order to make rates equation work properly with "optimal IQ"
+    # RO mode, regardless of the orientation of the blobs on the IQ-plane
+
+    # There might be small imaginary part here in the cases where the measured
+    # SI or SX are points outside the the triangle formed by the calibration
+    # points
+    P0 = np.real(P0)
+    P1 = np.real(P1)
 
     P2 = 1 - P0 - P1
 
