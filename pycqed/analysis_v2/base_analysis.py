@@ -723,7 +723,7 @@ class BaseDataAnalysis(object):
             if self.verbose:
                 print('Saving quantities of interest to %s' % fn)
 
-            qoi = 'quantities_of_interest'
+            qoi_name = 'quantities_of_interest'
             # Save data to file
             with h5py.File(fn, 'a') as data_file:
                 try:
@@ -733,15 +733,20 @@ class BaseDataAnalysis(object):
                     # (as not to overwrite previous/other fits)
                     analysis_group = data_file['Analysis']
                 try:
-
-                    qoi_group = analysis_group.create_group(qoi)
+                    qois_group = analysis_group.create_group(qoi_name)
                 except ValueError:
                     # Delete the old group and create a new group (overwrite).
-                    del analysis_group[qoi]
-                    qoi_group = analysis_group.create_group(qoi)
+                    # del analysis_group[qoi_name]
+                    # qois_group = analysis_group.create_group(qoi_name)
 
-                write_dict_to_hdf5(self.proc_data_dict['quantities_of_interest'],
-                                   entry_point=qoi_group)
+                    # [2020-07-11 Victor] some analysis can be called several
+                    # time on the same datafile, the `qois` group should no be
+                    # removed! Line above commented out
+                    qois_group = analysis_group[qoi_name]
+
+                d = copy.deepcopy(self.proc_data_dict['quantities_of_interest'])
+                d = self._convert_dict_rec(d)
+                write_dict_to_hdf5(d, entry_point=qois_group)
 
     @staticmethod
     def _convert_dict_rec(obj):
