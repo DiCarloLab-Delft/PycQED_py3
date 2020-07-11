@@ -4058,7 +4058,7 @@ class DeviceCCL(Instrument):
         MC=None,
         recompile: bool = 'as needed',
         prepare_for_timedomain: bool = True,
-        cal_points=True,
+        cal_points: bool = True,
         ro_acq_weight_type: str = "optimal IQ",
         flux_codeword: str = "cz",
         rb_on_parked_qubit_only: bool = False,
@@ -4220,12 +4220,12 @@ class DeviceCCL(Instrument):
         MC.run(label + self.msmt_suffix, exp_metadata={'bins': sweep_points})
 
         log.warning("[Victor] still need to figure out the right channels indices!")
-        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
-            label=label, ignore_f_cal_pts=False,
-            rates_ch_idx=-2,
-            second_quadrature_ch_idx=-1
+        a_q2 = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
+            label=label,
+            rates_I_quad_ch_idx=-2,
+            cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
         )
-        return a
+        return a_q2
 
     def measure_two_qubit_purity_benchmarking(
         self,
@@ -4547,7 +4547,10 @@ class DeviceCCL(Instrument):
         interleaving_cliffords=[None],
         label="TwoQubit_sim_RB_{}seeds_{}_{}",
         recompile: bool = "as needed",
-        cal_points=True,
+        cal_points: bool = True,
+        compile_only: bool = False,
+        pool=None,  # a multiprocessing.Pool()
+        rb_tasks=None  # used after called with `compile_only=True`
     ):
         """
         Performs simultaneous single qubit RB on two qubits.
@@ -4580,7 +4583,7 @@ class DeviceCCL(Instrument):
                 specified in self.cfg_openql_platform_fn
 
             cal_points (bool):
-                should aclibration point (qubits in 0 and 1 states)
+                should calibration point (qubits in 0, 1 and 2 states)
                 be included in the measurement
         """
 
@@ -4608,45 +4611,50 @@ class DeviceCCL(Instrument):
 
         MC.soft_avg(1)
 
-        programs = []
-        t0 = time.time()
-        print("Generating {} RB programs".format(nr_seeds))
-        qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
-        for i in range(nr_seeds):
-            # check for keyboard interrupt q because generating can be slow
-            check_keyboard_interrupt()
-            sweep_points = np.concatenate([nr_cliffords, [nr_cliffords[-1] + 0.5] * 4])
+        def send_rb_tasks(pool_):
+            tasks_inputs = []
+            for i in range(nr_seeds):
+                task_dict = dict(
+                    qubits=[self.find_instrument(q).cfg_qubit_nr() for q in qubits],
+                    nr_cliffords=nr_cliffords,
+                    nr_seeds=1,
+                    platf_cfg=self.cfg_openql_platform_fn(),
+                    program_name="TwoQ_Sim_RB_int_cl{}_s{}_ncl{}_{}_{}_double".format(
+                        i,
+                        list(map(int, nr_cliffords)),
+                        interleaving_cliffords,
+                        qubits[0],
+                        qubits[1],
+                    ),
+                    interleaving_cliffords=interleaving_cliffords,
+                    simultaneous_single_qubit_RB=True,
+                    cal_points=cal_points,
+                    net_cliffords=[0, 3],  # measures with and without inverting
+                    f_state_cal_pts=True,
+                    recompile=recompile,
+                )
+                tasks_inputs.append(task_dict)
+            # pool.starmap_async can be used for positional arguments
+            # but we are using a wrapper
+            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
 
-            p = cl_oql.randomized_benchmarking(
-                qubits=qubit_idxs,
-                nr_cliffords=nr_cliffords,
-                nr_seeds=1,
-                platf_cfg=self.cfg_openql_platform_fn(),
-                program_name="TwoQ_Sim_RB_int_cl{}_s{}_ncl{}_{}_{}_double".format(
-                    i,
-                    list(map(int, nr_cliffords)),
-                    interleaving_cliffords,
-                    qubits[0],
-                    qubits[1],
-                ),
-                interleaving_cliffords=interleaving_cliffords,
-                simultaneous_single_qubit_RB=True,
-                cal_points=cal_points,
-                net_cliffords=[0, 3],  # measures with and without inverting
-                f_state_cal_pts=True,
-                recompile=recompile,
-            )
-            p.sweep_points = sweep_points
-            programs.append(p)
-            print(
-                "Generated {} RB programs in {:>7.1f}s".format(i + 1, time.time() - t0),
-                end="\r",
-            )
-        print(
-            "Successfully generated {} RB programs in {:>7.1f}s".format(
-                nr_seeds, time.time() - t0
-            )
-        )
+            return rb_tasks
+
+        if compile_only:
+            assert pool is not None
+            rb_tasks = send_rb_tasks(pool)
+            return rb_tasks
+
+        if rb_tasks is None:
+            # Using `with ...:` makes sure the other processes will be terminated
+            # avoid starting too mane processes,
+            # nr_processes = None will start as many as the PC can handle
+            nr_processes = None if recompile else 1
+            with multiprocessing.Pool(nr_processes) as pool:
+                rb_tasks = send_rb_tasks(pool)
+                cl_oql.wait_for_rb_tasks(rb_tasks)
+
+        programs_filenames = rb_tasks.get()
 
         # to include calibration points
         if cal_points:
@@ -4662,14 +4670,15 @@ class DeviceCCL(Instrument):
         counter_param = ManualParameter("name_ctr", initial_value=0)
         prepare_function_kwargs = {
             "counter_param": counter_param,
-            "programs": programs,
+            "programs_filenames": programs_filenames,
             "CC": self.instr_CC.get_instr(),
         }
 
         # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
         d.set_prepare_function(
-            oqh.load_range_of_oql_programs, prepare_function_kwargs, detectors="first"
+            oqh.load_range_of_oql_programs_from_filenames,
+            prepare_function_kwargs, detectors="first"
         )
         # d.nr_averages = 128
 
@@ -4682,13 +4691,30 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
 
         MC.set_detector_function(d)
-        MC.run(
-            label.format(nr_seeds, qubits[0], qubits[1]),
-            exp_metadata={"bins": sweep_points},
-        )
+        label = label.format(nr_seeds, qubits[0], qubits[1])
+        MC.run(label, exp_metadata={"bins": sweep_points})
+
         # N.B. if interleaving cliffords are used, this won't work
-        # FIXME: write a proper analysis for simultaneous RB
-        ma2.RandomizedBenchmarking_TwoQubit_Analysis()
+        # [2020-07-11 Victor] not sure if NB still holds
+
+        cal_2Q = ["00", "01", "10", "11", "02", "20", "22"]
+
+        rates_I_quad_ch_idx = 0
+        cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
+        a_q0 = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
+            label=label,
+            rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+            cal_pnts_in_dset=cal_1Q
+        )
+        rates_I_quad_ch_idx = 2
+        cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
+        a_q1 = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
+            label=label,
+            rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+            cal_pnts_in_dset=cal_1Q
+        )
+
+        return a_q0, a_q1
 
     ########################################################
     # Calibration methods
