@@ -1016,10 +1016,12 @@ class BaseDataAnalysis(object):
         else:
             if pdict.get('color', False):
                 plot_linekws['color'] = pdict.get('color')
-
+            # "setlabel": "NONE" allows to disable the label
             p_out = pfunc(plot_xvals, plot_yvals,
-                          linestyle=plot_linestyle, marker=plot_marker,
-                          label='%s%s' % (dataset_desc, dataset_label),
+                          linestyle=plot_linestyle,
+                          marker=plot_marker,
+                          label=(None if dataset_label == "NONE"
+                            else '%s%s' % (dataset_desc, dataset_label)),
                           **plot_linekws)
 
         if plot_xrange is None:
