@@ -642,7 +642,7 @@ class SafeFormatter(string.Formatter):
 
 def format_value_string(par_name: str, lmfit_par, end_char="", unit=None):
     """
-    Format an lmfit par to a  string of value with uncertainty.
+    Format an lmfit par to a string of value with uncertainty.
 
     par_name (str):
         the name of the parameter to use in the string
@@ -658,12 +658,17 @@ def format_value_string(par_name: str, lmfit_par, end_char="", unit=None):
     val_string = par_name
     val_string += ": {:.4f}$\pm${:.4f} {}{}"
 
-    scale_factor, unit = SI_prefix_and_scale_factor(lmfit_par.value, unit)
-    val = lmfit_par.value * scale_factor
+    if lmfit_par is not None:
+        scale_factor, unit = SI_prefix_and_scale_factor(lmfit_par.value, unit)
+        val = lmfit_par.value * scale_factor
+    else:
+        val = None
+
     if lmfit_par.stderr is not None:
         stderr = lmfit_par.stderr * scale_factor
     else:
         stderr = None
+
     fmt = SafeFormatter(missing="NaN")
     val_string = fmt.format(val_string, val, stderr, unit, end_char)
     return val_string
