@@ -4541,7 +4541,7 @@ class DeviceCCL(Instrument):
     def measure_two_qubit_simultaneous_randomized_benchmarking(
         self,
         qubits,
-        MC,
+        MC=None,
         nr_cliffords=2 ** np.arange(11),
         nr_seeds=100,
         interleaving_cliffords=[None],
@@ -4595,7 +4595,8 @@ class DeviceCCL(Instrument):
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
-
+        if MC is None:
+            MC = self.instr_MC.get_instr()
         MC.soft_avg(1)
 
         # The detector needs to be defined before setting back parameters
