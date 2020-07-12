@@ -19,6 +19,8 @@ from uncertainties import UFloat
 
 # from pycqed.utilities.general import RepresentsInt
 
+log = logging.getLogger(__name__)
+
 
 class DateTimeGenerator:
     """
@@ -139,7 +141,9 @@ def encode_to_utf8(s):
     return s
 
 
-def write_dict_to_hdf5(data_dict: dict, entry_point):
+def write_dict_to_hdf5(
+    data_dict: dict, entry_point, group_overwrite_level: int = np.inf
+):
     """
     Args:
         data_dict (dict): dictionary to write to hdf5 file
@@ -161,7 +165,7 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                         key, item, type(item), entry_point
                     )
                 )
-                logging.warning(e)
+                log.warning(e)
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
         elif item is None:
@@ -172,12 +176,34 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
 
         elif isinstance(item, dict):
             # converting key to string is to make int dictionary keys work
-            entry_point.create_group(str(key))
-            write_dict_to_hdf5(data_dict=item, entry_point=entry_point[str(key)])
+            str_key = str(key)
+            if str_key not in entry_point.keys():
+                entry_point.create_group(str_key)
+            elif group_overwrite_level < 1:
+                log.debug("Overwriting hdf5 group: {}".format(str_key))
+                del entry_point[str_key]
+                entry_point.create_group(str_key)
+
+            write_dict_to_hdf5(
+                data_dict=item,
+                entry_point=entry_point[str_key],
+                group_overwrite_level=group_overwrite_level - 1,
+            )
         elif isinstance(item, UFloat):
-            entry_point.create_group(str(key))
+            str_key = str(key)
+            if str_key not in entry_point.keys():
+                entry_point.create_group(str_key)
+            elif group_overwrite_level < 1:
+                log.debug("Overwriting hdf5 group: {}".format(str_key))
+                del entry_point[str_key]
+                entry_point.create_group(str_key)
+
             new_item = {"nominal_value": item.nominal_value, "std_dev": item.std_dev}
-            write_dict_to_hdf5(data_dict=new_item, entry_point=entry_point[str(key)])
+            write_dict_to_hdf5(
+                data_dict=new_item,
+                entry_point=entry_point[str_key],
+                group_overwrite_level=group_overwrite_level - 1,
+            )
 
         elif isinstance(item, (list, tuple)):
             if len(item) > 0:
@@ -201,14 +227,20 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                         ds.attrs["list_type"] = "str"
                         ds[:] = data
                     else:
-                        logging.warning(
+                        log.warning(
                             'List of type "{}" for "{}":"{}" not '
                             "supported, storing as string".format(elt_type, key, item)
                         )
                         entry_point.attrs[key] = str(item)
                 # Storing of generic lists/tuples
                 else:
-                    entry_point.create_group(key)
+                    if key not in entry_point.keys():
+                        entry_point.create_group(key)
+                    elif group_overwrite_level < 1:
+                        log.debug("Overwriting hdf5 group: {}".format(key))
+                        del entry_point[key]
+                        entry_point.create_group(key)
+
                     # N.B. item is of type list
                     list_dct = {
                         "list_idx_{}".format(idx): entry
@@ -220,13 +252,17 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                     else:
                         group_attrs["list_type"] = "generic_list"
                     group_attrs["list_length"] = len(item)
-                    write_dict_to_hdf5(data_dict=list_dct, entry_point=entry_point[key])
+                    write_dict_to_hdf5(
+                        data_dict=list_dct,
+                        entry_point=entry_point[key],
+                        group_overwrite_level=group_overwrite_level - 1,
+                    )
             else:
                 # as h5py does not support saving None as attribute
                 entry_point.attrs[key] = "NoneType:__emptylist__"
 
         else:
-            logging.warning(
+            log.warning(
                 'Type "{}" for "{}" (key): "{}" (item) at location {} '
                 "not supported, "
                 "storing as string".format(type(item), key, item, entry_point)
