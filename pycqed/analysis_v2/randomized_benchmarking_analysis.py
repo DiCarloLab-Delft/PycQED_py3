@@ -88,6 +88,9 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         self.d1 = 2
         self.cal_pnts_in_dset = np.array(cal_pnts_in_dset)
         self.ignore_f_cal_pts = ignore_f_cal_pts
+
+        # Allows to run this analysis for different qubits in same dataset
+        self.overwrite_qois = False
         if auto:
             self.run_analysis()
 
@@ -291,11 +294,19 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         else:
             raise NotImplementedError()
 
-    def run_fitting(self):
+    def run_fitting(self, fit_input_tag: str = None):
+        """
+        Args:
+            fit_input_tag (str): allows to fit specific M0 and X1
+                intended for use in 2Q RBs
+        """
         super().run_fitting()
         rdd = self.raw_data_dict
         pdd = self.proc_data_dict
-        val_name_I = rdd["value_names"][self.rates_I_quad_ch_idx]
+
+        if fit_input_tag is None:
+            # Default value for single qubit RB analysis
+            fit_input_tag = rdd["value_names"][self.rates_I_quad_ch_idx]
 
         leak_mod = lmfit.Model(leak_decay, independent_vars="m")
         leak_mod.set_param_hint("A", value=0.95, min=0, vary=True)
@@ -311,9 +322,9 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         params = leak_mod.make_params()
         try:
             fit_res_leak = leak_mod.fit(
-                data=pdd["X1"][val_name_I], m=pdd["ncl"], params=params,
+                data=pdd["X1"][fit_input_tag], m=pdd["ncl"], params=params,
             )
-            self.fit_res["leakage_decay_" + val_name_I] = fit_res_leak
+            self.fit_res["leakage_decay_" + fit_input_tag] = fit_res_leak
             lambda_1 = fit_res_leak.best_values["lambda_1"]
             L1 = fit_res_leak.params["L1"].value
         except Exception as e:
@@ -321,12 +332,16 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             log.warning(e)
             lambda_1 = 1
             L1 = 0
-            self.fit_res["leakage_decay_" + val_name_I] = {}
+            self.fit_res["leakage_decay_" + fit_input_tag] = {}
 
-        fit_res_rb = self.fit_rb_decay(lambda_1=lambda_1, L1=L1, simple=False)
-        self.fit_res["rb_decay_" + val_name_I] = fit_res_rb
-        fit_res_rb_simple = self.fit_rb_decay(lambda_1=1, L1=0, simple=True)
-        self.fit_res["rb_decay_simple_" + val_name_I] = fit_res_rb_simple
+        fit_res_rb = self.fit_rb_decay(
+            fit_input_tag, lambda_1=lambda_1, L1=L1, simple=False
+        )
+        self.fit_res["rb_decay_" + fit_input_tag] = fit_res_rb
+        fit_res_rb_simple = self.fit_rb_decay(
+            fit_input_tag, lambda_1=1, L1=0, simple=True
+        )
+        self.fit_res["rb_decay_simple_" + fit_input_tag] = fit_res_rb_simple
 
         def safe_get_par_from_fit_result(fit_res, par_name):
             """
@@ -343,13 +358,13 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
             return par
 
-        fr_rb_dict = self.fit_res["rb_decay_" + val_name_I]
+        fr_rb_dict = self.fit_res["rb_decay_" + fit_input_tag]
         eps = safe_get_par_from_fit_result(fr_rb_dict, "eps")
 
-        fr_rb_simple_dict = self.fit_res["rb_decay_simple_" + val_name_I]
+        fr_rb_simple_dict = self.fit_res["rb_decay_simple_" + fit_input_tag]
         eps_simple = safe_get_par_from_fit_result(fr_rb_simple_dict, "eps")
 
-        fr_dec = self.fit_res["leakage_decay_" + val_name_I]
+        fr_dec = self.fit_res["leakage_decay_" + fit_input_tag]
         L1 = safe_get_par_from_fit_result(fr_dec, "L1")
         L2 = safe_get_par_from_fit_result(fr_dec, "L2")
 
@@ -360,24 +375,24 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         text_msg += format_value_string(r"$\epsilon_{{\chi_1}}$", eps, "\n")
         text_msg += format_value_string(r"$L_1$", L1, "\n")
         text_msg += format_value_string(r"$L_2$", L2, "\n")
-        pdd["rb_msg"] = text_msg
+        pdd["rb_msg_" + fit_input_tag] = text_msg
 
         pdd["quantities_of_interest"] = {}
         qoi = pdd["quantities_of_interest"]
-        qoi["eps_simple_" + val_name_I] = ufloat(
+        qoi["eps_simple_" + fit_input_tag] = ufloat(
             eps_simple.value, eps_simple.stderr or np.NaN
         )
-        qoi["eps_X1_" + val_name_I] = ufloat(eps.value, eps.stderr or np.NaN)
-        qoi["L1_" + val_name_I] = ufloat(L1.value, L1.stderr or np.NaN)
-        qoi["L2_" + val_name_I] = ufloat(L2.value, L2.stderr or np.NaN)
+        qoi["eps_X1_" + fit_input_tag] = ufloat(eps.value, eps.stderr or np.NaN)
+        qoi["L1_" + fit_input_tag] = ufloat(L1.value, L1.stderr or np.NaN)
+        qoi["L2_" + fit_input_tag] = ufloat(L2.value, L2.stderr or np.NaN)
 
-    def fit_rb_decay(self, lambda_1: float, L1: float, simple: bool = False):
+    def fit_rb_decay(
+        self, val_name: str, lambda_1: float, L1: float, simple: bool = False
+    ):
         """
         Fits the data
         """
-        rdd = self.raw_data_dict
         pdd = self.proc_data_dict
-        val_name_I = rdd["value_names"][self.rates_I_quad_ch_idx]
 
         fit_mod_rb = lmfit.Model(full_rb_decay, independent_vars="m")
         fit_mod_rb.set_param_hint("A", value=0.5, min=0, vary=True)
@@ -414,7 +429,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
         try:
             fit_res_rb = fit_mod_rb.fit(
-                data=pdd["M0"][val_name_I], m=pdd["ncl"], params=params
+                data=pdd["M0"][val_name], m=pdd["ncl"], params=params
             )
         except Exception as e:
             log.warning("Fitting failed!")
@@ -423,228 +438,242 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
         return fit_res_rb
 
-    def prepare_plots(self):
-        val_names = self.raw_data_dict["value_names"]
+    def prepare_plots(self, fit_input_tag: str = None):
+        """
+        Args:
+            fit_input_tag (str): allows to fit specific M0 and X1
+                intended for use in 2Q RBs
+        """
 
         rdd = self.raw_data_dict
         pdd = self.proc_data_dict
-        val_name_I = rdd["value_names"][self.rates_I_quad_ch_idx]
 
-        for i, val_name in enumerate(val_names):
-            self.plot_dicts["binned_data_{}".format(val_name)] = {
-                "plotfn": self.plot_line,
-                "xvals": rdd["bins"],
-                "yvals": np.nanmean(rdd["binned_vals"][val_name], axis=1),
-                "yerr": sem(rdd["binned_vals"][val_name], axis=1),
-                "xlabel": "Number of Cliffords",
-                "xunit": "#",
-                "ylabel": val_name,
-                "yunit": rdd["value_units"][i],
-                "title": rdd["timestamp_string"] + "\n" + rdd["measurementstring"],
-            }
+        if fit_input_tag is None:
+            val_name_I = rdd["value_names"][self.rates_I_quad_ch_idx]
+            fit_input_tag = val_name_I
 
-        fs = plt.rcParams["figure.figsize"]
-
-        fig_id_hex = "cal_points_hexbin_{}".format(val_name_I)
-        self.plot_dicts[fig_id_hex] = {
-            "plotfn": plot_cal_points_hexbin,
-            "shots_0": (
-                rdd["cal_pts_zero"][val_names[self.rates_I_quad_ch_idx]],
-                rdd["cal_pts_zero"][val_names[self.rates_Q_quad_ch_idx]],
-            ),
-            "shots_1": (
-                rdd["cal_pts_one"][val_names[self.rates_I_quad_ch_idx]],
-                rdd["cal_pts_one"][val_names[self.rates_Q_quad_ch_idx]],
-            ),
-            "shots_2": (
-                rdd["cal_pts_two"][val_names[self.rates_I_quad_ch_idx]],
-                rdd["cal_pts_two"][val_names[self.rates_Q_quad_ch_idx]],
-            ),
-            "xlabel": val_names[self.rates_I_quad_ch_idx],
-            "xunit": rdd["value_units"][0],
-            "ylabel": val_names[self.rates_Q_quad_ch_idx],
-            "yunit": rdd["value_units"][1],
-            "title": rdd["timestamp_string"]
-            + "\n"
-            + rdd["measurementstring"]
-            + " hexbin plot",
-            "plotsize": (fs[0] * 1.5, fs[1]),
-        }
-
-        num_cal_pnts = len(pdd["cal_triangle"])
-        fig_id_RB_on_IQ = "rb_on_iq_{}".format(val_name_I)
-        for ax_id in [fig_id_hex, fig_id_RB_on_IQ]:
-            self.plot_dicts[ax_id + "_cal_pnts"] = {
-                "plotfn": self.plot_line,
-                "ax_id": ax_id,
-                "xvals": pdd["cal_triangle"].T[0].reshape(num_cal_pnts, 1),
-                "yvals": pdd["cal_triangle"].T[1].reshape(num_cal_pnts, 1),
-                "setlabel": [r"V$_{\left |" + str(i) + r"\right >}$" for i in range(num_cal_pnts)],
-                "marker": "d",
-                "line_kws": {"markersize": 14, "markeredgecolor": "white"},
-                "do_legend": True,
-                # "legend_title": "Calibration points",
-                "legend_ncol": 3,
-                "linestyle": ""
-            }
-
-        # define figure and axes here to have custom layout
-        fs = plt.rcParams["figure.figsize"]
-        self.figs[fig_id_RB_on_IQ], axs = plt.subplots(
-            ncols=2, figsize=(fs[0] * 2.0, fs[1])
-        )
-        self.figs[fig_id_RB_on_IQ].patch.set_alpha(0)
-        self.axs[fig_id_RB_on_IQ] = axs[0]
-        fig_id_RB_on_IQ_det = fig_id_RB_on_IQ + "_detailed"
-        self.axs[fig_id_RB_on_IQ_det] = axs[1]
-        axs[1].yaxis.set_label_position("right")
-        axs[1].yaxis.tick_right()
-
-        close_triangle = list(range(num_cal_pnts)) + [0]
-        self.plot_dicts[fig_id_RB_on_IQ] = {
-            "ax_id": fig_id_RB_on_IQ,
-            "plotfn": self.plot_line,
-            "xvals": pdd["cal_triangle"].T[0][close_triangle],
-            "yvals": pdd["cal_triangle"].T[1][close_triangle],
-            "xlabel": val_names[self.rates_I_quad_ch_idx],
-            "xunit": rdd["value_units"][0],
-            "ylabel": val_names[self.rates_Q_quad_ch_idx],
-            "yunit": rdd["value_units"][1],
-            "title": rdd["timestamp_string"]
-            + "\n"
-            + rdd["measurementstring"]
-            + " hexbin plot",
-            "marker": "",
-            "color": "black",
-            "line_kws": {"linewidth": 1},
-            "setlabel": "NONE",
-        }
-
-        self.plot_dicts[fig_id_RB_on_IQ_det] = {
-            "ax_id": fig_id_RB_on_IQ_det,
-            "plotfn": self.plot_line,
-            "xvals": pdd["cal_triangle"].T[0][:2],
-            "yvals": pdd["cal_triangle"].T[1][:2],
-            "xlabel": val_names[self.rates_I_quad_ch_idx],
-            "xunit": rdd["value_units"][0],
-            "ylabel": val_names[self.rates_Q_quad_ch_idx],
-            "yunit": rdd["value_units"][1],
-            "title": r"Detailed view",
-            "marker": "",
-            "color": "black",
-            "line_kws": {"linewidth": 1},
-            "setlabel": "NONE",
-        }
-
-        val_name_Q = rdd["value_names"][self.rates_Q_quad_ch_idx]
-        rb_SI = (pdd["SI"][val_name_I], pdd["SI"][val_name_Q])
-        rb_SX = (pdd["SX"][val_name_I], pdd["SX"][val_name_Q])
-        rb_SI_corr = (pdd["SI_corr"][val_name_I], pdd["SI_corr"][val_name_Q])
-        rb_SX_corr = (pdd["SX_corr"][val_name_I], pdd["SX_corr"][val_name_Q])
-
-        sigs = (rb_SI, rb_SI_corr, rb_SX, rb_SX_corr)
-        ids = ("SI", "SI_corr", "SX", "SX_corr")
-        labels = ("SI", "SI corrected", "SX", "SX corrected")
-
-        cols = ["royalblue", "dodgerblue", "red", "salmon"]
-        mks = [8, 4, 8, 4]
-        for ax_id, do_legend in zip(
-                [fig_id_RB_on_IQ, fig_id_RB_on_IQ_det], [True, False]):
-            for S, col, mk_size, ID, label in zip(sigs, cols, mks, ids, labels):
-                self.plot_dicts[ax_id + "_{}".format(ID)] = {
+            val_names = rdd["value_names"]
+            for i, val_name in enumerate(val_names):
+                self.plot_dicts["binned_data_{}".format(val_name)] = {
                     "plotfn": self.plot_line,
-                    "ax_id": ax_id,
-                    "xvals": S[0],
-                    "yvals": S[1],
-                    "setlabel": label,
-                    "marker": "o",
-                    "line_kws": {"markersize": mk_size},
-                    "color": col,
-                    "do_legend": do_legend,
-                    "legend_ncol": 3,
-                    "linestyle": ""
+                    "xvals": rdd["bins"],
+                    "yvals": np.nanmean(rdd["binned_vals"][val_name], axis=1),
+                    "yerr": sem(rdd["binned_vals"][val_name], axis=1),
+                    "xlabel": "Number of Cliffords",
+                    "xunit": "#",
+                    "ylabel": val_name,
+                    "yunit": rdd["value_units"][i],
+                    "title": rdd["timestamp_string"] + "\n" + rdd["measurementstring"],
                 }
 
-        for idx in [self.rates_I_quad_ch_idx, self.rates_Q_quad_ch_idx]:
-            val_name = rdd["value_names"][idx]
-            self.plot_dicts["raw_RB_curve_data_{}".format(val_name)] = {
-                "plotfn": plot_raw_RB_curve,
+            fs = plt.rcParams["figure.figsize"]
+
+            fig_id_hex = "cal_points_hexbin_{}".format(val_name_I)
+            self.plot_dicts[fig_id_hex] = {
+                "plotfn": plot_cal_points_hexbin,
+                "shots_0": (
+                    rdd["cal_pts_zero"][val_names[self.rates_I_quad_ch_idx]],
+                    rdd["cal_pts_zero"][val_names[self.rates_Q_quad_ch_idx]],
+                ),
+                "shots_1": (
+                    rdd["cal_pts_one"][val_names[self.rates_I_quad_ch_idx]],
+                    rdd["cal_pts_one"][val_names[self.rates_Q_quad_ch_idx]],
+                ),
+                "shots_2": (
+                    rdd["cal_pts_two"][val_names[self.rates_I_quad_ch_idx]],
+                    rdd["cal_pts_two"][val_names[self.rates_Q_quad_ch_idx]],
+                ),
+                "xlabel": val_names[self.rates_I_quad_ch_idx],
+                "xunit": rdd["value_units"][0],
+                "ylabel": val_names[self.rates_Q_quad_ch_idx],
+                "yunit": rdd["value_units"][1],
+                "title": rdd["timestamp_string"]
+                + "\n"
+                + rdd["measurementstring"]
+                + " hexbin plot",
+                "plotsize": (fs[0] * 1.5, fs[1]),
+            }
+
+            num_cal_pnts = len(pdd["cal_triangle"])
+            fig_id_RB_on_IQ = "rb_on_iq_{}".format(val_name_I)
+            for ax_id in [fig_id_hex, fig_id_RB_on_IQ]:
+                self.plot_dicts[ax_id + "_cal_pnts"] = {
+                    "plotfn": self.plot_line,
+                    "ax_id": ax_id,
+                    "xvals": pdd["cal_triangle"].T[0].reshape(num_cal_pnts, 1),
+                    "yvals": pdd["cal_triangle"].T[1].reshape(num_cal_pnts, 1),
+                    "setlabel": [
+                        r"V$_{\left |" + str(i) + r"\right >}$"
+                        for i in range(num_cal_pnts)
+                    ],
+                    "marker": "d",
+                    "line_kws": {"markersize": 14, "markeredgecolor": "white"},
+                    "do_legend": True,
+                    # "legend_title": "Calibration points",
+                    "legend_ncol": 3,
+                    "linestyle": "",
+                }
+
+            # define figure and axes here to have custom layout
+            fs = plt.rcParams["figure.figsize"]
+            self.figs[fig_id_RB_on_IQ], axs = plt.subplots(
+                ncols=2, figsize=(fs[0] * 2.0, fs[1])
+            )
+            self.figs[fig_id_RB_on_IQ].patch.set_alpha(0)
+            self.axs[fig_id_RB_on_IQ] = axs[0]
+            fig_id_RB_on_IQ_det = fig_id_RB_on_IQ + "_detailed"
+            self.axs[fig_id_RB_on_IQ_det] = axs[1]
+            axs[1].yaxis.set_label_position("right")
+            axs[1].yaxis.tick_right()
+
+            close_triangle = list(range(num_cal_pnts)) + [0]
+            self.plot_dicts[fig_id_RB_on_IQ] = {
+                "ax_id": fig_id_RB_on_IQ,
+                "plotfn": self.plot_line,
+                "xvals": pdd["cal_triangle"].T[0][close_triangle],
+                "yvals": pdd["cal_triangle"].T[1][close_triangle],
+                "xlabel": val_names[self.rates_I_quad_ch_idx],
+                "xunit": rdd["value_units"][0],
+                "ylabel": val_names[self.rates_Q_quad_ch_idx],
+                "yunit": rdd["value_units"][1],
+                "title": rdd["timestamp_string"]
+                + "\n"
+                + rdd["measurementstring"]
+                + " hexbin plot",
+                "marker": "",
+                "color": "black",
+                "line_kws": {"linewidth": 1},
+                "setlabel": "NONE",
+            }
+
+            self.plot_dicts[fig_id_RB_on_IQ_det] = {
+                "ax_id": fig_id_RB_on_IQ_det,
+                "plotfn": self.plot_line,
+                "xvals": pdd["cal_triangle"].T[0][:2],
+                "yvals": pdd["cal_triangle"].T[1][:2],
+                "xlabel": val_names[self.rates_I_quad_ch_idx],
+                "xunit": rdd["value_units"][0],
+                "ylabel": val_names[self.rates_Q_quad_ch_idx],
+                "yunit": rdd["value_units"][1],
+                "title": r"Detailed view",
+                "marker": "",
+                "color": "black",
+                "line_kws": {"linewidth": 1},
+                "setlabel": "NONE",
+            }
+
+            val_name_Q = rdd["value_names"][self.rates_Q_quad_ch_idx]
+            rb_SI = (pdd["SI"][val_name_I], pdd["SI"][val_name_Q])
+            rb_SX = (pdd["SX"][val_name_I], pdd["SX"][val_name_Q])
+            rb_SI_corr = (pdd["SI_corr"][val_name_I], pdd["SI_corr"][val_name_Q])
+            rb_SX_corr = (pdd["SX_corr"][val_name_I], pdd["SX_corr"][val_name_Q])
+
+            sigs = (rb_SI, rb_SI_corr, rb_SX, rb_SX_corr)
+            ids = ("SI", "SI_corr", "SX", "SX_corr")
+            labels = ("SI", "SI corrected", "SX", "SX corrected")
+
+            cols = ["royalblue", "dodgerblue", "red", "salmon"]
+            mks = [8, 4, 8, 4]
+            for ax_id, do_legend in zip(
+                [fig_id_RB_on_IQ, fig_id_RB_on_IQ_det], [True, False]
+            ):
+                for S, col, mk_size, ID, label in zip(sigs, cols, mks, ids, labels):
+                    self.plot_dicts[ax_id + "_{}".format(ID)] = {
+                        "plotfn": self.plot_line,
+                        "ax_id": ax_id,
+                        "xvals": S[0],
+                        "yvals": S[1],
+                        "setlabel": label,
+                        "marker": "o",
+                        "line_kws": {"markersize": mk_size},
+                        "color": col,
+                        "do_legend": do_legend,
+                        "legend_ncol": 3,
+                        "linestyle": "",
+                    }
+
+            for idx in [self.rates_I_quad_ch_idx, self.rates_Q_quad_ch_idx]:
+                val_name = rdd["value_names"][idx]
+                self.plot_dicts["raw_RB_curve_data_{}".format(val_name)] = {
+                    "plotfn": plot_raw_RB_curve,
+                    "ncl": pdd["ncl"],
+                    "SI": pdd["SI"][val_name],
+                    "SX": pdd["SX"][val_name],
+                    "V0": pdd["V0"][val_name],
+                    "V1": pdd["V1"][val_name],
+                    "V2": pdd["V2"][val_name],
+                    "xlabel": "Number of Cliffords",
+                    "xunit": "#",
+                    "ylabel": val_name,
+                    "yunit": pdd["value_units"][idx],
+                    "title": pdd["timestamp_string"] + "\n" + pdd["measurementstring"],
+                }
+
+            self.plot_dicts["rb_rate_eq_pops_{}".format(val_name_I)] = {
+                "plotfn": plot_populations_RB_curve,
                 "ncl": pdd["ncl"],
-                "SI": pdd["SI"][val_name],
-                "SX": pdd["SX"][val_name],
-                "V0": pdd["V0"][val_name],
-                "V1": pdd["V1"][val_name],
-                "V2": pdd["V2"][val_name],
-                "xlabel": "Number of Cliffords",
-                "xunit": "#",
-                "ylabel": val_name,
-                "yunit": pdd["value_units"][idx],
+                "P0": pdd["P0"][val_name_I],
+                "P1": pdd["P1"][val_name_I],
+                "P2": pdd["P2"][val_name_I],
+                "title": pdd["timestamp_string"]
+                + "\n"
+                + "Population using rate equations ch{}".format(val_name_I),
+            }
+
+            # [2020-07-09 Victor] This is not being used for anything...
+            # self.plot_dicts["logres_decision_bound"] = {
+            #     "plotfn": plot_classifier_decission_boundary,
+            #     "classifier": pdd["classifier"],
+            #     "shots_0": (
+            #         pdd["cal_pts_zero"][val_names[ch_idx_0]],
+            #         pdd["cal_pts_zero"][val_names[ch_idx_1]],
+            #     ),
+            #     "shots_1": (
+            #         pdd["cal_pts_one"][val_names[ch_idx_0]],
+            #         pdd["cal_pts_one"][val_names[ch_idx_1]],
+            #     ),
+            #     "shots_2": (
+            #         pdd["cal_pts_two"][val_names[ch_idx_0]],
+            #         pdd["cal_pts_two"][val_names[ch_idx_1]],
+            #     ),
+            #     "xlabel": val_names[ch_idx_0],
+            #     "xunit": pdd["value_units"][0],
+            #     "ylabel": val_names[ch_idx_1],
+            #     "yunit": pdd["value_units"][1],
+            #     "title": pdd["timestamp_string"]
+            #     + "\n"
+            #     + pdd["measurementstring"]
+            #     + " Decision boundary",
+            #     "plotsize": (fs[0] * 1.5, fs[1]),
+            # }
+
+        # #####################################################################
+        # End of plots for single qubit only
+        # #####################################################################
+
+        if self.do_fitting:
+            # define figure and axes here to have custom layout
+            rb_fig_id = "main_rb_decay_{}".format(fit_input_tag)
+            leak_fig_id = "leak_decay_{}".format(fit_input_tag)
+            self.figs[rb_fig_id], axs = plt.subplots(
+                nrows=2, sharex=True, gridspec_kw={"height_ratios": (2, 1)}
+            )
+            self.figs[rb_fig_id].patch.set_alpha(0)
+            self.axs[rb_fig_id] = axs[0]
+            self.axs[leak_fig_id] = axs[1]
+            self.plot_dicts[rb_fig_id] = {
+                "plotfn": plot_rb_decay_woods_gambetta,
+                "ncl": pdd["ncl"],
+                "M0": pdd["M0"][fit_input_tag],
+                "X1": pdd["X1"][fit_input_tag],
+                "ax1": axs[1],
                 "title": pdd["timestamp_string"] + "\n" + pdd["measurementstring"],
             }
 
-        self.plot_dicts["rb_rate_eq_pops_{}".format(val_name_I)] = {
-            "plotfn": plot_populations_RB_curve,
-            "ncl": pdd["ncl"],
-            "P0": pdd["P0"][val_name_I],
-            "P1": pdd["P1"][val_name_I],
-            "P2": pdd["P2"][val_name_I],
-            "title": pdd["timestamp_string"]
-            + "\n"
-            + "Population using rate equations ch{}".format(val_name_I),
-        }
-
-        # [2020-07-09 Victor] This is not being used for anything...
-        # self.plot_dicts["logres_decision_bound"] = {
-        #     "plotfn": plot_classifier_decission_boundary,
-        #     "classifier": self.proc_data_dict["classifier"],
-        #     "shots_0": (
-        #         self.proc_data_dict["cal_pts_zero"][val_names[ch_idx_0]],
-        #         self.proc_data_dict["cal_pts_zero"][val_names[ch_idx_1]],
-        #     ),
-        #     "shots_1": (
-        #         self.proc_data_dict["cal_pts_one"][val_names[ch_idx_0]],
-        #         self.proc_data_dict["cal_pts_one"][val_names[ch_idx_1]],
-        #     ),
-        #     "shots_2": (
-        #         self.proc_data_dict["cal_pts_two"][val_names[ch_idx_0]],
-        #         self.proc_data_dict["cal_pts_two"][val_names[ch_idx_1]],
-        #     ),
-        #     "xlabel": val_names[ch_idx_0],
-        #     "xunit": self.proc_data_dict["value_units"][0],
-        #     "ylabel": val_names[ch_idx_1],
-        #     "yunit": self.proc_data_dict["value_units"][1],
-        #     "title": self.proc_data_dict["timestamp_string"]
-        #     + "\n"
-        #     + self.proc_data_dict["measurementstring"]
-        #     + " Decision boundary",
-        #     "plotsize": (fs[0] * 1.5, fs[1]),
-        # }
-
-        # define figure and axes here to have custom layout
-        rb_fig_id = "main_rb_decay_{}".format(val_name_I)
-        leak_fig_id = "leak_decay_{}".format(val_name_I)
-        self.figs[rb_fig_id], axs = plt.subplots(
-            nrows=2, sharex=True, gridspec_kw={"height_ratios": (2, 1)}
-        )
-        self.figs[rb_fig_id].patch.set_alpha(0)
-        self.axs[rb_fig_id] = axs[0]
-        self.axs[leak_fig_id] = axs[1]
-        self.plot_dicts[rb_fig_id] = {
-            "plotfn": plot_rb_decay_woods_gambetta,
-            "ncl": self.proc_data_dict["ncl"],
-            "M0": self.proc_data_dict["M0"][val_name_I],
-            "X1": self.proc_data_dict["X1"][val_name_I],
-            "ax1": axs[1],
-            "title": self.proc_data_dict["timestamp_string"]
-            + "\n"
-            + self.proc_data_dict["measurementstring"],
-        }
-
-        if self.do_fitting:
             self.plot_dicts["fit_leak"] = {
                 "plotfn": self.plot_fit,
                 "ax_id": leak_fig_id,
-                "fit_res": self.fit_res["leakage_decay_" + val_name_I],
+                "fit_res": self.fit_res["leakage_decay_" + fit_input_tag],
                 "setlabel": "Leakage fit",
                 "do_legend": True,
                 "color": "C2",
@@ -652,14 +681,14 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts["fit_rb_simple"] = {
                 "plotfn": self.plot_fit,
                 "ax_id": rb_fig_id,
-                "fit_res": self.fit_res["rb_decay_simple_" + val_name_I],
+                "fit_res": self.fit_res["rb_decay_simple_" + fit_input_tag],
                 "setlabel": "Simple RB fit",
                 "do_legend": True,
             }
             self.plot_dicts["fit_rb"] = {
                 "plotfn": self.plot_fit,
                 "ax_id": rb_fig_id,
-                "fit_res": self.fit_res["rb_decay_" + val_name_I],
+                "fit_res": self.fit_res["rb_decay_" + fit_input_tag],
                 "setlabel": "Full RB fit",
                 "do_legend": True,
                 "color": "C2",
@@ -667,7 +696,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
             self.plot_dicts["rb_text"] = {
                 "plotfn": self.plot_text,
-                "text_string": self.proc_data_dict["rb_msg"],
+                "text_string": pdd["rb_msg_" + fit_input_tag],
                 "xpos": 1.05,
                 "ypos": 0.6,
                 "ax_id": rb_fig_id,
@@ -687,7 +716,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         auto=True,
         close_figs=True,
         classification_method="rates",
-        rates_ch_idxs: list = [2, 0],
+        rates_ch_I_quad_idxs: list = [0, 2],
         ignore_f_cal_pts: bool = False,
         extract_only: bool = False,
     ):
@@ -703,10 +732,14 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             extract_only=extract_only,
         )
         self.d1 = 4
+        self.rates_ch_I_quad_idxs = rates_ch_I_quad_idxs
         # used to determine how to determine 2nd excited state population
         self.classification_method = classification_method
-        self.rates_ch_idxs = rates_ch_idxs
-        self.ignore_f_cal_pts = ignore_f_cal_pts
+
+        # The interleaved analysis does a bit of nasty things and this becomes
+        # necessary
+        self.overwrite_qois = True
+
         if auto:
             self.run_analysis()
 
@@ -716,338 +749,85 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         """
         self.raw_data_dict = OrderedDict()
 
-        self.timestamps = a_tools.get_timestamps_in_range(
-            self.t_start, self.t_stop, label=self.labels
+        # We run the single qubit analysis twice for each qubit
+        # It will generate all the quantities we want for each qubit
+
+        cal_2Q = ["00", "01", "10", "11", "02", "20", "22"]
+        rates_I_quad_ch_idx = self.rates_ch_I_quad_idxs[0]
+        cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
+
+        a_q0 = RandomizedBenchmarking_SingleQubit_Analysis(
+            label=self.labels[0],
+            rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+            cal_pnts_in_dset=cal_1Q,
+            do_fitting=False,
         )
 
-        a = ma_old.MeasurementAnalysis(
-            timestamp=self.timestamps[0], auto=False, close_file=False
+        rates_I_quad_ch_idx = self.rates_ch_I_quad_idxs[1]
+        cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
+        a_q1 = RandomizedBenchmarking_SingleQubit_Analysis(
+            label=self.labels[0],
+            rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+            cal_pnts_in_dset=cal_1Q,
+            do_fitting=False,
         )
-        a.get_naming_and_values()
 
-        if "bins" in a.data_file["Experimental Data"]["Experimental Metadata"].keys():
-            bins = a.data_file["Experimental Data"]["Experimental Metadata"][
-                "bins"
-            ].value
-            self.raw_data_dict["ncl"] = bins[:-7:2]  # 7 calibration points
-            self.raw_data_dict["bins"] = bins
+        # Upwards and downwards hierarchical compatibilities
+        rdd = self.raw_data_dict
+        self.timestamps = a_q0.timestamps
+        rdd["analyses"] = {"q0": a_q0, "q1": a_q1}
 
-            self.raw_data_dict["value_names"] = a.value_names
-            self.raw_data_dict["value_units"] = a.value_units
-            self.raw_data_dict["measurementstring"] = a.measurementstring
-            self.raw_data_dict["timestamp_string"] = a.timestamp_string
-
-            self.raw_data_dict["binned_vals"] = OrderedDict()
-            self.raw_data_dict["cal_pts_x0"] = OrderedDict()
-            self.raw_data_dict["cal_pts_x1"] = OrderedDict()
-            self.raw_data_dict["cal_pts_x2"] = OrderedDict()
-            self.raw_data_dict["cal_pts_0x"] = OrderedDict()
-            self.raw_data_dict["cal_pts_1x"] = OrderedDict()
-            self.raw_data_dict["cal_pts_2x"] = OrderedDict()
-
-            self.raw_data_dict["measured_values_I"] = OrderedDict()
-            self.raw_data_dict["measured_values_X"] = OrderedDict()
-
-            for i, val_name in enumerate(a.value_names):
-                invalid_idxs = np.where(
-                    (a.measured_values[0] == 0)
-                    & (a.measured_values[1] == 0)
-                    & (a.measured_values[2] == 0)
-                    & (a.measured_values[3] == 0)
-                )[0]
-                a.measured_values[:, invalid_idxs] = np.array(
-                    [[np.nan] * len(invalid_idxs)] * 4
-                )
-
-                binned_yvals = np.reshape(
-                    a.measured_values[i], (len(bins), -1), order="F"
-                )
-                self.raw_data_dict["binned_vals"][val_name] = binned_yvals
-
-                # 7 cal points:  [00, 01, 10, 11, 02, 20, 22]
-                #      col_idx:  [-7, -6, -5, -4, -3, -2, -1]
-                self.raw_data_dict["cal_pts_x0"][val_name] = binned_yvals[
-                    (-7, -5), :
-                ].flatten()
-                self.raw_data_dict["cal_pts_x1"][val_name] = binned_yvals[
-                    (-6, -4), :
-                ].flatten()
-                self.raw_data_dict["cal_pts_x2"][val_name] = binned_yvals[
-                    (-3, -1), :
-                ].flatten()
-
-                self.raw_data_dict["cal_pts_0x"][val_name] = binned_yvals[
-                    (-7, -6), :
-                ].flatten()
-                self.raw_data_dict["cal_pts_1x"][val_name] = binned_yvals[
-                    (-5, -4), :
-                ].flatten()
-                self.raw_data_dict["cal_pts_2x"][val_name] = binned_yvals[
-                    (-2, -1), :
-                ].flatten()
-
-                self.raw_data_dict["measured_values_I"][val_name] = binned_yvals[
-                    :-7:2, :
-                ]
-                self.raw_data_dict["measured_values_X"][val_name] = binned_yvals[
-                    1:-7:2, :
-                ]
-
-        else:
-            bins = None
-
-        self.raw_data_dict["folder"] = a.folder
-        self.raw_data_dict["timestamps"] = self.timestamps
-        a.finish()  # closes data file
+        rdd["folder"] = a_q0.raw_data_dict["folder"]
+        rdd["timestamps"] = a_q0.raw_data_dict["timestamps"]
+        rdd["timestamp_string"] = a_q0.raw_data_dict["timestamp_string"]
+        rdd["measurementstring"] = a_q1.raw_data_dict["measurementstring"]
 
     def process_data(self):
-        self.proc_data_dict = deepcopy(self.raw_data_dict)
+        self.proc_data_dict = OrderedDict()
+        pdd = self.proc_data_dict
+        for key in ["M0", "X1"]:
+            # Keeping it compatible with 1Q on purpose
+            pdd[key] = OrderedDict()
 
-        for key in [
-            "Vx0",
-            "V0x",
-            "Vx1",
-            "V1x",
-            "Vx2",
-            "V2x",
-            "SI",
-            "SX",
-            "Px0",
-            "P0x",
-            "Px1",
-            "P1x",
-            "Px2",
-            "P2x",
-            "M_inv_q0",
-            "M_inv_q1",
-        ]:
-            self.proc_data_dict[key] = OrderedDict()
+        rdd = self.raw_data_dict
 
-        for val_name in self.raw_data_dict["value_names"]:
-            for idx in ["x0", "x1", "x2", "0x", "1x", "2x"]:
-                self.proc_data_dict["V{}".format(idx)][val_name] = np.nanmean(
-                    self.raw_data_dict["cal_pts_{}".format(idx)][val_name]
-                )
-            SI = np.nanmean(self.raw_data_dict["measured_values_I"][val_name], axis=1)
-            SX = np.nanmean(self.raw_data_dict["measured_values_X"][val_name], axis=1)
-            self.proc_data_dict["SI"][val_name] = SI
-            self.proc_data_dict["SX"][val_name] = SX
+        pdd["folder"] = rdd["folder"]
+        pdd["timestamps"] = rdd["timestamps"]
+        pdd["timestamp_string"] = rdd["timestamp_string"]
+        pdd["measurementstring"] = rdd["measurementstring"]
 
-            Px0, Px1, Px2, M_inv_q0 = populations_using_rate_equations(
-                SI,
-                SX,
-                self.proc_data_dict["Vx0"][val_name],
-                self.proc_data_dict["Vx1"][val_name],
-                self.proc_data_dict["Vx2"][val_name],
-            )
-            P0x, P1x, P2x, M_inv_q1 = populations_using_rate_equations(
-                SI,
-                SX,
-                self.proc_data_dict["V0x"][val_name],
-                self.proc_data_dict["V1x"][val_name],
-                self.proc_data_dict["V2x"][val_name],
-            )
-
-            for key, val in [
-                ("Px0", Px0),
-                ("Px1", Px1),
-                ("Px2", Px2),
-                ("P0x", P0x),
-                ("P1x", P1x),
-                ("P2x", P2x),
-                ("M_inv_q0", M_inv_q0),
-                ("M_inv_q1", M_inv_q1),
-            ]:
-                self.proc_data_dict[key][val_name] = val
+        val_names = rdd["analyses"]["q0"].raw_data_dict["value_names"]
 
         if self.classification_method == "rates":
-            val_name_q0 = self.raw_data_dict["value_names"][self.rates_ch_idxs[0]]
-            val_name_q1 = self.raw_data_dict["value_names"][self.rates_ch_idxs[1]]
+            val_name_q0 = val_names[self.rates_ch_I_quad_idxs[0]]
+            val_name_q1 = val_names[self.rates_ch_I_quad_idxs[1]]
 
-            self.proc_data_dict["M0"] = (
-                self.proc_data_dict["Px0"][val_name_q0]
-                * self.proc_data_dict["P0x"][val_name_q1]
+            fit_input_tag = "2Q"
+            self.proc_data_dict["M0"][fit_input_tag] = (
+                rdd["analyses"]["q0"].proc_data_dict["P0"][val_name_q0]
+                * rdd["analyses"]["q1"].proc_data_dict["P0"][val_name_q1]
             )
 
-            self.proc_data_dict["X1"] = (
+            self.proc_data_dict["X1"][fit_input_tag] = (
                 1
-                - self.proc_data_dict["Px2"][val_name_q0]
-                - self.proc_data_dict["P2x"][val_name_q1]
+                - rdd["analyses"]["q0"].proc_data_dict["P2"][val_name_q0]
+                - rdd["analyses"]["q1"].proc_data_dict["P2"][val_name_q1]
             )
         else:
             raise NotImplementedError()
 
+        # Required for the plotting in super()
+        pdd["ncl"] = rdd["analyses"]["q0"].raw_data_dict["ncl"]
+
+    def run_fitting(self):
+        # Call the prepare plots of the class above
+        fit_input_tag = "2Q"
+        super().run_fitting(fit_input_tag=fit_input_tag)
+
     def prepare_plots(self):
-        val_names = self.proc_data_dict["value_names"]
-
-        for i, val_name in enumerate(val_names):
-            self.plot_dicts["binned_data_{}".format(val_name)] = {
-                "plotfn": self.plot_line,
-                "xvals": self.proc_data_dict["bins"],
-                "yvals": np.nanmean(
-                    self.proc_data_dict["binned_vals"][val_name], axis=1
-                ),
-                "yerr": sem(self.proc_data_dict["binned_vals"][val_name], axis=1),
-                "xlabel": "Number of Cliffords",
-                "xunit": "#",
-                "ylabel": val_name,
-                "yunit": self.proc_data_dict["value_units"][i],
-                "title": self.proc_data_dict["timestamp_string"]
-                + "\n"
-                + self.proc_data_dict["measurementstring"],
-            }
-        fs = plt.rcParams["figure.figsize"]
-
-        # define figure and axes here to have custom layout
-        self.figs["rb_populations_decay"], axs = plt.subplots(
-            ncols=2, sharex=True, sharey=True, figsize=(fs[0] * 1.5, fs[1])
-        )
-        self.figs["rb_populations_decay"].suptitle(
-            self.proc_data_dict["timestamp_string"]
-            + "\n"
-            + "Population using rate equations",
-            y=1.05,
-        )
-        self.figs["rb_populations_decay"].patch.set_alpha(0)
-        self.axs["rb_pops_q0"] = axs[0]
-        self.axs["rb_pops_q1"] = axs[1]
-
-        val_name_q0 = val_names[self.rates_ch_idxs[0]]
-        val_name_q1 = val_names[self.rates_ch_idxs[1]]
-        self.plot_dicts["rb_rate_eq_pops_{}".format(val_name_q0)] = {
-            "plotfn": plot_populations_RB_curve,
-            "ncl": self.proc_data_dict["ncl"],
-            "P0": self.proc_data_dict["Px0"][val_name_q0],
-            "P1": self.proc_data_dict["Px1"][val_name_q0],
-            "P2": self.proc_data_dict["Px2"][val_name_q0],
-            "title": " {}".format(val_name_q0),
-            "ax_id": "rb_pops_q0",
-        }
-
-        self.plot_dicts["rb_rate_eq_pops_{}".format(val_name_q1)] = {
-            "plotfn": plot_populations_RB_curve,
-            "ncl": self.proc_data_dict["ncl"],
-            "P0": self.proc_data_dict["P0x"][val_name_q1],
-            "P1": self.proc_data_dict["P1x"][val_name_q1],
-            "P2": self.proc_data_dict["P2x"][val_name_q1],
-            "title": " {}".format(val_name_q1),
-            "ax_id": "rb_pops_q1",
-        }
-
-        # This exists for when the order of RO of qubits is
-        # different than expected.
-        if self.rates_ch_idxs[1] > 0:
-            v0_q0 = val_names[0]
-            v1_q0 = val_names[1]
-            v0_q1 = val_names[2]
-            v1_q1 = val_names[3]
-        else:
-            v0_q0 = val_names[2]
-            v1_q0 = val_names[3]
-            v0_q1 = val_names[0]
-            v1_q1 = val_names[1]
-
-        self.plot_dicts["cal_points_hexbin_q0"] = {
-            "plotfn": plot_cal_points_hexbin,
-            "shots_0": (
-                self.proc_data_dict["cal_pts_x0"][v0_q0],
-                self.proc_data_dict["cal_pts_x0"][v1_q0],
-            ),
-            "shots_1": (
-                self.proc_data_dict["cal_pts_x1"][v0_q0],
-                self.proc_data_dict["cal_pts_x1"][v1_q0],
-            ),
-            "shots_2": (
-                self.proc_data_dict["cal_pts_x2"][v0_q0],
-                self.proc_data_dict["cal_pts_x2"][v1_q0],
-            ),
-            "xlabel": v0_q0,
-            "xunit": self.proc_data_dict["value_units"][0],
-            "ylabel": v1_q0,
-            "yunit": self.proc_data_dict["value_units"][1],
-            "common_clims": False,
-            "title": self.proc_data_dict["timestamp_string"]
-            + "\n"
-            + self.proc_data_dict["measurementstring"]
-            + " hexbin plot q0",
-            "plotsize": (fs[0] * 1.5, fs[1]),
-        }
-        self.plot_dicts["cal_points_hexbin_q1"] = {
-            "plotfn": plot_cal_points_hexbin,
-            "shots_0": (
-                self.proc_data_dict["cal_pts_0x"][v0_q1],
-                self.proc_data_dict["cal_pts_0x"][v1_q1],
-            ),
-            "shots_1": (
-                self.proc_data_dict["cal_pts_1x"][v0_q1],
-                self.proc_data_dict["cal_pts_1x"][v1_q1],
-            ),
-            "shots_2": (
-                self.proc_data_dict["cal_pts_2x"][v0_q1],
-                self.proc_data_dict["cal_pts_2x"][v1_q1],
-            ),
-            "xlabel": v0_q1,
-            "xunit": self.proc_data_dict["value_units"][2],
-            "ylabel": v1_q1,
-            "yunit": self.proc_data_dict["value_units"][3],
-            "common_clims": False,
-            "title": self.proc_data_dict["timestamp_string"]
-            + "\n"
-            + self.proc_data_dict["measurementstring"]
-            + " hexbin plot q1",
-            "plotsize": (fs[0] * 1.5, fs[1]),
-        }
-
-        # define figure and axes here to have custom layout
-        self.figs["main_rb_decay"], axs = plt.subplots(
-            nrows=2, sharex=True, gridspec_kw={"height_ratios": (2, 1)}
-        )
-        self.figs["main_rb_decay"].patch.set_alpha(0)
-        self.axs["main_rb_decay"] = axs[0]
-        self.axs["leak_decay"] = axs[1]
-        self.plot_dicts["main_rb_decay"] = {
-            "plotfn": plot_rb_decay_woods_gambetta,
-            "ncl": self.proc_data_dict["ncl"],
-            "M0": self.proc_data_dict["M0"],
-            "X1": self.proc_data_dict["X1"],
-            "ax1": axs[1],
-            "title": self.proc_data_dict["timestamp_string"]
-            + "\n"
-            + self.proc_data_dict["measurementstring"],
-        }
-
-        self.plot_dicts["fit_leak"] = {
-            "plotfn": self.plot_fit,
-            "ax_id": "leak_decay",
-            "fit_res": self.fit_res["leakage_decay"],
-            "setlabel": "Leakage fit",
-            "do_legend": True,
-            "color": "C2",
-        }
-        self.plot_dicts["fit_rb_simple"] = {
-            "plotfn": self.plot_fit,
-            "ax_id": "main_rb_decay",
-            "fit_res": self.fit_res["rb_decay_simple"],
-            "setlabel": "Simple RB fit",
-            "do_legend": True,
-        }
-        self.plot_dicts["fit_rb"] = {
-            "plotfn": self.plot_fit,
-            "ax_id": "main_rb_decay",
-            "fit_res": self.fit_res["rb_decay"],
-            "setlabel": "Full RB fit",
-            "do_legend": True,
-            "color": "C2",
-        }
-
-        self.plot_dicts["rb_text"] = {
-            "plotfn": self.plot_text,
-            "text_string": self.proc_data_dict["rb_msg"],
-            "xpos": 1.05,
-            "ypos": 0.6,
-            "ax_id": "main_rb_decay",
-            "horizontalalignment": "left",
-        }
+        # Call the prepare plots of the class above
+        fit_input_tag = "2Q"
+        super().prepare_plots(fit_input_tag=fit_input_tag)
 
 
 class UnitarityBenchmarking_TwoQubit_Analysis(
@@ -1071,6 +851,10 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
 
         This analysis is based on
         """
+        log.error(
+            "[2020-07-12 Victor] This analysis requires to be "
+            "upgraded to the new version of the 1Q-RB analysis."
+        )
         if nseeds is None:
             raise TypeError("You must specify number of seeds!")
         self.nseeds = nseeds
@@ -1660,7 +1444,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         options_dict: dict = {},
         auto=True,
         close_figs=True,
-        ch_idxs: list = [2, 0],
+        rates_ch_I_quad_idxs: list = [0, 2],
         ignore_f_cal_pts: bool = False,
         plot_label="",
     ):
@@ -1671,7 +1455,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         self.ts_int = ts_int
         self.label_base = label_base
         self.label_int = label_int
-        self.ch_idxs = ch_idxs
+        self.rates_ch_I_quad_idxs = rates_ch_I_quad_idxs
         self.options_dict = options_dict
         self.close_figs = close_figs
         self.ignore_f_cal_pts = ignore_f_cal_pts
@@ -1687,7 +1471,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             options_dict=self.options_dict,
             auto=True,
             close_figs=self.close_figs,
-            rates_ch_idxs=self.ch_idxs,
+            rates_ch_I_quad_idxs=self.rates_ch_I_quad_idxs,
             extract_only=True,
             ignore_f_cal_pts=self.ignore_f_cal_pts,
         )
@@ -1698,7 +1482,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             options_dict=self.options_dict,
             auto=True,
             close_figs=self.close_figs,
-            rates_ch_idxs=self.ch_idxs,
+            rates_ch_I_quad_idxs=self.rates_ch_I_quad_idxs,
             extract_only=True,
             ignore_f_cal_pts=self.ignore_f_cal_pts,
         )
@@ -1708,8 +1492,8 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         self.timestamps = [a_int.timestamps[0], a_base.timestamps[0]]
 
         self.raw_data_dict["timestamps"] = self.timestamps
-        self.raw_data_dict["timestamp_string"] = a_int.raw_data_dict["timestamp_string"]
-        self.raw_data_dict["folder"] = a_int.raw_data_dict["folder"]
+        self.raw_data_dict["timestamp_string"] = a_int.proc_data_dict["timestamp_string"]
+        self.raw_data_dict["folder"] = a_int.proc_data_dict["folder"]
         self.raw_data_dict["analyses"] = {"base": a_base, "int": a_int}
 
     def process_data(self):
@@ -1724,23 +1508,28 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             "quantities_of_interest"
         ]
 
+        self.overwrite_qois = True
         qoi.update({k + "_ref": v for k, v in qoi_base.items()})
         qoi.update({k + "_int": v for k, v in qoi_int.items()})
 
         qoi["eps_CZ_X1"] = interleaved_error(
-            eps_int=qoi_int["eps_X1"], eps_base=qoi_base["eps_X1"]
+            eps_int=qoi_int["eps_X1_2Q"], eps_base=qoi_base["eps_X1_2Q"]
         )
         qoi["eps_CZ_simple"] = interleaved_error(
-            eps_int=qoi_int["eps_simple"], eps_base=qoi_base["eps_simple"]
+            eps_int=qoi_int["eps_simple_2Q"], eps_base=qoi_base["eps_simple_2Q"]
         )
-        qoi["L1_CZ"] = interleaved_error(eps_int=qoi_int["L1"], eps_base=qoi_base["L1"])
+        qoi["L1_CZ"] = interleaved_error(
+            eps_int=qoi_int["L1_2Q"], eps_base=qoi_base["L1_2Q"]
+        )
 
         # This is the naive estimate, when all observed error is assigned
         # to the CZ gate
         try:
-            qoi["L1_CZ_naive"] = 1 - (1 - qoi_base["L1"]) ** (1 / 1.5)
-            qoi["eps_CZ_simple_naive"] = 1 - (1 - qoi_base["eps_simple"]) ** (1 / 1.5)
-            qoi["eps_CZ_X1_naive"] = 1 - (1 - qoi_base["eps_X1"]) ** (1 / 1.5)
+            qoi["L1_CZ_naive"] = 1 - (1 - qoi_base["L1_2Q"]) ** (1 / 1.5)
+            qoi["eps_CZ_simple_naive"] = 1 - (1 - qoi_base["eps_simple_2Q"]) ** (
+                1 / 1.5
+            )
+            qoi["eps_CZ_X1_naive"] = 1 - (1 - qoi_base["eps_X1_2Q"]) ** (1 / 1.5)
         except ValueError:
             # prevents the analysis from crashing if the fits are bad.
             qoi["L1_CZ_naive"] = ufloat(np.NaN, np.NaN)
@@ -1748,6 +1537,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             qoi["eps_CZ_X1_naive"] = ufloat(np.NaN, np.NaN)
 
     def prepare_plots(self):
+        fit_tag = "2Q"
         dd_base = self.raw_data_dict["analyses"]["base"].proc_data_dict
         dd_int = self.raw_data_dict["analyses"]["int"].proc_data_dict
 
@@ -1763,16 +1553,16 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         self.plot_dicts["main_irb_decay"] = {
             "plotfn": plot_irb_decay_woods_gambetta,
             "ncl": dd_base["ncl"],
-            "M0_ref": dd_base["M0"],
-            "M0_int": dd_int["M0"],
-            "X1_ref": dd_base["X1"],
-            "X1_int": dd_int["X1"],
-            "fr_M0_ref": fr_base["rb_decay"],
-            "fr_M0_int": fr_int["rb_decay"],
-            "fr_M0_simple_ref": fr_base["rb_decay_simple"],
-            "fr_M0_simple_int": fr_int["rb_decay_simple"],
-            "fr_X1_ref": fr_base["leakage_decay"],
-            "fr_X1_int": fr_int["leakage_decay"],
+            "M0_ref": dd_base["M0"][fit_tag],
+            "M0_int": dd_int["M0"][fit_tag],
+            "X1_ref": dd_base["X1"][fit_tag],
+            "X1_int": dd_int["X1"][fit_tag],
+            "fr_M0_ref": fr_base["rb_decay_{}".format(fit_tag)],
+            "fr_M0_int": fr_int["rb_decay_{}".format(fit_tag)],
+            "fr_M0_simple_ref": fr_base["rb_decay_simple_{}".format(fit_tag)],
+            "fr_M0_simple_int": fr_int["rb_decay_simple_{}".format(fit_tag)],
+            "fr_X1_ref": fr_base["leakage_decay_{}".format(fit_tag)],
+            "fr_X1_int": fr_int["leakage_decay_{}".format(fit_tag)],
             "qoi": self.proc_data_dict["quantities_of_interest"],
             "ax1": axs[1],
             "title": "{}\n{} - {}".format(
@@ -2417,7 +2207,7 @@ def plot_irb_decay_woods_gambetta(
     title="",
     **kw
 ):
-
+    fit_tag = "2Q"
     ncl_fine = np.linspace(ncl[0], ncl[-1], 1001)
 
     ax.plot(ncl, M0_ref, marker="o", linestyle="", c="C0", label="Reference")
@@ -2447,8 +2237,16 @@ def plot_irb_decay_woods_gambetta(
     collabels = [r"$\epsilon_{\chi1}~(\%)$", r"$\epsilon~(\%)$", r"$L_1~(\%)$"]
     rowlabels = ["Ref. curve", "Int. curve", "CZ-int.", "CZ-naive"]
     table_data = [
-        [qoi["eps_X1_ref"] * 100, qoi["eps_simple_ref"] * 100, qoi["L1_ref"] * 100],
-        [qoi["eps_X1_int"] * 100, qoi["eps_simple_int"] * 100, qoi["L1_int"] * 100],
+        [
+            qoi["eps_X1_{}_ref".format(fit_tag)] * 100,
+            qoi["eps_simple_{}_ref".format(fit_tag)] * 100,
+            qoi["L1_{}_ref".format(fit_tag)] * 100,
+        ],
+        [
+            qoi["eps_X1_{}_int".format(fit_tag)] * 100,
+            qoi["eps_simple_{}_int".format(fit_tag)] * 100,
+            qoi["L1_{}_int".format(fit_tag)] * 100,
+        ],
         [qoi["eps_CZ_X1"] * 100, qoi["eps_CZ_simple"] * 100, qoi["L1_CZ"] * 100],
         [
             qoi["eps_CZ_X1_naive"] * 100,

@@ -735,18 +735,25 @@ class BaseDataAnalysis(object):
                 try:
                     qois_group = analysis_group.create_group(qoi_name)
                 except ValueError:
-                    # Delete the old group and create a new group (overwrite).
-                    # del analysis_group[qoi_name]
-                    # qois_group = analysis_group.create_group(qoi_name)
+                    # Keep the behavior for legacy reasons
+                    overwrite_qois = getattr(self, "overwrite_qois", True)
+                    if overwrite_qois:
+                        # Delete the old group and create a new group (overwrite).
+                        # Some analysis do some nasty things like coping all the
+                        # `qois` and renaming them...
+                        # In these case this is needed to still clear the `qois` group
+                        del analysis_group[qoi_name]
+                        qois_group = analysis_group.create_group(qoi_name)
+                    else:
+                        # [2020-07-11 Victor] some analysis can be called several
+                        # times on the same datafile, e.g. single qubit RB
+                        # the `qois` group should no be
+                        # removed! Line above commented out
+                        qois_group = analysis_group[qoi_name]
 
-                    # [2020-07-11 Victor] some analysis can be called several
-                    # time on the same datafile, the `qois` group should no be
-                    # removed! Line above commented out
-                    qois_group = analysis_group[qoi_name]
-
-                d = copy.deepcopy(self.proc_data_dict['quantities_of_interest'])
-                d = self._convert_dict_rec(d)
-                write_dict_to_hdf5(d, entry_point=qois_group)
+                write_dict_to_hdf5(
+                    self.proc_data_dict['quantities_of_interest'],
+                    entry_point=qois_group)
 
     @staticmethod
     def _convert_dict_rec(obj):
