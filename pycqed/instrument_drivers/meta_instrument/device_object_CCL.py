@@ -3998,6 +3998,11 @@ class DeviceCCL(Instrument):
                 rb_tasks=rb_tasks_CZ_park,
             )
 
+            ma2.InterleavedRandomizedBenchmarkingParkingAnalysis(
+                label_base="icl[None]",
+                label_int="icl[200000]"
+            )
+
             return rb_tasks_next
 
         if recompile or recompile == "as needed":
@@ -4042,6 +4047,11 @@ class DeviceCCL(Instrument):
                 recompile=recompile,
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds
+            )
+
+            ma2.InterleavedRandomizedBenchmarkingParkingAnalysis(
+                label_base="icl[None]",
+                label_int="icl[200000]"
             )
 
     def measure_single_qubit_randomized_benchmarking_parking(
@@ -4214,12 +4224,12 @@ class DeviceCCL(Instrument):
         # use that in the analysis instead of being dependent on the
         # measurement for those parameters
         rates_I_quad_ch_idx = -2
-        cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
+        cal_pnts_in_dset = np.repeat(["0", "1", "2"], 2)
         MC.run(label, exp_metadata={
             'bins': sweep_points,
             "rates_I_quad_ch_idx": rates_I_quad_ch_idx,
             "cal_pnts_in_dset": list(cal_pnts_in_dset)  # needs to be list to save
-            })
+        })
 
         a_q2 = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
             label=label,

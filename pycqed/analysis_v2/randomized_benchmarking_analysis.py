@@ -715,7 +715,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         auto=True,
         close_figs=True,
         classification_method="rates",
-        rates_ch_I_quad_idxs: list = [0, 2],
+        rates_I_quad_ch_idxs: list = [0, 2],
         ignore_f_cal_pts: bool = False,
         extract_only: bool = False,
     ):
@@ -731,7 +731,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             extract_only=extract_only,
         )
         self.d1 = 4
-        self.rates_ch_I_quad_idxs = rates_ch_I_quad_idxs
+        self.rates_I_quad_ch_idxs = rates_I_quad_ch_idxs
         # used to determine how to determine 2nd excited state population
         self.classification_method = classification_method
 
@@ -752,7 +752,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         # It will generate all the quantities we want for each qubit
 
         cal_2Q = ["00", "01", "10", "11", "02", "20", "22"]
-        rates_I_quad_ch_idx = self.rates_ch_I_quad_idxs[0]
+        rates_I_quad_ch_idx = self.rates_I_quad_ch_idxs[0]
         cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
 
         a_q0 = RandomizedBenchmarking_SingleQubit_Analysis(
@@ -763,7 +763,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             extract_only=self.extract_only,
         )
 
-        rates_I_quad_ch_idx = self.rates_ch_I_quad_idxs[1]
+        rates_I_quad_ch_idx = self.rates_I_quad_ch_idxs[1]
         cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
         a_q1 = RandomizedBenchmarking_SingleQubit_Analysis(
             label=self.labels[0],
@@ -800,8 +800,8 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         val_names = rdd["analyses"]["q0"].raw_data_dict["value_names"]
 
         if self.classification_method == "rates":
-            val_name_q0 = val_names[self.rates_ch_I_quad_idxs[0]]
-            val_name_q1 = val_names[self.rates_ch_I_quad_idxs[1]]
+            val_name_q0 = val_names[self.rates_I_quad_ch_idxs[0]]
+            val_name_q1 = val_names[self.rates_I_quad_ch_idxs[1]]
 
             fit_input_tag = "2Q"
             self.proc_data_dict["M0"][fit_input_tag] = (
@@ -1426,6 +1426,8 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
 class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
     """
     Analysis for two qubit interleaved randomized benchmarking of a CZ gate.
+    [2020-07-12 Victor] upgraded to allow for analysis of iRB for the
+    parked qubit during CZ on the other qubits
 
     This is a meta-analysis. It runs
     "RandomizedBenchmarking_TwoQubit_Analysis" for each of the individual
@@ -1447,7 +1449,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         options_dict: dict = {},
         auto=True,
         close_figs=True,
-        rates_ch_I_quad_idxs: list = [0, 2],
+        rates_I_quad_ch_idxs: list = [0, 2],
         ignore_f_cal_pts: bool = False,
         plot_label="",
     ):
@@ -1460,15 +1462,21 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         self.label_base = label_base
         self.label_int = label_int
         self.label_int_idle = label_int_idle
+        self.include_idle = self.ts_int_idle or self.label_int_idle
 
         assert ts_base or label_base
         assert ts_int or label_int
 
-        self.rates_ch_I_quad_idxs = rates_ch_I_quad_idxs
+        self.rates_I_quad_ch_idxs = rates_I_quad_ch_idxs
         self.options_dict = options_dict
         self.close_figs = close_figs
         self.ignore_f_cal_pts = ignore_f_cal_pts
         self.plot_label = plot_label
+
+        # For other classes derived from this one this will change
+        self.fit_tag = "2Q"
+        self.int_name = "CZ"
+
         if auto:
             self.run_analysis()
 
@@ -1480,7 +1488,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             options_dict=self.options_dict,
             auto=True,
             close_figs=self.close_figs,
-            rates_ch_I_quad_idxs=self.rates_ch_I_quad_idxs,
+            rates_I_quad_ch_idxs=self.rates_I_quad_ch_idxs,
             extract_only=True,
             ignore_f_cal_pts=self.ignore_f_cal_pts,
         )
@@ -1490,21 +1498,18 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             options_dict=self.options_dict,
             auto=True,
             close_figs=self.close_figs,
-            rates_ch_I_quad_idxs=self.rates_ch_I_quad_idxs,
+            rates_I_quad_ch_idxs=self.rates_I_quad_ch_idxs,
             extract_only=True,
             ignore_f_cal_pts=self.ignore_f_cal_pts,
         )
-
-        include_idle = self.ts_int_idle or self.label_int_idle
-        self.include_idle = include_idle
-        if include_idle:
+        if self.include_idle:
             a_int_idle = RandomizedBenchmarking_TwoQubit_Analysis(
                 t_start=self.ts_int_idle,
                 label=self.label_int_idle,
                 options_dict=self.options_dict,
                 auto=True,
                 close_figs=self.close_figs,
-                rates_ch_I_quad_idxs=self.rates_ch_I_quad_idxs,
+                rates_I_quad_ch_idxs=self.rates_I_quad_ch_idxs,
                 extract_only=True,
                 ignore_f_cal_pts=self.ignore_f_cal_pts,
             )
@@ -1519,7 +1524,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         ]
         self.raw_data_dict["folder"] = a_int.proc_data_dict["folder"]
         a_dict = {"base": a_base, "int": a_int}
-        if include_idle:
+        if self.include_idle:
             a_dict["int_idle"] = a_int_idle
         self.raw_data_dict["analyses"] = a_dict
 
@@ -1542,14 +1547,21 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         qoi.update({k + "_ref": v for k, v in qoi_base.items()})
         qoi.update({k + "_int": v for k, v in qoi_int.items()})
 
-        qoi["eps_CZ_X1"] = interleaved_error(
-            eps_int=qoi_int["eps_X1_2Q"], eps_base=qoi_base["eps_X1_2Q"]
+        # The functionality of this analysis was extended to make it usable for
+        # interleaved parking idle flux pulse
+        fit_tag = self.fit_tag
+        int_name = self.int_name
+
+        qoi["eps_%s_X1" % int_name] = interleaved_error(
+            eps_int=qoi_int["eps_X1_%s" % fit_tag],
+            eps_base=qoi_base["eps_X1_%s" % fit_tag],
         )
-        qoi["eps_CZ_simple"] = interleaved_error(
-            eps_int=qoi_int["eps_simple_2Q"], eps_base=qoi_base["eps_simple_2Q"]
+        qoi["eps_%s_simple" % int_name] = interleaved_error(
+            eps_int=qoi_int["eps_simple_%s" % fit_tag],
+            eps_base=qoi_base["eps_simple_%s" % fit_tag],
         )
-        qoi["L1_CZ"] = interleaved_error(
-            eps_int=qoi_int["L1_2Q"], eps_base=qoi_base["L1_2Q"]
+        qoi["L1_%s" % int_name] = interleaved_error(
+            eps_int=qoi_int["L1_%s" % fit_tag], eps_base=qoi_base["L1_%s" % fit_tag]
         )
         if self.include_idle:
             qoi_int_idle = self.raw_data_dict["analyses"]["int_idle"].proc_data_dict[
@@ -1557,32 +1569,38 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             ]
             qoi.update({k + "_int_idle": v for k, v in qoi_int_idle.items()})
             qoi["eps_idle_X1"] = interleaved_error(
-                eps_int=qoi_int_idle["eps_X1_2Q"], eps_base=qoi_base["eps_X1_2Q"]
+                eps_int=qoi_int_idle["eps_X1_%s" % fit_tag],
+                eps_base=qoi_base["eps_X1_%s" % fit_tag],
             )
             qoi["eps_idle_simple"] = interleaved_error(
-                eps_int=qoi_int_idle["eps_simple_2Q"], eps_base=qoi_base["eps_simple_2Q"]
+                eps_int=qoi_int_idle["eps_simple_%s" % fit_tag],
+                eps_base=qoi_base["eps_simple_%s" % fit_tag],
             )
             qoi["L1_idle"] = interleaved_error(
-                eps_int=qoi_int_idle["L1_2Q"], eps_base=qoi_base["L1_2Q"]
+                eps_int=qoi_int_idle["L1_%s" % fit_tag],
+                eps_base=qoi_base["L1_%s" % fit_tag],
             )
 
-        # This is the naive estimate, when all observed error is assigned
-        # to the CZ gate
-        try:
-            qoi["L1_CZ_naive"] = 1 - (1 - qoi_base["L1_2Q"]) ** (1 / 1.5)
-            qoi["eps_CZ_simple_naive"] = 1 - (1 - qoi_base["eps_simple_2Q"]) ** (
-                1 / 1.5
-            )
-            qoi["eps_CZ_X1_naive"] = 1 - (1 - qoi_base["eps_X1_2Q"]) ** (1 / 1.5)
-        except ValueError:
-            # prevents the analysis from crashing if the fits are bad.
-            qoi["L1_CZ_naive"] = ufloat(np.NaN, np.NaN)
-            qoi["eps_CZ_simple_naive"] = ufloat(np.NaN, np.NaN)
-            qoi["eps_CZ_X1_naive"] = ufloat(np.NaN, np.NaN)
+        if int_name == "CZ":
+            # This is the naive estimate, when all observed error is assigned
+            # to the CZ gate
+            try:
+                qoi["L1_%s_naive" % int_name] = 1 - (
+                    1 - qoi_base["L1_%s" % fit_tag]
+                ) ** (1 / 1.5)
+                qoi["eps_%s_simple_naive" % int_name] = 1 - (
+                    1 - qoi_base["eps_simple_%s" % fit_tag]
+                ) ** (1 / 1.5)
+                qoi["eps_%s_X1_naive" % int_name] = 1 - (
+                    1 - qoi_base["eps_X1_%s" % fit_tag]
+                ) ** (1 / 1.5)
+            except ValueError:
+                # prevents the analysis from crashing if the fits are bad.
+                qoi["L1_%s_naive" % int_name] = ufloat(np.NaN, np.NaN)
+                qoi["eps_%s_simple_naive" % int_name] = ufloat(np.NaN, np.NaN)
+                qoi["eps_%s_X1_naive" % int_name] = ufloat(np.NaN, np.NaN)
 
     def prepare_plots(self):
-        fit_tag = "2Q"
-
         # Might seem that are not used but there is an `eval` below
         dd_ref = self.raw_data_dict["analyses"]["base"].proc_data_dict
         dd_int = self.raw_data_dict["analyses"]["int"].proc_data_dict
@@ -1617,10 +1635,12 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             "plotfn": plot_irb_decay_woods_gambetta,
             "ncl": dd_ref["ncl"],
             "include_idle": self.include_idle,
+            "fit_tag": self.fit_tag,
+            "int_name": self.int_name,
             "qoi": self.proc_data_dict["quantities_of_interest"],
             "ax1": axs[1],
-            "title": "{}\n{} - {}".format(
-                self.plot_label, self.timestamps[0], self.timestamps[1]
+            "title": "{} - {}\n{}".format(
+                self.timestamps[0], self.timestamps[1], self.plot_label
             ),
         }
 
@@ -1633,7 +1653,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             frs: dict,
         ):
             for dd_q in dd_quantities:
-                plot_dict[dd_q + "_" + tag] = dds[tag][dd_q][fit_tag]
+                plot_dict[dd_q + "_" + tag] = dds[tag][dd_q][self.fit_tag]
             for fit_q in fit_quantities:
                 trans = {
                     "rb_decay": "fr_M0",
@@ -1641,7 +1661,7 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
                     "leakage_decay": "fr_X1",
                 }
                 plot_dict[trans[fit_q] + "_" + tag] = frs[tag][
-                    fit_q + "_{}".format(fit_tag)
+                    fit_q + "_{}".format(self.fit_tag)
                 ]
 
         tags = ["ref", "int"]
@@ -1656,6 +1676,108 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
                 dds=dds,
                 frs=frs,
             )
+
+
+class InterleavedRandomizedBenchmarkingParkingAnalysis(
+    InterleavedRandomizedBenchmarkingAnalysis, ba.BaseDataAnalysis
+):
+    """
+    Analysis for single qubit interleaved randomized benchmarking where the
+    interleaved gate is a parking identity (with the corresponding CZ being
+    applied on the other two qubits)
+
+    This is a meta-analysis. It runs
+    "RandomizedBenchmarking_SingleQubit_Analysis" for each of the individual
+    datasets in the "extract_data" method and uses the quantities of interest
+    to create the combined figure.
+
+    The figure as well as the quantities of interest are stored in
+    the interleaved data file.
+    """
+
+    def __init__(
+        self,
+        ts_base: str = None,
+        ts_int: str = None,
+        label_base: str = "",
+        label_int: str = "",
+        options_dict: dict = {},
+        auto=True,
+        close_figs=True,
+        rates_I_quad_ch_idx: int = -2,
+        rates_Q_quad_ch_idx: int = None,
+        ignore_f_cal_pts: bool = False,
+        plot_label="",
+    ):
+        # Here we don't want to run the __init__ of the Interleaved analysis,
+        # only the __init__ of the base class
+        ba.BaseDataAnalysis.__init__(
+            self, do_fitting=True, close_figs=close_figs, options_dict=options_dict
+        )
+        self.ts_base = ts_base
+        self.ts_int = ts_int
+        self.label_base = label_base
+        self.label_int = label_int
+
+        assert ts_base or label_base
+        assert ts_int or label_int
+
+        self.rates_I_quad_ch_idx = rates_I_quad_ch_idx
+        self.rates_Q_quad_ch_idx = rates_Q_quad_ch_idx
+        if self.rates_Q_quad_ch_idx is None:
+            self.rates_Q_quad_ch_idx = rates_I_quad_ch_idx + 1
+
+        self.options_dict = options_dict
+        self.close_figs = close_figs
+        self.ignore_f_cal_pts = ignore_f_cal_pts
+        self.plot_label = plot_label
+
+        # For other classes derived from this one this will change
+        self.fit_tag = None  # to be set in the extract data
+        self.int_name = "Idle flux"
+        self.include_idle = False
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.raw_data_dict = OrderedDict()
+        a_base = RandomizedBenchmarking_SingleQubit_Analysis(
+            t_start=self.ts_base,
+            label=self.label_base,
+            options_dict=self.options_dict,
+            auto=True,
+            close_figs=self.close_figs,
+            rates_I_quad_ch_idx=self.rates_I_quad_ch_idx,
+            extract_only=True,
+            ignore_f_cal_pts=self.ignore_f_cal_pts,
+        )
+        a_int = RandomizedBenchmarking_SingleQubit_Analysis(
+            t_start=self.ts_int,
+            label=self.label_int,
+            options_dict=self.options_dict,
+            auto=True,
+            close_figs=self.close_figs,
+            rates_I_quad_ch_idx=self.rates_I_quad_ch_idx,
+            extract_only=True,
+            ignore_f_cal_pts=self.ignore_f_cal_pts,
+        )
+
+        self.fit_tag = a_base.raw_data_dict["value_names"][self.rates_I_quad_ch_idx]
+
+        # order is such that any information (figures, quantities of interest)
+        # are saved in the interleaved file.
+        self.timestamps = [a_int.timestamps[0], a_base.timestamps[0]]
+
+        self.raw_data_dict["timestamps"] = self.timestamps
+        self.raw_data_dict["timestamp_string"] = a_int.proc_data_dict[
+            "timestamp_string"
+        ]
+        self.raw_data_dict["folder"] = a_int.proc_data_dict["folder"]
+        self.raw_data_dict["analyses"] = {"base": a_base, "int": a_int}
+
+        if not self.plot_label:
+            self.plot_label = a_int.proc_data_dict["measurementstring"]
 
 
 class CharacterBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):
@@ -2289,6 +2411,8 @@ def plot_irb_decay_woods_gambetta(
     qoi,
     ax,
     ax1,
+    fit_tag,
+    int_name,
     title="",
     include_idle=False,
     M0_int_idle=None,
@@ -2298,13 +2422,19 @@ def plot_irb_decay_woods_gambetta(
     fr_X1_int_idle=None,
     **kw
 ):
-    fit_tag = "2Q"
     ncl_fine = np.linspace(ncl[0], ncl[-1], 1001)
 
     ax.plot(ncl, M0_ref, marker="o", linestyle="", c="C0", label="Reference")
     plot_fit(ncl_fine, fr_M0_ref, ax=ax, c="C0")
 
-    ax.plot(ncl, M0_int, marker="d", linestyle="", c="C1", label="Interleaved CZ")
+    ax.plot(
+        ncl,
+        M0_int,
+        marker="d",
+        linestyle="",
+        c="C1",
+        label="Interleaved {}".format(int_name),
+    )
     plot_fit(ncl_fine, fr_M0_int, ax=ax, c="C1")
     if include_idle:
         ax.plot(
@@ -2335,16 +2465,19 @@ def plot_irb_decay_woods_gambetta(
 
     collabels = [r"$\epsilon_{\chi1}~(\%)$", r"$\epsilon~(\%)$", r"$L_1~(\%)$"]
 
-    idle_r_labels0 = ["Int. Idle curve"] if include_idle else []
-    idle_r_labels1 = ["Idle-int."] if include_idle else []
+    idle_r_labels0 = ["Interl. Idle curve"] if include_idle else []
+    idle_r_labels1 = ["Idle-interleaved"] if include_idle else []
 
     rowlabels = (
         ["Ref. curve"]
         + idle_r_labels0
-        + ["Int. CZ curve"]
+        + ["Interl. {} curve".format(int_name)]
         + idle_r_labels1
-        + ["CZ-int.", "CZ-naive"]
+        + ["{}-interleaved".format(int_name)]
     )
+
+    if int_name == "CZ":
+        rowlabels += ["{}-naive".format(int_name)]
 
     idle_r_extracted = (
         [[qoi["eps_idle_X1"] * 100, qoi["eps_idle_simple"] * 100, qoi["L1_idle"] * 100]]
@@ -2382,14 +2515,22 @@ def plot_irb_decay_woods_gambetta(
         ]
         + idle_r_extracted
         + [
-            [qoi["eps_CZ_X1"] * 100, qoi["eps_CZ_simple"] * 100, qoi["L1_CZ"] * 100],
             [
-                qoi["eps_CZ_X1_naive"] * 100,
-                qoi["eps_CZ_simple_naive"] * 100,
-                qoi["L1_CZ_naive"] * 100,
-            ],
+                qoi["eps_{}_X1".format(int_name)] * 100,
+                qoi["eps_{}_simple".format(int_name)] * 100,
+                qoi["L1_{}".format(int_name)] * 100,
+            ]
         ]
     )
+
+    if int_name == "CZ":
+        table_data += [
+            [
+                qoi["eps_{}_X1_naive".format(int_name)] * 100,
+                qoi["eps_{}_simple_naive".format(int_name)] * 100,
+                qoi["L1_{}_naive".format(int_name)] * 100,
+            ]
+        ]
 
     # Avoid too many digits when the uncertainty is np.nan
     for i, row in enumerate(table_data):
@@ -2400,12 +2541,14 @@ def plot_irb_decay_woods_gambetta(
                 # Keep 3 significant digits only
                 table_data[i][j] = "{:.3g}+/-nan".format(u_val.n)
 
-    ax.table(
+    ax1.table(
         cellText=table_data,
         colLabels=collabels,
         rowLabels=rowlabels,
         transform=ax1.transAxes,
-        bbox=(0.2, -2.0, 0.7, 1.5),
+        cellLoc="center",
+        rowLoc="center",
+        bbox=(0.1, -2.5, 1, 2),
     )
 
 
