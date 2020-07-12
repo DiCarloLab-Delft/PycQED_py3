@@ -116,7 +116,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         if "bins" in a.data_file["Experimental Data"]["Experimental Metadata"].keys():
             bins = a.data_file["Experimental Data"]["Experimental Metadata"][
                 "bins"
-            ].value
+            ][()]
 
             num_cal_pnts = len(self.cal_pnts_in_dset)
 
@@ -898,7 +898,7 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
         if "bins" in a.data_file["Experimental Data"]["Experimental Metadata"].keys():
             bins = a.data_file["Experimental Data"]["Experimental Metadata"][
                 "bins"
-            ].value
+            ][()]
             self.raw_data_dict["ncl"] = bins[:-7:10]  # 7 calibration points
             self.raw_data_dict["bins"] = bins
 
@@ -1821,7 +1821,7 @@ class CharacterBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):
             timestamp=self.timestamps[0], auto=False, close_file=False
         )
         a.get_naming_and_values()
-        bins = a.data_file["Experimental Data"]["Experimental Metadata"]["bins"].value
+        bins = a.data_file["Experimental Data"]["Experimental Metadata"]["bins"][()]
         a.finish()
 
         self.raw_data_dict["measurementstring"] = a.measurementstring

@@ -37,7 +37,7 @@ def parallel_friendly_rb(rb_kw_dict):
     return p.filename
 
 
-def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 5):
+def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 3):
     """
     Blocks the main process till all tasks in `rb_tasks` are done
     """
