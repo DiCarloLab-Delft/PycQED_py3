@@ -4053,7 +4053,7 @@ class DeviceCCL(Instrument):
     def measure_single_qubit_randomized_benchmarking_parking(
         self,
         qubits: list,
-        nr_cliffords=2**np.arange(12),
+        nr_cliffords=2**np.arange(11),
         nr_seeds: int = 100,
         MC=None,
         recompile: bool = 'as needed',
@@ -4214,16 +4214,22 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
         label = 'RB_{}_{}_park_{}_{}seeds_rb_park_only={}_icl{}'.format(
             *qubits, nr_seeds, rb_on_parked_qubit_only, interleaving_cliffords)
+        label += self.msmt_suffix
         # FIXME should include the indices in the exp_metadata and
         # use that in the analysis instead of being dependent on the
         # measurement for those parameters
-        MC.run(label + self.msmt_suffix, exp_metadata={'bins': sweep_points})
+        rates_I_quad_ch_idx = -2
+        cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
+        MC.run(label, exp_metadata={
+            'bins': sweep_points,
+            "rates_I_quad_ch_idx": rates_I_quad_ch_idx,
+            "cal_pnts_in_dset": list(cal_pnts_in_dset)  # needs to be list to save
+            })
 
-        log.warning("[Victor] still need to figure out the right channels indices!")
         a_q2 = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
             label=label,
-            rates_I_quad_ch_idx=-2,
-            cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
+            rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+            cal_pnts_in_dset=cal_pnts_in_dset
         )
         return a_q2
 
@@ -4541,13 +4547,14 @@ class DeviceCCL(Instrument):
     def measure_two_qubit_simultaneous_randomized_benchmarking(
         self,
         qubits,
-        MC,
+        MC=None,
         nr_cliffords=2 ** np.arange(11),
         nr_seeds=100,
         interleaving_cliffords=[None],
         label="TwoQubit_sim_RB_{}seeds_{}_{}",
         recompile: bool = "as needed",
         cal_points: bool = True,
+        ro_acq_weight_type: str = "optimal IQ",
         compile_only: bool = False,
         pool=None,  # a multiprocessing.Pool()
         rb_tasks=None  # used after called with `compile_only=True`
@@ -4591,11 +4598,12 @@ class DeviceCCL(Instrument):
         # 2-state readout and postprocessing
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        # self.ro_acq_weight_type("SSB")
+        self.ro_acq_weight_type(ro_acq_weight_type)
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
-
+        if MC is None:
+            MC = self.instr_MC.get_instr()
         MC.soft_avg(1)
 
         # The detector needs to be defined before setting back parameters
