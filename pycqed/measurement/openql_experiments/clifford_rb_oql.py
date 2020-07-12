@@ -401,7 +401,9 @@ def randomized_benchmarking(
                 )
             elif number_of_qubits == 3:
                 p = oqh.add_single_qubit_cal_points(
-                    p, qubit_idx=qubit_map["q2"], f_state_cal_pts=f_state_cal_pts
+                    p, qubit_idx=qubit_map["q2"], f_state_cal_pts=f_state_cal_pts,
+                    # we must measure all 3 qubits to avoid alignment issues
+                    measured_qubits=list(qubit_map.values())
                 )
 
     p = oqh.compile(p)

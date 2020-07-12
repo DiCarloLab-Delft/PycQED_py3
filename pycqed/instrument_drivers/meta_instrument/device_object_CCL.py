@@ -4053,7 +4053,7 @@ class DeviceCCL(Instrument):
     def measure_single_qubit_randomized_benchmarking_parking(
         self,
         qubits: list,
-        nr_cliffords=2**np.arange(11),
+        nr_cliffords=2**np.arange(10),
         nr_seeds: int = 100,
         MC=None,
         recompile: bool = 'as needed',
@@ -4146,8 +4146,9 @@ class DeviceCCL(Instrument):
                     net_cliffords=net_cliffords,  # always measure double sided
                     nr_seeds=1,
                     platf_cfg=self.cfg_openql_platform_fn(),
-                    program_name='RB_s{}_ncl{}_net{}_icl{}_{}_{}_park_{}'.format(
-                        i, nr_cliffords, net_cliffords, interleaving_cliffords, *qubits),
+                    program_name='RB_s{}_ncl{}_net{}_icl{}_{}_{}_park_{}_rb_on_parkonly{}'.format(
+                        i, nr_cliffords, net_cliffords, interleaving_cliffords, *qubits,
+                        rb_on_parked_qubit_only),
                     recompile=recompile,
                     simultaneous_single_qubit_parking_RB=True,
                     rb_on_parked_qubit_only=rb_on_parked_qubit_only,
