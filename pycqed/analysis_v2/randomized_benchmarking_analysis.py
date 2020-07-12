@@ -1523,6 +1523,9 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             a_dict["int_idle"] = a_int_idle
         self.raw_data_dict["analyses"] = a_dict
 
+        if not self.plot_label:
+            self.plot_label = a_int.proc_data_dict["measurementstring"]
+
     def process_data(self):
         self.proc_data_dict = OrderedDict()
         self.proc_data_dict["quantities_of_interest"] = {}
@@ -1601,8 +1604,10 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
 
         fs = plt.rcParams["figure.figsize"]
         self.figs["main_irb_decay"], axs = plt.subplots(
-            nrows=2, sharex=True, gridspec_kw={"height_ratios": (2, 1)},
-            figsize=(fs[0] * 1.3, fs[1] * 1.3)
+            nrows=2,
+            sharex=True,
+            gridspec_kw={"height_ratios": (2, 1)},
+            figsize=(fs[0] * 1.3, fs[1] * 1.3),
         )
 
         self.figs["main_irb_decay"].patch.set_alpha(0)
@@ -2334,13 +2339,17 @@ def plot_irb_decay_woods_gambetta(
     idle_r_labels1 = ["Idle-int."] if include_idle else []
 
     rowlabels = (
-        ["Ref. curve"] + idle_r_labels0 + ["Int. CZ curve"] + idle_r_labels1 + ["CZ-int.", "CZ-naive"]
+        ["Ref. curve"]
+        + idle_r_labels0
+        + ["Int. CZ curve"]
+        + idle_r_labels1
+        + ["CZ-int.", "CZ-naive"]
     )
 
     idle_r_extracted = (
         [[qoi["eps_idle_X1"] * 100, qoi["eps_idle_simple"] * 100, qoi["L1_idle"] * 100]]
         if include_idle
-        else [[]]
+        else []
     )
 
     idle_r_fit = (
@@ -2352,7 +2361,7 @@ def plot_irb_decay_woods_gambetta(
             ]
         ]
         if include_idle
-        else [[]]
+        else []
     )
 
     table_data = (
