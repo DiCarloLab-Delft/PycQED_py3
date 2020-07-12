@@ -726,34 +726,26 @@ class BaseDataAnalysis(object):
             qoi_name = 'quantities_of_interest'
             # Save data to file
             with h5py.File(fn, 'a') as data_file:
-                try:
-                    analysis_group = data_file.create_group('Analysis')
-                except ValueError:
-                    # If the analysis group already exists, re-use it
-                    # (as not to overwrite previous/other fits)
-                    analysis_group = data_file['Analysis']
-                try:
-                    qois_group = analysis_group.create_group(qoi_name)
-                except ValueError:
-                    # Keep the behavior for legacy reasons
-                    overwrite_qois = getattr(self, "overwrite_qois", True)
-                    if overwrite_qois:
-                        # Delete the old group and create a new group (overwrite).
-                        # Some analysis do some nasty things like coping all the
-                        # `qois` and renaming them...
-                        # In these case this is needed to still clear the `qois` group
-                        del analysis_group[qoi_name]
-                        qois_group = analysis_group.create_group(qoi_name)
-                    else:
-                        # [2020-07-11 Victor] some analysis can be called several
-                        # times on the same datafile, e.g. single qubit RB
-                        # the `qois` group should no be
-                        # removed! Line above commented out
-                        qois_group = analysis_group[qoi_name]
+                a_key = 'Analysis'
+                if a_key not in data_file.keys():
+                    analysis_group = data_file.create_group(a_key)
+                else:
+                    analysis_group = data_file[a_key]
 
+                # [2020-07-11 Victor] some analysis can be called several
+                # times on the same datafile, e.g. single qubit RB,
+                # in that case the `qois_group` should not be overwritten!
+                # level = 0 => Overwrites the entire qois_group
+                # level = 1 => Overwrites only the entries in the `qois_group`
+                # present in the `qois_dict`
+                overwrite_qois = getattr(self, "overwrite_qois", True)
+                group_overwrite_level = 0 if overwrite_qois else 1
+
+                qois_dict = {qoi_name: self.proc_data_dict['quantities_of_interest']}
                 write_dict_to_hdf5(
-                    self.proc_data_dict['quantities_of_interest'],
-                    entry_point=qois_group)
+                    qois_dict,
+                    entry_point=analysis_group,
+                    group_overwrite_level=group_overwrite_level)
 
     @staticmethod
     def _convert_dict_rec(obj):
