@@ -354,14 +354,17 @@ def extract_pars_from_datafile(filepath: str, param_spec: dict) -> dict:
                 value: tuple consiting of "/" separated parameter path
                     and attribute/dataset specificiation.
                     The attribute/dataset specification is
-                        "attr:attribute_name" or "dset".
+                    "attr:attribute_name", "dset", "attr:all_attr", or "group"
+                    "group" allows to recursively extract all the tree in
+                    the group
 
             example param_spec
                 param_spec = {
                     'T1': ('Analysis/Fitted Params F|1>/tau', 'attr:value'),
                     'uT1': ('Analysis/Fitted Params F|1>/tau', 'attr:stderr'),
                     'data': ('Experimental Data/Data', 'dset'),
-                    'timestamp': ('MC settings/begintime', 'dset' )}
+                    'timestamp': ('MC settings/begintime', 'dset'),
+                    'qois': ('Analysis/quantities_of_interest', 'group')}
         convert_str_arrays (bool):
             allows to automatically make the string array usable in python
             e.g. extracting the `value_names` of a measurement
@@ -376,13 +379,18 @@ def extract_pars_from_datafile(filepath: str, param_spec: dict) -> dict:
         for par_name, par_spec in param_spec.items():
             entry = f[par_spec[0]]
             if par_spec[1].startswith("dset"):
-                param_dict[par_name] = entry.value
+                param_dict[par_name] = entry[()]  # deprecated syntax: entry.value
             elif par_spec[1].startswith("attr:all_attr"):
                 param_dict[par_name] = dict()
                 for attribute_name in entry.attrs.keys():
                     param_dict[par_name][attribute_name] = entry.attrs[attribute_name]
             elif par_spec[1].startswith("attr"):
                 param_dict[par_name] = entry.attrs[par_spec[1][5:]]
+            elif par_spec[1].startswith("group"):
+                # This should allow to retrieve the entire tree under a certain
+                # as a dictionary
+                new_dict = dict()
+                param_dict[par_name] = read_dict_from_hdf5(new_dict, h5_group=entry)
             else:
                 raise ValueError(
                     "Parameter spec `{}` not recognized".format(par_spec[1])
