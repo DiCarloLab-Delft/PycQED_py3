@@ -1557,13 +1557,13 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
             ]
             qoi.update({k + "_int_idle": v for k, v in qoi_int_idle.items()})
             qoi["eps_idle_X1"] = interleaved_error(
-                eps_int=qoi_int["eps_X1_2Q"], eps_base=qoi_base["eps_X1_2Q"]
+                eps_int=qoi_int_idle["eps_X1_2Q"], eps_base=qoi_base["eps_X1_2Q"]
             )
             qoi["eps_idle_simple"] = interleaved_error(
-                eps_int=qoi_int["eps_simple_2Q"], eps_base=qoi_base["eps_simple_2Q"]
+                eps_int=qoi_int_idle["eps_simple_2Q"], eps_base=qoi_base["eps_simple_2Q"]
             )
             qoi["L1_idle"] = interleaved_error(
-                eps_int=qoi_int["L1_2Q"], eps_base=qoi_base["L1_2Q"]
+                eps_int=qoi_int_idle["L1_2Q"], eps_base=qoi_base["L1_2Q"]
             )
 
         # This is the naive estimate, when all observed error is assigned
