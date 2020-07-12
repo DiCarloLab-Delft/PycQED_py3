@@ -3590,16 +3590,15 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
 
         MC.set_detector_function(d)
-        MC.run(label.format(
+        label = label.format(
             nr_seeds,
             interleaving_cliffords,
             qubits[0],
             qubits[1],
-            flux_codeword),
-            exp_metadata={"bins": sweep_points},
-        )
+            flux_codeword)
+        MC.run(label, exp_metadata={"bins": sweep_points})
         # N.B. if interleaving cliffords are used, this won't work
-        ma2.RandomizedBenchmarking_TwoQubit_Analysis()
+        ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
 
     def measure_interleaved_randomized_benchmarking_statistics(
         self, RB_type: str = "CZ", nr_iRB_runs: int = 30, **iRB_kw
@@ -3785,8 +3784,6 @@ class DeviceCCL(Instrument):
                 rb_tasks=rb_tasks_CZ,
             )
             ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                ts_base=None,
-                ts_int=None,
                 label_base="icl[None]",
                 label_int="icl[104368]"
             )
@@ -3825,10 +3822,9 @@ class DeviceCCL(Instrument):
                     rb_tasks=rb_tasks_I
                 )
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                    ts_base=None,
-                    ts_int=None,
                     label_base="icl[None]",
-                    label_int="icl[100000]"
+                    label_int="icl[104368]",
+                    label_int_idle="icl[100000]"
                 )
 
             return rb_tasks_next
@@ -3880,10 +3876,8 @@ class DeviceCCL(Instrument):
             )
 
             ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                ts_base=None,
-                ts_int=None,
                 label_base="icl[None]",
-                label_int="icl[104368]"
+                label_int="icl[104368]",
             )
 
             if measure_idle_flux:
@@ -3900,10 +3894,10 @@ class DeviceCCL(Instrument):
                     sim_cz_qubits=sim_cz_qubits,
                 )
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                    ts_base=None,
-                    ts_int=None,
                     label_base="icl[None]",
-                    label_int="icl[100000]"
+                    label_int="icl[104368]",
+                    label_int_idle="icl[100000]"
+
                 )
 
     def measure_single_qubit_interleaved_randomized_benchmarking_parking(
