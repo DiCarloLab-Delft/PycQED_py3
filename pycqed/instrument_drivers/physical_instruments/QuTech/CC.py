@@ -175,7 +175,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     def _set_dio_delay(self, ccio: int, cnt_in_20ns_steps: int) -> None:
         if 1:
             self.set_seqbar_cnt(ccio, cnt_in_20ns_steps)
-        else:
+        else:  # FIXME: cleanup old seq_bar support once we're all on CC v0.2.0
             # FIXME: assumes Q1 was running, and has valid program
             self.stop()
             self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)

@@ -12,6 +12,45 @@ from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import 
     TwoQubitClifford,
     common_cliffords,
 )
+import json
+import time
+from pycqed.utilities.general import check_keyboard_interrupt
+from importlib import reload
+reload(rb)
+
+
+def parallel_friendly_rb(rb_kw_dict):
+    """
+    A wrapper around `randomized_benchmarking` such that we collect only
+    the filenames of the resulting programs that can be communicated back to
+    the main process when parallelizing the compilation using the python
+    multiprocessing capabilities.
+    """
+    p = randomized_benchmarking(**rb_kw_dict)
+
+    # [2020-07-04]
+    # Before parallelizing RB sequences compilation this line was in the
+    # the measure RB methods of the device object
+    # It seemed to not be necessary, left it out
+    # p.sweep_points = sweep_points
+
+    return p.filename
+
+
+def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 3):
+    """
+    Blocks the main process till all tasks in `rb_tasks` are done
+    """
+    t0 = time.time()
+    while not rb_tasks.ready():
+        print("{} RB programs left to compile. Elapsed {:>7.1f}s".format(
+            np.sum(rb_tasks._number_left), time.time() - t0), end="\r")
+
+        # check for keyboard interrupt q because generating can be slow
+        check_keyboard_interrupt()
+        time.sleep(refresh_rate)
+
+    print("\nDone compiling RB sequences!")
 
 
 def randomized_benchmarking(
@@ -22,7 +61,10 @@ def randomized_benchmarking(
     net_cliffords: list = [0],
     max_clifford_idx: int = 11520,
     flux_codeword: str = "cz",
+    flux_allocated_duration_ns: int = None,
     simultaneous_single_qubit_RB=False,
+    simultaneous_single_qubit_parking_RB=False,
+    rb_on_parked_qubit_only: bool = False,
     initialize: bool = True,
     interleaving_cliffords=[None],
     program_name: str = "randomized_benchmarking",
@@ -79,6 +121,10 @@ def randomized_benchmarking(
                         it returns an empty OpenQL program object with
                         the intended filename that can be used to upload the
                         previously compiled file.
+        flux_allocated_duration_ns:
+                        Used to emulate an idling gate with the duration of the
+                        flux. If not specified will try to grab the duration
+                        from the openql cfg file.
 
     Returns:
         p:              OpenQL Program object
@@ -140,13 +186,31 @@ def randomized_benchmarking(
         # arguments used to generate 2 single qubit sequences
         number_of_qubits = 2
         Cl = SingleQubitClifford
+    elif len(qubits) == 3 and simultaneous_single_qubit_parking_RB:
+        # In this case we want to benchmark the single qubit gates when
+        # interleaving the a cz with parking
+        qubit_map = {"q0": qubits[0], "q1": qubits[1], "q2": qubits[2]}
+        Cl = SingleQubitClifford
+        # at the end we will add calibration points only for the parking qubit
+        number_of_qubits = 3
     else:
         raise NotImplementedError()
+
+    if 100_000 in interleaving_cliffords and flux_allocated_duration_ns is None:
+        # Try to get the flux duration from the cfg file
+        with open(platf_cfg) as json_file:
+            loaded_json = json.load(json_file)
+        try:
+            flux_allocated_duration_ns = (
+                loaded_json["instructions"]["sf_cz_se q0"]["duration"]
+            )
+        except KeyError:
+            raise ValueError("Could not find flux duration. Specify manually!")
 
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
             for interleaving_cl in interleaving_cliffords:
-                if not simultaneous_single_qubit_RB:
+                if not simultaneous_single_qubit_RB and not simultaneous_single_qubit_parking_RB:
                     # ############ 1 qubit, or 2 qubits using TwoQubitClifford
                     # generate sequence
                     for net_clifford in net_cliffords:
@@ -162,10 +226,13 @@ def randomized_benchmarking(
                     # decompose
                     cl_seq_decomposed = []
                     for cl in cl_seq:
-                        # FIXME: hacking in exception for benchmarking only CZ
-                        # (not as a member of CNOT group)
-                        if cl == -4368:
+                        # benchmarking only CZ (not as a member of CNOT group)
+                        if cl == 104368:  # 104368 = 100_000 + CZ
                             cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
+                        # benchmarking only idling identity, with duration of cz
+                        # see below where wait-time is added
+                        elif cl == 100_000:
+                            cl_seq_decomposed.append([("I", ["q0", "q1"])])
                         else:
                             cl_seq_decomposed.append(Cl(cl).gate_decomposition)
 
@@ -192,7 +259,12 @@ def randomized_benchmarking(
                                 if isinstance(q, str):  # single qubit gate
                                     k.gate(g, [qubit_map[q]])
                                 elif isinstance(q, list):  # 2 qubit gate
-                                    if sim_cz_qubits is None:
+                                    if g == "I":
+                                        # interleaving an idling with the length of the CZ
+                                        k.gate("wait", [], 0)  # alignment
+                                        k.gate("wait", [], flux_allocated_duration_ns)
+                                        k.gate("wait", [], 0)
+                                    elif sim_cz_qubits is None:
                                         # OpenQL alignment is necessary to ensure
                                         # parking flux pulse is played in parallel
                                         k.gate("wait", [], 0)
@@ -260,10 +332,66 @@ def randomized_benchmarking(
                                 except IndexError:
                                     pass
                         # end of #157 HACK
-                        # FIXME: This hack is required to align multiplexed RO in openQL..
                         k.gate("wait", [], 0)
                         for qubit_idx in qubit_map.values():
                             k.measure(qubit_idx)
+                        k.gate("wait", [], 0)
+                        p.add_kernel(k)
+                elif simultaneous_single_qubit_parking_RB:
+                    for net_clifford in net_cliffords:
+                        k = oqh.create_kernel(
+                            "RB_{}Cl_s{}_net{}_inter{}".format(
+                                int(n_cl), seed, net_clifford, interleaving_cl
+                            ),
+                            p,
+                        )
+                        if initialize:
+                            for qubit_idx in qubit_map.values():
+                                k.prepz(qubit_idx)
+                        k.gate("wait", [], 0)
+
+                        rb_qubits = ["q2"] if rb_on_parked_qubit_only else ["q0", "q1", "q2"]
+                        cl_rb_seq_all_q = []  # One for each rb_qubit
+                        cl_seq_decomposed = []
+                        for rb_qubit in enumerate(rb_qubits):
+                            cl_seq = rb.randomized_benchmarking_sequence(
+                                n_cl,
+                                number_of_qubits=1,
+                                desired_net_cl=net_clifford,
+                                interleaving_cl=interleaving_cl,
+                            )
+                            cl_rb_seq_all_q.append(cl_seq)
+                        # Iterate over all the Cliffords "in parallel" for all qubits
+                        # and detect the interleaving one such that it can be converted
+                        # into a CZ with parking
+                        for cl_i, cl in enumerate(cl_rb_seq_all_q[-1]):
+                            if cl == 200_000:
+                                # Only this gate will be applied
+                                # it is intended to include implicit parking
+                                cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
+                            else:
+                                for q_str, cl_rb_seq in zip(rb_qubits, cl_rb_seq_all_q):
+                                    cl_decomposed = Cl(cl_rb_seq[cl_i]).gate_decomposition
+                                    # the decomposition of the single qubit Cliffords
+                                    # by default targets "q0", here we replace that
+                                    cl_decomposed = [(gate, q_str) for gate, _ in cl_decomposed]
+                                    cl_seq_decomposed.append(cl_decomposed)
+
+                        for gates in cl_seq_decomposed:
+                            for gate, qubit_or_qubits in gates:
+                                if isinstance(qubit_or_qubits, str):
+                                    # Just apply the gate to a single qubit
+                                    k.gate(gate, [qubit_map[qubit_or_qubits]])
+                                elif isinstance(qubit_or_qubits, list):
+                                    # interleaving the CZ with parking
+                                    # and ensure alignment
+                                    k.gate("wait", [], 0)  # alignment, avoid flux overlap with mw gates
+                                    k.gate(flux_codeword, [qubit_map[qubit] for qubit in qubit_or_qubits])
+                                    k.gate("wait", [], 0)
+
+                        k.gate("wait", [], 0)  # align RO
+                        for qubit_idx in qubit_map.values():
+                            k.measure(qubit_idx)  # measure parking qubit only
                         k.gate("wait", [], 0)
                         p.add_kernel(k)
 
@@ -279,6 +407,12 @@ def randomized_benchmarking(
                     combinations = ["00", "01", "10", "11"]
                 p = oqh.add_multi_q_cal_points(
                     p, qubits=qubits, combinations=combinations
+                )
+            elif number_of_qubits == 3:
+                p = oqh.add_single_qubit_cal_points(
+                    p, qubit_idx=qubit_map["q2"], f_state_cal_pts=f_state_cal_pts,
+                    # we must measure all 3 qubits to avoid alignment issues
+                    measured_qubits=list(qubit_map.values())
                 )
 
     p = oqh.compile(p)
@@ -366,7 +500,7 @@ def character_benchmarking(
                 for cl in cl_seq[1:]:
                     # hacking in exception for benchmarking only CZ
                     # (not as a member of CNOT-like group)
-                    if cl == -4368:
+                    if cl == 104368:
                         cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
                     else:
                         cl_seq_decomposed.append(Cl(cl).gate_decomposition)

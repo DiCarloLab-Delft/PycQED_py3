@@ -216,6 +216,22 @@ class SimControlCZ_v2(Instrument):
             initial_value=0,
         )
 
+        self.add_parameter(
+            "timestamp_for_contour",
+            docstring="FB: timestamp of previously generated heatmap. Used for contour scans along the 180 deg line",
+            parameter_class=ManualParameter,
+            vals=vals.Strings(),
+            initial_value="",
+        )
+
+        self.add_parameter(
+            "measurement_time",
+            docstring="FB: measurement time. Used to get the right missing fraction from the conditional-oscillations experiment",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=0,
+        )
+
         # for ramsey/Rabi simulations
 
         self.add_parameter(
@@ -240,6 +256,13 @@ class SimControlCZ_v2(Instrument):
             parameter_class=ManualParameter,
             vals=vals.Numbers(),
             initial_value=0,
+        )
+        self.add_parameter(
+            "czd_double_sided",
+            docstring="Ramsey or echo pulse. Used since it has been removed from fluxlutman",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value=False,
         )
 
         # for spectral tomo

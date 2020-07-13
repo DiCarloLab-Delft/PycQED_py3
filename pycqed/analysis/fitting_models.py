@@ -5,7 +5,7 @@ import lmfit
 import logging
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import data_manipulation as dm_tools
-
+import string
 
 #################################
 #   Fitting Functions Library   #
@@ -1283,9 +1283,34 @@ DoubleGauss2D_model = (lmfit.Model(gaussian_2D, independent_vars=['x', 'y'],
                                    prefix='B_'))
 DoubleGauss2D_model.guess = double_gauss_2D_guess
 
+
+def mkMultiGauss2DModel(n: int, prefixes: list = None):
+    """
+    Generates a bivariate multi Gaussian model
+
+    Args:
+        n (int): number of bivariate Gaussians in the model
+        prefixes (list): if not specified upper case letter will be used
+            to prefix the parameters of each bivariate Gaussian
+    """
+    assert n > 0
+    if prefixes is None:
+        prefixes = string.ascii_uppercase
+    model = lmfit.Model(
+        gaussian_2D,
+        independent_vars=['x', 'y'],
+        prefix=prefixes[0] + '_')
+    for i in range(1, n):
+        model += lmfit.Model(
+            gaussian_2D,
+            independent_vars=['x', 'y'],
+            prefix=prefixes[i] + '_')
+    return model
+
 ###################################
 # Models based on lmfit functions #
 ###################################
+
 
 LorentzModel = lmfit.Model(lmfit.models.lorentzian)
 Lorentz_w_background_Model = lmfit.models.LorentzianModel() + \

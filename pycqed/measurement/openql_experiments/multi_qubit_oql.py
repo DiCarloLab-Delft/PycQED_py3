@@ -1390,7 +1390,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
     q0:  X90   --  C-Phase  (repet. C-Phase) Rphi90 RO
     q1: X180/I --  C-Phase         --        X180   RO
     q2:  X90   -- PARK/C-Phase     --        Rphi90 RO
-    q3: X180/I -- PARK/C-Phase     --        X180   RO
+    q3: X180/I --  C-Phase         --        X180   RO
 
     Args:
         q0, q1      (str): names of the addressed qubits

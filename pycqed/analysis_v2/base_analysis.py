@@ -723,25 +723,29 @@ class BaseDataAnalysis(object):
             if self.verbose:
                 print('Saving quantities of interest to %s' % fn)
 
-            qoi = 'quantities_of_interest'
+            qoi_name = 'quantities_of_interest'
             # Save data to file
             with h5py.File(fn, 'a') as data_file:
-                try:
-                    analysis_group = data_file.create_group('Analysis')
-                except ValueError:
-                    # If the analysis group already exists, re-use it
-                    # (as not to overwrite previous/other fits)
-                    analysis_group = data_file['Analysis']
-                try:
+                a_key = 'Analysis'
+                if a_key not in data_file.keys():
+                    analysis_group = data_file.create_group(a_key)
+                else:
+                    analysis_group = data_file[a_key]
 
-                    qoi_group = analysis_group.create_group(qoi)
-                except ValueError:
-                    # Delete the old group and create a new group (overwrite).
-                    del analysis_group[qoi]
-                    qoi_group = analysis_group.create_group(qoi)
+                # [2020-07-11 Victor] some analysis can be called several
+                # times on the same datafile, e.g. single qubit RB,
+                # in that case the `qois_group` should not be overwritten!
+                # level = 0 => Overwrites the entire qois_group
+                # level = 1 => Overwrites only the entries in the `qois_group`
+                # present in the `qois_dict`
+                overwrite_qois = getattr(self, "overwrite_qois", True)
+                group_overwrite_level = 0 if overwrite_qois else 1
 
-                write_dict_to_hdf5(self.proc_data_dict['quantities_of_interest'],
-                                   entry_point=qoi_group)
+                qois_dict = {qoi_name: self.proc_data_dict['quantities_of_interest']}
+                write_dict_to_hdf5(
+                    qois_dict,
+                    entry_point=analysis_group,
+                    group_overwrite_level=group_overwrite_level)
 
     @staticmethod
     def _convert_dict_rec(obj):
@@ -1011,10 +1015,12 @@ class BaseDataAnalysis(object):
         else:
             if pdict.get('color', False):
                 plot_linekws['color'] = pdict.get('color')
-
+            # "setlabel": "NONE" allows to disable the label
             p_out = pfunc(plot_xvals, plot_yvals,
-                          linestyle=plot_linestyle, marker=plot_marker,
-                          label='%s%s' % (dataset_desc, dataset_label),
+                          linestyle=plot_linestyle,
+                          marker=plot_marker,
+                          label=(None if dataset_label == "NONE"
+                            else '%s%s' % (dataset_desc, dataset_label)),
                           **plot_linekws)
 
         if plot_xrange is None:
