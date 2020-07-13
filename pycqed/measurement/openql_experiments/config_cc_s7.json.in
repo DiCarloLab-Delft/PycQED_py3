@@ -803,7 +803,7 @@
             "cc_light_instr": "fl_cw_00",
             "cc": {
                 "signal_ref": "two-qubit-flux",
-                "static_codeword_override": [0]
+                "static_codeword_override": [0,0]   // FIXME
             }
         },
         "fl_cw_01": {
@@ -813,7 +813,7 @@
             "cc_light_instr": "fl_cw_01",
             "cc": {
                 "signal_ref": "two-qubit-flux",
-                "static_codeword_override": [1]
+                "static_codeword_override": [1,1]
             }
         },
         "fl_cw_02": {
@@ -823,7 +823,7 @@
             "cc_light_instr": "fl_cw_02",
             "cc": {
                 "signal_ref": "two-qubit-flux",
-                "static_codeword_override": [2]
+                "static_codeword_override": [2,2]
             }
         },
         "fl_cw_03": {
@@ -833,7 +833,7 @@
             "cc_light_instr": "fl_cw_03",
             "cc": {
                 "signal_ref": "two-qubit-flux",
-                "static_codeword_override": [3]
+                "static_codeword_override": [3,3]
             }
         },
         "fl_cw_04": {
@@ -843,7 +843,7 @@
             "cc_light_instr": "fl_cw_04",
             "cc": {
                 "signal_ref": "two-qubit-flux",
-                "static_codeword_override": [4]
+                "static_codeword_override": [4,4]
             }
         },
         "fl_cw_05": {
@@ -853,7 +853,7 @@
             "cc_light_instr": "fl_cw_05",
             "cc": {
                 "signal_ref": "two-qubit-flux",
-                "static_codeword_override": [5]
+                "static_codeword_override": [5,5]
             }
         },
         "fl_cw_06": {
@@ -863,7 +863,7 @@
             "cc_light_instr": "fl_cw_06",
             "cc": {
                 "signal_ref": "two-qubit-flux",
-                "static_codeword_override": [6]
+                "static_codeword_override": [6,6]
             }
         },
         "fl_cw_07": {
@@ -873,7 +873,7 @@
             "cc_light_instr": "fl_cw_07",
             "cc": {
                 "signal_ref": "two-qubit-flux",
-                "static_codeword_override": [7]
+                "static_codeword_override": [7,7]
             }
         },
 
