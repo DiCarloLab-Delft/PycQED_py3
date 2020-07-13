@@ -236,7 +236,7 @@ def randomized_benchmarking(
                         else:
                             cl_seq_decomposed.append(Cl(cl).gate_decomposition)
 
-                    # generate OpenQL kernel every net_clifford
+                    # generate OpenQL kernel for every net_clifford
                     for net_clifford in net_cliffords:
                         # create decomposed sequence including recovery
                         recovery_to_idx_clifford = net_cl_seq.get_inverse()
