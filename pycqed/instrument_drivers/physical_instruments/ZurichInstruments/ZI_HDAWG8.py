@@ -401,7 +401,7 @@ while (1) {
                 # NEW
                 # In the NO-VSM mw protocol bits [0:6] -> CW0, bits [13, 7] -> CW1,
                 # bits [22:16] -> CW2 and bits [29:23] -> CW4
-                elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+                elif self.cfg_codeword_protocol() == 'novsm_microwave':
                     if awg_nr == 0:
                         self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
                     elif awg_nr == 1:
@@ -640,7 +640,7 @@ while (1) {
                                  (3, list(reversed(staircase_sequence)))]
 
 
-        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+        elif self.cfg_codeword_protocol() == 'novsm_microwave':
 
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
                 '..','examples','QCC_example',
@@ -652,6 +652,21 @@ while (1) {
                                  (1, list(reversed(staircase_sequence))), \
                                  (2, list(staircase_sequence)), \
                                  (3, list(reversed(staircase_sequence))) ]
+
+        elif self.cfg_codeword_protocol() == 'novsm_microwave':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..','examples','QCC_example',
+                'qisa_test_assembly','novsm_calibration.qisa'))
+            # test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+            #                     '..', 'examples','CC_examples',
+            #                     'hdawg_calibration.vq1asm'))
+
+            sequence_length = 32
+            staircase_sequence = range(0, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence)), \
+                                 (1, list(staircase_sequence)), \
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(staircase_sequence))]
 
         else:
             zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
@@ -697,8 +712,17 @@ while (1) {
                                  (2, list(staircase_sequence)), \
                                  (3, list(staircase_sequence))]
 
-        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
-            raise NotImplementedError
+        elif self.cfg_codeword_protocol() == 'novsm_microwave':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                                '..', 'examples','CC_examples',
+                                'hdawg_calibration.vq1asm'))
+
+            sequence_length = 32
+            staircase_sequence = range(0, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence)), \
+                                 (1, list(staircase_sequence)), \
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(staircase_sequence))]
 
         else:
             raise zibase.ziConfigurationError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
@@ -772,8 +796,13 @@ while (1) {
             CC (instr) : an instance of a CCL or QCC
             verbose (bool): if True prints to stdout
         """
+        idn_str = CC.IDN()
+        if 'model' in idn_str.keys():
+            model_key = 'model'
+        elif 'Model' in idn_str.keys():
+            model_key = 'Model'
 
-        CC_model = CC.IDN()['model']
+        CC_model = idn_str[model_key]
         if 'QCC' in CC_model:
             expected_sequence = self._prepare_QCC_dio_calibration(
                 QCC=CC, verbose=verbose)
@@ -798,14 +827,32 @@ while (1) {
         if len(valid_delays) == 0:
             raise ziDIOCalibrationError('DIO calibration failed! No valid delays found')
 
-        min_valid_delay = min(valid_delays)
+        subseq = [[]]
+        for e in valid_delays:
+            if not subseq[-1] or subseq[-1][-1] == e - 1:
+                subseq[-1].append(e)
+            else:
+                subseq.append([e])
+
+        subseq = max(subseq, key=len)
+        delay = len(subseq)//2 + subseq[0]
+
+        # subseq = [[]]
+        # for e in valid_delays:
+        #     if not subseq[-1] or subseq[-1][-1] == e - 1:
+        #         subseq[-1].append(e)
+        #     else:
+        #         subseq.append([e])
+
+        # subseq = max(subseq, key=len)
+        # delay = len(subseq)//2 + subseq[0]
 
         # Print information
         if verbose: print("  Valid delays are {}".format(valid_delays))
-        if verbose: print("  Setting delay to {}".format(min_valid_delay))
+        if verbose: print("  Setting delay to {}".format(delay))
 
         # And configure the delays
-        self._set_dio_calibration_delay(min_valid_delay)
+        self._set_dio_calibration_delay(delay)
 
         # If successful clear all errors and return True
         self.clear_errors()

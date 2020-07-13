@@ -1,7 +1,7 @@
 import re
 import logging
 import numpy as np
-from os.path import join, dirname
+from os.path import join, dirname, isfile
 from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
@@ -17,7 +17,7 @@ ql.set_option('output_dir', output_dir)
 ql.set_option('scheduler', 'ALAP')
 
 
-def create_program(pname: str, platf_cfg: str, nregisters: int=32):
+def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
     """
     Wrapper around the constructor of openQL "Program" class.
 
@@ -64,7 +64,8 @@ def create_kernel(kname: str, program):
     """
     Wrapper around constructor of openQL "Kernel" class.
     """
-    kname = kname.translate ({ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
+    kname = kname.translate(
+        {ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
 
     k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
     return k
@@ -82,10 +83,10 @@ def compile(p, quiet: bool = True):
         p.compile()
 
     # determine extension of generated file
-    if p.eqasm_compiler=='eqasm_backend_cc':
-        ext = '.vq1asm' # CC
+    if p.eqasm_compiler == 'eqasm_backend_cc':  # NB: field .eqasm_compiler is set by p.compile()
+        ext = '.vq1asm'  # CC
     else:
-        ext = '.qisa' # CC-light, QCC
+        ext = '.qisa'  # CC-light, QCC
     # attribute is added to program to help finding the output files
     p.filename = join(p.output_dir, p.name + ext)
     return p
@@ -95,7 +96,7 @@ def compile(p, quiet: bool = True):
 # Calibration points
 #############################################################################
 def add_single_qubit_cal_points(p, qubit_idx,
-                                f_state_cal_pts: bool=False,
+                                f_state_cal_pts: bool = False,
                                 measured_qubits=None):
     """
     Adds single qubit calibration points to an OpenQL program
@@ -108,7 +109,7 @@ def add_single_qubit_cal_points(p, qubit_idx,
             if measured_qubits == None, it will default to measuring the
             qubit for which there are cal points.
     """
-    if measured_qubits==None:
+    if measured_qubits == None:
         measured_qubits = [qubit_idx]
 
     for i in np.arange(2):
@@ -144,8 +145,8 @@ def add_single_qubit_cal_points(p, qubit_idx,
 
 
 def add_two_q_cal_points(p, q0: int, q1: int,
-                         reps_per_cal_pt: int =1,
-                         f_state_cal_pts: bool=False,
+                         reps_per_cal_pt: int = 1,
+                         f_state_cal_pts: bool = False,
                          f_state_cal_pt_cw: int = 31,
                          measured_qubits=None,
                          interleaved_measured_qubits=None,
@@ -179,7 +180,6 @@ def add_two_q_cal_points(p, q0: int, q1: int,
     if measured_qubits == None:
         measured_qubits = [q0, q1]
 
-
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
         k.prepz(q0)
@@ -190,23 +190,24 @@ def add_two_q_cal_points(p, q0: int, q1: int,
                     k.measure(q)
                 k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
                 if interleaved_delay:
-                    k.gate('wait', [0, 1, 2, 3, 4, 5, 6], int(interleaved_delay*1e9))
+                    k.gate('wait', [0, 1, 2, 3, 4, 5, 6],
+                           int(interleaved_delay*1e9))
 
-        if comb[0] =='0':
+        if comb[0] == '0':
             k.gate('i', [q0])
         elif comb[0] == '1':
             k.gate('rx180', [q0])
-        elif comb[0] =='2':
+        elif comb[0] == '2':
             k.gate('rx180', [q0])
             # FIXME: this is a workaround
             #k.gate('rx12', [q0])
             k.gate('cw_31', [q0])
 
-        if comb[1] =='0':
+        if comb[1] == '0':
             k.gate('i', [q1])
         elif comb[1] == '1':
             k.gate('rx180', [q1])
-        elif comb[1] =='2':
+        elif comb[1] == '2':
             k.gate('rx180', [q1])
             # FIXME: this is a workaround
             #k.gate('rx12', [q1])
@@ -223,34 +224,58 @@ def add_two_q_cal_points(p, q0: int, q1: int,
     return p
 
 
-def add_multi_q_cal_points(p, qubits: list,
-                           combinations: list):
+def add_multi_q_cal_points(
+    p, qubits: list,
+    combinations: list = ["00", "01", "10", "11"],
+    reps_per_cal_pnt: int = 1,
+    f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+    return_comb=False
+):
     """
-    Adds calibration points based on a list of state combinations
+    Add a list of kernels containing calibration points in the program `p`
+
+    Args:
+        p               : OpenQL  program to add calibration points to
+        qubits          : list of int
+        combinations    : list with the target multi-qubit state
+            e.g. ["00", "01", "10", "11"] or
+            ["00", "01", "10", "11", "02", "20", "22"] or
+            ["000", "010", "101", "111"]
+        reps_per_cal_pnt : number of times to repeat each cal point
+        f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
+    Returns:
+        p
     """
-    kernel_list = []
+    kernel_list = []  # Not sure if this is needed
+    comb_repetead = []
+    for state in combinations:
+        comb_repetead += [state] * reps_per_cal_pnt
+
+    state_to_gates = {
+        "0": ["i"],
+        "1": ["rx180"],
+        "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
+    }
+
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
-        for q in qubits:
-            k.prepz(q)
 
-        for j, q in enumerate(qubits):
-            if comb[j] == '1':
-                k.gate('rx180', [q])
-            elif comb[j] == '2':
-                k.gate('rx180', [q])
-                k.gate('rx12', [q])
-            else:
-                pass
-        # Used to ensure timing is aligned
-        k.gate('wait', qubits, 0)
+        for q_state, q in zip(comb, qubits):
+            k.prepz(q)
+            for gate in state_to_gates[q_state]:
+                k.gate(gate, [q])
+        k.gate("wait", [], 0)  # alignment
+
         for q in qubits:
             k.measure(q)
-        k.gate('wait', qubits, 0)
+        k.gate('wait', [], 0)  # alignment
         kernel_list.append(k)
         p.add_kernel(k)
-    return p
 
+    if return_comb:
+        return comb_repetead
+    else:
+        return p
 
 #############################################################################
 # File modifications
@@ -261,7 +286,7 @@ def clocks_to_s(time, clock_cycle=20e-9):
     """
     Converts a time in clocks to a time in s
     """
-    return time*clock_cycle
+    return time * clock_cycle
 
 
 def infer_tqisa_filename(qisa_fn: str):
@@ -393,7 +418,7 @@ def split_time_tuples_on_operation(time_tuples, split_op: str):
     return split_tt
 
 
-def substract_time_offset(time_tuples, op_str: str='cw'):
+def substract_time_offset(time_tuples, op_str: str = 'cw'):
     """
     """
     for tt in time_tuples:
@@ -469,8 +494,8 @@ def plot_time_tuples(time_tuples, ax=None, time_unit='s',
 
 def plot_time_tuples_split(time_tuples, ax=None, time_unit='s',
                            mw_duration=20e-9, fl_duration=240e-9,
-                           ro_duration=1e-6, split_op: str='meas',
-                           align_op: str='cw'):
+                           ro_duration=1e-6, split_op: str = 'meas',
+                           align_op: str = 'cw'):
     ttuple_groups = split_time_tuples_on_operation(time_tuples,
                                                    split_op=split_op)
     corr_ttuple_groups = [substract_time_offset(tt, op_str=align_op) for
@@ -565,17 +590,12 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
     if recompile == True:
         return True
     elif recompile == 'as needed':
-        try:
-            if is_more_rencent(program_fn, platf_cfg):
-                return False
-            else:
-                return True  # compilation is required
-        except FileNotFoundError:
-            # File doesn't exist means compilation is required
-            return True
-
+        if isfile(program_fn):
+            return False
+        else:
+            return True  # compilation is required
     elif recompile == False:  # if False
-        if is_more_rencent(program_fn, platf_cfg):
+        if isfile(program_fn):
             return False
         else:
             raise ValueError('OpenQL config has changed more recently '
@@ -591,8 +611,26 @@ def load_range_of_oql_programs(programs, counter_param, CC):
     multiple OpenQL programs such as RB.
     """
     program = programs[counter_param()]
-    counter_param((counter_param()+1) % len(programs))
+    counter_param((counter_param() + 1) % len(programs))
     CC.eqasm_program(program.filename)
+
+
+def load_range_of_oql_programs_from_filenames(
+    programs_filenames: list, counter_param, CC
+):
+    """
+    This is a helper function for running an experiment that is spread over
+    multiple OpenQL programs such as RB.
+
+    [2020-07-04] this is a modification of the above function such that only
+    the filename is passed and not a OpenQL program, allowing for parallel
+    program compilations using the multiprocessing of python (only certain
+    types of data can be returned from the processing running the
+    compilations in parallel)
+    """
+    fn = programs_filenames[counter_param()]
+    counter_param((counter_param() + 1) % len(programs_filenames))
+    CC.eqasm_program(fn)
 
 
 def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
@@ -605,7 +643,7 @@ def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
     points in the detector.
     """
     program = programs[counter_param()]
-    counter_param((counter_param()+1) % len(programs))
+    counter_param((counter_param() + 1) % len(programs))
     CC.eqasm_program(program.filename)
 
     detector.nr_shots = len(program.sweep_points)

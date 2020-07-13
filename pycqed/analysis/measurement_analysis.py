@@ -21,7 +21,7 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.utilities.general import SafeFormatter, format_value_string
 from scipy.ndimage.filters import gaussian_filter
-import imp
+from importlib import reload
 import math
 
 # try:
@@ -59,7 +59,7 @@ from pycqed.analysis import composite_analysis as ca
 #     else:
 #         raise
 
-imp.reload(dm_tools)
+reload(dm_tools)
 
 sfmt = SafeFormatter()
 
@@ -1056,8 +1056,8 @@ class OptimizationAnalysis(MeasurementAnalysis):
             cbar = fig3.colorbar(sc, cax=cbar_ax)
             cbar.set_label('iteration (n)')
         else:
-            axarray.plot(self.sweep_points, self.measured_values[0],
-                         linestyle='--', c='k')
+            # axarray.plot(self.sweep_points, self.measured_values[0],
+            #              linestyle='--', c='k')
             sc = axarray.scatter(self.sweep_points, self.measured_values[0],
                                  c=np.arange(len(self.sweep_points)),
                                  cmap=cm, marker='o', lw=0.1)
@@ -5649,7 +5649,7 @@ class AllXY_Analysis(TD_Analysis):
                                             xlabel=self.xlabel,
                                             ylabel=str(
                                                 self.value_names[i]),
-                                            save=False)
+                                            save=False, label="Measurement")
         ax1.set_ylim(min(self.corr_data) - .1, max(self.corr_data) + .1)
         if self.flip_axis:
             ylabel = r'$F$ $|0 \rangle$'
@@ -5660,8 +5660,8 @@ class AllXY_Analysis(TD_Analysis):
                                         fig=fig1, ax=ax1,
                                         xlabel='',
                                         ylabel=ylabel,
-                                        save=False)
-        ax1.plot(self.sweep_points, ideal_data)
+                                        save=False, label="Measurement")
+        ax1.plot(self.sweep_points, ideal_data, label="Ideal")
         labels = [item.get_text() for item in ax1.get_xticklabels()]
         if len(self.measured_values[0]) == 42:
             locs = np.arange(1, 42, 2)
@@ -5675,9 +5675,18 @@ class AllXY_Analysis(TD_Analysis):
         ax1.xaxis.set_ticks(locs)
         ax1.set_xticklabels(labels, rotation=60)
 
-        deviation_text = r'Deviation: %.5f' % self.deviation_total
-        ax1.text(1, 1.05, deviation_text, fontsize=11,
-                 bbox=self.box_props)
+        if kw.pop("plot_deviation", True):
+            deviation_text = r'Deviation: %.5f' % self.deviation_total
+            ax1.text(1, 1.05, deviation_text, fontsize=11,
+                     bbox=self.box_props)
+        legend_loc = "lower right"
+        if len(self.value_names) > 1:
+            [ax.legend(loc=legend_loc) for ax in axarray]
+        else:
+            axarray.legend(loc=legend_loc)
+
+        ax1.legend(loc=legend_loc)
+
         if not close_main_fig:
             # Hacked in here, good idea to only show the main fig but can
             # be optimized somehow
@@ -10531,7 +10540,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
 
 # analysis functions
-def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True):
+def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True, sampling_rate=1.8e9):
     # predistortion_matrix = np.array(
     #     ((1,  np.tan(phi*2*np.pi/360)),
     #      (0, 1/alpha * 1/np.cos(phi*2*np.pi/360))))
@@ -10540,7 +10549,7 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
          (0, alpha * np.cos(phi * 2 * np.pi / 360))))
 
     trace_length = len(Ivals)
-    tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
+    tbase = np.arange(0, trace_length / sampling_rate, 1 / sampling_rate)
     if predistort:
         Ivals = Ivals - I_o
         Qvals = Qvals - Q_o

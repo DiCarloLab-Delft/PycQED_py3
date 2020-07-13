@@ -2,11 +2,11 @@
 omit =
     __init__.py
     */__init__.py
-    test.py
+    # not present anymore: test.py
     tests/*
-    instrument_drivers/physical_instruments/*
+    # we have some tests now, let's stimulate people to expand: instrument_drivers/physical_instruments/*
     analysis/*
-    scripts/*
-    utils/reload_code.py
+    # not present anymore: scripts/*
+    # not present anymore: utils/reload_code.py
     version.py
 

@@ -15,6 +15,7 @@ from functools import partial
 import logging
 import operator
 import random
+from pycqed.utilities.general import get_module_name
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +39,9 @@ class Learner1D_Minimizer(Learner1D):
     """
 
     def __init__(self, func, bounds, loss_per_interval=None):
+        # Sanity check that can save hours of debugging...
+        assert bounds[1] > bounds[0]
+
         super().__init__(func, bounds, loss_per_interval)
         # Keep the orignal learner behaviour but pass extra arguments to
         # the provided input loss function
@@ -118,6 +122,14 @@ def mk_res_loss_func(
     min_distance_orig = min_distance
     max_distance_orig = max_distance
 
+    # Wrappers to make it work with the default loss of `adaptive` package
+    if get_module_name(default_loss_func, level=0) == "adaptive":
+        def _default_loss_func(xs, values, *args, **kw):
+            return default_loss_func(xs, values)
+    else:
+        def _default_loss_func(xs, values, *args, **kw):
+            return default_loss_func(xs, values, *args, **kw)
+
     def func(xs, values, *args, **kw):
         if dist_is_norm:
             min_distance_used = min_distance_orig
@@ -136,7 +148,7 @@ def mk_res_loss_func(
             # on the distance between them
             loss = np.inf
         else:
-            loss = default_loss_func(xs, values, *args, **kw)
+            loss = _default_loss_func(xs, values, *args, **kw)
         return loss
 
     if not dist_is_norm:

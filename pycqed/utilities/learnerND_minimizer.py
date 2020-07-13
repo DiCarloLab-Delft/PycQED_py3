@@ -28,9 +28,9 @@ class LearnerND_Minimizer(LearnerND):
     Does everything that the LearnerND does plus wraps it such that
     `mk_optimize_res_loss_func` can be used
 
-    It also accepts using loss fucntions made by
+    It also accepts using loss functions made by
     `mk_non_uniform_res_loss_func` and `mk_vol_limits_loss_func`
-    inluding providing one of the loss functions from
+    including providing one of the loss functions from
     adaptive.learner.learnerND
 
     The resolution loss function in this doc are built such that some
@@ -39,10 +39,10 @@ class LearnerND_Minimizer(LearnerND):
 
     def __init__(self, func, bounds, loss_per_simplex=None):
         super().__init__(func, bounds, loss_per_simplex)
-        # Keep the orignal learner behaviour but pass extra arguments to
+        # Keep the original learner behavior but pass extra arguments to
         # the provided input loss function
         if hasattr(self.loss_per_simplex, "needs_learner_access"):
-            # Save the loss fucntion that requires the learner instance
+            # Save the loss function that requires the learner instance
             input_loss_per_simplex = self.loss_per_simplex
             self.loss_per_simplex = partial(input_loss_per_simplex, learner=self)
 
@@ -65,7 +65,7 @@ class LearnerND_Minimizer(LearnerND):
                 self.max_no_improve_in_local = (
                     input_loss_per_simplex.max_no_improve_in_local
                 )
-                assert self.max_no_improve_in_local >= 2
+                assert self.max_no_improve_in_local >= 1
             else:
                 self.max_no_improve_in_local = 7
 
@@ -133,7 +133,7 @@ def mk_vol_limits_loss_func(
         else:
             return default_loss_func(simplex, values, value_scale, *args, **kw)
 
-    # Preserve loss function atribute in case a loss function from
+    # Preserve loss function attribute in case a loss function from
     # adaptive.learner.learnerND is given
     if hasattr(default_loss_func, "nth_neighbors"):
         func.nth_neighbors = default_loss_func.nth_neighbors
@@ -207,7 +207,7 @@ def mk_minimization_loss(
             compare_op_start if learner.compare_op is None else learner.compare_op
         )
 
-        # `vol` is normalised 0 <= vol <= 1 because the domain is scaled to a
+        # `vol` is normalized 0 <= vol <= 1 because the domain is scaled to a
         # unit hypercube
         vol = volume(simplex)
 
@@ -215,7 +215,7 @@ def mk_minimization_loss(
         # finite value such that `vol` can be added
 
         # We ignore one of the points to be more resilient to noise, outliers
-        # and still sample simpleces that might have a non optimal value only
+        # and still sample simplices that might have a non optimal value only
         # on one of the vertices
         dist_best = np.average(
             learner._max_value - np.sort(values)[:-1] * learner._scale
@@ -342,7 +342,7 @@ def mk_minimization_loss_func(
 
     func.needs_learner_access = True
 
-    # This is inteded to accessed by the learner and goal func
+    # This is intended to accessed by the learner and goal func
     # Just to make life easier for the user
     func.threshold = threshold
     func.converge_at_local = converge_at_local
@@ -364,11 +364,7 @@ def mk_minimization_goal_func():
     def goal(learner):
         # No action if no points
         if len(learner.data):
-            # if len(learner.data) > 2 ** learner.ndim:  # Not sure if this is still needed
-            # print("\n\n", learner.npoints, " sampling local: ", learner.sampling_local_minima)
-            # print(learner.npoints, " learner.no_improve_count: ", learner.no_improve_count)
-            # print(learner.npoints, " max_loss: ", np.max(list(learner._losses.values())))
-            if len(learner.data) < 2:
+            if learner.moving_threshold == np.inf:
                 # First point, just take it as the threshold
                 # Do it here to make sure calculation with the
                 # `moving_threshold` don't run into numerical issues with inf

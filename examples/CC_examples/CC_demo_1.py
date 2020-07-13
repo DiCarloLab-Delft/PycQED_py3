@@ -5,11 +5,10 @@ import logging
 import sys
 import numpy as np
 
-from pycqed.instrument_drivers.physical_instruments.Transport import IPTransport
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.library.Transport import IPTransport
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 
 # parameter handling
 sel = 0
@@ -57,7 +56,7 @@ if sel==2:  # Rabi
 
 if 1:
     log.debug('connecting to CC')
-    cc = QuTechCC('cc', IPTransport(ip))
+    cc = CC('cc', IPTransport(ip))
     cc.reset()
     cc.clear_status()
     cc.status_preset()
