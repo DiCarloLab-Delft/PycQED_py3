@@ -103,9 +103,10 @@ def compute_betas_weight1(qubit_state_avg, matrix_B, num_qubits, cal_point_seg_s
     op_idx_w1 = np.zeros((num_qubits, 2), dtype=int)
     for i in range(num_qubits):
         op_list_bin = [format(0, '#0{}b'.format(num_qubits+2))[2:],
-                       format(2**(3-i), '#0{}b'.format(num_qubits+2))[2:]]
+                       format(2**(num_qubits-1-i), '#0{}b'.format(num_qubits+2))[2:]]
         op_id_list = [int(op, 2) for op in op_list_bin]
         op_idx_w1[i, :] = op_id_list
+        print(op_id_list,op_idx_w1)
 
         submatrix_B = matrix_B[op_id_list, :]
         inv_subB = np.linalg.pinv(submatrix_B).transpose()
@@ -115,12 +116,12 @@ def compute_betas_weight1(qubit_state_avg, matrix_B, num_qubits, cal_point_seg_s
 def compute_betas_weight2(matrix_B, correl_avg, correlations, idx_qubit_ro, num_qubits, cal_point_seg_start):
     """
     """
-    betas_w2 = np.zeros((len(correlations), len(correlations)))
-    op_idx_w2 = np.zeros((len(correlations), len(correlations)),
+    betas_w2 = np.zeros((len(correlations), 4))
+    op_idx_w2 = np.zeros((len(correlations), 4), # 4 comes out of 4 combinations in weight2 measurement operator
                          dtype=int)
     for i_c, c in enumerate(correlations):
-        z0 = 2**(3-idx_qubit_ro.index(c[0]))
-        z1 = 2**(3-idx_qubit_ro.index(c[1]))
+        z0 = 2**(num_qubits-1-idx_qubit_ro.index(c[0]))
+        z1 = 2**(num_qubits-1-idx_qubit_ro.index(c[1]))
         z0z1 = z1+z0
         op_list_bin = [format(0, '#0{}b'.format(num_qubits+2))[2:],
                        format(z0, '#0{}b'.format(num_qubits+2))[2:],

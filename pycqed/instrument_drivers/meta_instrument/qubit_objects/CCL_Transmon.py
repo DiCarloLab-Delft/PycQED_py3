@@ -1,4 +1,3 @@
-
 import time
 import logging
 import numpy as np
@@ -14,8 +13,6 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.utilities.general import gen_sweep_pts
-from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
-    mk_optimize_res_loss_func
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
     mk_minimization_loss_func, mk_minimization_goal_func
 
@@ -27,7 +24,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement import calibration_toolbox as cal_toolbox
 from pycqed.measurement.openql_experiments.openql_helpers import \
-    load_range_of_oql_programs
+    load_range_of_oql_programs, load_range_of_oql_programs_from_filenames
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
@@ -37,6 +34,7 @@ import pytest
 import cma
 from pycqed.measurement.optimization import nelder_mead
 import datetime
+import multiprocessing
 
 # Imported for a type check
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
@@ -233,7 +231,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter(
-            'ro_acq_delay',  unit='s',
+            'ro_acq_delay', unit='s',
             label='Readout acquisition delay',
             vals=vals.Numbers(min_value=0),
             initial_value=0,
@@ -244,7 +242,7 @@ class CCLight_Transmon(Qubit):
                        'acquisition is started after the pulse is send.'))
 
         self.add_parameter(
-            'ro_acq_mixer_phi',  unit='degree',
+            'ro_acq_mixer_phi', unit='degree',
             label='Readout mixer phi',
             vals=vals.Numbers(),
             initial_value=0,
@@ -253,7 +251,7 @@ class CCLight_Transmon(Qubit):
                        'real time'))
 
         self.add_parameter(
-            'ro_acq_mixer_alpha',  unit='',
+            'ro_acq_mixer_alpha', unit='',
             label='Readout mixer alpha',
             vals=vals.Numbers(min_value=0.8),
             initial_value=1,
@@ -262,7 +260,7 @@ class CCLight_Transmon(Qubit):
                        'real time'))
 
         self.add_parameter(
-            'ro_acq_input_average_length',  unit='s',
+            'ro_acq_input_average_length', unit='s',
             label='Readout acquisition delay',
             vals=vals.Numbers(min_value=0, max_value=4096/1.8e9),
             initial_value=4096/1.8e9,
@@ -307,10 +305,10 @@ class CCLight_Transmon(Qubit):
             initial_value=0,
             parameter_class=ManualParameter)
         self.add_parameter('ro_acq_integration_length_weigth_function', vals=vals.Numbers(
-            min_value=0, max_value=4096/1.8e9),
+            min_value=0, max_value=4096 / 1.8e9),
             docstring=(
             'sets weight function elements to 0 beyond this time'),
-            initial_value=4096/1.8e9,
+            initial_value=4096 / 1.8e9,
             parameter_class=ManualParameter)
 
         # self.add_parameter('cal_pt_zero',
@@ -490,8 +488,11 @@ class CCLight_Transmon(Qubit):
             lutman = self.find_instrument(self.instr_LutMan_MW())
             AWG = lutman.find_instrument(lutman.AWG())
             if self._using_QWG():
-                logging.warning(
-                    'CCL transmon is using QWG. mw_fine_delay not supported.')
+                if val != 0.0:
+                    logging.warning(
+                        'CCL transmon is using QWG. mw_fine_delay not supported!'
+                        'Adding zeros to waveforms. Intended for delays measurement only!')
+                lutman.pulse_delay(val)
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_Q()-1), val)
@@ -1588,7 +1589,7 @@ class CCLight_Transmon(Qubit):
         return frequency_sweet_spot
 
     def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
-                                    mode='pulsed_marked', update=True):
+                                    mode='pulsed_marked', update=True, power_12=10):
         """
         Finds an estimate of the anharmonicity by doing a spectroscopy around
         150 MHz below the qubit frequency.
@@ -1609,7 +1610,7 @@ class CCLight_Transmon(Qubit):
             freqs = np.arange(freq_center-1/2*freq_range, self.freq_qubit()+1/2*freq_range,
                               0.5e6)
         old_spec_pow = self.spec_pow()
-        self.spec_pow(self.spec_pow()+10)
+        self.spec_pow(self.spec_pow()+power_12)
 
         self.measure_spectroscopy(freqs=freqs, mode=mode, analyze=False)
 
@@ -5240,10 +5241,16 @@ class CCLight_Transmon(Qubit):
             return a
 
     def measure_single_qubit_randomized_benchmarking(
-            self, nr_cliffords=2**np.arange(12), nr_seeds=100,
+            self, nr_cliffords=2**np.arange(12),
+            nr_seeds=100,
             MC=None,
-            recompile: bool = 'as needed', prepare_for_timedomain: bool = True,
-            ignore_f_cal_pts: bool = False):
+            recompile: bool = 'as needed',
+            prepare_for_timedomain: bool = True,
+            ro_acq_weight_type: str = "optimal IQ",
+            compile_only: bool = False,
+            pool=None,  # a multiprocessing.Pool()
+            rb_tasks=None  # used after called with `compile_only=True`
+    ):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -5277,13 +5284,10 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        counter_param = ManualParameter('name_ctr', initial_value=0)
-        programs = []
-
         # Settings that have to be changed....
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        self.ro_acq_weight_type('SSB')
+        self.ro_acq_weight_type(ro_acq_weight_type)
         self.ro_acq_digitized(False)
 
         if prepare_for_timedomain:
@@ -5299,53 +5303,76 @@ class CCLight_Transmon(Qubit):
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
 
-        t0 = time.time()
         net_cliffords = [0, 3]  # always measure double sided
-        print('Generating {} RB programs'.format(nr_seeds))
-        for i in range(nr_seeds):
-            p = cl_oql.randomized_benchmarking(
-                qubits=[self.cfg_qubit_nr()],
-                nr_cliffords=nr_cliffords,
-                net_cliffords=net_cliffords,  # always measure double sided
-                nr_seeds=1,
-                platf_cfg=self.cfg_openql_platform_fn(),
-                program_name='RB_s{}_ncl{}_net{}_{}'.format(
-                    i, nr_cliffords, net_cliffords, self.name),
-                recompile=recompile)
-            programs.append(p)
-            print('Generated {} RB programs in {:.1f}s'.format(
-                i+1, time.time()-t0), end='\r')
-        print('Succesfully generated {} RB programs in {:.1f}s'.format(
-            nr_seeds, time.time()-t0))
+
+        def send_rb_tasks(pool_):
+            tasks_inputs = []
+            for i in range(nr_seeds):
+                task_dict = dict(
+                    qubits=[self.cfg_qubit_nr()],
+                    nr_cliffords=nr_cliffords,
+                    net_cliffords=net_cliffords,  # always measure double sided
+                    nr_seeds=1,
+                    platf_cfg=self.cfg_openql_platform_fn(),
+                    program_name='RB_s{}_ncl{}_net{}_{}'.format(
+                        i, nr_cliffords, net_cliffords, self.name),
+                    recompile=recompile
+                )
+                tasks_inputs.append(task_dict)
+            # pool.starmap_async can be used for positional arguments
+            # but we are using a wrapper
+            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+
+            return rb_tasks
+
+        if compile_only:
+            assert pool is not None
+            rb_tasks = send_rb_tasks(pool)
+            return rb_tasks
+
+        if rb_tasks is None:
+            # Using `with ...:` makes sure the other processes will be terminated
+            # avoid starting too mane processes,
+            # nr_processes = None will start as many as the PC can handle
+            nr_processes = None if recompile else 1
+            with multiprocessing.Pool(nr_processes) as pool:
+                rb_tasks = send_rb_tasks(pool)
+                cl_oql.wait_for_rb_tasks(rb_tasks)
+
+        programs_filenames = rb_tasks.get()
+
+        counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
             'counter_param': counter_param,
-            'programs': programs,
+            'programs_filenames': programs_filenames,
             'CC': self.instr_CC.get_instr()}
 
         # to include calibration points
         sweep_points = np.append(
             # repeat twice because of net clifford being 0 and 3
             np.repeat(nr_cliffords, 2),
-            [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2 +
-            [nr_cliffords[-1]+2.5]*2,
+            [nr_cliffords[-1] + .5] * 2 + [nr_cliffords[-1] + 1.5] * 2 +
+            [nr_cliffords[-1] + 2.5] * 2,
         )
 
         d = self.int_log_det
-        d.prepare_function = load_range_of_oql_programs
+        d.prepare_function = load_range_of_oql_programs_from_filenames
         d.prepare_function_kwargs = prepare_function_kwargs
-        reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        reps_per_seed = 4094 // len(sweep_points)
+        d.nr_shots = reps_per_seed * len(sweep_points)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
         MC.set_detector_function(d)
-        MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix,
+        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix,
                exp_metadata={'bins': sweep_points})
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
-            label='RB_', ignore_f_cal_pts=ignore_f_cal_pts)
+            label='RB_',
+            rates_I_quad_ch_idx=0,
+            cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2))
         return a
 
     def measure_randomized_benchmarking_old(self, nr_cliffords=2**np.arange(12),
@@ -5437,7 +5464,8 @@ class CCLight_Transmon(Qubit):
         p = sqo.ef_rabi_seq(
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
-            platf_cfg=self.cfg_openql_platform_fn())
+            platf_cfg=self.cfg_openql_platform_fn(),
+            add_cal_points = True)
 
         s = swf.OpenQL_Sweep(openql_program=p,
                              parameter_name='Pulse amp',

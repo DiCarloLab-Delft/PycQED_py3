@@ -44,8 +44,12 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
         options_dict: dict = None,
         extract_only: bool = False,
         do_fitting: bool = True,
-        close_figs=True,
-        auto=True,
+        close_figs: bool = True,
+        auto: bool = True,
+        hide_lines: bool = False,
+        hide_pnts: bool = False,
+        plt_sorted_x: bool = True,
+        legend_labels: list = None
     ):
         super().__init__(
             t_start=t_start,
@@ -75,17 +79,27 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
             self.params_dict["x2"] = x2
             self.numeric_params = ["x2"]
 
+        # Adaptive measurements need sorting to avoid messy line plotting
+        self.plt_sorted_x = plt_sorted_x
+
+        # In case you only want one of them
+        self.hide_pnts = hide_pnts
+        self.hide_lines = hide_lines
+
+        # Set specific legend label when specifying  `t_start` and `t_stop`
+        self.legend_labels = legend_labels
+
         if auto:
             self.run_analysis()
 
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
-
-        setlabel = self.raw_data_dict.get("x2", self.timestamps)
+        labels = self.legend_labels if self.legend_labels is not None else self.timestamps
+        setlabel = self.raw_data_dict.get("x2", labels)
         if "x2" in self.options_dict.keys():
             legend_title = self.options_dict.get("x2_label", self.options_dict["x2"])
         else:
-            legend_title = "timestamp"
+            legend_title = "timestamp" if self.legend_labels is None else ""
 
         for i, val_name in enumerate(self.raw_data_dict["value_names"][0]):
 
@@ -112,43 +126,52 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
             # Sort points, necessary for adaptive sampling
             arg_sort = np.argsort(xvals)
 
-            self.plot_dicts[val_name + "_line"] = {
-                "ax_id": val_name,
-                "plotfn": self.plot_line,
-                "xvals": [xval_i[argsort_i] for xval_i, argsort_i in zip(xvals, arg_sort)],
-                "xlabel": self.raw_data_dict["xlabel"][0],
-                "xunit": self.raw_data_dict["xunit"][0][0],
-                "yvals": [yval_i[argsort_i] for yval_i, argsort_i in zip(yvals, arg_sort)],
-                "ylabel": val_name,
-                "yrange": self.options_dict.get("yrange", None),
-                "xrange": self.options_dict.get("xrange", None),
-                "yunit": self.raw_data_dict["value_units"][0][i],
-                "setlabel": setlabel,
-                "legend_title": legend_title,
-                "title": (
-                    self.raw_data_dict["timestamps"][0]
-                    + " - "
-                    + self.raw_data_dict["timestamps"][-1]
-                    + "\n"
-                    + self.raw_data_dict["measurementstring"][0]
-                ),
-                "do_legend": do_legend,
-                "legend_pos": "upper right",
-                "marker": "",  # don't use markers
-                "linestyle": "-"
-            }
+            if not self.hide_lines:
+                self.plot_dicts[val_name + "_line"] = {
+                    "ax_id": val_name,
+                    "plotfn": self.plot_line,
+                    "xvals": [xval_i[argsort_i] for xval_i, argsort_i in zip(xvals, arg_sort)],
+                    "xlabel": self.raw_data_dict["xlabel"][0],
+                    "xunit": self.raw_data_dict["xunit"][0][0],
+                    "yvals": [yval_i[argsort_i] for yval_i, argsort_i in zip(yvals, arg_sort)],
+                    "ylabel": val_name,
+                    "yrange": self.options_dict.get("yrange", None),
+                    "xrange": self.options_dict.get("xrange", None),
+                    "yunit": self.raw_data_dict["value_units"][0][i],
+                    "setlabel": setlabel,
+                    "legend_title": legend_title,
+                    "title": (
+                        self.raw_data_dict["timestamps"][0]
+                        + " - "
+                        + self.raw_data_dict["timestamps"][-1]
+                        + "\n"
+                        + self.raw_data_dict["measurementstring"][0]
+                    ),
+                    "do_legend": do_legend,
+                    "legend_pos": "best",
+                    "marker": "",  # don't use markers
+                    "linestyle": "-"
+                }
 
-            self.plot_dicts[val_name + "_scatter"] = {
-                "ax_id": val_name,
-                "plotfn": scatter_pnts_overlay,
-                "x": xvals,
-                "y": yvals,
-                "color": None,
-                "edgecolors": "black",
-                "marker": "o",
-                "c": [range(len(xval)) for xval in xvals],
-                "cmap": "plasma",
-            }
+            if not self.hide_pnts:
+                self.plot_dicts[val_name + "_scatter"] = {
+                    "ax_id": val_name,
+                    "plotfn": scatter_pnts_overlay,
+                    "x": xvals,
+                    "y": yvals,
+                    "color": None,
+                    "edgecolors": "black",
+                    "marker": "o",
+                }
+                if self.plt_sorted_x:
+                    # For adaptive sampling it is useful to know the sampling
+                    # order
+                    self.plot_dicts[val_name + "_scatter"]["c"] = (
+                        [range(len(xval)) for xval in xvals]
+                    )
+                    self.plot_dicts[val_name + "_scatter"]["cmap"] = (
+                        "plasma"
+                    )
 
 
 class Basic1DBinnedAnalysis(ba.BaseDataAnalysis):
@@ -256,7 +279,10 @@ class Basic2DAnalysis(Basic1DAnalysis):
         # assumes that value names are unique in an experiment
         super().prepare_plots()
         for i, val_name in enumerate(self.raw_data_dict["value_names"][0]):
-            self.plot_dicts[val_name]["cmap"] = "viridis"
+
+            if not self.hide_lines:
+                # Use same color scale for 1D curves
+                self.plot_dicts[val_name + "_line"]["cmap"] = "viridis"
 
             if "x2" in self.raw_data_dict.keys():
                 xvals = self.raw_data_dict["x2"]

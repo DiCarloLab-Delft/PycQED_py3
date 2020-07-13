@@ -766,7 +766,8 @@ def Ram_Z(qubit_name,
 
 def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
                           flux_cw: str = 'fl_cw_02',
-                          cal_points: bool = True):
+                          cal_points: bool = True,
+                          mw_gate: str = "rx90"):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
@@ -779,7 +780,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         t_nanoseconds = int(round(t/1e-9))
         k = oqh.create_kernel('pi_flux_pi_{}'.format(i_t), p)
         k.prepz(qubit_idx)
-        k.gate('rx90', [qubit_idx])
+        k.gate(mw_gate, [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         k.gate("wait", [], 0)  # alignment workaround
         # k.gate(flux_cw, [2, 0])
@@ -788,7 +789,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
             # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
             k.gate("wait", [], t_nanoseconds)  # alignment workaround
             # k.gate("wait", [qubit_idx], t_nanoseconds)
-        k.gate('rx90', [qubit_idx])
+        k.gate(mw_gate, [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -986,4 +987,57 @@ def ef_rabi_seq(q0: int,
     except TypeError:
         # openql-0.5 compatibility
         p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    return p
+
+
+def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
+    """
+    Input pars:
+        times:          the list of waiting times for each ALLXY element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+    """
+
+    allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+             ['rx180', 'ry180'], ['ry180', 'rx180'],
+             ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+             ['ry90', 'rx90'], ['rx90', 'ry180'], ['ry90', 'rx180'],
+             ['rx180', 'ry90'], ['ry180', 'rx90'], ['rx90', 'rx180'],
+             ['rx180', 'rx90'], ['ry90', 'ry180'], ['ry180', 'ry90'],
+             ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+             ['ry90', 'ry90']]
+
+    p = oqh.create_program('Depletion', platf_cfg)
+
+    try:
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+
+    if double_points:
+        js=2
+    else:
+        js=1
+
+    for i, xy in enumerate(allXY):
+        for j in range(js):
+            k = oqh.create_kernel('Depletion_{}_{}'.format(i, j), p)
+            # Prepare qubit
+            k.prepz(qubit_idx)
+            # Initial measurement
+            k.measure(qubit_idx)
+            # Wait time
+            wait_nanoseconds = int(round(time/1e-9))
+            k.gate("wait", [qubit_idx], wait_nanoseconds)
+            # AllXY pulse
+            k.gate(xy[0], [qubit_idx])
+            k.gate(xy[1], [qubit_idx])
+            # Final measurement
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    p = oqh.compile(p)
     return p

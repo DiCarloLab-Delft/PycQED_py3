@@ -3,6 +3,7 @@ from qcodes.utils.validators import Validator, Strings
 
 import numpy as np
 
+
 class NP_NANs(Validator):
     is_numeric = True
 
@@ -17,7 +18,7 @@ class NP_NANs(Validator):
             if not np.isnan(value):
                 raise ValueError('{} is not nan; {}'.format(
                     repr(value), context))
-        except:
+        except Exception:
             raise ValueError('{} is not nan; {}'.format(
                 repr(value), context))
 

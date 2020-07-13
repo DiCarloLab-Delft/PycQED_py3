@@ -60,8 +60,8 @@ from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,
     Basic2DAnalysis, Basic2DInterpolatedAnalysis)
 from pycqed.analysis_v2.timedomain_analysis import (
-    FlippingAnalysis, Intersect_Analysis, CZ_1QPhaseCal_Analysis,
-    Oscillation_Analysis,
+    FlippingAnalysis, Intersect_Analysis,
+    Oscillation_Analysis, Crossing_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,
     Grovers_TwoQubitAllStates_Analysis)
 from pycqed.analysis_v2.readout_analysis import (
@@ -69,7 +69,8 @@ from pycqed.analysis_v2.readout_analysis import (
     Dispersive_shift_Analysis, Readout_landspace_Analysis)
 
 from pycqed.analysis_v2.multiplexed_readout_analysis import \
-    Multiplexed_Readout_Analysis
+    Multiplexed_Readout_Analysis, Multiplexed_Transient_Analysis,\
+    Multiplexed_Weights_Analysis
 
 from pycqed.analysis_v2.syndrome_analysis import (
     Single_Qubit_RoundsToEvent_Analysis, One_Qubit_Paritycheck_Analysis)
@@ -101,7 +102,8 @@ from pycqed.analysis_v2.randomized_benchmarking_analysis import (
     RandomizedBenchmarking_TwoQubit_Analysis,
     UnitarityBenchmarking_TwoQubit_Analysis,
     InterleavedRandomizedBenchmarkingAnalysis,
-    CharacterBenchmarking_TwoQubit_Analysis)
+    CharacterBenchmarking_TwoQubit_Analysis,
+    InterleavedRandomizedBenchmarkingParkingAnalysis)
 from pycqed.analysis_v2.gate_set_tomography_analysis import \
     GST_SingleQubit_DataExtraction, GST_TwoQubit_DataExtraction
 
