@@ -3611,7 +3611,7 @@ class DeviceCCL(Instrument):
         amount of idle time on the experimental setup
         """
         if not iRB_kw["recompile"]:
-            log.error(
+            log.warning(
                 "iRB statistics are intended to be measured while " +
                 "recompiling the RB sequences!"
             )
@@ -3936,6 +3936,7 @@ class DeviceCCL(Instrument):
                     recompile=recompile,
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
+                    rb_on_parked_qubit_only=rb_on_parked_qubit_only,
                     compile_only=True,
                     pool=pool
                 )
@@ -3954,6 +3955,7 @@ class DeviceCCL(Instrument):
                 recompile=recompile,
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
                 compile_only=True,
                 pool=pool
             )
@@ -3966,6 +3968,7 @@ class DeviceCCL(Instrument):
                 recompile=False,  # This of course needs to be False
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
                 rb_tasks=rb_tasks_start,
             )
 
@@ -3983,6 +3986,7 @@ class DeviceCCL(Instrument):
                     recompile=recompile,
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
+                    rb_on_parked_qubit_only=rb_on_parked_qubit_only,
                     compile_only=True,
                     pool=pool
                 )
@@ -3995,6 +3999,7 @@ class DeviceCCL(Instrument):
                 recompile=False,
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
                 rb_tasks=rb_tasks_CZ_park,
             )
 
@@ -4035,7 +4040,8 @@ class DeviceCCL(Instrument):
                 interleaving_cliffords=[None],
                 recompile=recompile,
                 flux_codeword=flux_codeword,
-                nr_seeds=nr_seeds
+                nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
             )
 
             # Perform two-qubit RB with CZ interleaved
@@ -4046,7 +4052,8 @@ class DeviceCCL(Instrument):
                 interleaving_cliffords=[200_000],
                 recompile=recompile,
                 flux_codeword=flux_codeword,
-                nr_seeds=nr_seeds
+                nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
             )
 
             ma2.InterleavedRandomizedBenchmarkingParkingAnalysis(
@@ -4296,18 +4303,20 @@ class DeviceCCL(Instrument):
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
-        # old_weight_type = self.ro_acq_weight_type()
+        old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
         # [2020-07-02] 'optimal IQ' mode is the standard now,
-        # set it before running
-        # self.ro_acq_weight_type("SSB")
+        self.ro_acq_weight_type("optimal IQ")
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
 
+        # Need to be created before setting back the ro mode
+        d = self.get_int_logging_detector(qubits=qubits)
+
         MC.soft_avg(1)
         # set back the settings
-        # self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
         for q in qubits:
@@ -4383,8 +4392,6 @@ class DeviceCCL(Instrument):
         else:
             sweep_points = np.repeat(nr_cliffords, 10)
 
-        d = self.get_int_logging_detector(qubits=qubits)
-
         counter_param = ManualParameter("name_ctr", initial_value=0)
         prepare_function_kwargs = {
             "counter_param": counter_param,
@@ -4395,7 +4402,8 @@ class DeviceCCL(Instrument):
         # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
         d.set_prepare_function(
-            oqh.load_range_of_oql_programs, prepare_function_kwargs, detectors="first"
+            oqh.load_range_of_oql_programs, prepare_function_kwargs,
+            detectors="first"
         )
         # d.nr_averages = 128
 
