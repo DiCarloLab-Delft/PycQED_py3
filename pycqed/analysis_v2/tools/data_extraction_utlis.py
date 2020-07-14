@@ -58,6 +58,7 @@ def extract_qois_and_msmt_times(
         exact_label_match=exact_label_match,
         folder=folder,
     )
+    timestamps.sort()
     extr_list = []
     failed_ts = []
     for ts in timestamps:
