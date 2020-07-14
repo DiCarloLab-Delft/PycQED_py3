@@ -3402,7 +3402,7 @@ class DeviceCCL(Instrument):
         ),
         nr_seeds=100,
         interleaving_cliffords=[None],
-        label="TwoQubit_RB_{}seeds_icl{}_{}_{}_{}",
+        label="TwoQubit_RB_{}seeds_recompile={}_icl{}_{}_{}_{}",
         recompile: bool = "as needed",
         cal_points=True,
         flux_codeword="cz",
@@ -3592,6 +3592,7 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
         label = label.format(
             nr_seeds,
+            recompile,
             interleaving_cliffords,
             qubits[0],
             qubits[1],
@@ -3628,7 +3629,7 @@ class DeviceCCL(Instrument):
         rounds_success = np.zeros(nr_iRB_runs)
         t0 = time.time()
         # `maxtasksperchild` is specified to free up the memory from time to time
-        with multiprocessing.Pool(maxtasksperchild=400) as pool:
+        with multiprocessing.Pool(maxtasksperchild=100) as pool:
             rb_tasks_start = None
             last_run = nr_iRB_runs - 1
             for i in range(nr_iRB_runs):
@@ -4224,8 +4225,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
 
         MC.set_detector_function(d)
-        label = 'RB_{}_{}_park_{}_{}seeds_rb_park_only={}_icl{}'.format(
-            *qubits, nr_seeds, rb_on_parked_qubit_only, interleaving_cliffords)
+        label = 'RB_{}_{}_park_{}_{}seeds_recompile={}_rb_park_only={}_icl{}'.format(
+            *qubits, nr_seeds, recompile, rb_on_parked_qubit_only, interleaving_cliffords)
         label += self.msmt_suffix
         # FIXME should include the indices in the exp_metadata and
         # use that in the analysis instead of being dependent on the
@@ -4564,7 +4565,7 @@ class DeviceCCL(Instrument):
         nr_cliffords=2 ** np.arange(11),
         nr_seeds=100,
         interleaving_cliffords=[None],
-        label="TwoQubit_sim_RB_{}seeds_{}_{}",
+        label="TwoQubit_sim_RB_{}seeds_recompile={}_{}_{}",
         recompile: bool = "as needed",
         cal_points: bool = True,
         ro_acq_weight_type: str = "optimal IQ",
@@ -4712,7 +4713,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
 
         MC.set_detector_function(d)
-        label = label.format(nr_seeds, qubits[0], qubits[1])
+        label = label.format(nr_seeds, recompile, qubits[0], qubits[1])
         MC.run(label, exp_metadata={"bins": sweep_points})
 
         # N.B. if interleaving cliffords are used, this won't work
