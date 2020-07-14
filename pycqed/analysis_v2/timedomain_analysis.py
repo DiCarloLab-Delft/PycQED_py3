@@ -1385,14 +1385,10 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         ax.tick_params(axis="x", labelrotation=45)
 
 
-class Crossing_Analysis(Single_Qubit_TimeDomainAnalysis):
+class Crossing_Analysis(ba.BaseDataAnalysis):
     """
-    Analysis to extract the intercept of two parameters.
-
-    relevant options_dict parameters
-        ch_idx_A (int) specifies first channel for intercept
-        ch_idx_B (int) specifies second channel for intercept if same as first
-            it will assume data was taken interleaved.
+    Analysis to extract the intercept of a parameter with the `target_crossing`
+    The interception measured quantity is defined by `ch_idx`
     """
 
     def __init__(
@@ -1400,12 +1396,13 @@ class Crossing_Analysis(Single_Qubit_TimeDomainAnalysis):
         t_start: str = None,
         t_stop: str = None,
         label: str = "",
+        target_crossing: float = 0,
+        ch_idx: int = -1,
         data_file_path: str = None,
         options_dict: dict = None,
         extract_only: bool = False,
         do_fitting: bool = True,
         auto=True,
-        normalized_probability=False,
     ):
 
         super().__init__(
@@ -1419,8 +1416,6 @@ class Crossing_Analysis(Single_Qubit_TimeDomainAnalysis):
         )
         self.single_timestamp = False
 
-        self.normalized_probability = normalized_probability
-
         self.params_dict = {
             "xlabel": "sweep_name",
             "xvals": "sweep_points",
@@ -1431,19 +1426,17 @@ class Crossing_Analysis(Single_Qubit_TimeDomainAnalysis):
             "measured_values": "measured_values",
         }
 
+        self.target_crossing = target_crossing
+        self.ch_idx = ch_idx
+
         self.numeric_params = []
         if auto:
             self.run_analysis()
 
     def process_data(self):
-        """
-        selects the relevant acq channel based on "ch_idx_A" and "ch_idx_B"
-        specified in the options dict. If ch_idx_A and ch_idx_B are the same
-        it will unzip the data.
-        """
+
         self.proc_data_dict = deepcopy(self.raw_data_dict)
-        # The channel containing the data must be specified in the options dict
-        ch_idx = self.options_dict.get("ch_idx", 5)
+        ch_idx = self.ch_idx
 
         self.proc_data_dict["ylabel"] = self.raw_data_dict["value_names"][0][ch_idx]
         self.proc_data_dict["yunit"] = self.raw_data_dict["value_units"][0][ch_idx]
@@ -1462,7 +1455,7 @@ class Crossing_Analysis(Single_Qubit_TimeDomainAnalysis):
 
     def analyze_fit_results(self):
         # pack function
-        target_crossing = self.options_dict.get("target_crossing", 0)
+        target_crossing = self.target_crossing
         fit_res = self.fit_dicts["line_fit"]["fit_res"]
         c0 = fit_res.best_values["c0"] - target_crossing  # constant term
         c1 = fit_res.best_values["c1"]  # linear term
