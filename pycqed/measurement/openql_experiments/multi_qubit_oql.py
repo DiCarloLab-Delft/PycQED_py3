@@ -1140,7 +1140,7 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
                               number_of_repetitions: int = 10,
                               initialization_msmt: bool=False,
                               initial_states=['0', '1'],
-                              flux_codeword: str = 'fl_cw_01',
+                              flux_codeword: str = 'cz',
                               parity_axis='Z'):
     """
     Implements a circuit for repeated parity checks.
@@ -1148,9 +1148,9 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
     Circuit looks as follows:
 
     Data    (M)|------0------- | ^N- M
+ M
                |      |        |
-    Ancilla (M)|--y90-0-y90-M- |   - M
-
+    Ancilla (M)|-my90-0-y90-M- |   - M
     The initial "M" measurement is optional, the circuit is repated N times
     At the end both qubits are measured.
 
@@ -1173,7 +1173,7 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
         if initialization_msmt:
             k.measure(qA)
             k.measure(qD)
-            k.gate("wait", [], 500) #wait on all
+            k.gate("wait", []) #wait on all
         if initial_state == '1':
             k.gate('ry180', [qD])
         elif initial_state == '+':
@@ -1196,13 +1196,15 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
             k.gate(flux_codeword, [qA, qD])
             k.gate("wait", [], 0) #alignment workaround
             k.gate('ry90', [qA])
+            k.gate('wait', [qA, qD], 0)
             if parity_axis=='X':
                 k.gate('ry90', [qD])
             k.measure(qA)
 
+
         k.measure(qD)
         # hardcoded barrier because of openQL #104
-        k.gate('wait', [2, 0], 0)
+        # k.gate('wait', [2, 0], 0)
         k.gate('wait', [qA, qD], 0)
         p.add_kernel(k)
 
@@ -1214,8 +1216,8 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                                     number_of_repetitions: int = 10,
                                     initialization_msmt: bool=False,
                                     initial_states=[['0','0'], ['0','1'], ['1','1',], ['1','0']],
-                                    flux_codeword0: str = 'fl_cw_03',
-                                    flux_codeword1: str = 'fl_cw_01',
+                                    flux_codeword: str = 'cz',
+                                    # flux_codeword1: str = 'cz',
                                     parity_axes=['ZZ'], tomo=False,
                                     tomo_after=False,
                                     ro_time=500e-9,
@@ -1228,11 +1230,11 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
 
     Circuit looks as follows:
                                                          ^N
-    Data0   ----prep.|(my90)0--(y90)(wait) (echo) (wait)| (tomo) -MMMMMMMMMMMMMMMMMMMM
+    Data0   ----prep.|------0-------(wait) (echo) (wait)| (tomo) -MMMMMMMMMMMMMMMMMMMM
                      |      |                           |
     Ancilla (M)------|-my90-0-0-y90-MMMMMMMMMMMMMMMMMMMM|
                      |        |                         |
-    Data1   ----prep.|(my90)--0(y90)(wait) (echo) (wait)| (tomo) -MMMMMMMMMMMMMMMMMMMM
+    Data1   ----prep.|--------0-----(wait) (echo) (wait)| (tomo) -MMMMMMMMMMMMMMMMMMMM
 
 
     The initial "M" measurement is optional, the circuit is repated N times
@@ -1295,27 +1297,38 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                 #parity measurement(s)
                 for i in range(number_of_repetitions):
                     for parity_axis in parity_axes:
-                        #k.gate("wait", [], 0) #alignment workaround
+                        k.gate("wait", [], 0) #alignment workaround
                         if parity_axis=='XX':
                             k.gate('rym90', [qD0])
                             k.gate('rym90', [qD1])
+                            k.gate("wait", [], 0) #alignment workaround
                         if parity_axis=='YY':
                             k.gate('rxm90', [qD0])
                             k.gate('rxm90', [qD1])
+                            k.gate("wait", [], 0) #alignment workaround
                         k.gate('rym90', [qA])
+                        # k.gate('ry90', [qD0])
+                        # k.gate('ry90', [qD1])
                         k.gate("wait", [], 0) #alignment workaround
-                        k.gate(flux_codeword0, [2, 0])
-                        if echo:
-                            k.gate('ry180', [qA])
-                        k.gate(flux_codeword1, [2, 0])
+                        # k.gate(flux_codeword, [qA, qD1])
+                        k.gate(flux_codeword, [qA, qD0])
+                        k.gate("wait", [], 0)
+                        # if echo:
+                        #     k.gate('ry180', [qA])
+                        k.gate(flux_codeword, [qA, qD1])
                         k.gate("wait", [], 0) #alignment workaround
                         k.gate('ry90', [qA])
+                        # k.gate('rym90', [qD0])
+                        # k.gate('rym90', [qD1])
+                        k.gate("wait", [], 0)
                         if parity_axis=='XX':
                             k.gate('ry90', [qD0])
                             k.gate('ry90', [qD1])
+                            k.gate("wait", [], 0) #alignment workaround
                         elif parity_axis=='YY':
                             k.gate('rx90', [qD0])
                             k.gate('rx90', [qD1])
+                            k.gate("wait", [], 0) #alignment workaround
                         if (i is not number_of_repetitions-1) or (tomo_after): #last mmt can be multiplexed
                             k.gate("wait", [], 0)
                             k.measure(qA)
@@ -2525,6 +2538,173 @@ def Two_qubit_RTE(QX: int , QZ: int, platf_cfg: str,
             k.measure(QZ)
 
         p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+def Two_qubit_RTE_pipelined(QX:int, QZ:int, QZ_d:int, platf_cfg: str,
+                            measurements:int, start_states:list = ['0'],
+                            ramsey_time: int = 120, echo:bool = False):
+    """
+
+    """
+    p = oqh.create_program('RTE_pipelined', platf_cfg)
+
+    for state in start_states:
+      k = oqh.create_kernel('RTE pip start state {}'.format(state), p)
+      k.prepz(QX)
+      k.prepz(QZ)
+      if state == '1':
+          k.gate('rx180', [QX])
+          k.gate('rx180', [QZ])
+      k.gate('wait', [QX, QZ, QZ_d], 0)
+      # k.gate('wait', [QX], 0)
+      ######################
+      # Parity check
+      #####################
+      for m in range(measurements):
+
+        k.measure(QZ_d)
+        if echo is True:
+            k.gate('wait', [QZ_d], ramsey_time+60)
+        else:
+            k.gate('wait', [QZ_d], ramsey_time+40)
+
+        k.gate('rx90', [QZ])
+        if echo is True:
+            k.gate('wait', [QZ], ramsey_time/2)
+            k.gate('rx180', [QZ])
+            k.gate('wait', [QZ], ramsey_time/2)
+            k.gate('rx90', [QZ])
+        else:
+            k.gate('wait', [QZ], ramsey_time)
+            k.gate('rxm90', [QZ])
+        k.gate('wait', [QZ], 500)
+
+        k.measure(QX)
+        k.gate('rx90', [QX])
+        if echo is True:
+            k.gate('wait', [QX], ramsey_time/2)
+            k.gate('rx180', [QX])
+            k.gate('wait', [QX], ramsey_time/2)
+            k.gate('rx90', [QX])
+        else:
+            k.gate('wait', [QX], ramsey_time)
+            k.gate('rxm90', [QX])
+
+        k.gate('wait', [QX, QZ, QZ_d], 0)
+
+      p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+
+def Ramsey_cross(wait_time: int,
+                 angles: list,
+                 q_rams: int,
+                 q_meas: int,
+                 echo: bool,
+                 platf_cfg: str,
+                 initial_state: str = '0'):
+    """
+    q_target is ramseyed
+    q_spec is measured
+
+    """
+    p = oqh.create_program("Ramsey_msmt_induced_dephasing", platf_cfg)
+
+    for i, angle in enumerate(angles[:-4]):
+        cw_idx = angle//20 + 9
+        k = oqh.create_kernel("Ramsey_azi_"+str(angle), p)
+
+        k.prepz(q_rams)
+        k.prepz(q_meas)
+        k.gate("wait", [], 0)
+
+        k.gate('rx90', [q_rams])
+        # k.gate("wait", [], 0)
+        k.measure(q_rams)
+        if echo:
+            k.gate("wait", [q_rams], round(wait_time/2)-20)
+            k.gate('rx180', [q_rams])
+            k.gate("wait", [q_rams], round(wait_time/2))
+        else:
+            k.gate("wait", [q_rams], wait_time-20)
+        if angle == 90:
+            k.gate('ry90', [q_rams])
+        elif angle == 0:
+            k.gate('rx90', [q_rams])
+        else:
+            k.gate('cw_{:02}'.format(cw_idx), [q_rams])
+
+
+        # k.measure(q_rams)
+        if initial_state == '1':
+            k.gate('rx180', [q_meas])
+        k.measure(q_meas)
+        if echo:
+            k.gate("wait", [q_meas], wait_time+20)
+        else:
+            k.gate("wait", [q_meas], wait_time)
+
+        k.gate("wait", [], 0)
+
+        p.add_kernel(k)
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p, qubit_idx=q_rams)
+
+    p = oqh.compile(p)
+    return p
+
+def TEST_RTE(QX:int , QZ:int, platf_cfg: str,
+             measurements:int):
+    """
+
+    """
+    p = oqh.create_program('Multi_RTE', platf_cfg)
+
+    k = oqh.create_kernel('Multi_RTE', p)
+    k.prepz(QX)
+    k.prepz(QZ)
+    ######################
+    # Parity check
+    ######################
+    for m in range(measurements):
+        # Superposition
+        k.gate('ry90', [QX])
+        k.gate('i', [QZ])
+        # CZ emulation
+        k.gate('i', [QZ, QX])
+        k.gate('i', [QZ, QX])
+        k.gate('i', [QZ, QX])
+        # CZ emulation
+        k.gate('i', [QZ, QX])
+        k.gate('i', [QZ, QX])
+        k.gate('i', [QZ, QX])
+        # intermidate sequential
+        k.gate('rym90', [QX])
+        k.gate('i', [QZ])
+        k.gate('i', [QX])
+        k.gate('ry90', [QZ])
+        # CZ emulation
+        k.gate('i', [QZ, QX])
+        k.gate('i', [QZ, QX])
+        k.gate('i', [QZ, QX])
+        # CZ emulation
+        k.gate('i', [QZ, QX])
+        k.gate('i', [QZ, QX])
+        k.gate('i', [QZ, QX])
+        # Recovery pulse
+        k.gate('i', [QX])
+        k.gate('rym90', [QZ])
+        # Measurement
+        k.measure(QX)
+        k.measure(QZ)
+
+    p.add_kernel(k)
 
     p = oqh.compile(p)
     return p
