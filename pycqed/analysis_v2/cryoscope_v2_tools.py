@@ -15,8 +15,17 @@ import lmfit
 import numpy as np
 import logging
 
+# Filter and optimization tools
+import pycqed.measurement.kernel_functions_ZI as kzi
+from scipy import signal
+import cma
+
 log = logging.getLogger(__name__)
 
+
+# ######################################################################
+# Main analysis tool
+# ######################################################################
 
 def cryoscope_v2(
     qubit,
@@ -31,8 +40,14 @@ def cryoscope_v2(
 ):
     """
     Example:
+
+        # ##############################################################
+        # Analysis tool
+        # ##############################################################
+
         from pycqed.analysis_v2 import cryoscope_v2_tools as cv2
         import numpy as np
+        from scipy import signal
 
         reload(cv2)
         ts_trace = "20200628_034745"
@@ -43,6 +58,10 @@ def cryoscope_v2(
             kw_processing={"plot": True}
         )
 
+        # ##############################################################
+        # Plot analysed step response
+        # ##############################################################
+
         fig, ax = plt.subplots(1, 1, figsize=(10, 5))
 
         time_ns = res["time_ns"]
@@ -50,7 +69,7 @@ def cryoscope_v2(
         step_response = res["step_response"]
         ax.plot(time_ns[:len(step_response)], step_response, label="Step response")
 
-        # If the first point in the step_response is somewhat significantly below 1.0
+        # If the first point in the step_response is somewhat significantly far from 1.0
         # Using the right shifted step response might help for the FIRs
         # [2020-07-15 Victor] Not tested yet if the shifted response allows for better
         # FIR calibration
@@ -67,7 +86,119 @@ def cryoscope_v2(
         set_ylabel(ax, "Normalized amplitude", "a.u.")
         ax.legend()
 
-    """
+        # ##############################################################
+        # IIR optimization
+        # ##############################################################
+
+        # TODO: add here for reference next time!!!
+
+        # ##############################################################
+        # FIR optimization
+        # ##############################################################
+
+        # Limit the number of point up to which this FIR should correct
+        # This helps to avoid fitting noise and make the convergence faster
+        # and targeted to what we want to correct
+        # maximum 72 taps are available for HDAWG real-time FIR (~ 30 ns)
+        max_taps = 72
+
+        opt_fir, _ = cv2.optimize_fir_software(
+            step_response,
+            baseline_start=np.where(time_ns > 10)[0].min(),
+            max_taps=max_taps,
+            cma_options={
+                "verb_disp":10000,  # Avoid too much output
+                #"ftarget": 1e-3, "tolfun": 1e-15, "tolfunhist": 1e-15, "tolx": 1e-15
+            }
+        )
+
+        # ##############################################################
+        # FIR optimization plotting
+        # ##############################################################
+
+        ac_soft_FIR = signal.lfilter(opt_fir, 1, step_response)
+
+        fig, ax = plt.subplots(1, 1, figsize=(20, 8))
+
+        ax.plot(time_ns[:len(step_response)], step_response, "-o")
+        ax.plot(time_ns[:len(step_response)], ac_soft_FIR, "-o")
+
+        ax.hlines(np.array([.99, .999, 1.01, 1.001]),
+                  xmin=np.min(time_ns), xmax=np.max(time_ns[:len(step_response)]),
+                  linestyle=["-", "--", "-", "--"])
+
+        # ##############################################################
+        # Generate loading code (first iteration only)
+        # ##############################################################
+
+        # Run this cell for the first FIR only
+        # Then copy paste below in order to keep track of the FIRs
+        # You may want to go back a previous one
+        filter_model_number = 4  # CHANGE ME IF NEEDED!!!
+
+        cv2.print_FIR_loading(
+            qubit,
+            filter_model_number,
+            cv2.convert_FIR_for_HDAWG(opt_fir),
+            real_time=True)
+
+        # Output sample:
+        # lin_dist_kern_D1.filter_model_04({'params': {'weights': np.array([ 1.13092421e+00, -6.82709369e-02, -4.64421034e-02, -2.58260195e-02,
+        #        -1.04921358e-02, -9.73883537e-03, -2.42308728e-03,  5.35076244e-03,
+        #         3.77617499e-03,  5.28141742e-03, -6.33810801e-03,  2.69420579e-03,
+        #         9.06057712e-03,  7.32841146e-03,  1.20281705e-03, -2.35979362e-03,
+        #        -4.87644425e-03,  1.49692530e-03, -9.34622902e-04, -2.26087315e-04,
+        #        -1.15781407e-02,  1.11572007e-03,  4.48942912e-03, -4.85723912e-03,
+        #         5.10716383e-03,  2.29466092e-03,  2.88845548e-03,  1.74550550e-03,
+        #        -3.71967987e-03, -3.46337041e-03,  8.76836280e-03, -7.60823516e-03,
+        #         7.90059429e-03, -1.11806920e-02,  8.48894913e-03, -6.42957441e-03,
+        #         3.25895281e-03, -1.24377996e-03, -8.87517579e-04,  2.20711760e-03])}, 'model': 'FIR', 'real-time': True })
+
+        # Use the above to run on the setup if this is the first FIR
+
+        # ##############################################################
+        # Convolve new FIR iteration with the last one
+        # ##############################################################
+
+        # Keep adding fir_{i} here and convolving with the last one
+
+        # fir_0 should be from the first optimization or the current real-time FIR in use on the setup
+        fir_0 = np.array([ 1.05614572e+00, -2.53850198e-03, -2.52682533e-03, -2.51521371e-03,
+               -2.50372099e-03, -2.49226498e-03, -2.48089918e-03, -2.46960924e-03,
+               -2.45266068e-03, -2.43085526e-03, -2.40884910e-03, -3.96701006e-03,
+                2.07353990e-03, -2.00725135e-03,  1.69462462e-03,  4.57420262e-03,
+                1.29168122e-03,  1.41930085e-03,  1.19988012e-03, -2.64650972e-03,
+               -1.92008328e-03, -2.09618589e-03, -4.35853136e-03, -3.46286777e-03,
+               -2.70556691e-03, -1.96788087e-03, -8.97396693e-04, -7.83636242e-04,
+                1.89748899e-04,  5.96137205e-04,  4.40804891e-04,  1.22959418e-03,
+                6.27207165e-05,  1.78369142e-04,  5.88531033e-04,  3.75452325e-04,
+               -1.52053376e-04,  7.29338599e-04, -9.92730555e-05, -7.75952068e-04])
+
+        # fir_1 =
+
+        last_FIR = cv2.convert_FIR_from_HDAWG(fir_0)  # UPDATE last FIR FOR EACH ITERATION!
+        c1 = cv2.convolve_FIRs([last_FIR, opt_fir])
+
+        cv2.print_FIR_loading(
+            qubit,
+            filter_model_number,
+            cv2.convert_FIR_for_HDAWG(c1),
+            real_time=True)
+
+        # Output sample:
+        # lin_dist_kern_D1.filter_model_04({'params': {'weights': np.array([ 1.19442077e+00, -7.49749111e-02, -5.17339708e-02, -2.98301540e-02,
+        #        -1.35581165e-02, -1.27245568e-02, -4.96222306e-03,  3.26517377e-03,
+        #         1.60572820e-03,  3.18970858e-03, -9.07183243e-03, -1.22431441e-03,
+        #         1.22491343e-02,  5.37109853e-03,  3.15302396e-03,  2.27680655e-03,
+        #        -4.28813944e-03,  2.85768654e-03,  4.20547339e-05, -3.31392990e-03,
+        #        -1.40901704e-02, -7.79037165e-04,  3.36395118e-04, -8.28875071e-03,
+        #         2.94764301e-03,  7.55326282e-04,  2.33059861e-03,  1.02747385e-03,
+        #        -3.77002742e-03, -3.18534929e-03,  9.54446304e-03, -7.03080156e-03,
+        #         8.12891025e-03, -1.17499888e-02,  9.59861367e-03, -6.31999213e-03,
+        #         3.35793857e-03, -4.27721721e-04, -9.07270542e-04,  1.55317845e-03])}, 'model': 'FIR', 'real-time': True })
+
+        # The above output would be used to set fir_1
+        """
     a_obj = ma2.Basic1DAnalysis(t_start=timestamp)
     rdd = a_obj.raw_data_dict
 
@@ -82,15 +213,15 @@ def cryoscope_v2(
 
     time_ns = time_ns[start_idx:]
 
-    pnts_per_fit_second_pass = kw_processing.get(
-        "pnts_per_fit_second_pass", 3)
-    pnts_per_fit_first_pass = kw_processing.get(
-        "pnts_per_fit_first_pass", 4)
+    pnts_per_fit_second_pass = kw_processing.get("pnts_per_fit_second_pass", 3)
+    pnts_per_fit_first_pass = kw_processing.get("pnts_per_fit_first_pass", 4)
 
-    kw_processing.update({
-        "pnts_per_fit_first_pass": pnts_per_fit_first_pass,
-        "pnts_per_fit_second_pass": pnts_per_fit_second_pass,
-    })
+    kw_processing.update(
+        {
+            "pnts_per_fit_first_pass": pnts_per_fit_first_pass,
+            "pnts_per_fit_second_pass": pnts_per_fit_second_pass,
+        }
+    )
 
     for mv in mvs:
         res = cryoscope_v2_processing(
@@ -112,7 +243,7 @@ def cryoscope_v2(
         "results_list": results_list,
         "averaged_frequency": av_freq,
         "amp_pars": amp_pars,
-        "time_ns": time_ns
+        "time_ns": time_ns,
     }
 
     # Here we correct for the averaging effect of the moving cosine-fitting
@@ -124,12 +255,14 @@ def cryoscope_v2(
     # might be more accurate for distortion corrections
     step_response = conversion["step_response"]
     extra_pnts = pnts_per_fit_second_pass // 2
-    step_response = np.concatenate((
-        # linear extrapolation, assuming the step response is rising up
-        # linearly, we don't  return the data point at zero
-        np.linspace(0, step_response[0], 2 + extra_pnts)[1:-1],
-        step_response
-    ))
+    step_response = np.concatenate(
+        (
+            # linear extrapolation, assuming the step response is rising up
+            # linearly, we don't  return the data point at zero
+            np.linspace(0, step_response[0], 2 + extra_pnts)[1:-1],
+            step_response,
+        )
+    )
     conversion["step_response_right_shifted"] = step_response
 
     res.update(conversion)
@@ -137,12 +270,12 @@ def cryoscope_v2(
     return res
 
 
+# ######################################################################
+# Analysis utilities
+# ######################################################################
+
 def rough_freq_to_amp(
-    amp_pars,
-    time_ns,
-    freqs,
-    plateau_time_start_ns=-25,
-    plateau_time_end_ns=-5,
+    amp_pars, time_ns, freqs, plateau_time_start_ns=-25, plateau_time_end_ns=-5,
 ):
     time_ = time_ns[: len(freqs)]
     where = np.where(
@@ -385,3 +518,137 @@ def extract_amp_pars(
     extracted = hd5.extract_pars_from_datafile(filepath, param_spec=exctraction_spec)
 
     return extracted
+
+
+# ######################################################################
+# IIRs (exponential filters) utilities
+# ######################################################################
+
+
+def pred_corrected_sig(sig, taus, amps):
+    """
+    [2020-07-15 Victor] Not tested in a while, see old cryoscope notebooks
+    """
+    for i, (tau, amp) in enumerate(zip(taus, amps)):
+        sig = kzi.exponential_decay_correction_hw_friendly(
+            sig, tau, amp, sampling_rate=2.4e9
+        )
+    return sig
+
+
+def predicted_waveform(time, tau0, amp0, tau1, amp1, tau2, amp2, tau3, amp3):
+    """
+    [2020-07-15 Victor] Not tested in a while, see old cryoscope notebooks
+    """
+    taus = [tau0, tau1, tau2, tau3]
+    amps = [amp0, amp1, amp2, amp3]
+    y_pred = pred_corrected_sig(a0, taus, amps)
+
+    # Normalized
+    y_pred /= np.mean(y_pred[-100:])
+    # Smooth tail
+    # y_pred[100:] = filtfilt(a=[1], b=1/20*np.ones(20), x=y_pred[100:])
+    # y_pred[50:100] = filtfilt(a=[1], b=1/5*np.ones(5), x=y_pred[50:100])
+
+    return y_pred
+
+
+# ######################################################################
+# FIRs utilities
+# ######################################################################
+
+
+def print_FIR_loading(qubit, model_num, FIR, real_time=False):
+    print(
+        (
+            "lin_dist_kern_{}.filter_model_0{:1d}({{'params': {{'weights': np."
+            + repr(FIR)
+            + "}}, 'model': 'FIR', 'real-time': {} }})"
+        ).format(qubit, model_num, real_time)
+    )
+
+
+def optimize_fir_software(
+    y,
+    baseline_start=100,
+    baseline_stop=None,
+    taps=72,
+    max_taps=72,
+    start_sample=0,
+    stop_sample=None,
+    cma_options={},
+):
+    step_response = np.concatenate((np.array([0]), y))
+    baseline = np.mean(y[baseline_start:baseline_stop])
+    x0 = [1] + (max_taps - 1) * [0]
+
+    def objective_function_fir(x):
+        y = step_response
+        zeros = np.zeros(taps - max_taps)
+        x = np.concatenate((x, zeros))
+        yc = signal.lfilter(x, 1, y)
+        return np.mean(np.abs(yc[1 + start_sample : stop_sample] - baseline)) / np.abs(
+            baseline
+        )
+
+    return cma.fmin2(objective_function_fir, x0, 0.1, options=cma_options)
+
+
+def optimize_fir_HDAWG(
+    y,
+    baseline_start=100,
+    baseline_stop=None,
+    start_sample=0,
+    stop_sample=None,
+    cma_options={},
+    max_taps=40,
+    hdawg_taps=40,
+):
+    step_response = np.concatenate((np.array([0]), y))
+    baseline = np.mean(y[baseline_start:baseline_stop])
+    x0 = [1] + (max_taps - 1) * [0]
+
+    def objective_function_fir(x):
+        y = step_response
+        zeros = np.zeros(hdawg_taps - max_taps)
+        x = np.concatenate((x, zeros))
+        yc = signal.lfilter(convert_FIR_from_HDAWG(x), 1, y)
+        return np.mean(np.abs(yc[1 + start_sample : stop_sample] - baseline)) / np.abs(
+            baseline
+        )
+
+    return cma.fmin2(objective_function_fir, x0, 0.1, options=cma_options)
+
+
+def convolve_FIRs(FIRs):
+    concolved_FIR = FIRs[0]
+    for FIR in FIRs[1:]:
+        concolved_FIR = np.convolve(concolved_FIR, FIR)
+    # We keep only the first coeff
+    concolved_FIR = concolved_FIR[: len(FIRs[0])]
+    return concolved_FIR
+
+
+def convert_FIR_for_HDAWG(k_joint):
+    """
+    The HDAWG imposes that beyond the first 8 coeff.,
+    the rest are paired together and have the same value.
+
+    Here account for that and take the average of the pair
+    """
+    dim_k_hw = 8 + (len(k_joint) - 8) / 2
+    k_joint_hw = np.zeros(int(dim_k_hw))
+    k_joint_hw[:8] = k_joint[:8]
+    k_joint_hw[8:] = (k_joint[8::2] + k_joint[9::2]) / 2  # average pairwise
+    return k_joint_hw
+
+
+def convert_FIR_from_HDAWG(hardware_fir):
+    """
+    does the opposite of `convert_FIR_for_HDAWG`
+    mind that it wont recover the same you input to `convert_FIR_for_HDAWG`
+    """
+    out_fir = np.concatenate(
+        (hardware_fir[:8], np.repeat(hardware_fir[8:], 2))  # duplicate entries
+    )
+    return out_fir
