@@ -2848,6 +2848,7 @@ class DeviceCCL(Instrument):
         times,
         MC=None,
         label="Cryoscope",
+        double_projections: bool = True,
         waveform_name: str = "square",
         max_delay: float = "auto",
         twoq_pair=[2, 0],
@@ -2917,18 +2918,29 @@ class DeviceCCL(Instrument):
             twoq_pair=twoq_pair,
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC.get_instr().name,
+            double_projections=double_projections,
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
         MC.set_sweep_function(sw)
         MC.set_sweep_points(times)
+
+        if double_projections:
+            # Cryoscope v2
+            values_per_point = 4
+            values_per_point_suffex = ["cos", "sin", "mcos", "msin"]
+        else:
+            # Cryoscope v1
+            values_per_point = 2
+            values_per_point_suffex = ["cos", "sin"]
+
         d = self.get_int_avg_det(
             qubits=[q0],
-            values_per_point=2,
-            values_per_point_suffex=["cos", "sin"],
+            values_per_point=values_per_point,
+            values_per_point_suffex=values_per_point_suffex,
             single_int_avg=True,
-            always_prepare=True,
+            always_prepare=True
         )
         MC.set_detector_function(d)
         MC.run(label)

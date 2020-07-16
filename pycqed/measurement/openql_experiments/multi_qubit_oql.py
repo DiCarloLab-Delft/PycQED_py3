@@ -536,10 +536,16 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
     return p
 
 
-def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
-              flux_cw: str='fl_cw_02',
-              twoq_pair=[2, 0],
-              platf_cfg: str='', cc: str='CCL'):
+def Cryoscope(
+    qubit_idx: int,
+    buffer_time1=0,
+    buffer_time2=0,
+    flux_cw: str = 'fl_cw_02',
+    twoq_pair=[2, 0],
+    platf_cfg: str = '',
+    cc: str = 'CCL',
+    double_projections: bool = True,
+):
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -554,28 +560,27 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
 
     """
     p = oqh.create_program("Cryoscope", platf_cfg)
-    buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
-    buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
+    buffer_nanoseconds1 = int(round(buffer_time1 / 1e-9))
+    buffer_nanoseconds2 = int(round(buffer_time2 / 1e-9))
 
-    if cc.upper()=='CCL':
+    if cc.upper() == 'CCL':
         flux_target = twoq_pair
-    elif cc.upper()=='QCC' or cc.upper()=='CC':
+    elif cc.upper() == 'QCC' or cc.upper() =='CC':
         flux_target = [qubit_idx]
         cw_idx = int(flux_cw[-2:])
         flux_cw = 'sf_{}'.format(_def_lm_flux[cw_idx]['name'].lower())
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
 
-
     k = oqh.create_kernel("RamZ_X", p)
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate("wait", [], 0) #alignment workaround
+    k.gate("wait", [], 0)  # alignment workaround
     k.gate(flux_cw, flux_target)
-    #k.gate(flux_cw, [10, 8])
+    # k.gate(flux_cw, [10, 8])
 
-    k.gate("wait", [], 0) #alignment workaround
+    k.gate("wait", [], 0)  # alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('rx90', [qubit_idx])
     k.measure(qubit_idx)
@@ -585,15 +590,44 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate("wait", [], 0) #alignment workaround
+    k.gate("wait", [], 0)  # alignment workaround
     k.gate(flux_cw, flux_target)
-    #k.gate(flux_cw, [10, 8])
+    # k.gate(flux_cw, [10, 8])
 
-    k.gate("wait", [], 0) #alignment workaround
+    k.gate("wait", [], 0)  # alignment workaround
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('ry90', [qubit_idx])
     k.measure(qubit_idx)
     p.add_kernel(k)
+
+    if double_projections:
+        k = oqh.create_kernel("RamZ_mX", p)
+        k.prepz(qubit_idx)
+        k.gate('rx90', [qubit_idx])
+        k.gate("wait", [qubit_idx], buffer_nanoseconds1)
+        k.gate("wait", [], 0)  # alignment workaround
+        k.gate(flux_cw, flux_target)
+        # k.gate(flux_cw, [10, 8])
+
+        k.gate("wait", [], 0)  # alignment workaround
+        k.gate("wait", [qubit_idx], buffer_nanoseconds2)
+        k.gate('rxm90', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+        k = oqh.create_kernel("RamZ_mY", p)
+        k.prepz(qubit_idx)
+        k.gate('rx90', [qubit_idx])
+        k.gate("wait", [qubit_idx], buffer_nanoseconds1)
+        k.gate("wait", [], 0)  # alignment workaround
+        k.gate(flux_cw, flux_target)
+        # k.gate(flux_cw, [10, 8])
+
+        k.gate("wait", [], 0)  # alignment workaround
+        k.gate("wait", [qubit_idx], buffer_nanoseconds2)
+        k.gate('rym90', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
 
     p = oqh.compile(p)
     return p
