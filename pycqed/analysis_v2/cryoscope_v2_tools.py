@@ -325,13 +325,8 @@ def moving_cos_fitting_window(
     if "offset" not in init_guess.keys():
         offset_guess = np.average(y_data)
         init_guess["offset"] = offset_guess
-        print(offset_guess)
+        # print(offset_guess)
     params = model.make_params(**init_guess)
-
-    pnts_per_fit = fit_window_pnts_nr
-    pnts_per_fit_idx = pnts_per_fit + 1
-    results = []
-    results_stderr = []
 
     def fix_pars(params, i):
         params["phase"].min = -180
@@ -346,30 +341,48 @@ def moving_cos_fitting_window(
         for par, val in min_params.items():
             params[par].min = val
 
-    for i in range(len(x_data) - pnts_per_fit + 1):
-        if len(results):
-            # Take the last fit as the initial guess for the next fit
-            params = model.make_params(
-                amplitude=results[i - 1][0],
-                frequency=results[i - 1][1],
-                phase=results[i - 1][2],
-                offset=results[i - 1][3],
-            )
-        fix_pars(params, i)
+    pnts_per_fit = fit_window_pnts_nr
+    pnts_per_fit_idx = pnts_per_fit + 1
 
-        t_fit_data = x_data[i : i + pnts_per_fit_idx]
-        fit_data = y_data[i : i + pnts_per_fit_idx]
-        res = model.fit(fit_data, t=t_fit_data, params=params)
+    max_num_fits = len(x_data) - pnts_per_fit + 1
+    middle_fits_num = max_num_fits // 2
+    results = [None for i in range(max_num_fits)]
+    # print(results)
+    results_stderr = [None for i in range(max_num_fits)]
 
-        res_pars = res.params.valuesdict()
-        results.append(np.fromiter(res_pars.values(), dtype=np.float64))
+    # We iterate from the middle of the data to avoid fitting issue
+    # This was verified to help!
+    # There is an iteration from the middle to the end and another one
+    # from the middle to the beginning
+    for fit_ref, iterator in zip(
+        [-1, + 1],
+        [
+            range(middle_fits_num, max_num_fits),
+            reversed(range(middle_fits_num))
+        ]
+    ):
+        for i in iterator:
+            if i != middle_fits_num:
+                # Take the last fit as the initial guess for the next fit
+                params = model.make_params(
+                    amplitude=results[i + fit_ref][0],
+                    frequency=results[i + fit_ref][1],
+                    phase=results[i + fit_ref][2],
+                    offset=results[i + fit_ref][3],
+                )
+            fix_pars(params, i)
 
-        results_stderr.append(
-            np.fromiter(
+            t_fit_data = x_data[i : i + pnts_per_fit_idx]
+            fit_data = y_data[i : i + pnts_per_fit_idx]
+            res = model.fit(fit_data, t=t_fit_data, params=params)
+
+            res_pars = res.params.valuesdict()
+            results[i] = np.fromiter(res_pars.values(), dtype=np.float64)
+
+            results_stderr[i] = np.fromiter(
                 (param.stderr for par_name, param in res.params.items()),
                 dtype=np.float64,
             )
-        )
 
     results = np.array(results).T
     results_stderr = np.array(results_stderr).T
