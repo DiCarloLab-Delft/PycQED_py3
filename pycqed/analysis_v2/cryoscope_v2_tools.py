@@ -258,12 +258,9 @@ def cryoscope_v2(
         step_response = conversion["step_response"]
         extra_pnts = pnts_per_fit_second_pass // 2
 
-        step_response_fit = step_response
-        time_ns_fit = time_ns[extra_pnts:][:len(step_response_fit)]
-
-        # Below tried with rising exponential fitting, but it doesn't
-        # work well
         # # Fit only first 15 ns
+        step_response_fit = np.array(step_response)
+        time_ns_fit = time_ns[extra_pnts:][:len(step_response_fit)]
         where = np.where(time_ns_fit < 15)[0]
         step_response_fit = step_response_fit[where]
         time_ns_fit = time_ns_fit[where]
@@ -280,12 +277,18 @@ def cryoscope_v2(
         fit_res = model.fit(step_response_fit, t=time_ns_fit, params=params)
         params = {key: fit_res.params[key] for key in fit_res.params.keys()}
 
+        if step_response[0] < 0.987:
+            # Only extrapolate if the first point is significantly off
+            corrected_pnts = exp_rise(time_ns[:extra_pnts], **params)
+        else:
+            corrected_pnts = [step_response[0]] * extra_pnts
+
         step_response = np.concatenate(
             (
                 # Extrapolate the missing points assuming exponential rise
                 # Seems a fair assumption and much better than a linear
                 # extrapolation
-                exp_rise(time_ns[:extra_pnts], **params),
+                corrected_pnts,
                 step_response,
             )
         )
