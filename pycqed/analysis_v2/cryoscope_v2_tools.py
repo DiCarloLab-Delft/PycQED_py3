@@ -204,6 +204,7 @@ def cryoscope_v2(
 
     results_list = []
     mvs = rdd["measured_values"][0]
+    vlns = rdd["value_names"][0]
 
     time_ns = rdd["xvals"][0] * 1e9
 
@@ -229,15 +230,13 @@ def cryoscope_v2(
         )
         results_list.append(res)
 
-    all_freq = np.array([res[0]["frequency"] for res in results_list]).T
-    av_freq = np.average(all_freq, axis=1)
+    all_freq = np.array([res[0]["frequency"] for res in results_list])
+    all_freq_T = all_freq.T
+    av_freq = np.average(all_freq_T, axis=1)
 
     kw_extract["qubit"] = qubit
     kw_extract["timestamp"] = timestamp
     amp_pars = extract_amp_pars(**kw_extract)
-    print(amp_pars)
-
-    conversion = rough_freq_to_amp(amp_pars, time_ns, av_freq, **kw_rough_freq_to_amp)
 
     res = {
         "results_list": results_list,
@@ -246,26 +245,33 @@ def cryoscope_v2(
         "time_ns": time_ns,
     }
 
-    # Here we correct for the averaging effect of the moving cosine-fitting
-    # window, we attribute the obtained frequency to the middle point in the
-    # fitting window, and interpolate linearly the missing points do to the
-    # right shift, this step response can be more accurate in certain cases
-    # TO DO: try to instead fit an exponential signal to the first few
-    # data points and use it to interpolate the missing points,
-    # might be more accurate for distortion corrections
-    step_response = conversion["step_response"]
-    extra_pnts = pnts_per_fit_second_pass // 2
-    step_response = np.concatenate(
-        (
-            # linear extrapolation, assuming the step response is rising up
-            # linearly, we don't  return the data point at zero
-            np.linspace(0, step_response[0], 2 + extra_pnts)[1:-1],
-            step_response,
-        )
-    )
-    conversion["step_response_right_shifted"] = step_response
+    for frequencies, name in zip([*all_freq, av_freq], [*vlns, "average"]):
+        conversion = rough_freq_to_amp(amp_pars, time_ns, frequencies, **kw_rough_freq_to_amp)
 
-    res.update(conversion)
+        # Here we correct for the averaging effect of the moving cosine-fitting
+        # window, we attribute the obtained frequency to the middle point in the
+        # fitting window, and interpolate linearly the missing points do to the
+        # right shift, this step response can be more accurate in certain cases
+        # TO DO: try to instead fit an exponential signal to the first few
+        # data points and use it to interpolate the missing points,
+        # might be more accurate for distortion corrections
+        step_response = conversion["step_response"]
+        extra_pnts = pnts_per_fit_second_pass // 2
+        step_response = np.concatenate(
+            (
+                # linear extrapolation, assuming the step response is rising up
+                # linearly, we don't  return the data point at zero
+                np.linspace(0, step_response[0], 2 + extra_pnts)[1:-1],
+                step_response,
+            )
+        )
+        conversion["step_response_right_shifted"] = step_response
+
+        # Renaming to be able to return the step responses from all measured
+        # channels along side with the average
+        step_response = conversion.pop("step_response")
+        conversion["step_response_" + name] = step_response
+        res.update(conversion)
 
     return res
 
