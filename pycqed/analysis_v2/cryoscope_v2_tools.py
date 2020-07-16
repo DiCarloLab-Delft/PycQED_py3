@@ -289,6 +289,7 @@ def cryoscope_v2(
                 step_response,
             )
         )
+        conversion.update(params)
         conversion["step_response_" + name + "_right_shifted"] = step_response
 
         # Renaming to be able to return the step responses from all measured
