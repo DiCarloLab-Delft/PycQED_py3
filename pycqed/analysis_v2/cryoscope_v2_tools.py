@@ -257,15 +257,37 @@ def cryoscope_v2(
         # might be more accurate for distortion corrections
         step_response = conversion["step_response"]
         extra_pnts = pnts_per_fit_second_pass // 2
+
+        step_response_fit = step_response[extra_pnts:]
+        time_ns_fit = time_ns[extra_pnts:][:len(step_response_fit)]
+
+        # Fit only first 15 ns
+        where = np.where(time_ns_fit < 15)[0]
+        step_response_fit = step_response_fit[where]
+        time_ns_fit = time_ns_fit[where]
+
+        def exp_rise(t, tau):
+            return 1 - np.exp(- t / tau)
+
+        model = lmfit.Model(exp_rise)
+        params = model.make_params()
+        params["tau"].value = 1
+        params["tau"].min = 0
+        params["tau"].max = 15
+
+        fit_res = model.fit(step_response_fit, t=time_ns_fit, params=params)
+        params = {key: fit_res.params[key] for key in fit_res.params.keys()}
+
         step_response = np.concatenate(
             (
-                # linear extrapolation, assuming the step response is rising up
-                # linearly, we don't  return the data point at zero
-                np.linspace(0, step_response[0], 2 + extra_pnts)[1:-1],
+                # Extrapolate the missing points assuming exponential rise
+                # Seems a fair assumption and much better than a linear
+                # extrapolation
+                exp_rise(time_ns[:extra_pnts], **params),
                 step_response,
             )
         )
-        conversion["step_response_right_shifted"] = step_response
+        conversion["step_response_" + name + "_right_shifted"] = step_response
 
         # Renaming to be able to return the step responses from all measured
         # channels along side with the average
