@@ -258,10 +258,12 @@ def cryoscope_v2(
         step_response = conversion["step_response"]
         extra_pnts = pnts_per_fit_second_pass // 2
 
-        step_response_fit = step_response[extra_pnts:]
+        step_response_fit = step_response
         time_ns_fit = time_ns[extra_pnts:][:len(step_response_fit)]
 
-        # Fit only first 15 ns
+        # Below tried with rising exponential fitting, but it doesn't
+        # work well
+        # # Fit only first 15 ns
         where = np.where(time_ns_fit < 15)[0]
         step_response_fit = step_response_fit[where]
         time_ns_fit = time_ns_fit[where]
@@ -334,27 +336,47 @@ def rough_freq_to_amp(
 
 
 def moving_cos_fitting_window(
-    x_data,
+    x_data_ns,
     y_data,
     fit_window_pnts_nr: int = 6,
-    init_guess: dict = {"frequency": 0.4, "amplitude": 2.0, "phase": 0.0},
+    init_guess: dict = {"phase": 0.0},
     fixed_params: dict = {},
     max_params: dict = {},
     min_params: dict = {},
 ):
+    """
+    NB: Intended to be used with input data in ns, this assumption is
+    used to generate educated guesses for the fitting
+    """
     model = lmfit.Model(fit_mods.CosFunc)
 
     if "offset" not in init_guess.keys():
         offset_guess = np.average(y_data)
         init_guess["offset"] = offset_guess
-        # print(offset_guess)
+
+    if "amplitude" not in init_guess.keys():
+        amplitude_guess = np.max(y_data) - init_guess["offset"]
+        init_guess["amplitude"] = amplitude_guess
+
+    if "frequency" not in init_guess.keys():
+        w = np.fft.fft(y_data)[:len(y_data) // 2]  # ignore negative values
+        f = np.fft.fftfreq(len(y_data), x_data_ns[1] - x_data_ns[0])[:len(w)]
+        w[0] = 0  # ignore DC component
+        frequency_guess = f[np.argmax(np.abs(w))]
+        init_guess["frequency"] = frequency_guess
+
     params = model.make_params(**init_guess)
 
     def fix_pars(params, i):
         params["phase"].min = -180
         params["phase"].max = 180
-        params["amplitude"].min = 0  # Ensures positive amp
+        params["amplitude"].min = 0
+        params["amplitude"].min = 0.4 * init_guess["amplitude"]
+        params["amplitude"].max = 1.6 * init_guess["amplitude"]
+
         params["frequency"].min = 0
+        params["frequency"].max = 5  # Not expected to be used for > 1GHz
+
         for par, val in fixed_params.items():
             params[par].value = val[i] if isinstance(val, Iterable) else val
             params[par].vary = False
@@ -366,7 +388,7 @@ def moving_cos_fitting_window(
     pnts_per_fit = fit_window_pnts_nr
     pnts_per_fit_idx = pnts_per_fit + 1
 
-    max_num_fits = len(x_data) - pnts_per_fit + 1
+    max_num_fits = len(x_data_ns) - pnts_per_fit + 1
     middle_fits_num = max_num_fits // 2
     results = [None for i in range(max_num_fits)]
     # print(results)
@@ -394,7 +416,7 @@ def moving_cos_fitting_window(
                 )
             fix_pars(params, i)
 
-            t_fit_data = x_data[i : i + pnts_per_fit_idx]
+            t_fit_data = x_data_ns[i : i + pnts_per_fit_idx]
             fit_data = y_data[i : i + pnts_per_fit_idx]
             res = model.fit(fit_data, t=t_fit_data, params=params)
 
@@ -440,27 +462,11 @@ def cryoscope_v2_processing(
     """
 
     assert time_ns[0] != 0.0, "Cryoscope time should not start at zero!"
-    x_data = time_ns
+    x_data_ns = time_ns
     y_data = osc_data
 
-    offset = np.average(y_data)
-
-    if not len(init_guess_first_pass):
-        init_guess_first_pass = {
-            "offset": offset,
-            "frequency": 0.5,
-            "amplitude": 1.0,
-            "phase": 0.0,
-        }
-
-    if not len(fixed_params_first_pass):
-        # Fixing the offset should work well
-        fixed_params_first_pass = {
-            "offset": offset,
-        }
-
     results, results_stderr = moving_cos_fitting_window(
-        x_data=x_data,
+        x_data_ns=x_data_ns,
         y_data=y_data,
         fit_window_pnts_nr=pnts_per_fit_first_pass,
         init_guess=init_guess_first_pass,
@@ -468,26 +474,26 @@ def cryoscope_v2_processing(
     )
 
     amps_from_fit = results["amplitude"]
-    x_for_fit = x_data[: len(amps_from_fit)]
+    x_for_fit = x_data_ns[: len(amps_from_fit)]
     # Here we are intentionally using poly of deg 1 to avoid the amplitude to be lower
     # in the beginning which should not be physical
     line_fit = np.polyfit(x_for_fit, amps_from_fit, 1)
-    fixed_amps = np.poly1d(line_fit)(x_data)
+    fixed_amps = np.poly1d(line_fit)(x_data_ns)
+    fixed_offset = np.average(results["offset"])
 
     if not len(init_guess_second_pass):
         init_guess_second_pass = {
-            "offset": offset,
-            "frequency": results["frequency"][0],
-            "amplitude": fixed_amps[0],
+            "offset": fixed_offset,
+            # "frequency": np.average(results["frequency"]),
             "phase": 0.0,
         }
 
     results, results_stderr = moving_cos_fitting_window(
-        x_data=x_data,
+        x_data_ns=x_data_ns,
         y_data=y_data,
         fit_window_pnts_nr=pnts_per_fit_second_pass,
         init_guess=init_guess_second_pass,
-        fixed_params={"offset": offset, "amplitude": fixed_amps},
+        fixed_params={"offset": fixed_offset, "amplitude": fixed_amps},
     )
 
     if plot:
@@ -495,19 +501,19 @@ def cryoscope_v2_processing(
 
         ax = axs[0]
         ax.plot(
-            x_data[: len(amps_from_fit)], amps_from_fit, label="Osc. amp. first pass"
+            x_data_ns[: len(amps_from_fit)], amps_from_fit, label="Osc. amp. first pass"
         )
         ax.plot(x_for_fit, np.poly1d(line_fit)(x_for_fit), label="Line fit osc. amp.")
         ax.set_xlabel("Osc. amp. (a.u.)")
         ax.legend()
 
         ax = axs[1]
-        ax.plot(x_data, y_data, "o")
+        ax.plot(x_data_ns, y_data, "o")
 
         for i in range(len(results[list(results.keys())[0]])):
             res_pars = {key: results[key][i] for key in results.keys()}
             time_sample = np.linspace(
-                x_data[i], x_data[i + pnts_per_fit_second_pass - 1], 20
+                x_data_ns[i], x_data_ns[i + pnts_per_fit_second_pass - 1], 20
             )
             cos_fit_sample = fit_mods.CosFunc(t=time_sample, **res_pars)
             ax.set_xlabel("Pulse duration (ns)")
