@@ -146,6 +146,10 @@ class Base_RO_LutMan(Base_LutMan):
                                vals=vals.Numbers(0, 1),
                                parameter_class=ManualParameter,
                                initial_value=0.1)
+            self.add_parameter('M_delay_R{}'.format(res), unit='s',
+                               vals=vals.Numbers(0, 1e-6),
+                               parameter_class=ManualParameter,
+                               initial_value=0)
             self.add_parameter('M_final_amp_R{}'.format(res), unit='V',
                                vals=vals.Numbers(0, 1),
                                parameter_class=ManualParameter,
@@ -159,6 +163,7 @@ class Base_RO_LutMan(Base_LutMan):
                                parameter_class=ManualParameter,
                                initial_value=200e-9)
             self.add_parameter('M_phi_R{}'.format(res), unit='deg',
+                               vals=vals.Numbers(0, 360),
                                parameter_class=ManualParameter,
                                initial_value=0.0)
             self.add_parameter('M_down_length0_R{}'.format(res), unit='s',
@@ -255,7 +260,7 @@ class Base_RO_LutMan(Base_LutMan):
             M = create_pulse(shape=self.pulse_primitive_shape(),
                              amplitude=self.get('M_amp_R{}'.format(res)),
                              length=up_len,
-                             delay=0,
+                             delay=self.get('M_delay_R{}'.format(res)),
                              phase=self.get('M_phi_R{}'.format(res)),
                              sampling_rate=sampling_rate)
             res_wave_dict['M_simple_R{}'.format(res)] = M

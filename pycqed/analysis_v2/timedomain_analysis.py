@@ -1490,6 +1490,8 @@ class Crossing_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict["root"],
             np.polyval(poly_coeff[::-1], self.proc_data_dict["root"]),
         ]
+        print("Intersect found at: \n", [
+            self.proc_data_dict["intersect"][0], self.proc_data_dict["intersect"][1] + self.target_crossing])
 
     def prepare_plots(self):
         pass
@@ -1524,7 +1526,7 @@ class Crossing_Analysis(ba.BaseDataAnalysis):
                 "ax_id": "main",
                 "plotfn": self.plot_line,
                 "xvals": [self.proc_data_dict["intersect"][0]],
-                "yvals": [self.proc_data_dict["intersect"][1]],
+                "yvals": [self.proc_data_dict["intersect"][1] + self.target_crossing],
                 "line_kws": {"alpha": 0.5, "color": "gray", "markersize": 15},
                 "marker": "o",
                 "setlabel": "Intercept: {:.3f}".format(self.proc_data_dict["root"]),
