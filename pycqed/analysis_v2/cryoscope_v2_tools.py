@@ -371,9 +371,8 @@ def moving_cos_fitting_window(
     def fix_pars(params, i):
         params["phase"].min = -180
         params["phase"].max = 180
-        params["amplitude"].min = 0
-        params["amplitude"].min = 0.4 * init_guess["amplitude"]
-        params["amplitude"].max = 1.6 * init_guess["amplitude"]
+        params["amplitude"].min = 0.1 * init_guess["amplitude"]
+        params["amplitude"].max = 2.0 * init_guess["amplitude"]
 
         params["frequency"].min = 0
         params["frequency"].max = 5  # Not expected to be used for > 1GHz
