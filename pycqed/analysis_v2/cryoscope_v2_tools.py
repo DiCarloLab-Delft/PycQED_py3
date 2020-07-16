@@ -374,8 +374,8 @@ def moving_cos_fitting_window(
         params["amplitude"].min = 0.1 * init_guess["amplitude"]
         params["amplitude"].max = 2.0 * init_guess["amplitude"]
 
-        params["frequency"].min = 0
-        params["frequency"].max = 5  # Not expected to be used for > 1GHz
+        params["frequency"].min = 0.0
+        params["frequency"].max = 1.0  # Not expected to be used for > 1GHz
 
         for par, val in fixed_params.items():
             params[par].value = val[i] if isinstance(val, Iterable) else val
@@ -407,7 +407,7 @@ def moving_cos_fitting_window(
     ):
         for i in iterator:
             if i != middle_fits_num:
-                # Take the last fit as the initial guess for the next fit
+                # Take the adjacent fit as the initial guess for the next fit
                 params = model.make_params(
                     amplitude=results[i + fit_ref][0],
                     frequency=results[i + fit_ref][1],
