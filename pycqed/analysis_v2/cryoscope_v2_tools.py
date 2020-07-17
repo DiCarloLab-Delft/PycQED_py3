@@ -37,8 +37,14 @@ def cryoscope_v2(
         "cfg_amp_key": "Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude",
     },
     kw_rough_freq_to_amp={},
+    savgol_window: int = 5,  # Useful after correcting up to ~1 or 2%
 ):
     """
+    Args:
+        savgol_window: used to generated a filtered step response that is useful
+        to use when the correction to apply are already very small on the order
+        of 1%, at that point the step response get very sensitive to new FIRs
+
     Example:
 
         # ##############################################################
@@ -277,11 +283,12 @@ def cryoscope_v2(
         fit_res = model.fit(step_response_fit, t=time_ns_fit, params=params)
         params = {key: fit_res.params[key] for key in fit_res.params.keys()}
 
-        if step_response[0] < 0.987:
-            # Only extrapolate if the first point is significantly off
+        if step_response[0] < 0.99:
+            # Only extrapolate if the first point is significantly below
             corrected_pnts = exp_rise(time_ns[:extra_pnts], **params)
         else:
-            corrected_pnts = [step_response[0]] * extra_pnts
+            corrected_pnts = [1.0] * extra_pnts
+            # corrected_pnts = [step_response[0]] * extra_pnts
 
         step_response = np.concatenate(
             (
@@ -293,12 +300,14 @@ def cryoscope_v2(
             )
         )
         conversion.update(params)
-        conversion["step_response_" + name + "_right_shifted"] = step_response
+        conversion["step_response_processed_" + name] = step_response
+        filtered = signal.savgol_filter(step_response, savgol_window, 0, 0)
+        conversion["step_response_filtered_" + name] = filtered
 
         # Renaming to be able to return the step responses from all measured
         # channels along side with the average
         step_response = conversion.pop("step_response")
-        conversion["step_response_" + name] = step_response
+        conversion["step_response_raw_" + name] = step_response
         res.update(conversion)
 
     return res
@@ -378,7 +387,7 @@ def moving_cos_fitting_window(
         params["amplitude"].max = 2.0 * init_guess["amplitude"]
 
         params["frequency"].min = 0.0
-        params["frequency"].max = 1.0  # Not expected to be used for > 1GHz
+        params["frequency"].max = 0.7  # Not expected to be used for > 1GHz
 
         for par, val in fixed_params.items():
             params[par].value = val[i] if isinstance(val, Iterable) else val
