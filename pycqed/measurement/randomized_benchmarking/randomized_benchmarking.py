@@ -135,7 +135,7 @@ def randomized_benchmarking_sequence_old(n_cl: int,
 ##############################################################################
 # New style RB sequences (using the hash-table method) compatible
 # with Clifford object.
-# More advanced sequences are avaliable using this method.
+# More advanced sequences are available using this method.
 ##############################################################################
 
 
