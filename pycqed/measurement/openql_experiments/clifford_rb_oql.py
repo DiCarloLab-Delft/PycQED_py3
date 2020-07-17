@@ -23,6 +23,14 @@ reload(rb)
 
 log = logging.getLogger(__name__)
 
+# We same here a global configuration of the number of maximum task a process
+# (from `multiprocessing` package) of RB compilation task should execute before
+# being restarted, this is necessary do to memory leakage happening
+# likely do to code outside python
+# Not sure what this number should be, it is a trade off between memory
+# consumption and the overhead of having to start a new python process
+maxtasksperchild = 10
+
 
 def parallel_friendly_rb(rb_kw_dict):
     """
@@ -53,9 +61,9 @@ def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 4):
         # It is enough to have an indication of progress without
         # compromising the efficiency
         print(
-            "{} RB compilation task chunks left (NB: not programs)."
+            "{} RB compilation tasks left."
             " Elapsed waiting {:>7.1f}s".format(
-                np.sum(rb_tasks._number_left), time.time() - t0
+                np.sum(rb_tasks._number_left * rb_tasks._chunksize), time.time() - t0
             ),
             end="\r",
         )
