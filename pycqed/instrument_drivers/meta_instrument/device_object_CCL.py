@@ -3560,7 +3560,10 @@ class DeviceCCL(Instrument):
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
-            with multiprocessing.Pool(nr_processes) as pool:
+            with multiprocessing.Pool(
+                nr_processes,
+                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+            ) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
@@ -3640,8 +3643,8 @@ class DeviceCCL(Instrument):
 
         rounds_success = np.zeros(nr_iRB_runs)
         t0 = time.time()
-        # `maxtasksperchild` is specified to free up the memory from time to time
-        with multiprocessing.Pool(maxtasksperchild=100) as pool:
+        # `maxtasksperchild` avoid RAM issues
+        with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
             rb_tasks_start = None
             last_run = nr_iRB_runs - 1
             for i in range(nr_iRB_runs):
@@ -3848,7 +3851,8 @@ class DeviceCCL(Instrument):
             # one
             if pool is None:
                 # Using `with ...:` makes sure the other processes will be terminated
-                with multiprocessing.Pool() as pool:
+                # `maxtasksperchild` avoid RAM issues
+                with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
                     run_parallel_iRB(
                         recompile=recompile,
                         pool=pool,
@@ -4029,7 +4033,7 @@ class DeviceCCL(Instrument):
             # one
             if pool is None:
                 # Using `with ...:` makes sure the other processes will be terminated
-                with multiprocessing.Pool() as pool:
+                with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
                     run_parallel_iRB(
                         recompile=recompile,
                         pool=pool,
@@ -4197,7 +4201,10 @@ class DeviceCCL(Instrument):
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
-            with multiprocessing.Pool(nr_processes) as pool:
+            with multiprocessing.Pool(
+                nr_processes,
+                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+            ) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
@@ -4684,7 +4691,10 @@ class DeviceCCL(Instrument):
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
-            with multiprocessing.Pool(nr_processes) as pool:
+            with multiprocessing.Pool(
+                nr_processes,
+                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+            ) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
