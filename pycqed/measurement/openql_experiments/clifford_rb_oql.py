@@ -18,6 +18,7 @@ from pycqed.utilities.general import check_keyboard_interrupt
 import inspect
 from importlib import reload
 import logging
+
 reload(rb)
 
 log = logging.getLogger(__name__)
@@ -41,15 +42,23 @@ def parallel_friendly_rb(rb_kw_dict):
     return p.filename
 
 
-def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 3):
+def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 4):
     """
     Blocks the main process till all tasks in `rb_tasks` are done
     """
     t0 = time.time()
     while not rb_tasks.ready():
-        # FIXME _number_left doesn't seem to be represent things correctly
-        print("{} RB programs left to compile. Elapsed {:>7.1f}s".format(
-            np.sum(rb_tasks._number_left), time.time() - t0), end="\r")
+        # NB the _number_left is not the number of RB programs,
+        # it is an internal number of groups of compilation tasks (chunks)
+        # It is enough to have an indication of progress without
+        # compromising the efficiency
+        print(
+            "{} RB compilation task chunks left (NB: not programs)."
+            " Elapsed waiting {:>7.1f}s".format(
+                np.sum(rb_tasks._number_left), time.time() - t0
+            ),
+            end="\r",
+        )
 
         # check for keyboard interrupt q because generating can be slow
         check_keyboard_interrupt()
@@ -213,16 +222,19 @@ def randomized_benchmarking(
         with open(platf_cfg) as json_file:
             loaded_json = json.load(json_file)
         try:
-            flux_allocated_duration_ns = (
-                loaded_json["instructions"]["sf_cz_se q0"]["duration"]
-            )
+            flux_allocated_duration_ns = loaded_json["instructions"]["sf_cz_se q0"][
+                "duration"
+            ]
         except KeyError:
             raise ValueError("Could not find flux duration. Specify manually!")
 
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
             for interleaving_cl in interleaving_cliffords:
-                if not simultaneous_single_qubit_RB and not simultaneous_single_qubit_parking_RB:
+                if (
+                    not simultaneous_single_qubit_RB
+                    and not simultaneous_single_qubit_parking_RB
+                ):
                     for net_clifford in net_cliffords:
                         cl_seq = rb.randomized_benchmarking_sequence(
                             n_cl,
@@ -273,7 +285,9 @@ def randomized_benchmarking(
                                         # OpenQL alignment is necessary to ensure
                                         # parking flux pulse is played in parallel
                                         k.gate("wait", [], 0)
-                                        k.gate(flux_codeword, list(qubit_map.values()))  # fix for QCC
+                                        k.gate(
+                                            flux_codeword, list(qubit_map.values())
+                                        )  # fix for QCC
                                         k.gate("wait", [], 0)
                                     else:
                                         # A simultaneous CZ is applied to characterize cz gates that
@@ -282,8 +296,12 @@ def randomized_benchmarking(
                                         # OpenQL alignment is necessary to ensure
                                         # parking flux pulse is played in parallel
                                         k.gate("wait", [], 0)
-                                        k.gate(flux_codeword, list(qubit_map.values()))  # fix for QCC
-                                        k.gate(flux_codeword, sim_cz_qubits)  # fix for QCC
+                                        k.gate(
+                                            flux_codeword, list(qubit_map.values())
+                                        )  # fix for QCC
+                                        k.gate(
+                                            flux_codeword, sim_cz_qubits
+                                        )  # fix for QCC
                                         k.gate("wait", [], 0)
 
                         # FIXME: This hack is required to align multiplexed RO in openQL..
@@ -353,7 +371,9 @@ def randomized_benchmarking(
                                 k.prepz(qubit_idx)
                         k.gate("wait", [], 0)
 
-                        rb_qubits = ["q2"] if rb_on_parked_qubit_only else ["q0", "q1", "q2"]
+                        rb_qubits = (
+                            ["q2"] if rb_on_parked_qubit_only else ["q0", "q1", "q2"]
+                        )
                         cl_rb_seq_all_q = []  # One for each rb_qubit
                         cl_seq_decomposed = []
                         for rb_qubit in enumerate(rb_qubits):
@@ -374,10 +394,14 @@ def randomized_benchmarking(
                                 cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
                             else:
                                 for q_str, cl_rb_seq in zip(rb_qubits, cl_rb_seq_all_q):
-                                    cl_decomposed = Cl(cl_rb_seq[cl_i]).gate_decomposition
+                                    cl_decomposed = Cl(
+                                        cl_rb_seq[cl_i]
+                                    ).gate_decomposition
                                     # the decomposition of the single qubit Cliffords
                                     # by default targets "q0", here we replace that
-                                    cl_decomposed = [(gate, q_str) for gate, _ in cl_decomposed]
+                                    cl_decomposed = [
+                                        (gate, q_str) for gate, _ in cl_decomposed
+                                    ]
                                     cl_seq_decomposed.append(cl_decomposed)
 
                         for gates in cl_seq_decomposed:
@@ -388,8 +412,13 @@ def randomized_benchmarking(
                                 elif isinstance(qubit_or_qubits, list):
                                     # interleaving the CZ with parking
                                     # and ensure alignment
-                                    k.gate("wait", [], 0)  # alignment, avoid flux overlap with mw gates
-                                    k.gate(flux_codeword, [qubit_map[qubit] for qubit in qubit_or_qubits])
+                                    k.gate(
+                                        "wait", [], 0
+                                    )  # alignment, avoid flux overlap with mw gates
+                                    k.gate(
+                                        flux_codeword,
+                                        [qubit_map[qubit] for qubit in qubit_or_qubits],
+                                    )
                                     k.gate("wait", [], 0)
 
                         k.gate("wait", [], 0)  # align RO
@@ -414,9 +443,11 @@ def randomized_benchmarking(
                 )
             elif number_of_qubits == 3:
                 p = oqh.add_single_qubit_cal_points(
-                    p, qubit_idx=qubit_map["q2"], f_state_cal_pts=f_state_cal_pts,
+                    p,
+                    qubit_idx=qubit_map["q2"],
+                    f_state_cal_pts=f_state_cal_pts,
                     # we must measure all 3 qubits to avoid alignment issues
-                    measured_qubits=list(qubit_map.values())
+                    measured_qubits=list(qubit_map.values()),
                 )
 
     p = oqh.compile(p)
