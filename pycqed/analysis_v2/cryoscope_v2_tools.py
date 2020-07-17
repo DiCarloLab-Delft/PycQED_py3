@@ -287,8 +287,10 @@ def cryoscope_v2(
             # Only extrapolate if the first point is significantly below
             corrected_pnts = exp_rise(time_ns[:extra_pnts], **params)
         else:
-            corrected_pnts = [1.0] * extra_pnts
-            # corrected_pnts = [step_response[0]] * extra_pnts
+            corrected_pnts = [step_response[0]] * extra_pnts
+            # For some cases maybe works better to just assume the first
+            # point is calibrated, didn't test enough...
+            # corrected_pnts = [1.0] * extra_pnts
 
         step_response = np.concatenate(
             (
@@ -301,6 +303,9 @@ def cryoscope_v2(
         )
         conversion.update(params)
         conversion["step_response_processed_" + name] = step_response
+
+        # FIXME should be filtering first and processing as above afterwards
+        # not tested but sounds like a better way of doing it
         filtered = signal.savgol_filter(step_response, savgol_window, 0, 0)
         conversion["step_response_filtered_" + name] = filtered
 
