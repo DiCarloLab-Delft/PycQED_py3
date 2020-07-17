@@ -11,6 +11,7 @@ from pycqed.utilities.general import is_more_rencent
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform, CReg, Operation
 
+log = logging.getLogger(__name__)
 
 output_dir = join(dirname(__file__), 'output')
 ql.set_option('output_dir', output_dir)
@@ -582,32 +583,41 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
                                recompile=True):
     """
     determines if compilation of a file is needed based on it's timestamp
-    and an optional recompile option.
-    FIXME: program_fn is platform dependent, because it includes extension
+    and an optional recompile option
 
-    The behaviour of this function depends on the recompile argument.
+    The behavior of this function depends on the recompile argument.
 
     recompile:
         True -> True, the program should be compiled
 
         'as needed' -> compares filename to timestamp of config
             and checks if the file exists, if required recompile.
-        False -> compares program to timestamp of config.
-            if compilation is required raises a ValueError
+        False -> checks if the file exists, if it doesn't
+            compilation is required and raises a ValueError.
+            Use carefully, only if you know what you are doing!
+            Use 'as needed' to stay safe!
     """
-    if recompile == True:
-        return True
+
+    if recompile is True:
+        return True  # compilation is enforced
     elif recompile == 'as needed':
-        if isfile(program_fn):
-            return False
+        # In case you ever think of a hash-based check mind that this
+        # function is called in parallel multiprocessing sometime!!!
+        if isfile(program_fn) and is_more_rencent(program_fn, platf_cfg):
+            return False  # program file is good for using
         else:
             return True  # compilation is required
-    elif recompile == False:  # if False
+    elif recompile is False:
         if isfile(program_fn):
+            if is_more_rencent(platf_cfg, program_fn):
+                log.warnings("File {}\n is more recent"
+                    "than program, use `recompile='as needed'` if you"
+                    " don't know what this means!".format(platf_cfg))
             return False
         else:
-            raise ValueError('OpenQL config has changed more recently '
-                             'than program.')
+            raise ValueError(
+                'No file:\n{}'.format(platf_cfg)
+            )
     else:
         raise NotImplementedError(
             'recompile should be True, False or "as needed"')
