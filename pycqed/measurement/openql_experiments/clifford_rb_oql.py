@@ -15,8 +15,12 @@ from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import 
 import json
 import time
 from pycqed.utilities.general import check_keyboard_interrupt
+import inspect
 from importlib import reload
+import logging
 reload(rb)
+
+log = logging.getLogger(__name__)
 
 
 def parallel_friendly_rb(rb_kw_dict):
@@ -168,9 +172,17 @@ def randomized_benchmarking(
     # attribute get's added to program to help finding the output files
     p.filename = join(p.output_dir, p.name + ".qisa")  # FIXME: platform dependency
 
-    if not oqh.check_recompilation_needed(
+    # Ensure that programs are recompiled when changing the code as well
+    this_file = inspect.getfile(inspect.currentframe())
+    # reusing the check_recompilation_needed for a different file
+    recompile_due_to_code_change = oqh.check_recompilation_needed(
+        program_fn=p.filename, platf_cfg=this_file, recompile=recompile
+    )
+    recompile_due_to_platf_cfg = oqh.check_recompilation_needed(
         program_fn=p.filename, platf_cfg=platf_cfg, recompile=recompile
-    ):
+    )
+
+    if not recompile_due_to_platf_cfg and not recompile_due_to_code_change:
         return p
 
     if len(qubits) == 1:
