@@ -240,6 +240,14 @@ def cryoscope_v2(
     all_freq_T = all_freq.T
     av_freq = np.average(all_freq_T, axis=1)
 
+    all_freq_filtered = [
+        signal.savgol_filter(sig, savgol_window, 0, 0)
+        for sig in [*all_freq, av_freq]
+    ]
+    all_names_filtered = [name + "_filtered" for name in vlns]
+
+    av_freq_filtered = signal.savgol_filter(av_freq, savgol_window, 0, 0)
+
     kw_extract["qubit"] = qubit
     kw_extract["timestamp"] = timestamp
     amp_pars = extract_amp_pars(**kw_extract)
@@ -251,7 +259,11 @@ def cryoscope_v2(
         "time_ns": time_ns,
     }
 
-    for frequencies, name in zip([*all_freq, av_freq], [*vlns, "average"]):
+    for frequencies, name in zip(
+        # Make available in the results all combinations
+        [*all_freq, av_freq, *all_freq_filtered, av_freq_filtered],
+        [*vlns, "average", *all_names_filtered, "average_filtered"]
+    ):
         conversion = rough_freq_to_amp(amp_pars, time_ns, frequencies, **kw_rough_freq_to_amp)
 
         # Here we correct for the averaging effect of the moving cosine-fitting
@@ -303,11 +315,6 @@ def cryoscope_v2(
         )
         conversion.update(params)
         conversion["step_response_processed_" + name] = step_response
-
-        # FIXME should be filtering first and processing as above afterwards
-        # not tested but sounds like a better way of doing it
-        filtered = signal.savgol_filter(step_response, savgol_window, 0, 0)
-        conversion["step_response_filtered_" + name] = filtered
 
         # Renaming to be able to return the step responses from all measured
         # channels along side with the average
