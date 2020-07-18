@@ -37,7 +37,8 @@ def cryoscope_v2(
         "cfg_amp_key": "Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude",
     },
     kw_rough_freq_to_amp={},
-    savgol_window: int = 5,  # Useful after correcting up to ~1 or 2%
+    savgol_window: int = 5,
+    savgol_polyorder: int = 1,
 ):
     """
     Args:
@@ -241,12 +242,16 @@ def cryoscope_v2(
     av_freq = np.average(all_freq_T, axis=1)
 
     all_freq_filtered = [
-        signal.savgol_filter(sig, savgol_window, 0, 0)
+        signal.savgol_filter(sig, savgol_window, savgol_polyorder, 0)
         for sig in [*all_freq, av_freq]
     ]
     all_names_filtered = [name + "_filtered" for name in vlns]
 
-    av_freq_filtered = signal.savgol_filter(av_freq, savgol_window, 0, 0)
+    av_freq_filtered = signal.savgol_filter(
+        av_freq,
+        window_length=savgol_window,
+        polyorder=savgol_polyorder,
+        deriv=0)
 
     kw_extract["qubit"] = qubit
     kw_extract["timestamp"] = timestamp
