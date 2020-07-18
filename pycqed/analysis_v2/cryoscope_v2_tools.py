@@ -27,18 +27,19 @@ log = logging.getLogger(__name__)
 # Main analysis tool
 # ######################################################################
 
+
 def cryoscope_v2(
     qubit,
     timestamp,
-    kw_processing={},
+    kw_processing={"insert_ideal_projection": True},
     kw_extract={
         "dac_amp_key": "Snapshot/instruments/flux_lm_{}/parameters/sq_amp",
         "vpp_key": "Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_range",
         "cfg_amp_key": "Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude",
     },
-    kw_rough_freq_to_amp={},
-    savgol_window: int = 5,
-    savgol_polyorder: int = 1,
+    kw_rough_freq_to_amp={"plateau_time_start_ns": -25, "plateau_time_end_ns": -5},
+    savgol_window: int = 5,  # 3 or 5 should work best
+    savgol_polyorder: int = 1,  # Might be useful to put to 0 after some iterations
 ):
     """
     Args:
@@ -231,9 +232,14 @@ def cryoscope_v2(
         }
     )
 
-    for mv in mvs:
+    for mv, vln in zip(mvs, vlns):
         res = cryoscope_v2_processing(
-            time_ns=time_ns, osc_data=mv[start_idx:], **kw_processing
+            time_ns=time_ns,
+            osc_data=mv[start_idx:],
+            vln=vln,
+            # NB it True, the raw step response is effectively right-shifted
+            # as consequence of how the data flows in this analysis
+            **kw_processing
         )
         results_list.append(res)
 
@@ -248,10 +254,8 @@ def cryoscope_v2(
     all_names_filtered = [name + "_filtered" for name in vlns]
 
     av_freq_filtered = signal.savgol_filter(
-        av_freq,
-        window_length=savgol_window,
-        polyorder=savgol_polyorder,
-        deriv=0)
+        av_freq, window_length=savgol_window, polyorder=savgol_polyorder, deriv=0
+    )
 
     kw_extract["qubit"] = qubit
     kw_extract["timestamp"] = timestamp
@@ -267,9 +271,11 @@ def cryoscope_v2(
     for frequencies, name in zip(
         # Make available in the results all combinations
         [*all_freq, av_freq, *all_freq_filtered, av_freq_filtered],
-        [*vlns, "average", *all_names_filtered, "average_filtered"]
+        [*vlns, "average", *all_names_filtered, "average_filtered"],
     ):
-        conversion = rough_freq_to_amp(amp_pars, time_ns, frequencies, **kw_rough_freq_to_amp)
+        conversion = rough_freq_to_amp(
+            amp_pars, time_ns, frequencies, **kw_rough_freq_to_amp
+        )
 
         # Here we correct for the averaging effect of the moving cosine-fitting
         # window, we attribute the obtained frequency to the middle point in the
@@ -283,13 +289,13 @@ def cryoscope_v2(
 
         # # Fit only first 15 ns
         step_response_fit = np.array(step_response)
-        time_ns_fit = time_ns[extra_pnts:][:len(step_response_fit)]
+        time_ns_fit = time_ns[extra_pnts:][: len(step_response_fit)]
         where = np.where(time_ns_fit < 15)[0]
         step_response_fit = step_response_fit[where]
         time_ns_fit = time_ns_fit[where]
 
         def exp_rise(t, tau):
-            return 1 - np.exp(- t / tau)
+            return 1 - np.exp(-t / tau)
 
         model = lmfit.Model(exp_rise)
         params = model.make_params()
@@ -333,6 +339,7 @@ def cryoscope_v2(
 # ######################################################################
 # Analysis utilities
 # ######################################################################
+
 
 def rough_freq_to_amp(
     amp_pars, time_ns, freqs, plateau_time_start_ns=-25, plateau_time_end_ns=-5,
@@ -389,8 +396,8 @@ def moving_cos_fitting_window(
         init_guess["amplitude"] = amplitude_guess
 
     if "frequency" not in init_guess.keys():
-        w = np.fft.fft(y_data)[:len(y_data) // 2]  # ignore negative values
-        f = np.fft.fftfreq(len(y_data), x_data_ns[1] - x_data_ns[0])[:len(w)]
+        w = np.fft.fft(y_data)[: len(y_data) // 2]  # ignore negative values
+        f = np.fft.fftfreq(len(y_data), x_data_ns[1] - x_data_ns[0])[: len(w)]
         w[0] = 0  # ignore DC component
         frequency_guess = f[np.argmax(np.abs(w))]
         init_guess["frequency"] = frequency_guess
@@ -428,11 +435,8 @@ def moving_cos_fitting_window(
     # There is an iteration from the middle to the end and another one
     # from the middle to the beginning
     for fit_ref, iterator in zip(
-        [-1, + 1],
-        [
-            range(middle_fits_num, max_num_fits),
-            reversed(range(middle_fits_num))
-        ]
+        [-1, +1],
+        [range(middle_fits_num, max_num_fits), reversed(range(middle_fits_num))],
     ):
         for i in iterator:
             if i != middle_fits_num:
@@ -477,6 +481,8 @@ def cryoscope_v2_processing(
     fixed_params_first_pass: dict = {},
     init_guess_second_pass: dict = {},
     plot: bool = True,
+    vln: str = "",
+    insert_ideal_projection: bool = True,
 ):
     """
     TBW
@@ -491,23 +497,44 @@ def cryoscope_v2_processing(
     """
 
     assert time_ns[0] != 0.0, "Cryoscope time should not start at zero!"
-    x_data_ns = time_ns
-    y_data = osc_data
+
+    def add_ideal_projection_at_zero(time_ns, y_data, vln, offset, osc_amp):
+        """
+        Inserts and ideal point at t = 0 based on the type of projection
+        """
+        if vln:
+            if "mcos" in vln:
+                time_ns = np.insert(time_ns, 0, 0)
+                y_data = np.insert(y_data, 0, offset - osc_amp)
+            elif "cos" in vln:
+                time_ns = np.insert(time_ns, 0, 0)
+                y_data = np.insert(y_data, 0, offset + osc_amp)
+            elif "sin" in vln or "msin" in vln:
+                time_ns = np.insert(time_ns, 0, 0)
+                y_data = np.insert(y_data, 0, offset)
+            else:
+                log.warning(
+                    "Projection type not supported. Unexpected results may arise."
+                )
+            return time_ns, y_data
+        else:
+            print("Skipping!")
+            return time_ns, y_data
 
     results, results_stderr = moving_cos_fitting_window(
-        x_data_ns=x_data_ns,
-        y_data=y_data,
+        x_data_ns=time_ns,
+        y_data=osc_data,
         fit_window_pnts_nr=pnts_per_fit_first_pass,
         init_guess=init_guess_first_pass,
         fixed_params=fixed_params_first_pass,
     )
 
     amps_from_fit = results["amplitude"]
-    x_for_fit = x_data_ns[: len(amps_from_fit)]
+    x_for_fit = time_ns[: len(amps_from_fit)]
     # Here we are intentionally using poly of deg 1 to avoid the amplitude to be lower
     # in the beginning which should not be physical
     line_fit = np.polyfit(x_for_fit, amps_from_fit, 1)
-    fixed_amps = np.poly1d(line_fit)(x_data_ns)
+    poly1d = np.poly1d(line_fit)
     fixed_offset = np.average(results["offset"])
 
     if not len(init_guess_second_pass):
@@ -517,12 +544,20 @@ def cryoscope_v2_processing(
             "phase": 0.0,
         }
 
+    time_ns, osc_data = add_ideal_projection_at_zero(
+        time_ns=time_ns,
+        y_data=osc_data,
+        vln=vln,
+        osc_amp=poly1d(0.0),
+        offset=fixed_offset,
+    )
+
     results, results_stderr = moving_cos_fitting_window(
-        x_data_ns=x_data_ns,
-        y_data=y_data,
+        x_data_ns=time_ns,
+        y_data=osc_data,
         fit_window_pnts_nr=pnts_per_fit_second_pass,
         init_guess=init_guess_second_pass,
-        fixed_params={"offset": fixed_offset, "amplitude": fixed_amps},
+        fixed_params={"offset": fixed_offset, "amplitude": poly1d(time_ns)},
     )
 
     if plot:
@@ -530,19 +565,19 @@ def cryoscope_v2_processing(
 
         ax = axs[0]
         ax.plot(
-            x_data_ns[: len(amps_from_fit)], amps_from_fit, label="Osc. amp. first pass"
+            time_ns[: len(amps_from_fit)], amps_from_fit, label="Osc. amp. first pass"
         )
         ax.plot(x_for_fit, np.poly1d(line_fit)(x_for_fit), label="Line fit osc. amp.")
         ax.set_xlabel("Osc. amp. (a.u.)")
         ax.legend()
 
         ax = axs[1]
-        ax.plot(x_data_ns, y_data, "o")
+        ax.plot(time_ns, osc_data, "o")
 
         for i in range(len(results[list(results.keys())[0]])):
             res_pars = {key: results[key][i] for key in results.keys()}
             time_sample = np.linspace(
-                x_data_ns[i], x_data_ns[i + pnts_per_fit_second_pass - 1], 20
+                time_ns[i], time_ns[i + pnts_per_fit_second_pass - 1], 20
             )
             cos_fit_sample = fit_mods.CosFunc(t=time_sample, **res_pars)
             ax.set_xlabel("Pulse duration (ns)")
