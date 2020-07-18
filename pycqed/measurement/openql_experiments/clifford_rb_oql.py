@@ -3,7 +3,7 @@ This file reads in a pygsti dataset file and converts it to a valid
 OpenQL sequence. FIXME: copy/paste error
 """
 
-from os.path import join
+import os
 import numpy as np
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
@@ -19,6 +19,7 @@ import inspect
 from importlib import reload
 import logging
 
+reload(oqh)
 reload(rb)
 
 log = logging.getLogger(__name__)
@@ -187,19 +188,20 @@ def randomized_benchmarking(
     p = oqh.create_program(program_name, platf_cfg)
 
     # attribute get's added to program to help finding the output files
-    p.filename = join(p.output_dir, p.name + ".qisa")  # FIXME: platform dependency
+    p.filename = os.path.join(p.output_dir, p.name + ".qisa")  # FIXME: platform dependency
+
+    this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
-    this_file = inspect.getfile(inspect.currentframe())
-    # reusing the check_recompilation_needed for a different file
-    recompile_due_to_code_change = oqh.check_recompilation_needed(
-        program_fn=p.filename, platf_cfg=this_file, recompile=recompile
-    )
-    recompile_due_to_platf_cfg = oqh.check_recompilation_needed(
-        program_fn=p.filename, platf_cfg=platf_cfg, recompile=recompile
+    recompile_dict = oqh.check_recompilation_needed_hash_based(
+        program_fn=p.filename,
+        platf_cfg=platf_cfg,
+        clifford_rb_oql=this_file,
+        recompile=recompile,
     )
 
-    if not recompile_due_to_platf_cfg and not recompile_due_to_code_change:
+    if not recompile_dict["recompile"]:
+        os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
         return p
 
     if len(qubits) == 1:
@@ -459,6 +461,9 @@ def randomized_benchmarking(
                 )
 
     p = oqh.compile(p)
+    # Just before returning we rename the hashes file as an indication of the
+    # integrity of the RB code
+    os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
     return p
 
 
@@ -506,11 +511,20 @@ def character_benchmarking(
     p = oqh.create_program(program_name, platf_cfg)
 
     # attribute get's added to program to help finding the output files
-    p.filename = join(p.output_dir, p.name + ".qisa")
+    p.filename = os.path.join(p.output_dir, p.name + ".qisa")
 
-    if not oqh.check_recompilation_needed(
-        program_fn=p.filename, platf_cfg=platf_cfg, recompile=recompile
-    ):
+    this_file = inspect.getfile(inspect.currentframe())
+
+    # Ensure that programs are recompiled when changing the code as well
+    recompile_dict = oqh.check_recompilation_needed_hash_based(
+        program_fn=p.filename,
+        platf_cfg=platf_cfg,
+        clifford_rb_oql=this_file,
+        recompile=recompile,
+    )
+
+    if not recompile_dict["recompile"]:
+        os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
         return p
 
     qubit_map = {"q0": qubits[0], "q1": qubits[1]}
@@ -596,4 +610,7 @@ def character_benchmarking(
             p = oqh.add_multi_q_cal_points(p, qubits=qubits, combinations=combinations)
 
     p = oqh.compile(p)
+    # Just before returning we rename the hashes file as an indication of the
+    # integrity of the RB code
+    os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
     return p
