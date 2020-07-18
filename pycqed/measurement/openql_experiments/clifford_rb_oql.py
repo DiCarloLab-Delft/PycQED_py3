@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 # likely do to code outside python
 # Not sure what this number should be, it is a trade off between memory
 # consumption and the overhead of having to start a new python process
-maxtasksperchild = 10
+maxtasksperchild = 4
 
 
 def parallel_friendly_rb(rb_kw_dict):
