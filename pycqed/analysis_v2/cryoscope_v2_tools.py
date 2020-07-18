@@ -244,18 +244,13 @@ def cryoscope_v2(
         results_list.append(res)
 
     all_freq = np.array([res[0]["frequency"] for res in results_list])
-    av_freq = np.average(all_freq.T, axis=1)
-
-    all_freq_filtered = [
-        signal.savgol_filter(sig, savgol_window, savgol_polyorder, 0)
-        for sig in [*all_freq, av_freq]
-    ]
-    av_filtered_freq = np.average(all_freq_filtered.T, axis=1)
+    av_freq = np.average(all_freq, axis=0)
 
     all_names_filtered = [name + "_filtered" for name in vlns]
-    filtered_av_freq = signal.savgol_filter(
-        av_freq, window_length=savgol_window, polyorder=savgol_polyorder, deriv=0
-    )
+    all_freq_filtered = np.array([
+        signal.savgol_filter(sig, savgol_window, savgol_polyorder, 0)
+        for sig in [*all_freq, av_freq]
+    ])
 
     kw_extract["qubit"] = qubit
     kw_extract["timestamp"] = timestamp
@@ -270,8 +265,8 @@ def cryoscope_v2(
 
     for frequencies, name in zip(
         # Make available in the results all combinations
-        [*all_freq, av_freq, *all_freq_filtered, filtered_av_freq, av_filtered_freq],
-        [*vlns, "average", *all_names_filtered, "filtered_average", "average_filtered"],
+        [*all_freq, av_freq, *all_freq_filtered],
+        [*vlns, "average", *all_names_filtered, "average_filtered"],
     ):
         conversion = rough_freq_to_amp(
             amp_pars, time_ns, frequencies, **kw_rough_freq_to_amp
