@@ -306,7 +306,7 @@ def cryoscope_v2(
         fit_res = model.fit(step_response_fit, t=time_ns_fit, params=params)
         params = {key: fit_res.params[key] for key in fit_res.params.keys()}
 
-        if step_response[0] < 0.99:
+        if step_response[0] < 0.97:
             # Only extrapolate if the first point is significantly below
             corrected_pnts = exp_rise(time_ns[:extra_pnts], **params)
         else:
@@ -411,7 +411,7 @@ def moving_cos_fitting_window(
         params["amplitude"].max = 2.0 * init_guess["amplitude"]
 
         params["frequency"].min = 0.0
-        params["frequency"].max = 0.7  # Not expected to be used for > 1GHz
+        params["frequency"].max = 0.6  # Not expected to be used for > 0.5 GHz
 
         for par, val in fixed_params.items():
             params[par].value = val[i] if isinstance(val, Iterable) else val
