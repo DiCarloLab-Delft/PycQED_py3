@@ -1,15 +1,12 @@
 """
 Created: 2020-07-15
 Author: Victor Negirneac
-This includes a dirty analysis to be called from a notebook
-Should be moved into its own analysis and keep here only the tools
 """
 
 import matplotlib.pyplot as plt
 from collections.abc import Iterable
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import measurement_analysis as ma
-import pycqed.analysis_v2.measurement_analysis as ma2
 import pycqed.measurement.hdf5_data as hd5
 import lmfit
 import numpy as np
@@ -21,315 +18,6 @@ from scipy import signal
 import cma
 
 log = logging.getLogger(__name__)
-
-
-# ######################################################################
-# Main analysis tool
-# ######################################################################
-
-
-def cryoscope_v2(
-    qubit,
-    timestamp,
-    kw_processing={"insert_ideal_projection": True},
-    kw_extract={
-        "dac_amp_key": "Snapshot/instruments/flux_lm_{}/parameters/sq_amp",
-        "vpp_key": "Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_range",
-        "cfg_amp_key": "Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude",
-    },
-    kw_rough_freq_to_amp={"plateau_time_start_ns": -25, "plateau_time_end_ns": -5},
-    savgol_window: int = 5,  # 3 or 5 should work best
-    savgol_polyorder: int = 1,  # Might be useful to put to 0 after some iterations
-):
-    """
-    Args:
-        savgol_window: used to generated a filtered step response that is useful
-        to use when the correction to apply are already very small on the order
-        of 1%, at that point the step response get very sensitive to new FIRs
-
-    Example:
-
-        # ##############################################################
-        # Analysis tool
-        # ##############################################################
-
-        from pycqed.analysis_v2 import cryoscope_v2_tools as cv2
-        import numpy as np
-        from scipy import signal
-
-        reload(cv2)
-        ts_trace = "20200628_034745"
-        qubit = "D1"
-        res = cv2.cryoscope_v2(
-            qubit=qubit,
-            timestamp=ts_trace,
-            kw_processing={"plot": True}
-        )
-
-        # ##############################################################
-        # Plot analysed step response
-        # ##############################################################
-
-        fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-
-        time_ns = res["time_ns"]
-
-        step_response = res["step_response"]
-        ax.plot(time_ns[:len(step_response)], step_response, label="Step response")
-
-        # If the first point in the step_response is somewhat significantly far from 1.0
-        # Using the right shifted step response might help for the FIRs
-        # [2020-07-15 Victor] Not tested yet if the shifted response allows for better
-        # FIR calibration
-        step_response_right_shifted = res["step_response_right_shifted"]
-        ax.plot(time_ns[:len(step_response_right_shifted)],
-                step_response_right_shifted, label="Step response right-shifted")
-
-        ax.hlines(np.array([.99, .999, 1.01, 1.001, .97, 1.03]) ,
-                  xmin=np.min(time_ns), xmax=np.max(time_ns[:len(step_response)]),
-                  linestyle=["-", "--", "-", "--", "-.", "-."])
-
-        ax.set_title(ts_trace + ": Cryoscope " + qubit)
-        set_xlabel(ax, "Pulse duration", "ns")
-        set_ylabel(ax, "Normalized amplitude", "a.u.")
-        ax.legend()
-
-        # ##############################################################
-        # IIR optimization
-        # ##############################################################
-
-        # TODO: add here for reference next time!!!
-
-        # ##############################################################
-        # FIR optimization
-        # ##############################################################
-
-        # Limit the number of point up to which this FIR should correct
-        # This helps to avoid fitting noise and make the convergence faster
-        # and targeted to what we want to correct
-        # maximum 72 taps are available for HDAWG real-time FIR (~ 30 ns)
-        max_taps = 72
-
-        opt_fir, _ = cv2.optimize_fir_software(
-            step_response,
-            baseline_start=np.where(time_ns > 10)[0].min(),
-            max_taps=max_taps,
-            cma_options={
-                "verb_disp":10000,  # Avoid too much output
-                #"ftarget": 1e-3, "tolfun": 1e-15, "tolfunhist": 1e-15, "tolx": 1e-15
-            }
-        )
-
-        # ##############################################################
-        # FIR optimization plotting
-        # ##############################################################
-
-        ac_soft_FIR = signal.lfilter(opt_fir, 1, step_response)
-
-        fig, ax = plt.subplots(1, 1, figsize=(20, 8))
-
-        ax.plot(time_ns[:len(step_response)], step_response, "-o")
-        ax.plot(time_ns[:len(step_response)], ac_soft_FIR, "-o")
-
-        ax.hlines(np.array([.99, .999, 1.01, 1.001]),
-                  xmin=np.min(time_ns), xmax=np.max(time_ns[:len(step_response)]),
-                  linestyle=["-", "--", "-", "--"])
-
-        # ##############################################################
-        # Generate loading code (first iteration only)
-        # ##############################################################
-
-        # Run this cell for the first FIR only
-        # Then copy paste below in order to keep track of the FIRs
-        # You may want to go back a previous one
-        filter_model_number = 4  # CHANGE ME IF NEEDED!!!
-
-        cv2.print_FIR_loading(
-            qubit,
-            filter_model_number,
-            cv2.convert_FIR_for_HDAWG(opt_fir),
-            real_time=True)
-
-        # Output sample:
-        # lin_dist_kern_D1.filter_model_04({'params': {'weights': np.array([ 1.13092421e+00, -6.82709369e-02, -4.64421034e-02, -2.58260195e-02,
-        #        -1.04921358e-02, -9.73883537e-03, -2.42308728e-03,  5.35076244e-03,
-        #         3.77617499e-03,  5.28141742e-03, -6.33810801e-03,  2.69420579e-03,
-        #         9.06057712e-03,  7.32841146e-03,  1.20281705e-03, -2.35979362e-03,
-        #        -4.87644425e-03,  1.49692530e-03, -9.34622902e-04, -2.26087315e-04,
-        #        -1.15781407e-02,  1.11572007e-03,  4.48942912e-03, -4.85723912e-03,
-        #         5.10716383e-03,  2.29466092e-03,  2.88845548e-03,  1.74550550e-03,
-        #        -3.71967987e-03, -3.46337041e-03,  8.76836280e-03, -7.60823516e-03,
-        #         7.90059429e-03, -1.11806920e-02,  8.48894913e-03, -6.42957441e-03,
-        #         3.25895281e-03, -1.24377996e-03, -8.87517579e-04,  2.20711760e-03])}, 'model': 'FIR', 'real-time': True })
-
-        # Use the above to run on the setup if this is the first FIR
-
-        # ##############################################################
-        # Convolve new FIR iteration with the last one
-        # ##############################################################
-
-        # Keep adding fir_{i} here and convolving with the last one
-
-        # fir_0 should be from the first optimization or the current real-time FIR in use on the setup
-        fir_0 = np.array([ 1.05614572e+00, -2.53850198e-03, -2.52682533e-03, -2.51521371e-03,
-               -2.50372099e-03, -2.49226498e-03, -2.48089918e-03, -2.46960924e-03,
-               -2.45266068e-03, -2.43085526e-03, -2.40884910e-03, -3.96701006e-03,
-                2.07353990e-03, -2.00725135e-03,  1.69462462e-03,  4.57420262e-03,
-                1.29168122e-03,  1.41930085e-03,  1.19988012e-03, -2.64650972e-03,
-               -1.92008328e-03, -2.09618589e-03, -4.35853136e-03, -3.46286777e-03,
-               -2.70556691e-03, -1.96788087e-03, -8.97396693e-04, -7.83636242e-04,
-                1.89748899e-04,  5.96137205e-04,  4.40804891e-04,  1.22959418e-03,
-                6.27207165e-05,  1.78369142e-04,  5.88531033e-04,  3.75452325e-04,
-               -1.52053376e-04,  7.29338599e-04, -9.92730555e-05, -7.75952068e-04])
-
-        # fir_1 =
-
-        last_FIR = cv2.convert_FIR_from_HDAWG(fir_0)  # UPDATE last FIR FOR EACH ITERATION!
-        c1 = cv2.convolve_FIRs([last_FIR, opt_fir])
-
-        cv2.print_FIR_loading(
-            qubit,
-            filter_model_number,
-            cv2.convert_FIR_for_HDAWG(c1),
-            real_time=True)
-
-        # Output sample:
-        # lin_dist_kern_D1.filter_model_04({'params': {'weights': np.array([ 1.19442077e+00, -7.49749111e-02, -5.17339708e-02, -2.98301540e-02,
-        #        -1.35581165e-02, -1.27245568e-02, -4.96222306e-03,  3.26517377e-03,
-        #         1.60572820e-03,  3.18970858e-03, -9.07183243e-03, -1.22431441e-03,
-        #         1.22491343e-02,  5.37109853e-03,  3.15302396e-03,  2.27680655e-03,
-        #        -4.28813944e-03,  2.85768654e-03,  4.20547339e-05, -3.31392990e-03,
-        #        -1.40901704e-02, -7.79037165e-04,  3.36395118e-04, -8.28875071e-03,
-        #         2.94764301e-03,  7.55326282e-04,  2.33059861e-03,  1.02747385e-03,
-        #        -3.77002742e-03, -3.18534929e-03,  9.54446304e-03, -7.03080156e-03,
-        #         8.12891025e-03, -1.17499888e-02,  9.59861367e-03, -6.31999213e-03,
-        #         3.35793857e-03, -4.27721721e-04, -9.07270542e-04,  1.55317845e-03])}, 'model': 'FIR', 'real-time': True })
-
-        # The above output would be used to set fir_1
-        """
-    a_obj = ma2.Basic1DAnalysis(t_start=timestamp)
-    rdd = a_obj.raw_data_dict
-
-    results_list = []
-    mvs = rdd["measured_values"][0]
-    vlns = rdd["value_names"][0]
-
-    time_ns = rdd["xvals"][0] * 1e9
-
-    # Confirm that first point was not measured starting from zero,
-    # zero has no meaning
-    start_idx = 0 if time_ns[0] != 0.0 else 1
-
-    time_ns = time_ns[start_idx:]
-
-    pnts_per_fit_second_pass = kw_processing.get("pnts_per_fit_second_pass", 3)
-    pnts_per_fit_first_pass = kw_processing.get("pnts_per_fit_first_pass", 4)
-
-    kw_processing.update(
-        {
-            "pnts_per_fit_first_pass": pnts_per_fit_first_pass,
-            "pnts_per_fit_second_pass": pnts_per_fit_second_pass,
-        }
-    )
-
-    for mv, vln in zip(mvs, vlns):
-        res = cryoscope_v2_processing(
-            time_ns=time_ns,
-            osc_data=mv[start_idx:],
-            vln=vln,
-            # NB it True, the raw step response is effectively right-shifted
-            # as consequence of how the data flows in this analysis
-            **kw_processing
-        )
-        results_list.append(res)
-
-    all_freq = np.array([res[0]["frequency"] for res in results_list])
-    av_freq = np.average(all_freq, axis=0)
-
-    all_names_filtered = [name + "_filtered" for name in vlns]
-    all_freq_filtered = np.array([
-        signal.savgol_filter(sig, savgol_window, savgol_polyorder, 0)
-        for sig in [*all_freq, av_freq]
-    ])
-
-    kw_extract["qubit"] = qubit
-    kw_extract["timestamp"] = timestamp
-    amp_pars = extract_amp_pars(**kw_extract)
-
-    res = {
-        "results_list": results_list,
-        "averaged_frequency": av_freq,
-        "amp_pars": amp_pars,
-        "time_ns": time_ns,
-    }
-
-    for frequencies, name in zip(
-        # Make available in the results all combinations
-        [*all_freq, av_freq, *all_freq_filtered],
-        [*vlns, "average", *all_names_filtered, "average_filtered"],
-    ):
-        conversion = rough_freq_to_amp(
-            amp_pars, time_ns, frequencies, **kw_rough_freq_to_amp
-        )
-
-        # Here we correct for the averaging effect of the moving cosine-fitting
-        # window, we attribute the obtained frequency to the middle point in the
-        # fitting window, and interpolate linearly the missing points do to the
-        # right shift, this step response can be more accurate in certain cases
-        # TO DO: try to instead fit an exponential signal to the first few
-        # data points and use it to interpolate the missing points,
-        # might be more accurate for distortion corrections
-        step_response = conversion["step_response"]
-        extra_pnts = pnts_per_fit_second_pass // 2
-
-        # # Fit only first 15 ns
-        step_response_fit = np.array(step_response)
-        time_ns_fit = time_ns[extra_pnts:][: len(step_response_fit)]
-        where = np.where(time_ns_fit < 15)[0]
-        step_response_fit = step_response_fit[where]
-        time_ns_fit = time_ns_fit[where]
-
-        def exp_rise(t, tau):
-            return 1 - np.exp(-t / tau)
-
-        model = lmfit.Model(exp_rise)
-        params = model.make_params()
-        params["tau"].value = 1
-        params["tau"].min = 0
-        params["tau"].max = 15
-
-        fit_res = model.fit(step_response_fit, t=time_ns_fit, params=params)
-        params = {key: fit_res.params[key] for key in fit_res.params.keys()}
-
-        if step_response[0] < 0.97:
-            # Only extrapolate if the first point is significantly below
-            corrected_pnts = exp_rise(time_ns[:extra_pnts], **params)
-        else:
-            corrected_pnts = [step_response[0]] * extra_pnts
-            # For some cases maybe works better to just assume the first
-            # point is calibrated, didn't test enough...
-            # corrected_pnts = [1.0] * extra_pnts
-
-        step_response = np.concatenate(
-            (
-                # Extrapolate the missing points assuming exponential rise
-                # Seems a fair assumption and much better than a linear
-                # extrapolation
-                corrected_pnts,
-                step_response,
-            )
-        )
-        conversion.update(params)
-        conversion["step_response_processed_" + name] = step_response
-
-        # Renaming to be able to return the step responses from all measured
-        # channels along side with the average
-        step_response = conversion.pop("step_response")
-        conversion["step_response_raw_" + name] = step_response
-        res.update(conversion)
-
-    return res
-
 
 # ######################################################################
 # Analysis utilities
@@ -464,7 +152,10 @@ def moving_cos_fitting_window(
         key: values for key, values in zip(res_pars.keys(), results_stderr)
     }
 
-    return results, results_stderr
+    return {
+        "results": results,
+        "results_stderr": results_stderr,
+    }
 
 
 def cryoscope_v2_processing(
@@ -475,7 +166,6 @@ def cryoscope_v2_processing(
     init_guess_first_pass: dict = {},
     fixed_params_first_pass: dict = {},
     init_guess_second_pass: dict = {},
-    plot: bool = True,
     vln: str = "",
     insert_ideal_projection: bool = True,
 ):
@@ -516,13 +206,15 @@ def cryoscope_v2_processing(
             print("Skipping!")
             return time_ns, y_data
 
-    results, results_stderr = moving_cos_fitting_window(
+    res_dict = moving_cos_fitting_window(
         x_data_ns=time_ns,
         y_data=osc_data,
         fit_window_pnts_nr=pnts_per_fit_first_pass,
         init_guess=init_guess_first_pass,
         fixed_params=fixed_params_first_pass,
     )
+
+    results = res_dict["results"]
 
     amps_from_fit = results["amplitude"]
     x_for_fit = time_ns[: len(amps_from_fit)]
@@ -539,15 +231,18 @@ def cryoscope_v2_processing(
             "phase": 0.0,
         }
 
-    time_ns, osc_data = add_ideal_projection_at_zero(
-        time_ns=time_ns,
-        y_data=osc_data,
-        vln=vln,
-        osc_amp=poly1d(0.0),
-        offset=fixed_offset,
-    )
+    if insert_ideal_projection:
+        # This helps with the uncertainty of not knowing very well what is
+        # the amplitude of the first point of the step response
+        time_ns, osc_data = add_ideal_projection_at_zero(
+            time_ns=time_ns,
+            y_data=osc_data,
+            vln=vln,
+            osc_amp=poly1d(0.0),
+            offset=fixed_offset,
+        )
 
-    results, results_stderr = moving_cos_fitting_window(
+    res_dict = moving_cos_fitting_window(
         x_data_ns=time_ns,
         y_data=osc_data,
         fit_window_pnts_nr=pnts_per_fit_second_pass,
@@ -555,46 +250,7 @@ def cryoscope_v2_processing(
         fixed_params={"offset": fixed_offset, "amplitude": poly1d(time_ns)},
     )
 
-    if plot:
-        fig, axs = plt.subplots(len(results) + 2, 1, figsize=(20, 25))
-
-        ax = axs[0]
-        ax.plot(
-            time_ns[: len(amps_from_fit)], amps_from_fit, label="Osc. amp. first pass"
-        )
-        ax.plot(x_for_fit, np.poly1d(line_fit)(x_for_fit), label="Line fit osc. amp.")
-        ax.set_xlabel("Osc. amp. (a.u.)")
-        ax.legend()
-
-        ax = axs[1]
-        ax.plot(time_ns, osc_data, "o")
-
-        for i in range(len(results[list(results.keys())[0]])):
-            res_pars = {key: results[key][i] for key in results.keys()}
-            time_sample = np.linspace(
-                time_ns[i], time_ns[i + pnts_per_fit_second_pass - 1], 20
-            )
-            cos_fit_sample = fit_mods.CosFunc(t=time_sample, **res_pars)
-            ax.set_xlabel("Pulse duration (ns)")
-            ax.set_ylabel("Amplitude (a.u.)")
-            ax.plot(time_sample, cos_fit_sample, "-")
-
-        for ax, key in zip(axs[2:], results.keys()):
-            ax.plot(time_ns[: len(results[key])], results[key], "-o")
-
-            if key == "frequency":
-                ax.set_ylabel("Frequency (GHz)")
-            elif key == "amplitude":
-                ax.set_ylabel("Amplitude (a.u.)")
-            elif key == "offset":
-                ax.set_ylabel("Offset (a.u.)")
-            elif key == "phase":
-                ax.set_ylabel("Phase (deg)")
-            ax.set_xlabel("Pulse duration (ns)")
-
-        return results, results_stderr, axs
-    else:
-        return results, results_stderr
+    return res_dict
 
 
 def extract_amp_pars(

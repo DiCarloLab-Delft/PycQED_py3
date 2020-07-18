@@ -55,6 +55,9 @@ reload(ta)
 import pycqed.analysis_v2.multiplexed_readout_analysis as mra
 reload(mra)
 
+import pycqed.analysis_v2.cryoscope_v2_analysis as cv2
+reload(cv2)
+
 # from pycqed.analysis_v2.base_analysis import  # remove me if everything still works*
 from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,
@@ -111,3 +114,5 @@ from pycqed.analysis_v2.gate_set_tomography_analysis import \
 from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis,\
     Conditional_Oscillation_Heatmap_Analysis, interp_to_1D_arr,\
     Chevron_Alignment_Analysis
+
+from pycqed.analysis_v2.cryoscope_v2_analysis import Cryoscope_v2_Analysis
