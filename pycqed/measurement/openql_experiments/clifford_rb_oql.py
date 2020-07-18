@@ -19,7 +19,6 @@ import inspect
 from importlib import reload
 import logging
 
-reload(oqh)
 reload(rb)
 
 log = logging.getLogger(__name__)
