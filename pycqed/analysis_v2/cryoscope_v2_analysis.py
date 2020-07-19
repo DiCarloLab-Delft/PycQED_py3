@@ -6,6 +6,7 @@ Author: Victor Negirneac
 import matplotlib.pyplot as plt
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.analysis_v2.cryoscope_v2_tools as cv2_tools
+from pycqed.analysis import fitting_models as fit_mods
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.measurement.hdf5_data as hd5
 from collections import OrderedDict
@@ -39,7 +40,9 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         # Allows to exclude certain projections from the averaging
         # Handy when the fits failed for one or more projections
         average_exclusion_val_names: list = [],  # e.g. [" cos", "msin"]
+
         savgol_window: int = 3,  # 3 or 5 should work best
+
         # Might be useful to put to 0 after some iterations,
         # In order to use savgol_polyorder=0, step response should be almost flat
         # Otherwise first points get affected
@@ -55,6 +58,25 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
     ):
         """
         Second version of cryoscope analysis
+
+        Does not require the flux arc, assumes quadratic dependence on frequency
+
+        Uses a moving cos-fitting-window to extract instantaneous oscillation
+        frequency
+
+        Generates 4 variations of the step response, use the one that look
+        more suitable to the situation (initial FIR vs last FIR iteration)
+        4 variations:
+            - 2 w/out filtering:
+                - No processing (included extra ideal projection if
+                insert_ideal_projection = True)
+                - Processing replaces the first point with the value from an
+                exponential fit
+            - 2 w/ filtered:
+                A Savitzky–Golay filter is applied controlled by `savgol_window`
+                and `savgol_polyorder`. NB: savgol_polyorder=0 is more
+                aggressive but at expense of the points in the beginning and
+                end of the step response
         """
         if options_dict is None:
             options_dict = dict()
@@ -74,6 +96,8 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
 
         self.qubit = qubit
         self.insert_ideal_projection = insert_ideal_projection
+        # Necessary to know how to present data correctly
+        self.idx_processed = 1 if self.insert_ideal_projection else 0
         self.savgol_window = savgol_window
         self.savgol_polyorder = savgol_polyorder
         self.average_exclusion_val_names = average_exclusion_val_names
@@ -135,6 +159,7 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             {
                 "pnts_per_fit_first_pass": pnts_per_fit_first_pass,
                 "pnts_per_fit_second_pass": pnts_per_fit_second_pass,
+                "insert_ideal_projection": self.insert_ideal_projection,
             }
         )
 
@@ -155,11 +180,11 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 for vn in vlns
             ]
         )
-        filtered = vlns[exclude]
+        vlns_for_av = vlns[exclude]
 
         all_freq = np.array([results[key]["results"]["frequency"] for key in vlns])
         all_freq_for_average = np.array(
-            [results[vln]["results"]["frequency"] for vln in filtered]
+            [results[vln]["results"]["frequency"] for vln in vlns_for_av]
         )
         av_freq = np.average(all_freq_for_average, axis=0)
 
@@ -179,10 +204,8 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             "results": results,
             "averaged_frequency": av_freq,
             "amp_pars": amp_pars,
-            "time_ns": time_ns,
+            "time_ns": time_ns,  # This one always starts at 1/sample_rate
         }
-
-        idx_processed = 1 if self.insert_ideal_projection else 0
 
         for frequencies, name in zip(
             # Make available in the results all combinations
@@ -204,7 +227,7 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             extra_pnts = pnts_per_fit_second_pass // 2
 
             # # Fit only first 15 ns
-            step_response_fit = np.array(step_response)[idx_processed:]
+            step_response_fit = np.array(step_response)[self.idx_processed :]
             time_ns_fit = time_ns[extra_pnts:][: len(step_response_fit)]
             where = np.where(time_ns_fit < self.kw_exp_fit.get("time_ns_fit_max", 15))[
                 0
@@ -225,13 +248,13 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             params = {key: fit_res.params[key] for key in fit_res.params.keys()}
             exp_fit = exp_rise(time_ns_fit, **params)
 
-            if step_response[idx_processed] < self.kw_exp_fit.get(
+            if step_response[self.idx_processed] < self.kw_exp_fit.get(
                 "threshold_apply", 0.97
             ):
                 # Only extrapolate if the first point is significantly below
                 corrected_pnts = exp_fit[:extra_pnts]
             else:
-                corrected_pnts = [step_response[idx_processed]] * extra_pnts
+                corrected_pnts = [step_response[self.idx_processed]] * extra_pnts
                 # For some cases maybe works better to just assume the first
                 # point is calibrated, didn't test enough...
                 # corrected_pnts = [1.0] * extra_pnts
@@ -242,20 +265,24 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                     # Seems a fair assumption and much better than a linear
                     # extrapolation
                     corrected_pnts,
-                    step_response[idx_processed:],
+                    step_response[self.idx_processed :],
                 )
             )
             conversion.update(
-                {"tau": ufloat(params["tau"].value, params["tau"].stderr)}
+                {
+                    "tau": ufloat(
+                        params["tau"].value,
+                        params["tau"].stderr
+                        if params["tau"].stderr is not None
+                        else np.nan,
+                    )
+                }
             )
             conversion.update({"exp_fit": exp_fit})
-            conversion["step_response_processed_" + name] = step_response
+            conversion["step_response_processed"] = step_response
 
-            # Renaming to be able to return the step responses from all measured
-            # channels along side with the average
-            step_response = conversion.pop("step_response")
-            conversion["step_response_" + name] = step_response
-            res.update(conversion)
+            for key, val in conversion.items():
+                res[key + "_" + name] = conversion[key]
 
         pdd["quantities_of_interest"] = res
 
@@ -272,86 +299,172 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
 
         fig_id_amp = "osc_amp"
         fig_id_step_resp = "step_response"
+        fig_id_step_resp_av = "step_response_av"
         # define figure and axes here to have custom layout
         # One extra plot for the average
 
         nrows = len(vlns)
         self.figs[fig_id_amp], axs_amp = plt.subplots(
-            ncols=1,
-            nrows=nrows,
-            figsize=(fs[0] * 4, fs[1] * nrows * 1.2)
+            ncols=1, nrows=nrows, figsize=(fs[0] * 4, fs[1] * nrows * 1.2), sharex=True
         )
         self.figs[fig_id_step_resp], axs_step_resp = plt.subplots(
-            ncols=1,
-            nrows=nrows,
-            figsize=(fs[0] * 4 + 1, fs[1] * nrows * 1.2)
+            ncols=1, nrows=nrows, figsize=(fs[0] * 4, fs[1] * nrows * 1.2), sharex=True,
+        )
+        self.figs[fig_id_step_resp_av], axs_step_resp_av = plt.subplots(
+            ncols=1, nrows=1, figsize=(fs[0] * 4, fs[1] * 1.2 * 2)
         )
 
         self.figs[fig_id_amp].patch.set_alpha(0)
         self.figs[fig_id_step_resp].patch.set_alpha(0)
+        self.figs[fig_id_step_resp_av].patch.set_alpha(0)
 
-        for fig_id, axs_group in zip([fig_id_amp, fig_id_step_resp], [axs_amp, axs_step_resp]):
+        for fig_id, axs_group in zip(
+            [fig_id_amp, fig_id_step_resp], [axs_amp, axs_step_resp]
+        ):
             for ax_id, ax in zip([*vlns, "average"], axs_group):
                 self.axs[fig_id + "_" + ax_id] = ax
 
+        self.axs[fig_id_step_resp_av + "_average"] = axs_step_resp_av
+
+        xlabel = "Square pulse truncation time"
         fig_id = fig_id_amp
-        for vln, mv, vlu in zip(vlns, mvs, vlus):
+        for vln, vlu in zip(vlns, vlus):
             ax_id = fig_id + "_" + vln
+
+            time = qois["results"][vln]["time_ns"] * 1e-9
+            osc_data = qois["results"][vln]["osc_data"]
+
+            amps = qois["results"][vln]["results"]["amplitude"]
+            offset = qois["results"][vln]["results"]["offset"]
+            frequency = qois["results"][vln]["results"]["frequency"]
+            phase = qois["results"][vln]["results"]["phase"]
+
+            yvals = amps + offset
+            self.plot_dicts[ax_id + "_amp_pos"] = {
+                "plotfn": self.plot_line,
+                "ax_id": ax_id,
+                "xvals": time[: len(yvals)],
+                "yvals": yvals,
+                "marker": "",
+                "linestyle": "--",
+                "color": "darkgray",
+            }
+            yvals = offset - amps
+            self.plot_dicts[ax_id + "_amp_neg"] = {
+                "plotfn": self.plot_line,
+                "ax_id": ax_id,
+                "xvals": time[: len(yvals)],
+                "yvals": yvals,
+                "marker": "",
+                "linestyle": "--",
+                "color": "darkgray",
+            }
+            self.plot_dicts[ax_id + "_offset"] = {
+                "plotfn": self.plot_line,
+                "ax_id": ax_id,
+                "xvals": time[: len(offset)],
+                "yvals": offset,
+                "marker": "",
+                "linestyle": "--",
+                "color": "lightgray",
+            }
+
+            dt = time[1] - time[0]
+            pnts_per_fit_second_pass = self.kw_processing.get(
+                "pnts_per_fit_second_pass", 3
+            )
+            times_0 = np.linspace(
+                time[0] - dt / 2, time[pnts_per_fit_second_pass - 1] + dt / 2, 20
+            )
+            all_times = [
+                times_0 + time_offset for time_offset in np.arange(0, len(amps), 1) * dt
+            ]
+            all_cos = [
+                fit_mods.CosFunc(
+                    t=time_sample,
+                    amplitude=amp,
+                    offset=offset_,
+                    phase=phase_,
+                    frequency=freq * 1e9,
+                )
+                for time_sample, offset_, phase_, amp, freq in zip(
+                    all_times, offset, phase, amps, frequency
+                )
+            ]
+            self.plot_dicts[ax_id + "_cos_fits"] = {
+                "plotfn": self.plot_line,
+                "ax_id": ax_id,
+                "xvals": all_times,
+                "yvals": all_cos,
+                "marker": "",
+                "linestyle": "-",
+            }
             self.plot_dicts[ax_id] = {
                 "plotfn": self.plot_line,
                 "ax_id": ax_id,
-                "xvals": pdd["time"],
+                "xvals": time,
                 "xunit": "s",
                 "yunit": vlu,
-                "yvals": mv,
+                "yvals": osc_data,
                 "marker": "o",
                 "linestyle": "",
+                "xlabel": xlabel,
+                "ylabel": "Oscillation amplitude",
             }
-            yvals = qois["results"]
-            self.plot_dicts[ax_id] = {
-                "plotfn": self.plot_line,
+
+        # fig_id = fig_id_step_resp
+        for fig_id, vln, vlu in zip(
+            [fig_id_step_resp] * len(vlns) + [fig_id_step_resp_av],
+            [*vlns, "average"],
+            [*vlus, "a.u."],
+        ):
+            ax_id = fig_id + "_" + vln
+            time = qois["time_ns"]
+
+            label1 = "step_response_" + vln
+            label2 = "step_response_" + vln + "_filtered"
+            label3 = "step_response_processed_" + vln
+            label4 = "step_response_processed_" + vln + "_filtered"
+            for label in [label1, label2, label3, label4]:
+                yvals = qois[label]
+                self.plot_dicts[ax_id + label] = {
+                    "plotfn": self.plot_line,
+                    "ax_id": ax_id,
+                    "xvals": time[: len(yvals)],
+                    "yvals": yvals,
+                    "marker": ".",
+                    "linestyle": "-",
+                    "setlabel": label,
+                    "do_legend": label == label4,
+                    "legend_pos": "lower center",
+                    "ylabel": "Step response",
+                    "yunit": "a.u.",
+                    "xlabel": xlabel,
+                    "xunit": "s"
+                }
+
+            levels = [0.005, 0.01, 0.03]
+            linestyle = [":", "--", "-"]
+            self.plot_dicts[ax_id + "_percent_neg"] = {
+                "plotfn": self.plot_matplot_ax_method,
                 "ax_id": ax_id,
-                "xvals": pdd["time"],
-                "xunit": "s",
-                "yunit": vlu,
-                "yvals": mv,
-                "marker": "o",
-                "linestyle": "",
+                "func": "hlines",
+                "plot_kws": {
+                    "xmin": time[0],
+                    "xmax": time[-1],
+                    "linestyle": linestyle,
+                    "label": ["±{:1.1f}".format(level * 100) for level in levels],
+                    "y": 1 - np.array(levels),
+                },
             }
-
-    # if plot:
-    #     fig, axs = plt.subplots(len(results) + 2, 1, figsize=(20, 25))
-
-    #     ax = axs[0]
-    #     ax.plot(
-    #         time_ns[: len(amps_from_fit)], amps_from_fit, label="Osc. amp. first pass"
-    #     )
-    #     ax.plot(x_for_fit, np.poly1d(line_fit)(x_for_fit), label="Line fit osc. amp.")
-    #     ax.set_xlabel("Osc. amp. (a.u.)")
-    #     ax.legend()
-
-    #     ax = axs[1]
-    #     ax.plot(time_ns, osc_data, "o")
-
-    #     for i in range(len(results[list(results.keys())[0]])):
-    #         res_pars = {key: results[key][i] for key in results.keys()}
-    #         time_sample = np.linspace(
-    #             time_ns[i], time_ns[i + pnts_per_fit_second_pass - 1], 20
-    #         )
-    #         cos_fit_sample = fit_mods.CosFunc(t=time_sample, **res_pars)
-    #         ax.set_xlabel("Pulse duration (ns)")
-    #         ax.set_ylabel("Amplitude (a.u.)")
-    #         ax.plot(time_sample, cos_fit_sample, "-")
-
-    #     for ax, key in zip(axs[2:], results.keys()):
-    #         ax.plot(time_ns[: len(results[key])], results[key], "-o")
-
-    #         if key == "frequency":
-    #             ax.set_ylabel("Frequency (GHz)")
-    #         elif key == "amplitude":
-    #             ax.set_ylabel("Amplitude (a.u.)")
-    #         elif key == "offset":
-    #             ax.set_ylabel("Offset (a.u.)")
-    #         elif key == "phase":
-    #             ax.set_ylabel("Phase (deg)")
-    #         ax.set_xlabel("Pulse duration (ns)")
+            self.plot_dicts[ax_id + "_percent_pos"] = {
+                "plotfn": self.plot_matplot_ax_method,
+                "ax_id": ax_id,
+                "func": "hlines",
+                "plot_kws": {
+                    "xmin": time[0],
+                    "xmax": time[-1],
+                    "linestyle": linestyle,
+                    "y": 1 + np.array(levels),
+                },
+            }

@@ -250,6 +250,9 @@ def cryoscope_v2_processing(
         fixed_params={"offset": fixed_offset, "amplitude": poly1d(time_ns)},
     )
 
+    res_dict["time_ns"] = time_ns
+    res_dict["osc_data"] = osc_data
+
     return res_dict
 
 
