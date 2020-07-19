@@ -51,7 +51,7 @@ default_sequencer_config = {
     'Buffer_RO_MW': 0,
     'Buffer_RO_RO': 0,
     'Flux_comp_dead_time': 3e-6,
-    'slave_AWG_trig_channels': [],
+    'subordinate_AWG_trig_channels': [],
 }
 
 class TestMultipleAWGs(unittest.TestCase):

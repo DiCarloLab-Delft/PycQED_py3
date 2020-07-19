@@ -94,7 +94,7 @@ class CBox_tests_v3(test_suite.CBox_tests):
                 self.assertEqual(self.CBox.get('AWG{}_mode'.format(j)),
                                  defHeaders.awg_modes[i])
 
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.set('acquisition_mode', 'idle')
         for j in range(3):
             self.CBox.set('AWG{}_mode'.format(j), 0)
@@ -125,9 +125,9 @@ class CBox_tests_v3(test_suite.CBox_tests):
                             unit='dac', length=waveLength)
 
         self.CBox.set('acquisition_mode', 'idle')    # set to idle state
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.load_instructions('programs\\input_avg.asm')
-        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.set_main_controller_working_state(1, 0, 0)
 
         self.CBox.set('run_mode', 1)
         NoSamples = 400
@@ -167,9 +167,9 @@ class CBox_tests_v3(test_suite.CBox_tests):
 
         self.CBox.set('log_length', 8)
         self.CBox.set('acquisition_mode', 'idle')
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.load_instructions('programs\\int_log.txt')
-        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.set_main_controller_working_state(1, 0, 0)
         self.CBox.set('acquisition_mode', 'integration logging')
         self.CBox.set('run_mode', 1)
         [IntLogResult0_8, IntLogResult1_8] = \
@@ -180,9 +180,9 @@ class CBox_tests_v3(test_suite.CBox_tests):
         self.CBox.set('log_length', 200)
 
         self.CBox.set('acquisition_mode', 'idle')
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.load_instructions('programs\\int_log.txt')
-        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.set_main_controller_working_state(1, 0, 0)
         self.CBox.set('acquisition_mode', 'integration logging')
         self.CBox.set('run_mode', 1)
         [IntLogResult0_200, IntLogResult1_200] = \
@@ -211,7 +211,7 @@ class CBox_tests_v3(test_suite.CBox_tests):
                                                   length=triggerlength-1)
 
         # load instructions
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.load_instructions('programs\\int_avg.txt')
 
         # Set the parameters
@@ -233,8 +233,8 @@ class CBox_tests_v3(test_suite.CBox_tests):
 
         # Perform integration average and plot the result
         self.CBox.set('acquisition_mode', 'idle')
-        self.CBox.set_master_controller_working_state(0, 0, 0)
-        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(1, 0, 0)
         self.CBox.set('acquisition_mode', 'integration averaging')
         self.CBox.set('run_mode', 1)
         [IntAvgRst0, IntAvgRst1] = self.CBox.get_integrated_avg_results()
@@ -256,7 +256,7 @@ class CBox_tests_v3(test_suite.CBox_tests):
                                                   plane, unit='dac',
                                                   length=triggerlength-1)
         # load instructions
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.load_instructions('programs\\QubitStateLog.asm')
 
         # Set the parameters
@@ -277,8 +277,8 @@ class CBox_tests_v3(test_suite.CBox_tests):
 
         # Perform integration average and plot the result
         self.CBox.set('acquisition_mode', 'idle')
-        self.CBox.set_master_controller_working_state(0, 0, 0)
-        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(1, 0, 0)
         self.CBox.set('acquisition_mode', 'integration logging')
         self.CBox.set('run_mode', 1)
         [ch0_counters, ch1_counters] = self.CBox.get_qubit_state_log_counters()
@@ -315,9 +315,9 @@ class CBox_tests_v3(test_suite.CBox_tests):
         self.CBox.AWG2_mode.set('tape')
 
         self.CBox.set('acquisition_mode', 'idle')
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.load_instructions('programs\\TimingTapeTest0.asm')
-        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.set_main_controller_working_state(1, 0, 0)
 
         NoSamples = 400
         self.CBox.set("nr_samples", NoSamples)
@@ -329,9 +329,9 @@ class CBox_tests_v3(test_suite.CBox_tests):
         [TimingtapeResult0, _] = self.CBox.get_input_avg_results()
 
         self.CBox.set('acquisition_mode', 'idle')
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.load_instructions('programs\\TimingTapeTest7.asm')
-        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.set_main_controller_working_state(1, 0, 0)
 
         NoSamples = 400
         self.CBox.set("nr_samples", NoSamples)

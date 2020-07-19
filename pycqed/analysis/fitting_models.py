@@ -335,7 +335,7 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
                            slope=1):
     """
     This is the complex function for a hanger (lamda/4 resonator).
-    See equation 3.1 of the Asaad master thesis.
+    See equation 3.1 of the Asaad main thesis.
 
     It differens from the "old" HangerFuncComplex in that all inputs are SI
     (no longer f in SI and f0 not in SI...)

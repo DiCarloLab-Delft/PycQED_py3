@@ -346,7 +346,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         Parameters:
         :param target_index: unsigned int, optional: When provided the calibration will select an active index based
         on the target index. Used to determine the new index before or after the edge. This parameter is commonly used
-        to calibrate a DIO slave where the target index is the active index after calibration of the DIO master
+        to calibrate a DIO subordinate where the target index is the active index after calibration of the DIO main
 
         Notes:
         \t- Expects a DIO calibration signal on the inputs where all codewords bits show activity (e.g. high followed \
@@ -385,7 +385,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     def dio_interboard(self):
         """
         Get the DIO interboard status. Result:
-             True:  To master interboard connection detected
+             True:  To main interboard connection detected
              False: No interboard connection detected
         """
         return bool(self._ask_int('DIO:IB?'))

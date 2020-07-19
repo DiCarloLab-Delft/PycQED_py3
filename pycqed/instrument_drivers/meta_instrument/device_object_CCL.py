@@ -922,7 +922,7 @@ class DeviceCCL(Instrument):
 
         int_avg_dets = []
         for i, acq_instr_name in enumerate(acq_ch_map.keys()):
-            # The master detector is the one that holds the CC object
+            # The main detector is the one that holds the CC object
             if i == 0:
                 CC = self.instr_CC.get_instr()
             else:

@@ -37,11 +37,11 @@ class Pulsar(Instrument):
     Args:
         default_AWG: Name of the AWG that new channels get defined on if no
                      AWG is specified
-        master_AWG: Name of the AWG that triggers all the other AWG-s and
+        main_AWG: Name of the AWG that triggers all the other AWG-s and
                     should be started last (after other AWG-s are already
                     waiting for a trigger.
     """
-    def __init__(self, name='Pulsar', default_AWG=None, master_AWG=None):
+    def __init__(self, name='Pulsar', default_AWG=None, main_AWG=None):
         super().__init__(name)
 
         # for compatibility with old code, the default AWG name is stored in
@@ -57,8 +57,8 @@ class Pulsar(Instrument):
         self.add_parameter('default_AWG',
                            set_cmd=self._set_default_AWG,
                            get_cmd=self._get_default_AWG)
-        self.add_parameter('master_AWG', parameter_class=InstrumentParameter,
-                           initial_value=master_AWG)
+        self.add_parameter('main_AWG', parameter_class=InstrumentParameter,
+                           initial_value=main_AWG)
 
         self.channels = {}
         self.last_sequence = None
@@ -182,20 +182,20 @@ class Pulsar(Instrument):
     def start(self):
         """
         Start the active AWGs. If multiple AWGs are used in a setup where the
-        slave AWGs are triggered by the master AWG, then the slave AWGs must be
-        running and waiting for trigger when the master AWG is started to
+        subordinate AWGs are triggered by the main AWG, then the subordinate AWGs must be
+        running and waiting for trigger when the main AWG is started to
         ensure synchronous playback.
         """
-        if self.master_AWG() is None:
+        if self.main_AWG() is None:
             for AWG in self.used_AWGs():
                 self._start_AWG(AWG)
         else:
             for AWG in self.used_AWGs():
-                if AWG != self.master_AWG():
+                if AWG != self.main_AWG():
                     self._start_AWG(AWG)
             tstart = time.time()
             for AWG in self.used_AWGs():
-                if AWG != self.master_AWG():
+                if AWG != self.main_AWG():
                     good = False
                     while time.time() - tstart < 10:
                         if self._is_AWG_running(AWG):
@@ -205,7 +205,7 @@ class Pulsar(Instrument):
                             time.sleep(0.1)
                     if not good:
                         raise Exception('AWG {} did not start in 10s'.format(AWG))
-            self._start_AWG(self.master_AWG())
+            self._start_AWG(self.main_AWG())
 
     def stop(self):
         """

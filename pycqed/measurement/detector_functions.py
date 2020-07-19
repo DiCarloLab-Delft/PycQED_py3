@@ -238,7 +238,7 @@ class Multi_Detector_UHF(Multi_Detector):
     def get_values(self):
         values_list = []
 
-        # Since master (holding cc object) is first in self.detectors,
+        # Since main (holding cc object) is first in self.detectors,
         self.detectors[0].AWG.stop()
 
         # Prepare and arm

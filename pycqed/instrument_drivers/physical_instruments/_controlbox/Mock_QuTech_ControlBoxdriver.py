@@ -33,7 +33,7 @@ class Mock_QuTech_ControlBox(qcb3.QuTech_ControlBox_v3):
     def _get_visa_timeout(self):
         pass
 
-    def get_master_controller_params(self):
+    def get_main_controller_params(self):
         self._core_state = defHeaders.core_states[0]
         self._trigger_source = defHeaders.trigger_sources[0]
         message = self.create_message(defHeaders.ReadVersion)

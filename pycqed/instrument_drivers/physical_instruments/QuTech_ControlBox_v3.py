@@ -67,7 +67,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
 
     def init_params(self):
         self.add_params()
-        self.get_master_controller_params()
+        self.get_main_controller_params()
         self.set('acquisition_mode', 'idle')
         self.set('demodulation_mode', 'double')
         self.set('trigger_source', 'internal')
@@ -103,21 +103,21 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         self.core_state('idle')
 
     def _do_get_firmware_version(self):
-        v = self.get_master_controller_params()
+        v = self.get_main_controller_params()
         return v
 
     def _do_get_pulse_queue_state(self):
-        self.get_master_controller_params()
+        self.get_main_controller_params()
         return self._pulse_queue_state
 
     def _do_get_max_instruction_address(self):
-        self.get_master_controller_params()
+        self.get_main_controller_params()
         return self._max_instruction_address
 
     def _do_get_uploaded_program_length(self):
         return self._uploaded_program_length
 
-    def get_master_controller_params(self):
+    def get_main_controller_params(self):
         message = self.create_message(defHeaders.ReadVersion)
         (stat, mesg) = self.serial_write(message)
         if stat:
@@ -183,7 +183,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             tmp_demodulation_mode = self.get('demodulation_mode')
         else:
             tmp_demodulation_mode = 'double'  # double side band demodulation
-        self._set_master_controller_working_state(core_state,
+        self._set_main_controller_working_state(core_state,
                                                   tmp_acquisition_mode,
                                                   tmp_trigger_source,
                                                   tmp_demodulation_mode)
@@ -215,7 +215,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         else:
             tmp_demodulation_mode = 'double'
 
-        self._set_master_controller_working_state(tmp_core_state,
+        self._set_main_controller_working_state(tmp_core_state,
                                                   acquisition_mode,
                                                   tmp_trigger_source,
                                                   tmp_demodulation_mode)
@@ -241,7 +241,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         else:
             tmp_demodulation_mode = 'double'   # double side band demodulation
 
-        self._set_master_controller_working_state(tmp_core_state,
+        self._set_main_controller_working_state(tmp_core_state,
                                                   tmp_acquisition_mode,
                                                   trigger_source,
                                                   tmp_demodulation_mode)
@@ -266,7 +266,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         else:
             tmp_trigger_source = 'internal'  # internal MC trigger
 
-        self._set_master_controller_working_state(tmp_core_state,
+        self._set_main_controller_working_state(tmp_core_state,
                                                   tmp_acquisition_mode,
                                                   tmp_trigger_source,
                                                   demodulation_mode)
@@ -295,7 +295,7 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
             "This is CBox_v3 driver." +
             "Touch 'n Go is only valid for ControlBox version 2.")
 
-    def _set_master_controller_working_state(
+    def _set_main_controller_working_state(
             self, core_state='idle', acquisition_mode='idle',
             trigger_source='internal',
             demodulation_mode='double side band demodulation'):
@@ -303,13 +303,13 @@ class QuTech_ControlBox_v3(qcb.QuTech_ControlBox):
         @param core_states: activate the core or disable it:
                         > idle,
                         > active.
-        @param acquisition_modes: the data collection mode in MasterController:
+        @param acquisition_modes: the data collection mode in MainController:
                         > idle (default),
                         > integration logging mode,
                         > integration averaging mode,
                         > input averaging mode,
                         > integration streaming mode.
-        @param trigger_sources: trigger source of the MasterController:
+        @param trigger_sources: trigger source of the MainController:
                         > internal trigger (default),
                         > external trigger,
                         > mixed trigger.

@@ -65,7 +65,7 @@ Get or set the DIO input operation mode\n
 \tOptions:\n
 \t- MASTER: Use DIO codeword (lower 14 bits) input from its own IORearDIO board (Default)\n
 \t\tEnables single-ended (SE) and differential (DIFF) inputs\n
-\t- SLAVE: Use DIO codeword (upper 14 bits) input from the connected master IORearDIO board\n
+\t- SLAVE: Use DIO codeword (upper 14 bits) input from the connected main IORearDIO board\n
 \t\tDisables single-ended (SE) and differential (DIFF) inputs'''
 
 # FIXME: modes outdated:
@@ -560,7 +560,7 @@ class QWGMultiDevices:
         """
         Calibrate multiple QWG using a CCLight
         First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
-        master.
+        main.
         On failure of calibration an exception is raised.
         Will stop all QWGs before calibration
 

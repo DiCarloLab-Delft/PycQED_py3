@@ -62,7 +62,7 @@ _dio_mode_doc = 'Get or set the DIO input operation mode\n' \
                 'from its own IORearDIO board (Default)\n' \
                 '\t\tEnables single-ended (SE) and differential (DIFF) inputs\n' \
                 '\t- SLAVE: Use DIO codeword (upper 14 bits) input ' \
-                'from the connected master IORearDIO board\n' \
+                'from the connected main IORearDIO board\n' \
                 '\t\tDisables single-ended (SE) and differential (DIFF) inputs'
 
 _codeword_protocol_doc = 'Configures the codeword input bits/channels per channel. These are predefined sets of ' \
@@ -316,7 +316,7 @@ class QuTech_AWG_Module(SCPI):
                            val_mapping={True: '1', False: '0'},
                            docstring='Get the DIO interboard status.\n'
                                      'Result:\n'
-                                     '\tTrue:  To master interboard connection detected\n'
+                                     '\tTrue:  To main interboard connection detected\n'
                                      '\tFalse: No interboard connection detected'
                            )
 
@@ -732,7 +732,7 @@ class QuTech_AWG_Module(SCPI):
         Parameters:
         :param target_index: unsigned int, optional: When provided the calibration will select an active index based
         on the target index. Used to determine the new index before or after the edge. This parameter is commonly used
-        to calibrate a DIO slave where the target index is the active index after calibration of the DIO master
+        to calibrate a DIO subordinate where the target index is the active index after calibration of the DIO main
 
         Note 1: Expects a DIO calibration signal on the inputs:\n
         \tAn all codewords bits high followed by an all codeword
@@ -1095,7 +1095,7 @@ class QWGMultiDevices:
         """
         Calibrate multiple QWG using a CCLight, QCC or other CC-like devices
         First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
-        master.
+        main.
         On failure of calibration an exception is raised.
         Will stop all QWGs before calibration
 

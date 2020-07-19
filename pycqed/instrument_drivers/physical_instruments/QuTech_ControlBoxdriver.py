@@ -344,12 +344,12 @@ class QuTech_ControlBox(VisaInstrument):
 
     def get_integrated_avg_results(self):
         '''
-        read the log of the master
+        read the log of the main
         Corresponds to mode 4: integrated average
 
         @param timeout : the timeout time in ms
         @return stat : 0 if the upload succeeded and 1 if the upload failed.
-        @return mesg : the message the master returned.
+        @return mesg : the message the main returned.
         '''
         nr_samples = self.get('nr_samples')
         # Information on the encoding
@@ -384,7 +384,7 @@ class QuTech_ControlBox(VisaInstrument):
 
     def get_integration_log_results(self):
         '''
-        read the log of the master
+        read the log of the main
         Corresponds to mode 2: Integration logging
 
         Uses fixed length for reading out the message for speedup.
@@ -993,7 +993,7 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             tmp_acquisition_mode = 'idle'
 
-        self._set_master_controller_working_state(tmp_acquisition_mode,
+        self._set_main_controller_working_state(tmp_acquisition_mode,
                                                  demodulation_mode)
 
     def _do_get_demodulation_mode(self):
@@ -1016,10 +1016,10 @@ class QuTech_ControlBox(VisaInstrument):
         else:
             tmp_demodulation_mode = 'double'
 
-        self._set_master_controller_working_state(acquisition_mode,
+        self._set_main_controller_working_state(acquisition_mode,
                                                   tmp_demodulation_mode)
 
-    def _set_master_controller_working_state(self, acquisition_mode,
+    def _set_main_controller_working_state(self, acquisition_mode,
                                             demodulation_mode):
         '''
         @param acquisition_mode : acquisition_mode of the fpga,
@@ -1176,7 +1176,7 @@ class QuTech_ControlBox(VisaInstrument):
     def _do_set_adc_offset(self, adc_offset):
         '''
         set the offset in  ADC levels to be subtracted from the ADCs of
-        the master AWG.
+        the main AWG.
         NOTE: THE SAME OFFSET IS SUBTRACTED FROM BOTH ADCs.
 
         @param s : the serial connection for the operation.

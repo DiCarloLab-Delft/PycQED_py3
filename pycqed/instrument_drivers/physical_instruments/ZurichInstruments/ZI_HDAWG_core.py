@@ -131,8 +131,8 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         if self.geti('system/fpgarevision') < ZI_HDAWG_core.MIN_FPGAREVISION:
             raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
 
-        if self.geti('system/slaverevision') < ZI_HDAWG_core.MIN_SLAVEREVISION:
-            raise zibase.ziVersionError('Insufficient FPGA Slave revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_SLAVEREVISION, self.geti('system/slaverevision')))
+        if self.geti('system/subordinaterevision') < ZI_HDAWG_core.MIN_SLAVEREVISION:
+            raise zibase.ziVersionError('Insufficient FPGA Subordinate revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_SLAVEREVISION, self.geti('system/subordinaterevision')))
 
     def _num_channels(self):
         if self.devtype == 'HDAWG8':
@@ -261,7 +261,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
     def get_idn(self) -> dict:
         idn_dict = super().get_idn()
-        idn_dict['slave_firmware'] = self.geti('system/slaverevision')
+        idn_dict['subordinate_firmware'] = self.geti('system/subordinaterevision')
         return idn_dict
 
     ##########################################################################

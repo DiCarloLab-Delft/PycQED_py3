@@ -926,7 +926,7 @@ class CoherenceTimesAnalysis_old(ba.BaseDataAnalysis):
                     dac=dac_instr_name, qubit=qubit_instr_name, pattern=frequency_key_pattern)
                 self.freq_keys.append(freq_key)
 
-        # Create all slave objects
+        # Create all subordinate objects
         self.all_analysis = {}
         for i, dac_instr_name in enumerate(dac_instr_names):
             qubit = self.qubit_names[i]

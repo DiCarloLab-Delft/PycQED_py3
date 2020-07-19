@@ -569,9 +569,9 @@ class CBox_driven_transmon(Transmon):
         self.CBox.AWG0_mode('Codeword-trigger mode')
         self.CBox.AWG1_mode('Codeword-trigger mode')
         self.CBox.AWG2_mode('Codeword-trigger mode')
-        self.CBox.set_master_controller_working_state(0, 0, 0)
+        self.CBox.set_main_controller_working_state(0, 0, 0)
         self.CBox.load_instructions('CBox_v3_test_program\Rabi.asm')
-        self.CBox.set_master_controller_working_state(1, 0, 0)
+        self.CBox.set_main_controller_working_state(1, 0, 0)
         MC.set_sweep_function(pw.wrap_par_to_swf(self.LutMan.amp180))
         MC.set_sweep_points(amps)
         MC.set_detector_function(det.CBox_v3_single_int_avg_with_LutReload(

@@ -59,7 +59,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                                 'Buffer_RO_MW': 0,
                                 'Buffer_RO_RO': 0,
                                 'Flux_comp_dead_time': 3e-6,
-                                'slave_AWG_trig_channels': [],
+                                'subordinate_AWG_trig_channels': [],
                                 }
 
     ##########################
@@ -231,10 +231,10 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                                  amplitude=0, length=final_len),
                refpulse=last_pulse, refpoint='end')
 
-    # Trigger the slave AWG-s
-    slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
-    for cname in slave_triggers:
-        el.add(pulse.SquarePulse(name='slave_trigger', channel=cname,
+    # Trigger the subordinate AWG-s
+    subordinate_triggers = sequencer_config.get('subordinate_AWG_trig_channels', [])
+    for cname in subordinate_triggers:
+        el.add(pulse.SquarePulse(name='subordinate_trigger', channel=cname,
                                  amplitude=1, length=20e-9), start=10e-9)
 
     return el

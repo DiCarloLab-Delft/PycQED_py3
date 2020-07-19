@@ -1200,9 +1200,9 @@ class CBox_v3_T1(swf.Hard_Sweep):
             self.CBox.AWG0_mode('Codeword-trigger mode')
             self.CBox.AWG1_mode('Codeword-trigger mode')
             self.CBox.AWG2_mode('Codeword-trigger mode')
-            self.CBox.set_master_controller_working_state(0, 0, 0)
+            self.CBox.set_main_controller_working_state(0, 0, 0)
             self.CBox.load_instructions('CBox_v3_test_program\T1.asm')
-            self.CBox.set_master_controller_working_state(1, 0, 0)
+            self.CBox.set_main_controller_working_state(1, 0, 0)
 
 
 class CBox_v3_T1(swf.Hard_Sweep):
@@ -1220,9 +1220,9 @@ class CBox_v3_T1(swf.Hard_Sweep):
             self.CBox.AWG0_mode('Codeword-trigger mode')
             self.CBox.AWG1_mode('Codeword-trigger mode')
             self.CBox.AWG2_mode('Codeword-trigger mode')
-            self.CBox.set_master_controller_working_state(0, 0, 0)
+            self.CBox.set_main_controller_working_state(0, 0, 0)
             self.CBox.load_instructions('CBox_v3_test_program\T1.asm')
-            self.CBox.set_master_controller_working_state(1, 0, 0)
+            self.CBox.set_main_controller_working_state(1, 0, 0)
 
 
 class CBox_Ramsey(swf.Hard_Sweep):

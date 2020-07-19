@@ -297,7 +297,7 @@ class MockDAQServer():
         self.nodes['/' + self.device +
                    '/system/fpgarevision'] = {'type': 'Integer', 'value': 99999}
         self.nodes['/' + self.device +
-                   '/system/slaverevision'] = {'type': 'Integer', 'value': 99999}
+                   '/system/subordinaterevision'] = {'type': 'Integer', 'value': 99999}
 
         if self.devtype == 'UHFQA':
             self.nodes['/' + self.device +
