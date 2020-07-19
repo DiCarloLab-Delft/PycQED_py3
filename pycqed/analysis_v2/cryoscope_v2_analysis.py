@@ -77,6 +77,171 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 and `savgol_polyorder`. NB: savgol_polyorder=0 is more
                 aggressive but at expense of the points in the beginning and
                 end of the step response
+
+        Full example of working with the cryoscope tools:
+
+        READ FIRST!
+
+        # ##############################################################
+        # Analysis tool
+        # ##############################################################
+
+        from pycqed.analysis_v2 import cryoscope_v2_tools as cv2
+        import numpy as np
+        from scipy import signal
+        from pycqed.analysis_v2 import measurement_analysis as ma2
+
+        ts = "20200718_202347"
+        qubit = "D1"
+        a_obj = ma2.Cryoscope_v2_Analysis(
+            qubit=qubit,
+            t_start=ts,
+            savgol_window=3,
+            savgol_polyorder=1,
+            kw_exp_fit={
+                'tau_min': 0,
+                'tau_max': 3,
+                'time_ns_fit_max': 15,
+                'threshold_apply': 0.99
+            },
+        )
+        rdd = a_obj.raw_data_dict
+        pdd = a_obj.proc_data_dict
+        qois = pdd["quantities_of_interest"]
+        time_ns = qois["time_ns"]
+
+        # ##############################################################
+        # Plot analysed step response
+        # ##############################################################
+
+        fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+
+        time_ns = qois["time_ns"]
+
+        key = "step_response_average"
+        step_response = qois[key]
+        ax.plot(time_ns[:len(step_response)], step_response, label=key)
+
+        key = "step_response_average_filtered"
+        step_response = qois[key]
+        ax.plot(time_ns[:len(step_response)], step_response, label=key)
+
+        ax.hlines(np.array([.99, .999, 1.01, 1.001, .97, 1.03]) ,
+                  xmin=np.min(time_ns), xmax=np.max(time_ns[:len(step_response)]),
+                  linestyle=["-", "--", "-", "--", "-.", "-."])
+
+        ax.set_title(ts + ": Cryoscope " + qubit)
+        set_xlabel(ax, "Pulse duration", "ns")
+        set_ylabel(ax, "Normalized amplitude", "a.u.")
+        ax.legend()
+
+        # ##############################################################
+        # IIR optimization
+        # ##############################################################
+
+        # TODO: add here for reference next time!!!
+
+        # ##############################################################
+        # FIR optimization
+        # ##############################################################
+
+        # Limit the number of point up to which this FIR should correct
+        # This helps to avoid fitting noise and make the convergence faster
+        # and targeted to what we want to correct
+        # maximum 72 taps are available for HDAWG real-time FIR (~ 30 ns)
+        max_taps = int(30 * 2.4)
+
+        t_min_baseline_ns = np.max(time_ns) - 25
+        t_max_baseline_ns = np.max(time_ns) - 5
+
+        opt_input = step_response
+
+        opt_fir, _ = cv2.optimize_fir_software(
+        #     step_response,
+            opt_input,
+            baseline_start=np.where(time_ns > t_min_baseline_ns)[0].min(),
+            baseline_stop=np.where(time_ns > t_max_baseline_ns)[0].min(),
+            max_taps=max_taps,
+            cma_options={
+                "verb_disp":10000,  # Avoid too much output
+                #"ftarget": 1e-3, "tolfun": 1e-15, "tolfunhist": 1e-15, "tolx": 1e-15
+            }
+        )
+
+        # ##############################################################
+        # FIR optimization plotting
+        # ##############################################################
+
+        ac_soft_FIR = signal.lfilter(opt_fir, 1, opt_input)
+
+        fig, ax = plt.subplots(1, 1, figsize=(20, 8))
+
+        ax.plot(time_ns[:len(step_response)], step_response, "-o")
+        ax.plot(time_ns[:len(opt_input)], opt_input, "-o")
+        ax.plot(time_ns[:len(step_response)], ac_soft_FIR, "-o")
+
+        ax.hlines(np.array([.99, .999, 1.01, 1.001]),
+                  xmin=np.min(time_ns), xmax=np.max(time_ns[:len(step_response)]),
+                  linestyle=["-", "--", "-", "--"])
+
+        ax.vlines(([t_min_baseline_ns, t_max_baseline_ns]),
+                  ymin=np.min(step_response), ymax=np.max(step_response), color="red")
+
+        # ##############################################################
+        # Generate loading code (first iteration only)
+        # ##############################################################
+
+        # Run this cell for the first FIR only
+        # Then copy paste below in order to keep track of the FIRs
+        # You may want to go back a previous one
+        filter_model_number = 4  # CHANGE ME IF NEEDED!!!
+
+        cv2.print_FIR_loading(
+            qubit,
+            filter_model_number,
+            cv2.convert_FIR_for_HDAWG(opt_fir),
+            real_time=True)
+
+        # Output sample:
+        # lin_dist_kern_D1.filter_model_04({'params': {'weights': np.array([ 1.13092421e+00, -6.82709369e-02, -4.64421034e-02, -2.58260195e-02,
+        #        -1.04921358e-02, -9.73883537e-03, -2.42308728e-03,  5.35076244e-03,
+        #         3.77617499e-03,  5.28141742e-03, -6.33810801e-03,  2.69420579e-03,
+        #         9.06057712e-03,  7.32841146e-03,  1.20281705e-03, -2.35979362e-03,
+        #        -4.87644425e-03,  1.49692530e-03, -9.34622902e-04, -2.26087315e-04,
+        #        -1.15781407e-02,  1.11572007e-03,  4.48942912e-03, -4.85723912e-03,
+        #         5.10716383e-03,  2.29466092e-03,  2.88845548e-03,  1.74550550e-03,
+        #        -3.71967987e-03, -3.46337041e-03,  8.76836280e-03, -7.60823516e-03,
+        #         7.90059429e-03, -1.11806920e-02,  8.48894913e-03, -6.42957441e-03,
+        #         3.25895281e-03, -1.24377996e-03, -8.87517579e-04,  2.20711760e-03])}, 'model': 'FIR', 'real-time': True })
+
+        # Use the above to run on the setup if this is the first FIR
+
+        # ##############################################################
+        # Convolve new FIR iteration with the last one
+        # ##############################################################
+
+        # fir_0 should be from the first optimization or the current real-time FIR in use on the setup
+        fir_0 = np.array([ 1.05614572e+00, -2.53850198e-03, -2.52682533e-03, -2.51521371e-03,
+               -2.50372099e-03, -2.49226498e-03, -2.48089918e-03, -2.46960924e-03,
+               -2.45266068e-03, -2.43085526e-03, -2.40884910e-03, -3.96701006e-03,
+                2.07353990e-03, -2.00725135e-03,  1.69462462e-03,  4.57420262e-03,
+                1.29168122e-03,  1.41930085e-03,  1.19988012e-03, -2.64650972e-03,
+               -1.92008328e-03, -2.09618589e-03, -4.35853136e-03, -3.46286777e-03,
+               -2.70556691e-03, -1.96788087e-03, -8.97396693e-04, -7.83636242e-04,
+                1.89748899e-04,  5.96137205e-04,  4.40804891e-04,  1.22959418e-03,
+                6.27207165e-05,  1.78369142e-04,  5.88531033e-04,  3.75452325e-04,
+               -1.52053376e-04,  7.29338599e-04, -9.92730555e-05, -7.75952068e-04])
+
+        last_hardware_fir = fir_0
+
+        last_FIR = cv2.convert_FIR_from_HDAWG(last_hardware_fir)  # UPDATE last FIR FOR EACH ITERATION!
+        c1 = cv2.convolve_FIRs([last_FIR, opt_fir])
+
+        cv2.print_FIR_loading(
+            qubit,
+            filter_model_number,
+            cv2.convert_FIR_for_HDAWG(c1),
+            real_time=True)
         """
         if options_dict is None:
             options_dict = dict()
@@ -244,20 +409,35 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             params["tau"].min = self.kw_exp_fit.get("tau_min", 0)
             params["tau"].max = self.kw_exp_fit.get("tau_max", 15)
 
-            fit_res = model.fit(step_response_fit, t=time_ns_fit, params=params)
-            params = {key: fit_res.params[key] for key in fit_res.params.keys()}
-            exp_fit = exp_rise(time_ns_fit, **params)
+            try:
+                fit_res = model.fit(step_response_fit, t=time_ns_fit, params=params)
+                params = {key: fit_res.params[key] for key in fit_res.params.keys()}
+                exp_fit = exp_rise(time_ns_fit, **params)
+                if step_response[self.idx_processed] < self.kw_exp_fit.get(
+                    "threshold_apply", 0.97
+                ):
+                    # Only extrapolate if the first point is significantly below
+                    corrected_pnts = exp_fit[:extra_pnts]
+                else:
+                    corrected_pnts = [step_response[self.idx_processed]] * extra_pnts
+                    # For some cases maybe works better to just assume the first
+                    # point is calibrated, didn't test enough...
+                    # corrected_pnts = [1.0] * extra_pnts
 
-            if step_response[self.idx_processed] < self.kw_exp_fit.get(
-                "threshold_apply", 0.97
-            ):
-                # Only extrapolate if the first point is significantly below
-                corrected_pnts = exp_fit[:extra_pnts]
-            else:
+                conversion.update(
+                    {
+                        "tau": ufloat(
+                            params["tau"].value,
+                            params["tau"].stderr
+                            if params["tau"].stderr is not None
+                            else np.nan,
+                        )
+                    }
+                )
+                conversion.update({"exp_fit": exp_fit})
+            except Exception as e:
+                log.warning("Exponential fit failed!\n{}".format(e))
                 corrected_pnts = [step_response[self.idx_processed]] * extra_pnts
-                # For some cases maybe works better to just assume the first
-                # point is calibrated, didn't test enough...
-                # corrected_pnts = [1.0] * extra_pnts
 
             step_response = np.concatenate(
                 (
@@ -268,17 +448,6 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                     step_response[self.idx_processed :],
                 )
             )
-            conversion.update(
-                {
-                    "tau": ufloat(
-                        params["tau"].value,
-                        params["tau"].stderr
-                        if params["tau"].stderr is not None
-                        else np.nan,
-                    )
-                }
-            )
-            conversion.update({"exp_fit": exp_fit})
             conversion["step_response_processed"] = step_response
 
             for key, val in conversion.items():
@@ -292,7 +461,6 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         pdd = self.proc_data_dict
         vlns = rdd["value_names"]
         vlus = rdd["value_units"]
-        mvs = pdd["measured_values"]
         qois = self.proc_data_dict["quantities_of_interest"]
 
         fs = plt.rcParams["figure.figsize"]
@@ -421,6 +589,35 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             ax_id = fig_id + "_" + vln
             time = qois["time_ns"]
 
+            levels = [0.005, 0.01, 0.03]
+            linestyles = [":", "--", "-"]
+            labels = ["±{:1.1f}%".format(level * 100) for level in levels]
+            for level, linestyle, label in zip(levels, linestyles, labels):
+                self.plot_dicts[ax_id + "_level_pos_" + label] = {
+                    "plotfn": self.plot_matplot_ax_method,
+                    "ax_id": ax_id,
+                    "func": "hlines",
+                    "plot_kws": {
+                        "xmin": time[0],
+                        "xmax": time[-1],
+                        "linestyle": linestyle,
+                        "label": label,
+                        "y": 1 - level,
+                    },
+                }
+
+            self.plot_dicts[ax_id + "_level_neg"] = {
+                "plotfn": self.plot_matplot_ax_method,
+                "ax_id": ax_id,
+                "func": "hlines",
+                "plot_kws": {
+                    "xmin": time[0],
+                    "xmax": time[-1],
+                    "linestyle": linestyles,
+                    "y": 1 + np.array(levels),
+                },
+            }
+
             label1 = "step_response_" + vln
             label2 = "step_response_" + vln + "_filtered"
             label3 = "step_response_processed_" + vln
@@ -442,29 +639,3 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                     "xlabel": xlabel,
                     "xunit": "s"
                 }
-
-            levels = [0.005, 0.01, 0.03]
-            linestyle = [":", "--", "-"]
-            self.plot_dicts[ax_id + "_percent_neg"] = {
-                "plotfn": self.plot_matplot_ax_method,
-                "ax_id": ax_id,
-                "func": "hlines",
-                "plot_kws": {
-                    "xmin": time[0],
-                    "xmax": time[-1],
-                    "linestyle": linestyle,
-                    "label": ["±{:1.1f}".format(level * 100) for level in levels],
-                    "y": 1 - np.array(levels),
-                },
-            }
-            self.plot_dicts[ax_id + "_percent_pos"] = {
-                "plotfn": self.plot_matplot_ax_method,
-                "ax_id": ax_id,
-                "func": "hlines",
-                "plot_kws": {
-                    "xmin": time[0],
-                    "xmax": time[-1],
-                    "linestyle": linestyle,
-                    "y": 1 + np.array(levels),
-                },
-            }
