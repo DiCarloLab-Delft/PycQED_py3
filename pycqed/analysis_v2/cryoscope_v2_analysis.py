@@ -577,7 +577,7 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 "marker": "o",
                 "linestyle": "",
                 "xlabel": xlabel,
-                "ylabel": "Oscillation amplitude",
+                "ylabel": "Osc. ampl. " + vln,
             }
 
         # fig_id = fig_id_step_resp
@@ -634,7 +634,7 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                     "setlabel": label,
                     "do_legend": label == label4,
                     "legend_pos": "lower center",
-                    "ylabel": "Step response",
+                    "ylabel": "Step resp. " + vln,
                     "yunit": "a.u.",
                     "xlabel": xlabel,
                     "xunit": "s"

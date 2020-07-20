@@ -242,6 +242,7 @@ def CosFunc(t, amplitude, frequency, phase, offset):
     """
     return amplitude * np.cos(2 * np.pi * frequency * t + phase) + offset
 
+
 def CosFunc2(t, amplitude, frequency, phase, offset):
     """
     parameters:
