@@ -22,7 +22,9 @@ from contextlib import ContextDecorator
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 from IPython.core.ultratb import AutoFormattedTB
 from collections.abc import Iterable
-
+import hashlib
+import inspect
+from itertools import dropwhile
 
 try:
     import msvcrt  # used on windows to catch keyboard input
@@ -800,14 +802,44 @@ def get_module_name(obj, level=-1):
     """
     return obj.__module__.split(".")[level]
 
+# ######################################################################
+# File hashing utilities
+# ######################################################################
 
+
+def get_file_sha256_hash(
+    filepath: str,
+    read_block_size: int = 2 ** 16,  # 64 Kb
+    return_hexdigest: bool = True,
+):
+    """
+    Inspired from:
+    https://nitratine.net/blog/post/how-to-hash-files-in-python/
+
+    `read_block_size` avoids loading too much of the file into memory
+    """
+    file_hash = hashlib.sha256()  # Create the hash object, can use something other than `.sha256()` if you wish
+    with open(filepath, 'rb') as f:  # Open the file to read it's bytes
+        fb = f.read(read_block_size)  # Read from the file. Take in the amount declared above
+        while len(fb) > 0:  # While there is still data being read from the file
+            file_hash.update(fb)  # Update the hash
+            fb = f.read(read_block_size)  # Read the next block from the file
+
+    if return_hexdigest:
+        return file_hash.hexdigest()
+    else:
+        return file_hash
+
+# ######################################################################
 # Handy things to print the traceback of exceptions
-
+# ######################################################################
 
 # initialize the formatter for making the tracebacks into strings
 # mode = 'Plain' # for printing like in the interactive python traceback
 # TODO: Not sure if this line needs to be run in the highest level
 # python file in order to get a full traceback
+
+
 itb = AutoFormattedTB(mode="Verbose", tb_offset=None)
 
 
