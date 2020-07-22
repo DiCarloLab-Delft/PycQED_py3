@@ -1,5 +1,5 @@
 import time
-from collections import MutableMapping
+from collections.abc import MutableMapping
 import os
 import sys
 import numpy as np
@@ -743,7 +743,7 @@ def delete_keys_from_dict(
 ):
     """
     Two recursive functionalities:
-        1. Delete keys from dictionary
+        1. Delete `keys` from dictionary
         2. Replace types with their string representation
 
     Args:

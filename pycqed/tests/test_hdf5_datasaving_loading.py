@@ -180,16 +180,18 @@ class Test_HDF5(unittest.TestCase):
         self.mock_parabola.y(2)
         self.mock_parabola.status(True)
         self.mock_parabola.dict_like({'a': {'b': [2, 3, 5]}})
+        self.mock_parabola.nested_lists_like([[1], [8, 9]])
+        self.mock_parabola.complex_like(1.0 + 4.0j)
 
         self.MC.set_sweep_function(self.mock_parabola.x)
         self.MC.set_sweep_points([0, 1])
         self.MC.set_detector_function(self.mock_parabola.skewed_parabola)
         self.MC.run('test_MC_snapshot_storing')
-        self.mock_parabola.array_like(arr+5)
+        self.mock_parabola.array_like(arr + 5)
         self.mock_parabola.x(13)
         # Test that these are not the same as before the experiment
         np.testing.assert_array_equal(self.mock_parabola.array_like(),
-                                      arr+5)
+                                      arr + 5)
         self.assertEqual(self.mock_parabola.x(), 13)
 
         # Now load the settings from the last file
@@ -210,6 +212,11 @@ class Test_HDF5(unittest.TestCase):
         self.assertEqual(self.mock_parabola_2.status(), True)
         self.assertEqual(self.mock_parabola_2.dict_like(),
                          {'a': {'b': [2, 3, 5]}})
+        # e.g. Resonator combinations
+        self.assertEqual(self.mock_parabola_2.nested_lists_like(), [[1], [8, 9]])
+        # e.g. Saving some rotation parameters that are complex numbers
+        # complex numbers are automatically converted to strings
+        self.assertEqual(self.mock_parabola_2.complex_like(), 1.0 + 4.0j)
 
 
 def test_wr_rd_hdf5_array():
