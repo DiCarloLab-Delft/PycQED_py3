@@ -338,7 +338,9 @@ class Test_CCL(unittest.TestCase):
         self.CCL_qubit.ro_acq_weight_type('SSB')
 
         # set to not set to bypass validator
-        self.CCL_qubit.freq_res._save_val(None)
+        # [2020-07-23 Victor] commented out, it is already None by default
+        # `_save_val` is not available anymore
+        # self.CCL_qubit.freq_res._save_val(None)
         try:
             self.CCL_qubit.find_resonator_frequency()
         except ValueError:
@@ -359,7 +361,9 @@ class Test_CCL(unittest.TestCase):
         powers = np.arange(-30, -10, 5)
 
         # set to not set to bypass validator
-        self.CCL_qubit.freq_res._save_val(None)
+        # [2020-07-23 Victor] commented out, it is already None by default
+        # `_save_val` is not available anymore
+        # self.CCL_qubit.freq_res._save_val(None)
         self.CCL_qubit.measure_resonator_power(freqs=freqs, powers=powers)
 
     def test_measure_transients(self):
