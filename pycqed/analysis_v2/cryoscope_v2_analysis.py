@@ -68,16 +68,17 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         **kwargs
     ):
         """
-        Second version of cryoscope analysis, best suited for FIRs
+        ================================================================
+        A second version of cryoscope analysis, best suited for FIRs
         calibration.
 
         [2020-07-22] Not tested for IIR calibration, should still be usable
         In that case you may want to apply a more aggressive savgol filter
 
-        IMPORTANT: how to choose the detuning (i.e. amplitude of flux pulse)
+        IMPORTANT: how to choose the detuning (i.e. amplitude of flux pulse)?
         Answer: target a detuning on the order of ~450-700 MHz and mind that
         very high detuning might difficult the fitting involved in this
-        analysis
+        analysis, but low amplitude has low SNR
 
         Does not require the flux arc, assumes quadratic dependence on
         frequency and a plateau of stable frequency to extract an average
@@ -86,6 +87,13 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
 
         Uses a moving cos-fitting-window to extract instantaneous oscillation
         frequency
+
+        Requirements:
+            - Single qubit gates very well calibrated for this qubit to avoid
+            systematical errors in the different projections of the Bloch
+            vector
+            - Well calibrated RO
+            - Qubit parked ~ at sweet-spot
 
         Generates 4 variations of the step response, use the one that look
         more suitable to the situation (initial FIR vs last FIR iteration)
@@ -100,6 +108,27 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 and `savgol_polyorder`. NB: savgol_polyorder=0 is more
                 aggressive but at expense of the points in the beginning and
                 end of the step response
+
+        Possible improvements:
+
+        a) Instead of doing cosine fittings for each projection, I expect better
+        results doing cosine fitting with COMMON frequency free parameter
+        between the cosines that are being fitted to each projection, i.e. in
+        the second pass after knowing the amplitude and offset, we would fit
+        a cosine function with fixed amplitude, fixed offset, free phase and
+        free frequency but this frequency value would be constrained such that
+        it simultaneously best fits all Bloch vector projections.
+        I only thought of this after implementing the version with independent
+        fitting. I expect better SNR and maybe easier fitting as it constrains
+        it more, or bad results if the projection have systematic errors.
+        Actually, with this the amplitude and offset could be shared as well
+        and therefore a second pass maybe not necessary.
+
+        b) Don't assume fixed frequency in the fitting window and instead use
+        a linear time-dependent frequency. This should help getting more
+        accurate response for the rising of the flux pulse.
+
+        ================================================================
 
         Full example of working with the cryoscope tools for FIR corrections
 
