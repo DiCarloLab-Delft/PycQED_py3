@@ -476,6 +476,12 @@ class MockDAQServer():
         if path in self.poll_nodes:
             self.poll_nodes.remove(path)
 
+    def sync(self):
+        """The sync method does not need to do anything as there are no
+        device delays to deal with when using the mock server.
+        """
+        pass
+
     def _load_parameter_file(self, filename: str):
         """
         Takes in a node_doc JSON file auto generates paths based on
