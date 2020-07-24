@@ -163,7 +163,7 @@ def f_to_parallelize_v2(arglist):
                                                  getattr(fluxlutman, "vcz_amp_fine_{}".format(which_gate)), 
                                                  c_180_in_hull)
         MC.set_sweep_function(swf_2d_contour)
-        MC.set_sweep_points(np.linspace(0, 1, 40))
+        MC.set_sweep_points(np.linspace(0, 1, 20))
 
         if sim_control_CZ.cluster():
             dat = MC.run(
