@@ -97,7 +97,7 @@ def moving_cos_fitting_window(
         frequency_guess = f[np.argmax(np.abs(w))]
         init_guess["frequency"] = frequency_guess
         print("Frequency guess from FFT: {:.3g} GHz".format(frequency_guess))
-        warn_thr = .7  # GHz
+        warn_thr = 0.7  # GHz
         if frequency_guess > warn_thr:
             log.warning(
                 "\nHigh detuning above {} GHz detected. Cosine fitting may fail! "
@@ -112,8 +112,8 @@ def moving_cos_fitting_window(
     def fix_pars(params, i):
         # The large range is just to allow the phase to move continuously
         # between the adjacent fits even if it is not inside [-pi, pi]
-        params["phase"].min = - 100. * np.pi
-        params["phase"].max = 100. * np.pi
+        params["phase"].min = -100.0 * np.pi
+        params["phase"].max = 100.0 * np.pi
         params["amplitude"].min = 0.1 * init_guess["amplitude"]
         params["amplitude"].max = 2.0 * init_guess["amplitude"]
 
