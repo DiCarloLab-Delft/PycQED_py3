@@ -2,37 +2,55 @@
 *CLS
 STATus:QUEStionable:FREQ:ENABle 32767
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO0:Q1REG63 0
 awgcontrol:run:immediate
+*OPC?
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO0:Q1REG63 31
 awgcontrol:run:immediate
+*OPC?
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO8:Q1REG63 0
 awgcontrol:run:immediate
+*OPC?
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO8:Q1REG63 31
 awgcontrol:run:immediate
+*OPC?
 QUTech:CCIO5:VSMbit0:RISEDELAY 0
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO5:Q1REG63 0
 awgcontrol:run:immediate
+*OPC?
 QUTech:CCIO5:VSMbit0:RISEDELAY 3
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO5:Q1REG63 0
 awgcontrol:run:immediate
+*OPC?
 QUTech:CCIO5:VSMbit0:RISEDELAY 21
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO5:Q1REG63 15
 awgcontrol:run:immediate
+*OPC?
 QUTech:CCIO5:VSMbit31:RISEDELAY 0
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO5:Q1REG63 0
 awgcontrol:run:immediate
+*OPC?
 QUTech:CCIO5:VSMbit31:RISEDELAY 21
 awgcontrol:stop:immediate
+*OPC?
 QUTech:CCIO5:Q1REG63 15
 awgcontrol:run:immediate
+*OPC?
 QUTech:CCIO5:VSMbit0:RISEDELAY 0
 QUTech:CCIO5:VSMbit0:RISEDELAY 48
 QUTech:CCIO5:VSMbit31:RISEDELAY 0
@@ -49,5 +67,8 @@ QUTech:SEQuence:PROGram:ASSEMble #19    stop
 
 QUTech:SEQuence:PROGram:ASSEMble #19    stop
 
+QUTech:SEQuence:PROGram:ASSEMble:SUCCESS?
 awgcontrol:run:immediate
+*OPC?
 awgcontrol:stop:immediate
+*OPC?
