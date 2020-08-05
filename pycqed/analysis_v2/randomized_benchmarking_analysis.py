@@ -756,7 +756,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
 
         a_q0 = RandomizedBenchmarking_SingleQubit_Analysis(
-            label=self.labels[0],
+            t_start=self.t_start,
             rates_I_quad_ch_idx=rates_I_quad_ch_idx,
             cal_pnts_in_dset=cal_1Q,
             do_fitting=False,
@@ -766,7 +766,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         rates_I_quad_ch_idx = self.rates_I_quad_ch_idxs[1]
         cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
         a_q1 = RandomizedBenchmarking_SingleQubit_Analysis(
-            label=self.labels[0],
+            t_start=self.t_start,
             rates_I_quad_ch_idx=rates_I_quad_ch_idx,
             cal_pnts_in_dset=cal_1Q,
             do_fitting=False,
@@ -2103,7 +2103,7 @@ def plot_cal_points_hexbin(
             norm=PowerNorm(gamma=0.25),
         )
         cb = f.colorbar(hb, ax=ax)
-        cb.set_label(r"Counts $|{}\rangle$".format(i + 1))
+        cb.set_label(r"Counts $|{}\rangle$".format(i))
         hbs.append(hb)
 
     if common_clims:
