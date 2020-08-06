@@ -92,9 +92,9 @@ class ConfigParameter(ManualParameter):
 
         if initial_value is not None:
             self.validate(initial_value)
-            self._save_val(initial_value)
+            self.cache.set(initial_value)
 
-    def set(self, value):
+    def set_raw(self, value):
         """
         Validate and saves value.
         If the value is different from the latest value it sets the
@@ -104,8 +104,8 @@ class ConfigParameter(ManualParameter):
         self.validate(value)
         if value != self.get_latest():
             self._instrument._config_changed = True
-        self._save_val(value)
+        self.cache.set(value)
 
-    def get(self):
+    def get_raw(self):
         """ Return latest value"""
         return self.get_latest()
