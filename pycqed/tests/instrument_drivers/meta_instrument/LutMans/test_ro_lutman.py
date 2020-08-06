@@ -1,9 +1,5 @@
 import unittest
-import tempfile
-import os
-import numpy
 
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibi
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
