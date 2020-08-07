@@ -415,7 +415,7 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
     if replace_q1_pulses_with is not None:
         # pulse_combinations_q1 = [[replace_q1_pulses_with]*2 for val in pulse_combinations]
         pulse_combinations_q1 = np.repeat(
-            [[replace_q1_pulses_with]*2], len(pulse_combinations_q0), axis=0)
+            [[replace_q1_pulses_with] * 2], len(pulse_combinations_q0), axis=0)
     else:
         pulse_combinations_q1 = np.tile(pulse_combinations, [repetitions, 1])
     i = 0

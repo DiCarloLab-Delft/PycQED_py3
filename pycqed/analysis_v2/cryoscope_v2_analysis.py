@@ -29,20 +29,31 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             "vpp_key": "Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_range",
             "cfg_amp_key": "Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude",
         },
-        kw_rough_freq_to_amp={"plateau_time_start_ns": -25, "plateau_time_end_ns": -5},
+        kw_rough_freq_to_amp={
+            # Negative values are w.r.t the maximum time
+            "plateau_time_start_ns": -25,
+            "plateau_time_end_ns": -5
+        },
         kw_exp_fit={
             "tau_min": 0,
             "tau_max": 15,
             "time_ns_fit_max": 15,
             "threshold_apply": 0.97,
         },
-        kw_processing={"pnts_per_fit_second_pass": 3, "pnts_per_fit_first_pass": 4},
+        kw_processing={
+            "pnts_per_fit_second_pass": 3,
+            "pnts_per_fit_first_pass": 4,
+            # Controls the polynomial fitted to the oscillation envelope
+            "osc_amp_envelop_poly_deg": 1,
+            # Setting sensible limits for the oscillation frequency helps
+            # avoiding cosine fitting failures
+            "min_params": {"frequency": 0.1},
+            "max_params": {"frequency": 0.6},
+        },
         # Allows to exclude certain projections from the averaging
         # Handy when the fits failed for one or more projections
         average_exclusion_val_names: list = [],  # e.g. [" cos", "msin"]
-
         savgol_window: int = 3,  # 3 or 5 should work best
-
         # Might be useful to put to 0 after some iterations,
         # In order to use savgol_polyorder=0, step response should be almost flat
         # Otherwise first points get affected
@@ -57,12 +68,32 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         **kwargs
     ):
         """
-        Second version of cryoscope analysis
+        ================================================================
+        A second version of cryoscope analysis, best suited for FIRs
+        calibration.
 
-        Does not require the flux arc, assumes quadratic dependence on frequency
+        [2020-07-22] Not tested for IIR calibration, should still be usable
+        In that case you may want to apply a more aggressive savgol filter
+
+        IMPORTANT: how to choose the detuning (i.e. amplitude of flux pulse)?
+        Answer: target a detuning on the order of ~450-700 MHz and mind that
+        very high detuning might difficult the fitting involved in this
+        analysis, but low amplitude has low SNR
+
+        Does not require the flux arc, assumes quadratic dependence on
+        frequency and a plateau of stable frequency to extract an average
+        The plateau is controlled by `plateau_time_start_ns` and
+        `plateau_time_stop_ns`.
 
         Uses a moving cos-fitting-window to extract instantaneous oscillation
         frequency
+
+        Requirements:
+            - Single qubit gates very well calibrated for this qubit to avoid
+            systematical errors in the different projections of the Bloch
+            vector
+            - Well calibrated RO
+            - Qubit parked ~ at sweet-spot
 
         Generates 4 variations of the step response, use the one that look
         more suitable to the situation (initial FIR vs last FIR iteration)
@@ -78,7 +109,31 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 aggressive but at expense of the points in the beginning and
                 end of the step response
 
-        Full example of working with the cryoscope tools:
+        Possible improvements:
+
+        a) Instead of doing cosine fittings for each projection, I expect better
+        results doing cosine fitting with COMMON frequency free parameter
+        between the cosines that are being fitted to each projection, i.e. in
+        the second pass after knowing the amplitude and offset, we would fit
+        a cosine function with fixed amplitude, fixed offset, free phase and
+        free frequency but this frequency value would be constrained such that
+        it simultaneously best fits all Bloch vector projections.
+        I only thought of this after implementing the version with independent
+        fitting. I expect better SNR and maybe easier fitting as it constrains
+        it more, or bad results if the projection have systematic errors.
+        Actually, with this the amplitude and offset could be shared as well
+        and therefore a second pass maybe not necessary.
+
+        b) Don't assume fixed frequency in the fitting window and instead use
+        a linear time-dependent frequency. This should help getting more
+        accurate response for the rising of the flux pulse.
+
+        ================================================================
+
+        Full example of working with the cryoscope tools for FIR corrections
+
+        NB the analysis is a bit heavy, might take a few minutes to run for
+        very long measurements, and especially long if the fist are failing!!!
 
         READ FIRST!
 
@@ -306,6 +361,12 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         pdd["time"] = rdd["data"][:, : -len(vlns)].flatten()
         mvs = pdd["measured_values"] = rdd["data"][:, -len(vlns) :].T
 
+        # Keep this in here to raise any error regarding this extraction
+        # right away before the heavy data processing
+        self.kw_extract["qubit"] = self.qubit
+        self.kw_extract["timestamp"] = self.timestamp
+        amp_pars = cv2_tools.extract_amp_pars(**self.kw_extract)
+
         results = OrderedDict()
 
         # Working in ns to avoid fitting and numerical problems
@@ -361,16 +422,15 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             ]
         )
 
-        self.kw_extract["qubit"] = self.qubit
-        self.kw_extract["timestamp"] = self.timestamp
-        amp_pars = cv2_tools.extract_amp_pars(**self.kw_extract)
-
         res = {
             "results": results,
             "averaged_frequency": av_freq,
             "amp_pars": amp_pars,
             "time_ns": time_ns,  # This one always starts at 1/sample_rate
         }
+        plateau_time_start_ns = self.kw_rough_freq_to_amp["plateau_time_start_ns"]
+        plateau_time_end_ns = self.kw_rough_freq_to_amp["plateau_time_end_ns"]
+        assert plateau_time_start_ns < plateau_time_end_ns
 
         for frequencies, name in zip(
             # Make available in the results all combinations
@@ -385,13 +445,13 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
             # window, we attribute the obtained frequency to the middle point in the
             # fitting window, and interpolate linearly the missing points do to the
             # right shift, this step response can be more accurate in certain cases
-            # TO DO: try to instead fit an exponential signal to the first few
+            # We try also to fit an exponential signal to the first few
             # data points and use it to interpolate the missing points,
             # might be more accurate for distortion corrections
             step_response = conversion["step_response"]
             extra_pnts = pnts_per_fit_second_pass // 2
 
-            # # Fit only first 15 ns
+            # Fit only first 15 ns
             step_response_fit = np.array(step_response)[self.idx_processed :]
             time_ns_fit = time_ns[extra_pnts:][: len(step_response_fit)]
             where = np.where(time_ns_fit < self.kw_exp_fit.get("time_ns_fit_max", 15))[
@@ -439,6 +499,8 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 log.warning("Exponential fit failed!\n{}".format(e))
                 corrected_pnts = [step_response[self.idx_processed]] * extra_pnts
 
+            corrected_pnts = [step_response[self.idx_processed]] * extra_pnts
+
             step_response = np.concatenate(
                 (
                     # Extrapolate the missing points assuming exponential rise
@@ -471,9 +533,12 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         # define figure and axes here to have custom layout
         # One extra plot for the average
 
+        time = pdd["time"]
+        total_t = time[-1] - time[0]
+        xsize = fs[0] * (np.ceil(total_t * 1e9 / 50) * 2)
         nrows = len(vlns)
         self.figs[fig_id_amp], axs_amp = plt.subplots(
-            ncols=1, nrows=nrows, figsize=(fs[0] * 4, fs[1] * nrows * 1.2), sharex=True
+            ncols=1, nrows=nrows, figsize=(xsize, fs[1] * nrows * 1.2), sharex=True
         )
         self.figs[fig_id_step_resp], axs_step_resp = plt.subplots(
             ncols=1, nrows=nrows, figsize=(fs[0] * 4, fs[1] * nrows * 1.2), sharex=True,
@@ -494,6 +559,12 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
 
         self.axs[fig_id_step_resp_av + "_average"] = axs_step_resp_av
 
+        dt = time[1] - time[0]
+        pnts_per_fit_second_pass = self.kw_processing.get("pnts_per_fit_second_pass", 3)
+        num_pnts = 20 if total_t < 100e-9 else 50
+        times_0 = np.linspace(
+            time[0] - dt / 2, time[pnts_per_fit_second_pass - 1] + dt / 2, num_pnts
+        )
         xlabel = "Square pulse truncation time"
         fig_id = fig_id_amp
         for vln, vlu in zip(vlns, vlus):
@@ -536,14 +607,6 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 "linestyle": "--",
                 "color": "lightgray",
             }
-
-            dt = time[1] - time[0]
-            pnts_per_fit_second_pass = self.kw_processing.get(
-                "pnts_per_fit_second_pass", 3
-            )
-            times_0 = np.linspace(
-                time[0] - dt / 2, time[pnts_per_fit_second_pass - 1] + dt / 2, 20
-            )
             all_times = [
                 times_0 + time_offset for time_offset in np.arange(0, len(amps), 1) * dt
             ]
@@ -577,17 +640,17 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 "marker": "o",
                 "linestyle": "",
                 "xlabel": xlabel,
-                "ylabel": "Oscillation amplitude",
+                "ylabel": "Osc. ampl. " + vln,
             }
 
         # fig_id = fig_id_step_resp
+        time = qois["time_ns"] * 1e-9
         for fig_id, vln, vlu in zip(
             [fig_id_step_resp] * len(vlns) + [fig_id_step_resp_av],
             [*vlns, "average"],
             [*vlus, "a.u."],
         ):
             ax_id = fig_id + "_" + vln
-            time = qois["time_ns"]
 
             levels = [0.005, 0.01, 0.03]
             linestyles = [":", "--", "-"]
@@ -634,8 +697,8 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                     "setlabel": label,
                     "do_legend": label == label4,
                     "legend_pos": "lower center",
-                    "ylabel": "Step response",
+                    "ylabel": "Step resp. " + vln,
                     "yunit": "a.u.",
                     "xlabel": xlabel,
-                    "xunit": "s"
+                    "xunit": "s",
                 }

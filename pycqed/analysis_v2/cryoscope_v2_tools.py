@@ -3,7 +3,6 @@ Created: 2020-07-15
 Author: Victor Negirneac
 """
 
-import matplotlib.pyplot as plt
 from collections.abc import Iterable
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import measurement_analysis as ma
@@ -28,9 +27,11 @@ def rough_freq_to_amp(
     amp_pars, time_ns, freqs, plateau_time_start_ns=-25, plateau_time_end_ns=-5,
 ):
     time_ = time_ns[: len(freqs)]
+    time_ref_start = time_[-1] if plateau_time_start_ns < 0 else 0
+    time_ref_stop = time_[-1] if plateau_time_end_ns < 0 else 0
     where = np.where(
-        (time_ > time_[-1] + plateau_time_start_ns)
-        & (time_ < time_[-1] + plateau_time_end_ns)
+        (time_ > time_ref_start + plateau_time_start_ns)
+        & (time_ < time_ref_stop + plateau_time_end_ns)
     )
     avg_f = np.average(freqs[where])
 
@@ -75,32 +76,59 @@ def moving_cos_fitting_window(
         init_guess["offset"] = offset_guess
 
     if "amplitude" not in init_guess.keys():
-        amplitude_guess = np.max(y_data) - init_guess["offset"]
+        amplitude_guess = np.max(y_data[len(y_data) // 2 :]) - init_guess["offset"]
         init_guess["amplitude"] = amplitude_guess
 
     if "frequency" not in init_guess.keys():
-        w = np.fft.fft(y_data)[: len(y_data) // 2]  # ignore negative values
-        f = np.fft.fftfreq(len(y_data), x_data_ns[1] - x_data_ns[0])[: len(w)]
+        min_t = x_data_ns[0]
+        max_t = x_data_ns[-1]
+        total_t = min_t - max_t
+        y_data_for_fft = y_data[
+            np.where(
+                (x_data_ns > min_t + 0.1 * total_t)
+                & (x_data_ns < max_t - 0.1 * total_t)
+            )[0]
+        ]
+        w = np.fft.fft(y_data_for_fft)[
+            : len(y_data_for_fft) // 2
+        ]  # ignore negative values
+        f = np.fft.fftfreq(len(y_data_for_fft), x_data_ns[1] - x_data_ns[0])[: len(w)]
         w[0] = 0  # ignore DC component
         frequency_guess = f[np.argmax(np.abs(w))]
         init_guess["frequency"] = frequency_guess
+        print("Frequency guess from FFT: {:.3g} GHz".format(frequency_guess))
+        warn_thr = 0.7  # GHz
+        if frequency_guess > warn_thr:
+            log.warning(
+                "\nHigh detuning above {} GHz detected. Cosine fitting may fail! "
+                "Consider using lower detuning!".format(warn_thr)
+            )
+
+    if "phase" not in init_guess.keys():
+        init_guess["phase"] = 0.0
 
     params = model.make_params(**init_guess)
 
     def fix_pars(params, i):
-        params["phase"].min = -180
-        params["phase"].max = 180
+        # The large range is just to allow the phase to move continuously
+        # between the adjacent fits even if it is not inside [-pi, pi]
+        params["phase"].min = -100.0 * np.pi
+        params["phase"].max = 100.0 * np.pi
         params["amplitude"].min = 0.1 * init_guess["amplitude"]
         params["amplitude"].max = 2.0 * init_guess["amplitude"]
 
-        params["frequency"].min = 0.0
-        params["frequency"].max = 0.6  # Not expected to be used for > 0.5 GHz
+        # Not expected to be used for > 0.8 GHz
+        params["frequency"].min = 0.1
+        params["frequency"].max = 0.8
 
         for par, val in fixed_params.items():
+            # iterable case is for the amplitude
             params[par].value = val[i] if isinstance(val, Iterable) else val
             params[par].vary = False
+
         for par, val in max_params.items():
             params[par].max = val
+
         for par, val in min_params.items():
             params[par].min = val
 
@@ -166,8 +194,11 @@ def cryoscope_v2_processing(
     init_guess_first_pass: dict = {},
     fixed_params_first_pass: dict = {},
     init_guess_second_pass: dict = {},
+    max_params: dict = {},
+    min_params: dict = {},
     vln: str = "",
     insert_ideal_projection: bool = True,
+    osc_amp_envelop_poly_deg: int = 1,
 ):
     """
     TBW
@@ -177,8 +208,6 @@ def cryoscope_v2_processing(
     `pnts_per_fit_second_pass` shouldn't be smaller than 3, this is the limit
     to fit the cosine (technically 2 is the limit but but probably will not
     work very well)
-
-    NB max_params and min_params might be needed to be added if there are problems with the fitting
     """
 
     assert time_ns[0] != 0.0, "Cryoscope time should not start at zero!"
@@ -203,7 +232,7 @@ def cryoscope_v2_processing(
                 )
             return time_ns, y_data
         else:
-            print("Skipping!")
+            log.warning("\nSkipping ideal projection!")
             return time_ns, y_data
 
     res_dict = moving_cos_fitting_window(
@@ -212,6 +241,8 @@ def cryoscope_v2_processing(
         fit_window_pnts_nr=pnts_per_fit_first_pass,
         init_guess=init_guess_first_pass,
         fixed_params=fixed_params_first_pass,
+        max_params=max_params,
+        min_params=min_params,
     )
 
     results = res_dict["results"]
@@ -220,7 +251,7 @@ def cryoscope_v2_processing(
     x_for_fit = time_ns[: len(amps_from_fit)]
     # Here we are intentionally using poly of deg 1 to avoid the amplitude to be lower
     # in the beginning which should not be physical
-    line_fit = np.polyfit(x_for_fit, amps_from_fit, 1)
+    line_fit = np.polyfit(x_for_fit, amps_from_fit, osc_amp_envelop_poly_deg)
     poly1d = np.poly1d(line_fit)
     fixed_offset = np.average(results["offset"])
 
@@ -248,6 +279,8 @@ def cryoscope_v2_processing(
         fit_window_pnts_nr=pnts_per_fit_second_pass,
         init_guess=init_guess_second_pass,
         fixed_params={"offset": fixed_offset, "amplitude": poly1d(time_ns)},
+        max_params=max_params,
+        min_params=min_params,
     )
 
     res_dict["time_ns"] = time_ns

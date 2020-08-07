@@ -89,12 +89,12 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
                                  bins=int(min_len_all/50),
                                  label='input state {}'.format(state),
                                  histtype='step',
-                                 color='red', normed=True, visible=False)
+                                 color='red', density=True, visible=False)
     n, bins1, patches = plt.hist(namespace['w0_data_01'],
                                  bins=int(min_len_all/50),
                                  label='input state {}'.format(state),
                                  histtype='step',
-                                 color='red', normed=True, visible=False)
+                                 color='red', density=True, visible=False)
     fig, ax = plt.subplots(figsize=(8, 5))
     colors = ['blue', 'red', 'grey', 'magenta']
     markers = ['o', 'o', 'o', 'v']
@@ -103,7 +103,7 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
 
         n, bins, patches = ax.hist(namespace['w0_data_{}'.format(state)],
                                    bins=int(min_len_all/50),
-                                   histtype='step',  normed=True,
+                                   histtype='step',  density=True,
                                    visible=False)
         ax.plot(bins[:-1]+0.5*(bins[1]-bins[0]), n, color=color,
                 linestyle='None', marker=marker, label='|{}>'.format(state))
@@ -176,13 +176,13 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
     n, bins0, patches = plt.hist(namespace['w1_data_00'],
                                  bins=int(min_len_all/50),
                                  label='input state {}'.format(state),
-                                 histtype='step', color='red', normed=True,
+                                 histtype='step', color='red', density=True,
                                  visible=False)
     n, bins1, patches = plt.hist(namespace['w1_data_10'],
                                  bins=int(min_len_all/50),
                                  label='input state {}'.format(state),
                                  histtype='step',
-                                 color='red', normed=True, visible=False)
+                                 color='red', density=True, visible=False)
     fig, axes = plt.subplots(figsize=(8, 5))
     colors = ['blue', 'red', 'grey', 'magenta']
     markers = ['o', 'o', 'o', 'v']
@@ -190,7 +190,7 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
 
         n, bins, patches = plt.hist(namespace['w1_data_{}'.format(state)],
                                     bins=int(min_len_all/50),
-                                    histtype='step',  normed=True,
+                                    histtype='step',  density=True,
                                     visible=False)
         pylab.plot(bins[:-1]+0.5*(bins[1]-bins[0]), n,
                    color=color, linestyle='None', marker=marker)

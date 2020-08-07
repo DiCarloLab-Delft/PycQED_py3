@@ -158,7 +158,6 @@ def write_dict_to_hdf5(
             try:
                 entry_point.attrs[key] = item
             except Exception as e:
-
                 print(
                     "Exception occurred while writing"
                     " {}:{} of type {} at entry point {}".format(
@@ -189,6 +188,7 @@ def write_dict_to_hdf5(
                 entry_point=entry_point[str_key],
                 group_overwrite_level=group_overwrite_level - 1,
             )
+
         elif isinstance(item, UFloat):
             str_key = str(key)
             if str_key not in entry_point.keys():
@@ -227,10 +227,17 @@ def write_dict_to_hdf5(
                         ds.attrs["list_type"] = "str"
                         ds[:] = data
                     else:
-                        log.warning(
+                        # For nested list we don't throw warning, it will be
+                        # recovered in case of a snapshot
+                        warn_msg = (
                             'List of type "{}" for "{}":"{}" not '
                             "supported, storing as string".format(elt_type, key, item)
                         )
+                        if elt_type is list:
+                            log.debug(warn_msg)
+                        else:
+                            log.warning(warn_msg)
+
                         entry_point.attrs[key] = str(item)
                 # Storing of generic lists/tuples
                 else:

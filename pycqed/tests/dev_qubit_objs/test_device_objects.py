@@ -25,8 +25,6 @@ from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
 
-# from pycqed.measurement.waveform_control_CC import waveform as wf
-
 from qcodes import station
 
 

@@ -1,7 +1,6 @@
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 import numpy as np
 from copy import copy
-from importlib import reload
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -16,7 +15,6 @@ import time
 
 import logging
 
-reload(wf_vcz)
 log = logging.getLogger(__name__)
 
 """

@@ -89,8 +89,20 @@ class DummyParHolder(Instrument):
         )
 
         self.add_parameter(
+            "nested_lists_like",
+            unit="a.u.",
+            parameter_class=ManualParameter,
+            vals=vals.Lists(elt_validator=vals.Lists())
+        )
+
+        self.add_parameter(
             "dict_like", unit="a.u.", parameter_class=ManualParameter, vals=vals.Dict()
         )
+
+        self.add_parameter(
+            "complex_like", unit="a.u.", parameter_class=ManualParameter, vals=vals.ComplexNumbers()
+        )
+
         self.add_parameter(
             "status", vals=vals.Anything(), parameter_class=ManualParameter
         )
@@ -149,7 +161,7 @@ class DummyParHolder(Instrument):
         # UHFQC single int avg detector.
         # Where the outer list would be lenght 1 (seq of 1 segment)
         # with 1 entry (only one value logged)
-        return [self._measure_parabola()]
+        return np.array([self._measure_parabola()])
 
     def _measure_cos_mod_parabola(self):
         time.sleep(self.delay())
