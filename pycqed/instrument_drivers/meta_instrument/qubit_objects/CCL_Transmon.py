@@ -240,6 +240,13 @@ class CCLight_Transmon(Qubit):
                        ' readout pulse and the instruction that triggers the '
                        'acquisition. The positive number means that the '
                        'acquisition is started after the pulse is send.'))
+        self.add_parameter(
+            'ro_pulse_delay', unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(0, 1e-6),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('The delay time for the readout pulse'))
 
         self.add_parameter(
             'ro_acq_mixer_phi', unit='degree',
@@ -1023,6 +1030,8 @@ class CCLight_Transmon(Qubit):
                       self.ro_pulse_length())
             ro_lm.set('M_amp_R{}'.format(idx),
                       ro_amp)
+            ro_lm.set('M_delay_R{}'.format(idx),
+                      self.ro_pulse_delay())
             ro_lm.set('M_phi_R{}'.format(idx),
                       self.ro_pulse_phi())
             ro_lm.set('M_down_length0_R{}'.format(idx),
@@ -3000,7 +3009,8 @@ class CCLight_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC(),
-            trigger_idx=0 if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
+            # trigger_idx=0 if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
+            trigger_idx=1,
             wait_time_ns=wait_time_ns)
 
         CCL.eqasm_program(p.filename)

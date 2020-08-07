@@ -1041,3 +1041,37 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
 
     p = oqh.compile(p)
     return p
+
+def TEST_RTE(qubit_idx: int, platf_cfg: str,
+             measurements:int):
+    """
+
+    """
+    p = oqh.create_program('RTE', platf_cfg)
+
+    k = oqh.create_kernel('RTE', p)
+    k.prepz(qubit_idx)
+    ######################
+    # Parity check
+    ######################
+    for m in range(measurements):
+        # Superposition
+        k.gate('rx90', [qubit_idx])
+        # CZ emulation
+        k.gate('i', [qubit_idx])
+        k.gate('i', [qubit_idx])
+        k.gate('i', [qubit_idx])
+        # Refocus
+        k.gate('rx180', [qubit_idx])
+        # CZ emulation
+        k.gate('i', [qubit_idx])
+        k.gate('i', [qubit_idx])
+        k.gate('i', [qubit_idx])
+        # Recovery pulse
+        k.gate('rx90', [qubit_idx])
+        k.measure(qubit_idx)
+
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
