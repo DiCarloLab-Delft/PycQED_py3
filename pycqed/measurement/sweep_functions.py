@@ -1,19 +1,13 @@
 # FIXME: commented out CBox stuff for PR #620
 import logging
 import time
-import os
+#import os
 import numpy as np
-from pycqed.utilities.general import setInDict
+#from pycqed.utilities.general import setInDict
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
-#<<<<<<< HEAD
-#from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
-#from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
-#import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
-#=======
 #from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 #import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
 from pycqed.analysis_v2.tools import contours2d as c2d
-#>>>>>>> 1dde65350fdaebf0a760ed3e4e2dd307acc0b58f
 
 
 class Sweep_function(object):
@@ -618,7 +612,8 @@ class OpenQL_File_Sweep(Hard_Sweep):
 #         if self.upload:
 #             self.CBox.trigger_source('internal')
 #             self.CBox.load_instructions(self.filename)
-=======
+
+#=======
 
 class anharmonicity_sweep(Soft_Sweep):
     """
