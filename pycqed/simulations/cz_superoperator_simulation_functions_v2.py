@@ -1270,6 +1270,10 @@ def simulate_quantities_of_interest_superoperator_new(
     phase_diff_12_02 = (phases[6] - phases[4] - phase_q1) % 360
     phase_diff_21_20 = (phases[7] - phases[5] - phase_q0) % 360
 
+    population_transfer_01_10 = average_population_transfer_subspace_to_subspace(
+        U_final, states_in=[[0, 1]], states_out=[[1, 0]]
+    )
+
     return {
         "phi_cond": phi_cond,
         "L1": L1,
@@ -1293,6 +1297,7 @@ def simulate_quantities_of_interest_superoperator_new(
         "cond_phase20": cond_phase20,
         "population_transfer_12_21": population_transfer_12_21,
         "population_transfer_12_03": population_transfer_12_03,
+        "population_transfer_01_10": population_transfer_01_10
     }
 
 
