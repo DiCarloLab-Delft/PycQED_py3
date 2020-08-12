@@ -1240,3 +1240,6 @@ class Mock_QWG(QuTech_AWG_Module):
 
     def start(self):
         pass
+
+    def close(self):  # prevent calling IPInstrument:close()
+        pass
