@@ -290,52 +290,52 @@ class MockDAQServer():
 
         # Update connected status
         self.nodes['/zi/devices/connected']['value'] = self.device
-        self.nodes['/' + self.device +
-                   '/features/devtype'] = {'type': 'String', 'value': self.devtype}
-        self.nodes['/' + self.device +
-                   '/system/fwrevision'] = {'type': 'Integer', 'value': 99999}
-        self.nodes['/' + self.device +
-                   '/system/fpgarevision'] = {'type': 'Integer', 'value': 99999}
-        self.nodes['/' + self.device +
-                   '/system/slaverevision'] = {'type': 'Integer', 'value': 99999}
+
+        # Set the LabOne revision
+        self.nodes['/zi/about/revision'] = {'type': 'Integer', 'value': 200802104}
+
+        self.nodes[f'/{self.device}/features/devtype'] = {'type': 'String', 'value': self.devtype}
+        self.nodes[f'/{self.device}/system/fwrevision'] = {'type': 'Integer', 'value': 99999}
+        self.nodes[f'/{self.device}/system/fpgarevision'] = {'type': 'Integer', 'value': 99999}
+        self.nodes[f'/{self.device}/system/slaverevision'] = {'type': 'Integer', 'value': 99999}
 
         if self.devtype == 'UHFQA':
-            self.nodes['/' + self.device +
-                       '/features/options'] = {'type': 'String', 'value': 'QA\nAWG'}
+            self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'QA\nAWG'}
             for i in range(16):
-                self.nodes['/' + self.device + '/awgs/0/waveform/waves/' +
-                           str(i)] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/awgs/0/waveform/waves/{i}'] = {'type': 'ZIVectorData', 'value': np.array([])}
             for i in range(10):
-                self.nodes['/' + self.device + '/qas/0/integration/weights/' +
-                           str(i) + '/real'] = {'type': 'ZIVectorData', 'value': np.array([])}
-                self.nodes['/' + self.device + '/qas/0/integration/weights/' +
-                           str(i) + '/imag'] = {'type': 'ZIVectorData', 'value': np.array([])}
-                self.nodes['/' + self.device + '/qas/0/result/data/' +
-                           str(i) + '/wave'] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/qas/0/integration/weights/{i}/real'] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/qas/0/integration/weights/{i}/imag'] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/qas/0/result/data/{i}/wave'] = {'type': 'ZIVectorData', 'value': np.array([])}
+            self.nodes[f'/{self.device}/raw/dios/0/delay'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/drive'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/mode'] = {'type': 'Integer', 'value': 0}
         elif self.devtype == 'HDAWG8':
-            self.nodes['/' + self.device +
-                       '/features/options'] = {'type': 'String', 'value': 'PC\nME'}
-            self.nodes['/' + self.device + '/raw/error/json/errors'] = {
+            self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'PC\nME'}
+            self.nodes[f'/{self.device}/raw/error/json/errors'] = {
                 'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
-            self.nodes['/' + self.device +
-                       '/raw/error/blinkseverity'] = {'type': 'Integer', 'value': 0}
-            self.nodes['/' + self.device +
-                       '/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
-            self.nodes['/' + self.device +
-                       '/raw/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/raw/error/blinkseverity'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
             for awg_nr in range(4):
                 for i in range(32):
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
+                    self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
+                    self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
+                    self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
+                    self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
             for sigout_nr in range(8):
-                self.nodes['/' + self.device + '/sigouts/' + str(sigout_nr) + '/precompensation/fir/coefficients'] = {
+                self.nodes[f'/{self.device}/sigouts/{sigout_nr}/precompensation/fir/coefficients'] = {
                     'type': 'ZIVectorData', 'value': np.array([])}
+            self.nodes[f'/{self.device}/dios/0/mode'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/drive'] = {'type': 'Integer', 'value': 0}
+            for dio_nr in range(32):
+                self.nodes[f'/{self.device}/raw/dios/0/delays/{dio_nr}/value'] = {'type': 'Integer', 'value': 0}
 
     def listNodesJSON(self, path):
         pass
