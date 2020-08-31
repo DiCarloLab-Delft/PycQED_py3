@@ -376,7 +376,7 @@ class DeviceCCL(Instrument):
                 warnings.warn("Could not load flux pulses for {}".format(qb))
                 warnings.warn("Exception {}".format(e))
 
-    def prepare_readout(self, qubits):
+    def prepare_readout(self, qubits, reduced: bool = False):
         """
         Configures readout for specified qubits.
 
@@ -385,14 +385,17 @@ class DeviceCCL(Instrument):
                 list of qubit names that have to be prepared
         """
         log.info('Configuring readout for {}'.format(qubits))
-        self._prep_ro_sources(qubits=qubits)
-        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits)
-        self._prep_ro_integration_weights(qubits=qubits)
-        self._prep_ro_pulses(qubits=qubits)
+        if not reduced:
+            self._prep_ro_sources(qubits=qubits)
 
-        self._prep_ro_instantiate_detectors(qubits=qubits,
-                                            acq_ch_map=acq_ch_map)
-
+        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits) # this one is definetely needed
+        self._prep_ro_integration_weights(qubits=qubits) # this one is definetely needed
+        if not reduced:
+            # doesn't appear to be always needed
+            self._prep_ro_pulses(qubits=qubits) 
+            # doesn't appear to be always needed
+            self._prep_ro_instantiate_detectors(qubits=qubits, acq_ch_map=acq_ch_map) 
+            
         # TODO:
 
         # - update global readout parameters (relating to mixer settings)
@@ -847,7 +850,7 @@ class DeviceCCL(Instrument):
             #     'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
             #     qb.mw_vsm_delay())
 
-    def prepare_for_timedomain(self, qubits: list):
+    def prepare_for_timedomain(self, qubits: list, reduced: bool = False):
         """
         Prepare setup for a timedomain experiment:
 
@@ -855,7 +858,9 @@ class DeviceCCL(Instrument):
             qubits (list of str):
                 list of qubit names that have to be prepared
         """
-        self.prepare_readout(qubits=qubits)
+        self.prepare_readout(qubits=qubits, reduced=reduced)
+        if reduced:
+            return
         if self.find_instrument(qubits[0]).instr_LutMan_Flux() != None:
             self.prepare_fluxing(qubits=qubits)
         self.prepare_timing()
@@ -3868,6 +3873,11 @@ class DeviceCCL(Instrument):
             crossed_value = a_obj.proc_data_dict['root']
             getattr(flux_lm, 'cz_theta_f_' + gate )(crossed_value)
 
+    def prepare_for_inspire(self):
+        for lutman in ['mw_lutman_QNW','mw_lutman_QNE','mw_lutman_QC','mw_lutman_QSW','mw_lutman_QSE']:
+            self.find_instrument(lutman).set_inspire_lutmap()
+        self.prepare_for_timedomain(qubits=self.qubits())
+        self.find_instrument(self.instr_MC()).soft_avg(1)
 
 def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
     acq_ch_map_IQ = {}

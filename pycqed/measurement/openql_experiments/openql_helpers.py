@@ -1,7 +1,7 @@
 import re
 import logging
 import numpy as np
-from os.path import join, dirname
+from os.path import join, dirname, isfile
 from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
@@ -657,17 +657,12 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
     if recompile == True:
         return True
     elif recompile == 'as needed':
-        try:
-            if is_more_rencent(program_fn, platf_cfg):
-                return False
-            else:
-                return True  # compilation is required
-        except FileNotFoundError:
-            # File doesn't exist means compilation is required
-            return True
-
+        if isfile(program_fn):
+            return False
+        else:
+            return True  # compilation is required
     elif recompile == False:  # if False
-        if is_more_rencent(program_fn, platf_cfg):
+        if isfile(program_fn):
             return False
         else:
             raise ValueError('OpenQL config has changed more recently '

@@ -110,7 +110,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         spec_instr = 'spec'
     elif cc == 'QCC':
         spec_instr = 'sf_square'
-    elif cc == 'CC':
+    elif cc.lower() == 'cc':
         spec_instr = 'spec'
     else:
         raise ValueError('CC type not understood: {}'.format(cc))

@@ -714,9 +714,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                             which_gate=which_gate)
 
             nr_samples_step = int(np.round(step_length * self.sampling_rate())//2)
+
+            # nr_samples_step = int(np.ceil(step_length * self.sampling_rate()/2))
+
             step = np.ones(nr_samples_step)*step_max*step_height + theta_i
             step_eps = wfl.theta_to_eps(np.clip(step,theta_i,np.pi), g=q_J2)
 
+            # amplitudes for t_2Q
             step_pos_amp = self.calc_eps_to_amp(step_eps, state_A='11',
                                             state_B='02',
                                             positive_branch=(signs[0] == '+'),

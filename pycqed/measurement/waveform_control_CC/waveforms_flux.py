@@ -140,9 +140,17 @@ def martinis_flux_pulse_v2(length: float,
 
     # Pulse is generated at a denser grid to allow for good interpolation
     # N.B. Not clear why interpolation is needed at all... -MAR July 2018
-    fine_sampling_factor = 2  # 10
+
+    fine_sampling_factor = 1  # 10
     nr_samples = int(np.round((length) * sampling_rate * fine_sampling_factor))
     rounded_length = nr_samples / (fine_sampling_factor * sampling_rate)
+    """
+    New lines after ensuring sample rounding
+    """
+    # fine_sampling_factor = 1
+    # nr_samples = int(np.ceil(length * (fine_sampling_factor * sampling_rate)))
+    # rounded_length = nr_samples / (sampling_rate * fine_sampling_factor)
+
     tau_step = 1 / (fine_sampling_factor * sampling_rate)  # denser points
     # tau is a virtual time/proper time
     taus = np.arange(0, rounded_length - tau_step / 2, tau_step)
