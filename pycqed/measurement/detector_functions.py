@@ -238,17 +238,23 @@ class Multi_Detector_UHF(Multi_Detector):
     def get_values(self):
         values_list = []
 
+
+        # Since master (holding cc object) is first in self.detectors,
         self.detectors[0].AWG.stop()
         self.detectors[0].AWG.get_operation_complete()
 
+        # Prepare and arm
         for detector in self.detectors:
-            # if detector.always_prepare:
-            #     detector.prepare()
+            # Ramiro pointed out that prepare gets called by MC
+            # detector.prepare()
             detector.arm()
+            detector.UHFQC.sync()
 
+        # Run (both in parallel and implicitly)
         self.detectors[0].AWG.start()
         self.detectors[0].AWG.get_operation_complete()
 
+        # Get data
         for detector in self.detectors:
             new_values = detector.get_values(arm=False, is_single_detector=False)
             values_list.append(new_values)
@@ -1855,7 +1861,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                 self.AWG.start()
                 # FIXME: attempted solution to enforce program upload completion before start
                 self.AWG.get_operation_complete()
-
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
