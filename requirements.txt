@@ -1,3 +1,11 @@
+
+# WARNING:
+# `qutip` is a requirement for `pycqed` but its installation has issues for the
+# CI (Continuous Integration) of github (i.e. automatic tests in github)
+# DO NOT ADD `qutip` in this file (even though it is needed)
+# If you are installing pycqed on your computer run
+# `pip install qutip` before you install pycqed
+
 qcodes
 adaptive>=0.10.0
 cma
@@ -19,7 +27,8 @@ scipy
 spirack
 autodepgraph
 networkx
-scikit-learn
+scikit-learn==0.23.1  # Tests started to fail on 2020-08-05 due to 0.23.2
 qutechopenql
 zhinst
 plotly<3.8
+packaging

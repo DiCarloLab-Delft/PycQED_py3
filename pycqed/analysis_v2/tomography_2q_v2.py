@@ -15,7 +15,6 @@ import pycqed.measurement.hdf5_data as h5d
 import pycqed.analysis_v2.multiplexed_readout_analysis as mux_an
 import pycqed.analysis_v2.tfd_analysis as tfd_an
 import pycqed.analysis_v2.tomo_functions as tomo_func
-from pycqed.analysis import tomography as tomo_legacy
 import qutip as qtp
 from functools import reduce
 
@@ -26,8 +25,6 @@ class Full_State_Tomography_2Q(tfd_an.TFD_Analysis_Pauli_Strings):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
                  num_qubits: int = 2,
-                 target_bell = None,
-                 hardware_digitized=False,
                  options_dict: dict = None, extract_only: bool = False,
                  qubit_ro_channels=['D2', 'X'], # channels we will want to use for tomo
                  correl_ro_channels=[['D2', 'X']], # correlations we will want for the tomo
@@ -42,8 +39,6 @@ class Full_State_Tomography_2Q(tfd_an.TFD_Analysis_Pauli_Strings):
         self.qubit_ro_channels = qubit_ro_channels
         self.correl_ro_channels = correl_ro_channels
         self.tomo_qubits_idx = tomo_qubits_idx
-        self.hardware_digitized = hardware_digitized
-        self.target_bell = target_bell
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
@@ -103,20 +98,10 @@ class Full_State_Tomography_2Q(tfd_an.TFD_Analysis_Pauli_Strings):
         # 2. compute matrix for betas
         matrix_B = tomo_func.compute_beta_matrix(self.num_qubits)
         # 3. Computing threshold
-        # 3. Computing threshold
-        if self.hardware_digitized:
-            # if RO is digitized in HW
-            # we just need to change to eigenvalues 0 -> 1 1 ->- 1
-            # for that we use 0.5 as threshold
-            mn_voltages = {}
-            for i, ch_name in enumerate(value_names):
-                mn_voltages[ch_name] = {'threshold': 0.5}
-        else:
-            mn_voltages = tomo_func.define_thresholds_avg(data_shots=data_shots,
-                                                          value_names=value_names,
-                                                          combinations=combinations,
-                                                          num_states=self.num_states)
-
+        mn_voltages = tomo_func.define_thresholds_avg(data_shots=data_shots,
+                                                      value_names=value_names,
+                                                      combinations=combinations,
+                                                      num_states=self.num_states)
 
         # 4. Bining weight-1 data
         shots_discr, qubit_state_avg = tomo_func.threshold_weight1_data(data_shots=data_shots,
@@ -149,7 +134,6 @@ class Full_State_Tomography_2Q(tfd_an.TFD_Analysis_Pauli_Strings):
         self.raw_data_dict['ro_tq_ch_names'] = correlations
         self.proc_data_dict['betas_w1'] = betas_w1
         self.proc_data_dict['betas_w2'] = betas_w2
-        self.proc_data_dict['ro_levels'] = mn_voltages
 
         # 8. Computing inversion matrix for tomo
         """
@@ -225,25 +209,6 @@ class Full_State_Tomography_2Q(tfd_an.TFD_Analysis_Pauli_Strings):
         self.op_values = {}
         self.op_values['II'] = 1
         self.op_values.update({self.operators_labels[i+1]: p for i, p in enumerate(pauli_terms)})
-        self.proc_data_dict['rho'] = rho = tfd_an.tomo2dm(self.op_values)
-
-        # Adapting input for legacy function that fits errors
-        operator_old_key_order = ['II', 'IZ', 'IX', 'IY',
-                                  'ZI', 'ZZ', 'ZX', 'ZY',
-                                  'XI', 'XZ', 'XX', 'XY',
-                                  'YI', 'YZ', 'YX', 'YY']
-        operators_list = [self.op_values[k] for k in operator_old_key_order]
-        fit_res = tomo_legacy.rotated_bell_model(operators_list,self.target_bell)
-        fitted_state_dict = {operator_old_key_order[i]: fit_res.best_fit[i] for i in range(len(fit_res.best_fit))}
-        fidelity = np.dot(fit_res.best_fit, operators_list)*0.25
-        purity = np.dot(operators_list, operators_list)*0.25
-        self.proc_data_dict['corrected_state'] = fitted_state_dict
-        self.proc_data_dict['corrected_fidelity'] = fidelity
-        self.proc_data_dict['purity'] = purity
-        self.proc_data_dict['fit_res'] = fit_res
-        self.proc_data_dict['fidelity_raw'] = np.dot(fit_res.init_fit, operators_list)*0.25
-        self.proc_data_dict['phase_error_0'] = fit_res.best_values['angle_LSQ']*180./np.pi
-        self.proc_data_dict['phase_error_1'] = fit_res.best_values['angle_MSQ']*180./np.pi
         self.proc_data_dict['quantities_of_interest'] = {
             'g': self.g, 'T': self.T,
             'full_tomo_dict': self.op_values}
@@ -252,33 +217,14 @@ class Full_State_Tomography_2Q(tfd_an.TFD_Analysis_Pauli_Strings):
         self.plot_dicts['pauli_operators_tomo'] = {
             'plotfn': plot_pauli_ops,
             'pauli_terms': self.op_values,
-            'title': 'MSQ = {}; LSQ = {}'.format(self.qubit_ro_channels[-2],self.qubit_ro_channels[-1])
         }
-        msg = 'Purity %.3f'%self.proc_data_dict['purity']
-        if self.target_bell is not None:
-            self.plot_dicts['pauli_operators_fit'] = {
-                'plotfn': plot_pauli_ops,
-                'pauli_terms': self.proc_data_dict['corrected_state'],
-                'ax_id': 'pauli_operators_tomo',
-                'fill': False,
-            }
-            msg += '\n Fidelity = %.3f'%self.proc_data_dict['fidelity_raw']
-            msg += ('\nMAX Fidelity = %.3f \n at $\phi_{' + self.qubit_ro_channels[-1]
-                     + '}=$%.1f deg and \n $\phi_{' + self.qubit_ro_channels[-2]+ '}=$%.1f deg') \
-                     % (self.proc_data_dict['corrected_fidelity'],
-                        self.proc_data_dict['phase_error_0'], self.proc_data_dict['phase_error_1'])
-        self.plot_dicts['pauli_operators_legend'] = {
-            'plotfn': add_legend,
-            'ax_id': 'pauli_operators_tomo',
-            'msg': msg
-            }
         fig_dm = plt.figure()
         ax_dm = fig_dm.add_subplot(111, projection='3d')
         self.figs['density_matrix'] = fig_dm
         self.axs['density_matrix'] = ax_dm
         self.plot_dicts['density_matrix'] = {
             'plotfn': plot_density_matrix,
-            'rho': self.proc_data_dict['rho'],
+            'pauli_terms': self.op_values,
         }
         for ch_id, ch in enumerate(self.raw_data_dict['ro_sq_ch_names']):
             self.plot_dicts['TV_{}'.format(ch)] = {
@@ -317,44 +263,36 @@ def plot_pauli_ops(pauli_terms, ax=None, **kw):
     if ax is None:
         f, ax = plt.subplots()
 
-    fill = kw.pop('fill',True)
-    title = kw.pop('title','')
-
     LSQ_terms = ['IX', 'IY', 'IZ']
     MSQ_terms = ['XI', 'YI', 'ZI']
     CORREL_terms = ['XX', 'XY', 'XZ',
                     'YX', 'YY', 'YZ',
                     'ZX', 'ZY', 'ZZ']
                     
-    MSQ_positions = np.arange(3)       # MSQ starts
-    LSQ_positions = np.arange(3,6)     # LSQ finishes
-    CORREL_positions = np.arange(6,15) # afterwards, correlations
+    MSQ_positions = np.arange(3)
+    LSQ_positions = np.arange(3,6)
+    CORREL_positions = np.arange(6,15)
 
     LSQ_bars = [pauli_terms[k] for k in LSQ_terms]
     MSQ_bars = [pauli_terms[k] for k in MSQ_terms]
     CORREL_bars = [pauli_terms[k] for k in CORREL_terms]
 
-    ax.bar(MSQ_positions, MSQ_bars, color='b', align='center', fill=fill)
-    ax.bar(LSQ_positions, LSQ_bars, color='r', align='center', fill=fill)
-    ax.bar(CORREL_positions, CORREL_bars, color='purple', align='center', fill=fill)
+    ax.bar(LSQ_positions, LSQ_bars, color='r', align='center')
+    ax.bar(MSQ_positions, MSQ_bars, color='b', align='center')
+    ax.bar(CORREL_positions, CORREL_bars, color='purple', align='center')
 
     ax.set_xticks(np.arange(15))
-    #                    MSQ        LSQ
-    ax.set_xticklabels(MSQ_terms+LSQ_terms+CORREL_terms)
+    ax.set_xticklabels(LSQ_terms+MSQ_terms+CORREL_terms)
 
     ax.set_ylabel('Expectation value')
     ax.set_ylim(-1.05, 1.05)
-    if title != '': ax.set_title(title)
+    ax.set_title('Digitized pauli expectation values')
 
-def add_legend(ax, msg, **kw):
-    ax.text(0.5, .4, msg)
-
-
-def plot_density_matrix(rho, ax=None, **kw):
+def plot_density_matrix(pauli_terms, ax=None, **kw):
     if ax is None:
         f, ax = plt.subplots(projection='3d')
 
-    
+    rho = tfd_an.tomo2dm(pauli_terms)
     qtp.matrix_histogram_complex(rho, xlabels=['00', '01', '10', '11'],
                              ylabels=['00', '01', '10', '11'],
                              fig=ax.figure, ax=ax)

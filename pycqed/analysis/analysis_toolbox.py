@@ -216,7 +216,7 @@ def get_datafilepath_from_timestamp(timestamp):
 
     daydir = os.listdir(os.path.join(datadir, daystamp))
 
-    # Loooking for the folder starting with the right timestamp
+    # Looking for the folder starting with the right timestamp
     measdir_names = [item for item in daydir if item.startswith(tstamp)]
 
     if len(measdir_names) > 1:
@@ -226,7 +226,7 @@ def get_datafilepath_from_timestamp(timestamp):
     measdir_name = measdir_names[0]
     # Naming follows a standard convention
     data_fp = os.path.join(datadir, daystamp, measdir_name,
-                           measdir_name+'.hdf5')
+                           measdir_name + '.hdf5')
     return data_fp
 
 
@@ -1888,6 +1888,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
     y_unit = kw.get('y_unit', y_unit)
     z_unit = kw.get('z_unit', z_unit)
     cbarticks = kw.get('cbarticks', None)
+    cbarextend = kw.get('cbarextend', 'neither')
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
@@ -1922,7 +1923,8 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
         if cax is None:
             ax_divider = make_axes_locatable(ax)
             cax = ax_divider.append_axes('right', size='5%', pad='2%')
-        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical', ticks=cbarticks)
+        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical',
+            ticks=cbarticks, extend=cbarextend)
         if zlabel is not None:
             set_cbarlabel(cbar, zlabel, unit=z_unit)
         return fig, ax, colormap, cbar

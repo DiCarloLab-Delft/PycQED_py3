@@ -1,14 +1,14 @@
-# PycQED 
+# PycQED
 [![Build Status](https://github.com/DiCarloLab-Delft/pycqed_py3/workflows/Build%20Status/badge.svg)](https://github.com/DiCarloLab-Delft/pycqed_py3/actions)
 [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179)
 [![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger)
 [![codecov](https://codecov.io/gh/DiCarloLab-Delft/PycQED_py3/branch/master/graph/badge.svg)](https://codecov.io/gh/DiCarloLab-Delft/PycQED_py3)
 
-A Python-based measurement environment for circuit-QED experiments by the 
+A Python-based measurement environment for circuit-QED experiments by the
 [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/),
 Delft University of Technology.
-This module is build on top of [QCoDeS](http://qcodes.github.io/Qcodes/) and 
-is not intended as a stand-alone 
+This module is build on top of [QCoDeS](http://qcodes.github.io/Qcodes/) and
+is not intended as a stand-alone
 package.
 
 ## License
@@ -54,7 +54,7 @@ If you use this software in any of your publications we would appreciate it if y
 
 ## Overview of the main modules
 Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things.
-Also take a look at [this presentation](docs/160714_qcodes_meetup.pdf), where the relation to qcodes and the core concepts in the package are explained.
+Also take a look at [this recent (March 2020) presentation](docs/200330_Introduction_to_PycQED_v2.pdf) and [this previous presentation](docs/160714_qcodes_meetup.pdf), where the relation to QCoDeS and the core concepts in the package are explained.
 Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Adriaan) on the shoulder or create an issue to discuss it.
 
 ### Folder Structure
@@ -142,5 +142,5 @@ It is split into personal folders for messing around with your personal files an
 A little document containing some handy git commands:
 [Git tips & tricks](docs/git_tips_and_tricks.md).
 
-Lecture series on scientific Python: 
+Lecture series on scientific Python:
 [Scientific Computing with Python](https://github.com/jrjohansson/scientific-python-lectures)

@@ -21,7 +21,7 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.utilities.general import SafeFormatter, format_value_string
 from scipy.ndimage.filters import gaussian_filter
-import imp
+from importlib import reload
 import math
 
 # try:
@@ -59,7 +59,7 @@ from pycqed.analysis import composite_analysis as ca
 #     else:
 #         raise
 
-imp.reload(dm_tools)
+reload(dm_tools)
 
 sfmt = SafeFormatter()
 
@@ -277,14 +277,14 @@ class MeasurementAnalysis(object):
             names = self.get_key('sweep_parameter_names')
 
             ind = names.index(key)
-            values = self.g['Data'].value[:, ind]
+            values = self.g['Data'][()][:, ind]
         elif key in self.get_key('value_names'):
             names = self.get_key('value_names')
             ind = (names.index(key) +
                    len(self.get_key('sweep_parameter_names')))
-            values = self.g['Data'].value[:, ind]
+            values = self.g['Data'][()][:, ind]
         else:
-            values = self.g[key][()] # changed deprecated self.g[key].value => self.g[key][()]
+            values = self.g[key][()]  # changed deprecated self.g[key].value => self.g[key][()]
         # Makes sure all data is np float64
         return np.asarray(values, dtype=np.float64)
 
@@ -1056,8 +1056,8 @@ class OptimizationAnalysis(MeasurementAnalysis):
             cbar = fig3.colorbar(sc, cax=cbar_ax)
             cbar.set_label('iteration (n)')
         else:
-            axarray.plot(self.sweep_points, self.measured_values[0],
-                         linestyle='--', c='k')
+            # axarray.plot(self.sweep_points, self.measured_values[0],
+            #              linestyle='--', c='k')
             sc = axarray.scatter(self.sweep_points, self.measured_values[0],
                                  c=np.arange(len(self.sweep_points)),
                                  cmap=cm, marker='o', lw=0.1)
@@ -3784,12 +3784,12 @@ class SSRO_Analysis(MeasurementAnalysis):
                                               bins=n_bins,
                                               range=[[I_min, I_max],
                                                      [Q_min, Q_max]],
-                                              normed=True)
+                                              density=True)
         H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
                                               bins=n_bins,
                                               range=[[I_min, I_max, ],
                                                      [Q_min, Q_max, ]],
-                                              normed=True)
+                                              density=True)
 
         # this part performs 2D gaussian fits and calculates coordinates of the
         # maxima
@@ -4150,10 +4150,10 @@ class SSRO_Analysis(MeasurementAnalysis):
             fig, axes = plt.subplots(figsize=(7, 4))
             n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=40,
                                             label='1 I', histtype='step',
-                                            color='red', normed=False)
+                                            color='red', density=False)
             n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=40,
                                             label='0 I', histtype='step',
-                                            color='blue', normed=False)
+                                            color='blue', density=False)
             pylab.clf()
             # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50),
             #                          normed=1)
@@ -4284,7 +4284,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.y1_0 = y1_0
         self.y1_1 = y1_1
 
-
     def plot_2D_histograms(self, shots_I_0, shots_Q_0, shots_I_1, shots_Q_1,
                            **kw):
         cmap = kw.pop('cmap', 'viridis')
@@ -4299,12 +4298,12 @@ class SSRO_Analysis(MeasurementAnalysis):
                                               bins=n_bins,
                                               range=[[I_min, I_max],
                                                      [Q_min, Q_max]],
-                                              normed=True)
+                                              density=True)
         H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
                                               bins=n_bins,
                                               range=[[I_min, I_max, ],
                                                      [Q_min, Q_max, ]],
-                                              normed=True)
+                                              density=True)
 
         fig, axarray = plt.subplots(nrows=1, ncols=2)
         axarray[0].tick_params(axis='both', which='major',
@@ -4316,7 +4315,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         axarray[0].set_title('2D histogram, pi pulse')
         im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest',
-                                origin='low', aspect='auto',
+                                origin='lower', aspect='auto',
                                 extent=[xedges1[0], xedges1[-1],
                                         yedges1[0], yedges1[-1]], cmap=cmap)
 
@@ -4332,7 +4331,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         # plotting 2D histograms of mmts with no pulse
         axarray[1].set_title('2D histogram, no pi pulse')
         im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest',
-                                origin='low', aspect='auto',
+                                origin='lower', aspect='auto',
                                 extent=[xedges0[0], xedges0[-1], yedges0[0],
                                         yedges0[-1]], cmap=cmap)
 
@@ -4389,7 +4388,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                                    max(max(I_shots), 1e-6)],
                                                   [min(min(Q_shots), -1e-6),
                                                    max(max(Q_shots), 1e-6)]],
-                                           normed=True)
+                                           density=True)
         self.H = H
         self.xedges = xedges
         self.yedges = yedges
@@ -4561,7 +4560,7 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
             self.units = self.value_units[0]
 
     def histogram_shots(self, shots):
-        hist, bins = np.histogram(shots, bins=90, normed=True)
+        hist, bins = np.histogram(shots, bins=90, density=True)
         # 0.7 bin widht is a sensible default for plotting
         centers = (bins[:-1] + bins[1:]) / 2
         return hist, bins, centers
@@ -5649,7 +5648,7 @@ class AllXY_Analysis(TD_Analysis):
                                             xlabel=self.xlabel,
                                             ylabel=str(
                                                 self.value_names[i]),
-                                            save=False)
+                                            save=False, label="Measurement")
         ax1.set_ylim(min(self.corr_data) - .1, max(self.corr_data) + .1)
         if self.flip_axis:
             ylabel = r'$F$ $|0 \rangle$'
@@ -5660,8 +5659,8 @@ class AllXY_Analysis(TD_Analysis):
                                         fig=fig1, ax=ax1,
                                         xlabel='',
                                         ylabel=ylabel,
-                                        save=False)
-        ax1.plot(self.sweep_points, ideal_data)
+                                        save=False, label="Measurement")
+        ax1.plot(self.sweep_points, ideal_data, label="Ideal")
         labels = [item.get_text() for item in ax1.get_xticklabels()]
         if len(self.measured_values[0]) == 42:
             locs = np.arange(1, 42, 2)
@@ -5675,9 +5674,18 @@ class AllXY_Analysis(TD_Analysis):
         ax1.xaxis.set_ticks(locs)
         ax1.set_xticklabels(labels, rotation=60)
 
-        deviation_text = r'Deviation: %.5f' % self.deviation_total
-        ax1.text(1, 1.05, deviation_text, fontsize=11,
-                 bbox=self.box_props)
+        if kw.pop("plot_deviation", True):
+            deviation_text = r'Deviation: %.5f' % self.deviation_total
+            ax1.text(1, 1.05, deviation_text, fontsize=11,
+                     bbox=self.box_props)
+        legend_loc = "lower right"
+        if len(self.value_names) > 1:
+            [ax.legend(loc=legend_loc) for ax in axarray]
+        else:
+            axarray.legend(loc=legend_loc)
+
+        ax1.legend(loc=legend_loc)
+
         if not close_main_fig:
             # Hacked in here, good idea to only show the main fig but can
             # be optimized somehow
@@ -10531,7 +10539,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
 
 # analysis functions
-def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True):
+def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True, sampling_rate=1.8e9):
     # predistortion_matrix = np.array(
     #     ((1,  np.tan(phi*2*np.pi/360)),
     #      (0, 1/alpha * 1/np.cos(phi*2*np.pi/360))))
@@ -10540,7 +10548,7 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
          (0, alpha * np.cos(phi * 2 * np.pi / 360))))
 
     trace_length = len(Ivals)
-    tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
+    tbase = np.arange(0, trace_length / sampling_rate, 1 / sampling_rate)
     if predistort:
         Ivals = Ivals - I_o
         Qvals = Qvals - Q_o

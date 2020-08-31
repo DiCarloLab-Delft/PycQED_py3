@@ -2,7 +2,7 @@ import types
 import logging
 import time
 import numpy as np
-import collections
+from collections.abc import Iterable
 import operator
 from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
@@ -36,7 +36,7 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 
 # SKOptLearner Notes
 # NB: This optimizer can be slow and is intended for very, very costly
-# functions compared to the computation time of the optiizer itself
+# functions compared to the computation time of the optimizer itself
 
 # NB2: One of the cool things is that it can do hyper-parameter
 # optimizations e.g. if the parameters are integers
@@ -47,9 +47,9 @@ from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
 from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
-from pycqed.utilities.learnerND_optimize import LearnerND_Optimize
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer
-from pycqed.utilities.learner_utils import evaluate_X
+import pycqed.utilities.learner_utils as lu
+from . import measurement_control_helpers as mch
 
 from skopt import Optimizer  # imported for checking types
 
@@ -207,6 +207,11 @@ class MeasurementControl(Instrument):
         self.Learner_Minimizer_detected = False
         self.CMA_detected = False
 
+        # Setting this to true adds 5s to each experiment
+        # If possible set to False as default but mind that for now many
+        # Analysis rely on the old snapshot
+        self.save_legacy_snapshot = True
+
     ##############################################
     # Functions used to control the measurements #
     ##############################################
@@ -287,13 +292,13 @@ class MeasurementControl(Instrument):
                     if "bins" in exp_metadata.keys():
                         self.plotting_bins = exp_metadata["bins"]
 
-                if mode is not "adaptive":
+                if mode != "adaptive":
                     try:
                         # required for 2D plotting and data storing.
                         # try except because some swf get the sweep points in the
                         # prepare statement. This needs a proper fix
                         self.xlen = len(self.get_sweep_points())
-                    except:
+                    except Exception:
                         self.xlen = 1
                 if self.mode == "1D":
                     self.measure()
@@ -402,9 +407,9 @@ class MeasurementControl(Instrument):
         self.get_measurement_preparetime()
 
         # ######################################################################
-        # BEGIN loop of pnts in extra dims
+        # BEGIN loop of points in extra dims
         # ######################################################################
-        # Used to (re)initialize the plot monitor only betwen the iterations
+        # Used to (re)initialize the plot monitor only between the iterations
         # of this for loop
         last_i_af_pars = -1
 
@@ -416,9 +421,10 @@ class MeasurementControl(Instrument):
 
             for i_af_pars, af_pars in enumerate(af_pars_list):
                 # We detect the type of adaptive function here so that the right
-                # adaptive plot monitor is initialized
+                # adaptive plot monitor is initialized and configured
                 self.Learner_Minimizer_detected = False
                 self.CMA_detected = False
+
                 # Used to update plots specific to this type of optimizers
                 module_name = get_module_name(af_pars.get("adaptive_function", self))
                 self.Learner_Minimizer_detected = (
@@ -461,7 +467,9 @@ class MeasurementControl(Instrument):
 
                 if is_subclass(self.adaptive_function, BaseLearner):
                     Learner = self.adaptive_function
-                    # Pass the rigth parameters two each type of learner
+                    mch.scale_bounds(af_pars=af_pars, x_scale=self.x_scale)
+
+                    # Pass the right parameters two each type of learner
                     if issubclass(Learner, Learner1D):
                         self.learner = Learner(
                             opt_func,
@@ -503,9 +511,28 @@ class MeasurementControl(Instrument):
                             "Learner subclass type not supported."
                         )
 
+                    if "X0Y0" in af_pars:
+                        # Tell the learner points that are already evaluated
+                        # Typically to avoid evaluating the boundaries
+                        # Intended for `LearnerND` and derivatives there of
+                        # NB: this points don't show up in the `dset`. They are
+                        # stored only in the learner's memory
+                        # NB: Put a significant number of points (e.g. ~100) on
+                        # the boundaries to really avoid the learner going there
+                        X0 = af_pars["X0Y0"]["X0"]
+                        Y0 = af_pars["X0Y0"]["Y0"]
+
+                        # For convenience we allows the user to specify a
+                        # single Y0 value that will be the image for all the
+                        # domain points in X0
+                        if not isinstance(Y0, Iterable) or len(Y0) < len(X0):
+                            Y0 = np.repeat([Y0], len(X0), axis=0)
+
+                        lu.tell_X_Y(self.learner, X=X0, Y=Y0, x_scale=self.x_scale)
+
                     if "X0" in af_pars:
-                        # Teach the learner the initial point if provided
-                        evaluate_X(self.learner, af_pars["X0"])
+                        # Tell the learner the initial points if provided
+                        lu.evaluate_X(self.learner, af_pars["X0"], x_scale=self.x_scale)
 
                     # N.B. the runner that is used is not an `adaptive.Runner` object
                     # rather it is the `adaptive.runner.simple` function. This
@@ -531,8 +558,7 @@ class MeasurementControl(Instrument):
                                 self.adaptive_function, self.learner
                             )
                         elif (
-                            issubclass(self.adaptive_function, LearnerND_Optimize)
-                            or issubclass(self.adaptive_function, Learner1D_Minimizer)
+                            issubclass(self.adaptive_function, Learner1D_Minimizer)
                             or issubclass(self.adaptive_function, LearnerND_Minimizer)
                         ):
                             # Because this is also an optimizer we save the result
@@ -579,7 +605,7 @@ class MeasurementControl(Instrument):
             # ##################################################################
 
         # ######################################################################
-        # END loop of pnts in extra dims
+        # END loop of points in extra dims
         # ######################################################################
 
         for sweep_function in self.sweep_functions:
@@ -759,6 +785,8 @@ class MeasurementControl(Instrument):
             if self.x_scale is not None:
                 x_ = np.array(x, dtype=np.float64)
                 scale_ = np.array(self.x_scale, dtype=np.float64)
+                # NB this division here might interfere with measurements
+                # that involve integer values in `x`
                 x = type(x)(x_ / scale_)
 
             vals = self.measurement_function(x)
@@ -769,7 +797,7 @@ class MeasurementControl(Instrument):
                 vals = np.array(vals)[:, 0]
 
             # to check if vals is an array with multiple values
-            if isinstance(vals, collections.abc.Iterable):
+            if isinstance(vals, Iterable):
                 vals = vals[self.par_idx]
 
             if self.mode == "adaptive":
@@ -961,7 +989,7 @@ class MeasurementControl(Instrument):
                 )
                 self.curves.append(self.main_QtPlot.traces[-1])
 
-                if self.Learner_Minimizer_detected and yi == 0:
+                if self.Learner_Minimizer_detected and yi == self.par_idx:
                     self.main_QtPlot.add(
                         x=[0],
                         y=[0],
@@ -1029,7 +1057,11 @@ class MeasurementControl(Instrument):
                             self.curves[i]["config"]["x"] = x
                             self.curves[i]["config"]["y"] = y
                             i += 1
-                            if self.Learner_Minimizer_detected and y_ind == 0:
+
+                            if (
+                                self.Learner_Minimizer_detected
+                                and y_ind == self.par_idx
+                            ):
                                 min_x = np.min(x)
                                 max_x = np.max(x)
                                 threshold = (
@@ -1381,7 +1413,7 @@ class MeasurementControl(Instrument):
                 # We want to plot a line that indicates the moving threshold
                 # for the cost function when we use the `LearnerND_Minimizer` or
                 # the `Learner1D_Minimizer` samplers
-                if self.Learner_Minimizer_detected and j == 0:
+                if self.Learner_Minimizer_detected and j == self.par_idx:
                     iter_plotmon.add(
                         x=[0],
                         y=[0],
@@ -1995,7 +2027,6 @@ class MeasurementControl(Instrument):
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
         elif (
             is_subclass(adaptive_function, Learner1D_Minimizer)
-            or is_subclass(adaptive_function, LearnerND_Optimize)
             or is_subclass(adaptive_function, LearnerND_Minimizer)
         ):
             # result = learner
@@ -2009,7 +2040,7 @@ class MeasurementControl(Instrument):
             xopt = X[opt_indx]
             res_dict = {
                 "xopt": np.array(xopt)
-                if is_subclass(adaptive_function, LearnerND_Optimize)
+                if is_subclass(adaptive_function, LearnerND_Minimizer)
                 or is_subclass(adaptive_function, Learner1D_Minimizer)
                 else xopt,
                 "fopt": Y[opt_indx],
@@ -2049,24 +2080,35 @@ class MeasurementControl(Instrument):
                 "full_name",
                 "val_mapping",
             }
-            cleaned_snapshot = delete_keys_from_dict(snap, exclude_keys)
+            cleaned_snapshot = delete_keys_from_dict(
+                # complex values are not supported in hdf5
+                # converting to string avoids annoying warnings (but necessary
+                # for other cases), maybe this should be done at the level of
+                # `h5d.write_dict_to_hdf5` but would somewhat messy anyway as
+                # there are a lot of checks related to saving and parsing
+                # other types in `h5d.read_dict_from_hdf5`
+                # `gen.load_settings_onto_instrument_v2` works properly as it
+                # will try to evaluate a string if a parameter type is not str
+                # but was saved as a string
+                snap, keys=exclude_keys, types_to_str={complex})
 
             h5d.write_dict_to_hdf5(cleaned_snapshot, entry_point=snap_grp)
 
-            # Below is old style saving of snapshot, exists for the sake of
-            # preserving deprecated functionality
-            set_grp = data_object.create_group("Instrument settings")
-            inslist = dict_to_ordered_tuples(self.station.components)
-            for (iname, ins) in inslist:
-                instrument_grp = set_grp.create_group(iname)
-                par_snap = ins.snapshot()["parameters"]
-                parameter_list = dict_to_ordered_tuples(par_snap)
-                for (p_name, p) in parameter_list:
-                    try:
-                        val = str(p["value"])
-                    except KeyError:
-                        val = ""
-                    instrument_grp.attrs[p_name] = str(val)
+            if self.save_legacy_snapshot:
+                # Below is old style saving of snapshot, exists for the sake of
+                # preserving deprecated functionality
+                set_grp = data_object.create_group("Instrument settings")
+                inslist = dict_to_ordered_tuples(self.station.components)
+                for (iname, ins) in inslist:
+                    instrument_grp = set_grp.create_group(iname)
+                    par_snap = ins.snapshot()["parameters"]
+                    parameter_list = dict_to_ordered_tuples(par_snap)
+                    for (p_name, p) in parameter_list:
+                        try:
+                            val = str(p["value"])
+                        except KeyError:
+                            val = ""
+                        instrument_grp.attrs[p_name] = str(val)
 
     def save_MC_metadata(self, data_object=None, *args):
         """

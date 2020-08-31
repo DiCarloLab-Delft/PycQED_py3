@@ -1839,18 +1839,23 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     def get_values(self, arm=True, is_single_detector=True):
         if is_single_detector:
+            if self.always_prepare:
+                self.prepare()
+
             if self.AWG is not None:
                 self.AWG.stop()
                 self.AWG.get_operation_complete()
 
             if arm:
                 self.arm()
+                self.UHFQC.sync()
 
             # starting AWG
             if self.AWG is not None:
                 self.AWG.start()
                 # FIXME: attempted solution to enforce program upload completion before start
                 self.AWG.get_operation_complete()
+
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
@@ -2221,14 +2226,18 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.acquisition_arm()
         self.UHFQC.sync()
 
-    def get_values(self, arm=True, is_single_detector = True):
+    def get_values(self, arm=True, is_single_detector=True):
         if is_single_detector:
+            if self.always_prepare:
+                self.prepare()
+
             if self.AWG is not None:
                 self.AWG.stop()
                 self.AWG.get_operation_complete()
 
             if arm:
                 self.arm()
+                self.UHFQC.sync()
 
             # starting AWG
             if self.AWG is not None:

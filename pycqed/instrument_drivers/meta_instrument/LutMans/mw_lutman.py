@@ -1,6 +1,7 @@
 from .base_lutman import Base_LutMan, get_redundant_codewords, get_wf_idx_from_name
 import numpy as np
-from collections import Iterable, OrderedDict
+from collections.abc import Iterable
+from collections import OrderedDict
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -273,6 +274,10 @@ class Base_MW_LutMan(Base_LutMan):
                            vals=vals.Numbers(), unit='frac',
                            parameter_class=ManualParameter,
                            initial_value=1)
+        # parameters related to timings
+        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 1e-6),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
 
         self.add_parameter(
             'mw_modulation', vals=vals.Numbers(), unit='Hz',
@@ -329,8 +334,7 @@ class Base_MW_LutMan(Base_LutMan):
                 if waveform['theta'] == 90:
                     amp = self.mw_amp180()*self.mw_amp90_scale()
                 elif waveform['theta'] == -90:
-                    amp = -1 * self.mw_amp180()*self.mw_amp90_scale()
-
+                    amp = - self.mw_amp180() * self.mw_amp90_scale() 
                 else:
                     amp = theta_to_amp(theta=waveform['theta'],
                                        amp180=self.mw_amp180())

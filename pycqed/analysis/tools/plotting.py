@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib.colors as col
 import hsluv
 from scipy.interpolate import interp1d
-import logging
 from matplotlib.patches import Rectangle, ConnectionPatch
 
 golden_mean = (np.sqrt(5)-1.0)/2.0    # Aesthetic ratio

@@ -5,7 +5,7 @@ import lmfit
 import logging
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import data_manipulation as dm_tools
-
+import string
 
 #################################
 #   Fitting Functions Library   #
@@ -101,7 +101,7 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
                       dac_sweet_spot, V_per_phi0=None,
                       dac_flux_coefficient=None,
                       asymmetry=0, **kwargs):
-    '''
+    """
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
 
     dac_voltage (V)
@@ -110,7 +110,7 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
     V_per_phi0 (V): volt per phi0 (convert voltage to flux)
     dac_sweet_spot (V): voltage at which the sweet-spot is found
     asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
-    '''
+    """
     if V_per_phi0 is None and dac_flux_coefficient is None:
         raise ValueError('Please specify "V_per_phi0".')
 
@@ -144,7 +144,7 @@ def Resonator_dac_to_freq(dac_voltage, f_max_qubit, f_0_res,
 
 def Qubit_dac_to_detun(dac_voltage, f_max, E_c, dac_sweet_spot, V_per_phi0,
                        asymmetry=0):
-    '''
+    """
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
 
     dac_voltage (V)
@@ -153,7 +153,7 @@ def Qubit_dac_to_detun(dac_voltage, f_max, E_c, dac_sweet_spot, V_per_phi0,
     V_per_phi0 (V): volt per phi0 (convert voltage to flux)
     dac_sweet_spot (V): voltage at which the sweet-spot is found
     asymmetry (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
-    '''
+    """
     return f_max - Qubit_dac_to_freq(dac_voltage,
                                      f_max=f_max, E_c=E_c,
                                      dac_sweet_spot=dac_sweet_spot,
@@ -165,7 +165,7 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
                       dac_sweet_spot, V_per_phi0=None,
                       dac_flux_coefficient=None, asymmetry=0,
                       branch='positive'):
-    '''
+    """
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
     This function implements the inverse of "Qubit_dac_to_freq"
 
@@ -176,7 +176,7 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
     asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
     dac_sweet_spot (V): voltage at which the sweet-spot is found
     branch (enum: 'positive' 'negative')
-    '''
+    """
     if V_per_phi0 is None and dac_flux_coefficient is None:
         raise ValueError('Please specify "V_per_phi0".')
 
@@ -205,10 +205,10 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
 def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
                           dac_sweet_spot: float, V_per_phi0: float,
                           asymmetry: float = 0):
-    '''
+    """
     Derivative of the qubit detuning vs dac at dac_voltage.
     The returned quantity is "dfreq/dPhi (dac_voltage)"
-    '''
+    """
     cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
     sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
     return ((f_max + E_c) * (1 - asymmetry ** 2) * np.pi / (2 * V_per_phi0) *
@@ -225,32 +225,33 @@ def QubitFreqDac(dac_voltage, f_max, E_c,
 
 def QubitFreqFlux(flux, f_max, E_c,
                   flux_zero, dac_offset=0):
-    'The cosine Arc model for calibrated flux.'
+    """The cosine Arc model for calibrated flux."""
     calculated_frequency = (f_max + E_c) * np.sqrt(np.abs(
         np.cos(np.pi * (flux - dac_offset) / flux_zero))) - E_c
     return calculated_frequency
 
 
 def CosFunc(t, amplitude, frequency, phase, offset):
-    '''
+    """
     parameters:
         t, time in s
         amplitude a.u.
         frequency in Hz (f, not omega!)
         phase in rad
         offset a.u.
-    '''
+    """
     return amplitude * np.cos(2 * np.pi * frequency * t + phase) + offset
 
+
 def CosFunc2(t, amplitude, frequency, phase, offset):
-    '''
+    """
     parameters:
         t, time in s
         amplitude a.u.
         frequency in Hz (f, not omega!)
         phase in rad
         offset a.u.
-    '''
+    """
     return amplitude * np.cos(2 * np.pi * frequency * (t + phase)) + offset
 
 
@@ -301,9 +302,9 @@ def GaussExpDampOscFunc(t, tau, tau_2, frequency, phase, amplitude,
 def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2,
                       amp_1, amp_2,
                       osc_offset_1, osc_offset_2, exponential_offset):
-    '''
+    """
     Exponential decay with double cosine modulation
-    '''
+    """
     exp_decay = np.exp(-(t / tau) ** n)
     cos_1 = (np.cos(
         2 * np.pi * freq_1 * t + phase_1) + osc_offset_1)
@@ -314,7 +315,7 @@ def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2,
 
 
 def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
-    '''
+    """
     This is the function for a hanger  which does not take into account
     a possible slope.
     This function may be preferred over SlopedHangerFunc if the area around
@@ -325,7 +326,7 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
     Note! units are inconsistent
     f is in Hz
     f0 is in GHz
-    '''
+    """
     return abs(A * (1. - Q / Qe * np.exp(1.j * theta) / (1. + 2.j * Q * (f / 1.e9 - f0) / f0)))
 
 
@@ -333,7 +334,7 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
 def hanger_func_complex_SI(f, f0, Q, Qe,
                            A, theta, phi_v, phi_0,
                            slope=1):
-    '''
+    """
     This is the complex function for a hanger (lamda/4 resonator).
     See equation 3.1 of the Asaad master thesis.
 
@@ -357,7 +358,7 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
     is now called hanger_func_complex_SI_pars
 
 
-    '''
+    """
     slope_corr = (1+slope*(f-f0)/f0)
     propagation_delay_corr = np.exp(1j * (phi_v * f + phi_0))
     hanger_contribution = (1 - Q / Qe * np.exp(1j * theta)/
@@ -367,11 +368,11 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
     return S21
 
 def hanger_func_complex_SI_pars(f,pars):
-    '''
+    """
 
     This function is used in the minimization fitting which requires parameters.
     It calls the function hanger_func_complex_SI, see there for details.
-    '''
+    """
 
     f0 = pars['f0']
     Ql = pars['Ql']
@@ -410,23 +411,23 @@ def SlopedHangerFuncComplex(f, f0, Q, Qe, A, theta, phi_v, phi_0, slope):
 
 
 def linear_with_offset(x, a, b):
-    '''
+    """
     A linear signal with a fixed offset.
-    '''
+    """
     return a * x + b
 
 
 def linear_with_background(x, a, b):
-    '''
+    """
     A linear signal with a fixed background.
-    '''
+    """
     return np.sqrt((a * x) ** 2 + b ** 2)
 
 
 def linear_with_background_and_offset(x, a, b, c):
-    '''
+    """
     A linear signal with a fixed background.
-    '''
+    """
     return np.sqrt((a * x) ** 2 + b ** 2) + c
 
 
@@ -450,10 +451,10 @@ def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
 
 def ro_gauss(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
              B_amplitude, A_spurious, B_spurious):
-    '''
+    """
     Two double-gaussians with sigma and mu/center of the residuals equal to the
     according state.
-    '''
+    """
     gauss = lmfit.lineshapes.gaussian
     A_gauss = gauss(x=x[0], center=A_center, sigma=A_sigma, amplitude=A_amplitude)
     B_gauss = gauss(x=x[1], center=B_center, sigma=B_sigma, amplitude=B_amplitude)
@@ -483,10 +484,10 @@ def ro_CDF_discr(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
 def gaussian_2D(x, y, amplitude=1,
                 center_x=0, center_y=0,
                 sigma_x=1, sigma_y=1):
-    '''
+    """
     A 2D gaussian function. if you want to use this for fitting you need to
     flatten your data first.
-    '''
+    """
     gauss = lmfit.lineshapes.gaussian
     val = (gauss(x, amplitude, center_x, sigma_x) *
            gauss(y, amplitude, center_y, sigma_y))
@@ -600,23 +601,61 @@ def avoided_crossing_freq_shift(flux, a, b, g):
 
     frequencies = np.zeros([len(flux), 2])
     for kk, fl_i in enumerate(flux):
-        f_1 = a*fl_i  +  b
+        f_1 = a * fl_i + b
         f_2 = 0
         matrix = [[f_1, g],
                   [g, f_2]]
         frequencies[kk, :] = np.linalg.eigvalsh(matrix)[:2]
-    result = frequencies[:, 1]- frequencies[:, 0]
+    result = frequencies[:, 1] - frequencies[:, 0]
     return result
+
 
 def resonator_flux(f_bare, g, A, f, t, sweetspot_cur):
     return f_bare - g/(A*np.sqrt(np.abs(np.cos(np.pi*f*(t-sweetspot_cur))))
                        - f_bare)
 
+
+def ChevronFunc(amp, amp_center_1, amp_center_2, J2, detuning_swt_spt, t):
+    """
+    NB: [2020-03-11] This model was not thoroughly tested, implemented for
+    chevron alignment were we care only about the center of the maxima
+
+    Assuming we start in |0>, this function returns the population in |1>
+
+    This model approximates the bare detuning with a quadratic dependence
+    on amp.
+
+    Args:
+        amp (a.u.): flux square pulse amplitude
+        amp_center_1 (a.u.): center of the chevron on one side of the flux arc
+        amp_center_2 (a.u.): idem
+        J2 (Hz): coupling of the interacting states
+        detuning_swt_spt (Hz): detuning from the interaction point at sweet spot
+            NB: not meaningful from a fit
+    """
+    # We approximate the bare detuning with a quadratic dependence on amp
+    detuning = detuning_swt_spt * (amp - amp_center_1) * (amp - amp_center_2)
+    d_sq = detuning ** 2
+    J2_sq = J2 ** 2
+    d4J_sq = d_sq + 4 * J2_sq
+    return (4 * J2_sq * np.sin(np.pi * np.sqrt(d4J_sq) * t) ** 2) / d4J_sq
+
+
+def ChevronInvertedFunc(amp, amp_center_1, amp_center_2, J2, detuning_swt_spt, t):
+    """
+    Assuming we start in |0>, this function returns the population in |0>
+
+    See `ChevronFunc` for details
+    """
+    return 1 - ChevronFunc(amp, amp_center_1, amp_center_2, J2, detuning_swt_spt, t)
+
 ######################
 # Residual functions #
 ######################
+
+
 def residual_complex_fcn(pars, cmp_fcn, x, y):
-    '''
+    """
     Residual of a complex function with complex results 'y' and
     real input values 'x'
     For resonators 'x' is the the frequency, 'y' the complex transmission
@@ -627,7 +666,7 @@ def residual_complex_fcn(pars, cmp_fcn, x, y):
         y = output complex values from 'cmp_fcn'
 
     Author = Stefano Poletto
-    '''
+    """
     cmp_values = cmp_fcn(x, pars)
 
     res = cmp_values - y
@@ -639,10 +678,12 @@ def residual_complex_fcn(pars, cmp_fcn, x, y):
 ####################
 # Guess functions  #
 ####################
-def exp_dec_guess(model, data, t, vary_n=False):
-    '''
+
+
+def exp_dec_guess(model, data, t, vary_n=False, vary_off=True):
+    """
     Assumes exponential decay in estimating the parameters
-    '''
+    """
     offs_guess = data[np.argmax(t)]
     amp_guess = data[np.argmin(t)] - offs_guess
     # guess tau by looking for value closest to 1/e
@@ -654,11 +695,13 @@ def exp_dec_guess(model, data, t, vary_n=False):
         model.set_param_hint('n', value=1.1, vary=vary_n, min=1)
     else:
         model.set_param_hint('n', value=1, vary=vary_n)
-    model.set_param_hint('offset', value=offs_guess)
+    if vary_off:
+        model.set_param_hint('offset', value=offs_guess)
+    else:
+        model.set_param_hint('offset', value=0, vary=vary_off)
 
     params = model.make_params()
     return params
-
 
 
 def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
@@ -722,13 +765,12 @@ def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
     return guess_dict
 
 
-
 def hanger_func_complex_SI_Guess(data, f, fit_window=None):
-    ## This is complete garbage, just to get some return value
+    # This is complete garbage, just to get some return value
     xvals = f
     abs_data = np.abs(data)
     peaks = a_tools.peak_finder(xvals, abs_data)
-      # Search for peak
+    # Search for peak
     if peaks['dip'] is not None:    # look for dips first
         f0 = peaks['dip']
         amplitude_factor = -1.
@@ -776,7 +818,6 @@ def hanger_func_complex_SI_Guess(data, f, fit_window=None):
     return guess_dict
 
 
-
 def group_consecutives(vals, step=1):
     """Return list of consecutive lists of numbers from vals (number list)."""
     run = []
@@ -793,17 +834,17 @@ def group_consecutives(vals, step=1):
 
 
 def arc_guess(freq, dac, dd=0.1):
-    '''
+    """
     Expects the dac values to be sorted!
     :param freq:
     :param dac:
     :param dd:
     :return:
-    '''
+    """
     p = round(max(dd * len(dac), 1))
     f_small = np.average(np.sort(freq)[:p]) + np.std(np.sort(freq)[:p])
     f_big = np.average(np.sort(freq)[-p:]) - np.std(np.sort(freq)[-p:])
-    #print(f_small * 1e-9, f_big * 1e-9)
+    # print(f_small * 1e-9, f_big * 1e-9)
 
     fmax = np.max(freq)
     fmin = np.min(freq)
@@ -904,9 +945,9 @@ def Qubit_dac_arch_guess(model, data, dac_voltage, values=None):
 
 
 def idle_err_rate_guess(model, data, N):
-    '''
+    """
     Assumes exponential decay in estimating the parameters
-    '''
+    """
     amp_guess = 0.5
     offset = np.mean(data)
     N1 = np.mean(N)
@@ -919,9 +960,9 @@ def idle_err_rate_guess(model, data, N):
 
 
 def fft_freq_phase_guess(data, t):
-    '''
+    """
     Guess for a cosine fit using FFT, only works for evenly spaced points
-    '''
+    """
     # Freq guess ! only valid with uniform sampling
     # Only first half of array is used, because the second half contains the
     # negative frequecy components, and we want a positive frequency.
@@ -989,9 +1030,9 @@ def exp_damp_osc_guess(model, data, t):
 
 
 def Cos_amp_phase_guess(model, data, f, t):
-    '''
+    """
     Guess for a cosine fit with fixed frequency f.
-    '''
+    """
     amp_guess = abs(max(data) - min(data)) / 2  # amp is positive by convention
     offs_guess = np.mean(data)
 
@@ -1010,7 +1051,7 @@ def Cos_amp_phase_guess(model, data, f, t):
 
 
 def gauss_2D_guess(model, data, x, y):
-    '''
+    """
     takes the mean of every row/column and then uses the regular gauss guess
     function to get a guess for the model parameters.
 
@@ -1025,7 +1066,7 @@ def gauss_2D_guess(model, data, x, y):
                                     the curve) does not do the trick.
 
     Note: possibly not compatible if the model uses prefixes.
-    '''
+    """
     dx = x[1:]-x[:-1]
     dy = y[1:]-y[:-1]
     sums = np.sum(((data[:-1,:-1]*dx).transpose()*dy))
@@ -1056,7 +1097,7 @@ def gauss_2D_guess(model, data, x, y):
 
 
 def double_gauss_2D_guess(model, data, x, y):
-    '''
+    """
     takes the mean of every row/column and then uses the guess
     function of the double gauss.
 
@@ -1065,7 +1106,7 @@ def double_gauss_2D_guess(model, data, x, y):
     Note: possibly not compatible if the model uses prefixes.
     Note 2: see also gauss_2D_guess() for some notes on how to improve this
             function.
-    '''
+    """
     data_grid = data.reshape(-1, len(np.unique(x)))
     x_proj_data = np.mean(data_grid, axis=0)
     y_proj_data = np.mean(data_grid, axis=1)
@@ -1092,7 +1133,7 @@ def double_gauss_2D_guess(model, data, x, y):
 
 
 def double_gauss_guess(model, data, x=None, **kwargs):
-    '''
+    """
     Finds a guess for the intial parametes of the double gauss model.
     Guess is based on taking the cumulative sum of the data and
     finding the points corresponding to 25% and 75%
@@ -1102,7 +1143,7 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     Tip: to use this assign this guess function as a method to a model use:
         model.guess = double_gauss_guess.__get__(
             model, model.__class__)
-    '''
+    """
     if x is None:
         x = np.arange(len(data))
     cdf = np.cumsum(data)
@@ -1174,20 +1215,45 @@ def ro_double_gauss_guess(model, data, x, fixed_p01 = False, fixed_p10 = False):
     return model.make_params()
 
 
-def sum_int(x,y):
+def ChevronGuess(model, data, amp, t, J2_hint=12.5e6, detuning_swt_spt_hint=1e9):
+
+    model.set_param_hint("J2", value=J2_hint, min=1e6, max=100e6)
+
+    model.set_param_hint(
+        "detuning_swt_spt", value=detuning_swt_spt_hint, min=1e5, max=100e9
+    )
+
+    p_neg = np.array(data)
+    p_neg[amp > 0] = 0.0
+    amp_center_1 = amp[np.argmax(p_neg)]
+    model.set_param_hint("amp_center_1", value=amp_center_1, min=-1000, max=1000)
+
+    p_pos = np.array(data)
+    p_pos[amp < 0] = 0.0
+    amp_center_2 = amp[np.argmax(p_pos)]
+    model.set_param_hint("amp_center_2", value=amp_center_2, min=-1000, max=1000)
+
+    model.set_param_hint("t", value=t, min=0.0, max=100e-6, vary=False)
+
+    return model.make_params()
+
+
+def sum_int(x, y):
     return np.cumsum(y[:-1]*(x[1:]-x[:-1]))
 
 #################################
 #     User defined Models       #
 #################################
+
 # NOTE: it is actually better to instantiate the model within your analysis
 # file, this prevents the model params having a memory.
 # A valid reason to define it here would beexp_dec_guess if you want to add a guess function
+
+
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 CosModel2 = lmfit.Model(CosFunc2)
 ResonatorArch = lmfit.Model(resonator_flux)
-
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
 ExpDecayModel.guess = exp_dec_guess  # todo: fix
@@ -1217,15 +1283,41 @@ DoubleGauss2D_model = (lmfit.Model(gaussian_2D, independent_vars=['x', 'y'],
                        lmfit.Model(gaussian_2D, independent_vars=['x', 'y'],
                                    prefix='B_'))
 DoubleGauss2D_model.guess = double_gauss_2D_guess
+
+
+def mkMultiGauss2DModel(n: int, prefixes: list = None):
+    """
+    Generates a bivariate multi Gaussian model
+
+    Args:
+        n (int): number of bivariate Gaussians in the model
+        prefixes (list): if not specified upper case letter will be used
+            to prefix the parameters of each bivariate Gaussian
+    """
+    assert n > 0
+    if prefixes is None:
+        prefixes = string.ascii_uppercase
+    model = lmfit.Model(
+        gaussian_2D,
+        independent_vars=['x', 'y'],
+        prefix=prefixes[0] + '_')
+    for i in range(1, n):
+        model += lmfit.Model(
+            gaussian_2D,
+            independent_vars=['x', 'y'],
+            prefix=prefixes[i] + '_')
+    return model
+
 ###################################
 # Models based on lmfit functions #
 ###################################
 
+
 LorentzModel = lmfit.Model(lmfit.models.lorentzian)
 Lorentz_w_background_Model = lmfit.models.LorentzianModel() + \
-                             lmfit.models.LinearModel()
+    lmfit.models.LinearModel()
 PolyBgHangerAmplitudeModel = (HangerAmplitudeModel *
-                              lmfit.models.PolynomialModel(degree=7))
+    lmfit.models.PolynomialModel(degree=7))
 
 DoubleGaussModel = (lmfit.models.GaussianModel(prefix='A_') +
                     lmfit.models.GaussianModel(prefix='B_'))
@@ -1233,13 +1325,13 @@ DoubleGaussModel.guess = double_gauss_guess  # defines a guess function
 
 
 def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='viridis'):
-    '''
+    """
     Convenience function for plotting results of flattened 2D fits.
 
     It could be argued this does not belong in fitting models (it is not a
     model) but I put it here as it is closely related to all the stuff we do
     with lmfit. If anyone has a better location in mind, let me know (MAR).
-    '''
+    """
     # fixing the data rotation with [::-1]
     nr_cols = len(np.unique(x))
     data_2D = fit_res.data.reshape(-1, nr_cols, order='C')[::-1]

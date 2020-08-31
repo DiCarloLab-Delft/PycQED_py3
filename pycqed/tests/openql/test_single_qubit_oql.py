@@ -3,10 +3,10 @@ import unittest
 import pytest
 import numpy as np
 
-try:
+#try:  # FIXME: hides import problems
+if 1:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-    from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
-        generate_config
+    from pycqed.measurement.openql_experiments import openql_helpers as oqh
     from openql import openql as ql
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
@@ -149,18 +149,13 @@ try:
                                 platf_cfg=self.config_fn)
             self.assertEqual(p.name, 'ef_rabi_seq')
 
-    """
-        Author:             Wouter Vlothuizen, QuTech
-        Purpose:            single qubit OpenQL tests for Qutech Central Controller
-        Notes:              requires OpenQL with CC backend support
-    """
-
+    ##########################################################################
+    # repeat same tests for Qutech Central Controller
     # NB: we just hijack the parent class to run the same tests
+    # NB: requires OpenQL with CC backend support
+    ##########################################################################
 
-    # FIXME: This only works with Wouters custom OpenQL.
-    # Need a better check for this
-
-    if ql.get_version() > '0.7.0':
+    if oqh.is_compatible_openql_version_cc():
         class Test_single_qubit_seqs_CC(Test_single_qubit_seqs_CCL):
             def setUp(self):
                 curdir = os.path.dirname(__file__)
@@ -174,14 +169,15 @@ try:
             def test_fast_feedback_control(self):
                 pytest.skip("test_fast_feedback_control() uses conditional gates, which are not implemented yet")
     else:
-        class Test_single_qubit_seqs_CC(unittest.TestCase):
-                @unittest.skip('OpenQL version does not support CC')
-                def test_fail(self):
-                    pass
+        class Test_single_qubit_seqs_CC_incompatible_openql_version(unittest.TestCase):
+            @unittest.skip('OpenQL version does not support CC')
+            def test_fail(self):
+                pass
 
-except ImportError as e:
-    class Test_single_qubit_seqs_CCL(unittest.TestCase):
-
-        @unittest.skip('Missing dependency - ' + str(e))
-        def test_fail(self):
-            pass
+# FIXME: disabled
+# except ImportError as e:
+#     class Test_single_qubit_seqs_CCL_import_error(unittest.TestCase):
+#
+#         @unittest.skip('Missing dependency - ' + str(e))
+#         def test_fail(self):
+#             pass

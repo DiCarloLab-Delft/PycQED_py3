@@ -623,7 +623,7 @@ class UHFQC(zibase.ZI_base_instrument):
 const CW_MASK = (0x1ff << 17);
 // Counts wrong codewords
 var err_cnt = 0;
-""".format(self._cw_mask)
+"""
 
         if self._awg_program_features['diocws']:
             self._awg_program[0] += \

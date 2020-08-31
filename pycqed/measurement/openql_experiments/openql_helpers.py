@@ -1,6 +1,7 @@
 import re
 import logging
 import numpy as np
+from os import remove
 from os.path import join, dirname, isfile
 from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
@@ -10,14 +11,17 @@ import matplotlib.patches as mpatches
 from pycqed.utilities.general import is_more_rencent
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform, CReg, Operation
+from pycqed.utilities.general import get_file_sha256_hash
+import json
 
+log = logging.getLogger(__name__)
 
 output_dir = join(dirname(__file__), 'output')
 ql.set_option('output_dir', output_dir)
 ql.set_option('scheduler', 'ALAP')
 
 
-def create_program(pname: str, platf_cfg: str, nregisters: int=32):
+def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
     """
     Wrapper around the constructor of openQL "Program" class.
 
@@ -64,7 +68,8 @@ def create_kernel(kname: str, program):
     """
     Wrapper around constructor of openQL "Kernel" class.
     """
-    kname = kname.translate ({ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
+    kname = kname.translate(
+        {ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
 
     k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
     return k
@@ -82,20 +87,28 @@ def compile(p, quiet: bool = True):
         p.compile()
 
     # determine extension of generated file
-    if p.eqasm_compiler=='eqasm_backend_cc':
-        ext = '.vq1asm' # CC
+    if p.eqasm_compiler == 'eqasm_backend_cc':  # NB: field .eqasm_compiler is set by p.compile()
+        ext = '.vq1asm'  # CC
     else:
-        ext = '.qisa' # CC-light, QCC
+        ext = '.qisa'  # CC-light, QCC
     # attribute is added to program to help finding the output files
     p.filename = join(p.output_dir, p.name + ext)
     return p
 
 
+def is_compatible_openql_version_cc() -> bool:
+    """
+    test whether OpenQL version is compatible with Central Controller
+    """
+    return ql.get_version() > '0.8.0'  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
+
 #############################################################################
 # Calibration points
 #############################################################################
+
+
 def add_single_qubit_cal_points(p, qubit_idx,
-                                f_state_cal_pts: bool=False,
+                                f_state_cal_pts: bool = False,
                                 measured_qubits=None):
     """
     Adds single qubit calibration points to an OpenQL program
@@ -108,7 +121,7 @@ def add_single_qubit_cal_points(p, qubit_idx,
             if measured_qubits == None, it will default to measuring the
             qubit for which there are cal points.
     """
-    if measured_qubits==None:
+    if measured_qubits == None:
         measured_qubits = [qubit_idx]
 
     for i in np.arange(2):
@@ -144,8 +157,8 @@ def add_single_qubit_cal_points(p, qubit_idx,
 
 
 def add_two_q_cal_points(p, q0: int, q1: int,
-                         reps_per_cal_pt: int =1,
-                         f_state_cal_pts: bool=False,
+                         reps_per_cal_pt: int = 1,
+                         f_state_cal_pts: bool = False,
                          f_state_cal_pt_cw: int = 31,
                          measured_qubits=None,
                          interleaved_measured_qubits=None,
@@ -179,7 +192,6 @@ def add_two_q_cal_points(p, q0: int, q1: int,
     if measured_qubits == None:
         measured_qubits = [q0, q1]
 
-
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
         k.prepz(q0)
@@ -190,23 +202,24 @@ def add_two_q_cal_points(p, q0: int, q1: int,
                     k.measure(q)
                 k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
                 if interleaved_delay:
-                    k.gate('wait', [0, 1, 2, 3, 4, 5, 6], int(interleaved_delay*1e9))
+                    k.gate('wait', [0, 1, 2, 3, 4, 5, 6],
+                           int(interleaved_delay*1e9))
 
-        if comb[0] =='0':
+        if comb[0] == '0':
             k.gate('i', [q0])
         elif comb[0] == '1':
             k.gate('rx180', [q0])
-        elif comb[0] =='2':
+        elif comb[0] == '2':
             k.gate('rx180', [q0])
             # FIXME: this is a workaround
             #k.gate('rx12', [q0])
             k.gate('cw_31', [q0])
 
-        if comb[1] =='0':
+        if comb[1] == '0':
             k.gate('i', [q1])
         elif comb[1] == '1':
             k.gate('rx180', [q1])
-        elif comb[1] =='2':
+        elif comb[1] == '2':
             k.gate('rx180', [q1])
             # FIXME: this is a workaround
             #k.gate('rx12', [q1])
@@ -223,33 +236,58 @@ def add_two_q_cal_points(p, q0: int, q1: int,
     return p
 
 
-def add_multi_q_cal_points(p, qubits: list,
-                           combinations: list):
+def add_multi_q_cal_points(
+    p, qubits: list,
+    combinations: list = ["00", "01", "10", "11"],
+    reps_per_cal_pnt: int = 1,
+    f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+    return_comb=False
+):
     """
-    Adds calibration points based on a list of state combinations
+    Add a list of kernels containing calibration points in the program `p`
+
+    Args:
+        p               : OpenQL  program to add calibration points to
+        qubits          : list of int
+        combinations    : list with the target multi-qubit state
+            e.g. ["00", "01", "10", "11"] or
+            ["00", "01", "10", "11", "02", "20", "22"] or
+            ["000", "010", "101", "111"]
+        reps_per_cal_pnt : number of times to repeat each cal point
+        f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
+    Returns:
+        p
     """
-    kernel_list = []
+    kernel_list = []  # Not sure if this is needed
+    comb_repetead = []
+    for state in combinations:
+        comb_repetead += [state] * reps_per_cal_pnt
+
+    state_to_gates = {
+        "0": ["i"],
+        "1": ["rx180"],
+        "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
+    }
+
     for i, comb in enumerate(combinations):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
-        for q in qubits:
-            k.prepz(q)
 
-        for j, q in enumerate(qubits):
-            if comb[j] == '1':
-                k.gate('rx180', [q])
-            elif comb[j] == '2':
-                k.gate('rx180', [q])
-                k.gate('rx12', [q])
-            else:
-                pass
-        # Used to ensure timing is aligned
-        k.gate('wait', qubits, 0)
+        for q_state, q in zip(comb, qubits):
+            k.prepz(q)
+            for gate in state_to_gates[q_state]:
+                k.gate(gate, [q])
+        k.gate("wait", [], 0)  # alignment
+
         for q in qubits:
             k.measure(q)
-        k.gate('wait', qubits, 0)
+        k.gate('wait', [], 0)  # alignment
         kernel_list.append(k)
         p.add_kernel(k)
-    return p
+    if return_comb:
+        return comb_repetead
+    else:
+        return p
+
 
 def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
                          q2 = None,
@@ -342,18 +380,14 @@ def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
     return p
 
 
-
-
 #############################################################################
 # File modifications
 #############################################################################
-
-
 def clocks_to_s(time, clock_cycle=20e-9):
     """
     Converts a time in clocks to a time in s
     """
-    return time*clock_cycle
+    return time * clock_cycle
 
 
 def infer_tqisa_filename(qisa_fn: str):
@@ -485,7 +519,7 @@ def split_time_tuples_on_operation(time_tuples, split_op: str):
     return split_tt
 
 
-def substract_time_offset(time_tuples, op_str: str='cw'):
+def substract_time_offset(time_tuples, op_str: str = 'cw'):
     """
     """
     for tt in time_tuples:
@@ -561,8 +595,8 @@ def plot_time_tuples(time_tuples, ax=None, time_unit='s',
 
 def plot_time_tuples_split(time_tuples, ax=None, time_unit='s',
                            mw_duration=20e-9, fl_duration=240e-9,
-                           ro_duration=1e-6, split_op: str='meas',
-                           align_op: str='cw'):
+                           ro_duration=1e-6, split_op: str = 'meas',
+                           align_op: str = 'cw'):
     ttuple_groups = split_time_tuples_on_operation(time_tuples,
                                                    split_op=split_op)
     corr_ttuple_groups = [substract_time_offset(tt, op_str=align_op) for
@@ -637,36 +671,141 @@ def flux_pulse_replacement(qisa_fn: str):
     return mod_qisa_fn, grouped_fl_tuples
 
 
+def check_recompilation_needed_hash_based(
+    program_fn: str,
+    platf_cfg: str,
+    clifford_rb_oql: str,
+    recompile: bool = True,
+):
+    """
+    Similar functionality to the deprecated `check_recompilation_needed` but
+    based on a file that is generated alongside with the program file
+    containing hashes of the files that are relevant to the generation of the
+    RB sequences and that might be modified somewhat often
+
+    NB: Not intended for stand alone use!
+    The code invoking this function should later invoke:
+        `os.rename(recompile_dict["tmp_file"], recompile_dict["file"])`
+
+    The behavior of this function depends on the recompile argument.
+    recompile:
+        True -> True, the program should be compiled
+
+        'as needed' -> compares filename to timestamp of config
+            and checks if the file exists, if required recompile.
+        False -> checks if the file exists, if it doesn't
+            compilation is required and raises a ValueError.
+            Use carefully, only if you know what you are doing!
+            Use 'as needed' to stay safe!
+    """
+
+    hashes_ext = ".hashes"
+    tmp_ext = ".tmp"
+    rb_system_hashes_fn = program_fn + hashes_ext
+    tmp_fn = rb_system_hashes_fn + tmp_ext
+
+    platf_cfg_hash = get_file_sha256_hash(platf_cfg, return_hexdigest=True)
+    this_file_hash = get_file_sha256_hash(clifford_rb_oql, return_hexdigest=True)
+    file_hashes = {platf_cfg: platf_cfg_hash, clifford_rb_oql: this_file_hash}
+
+    def write_hashes_file():
+        # We use a temporary file such that for parallel compilations, if the
+        # process is interrupted before the end there will be no hash and
+        # recompilation will be forced
+        with open(tmp_fn, "w") as outfile:
+            json.dump(file_hashes, outfile)
+
+    def load_hashes_from_file():
+        with open(rb_system_hashes_fn) as json_file:
+            hashes_dict = json.load(json_file)
+        return hashes_dict
+
+    _recompile = False
+
+    if not isfile(program_fn):
+        if recompile is False:
+            raise ValueError('No file:\n{}'.format(platf_cfg))
+        else:
+            # Force recompile, there is no program file
+            _recompile |= True
+
+    # Determine if compilation is needed based on the hashed files
+    if not isfile(rb_system_hashes_fn):
+        # There is no file with the hashes, we must compile to be safe
+        _recompile |= True
+    else:
+        # Hashes exist we use them to determine if recompilations is needed
+        hashes_dict = load_hashes_from_file()
+        # Remove file to signal a compilation in progress
+        remove(rb_system_hashes_fn)
+
+        for fn in file_hashes.keys():
+            # Recompile becomes true if any of the hashed files has a different
+            # hash now
+            _recompile |= hashes_dict.get(fn, "") != file_hashes[fn]
+
+    # Write the updated hashes
+    write_hashes_file()
+
+    res_dict = {
+        "file": rb_system_hashes_fn,
+        "tmp_file": tmp_fn
+    }
+
+    if recompile is False:
+        if _recompile is True:
+            log.warning(
+                "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
+                " want to compile?".format(platf_cfg, clifford_rb_oql)
+            )
+        res_dict["recompile"] = False
+    elif recompile is True:
+        # Enforce recompilation
+        res_dict["recompile"] = True
+    elif recompile == "as needed":
+        res_dict["recompile"] = _recompile
+
+    return res_dict
+
+
 def check_recompilation_needed(program_fn: str, platf_cfg: str,
                                recompile=True):
     """
     determines if compilation of a file is needed based on it's timestamp
-    and an optional recompile option.
-    FIXME: program_fn is platform dependent, because it includes extension
+    and an optional recompile option
 
-    The behaviour of this function depends on the recompile argument.
+    The behavior of this function depends on the recompile argument.
 
     recompile:
         True -> True, the program should be compiled
 
         'as needed' -> compares filename to timestamp of config
             and checks if the file exists, if required recompile.
-        False -> compares program to timestamp of config.
-            if compilation is required raises a ValueError
+        False -> checks if the file exists, if it doesn't
+            compilation is required and raises a ValueError.
+            Use carefully, only if you know what you are doing!
+            Use 'as needed' to stay safe!
     """
-    if recompile == True:
-        return True
+    log.error("Deprecated! Use `check_recompilation_needed_hash_based`!")
+
+    if recompile is True:
+        return True  # compilation is enforced
     elif recompile == 'as needed':
-        if isfile(program_fn):
-            return False
+        # In case you ever think of a hash-based check mind that this
+        # function is called in parallel multiprocessing sometime!!!
+        if isfile(program_fn) and is_more_rencent(program_fn, platf_cfg):
+            return False  # program file is good for using
         else:
             return True  # compilation is required
-    elif recompile == False:  # if False
+    elif recompile is False:
         if isfile(program_fn):
+            if is_more_rencent(platf_cfg, program_fn):
+                log.warnings("File {}\n is more recent"
+                    "than program, use `recompile='as needed'` if you"
+                    " don't know what this means!".format(platf_cfg))
             return False
         else:
-            raise ValueError('OpenQL config has changed more recently '
-                             'than program.')
+            raise ValueError('No file:\n{}'.format(platf_cfg))
     else:
         raise NotImplementedError(
             'recompile should be True, False or "as needed"')
@@ -678,8 +817,26 @@ def load_range_of_oql_programs(programs, counter_param, CC):
     multiple OpenQL programs such as RB.
     """
     program = programs[counter_param()]
-    counter_param((counter_param()+1) % len(programs))
+    counter_param((counter_param() + 1) % len(programs))
     CC.eqasm_program(program.filename)
+
+
+def load_range_of_oql_programs_from_filenames(
+    programs_filenames: list, counter_param, CC
+):
+    """
+    This is a helper function for running an experiment that is spread over
+    multiple OpenQL programs such as RB.
+
+    [2020-07-04] this is a modification of the above function such that only
+    the filename is passed and not a OpenQL program, allowing for parallel
+    program compilations using the multiprocessing of python (only certain
+    types of data can be returned from the processing running the
+    compilations in parallel)
+    """
+    fn = programs_filenames[counter_param()]
+    counter_param((counter_param() + 1) % len(programs_filenames))
+    CC.eqasm_program(fn)
 
 
 def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
@@ -692,7 +849,7 @@ def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
     points in the detector.
     """
     program = programs[counter_param()]
-    counter_param((counter_param()+1) % len(programs))
+    counter_param((counter_param() + 1) % len(programs))
     CC.eqasm_program(program.filename)
 
     detector.nr_shots = len(program.sweep_points)

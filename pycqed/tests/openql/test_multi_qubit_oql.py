@@ -3,10 +3,10 @@ import unittest
 import pytest
 import numpy as np
 
-try:
+#try:  # FIXME: hides import problems
+if 1:
     from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
-    from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
-        generate_config
+    from pycqed.measurement.openql_experiments import openql_helpers as oqh
     from openql import openql as ql
 
     class Test_multi_qubit_oql(unittest.TestCase):
@@ -54,13 +54,13 @@ try:
         def test_two_qubit_AllXY(self):
             p = mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=self.config_fn,
                                     sequence_type='sequential',
-                                    replace_q1_pulses_X180=False,
-                                    double_points=True)
+                                    replace_q1_pulses_with="rx180",
+                                    repetitions=2)
             self.assertEqual(p.name, 'two_qubit_AllXY')
             p = mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=self.config_fn,
                                     sequence_type='simultaneous',
-                                    replace_q1_pulses_X180=False,
-                                    double_points=True)
+                                    replace_q1_pulses_with="rx180",
+                                    repetitions=2)
             self.assertEqual(p.name, 'two_qubit_AllXY')
 
         def test_residual_coupling_sequence(self):
@@ -211,18 +211,13 @@ try:
             self.assertEqual(p.name, 'sliding_flux_pulses_seq')
 
 
-    """
-        Author:             Wouter Vlothuizen, QuTech
-        Purpose:            multi qubit OpenQL tests for Qutech Central Controller
-        Notes:              requires OpenQL with CC backend support
-    """
-    # import test_multi_qubit_oql as parent  # rename to stop pytest from running tests directly
-
+    ##########################################################################
+    # repeat same tests for Qutech Central Controller
     # NB: we just hijack the parent class to run the same tests
+    # NB: requires OpenQL with CC backend support
+    ##########################################################################
 
-    # FIXME: This only works with Wouters custom OpenQL.
-    # Need a better check for this
-    if ql.get_version() > '0.7.0':
+    if oqh.is_compatible_openql_version_cc():
         class Test_multi_qubit_oql_CC(Test_multi_qubit_oql):
             def setUp(self):
                 curdir = os.path.dirname(__file__)
@@ -233,16 +228,17 @@ try:
             def test_multi_qubit_off_on(self):
                 pytest.skip("test_multi_qubit_off_on() gives signalconflict (FIXME)")
     else:
-        class Test_multi_qubit_oql_CC(unittest.TestCase):
-                @unittest.skip('OpenQL version does not support CC')
-                def test_fail(self):
-                    pass
+        class Test_multi_qubit_oql_CC_incompatible_openql_version(unittest.TestCase):
+            @unittest.skip('OpenQL version does not support CC')
+            def test_fail(self):
+                pass
 
-except ImportError as e:
-
-    class Test_multi_qubit_oql(unittest.TestCase):
-
-        @unittest.skip('Missing dependency - ' + str(e))
-        def test_fail(self):
-            pass
+# FIXME: disabled
+# except ImportError as e:
+#
+#     class Test_multi_qubit_oql_import_error(unittest.TestCase):
+#
+#         @unittest.skip('Missing dependency - ' + str(e))
+#         def test_fail(self):
+#             pass
 

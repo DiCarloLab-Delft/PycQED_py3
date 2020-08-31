@@ -16,6 +16,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
 
+
 class Qubit(Instrument):
 
     """

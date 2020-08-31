@@ -16,7 +16,7 @@ from pycqed.measurement.randomized_benchmarking import randomized_benchmarking a
 from importlib import reload
 reload(pulse)
 import pycqed.measurement.waveform_control.pulse_library as pl
-import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
+import pycqed.measurement.waveform_control.pulse as bpl  # base pulse library
 
 from ..waveform_control import pulse_library
 reload(pulse_library)
