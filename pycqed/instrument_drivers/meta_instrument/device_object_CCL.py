@@ -36,7 +36,6 @@ from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
 import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
 
 from pycqed.utilities import learner1D_minimizer as l1dm
-from pycqed_scripts.experiments.Quantum_Inspire import clean_functions as cf
 
 log = logging.getLogger(__name__)
 
@@ -481,12 +480,10 @@ class DeviceCCL(Instrument):
         if not reduced:
             self._prep_ro_sources(qubits=qubits)
 
-        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits) # this one is definetely needed
-        self._prep_ro_integration_weights(qubits=qubits) # this one is definetely needed
+        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits)
+        self._prep_ro_integration_weights(qubits=qubits)
         if not reduced:
-            # doesn't appear to be always needed
             self._prep_ro_pulses(qubits=qubits) 
-            # doesn't appear to be always needed
             self._prep_ro_instantiate_detectors(qubits=qubits, acq_ch_map=acq_ch_map) 
             
         # TODO:
@@ -5092,7 +5089,7 @@ class DeviceCCL(Instrument):
                 q1 = self.find_instrument(pair[1]) # control qubit
                 q2 = self.find_instrument(pair[2]) # parked qubit
     
-                cf.counter_param(0)
+                # cf.counter_param(0)
                 flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
                 nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
                 mc = self.instr_MC.get_instr()
@@ -5157,7 +5154,7 @@ class DeviceCCL(Instrument):
                         gate = gate
             
                     q2 = None
-                    cf.counter_param(0)
+                    # cf.counter_param(0)
                     flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
                     nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
                     mc = self.instr_MC.get_instr()
@@ -5207,7 +5204,7 @@ class DeviceCCL(Instrument):
             q2 = None
             gate = gate
         
-            cf.counter_param(0)
+            # cf.counter_param(0)
             flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
             nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
             mc = self.instr_MC.get_instr()
