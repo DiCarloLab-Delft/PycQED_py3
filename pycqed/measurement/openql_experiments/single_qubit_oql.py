@@ -110,7 +110,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         spec_instr = 'spec'
     elif cc.upper() == 'QCC':
         spec_instr = 'sf_square'
-    elif cc.upper() == 'CC':
+    elif cc.lower() == 'cc':
         spec_instr = 'spec'
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
@@ -687,7 +687,8 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
     i = 0
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
-            k = oqh.create_kernel('RB_{}Cl_s{}_{}'.format(n_cl, seed,j), p)
+            k = oqh.create_kernel('RB_{}Cl_s{}_{}'.format(n_cl, seed, j), p)
+
             if not restless:
                 k.prepz(qubit_idx)
             if cal_points and (j == (len(nr_cliffords)-4) or
@@ -961,7 +962,7 @@ def ef_rabi_seq(q0: int,
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = oqh.create_kernel("ef_A{}".format(int(abs(1000 * amp))), p)
+        k = oqh.create_kernel("ef_A{}_{}".format(int(abs(1000*amp)),i), p)
         k.prepz(q0)
         k.gate('rx180', [q0])
         k.gate('cw_{:02}'.format(cw_idx), [q0])

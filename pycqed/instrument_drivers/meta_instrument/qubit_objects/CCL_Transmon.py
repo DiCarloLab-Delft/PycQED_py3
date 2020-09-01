@@ -811,7 +811,8 @@ class CCLight_Transmon(Qubit):
         self._prep_cw_spec()
         # source is turned on in measure spec when needed
         self.instr_LO_mw.get_instr().off()
-        self.instr_spec_source.get_instr().off()
+        if self.instr_spec_source() != None:
+            self.instr_spec_source.get_instr().off()
         if self.instr_spec_source_2() != None:
             self.instr_spec_source_2.get_instr().off()
 
@@ -823,7 +824,8 @@ class CCLight_Transmon(Qubit):
         else:
             marker_source = 'ext'
 
-        self.instr_spec_source.get_instr().power(self.spec_pow())
+        if self.instr_spec_source() != None:
+            self.instr_spec_source.get_instr().power(self.spec_pow())
 
     def prepare_readout(self, CW=False):
         """
@@ -1152,7 +1154,8 @@ class CCLight_Transmon(Qubit):
             self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
-        self.instr_spec_source.get_instr().off()
+        if self.instr_spec_source() is not None:
+            self.instr_spec_source.get_instr().off()
         self.instr_LO_mw.get_instr().on()
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.instr_LO_mw.get_instr().frequency.set(
@@ -4283,14 +4286,14 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
 
         if initial_steps is None:
-            initial_steps: list = [0.05, 0.05]
+            initial_steps: list = [0.05, 0.05, 1e6]
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
 
         if parameter_list is None:
-            parameter_list = ['G_amp', 'D_amp']
-            # parameter_list = ['G_amp', 'D_amp','freq']
+            # parameter_list = ['G_amp', 'D_amp']
+            parameter_list = ['G_amp', 'D_amp','freq']
 
         mw_lutman = self.instr_LutMan_MW.get_instr()
 
@@ -4310,7 +4313,6 @@ class CCLight_Transmon(Qubit):
                 sweep_pars.append(D_amp_par)
             elif par == 'freq':
                 sweep_pars.append(freq_par)
-
             else:
                 raise NotImplementedError(
                     "Parameter {} not recognized".format(par))
@@ -5349,6 +5351,7 @@ class CCLight_Transmon(Qubit):
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
+        print(rb_tasks)
         programs_filenames = rb_tasks.get()
 
         counter_param = ManualParameter('name_ctr', initial_value=0)

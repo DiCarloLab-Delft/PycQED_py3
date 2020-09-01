@@ -714,10 +714,10 @@ while (1) {
 
         elif self.cfg_codeword_protocol() == 'novsm_microwave':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                                '..', 'examples','CC_examples',
-                                'hdawg_calibration.vq1asm'))
+                                      '..', 'examples','CC_examples',
+                                      'hdawg_calibration_7bit.vq1asm'))
 
-            sequence_length = 32
+            sequence_length = 128
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)), \
                                  (1, list(staircase_sequence)), \
@@ -836,16 +836,6 @@ while (1) {
 
         subseq = max(subseq, key=len)
         delay = len(subseq)//2 + subseq[0]
-
-        # subseq = [[]]
-        # for e in valid_delays:
-        #     if not subseq[-1] or subseq[-1][-1] == e - 1:
-        #         subseq[-1].append(e)
-        #     else:
-        #         subseq.append([e])
-
-        # subseq = max(subseq, key=len)
-        # delay = len(subseq)//2 + subseq[0]
 
         # Print information
         if verbose: print("  Valid delays are {}".format(valid_delays))

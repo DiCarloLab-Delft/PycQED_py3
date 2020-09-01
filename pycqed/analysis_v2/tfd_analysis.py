@@ -760,4 +760,5 @@ def plot_expectation_values_Gibbs(full_dict, qubit_order=['D1', 'Z1', 'X1', 'D3'
     ax.set_ylabel('Expectation value')
     ax.set_ylim(-1.05, 1.05)
     ax.set_title('Expectation values for pauli operators')
+    
     return f, ax
