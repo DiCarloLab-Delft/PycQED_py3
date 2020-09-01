@@ -5306,7 +5306,7 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
         else:
             self.prepare_readout()
-        MC.soft_avg(use_soft_avg)
+        MC.soft_avg(1)
         # set back the settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
@@ -5351,6 +5351,7 @@ class CCLight_Transmon(Qubit):
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
+        print(rb_tasks)
         programs_filenames = rb_tasks.get()
 
         counter_param = ManualParameter('name_ctr', initial_value=0)

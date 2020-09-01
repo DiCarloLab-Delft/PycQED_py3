@@ -625,9 +625,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.5)   
-        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 20e-9),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()

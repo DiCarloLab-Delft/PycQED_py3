@@ -362,7 +362,7 @@ class DeviceCCL(Instrument):
         """
         # 2. Setting the latencies
         cc = self.instr_CC.get_instr()
-        if isinstance(cc, CCL):
+        if cc.IDN()['model']=='CCL':
             latencies = OrderedDict(
                 [
                     ("ro_0", self.tim_ro_latency_0()),
@@ -631,7 +631,6 @@ class DeviceCCL(Instrument):
                 if opt_WI is None or opt_WQ is None:
                     # do not raise an exception as it should be possible to
                     # run input avg experiments to calibrate the optimal weights.
-<<<<<<< D:\GithubRepos\PycQED_py3\pycqed\instrument_drivers\meta_instrument\device_object_CCL.py
                     log.warning("No optimal weights defined for"
                                 " {}, not updating weights".format(qb_name))
                 else:
