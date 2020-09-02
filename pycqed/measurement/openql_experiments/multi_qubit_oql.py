@@ -1698,19 +1698,16 @@ def conditional_oscillation_seq(q0: int, q1: int,
     p = oqh.compile(p)
 
     # [2020-06-24] parallel cz not supported (yet)
+
     if add_cal_points:
         cal_pts_idx = [361, 362, 363, 364]
     else:
         cal_pts_idx = []
 
-    if (q2 is not None) and (q3 is None):
-        # add parking cal points
-        cal_pts_idx += [368, 369]
-
     p.sweep_points = np.concatenate(
         [np.repeat(angles, len(cases)), cal_pts_idx])
-    p.set_sweep_points(p.sweep_points)
 
+    p.set_sweep_points(p.sweep_points)
     return p
 
 
