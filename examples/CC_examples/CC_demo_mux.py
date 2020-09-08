@@ -192,9 +192,11 @@ if 1:  # test of Distributed Shared Memory
         
         # constants:
         .DEF    numIter     4
-        .DEF    smAddr      S16
-        .DEF    mux         0                       # SM[3:0] := I[3:0]
-        .DEF    pl          0                       # 4 times CW=1 conditional on SM[3:0]
+        .DEF    smAddr      S16 
+        #.DEF    mux         0                       # SM[3:0] := I[3:0]
+        #.DEF    pl          0                       # 4 times CW=1 conditional on SM[3:0]
+        .DEF    mux         1                       # SM[7:0] := I[7:0]
+        .DEF    pl          1                       # O[7:0] := SM[7:0]
 
         # timing constants:
         .DEF    uhfLatency  10                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
@@ -213,7 +215,8 @@ if 1:  # test of Distributed Shared Memory
 
         [{uhf}] seq_in_sm   $smAddr,$mux,$byte
         [{uhf}] seq_sw_sm   $smAddr                 # output to ARM SW for debugging
-        [{awg}] seq_wait    2                       # balance UHF duration
+        [{awg}] seq_inv_sm  $smAddr,1               # invalidate 1 byte at target
+        [{awg}] seq_wait    1                       # balance UHF duration
 
                 seq_wait    $smWait                 # wait for data distribution
 
