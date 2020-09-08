@@ -2079,9 +2079,16 @@ class MeasurementControl(Instrument):
                 "val_mapping",
             }
             cleaned_snapshot = delete_keys_from_dict(
-                # complex values and lists are not supported in hdf5
-                # converting to string avoids annoying warnings
-                snap, keys=exclude_keys, types_to_str={list, complex})
+                # complex values are not supported in hdf5
+                # converting to string avoids annoying warnings (but necessary
+                # for other cases), maybe this should be done at the level of
+                # `h5d.write_dict_to_hdf5` but would somewhat messy anyway as
+                # there are a lot of checks related to saving and parsing
+                # other types in `h5d.read_dict_from_hdf5`
+                # `gen.load_settings_onto_instrument_v2` works properly as it
+                # will try to evaluate a string if a parameter type is not str
+                # but was saved as a string
+                snap, keys=exclude_keys, types_to_str={complex})
 
             h5d.write_dict_to_hdf5(cleaned_snapshot, entry_point=snap_grp)
 

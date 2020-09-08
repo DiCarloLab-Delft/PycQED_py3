@@ -1508,8 +1508,8 @@ class DeviceCCL(Instrument):
             ["1", "0"],
         ],  # nb: this groups even and odd
         # nr_shots: int=4088*4,
-        flux_codeword0: str = "cz",
-        flux_codeword1: str = "cz",
+        flux_codeword: str = "cz",
+        # flux_codeword1: str = "cz",
         analyze: bool = True,
         close_fig: bool = True,
         prepare_for_timedomain: bool = True,
@@ -1519,7 +1519,7 @@ class DeviceCCL(Instrument):
         parity_axes=["ZZ"],
         tomo=False,
         tomo_after=False,
-        ro_time=1000e-9,
+        ro_time=600e-9,
         echo_during_ancilla_mmt: bool = True,
         idling_time=780e-9,
         idling_time_echo=480e-9,
@@ -1545,8 +1545,8 @@ class DeviceCCL(Instrument):
             number_of_repetitions=number_of_repetitions,
             initialization_msmt=initialization_msmt,
             initial_states=initial_states,
-            flux_codeword0=flux_codeword0,
-            flux_codeword1=flux_codeword1,
+            flux_codeword=flux_codeword,
+            # flux_codeword1=flux_codeword1,
             echo=echo,
             parity_axes=parity_axes,
             tomo=tomo,
@@ -2848,6 +2848,7 @@ class DeviceCCL(Instrument):
         times,
         MC=None,
         label="Cryoscope",
+        double_projections: bool = True,
         waveform_name: str = "square",
         max_delay: float = "auto",
         twoq_pair=[2, 0],
@@ -2917,18 +2918,29 @@ class DeviceCCL(Instrument):
             twoq_pair=twoq_pair,
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC.get_instr().name,
+            double_projections=double_projections,
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
         MC.set_sweep_function(sw)
         MC.set_sweep_points(times)
+
+        if double_projections:
+            # Cryoscope v2
+            values_per_point = 4
+            values_per_point_suffex = ["cos", "sin", "mcos", "msin"]
+        else:
+            # Cryoscope v1
+            values_per_point = 2
+            values_per_point_suffex = ["cos", "sin"]
+
         d = self.get_int_avg_det(
             qubits=[q0],
-            values_per_point=2,
-            values_per_point_suffex=["cos", "sin"],
+            values_per_point=values_per_point,
+            values_per_point_suffex=values_per_point_suffex,
             single_int_avg=True,
-            always_prepare=True,
+            always_prepare=True
         )
         MC.set_detector_function(d)
         MC.run(label)
@@ -3402,7 +3414,7 @@ class DeviceCCL(Instrument):
         ),
         nr_seeds=100,
         interleaving_cliffords=[None],
-        label="TwoQubit_RB_{}seeds_icl{}_{}_{}_{}",
+        label="TwoQubit_RB_{}seeds_recompile={}_icl{}_{}_{}_{}",
         recompile: bool = "as needed",
         cal_points=True,
         flux_codeword="cz",
@@ -3548,7 +3560,10 @@ class DeviceCCL(Instrument):
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
-            with multiprocessing.Pool(nr_processes) as pool:
+            with multiprocessing.Pool(
+                nr_processes,
+                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+            ) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
@@ -3592,6 +3607,7 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
         label = label.format(
             nr_seeds,
+            recompile,
             interleaving_cliffords,
             qubits[0],
             qubits[1],
@@ -3627,8 +3643,8 @@ class DeviceCCL(Instrument):
 
         rounds_success = np.zeros(nr_iRB_runs)
         t0 = time.time()
-        # `maxtasksperchild` is specified to free up the memory from time to time
-        with multiprocessing.Pool(maxtasksperchild=400) as pool:
+        # `maxtasksperchild` avoid RAM issues
+        with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
             rb_tasks_start = None
             last_run = nr_iRB_runs - 1
             for i in range(nr_iRB_runs):
@@ -3835,7 +3851,8 @@ class DeviceCCL(Instrument):
             # one
             if pool is None:
                 # Using `with ...:` makes sure the other processes will be terminated
-                with multiprocessing.Pool() as pool:
+                # `maxtasksperchild` avoid RAM issues
+                with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
                     run_parallel_iRB(
                         recompile=recompile,
                         pool=pool,
@@ -4016,7 +4033,7 @@ class DeviceCCL(Instrument):
             # one
             if pool is None:
                 # Using `with ...:` makes sure the other processes will be terminated
-                with multiprocessing.Pool() as pool:
+                with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
                     run_parallel_iRB(
                         recompile=recompile,
                         pool=pool,
@@ -4184,7 +4201,10 @@ class DeviceCCL(Instrument):
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
-            with multiprocessing.Pool(nr_processes) as pool:
+            with multiprocessing.Pool(
+                nr_processes,
+                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+            ) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
@@ -4224,8 +4244,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
 
         MC.set_detector_function(d)
-        label = 'RB_{}_{}_park_{}_{}seeds_rb_park_only={}_icl{}'.format(
-            *qubits, nr_seeds, rb_on_parked_qubit_only, interleaving_cliffords)
+        label = 'RB_{}_{}_park_{}_{}seeds_recompile={}_rb_park_only={}_icl{}'.format(
+            *qubits, nr_seeds, recompile, rb_on_parked_qubit_only, interleaving_cliffords)
         label += self.msmt_suffix
         # FIXME should include the indices in the exp_metadata and
         # use that in the analysis instead of being dependent on the
@@ -4564,7 +4584,7 @@ class DeviceCCL(Instrument):
         nr_cliffords=2 ** np.arange(11),
         nr_seeds=100,
         interleaving_cliffords=[None],
-        label="TwoQubit_sim_RB_{}seeds_{}_{}",
+        label="TwoQubit_sim_RB_{}seeds_recompile={}_{}_{}",
         recompile: bool = "as needed",
         cal_points: bool = True,
         ro_acq_weight_type: str = "optimal IQ",
@@ -4671,7 +4691,10 @@ class DeviceCCL(Instrument):
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
-            with multiprocessing.Pool(nr_processes) as pool:
+            with multiprocessing.Pool(
+                nr_processes,
+                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+            ) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
 
@@ -4712,7 +4735,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
 
         MC.set_detector_function(d)
-        label = label.format(nr_seeds, qubits[0], qubits[1])
+        label = label.format(nr_seeds, recompile, qubits[0], qubits[1])
         MC.run(label, exp_metadata={"bins": sweep_points})
 
         # N.B. if interleaving cliffords are used, this won't work

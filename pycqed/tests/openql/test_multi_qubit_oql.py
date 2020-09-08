@@ -54,13 +54,13 @@ if 1:
         def test_two_qubit_AllXY(self):
             p = mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=self.config_fn,
                                     sequence_type='sequential',
-                                    replace_q1_pulses_X180=False,
-                                    double_points=True)
+                                    replace_q1_pulses_with="rx180",
+                                    repetitions=2)
             self.assertEqual(p.name, 'two_qubit_AllXY')
             p = mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=self.config_fn,
                                     sequence_type='simultaneous',
-                                    replace_q1_pulses_X180=False,
-                                    double_points=True)
+                                    replace_q1_pulses_with="rx180",
+                                    repetitions=2)
             self.assertEqual(p.name, 'two_qubit_AllXY')
 
         def test_residual_coupling_sequence(self):
