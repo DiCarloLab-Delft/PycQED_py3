@@ -190,6 +190,7 @@ if 1:  # test of Distributed Shared Memory
         prog = inspect.cleandoc(f"""
         # program:  CC feedback test program
         
+        .CODE
         # constants:
         .DEF    numIter     4
         .DEF    smAddr      S16 
@@ -226,23 +227,27 @@ if 1:  # test of Distributed Shared Memory
                 seq_wait    $iterWait
                 loop        R0,@loop
                 stop
+        .END                            ; .CODE
+
+
+        .DATAPATH
+        .MUX 0  # 4 qubits from 1 UHF-QA: SM[3:0] := I[3:0]
+            SM[0] := I[0]
+            SM[1] := I[1]
+            SM[2] := I[2]
+            SM[3] := I[3]
+        
+        .PL 0	# 4 times CW=1 conditional on SM[3:0]
+            O[31] := 1               	; HDAWG trigger
+        
+            O[0] := SM[0]         		; ch 1&2
+            O[7] := SM[1]         		; ch 3&4
+            O[16] := SM[2]         		; ch 5&6
+            O[23] := SM[3]         		; ch 7&8
+            # NB: state is cleared        
+
+        .END                            ; .DATAPATH
         """)
-
-
-        codeFragmentMux = """
-        .DEF    smAddr      S16
-        .DEF    mux         0                       # SM[3:0] := I[3:0]
-        .DEF    byte        0                       # size parameter for seq_in_sm
-
-        [{uhf}] seq_in_sm   $smAddr,$mux,$byte
-        """
-
-        codeFragmentPl = """
-        .DEF    smAddr      S16
-        .DEF    pl          0                       # 4 times CW=1 conditional on SM[3:0]
-
-        [{awg}] seq_out_sm  $smAddr,$pl,1
-        """
 
 
         # watch UHF
