@@ -194,10 +194,10 @@ if 1:  # test of Distributed Shared Memory
         # constants:
         .DEF    numIter     4
         .DEF    smAddr      S16 
-        #.DEF    mux         0                       # SM[3:0] := I[3:0]
-        #.DEF    pl          0                       # 4 times CW=1 conditional on SM[3:0]
-        .DEF    mux         1                       # SM[7:0] := I[7:0]
-        .DEF    pl          1                       # O[7:0] := SM[7:0]
+        .DEF    mux         0                       # SM[3:0] := I[3:0]
+        .DEF    pl          0                       # 4 times CW=1 conditional on SM[3:0]
+        #.DEF    mux         1                       # SM[7:0] := I[7:0]
+        #.DEF    pl          1                       # O[7:0] := SM[7:0]
 
         # timing constants:
         .DEF    uhfLatency  10                      # 10: best latency, but SEQ_IN_EMPTY and STV, 11: stable
@@ -208,7 +208,7 @@ if 1:  # test of Distributed Shared Memory
         # instruction set constants:
         .DEF    byte        0                       # size parameter for seq_in_sm
 
-                seq_bar     1                       # synchronize processors so markers make sense
+                seq_bar                             # synchronize processors so markers make sense
                 move        $numIter,R0
         loop:   
         [{uhf}] seq_out     0x00010000,$uhfLatency  # trigger UHFQA
@@ -237,6 +237,16 @@ if 1:  # test of Distributed Shared Memory
             SM[2] := I[2]
             SM[3] := I[3]
         
+        .MUX 1  # debug support: SM[7:0] := I[7:0]
+            SM[0] := I[0]
+            SM[1] := I[1]
+            SM[2] := I[2]
+            SM[3] := I[3]
+            SM[4] := I[4]
+            SM[5] := I[5]
+            SM[6] := I[6]
+            SM[7] := I[7]
+
         .PL 0	# 4 times CW=1 conditional on SM[3:0]
             O[31] := 1               	; HDAWG trigger
         
@@ -244,6 +254,19 @@ if 1:  # test of Distributed Shared Memory
             O[7] := SM[1]         		; ch 3&4
             O[16] := SM[2]         		; ch 5&6
             O[23] := SM[3]         		; ch 7&8
+            # NB: state is cleared        
+
+        .PL 1	# debug support O[7:0] := SM[7:0]
+            O[31] := 1               	; HDAWG trigger
+        
+            O[0] := SM[0]
+            O[1] := SM[1]
+            O[2] := SM[2]
+            O[3] := SM[3]
+            O[4] := SM[4]
+            O[5] := SM[5]
+            O[6] := SM[6]
+            O[7] := SM[7]
             # NB: state is cleared        
 
         .END                            ; .DATAPATH
@@ -255,11 +278,11 @@ if 1:  # test of Distributed Shared Memory
         # cc.debug_marker_out(cc_slot_uhfqa0, cc.UHFQA_TRIG)
 
         # watch AWG
-        # FIXME: we currently use a CC-CONN-DIO (non differenential), and no connected AWG. As a result, we can only
+        # FIXME: we currently use a CC-CONN-DIO (non differential), and no connected AWG. As a result, we can only
         # watch bits [31:16], and HDAWG_TRIG is overriden by TOGGLE_DS
         #cc.debug_marker_out(cc_slot_awg, cc.UHFQA_TRIG)  #
         #cc.debug_marker_out(cc_slot_awg, cc.HDAWG_TRIG)  #
-        cc.debug_marker_out(cc_slot_awg, 23) # NB: always one with our data
+        cc.debug_marker_out(cc_slot_awg, 23) # NB: always pulses to one with our test data using MUX 0
 
         cc.stop()   # prevent tracing previous program
         for slot in [cc_slot_uhfqa0, cc_slot_awg]:
