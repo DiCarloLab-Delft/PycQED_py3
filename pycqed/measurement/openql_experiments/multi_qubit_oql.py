@@ -109,6 +109,115 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
 
     return p
 
+def single_qubit_off_on(qubits: list,
+                        qtarget,
+                        initialize: bool, 
+                        platf_cfg: str):
+
+    n_qubits = len(qubits)
+    comb_0 = '0'*n_qubits
+    comb_1 = comb_0[:qubits.index(qtarget)] + '1' + comb_0[qubits.index(qtarget)+1:]
+
+    combinations = [comb_0, comb_1]
+
+    p = oqh.create_program("single_qubit_off_on", platf_cfg)
+
+    for i, comb in enumerate(combinations):
+        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+
+        # 1. Prepare qubits in 0
+        for q in qubits:
+            k.prepz(q)
+
+        # 2. post-selection extra init readout
+        if initialize:
+            for q in qubits:
+                k.measure(q)
+            k.gate('wait', qubits, 0)
+
+        # 3. prepare desired state
+        for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
+            if state == '0':
+                pass
+            elif state == '1':
+                k.gate('rx180', [target_qubit])
+            elif state == '2':
+                k.gate('rx180', [target_qubit])
+                k.gate('rx12', [target_qubit])
+        # 4. measurement of all qubits
+        k.gate('wait', qubits, 0)
+        # Used to ensure timing is aligned
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+
+    return p
+
+def targeted_off_on(qubits: list,
+                    q_target: int,
+                    pulse_comb:str,
+                    platf_cfg: str):
+    """
+    Performs an 'off_on' sequence on the qubits specified.
+        off: prepz -      - RO
+        on:  prepz - x180 - RO
+
+    Will cycle through all combinations of computational states of every
+    qubit in <qubits> except the target qubit. The target qubit will be
+    initialized according to <pulse_comb>. 'Off' initializes the qubit in
+    the ground state and 'On' initializes the qubit in the excited state.
+
+    Args:
+        qubits (list) : list of integers denoting the qubits to use
+        q_target (str) : targeted qubit.
+        pulse_comb (str) : prepared state of target qubit.
+        platf_cfg (str) : filepath of OpenQL platform config file
+    """
+
+    nr_qubits = len(qubits)
+    idx = qubits.index(q_target)
+
+    combinations = ['{:0{}b}'.format(i, nr_qubits-1) for i in range(2**(nr_qubits-1))]
+    for i, comb in enumerate(combinations):
+        comb = list(comb)#
+        if 'on' in pulse_comb.lower():
+            comb.insert(idx, '1')
+        elif 'off' in pulse_comb.lower():
+            comb.insert(idx, '0')
+        else:
+            raise ValueError()
+        combinations[i] = ''.join(comb)
+
+    p = oqh.create_program("Targeted_off_on", platf_cfg)
+
+    for i, comb in enumerate(combinations):
+        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+
+        # 1. Prepare qubits in 0
+        for q in qubits:
+            k.prepz(q)
+
+        # 2. prepare desired state
+        for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
+            if state == '0':
+                pass
+            elif state == '1':
+                k.gate('rx180', [target_qubit])
+
+        # 3. measurement of all qubits
+        k.gate('wait', qubits, 0)
+        # Used to ensure timing is aligned
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+
+    return p
 
 def targeted_off_on(qubits: list,
                     q_target: int,
@@ -559,6 +668,7 @@ def Cryoscope(
         p:              OpenQL Program object containing
 
     """
+    
     p = oqh.create_program("Cryoscope", platf_cfg)
     buffer_nanoseconds1 = int(round(buffer_time1 / 1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2 / 1e-9))
@@ -1286,7 +1396,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
         initialization_msmt : whether to start with an initial measurement
                     to prepare the starting state.
     """
-    print('new')
+
     p = oqh.create_program("two_qubit_parity_check", platf_cfg)
     data_qubits=[qD0,qD1]
     if tomo:
@@ -1427,6 +1537,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
                                 flux_codeword_park: str = None,
                                 parked_qubit_seq: str = 'ground',
                                 disable_parallel_single_q_gates: bool = False):
+
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -1536,7 +1647,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
             # #################################################################
             # Single qubit ** parallel ** gates post flux pulses
             # #################################################################
-
             if case == "excitation":
                 for q in control_qubits:
                     k.gate("rx180", [q])
@@ -1572,7 +1682,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
             if q3 is not None:
                 k.measure(q3)
             k.gate('wait', [], 0)
-
             p.add_kernel(k)
 
     if add_cal_points:
@@ -1599,7 +1708,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
         [np.repeat(angles, len(cases)), cal_pts_idx])
 
     p.set_sweep_points(p.sweep_points)
-
     return p
 
 
@@ -2231,7 +2339,6 @@ def sliding_flux_pulses_seq(
         p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
 
-
 def two_qubit_state_tomography(qubit_idxs,
                                bell_state,
                                product_state,
@@ -2247,7 +2354,8 @@ def two_qubit_state_tomography(qubit_idxs,
     calibration_points = ['00', '01', '10', '11']
     measurement_pre_rotations = ['II', 'IF', 'FI', 'FF']
     bases = ['X', 'Y', 'Z']
-    ## Explain this ?
+
+    ## Explain this ? 
     bases_comb = [basis_0+basis_1 for basis_0 in bases for basis_1 in bases]
     combinations = []
     combinations += [b+'-'+c for b in bases_comb for c in measurement_pre_rotations]
@@ -2263,12 +2371,13 @@ def two_qubit_state_tomography(qubit_idxs,
             for q_idx in qubit_idxs:
                 k.prepz(q_idx)
 
-     # Choose a bell state and set the corresponding preparation pulses
-            if bell_state is not None:
+            # Choose a bell state and set the corresponding preparation pulses
+            if bell_state is not None: 
                         #
                 # Q1 |0> --- P1 --o-- A1 -- R1 -- M
                 #                 |
-                # Q0 |0> --- P0 --o-- I  -- R0 -- M
+                # Q0 |0> --- P0 --o-- I  -- R0 -- M 
+
                 if bell_state == 0:  # |Phi_m>=|00>-|11>
                     prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
                 elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>

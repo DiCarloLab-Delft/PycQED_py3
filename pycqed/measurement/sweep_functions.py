@@ -832,6 +832,82 @@ class lutman_par(Soft_Sweep):
             regenerate_waveforms=True)
 
 
+class anharmonicity_sweep(Soft_Sweep):
+    """
+    Sweeps a LutMan parameter and uploads the waveforms to AWG (in real-time if
+    supported)
+    """
+
+    def __init__(self, qubit, amps):
+        self.set_kw()
+        self.name = qubit.anharmonicity.name
+        self.parameter_name = qubit.anharmonicity.label
+        self.unit = qubit.anharmonicity.unit
+        self.sweep_control = 'soft'
+        self.qubit = qubit
+        self.amps = amps
+
+    def set_parameter(self, val):
+        self.qubit.anharmonicity.set(val)
+        # _prep_mw_pulses will upload anharmonicity val to LutMan
+        self.qubit._prep_mw_pulses()
+        # and we regenerate the waveform with that new modulation
+        mw_lutman = self.qubit.instr_LutMan_MW.get_instr()
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=self.amps)
+
+
+class joint_HDAWG_lutman_parameters(Soft_Sweep):
+    """
+    Sweeps two parameteres toghether, assigning the same value
+    name is defined by user
+    label and units are grabbed from parameter_1
+    """
+
+    def __init__(self, name, parameter_1, parameter_2,
+                 AWG, lutman):
+        self.set_kw()
+        self.name = name
+        self.parameter_name = parameter_1.label
+        self.unit = parameter_1.unit
+        self.lm = lutman
+        self.AWG = AWG
+        self.sweep_control = 'soft'
+        self.parameter_1 = parameter_1
+        self.parameter_2 = parameter_2
+
+    def set_parameter(self, val):
+        self.parameter_1.set(val)
+        self.parameter_2.set(-val)
+        self.AWG.stop()
+        self.lm.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.AWG.start()
+
+
+class RO_mod_freq_parameter(Soft_Sweep):
+    """
+    Sweeps two parameteres toghether, assigning the same value
+    name is defined by user
+    label and units are grabbed from parameter_1
+    """
+
+    def __init__(self, name, qubit, parameter):
+        self.set_kw()
+        self.name = name
+        self.parameter_name = parameter.label
+        self.unit = parameter.unit
+        self.sweep_control = 'soft'
+        self.qubit = qubit
+
+    def set_parameter(self, val):
+        # LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+        old_lo_freq = self.qubit.ro_freq.get() - self.qubit.ro_freq_mod.get()
+
+        # Parameter 1 will be qubit.ro_freq()
+        self.qubit.ro_freq.set(val)
+        # Parameter 2 will be qubit.ro_freq_mod()
+        self.qubit.ro_freq_mod.set(val - old_lo_freq)
+
+
 class QWG_lutman_par_chunks(Soft_Sweep):
     '''
     Sweep function that divides sweep points into chunks. Every chunk is
@@ -1172,7 +1248,7 @@ class FLsweep(Soft_Sweep):
     """
     Special sweep function for AWG8 and QWG flux pulses.
     """
-    def __init__(self, lm, par, waveform_name, upload_waveforms_always: bool=True):
+    def __init__(self, lm, par, waveform_name, amp_for_generation = None, upload_waveforms_always: bool=True):
         super().__init__()
         self.lm = lm
         self.par = par
@@ -1180,6 +1256,7 @@ class FLsweep(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
+        self.amp_for_generation = amp_for_generation
         self.upload_waveforms_always = upload_waveforms_always
 
         self.AWG = self.lm.AWG.get_instr()
@@ -1198,9 +1275,16 @@ class FLsweep(Soft_Sweep):
                 self.set_parameter_HDAWG(val)
 
     def set_parameter_HDAWG(self, val):
+        self.par(val)
+        if self.amp_for_generation:
+            old_val_amp = self.lm.cfg_awg_channel_amplitude()
+            self.lm.cfg_awg_channel_amplitude(self.amp_for_generation)
         self.AWG.stop()
-        self.lm.load_waveform_onto_AWG_lookuptable(
-            self.waveform_name, regenerate_waveforms=True)
+        self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
+                                                   regenerate_waveforms=True)
+        if self.amp_for_generation:
+            self.lm.cfg_awg_channel_amplitude(abs(old_val_amp))
+
         self.AWG.start()
         return
 

@@ -1085,6 +1085,24 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         qoi["park_phase_off"] = park_phase_off
         qoi["park_phase_on"] = park_phase_on
 
+        if self.include_park:
+            fp_0 = self.fit_res['park_fit_off']
+            fp_1 = self.fit_res['park_fit_on']
+            park_phase_off=ufloat(np.rad2deg(fp_0.params['phase'].value),
+                                  np.rad2deg(fp_0.params['phase'].stderr if
+                                             fp_0.params['phase'].stderr is not None
+                                             else np.nan))
+            park_phase_on=ufloat(np.rad2deg(fp_1.params['phase'].value),
+                                 np.rad2deg(fp_1.params['phase'].stderr if
+                                            fp_1.params['phase'].stderr is not None
+                                            else np.nan))
+        else:
+            park_phase_off = ufloat(0,0)
+            park_phase_on = ufloat(0,0)
+
+        qoi['park_phase_off'] = park_phase_off
+        qoi['park_phase_on'] = park_phase_on
+
     def prepare_plots(self):
         self._prepare_main_oscillation_figure()
         self._prepare_spectator_qubit_figure()
@@ -1434,7 +1452,6 @@ class Crossing_Analysis(ba.BaseDataAnalysis):
             self.run_analysis()
 
     def process_data(self):
-
         self.proc_data_dict = deepcopy(self.raw_data_dict)
         ch_idx = self.ch_idx
 
@@ -1460,6 +1477,7 @@ class Crossing_Analysis(ba.BaseDataAnalysis):
         c0 = fit_res.best_values["c0"] - target_crossing  # constant term
         c1 = fit_res.best_values["c1"]  # linear term
         c2 = fit_res.best_values["c2"]  # quadratic term
+
         ######################################
         # WARNING:
         # NUMPY HANDLES A DIFFERENT CONVENTION FOR THE FUNCTIONS

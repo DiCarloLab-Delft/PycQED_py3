@@ -753,6 +753,27 @@ def rotated_bell_state(dummy_x, angle_MSQ, angle_LSQ,
     return state
 
 
+def rotated_bell_model(operators,target_bell):
+    fit_func_wrapper = lambda dummy_x, angle_MSQ,\
+        angle_LSQ, contrast: rotated_bell_state(dummy_x,
+                                                angle_MSQ, angle_LSQ,
+                                                contrast, target_bell)
+    angles_model = lmfit.Model(fit_func_wrapper)
+
+    angles_model.set_param_hint(
+        'angle_MSQ', value=0., min=-np.pi, max=np.pi, vary=True)
+    angles_model.set_param_hint(
+        'angle_LSQ', value=0., min=-np.pi, max=np.pi, vary=True)
+    angles_model.set_param_hint(
+        'contrast', value=1., min=0., max=1., vary=False)
+    params = angles_model.make_params()
+
+    fit_res = angles_model.fit(data=operators,
+                                    dummy_x=np.arange(
+                                        len(operators)),
+                                    params=params)
+    return fit_res
+
 class Tomo_Multiplexed(ma.MeasurementAnalysis):
 
     def __init__(self, auto=True, label='', timestamp=None,
