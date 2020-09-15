@@ -333,7 +333,13 @@ while (1) {
             self.sync()
 
         # Use 50 MHz DIO clocking
-        self.seti('raw/dios/0/extclk', 1)
+        if self.geti('/zi/about/revision') < 200802104:
+          # Old-style nodes (used before 20.08)
+          self.seti('raw/dios/0/extclk', 1)
+        else:
+          # New node: Select a specific DIO mode (which configures various
+          # other bits and pieces accordingly)
+          self.seti('dios/0/mode', 2)
 
         # Configure the DIO interface and the waveforms
         for awg_nr in range(int(self._num_channels()//2)):
@@ -480,7 +486,7 @@ while (1) {
 
         # And configure the delays
         for i in range(32):
-            self.setd('raw/dios/0/delays/' + str(i) + '/value', self._dio_calibration_delay)
+            self.setd(f'raw/dios/0/delays/{i}/value', self._dio_calibration_delay)
 
     def _get_dio_calibration_delay(self):
         return self._dio_calibration_delay
