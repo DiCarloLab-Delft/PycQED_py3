@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import re
+from datetime import datetime
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators
@@ -612,6 +613,7 @@ class ZI_base_instrument(Instrument):
                  port: int= 8004,
                  apilevel: int= 5,
                  num_codewords: int= 0,
+                 logfile:str = None,
                  **kw) -> None:
         """
         Input arguments:
@@ -622,6 +624,7 @@ class ZI_base_instrument(Instrument):
             port            (int) the port to connect to for the ziDataServer (don't change)
             apilevel        (int) the API version level to use (don't change unless you know what you're doing)
             num_codewords   (int) the number of codeword-based waveforms to prepare
+            logfile         (str) file name where all commands should be logged
         """
         t0 = time.time()
         super().__init__(name=name, **kw)
@@ -692,6 +695,8 @@ class ZI_base_instrument(Instrument):
         self._add_codeword_waveform_parameters(num_codewords)
         # Create other neat parameters
         self._add_extra_parameters()
+        # A list of all subscribed paths
+        self._subscribed_paths = []
 
         # Structure for storing errors
         self._errors = None
@@ -699,6 +704,12 @@ class ZI_base_instrument(Instrument):
         self._errors_to_ignore = []
         # Make initial error check
         self.check_errors()
+
+        # Optionally setup log file
+        if logfile is not None:
+            self._logfile = open(logfile, 'w')
+        else:
+            self._logfile = None
 
         # Show some info
         serial = self.get('features_serial')
@@ -1209,29 +1220,44 @@ class ZI_base_instrument(Instrument):
         else:
             logging.warning(f"{self.devname}: No program configured for awg_nr {awg_nr}.")
 
+    def _write_cmd_to_logfile(self, cmd):
+        if self._logfile is not None:
+            now = datetime.now()
+            now_str = now.strftime("%d/%m/%Y %H:%M:%S")
+            self._logfile.write(f'#{now_str}\n')
+            self._logfile.write(f'{self.name}.{cmd}\n')
+
+    def _flush_logfile(self):
+        if self._logfile is not None:
+            self._logfile.flush()
+
     ##########################################################################
     # Public methods: node helpers
     ##########################################################################
 
     def setd(self, path, value) -> None:
+        self._write_cmd_to_logfile(f'daq.setDouble("{path}", {value})')
         self.daq.setDouble(self._get_full_path(path), value)
 
     def getd(self, path):
         return self.daq.getDouble(self._get_full_path(path))
 
     def seti(self, path, value) -> None:
+        self._write_cmd_to_logfile(f'daq.setDouble("{path}", {value})')
         self.daq.setInt(self._get_full_path(path), value)
 
     def geti(self, path):
         return self.daq.getInt(self._get_full_path(path))
 
     def sets(self, path, value) -> None:
+        self._write_cmd_to_logfile(f'daq.setString("{path}", {value})')
         self.daq.setString(self._get_full_path(path), value)
 
     def gets(self, path):
         return self.daq.getString(self._get_full_path(path))
 
     def setc(self, path, value) -> None:
+        self._write_cmd_to_logfile(f'daq.setComplex("{path}", {value})')
         self.daq.setComplex(self._get_full_path(path), value)
 
     def getc(self, path):
@@ -1240,8 +1266,10 @@ class ZI_base_instrument(Instrument):
     def setv(self, path, value) -> None:
         # Handle absolute path
         if self.use_setVector:
+            self._write_cmd_to_logfile(f'daq.setVector("{path}", np.array({np.array2string(value, separator=",")}))')
             self.daq.setVector(self._get_full_path(path), value)
         else:
+            self._write_cmd_to_logfile(f'daq.vectorWrite("{path}", np.array({np.array2string(value, separator=",")}))')
             self.daq.vectorWrite(self._get_full_path(path), value)
 
     def getv(self, path):
@@ -1265,11 +1293,22 @@ class ZI_base_instrument(Instrument):
 
         return None
 
-    def subs(self, path) -> None:
-        self.daq.subscribe(self._get_full_path(path))
+    def subs(self, path:str) -> None:
+        full_path = self._get_full_path(path)
+        if full_path not in self._subscribed_paths:
+            self._subscribed_paths.append(full_path)
+        self.daq.subscribe(full_path)
 
-    def unsubs(self, path) -> None:
-        self.daq.unsubscribe(self._get_full_path(path))
+    def unsubs(self, path:str=None) -> None:
+        if path is None:
+            for path in self._subscribed_paths:
+                self.daq.unsubscribe(path)
+            self._subscribed_paths.clear()
+        else:
+            full_path = self._get_full_path(path)
+            if full_path in self._subscribed_paths:
+                del self._subscribed_paths[self._subscribed_paths.index(full_path)]
+            self.daq.unsubscribe(full_path)
 
     def poll(self, poll_time=0.1):
         return self.daq.poll(poll_time, 500, 4, True)
@@ -1388,8 +1427,10 @@ class ZI_base_instrument(Instrument):
             log.info(f'{self.devname}: Configuring AWG {awg_nr}...')
 
             self._awgModule.set('awgModule/index', awg_nr)
+            self._write_cmd_to_logfile(f"_awgModule.set('awgModule/index', {awg_nr})")
             self._awgModule.set(
                 'awgModule/compiler/sourcestring', program_string)
+            self._write_cmd_to_logfile(f"_awgModule.set('awgModule/compiler/sourcestring', \'\'\'{program_string}\'\'\')")
 
             succes_msg = 'File successfully uploaded'
 
