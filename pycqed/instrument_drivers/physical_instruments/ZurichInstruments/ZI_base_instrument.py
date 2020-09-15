@@ -316,6 +316,9 @@ class MockDAQServer():
             self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'PC\nME'}
             self.nodes[f'/{self.device}/raw/error/json/errors'] = {
                 'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
+            for i in range(32):
+                self.nodes['/' + self.device +
+                        '/raw/dios/0/delays/' + str(i) + '/value'] = {'type': 'Integer', 'value': 0}
             self.nodes[f'/{self.device}/raw/error/blinkseverity'] = {'type': 'Integer', 'value': 0}
             self.nodes[f'/{self.device}/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
             self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
@@ -1373,7 +1376,7 @@ class ZI_base_instrument(Instrument):
             pass
         super().close()
 
-    def check_errors(self) -> None:
+    def check_errors(self, errors_to_ignore=None) -> None:
         raise NotImplementedError('Virtual method with no implementation!')
 
     def clear_errors(self) -> None:
