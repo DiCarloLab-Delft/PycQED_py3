@@ -1088,7 +1088,6 @@ class QWGMultiDevices:
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
     Usually all methods are static
     """
-    from pycqed.instrument_drivers.physical_instruments import QuTech_CCL
 
     @staticmethod
     def dio_calibration(cc, qwgs: List[QuTech_AWG_Module],
