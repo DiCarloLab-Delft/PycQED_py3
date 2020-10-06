@@ -1708,7 +1708,7 @@ class Rabi_Analysis(TD_Analysis):
 
             init_data_diff = np.abs(self.fit_result.init_fit[0] -
                                     self.normalized_data_points[0])
-            if (self.fit_result.chisqr > .35) or (init_data_diff > offset_guess):
+            if False:#(self.fit_result.chisqr > .35) or (init_data_diff > offset_guess):
                 logging.warning('Fit did not converge, varying phase.')
 
                 fit_res_lst = []
