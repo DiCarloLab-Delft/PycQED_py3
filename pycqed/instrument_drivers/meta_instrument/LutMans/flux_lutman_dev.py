@@ -197,10 +197,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             if waveform["type"] == "cz":
                 self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
             elif waveform["type"] == "idle_z":
-                # self._wave_dict[wave_name] = self._gen_idle_z(which_gate=which_gate)
-                # WARNING: temporary modification for testing the Victory CZ
-                # The pulse itself has all parameters necessary for the correction
-                self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
+                self._wave_dict[wave_name] = self._gen_idle_z(which_gate=which_gate)
 
     def _gen_i(self):
         return np.zeros(int(self.idle_pulse_length() * self.sampling_rate()))
@@ -210,7 +207,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             amp=self.sq_amp(),
             length=self.sq_length(),
             sampling_rate=self.sampling_rate(),
-            delay=self.sq_delay(),
+            delay=0,
         )
 
     def _gen_park(self):
@@ -303,12 +300,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         # CODEWORDS 1-4: CZ
         for this_cz in ["NE", "NW", "SW", "SE"]:
             self.add_parameter(
-                "cz_wf_generator_%s" % this_cz,
-                initial_value="vcz_dev_waveform",
-                vals=vals.Strings(),
-                parameter_class=ManualParameter,
-            )
-            self.add_parameter(
                 "czd_double_sided_%s" % this_cz,
                 initial_value=False,
                 vals=vals.Bool(),
@@ -320,6 +311,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 vals=vals.Bool(),
                 parameter_class=ManualParameter,
             )
+
             self.add_parameter(
                 "czd_net_integral_%s" % this_cz,
                 docstring="Used determine what the integral of"
@@ -439,7 +431,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 parameter_class=ManualParameter,
             )
             # #################################################################
-            # Development parameters for testing the Victory CZ gate
+            # Development parameters for testing the  new CZ parameterization
             # #################################################################
             self.add_parameter(
                 "czv_time_ramp_middle_%s" % this_cz,
@@ -447,8 +439,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "i.e. going form the interaction pnt on one side of the flux "
                 "arc to the interaction pnt on the other side.",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(0., 500e-9),
-                initial_value=2 / 2.4e9,
+                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
+                initial_value=4 / 2.4e9,
                 unit="s",
                 label="Time ramp middle",
             )
@@ -456,62 +448,39 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 "czv_time_ramp_outside_%s" % this_cz,
                 docstring="Time of the NZ pulse ramps at start and end",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(0., 500e-9),
-                initial_value=1 / 2.4e9,
+                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
+                initial_value=2 / 2.4e9,
                 unit="s",
                 label="Time ramp outside",
             )
             self.add_parameter(
-                "czv_time_sum_sqrs_%s" % this_cz,
-                docstring="The sum of the duration of both squares."
-                "Each square part will have half of this duration."
-                "You should set it close to the speed limit (minimum "
-                "time required to perform a full swap, i.e. 11 -> 02 -> 11)",
+                "czv_speed_limit_%s" % this_cz,
+                docstring="Minimum time required for the CZ gate for a "
+                "single sided square pulse with infinite slope.",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
                 initial_value=7.777e-9,
                 unit="s",
-                label="Sum dur. squares",
+                label="Speed limit",
             )
             self.add_parameter(
-                "czv_time_at_sweetspot_%s" % this_cz,
-                docstring="Time between the two square parts.",
+                "czv_total_time_%s" % this_cz,
+                docstring="Total gate time",
                 parameter_class=ManualParameter,
-                vals=vals.Numbers(0., 500e-9),
-                initial_value=0.,
+                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
+                initial_value=40e-9,
                 unit="s",
-                label="Time at sweet spot",
+                label="Total gate time",
             )
             self.add_parameter(
-                "czv_time_before_q_ph_corr_%s" % this_cz,
-                docstring="Time after main pulse before single qubit phase "
-                "correction.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0., 500e-9),
-                initial_value=0.,
-                unit="s",
-                label="Time before correction",
-            )
-            self.add_parameter(
-                "czv_amp_sq_%s" % this_cz,
+                "czv_sq_amp_%s" % this_cz,
                 docstring="Amplitude of the square parts of the NZ pulse. "
                 "1.0 means qubit detuned to the 11-02 interaction point.",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(0.0, 10.0),
                 initial_value=1.0,
                 unit="a.u.",
-                label="Relative amp.",
-            )
-            self.add_parameter(
-                "czv_amp_dac_at_11_02_%s" % this_cz,
-                docstring="DAC amplitude (in the case of HDAWG) at the 11-02 "
-                "interaction point. NB: the units might be different for some "
-                "other AWG that is distinct from the HDAWG.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 1.0),
-                initial_value=0.5,
-                unit="a.u.",
-                label="DAC amp at the interaction point",
+                label="Relative amp",
             )
             self.add_parameter(
                 "czv_amp_q_ph_corr_%s" % this_cz,
@@ -525,12 +494,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             )
             self.add_parameter(
                 "czv_time_q_ph_corr_%s" % this_cz,
-                docstring="Total time of the single qubit phase correction NZ pulse",
+                docstring="Time of the single qubit phase correction on "
+                "one side of the NZ. NB: The full pulse will have two of this "
+                "one at the beginning and one at end of the pulse.",
                 parameter_class=ManualParameter,
                 vals=vals.Numbers(0.0, 500e-9),
                 initial_value=0.,
                 unit="s",
-                label="Time phase correction",
+                label="Amp phase correction",
             )
             self.add_parameter(
                 "czv_invert_polarity_%s" % this_cz,
@@ -541,33 +512,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="Pulse polarity inversion",
             )
             self.add_parameter(
-                "czv_mirror_sqrs_%s" % this_cz,
-                docstring="Mirrors the two halves with respect to the point "
-                "of amplitude inversion between the two halves.",
-                parameter_class=ManualParameter,
-                vals=vals.Bool(),
-                initial_value=True,
-                label="Mirror squares",
-            )
-            self.add_parameter(
-                "czv_flip_wf_%s" % this_cz,
-                docstring="Flip the entire waveform, only has an effect when "
-                "`czv_mirror_sqrs_` is `False`",
-                parameter_class=ManualParameter,
-                vals=vals.Bool(),
-                initial_value=False,
-                label="Time-flipped waveform",
-            )
-            self.add_parameter(
-                "czv_correct_q_phase_%s" % this_cz,
-                docstring="",
-                parameter_class=ManualParameter,
-                vals=vals.Bool(),
-                initial_value=False,
-                label="Correct single Q phase?",
-            )
-            self.add_parameter(
-                "czv_incl_q_phase_in_cz_%s" % this_cz,
+                "czv_fixed_amp_%s" % this_cz,
                 docstring="",
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
@@ -575,198 +520,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 label="",
             )
             self.add_parameter(
-                "czv_q_ph_corr_only_%s" % this_cz,
-                docstring="Set True to make the main cz pulse zero and keep "
-                "the single qubit phase corrections.\n"
-                "NB: To get the time alignment right, "
-                "you should set all the czv parameters in the lower freq "
-                "qubit as in the fluxlutman of the high freq qubit and set "
-                "this flag to True.", # this statement need confirmation yet
-                parameter_class=ManualParameter,
-                vals=vals.Bool(),
-                initial_value=False,
-                label="Set main pulse to zero?",
-            )
-            # Parameters equivalent to the new ones added to Quantum Inspire
-            self.add_parameter(
-                "czv_time_step_%s" % this_cz,
-                docstring="Duration of each of the steps inserted after first "
-                "half NZ and just before the second half.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 500.0e-9),
-                initial_value=0.0,
-                unit="s",
-                label="Time step",
-            )
-            self.add_parameter(
-                "czv_amp_step_%s" % this_cz,
-                docstring="Amplitude of the steps inserted after first "
-                "half NZ and just before the second half. "
-                "1.0 means qubit detuned to the 11-02 interaction point.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 10.0),
-                initial_value=0.5,
-                unit="a.u.",
-                label="Step relative amp.",
-            )
-
-            for specificity in ["coarse", "fine"]:
-                self.add_parameter(
-                    "czv_{}_optimal_hull_{}".format(specificity, this_cz),
-                    initial_value=np.array([]),
-                    label="{} hull".format(specificity),
-                    docstring=(
-                        "Stores the boundary points of a optimal region 2D region "
-                        "generated from a landscape. Intended for data points "
-                        "(x, y) = (`czv_amp_sq_XX`, `czv_time_at_sweetspot_XX`)"
-                    ),
-                    parameter_class=ManualParameter,
-                    vals=vals.Arrays(),
-                )
-                self.add_parameter(
-                    "czv_{}_cond_phase_contour_{}".format(specificity, this_cz),
-                    initial_value=np.array([]),
-                    label="{} contour".format(specificity),
-                    docstring=(
-                        "Stores the points for an optimal conditional phase "
-                        "contour generated from a landscape. Intended for data points "
-                        "(x, y) = (`czv_amp_sq_XX`, `czv_time_at_sweetspot_XX`) "
-                        "typically for the 180 deg cond. phase."
-                    ),
-                    parameter_class=ManualParameter,
-                    vals=vals.Arrays(),
-                )
-
-            # #################################################################
-            # Parameters for the "simplified" VCZ
-            # #################################################################
-
-            self.add_parameter(
-                "vcz_amp_dac_at_11_02_%s" % this_cz,
-                docstring="DAC amplitude (in the case of HDAWG) at the 11-02 "
-                "interaction point. NB: the units might be different for some "
-                "other AWG that is distinct from the HDAWG.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 10.0),
-                initial_value=0.5,
-                unit="a.u.",
-                label="DAC amp. at the interaction point",
-            )
-            self.add_parameter(
-                "vcz_amp_sq_%s" % this_cz,
-                docstring="Amplitude of the square parts of the NZ pulse. "
-                "1.0 means qubit detuned to the 11-02 interaction point.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 10.0),
-                initial_value=1.0,
-                unit="a.u.",
-                label="Square relative amp.",
-            )
-            self.add_parameter(
-                "vcz_amp_fine_%s" % this_cz,
-                docstring="Amplitude of the single sample point inserted at "
-                "the end of the first half of the NZ pulse and at the "
-                "beginning of the second half. "
-                "1.0 means same amplitude as `sq_amp_XX`.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 1.0),
-                initial_value=.5,
-                unit="a.u.",
-                label="Fine tuning amp.",
-            )
-            self.add_parameter(
-                "vcz_use_amp_fine_%s" % this_cz,
-                docstring="",
-                parameter_class=ManualParameter,
-                vals=vals.Bool(),
-                initial_value=True,
-                label="Add extra point with amplitude `vcz_amp_fine_XX`?",
-            )
-            self.add_parameter(
-                "vcz_amp_q_ph_corr_%s" % this_cz,
-                docstring="Amplitude at the squares of the NZ pulse for single "
-                "qubit phase correction.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 1.0),
-                initial_value=0.,
-                unit="a.u.",
-                label="Amp. phase correction",
-            )
-            self.add_parameter(
-                "vcz_time_q_ph_corr_%s" % this_cz,
-                docstring="Total time of the single qubit phase correction NZ pulse.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0.0, 500e-9),
-                initial_value=0.,
-                unit="s",
-                label="Time phase correction",
-            )
-            self.add_parameter(
-                "vcz_correct_q_phase_%s" % this_cz,
+                "czv_correct_q_phase_%s" % this_cz,
                 docstring="",
                 parameter_class=ManualParameter,
                 vals=vals.Bool(),
                 initial_value=False,
-                label="Correct single Q phase?",
+                label="",
             )
-            self.add_parameter(
-                "vcz_time_single_sq_%s" % this_cz,
-                docstring="Duration of each square. "
-                "You should set it close to half speed limit (minimum "
-                "time required to perform a full swap, i.e. 11 -> 02 -> 11)",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(1.0 / 2.4e9, 500e-9),
-                initial_value=15.5555555e-9,
-                unit="s",
-                label="Duration single square",
-            )
-            self.add_parameter(
-                "vcz_time_middle_%s" % this_cz,
-                docstring="Time between the two square parts.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0., 500e-9),
-                initial_value=0.,
-                unit="s",
-                label="Time between squares",
-            )
-            self.add_parameter(
-                "vcz_time_before_q_ph_corr_%s" % this_cz,
-                docstring="Time after main pulse before single qubit phase "
-                "correction.",
-                parameter_class=ManualParameter,
-                vals=vals.Numbers(0., 500e-9),
-                initial_value=0.,
-                unit="s",
-                label="Time before correction",
-            )
-
-            for specificity in ["coarse", "fine"]:
-                self.add_parameter(
-                    "vcz_{}_optimal_hull_{}".format(specificity, this_cz),
-                    initial_value=np.array([]),
-                    label="{} hull".format(specificity),
-                    docstring=(
-                        "Stores the boundary points of a optimal region 2D region "
-                        "generated from a landscape. Intended for data points "
-                        "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`)"
-                    ),
-                    parameter_class=ManualParameter,
-                    vals=vals.Arrays(),
-                )
-                self.add_parameter(
-                    "vcz_{}_cond_phase_contour_{}".format(specificity, this_cz),
-                    initial_value=np.array([]),
-                    label="{} contour".format(specificity),
-                    docstring=(
-                        "Stores the points for an optimal conditional phase "
-                        "contour generated from a landscape. Intended for data points "
-                        "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`) "
-                        "typically for the 180 deg cond. phase."
-                    ),
-                    parameter_class=ManualParameter,
-                    vals=vals.Arrays(),
-                )
-
             # #################################################################
             # END new CZ parameterization
             # #################################################################
@@ -786,14 +546,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             unit="s",
             label="Square pulse length",
             initial_value=40e-9,
-            vals=vals.Numbers(0, 100e-6),
-            parameter_class=ManualParameter,
-        )
-        self.add_parameter(
-            "sq_delay",
-            unit="s",
-            label="Square pulse delay",
-            initial_value=0e-9,
             vals=vals.Numbers(0, 100e-6),
             parameter_class=ManualParameter,
         )
@@ -889,21 +641,23 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             modified_wf = np.concatenate([base_wf, corr_pulse])
         return modified_wf
 
-    def _gen_cz(self, which_gate, regenerate_cz=True):
+    def _gen_cz(self, which_gate, regenerate_cz=True, use_victor_waveform=True):
         gate_str = "cz_%s" % which_gate
+        if regenerate_cz:
+            if use_victor_waveform:
+                self._wave_dict[gate_str] = wfl_dev.victor_waveform(self, which_gate=which_gate)
+            else:
+                self._wave_dict[gate_str] = self._gen_adiabatic_pulse(which_gate=which_gate)
 
-        wf_generator = getattr(self, self.get("cz_wf_generator_{}".format(which_gate)), None)
-
-        if wf_generator is not None:
-            if regenerate_cz:
-                self._wave_dict[gate_str] = wf_generator(which_gate=which_gate)
+        # Commented out snippet is old (deprecated ) phase corr 19/6/2018 MAR
+        # phase_corr = self._gen_phase_corr(cz_offset_comp=True)
+        # # CZ with phase correction
+        # cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
+        if not use_victor_waveform:
             cz_pulse = self._get_phase_corrected_pulse(
                 base_wf=self._wave_dict[gate_str], which_gate=which_gate
             )
         else:
-            wf_generator = getattr(wfl_dev, self.get("cz_wf_generator_{}".format(which_gate)))
-            if regenerate_cz:
-                self._wave_dict[gate_str] = wf_generator(self, which_gate=which_gate)
             cz_pulse = self._wave_dict[gate_str]
 
         return cz_pulse
@@ -1065,21 +819,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         polycoeffs_B = self.get_polycoeffs_state(state=state_B, which_gate=which_gate)
         polycoeffs = polycoeffs_B - polycoeffs_A
         return np.polyval(polycoeffs, amp)
-
-    def calc_eps_to_dac(
-        self,
-        eps,
-        state_A: str = "01",
-        state_B: str = "02",
-        which_gate: str = "NE",
-        positive_branch=True,
-    ):
-        """
-        See `calc_eps_to_amp`
-        """
-        return (self.calc_eps_to_amp(
-            eps, state_A, state_B, which_gate, positive_branch) *
-            self.get_amp_to_dac_val_scalefactor())
 
     def calc_eps_to_amp(
         self,
@@ -1894,39 +1633,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return ax
 
-    # Here for convenience, no need to be a method
-    def plot_cz_waveforms(
-        self,
-        qubits: list,
-        which_gate_list: list,
-        ax=None,
-        show: bool = True
-    ):
-        """
-        Plots the cz waveforms from several flux lutamns, mainly for
-        verification, time alignment and debugging
-        """
-        if ax is None:
-            fig, ax = plt.subplots(1, 1)
-        flux_lm_list = [
-            self.find_instrument("flux_lm_{}".format(qubit))
-            for qubit in qubits
-        ]
-
-        for flux_lm, which_gate, qubit in zip(flux_lm_list, which_gate_list, qubits):
-            flux_lm.generate_standard_waveforms()
-            waveform_name = "cz_{}".format(which_gate)
-            ax.plot(
-                flux_lm._wave_dict[waveform_name], ".-",
-                label=waveform_name + " " + qubit
-            )
-        ax.legend()
-        fig = ax.get_figure()
-
-        if show:
-            fig.show()
-
-        return fig
     #################################
     #  Simulation methods           #
     #################################
@@ -1945,18 +1651,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 docstring="Noise and other parameters for CZ simulation.",
                 parameter_class=InstrumentRefParameter,
             )
-
-        self.add_parameter(
-            "step_response",
-            initial_value=np.array([]),
-            label="Step response",
-            docstring=(
-                "Stores the normalized flux line step response. "
-                "Intended for use in cz simulations with noise."
-            ),
-            parameter_class=ManualParameter,
-            vals=vals.Arrays(),
-        )
 
     def sim_CZ(self, fluxlutman_static, which_gate=None, qois="all"):
         """
@@ -2379,144 +2073,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             print(best_mv_res)
             # Returning same shapes as above for uniformity
             return [best_par_res], [best_mv_res]
-
-    # Here for convenience, no need to be a method
-    def align_czv_q_phase_corr_with(
-        self,
-        this_which_gate: str,
-        that_qubit: str,
-        that_which_gate: str,
-        allow_any_comb: bool = False,
-        plot_waveforms: bool = True
-    ):
-        """
-        Copies all the relevant parameters from the other flux_lm such
-        that the beginning of the corrections match on both. By coping all the
-        parameters of the waveform we ensure that the waveform will be generated in
-        the exact way regarding timing at the individual sample points level.
-        """
-        that_flux_lm = self.find_instrument("flux_lm_{}".format(that_qubit))
-
-        opt_1 = (this_which_gate == "NE") and (that_which_gate == "SW")
-        opt_2 = (this_which_gate == "NW") and (that_which_gate == "SE")
-        if not (opt_1 or opt_2):
-            # To avoid stupid mistakes
-            msg = "Are you sure you wanted to match `{} {}` with `{} {}`?".format(
-                self.name, this_which_gate, that_flux_lm.name, that_which_gate
-            )
-            log.error(msg)
-            if not allow_any_comb:
-                raise Exception("Aborting copying parameters!")
-
-        that_gen_par_name = "cz_wf_generator_{}".format(that_which_gate)
-        this_gen_par_name = "cz_wf_generator_{}".format(this_which_gate)
-
-        that_wf_generator_name = that_flux_lm.get(that_gen_par_name)
-        this_wf_generator_name = self.get(this_gen_par_name)
-        if this_wf_generator_name != that_wf_generator_name:
-            raise Exception("Both waveform generators must be the same!")
-
-        this_f_is_for = "vcz_dev_waveform"
-        if that_wf_generator_name != this_f_is_for:
-            raise Exception("This alignment work only with `" + this_f_is_for + "` waveform generator! "
-                "Check `{}` and see also `align_vcz_q_phase_corr_with`".format(that_gen_par_name))
-
-        par_names = {
-            "czv_time_at_sweetspot_{}",
-            "czv_time_sum_sqrs_{}",
-            "czv_time_ramp_middle_{}",
-            "czv_time_ramp_outside_{}",
-            "czv_time_before_q_ph_corr_{}",
-            "czv_time_q_ph_corr_{}",
-            "czv_time_step_{}",  # To be removed if not used in final VCZ
-            "czv_amp_sq_{}",
-            "czv_amp_step_{}",  # To be removed if not used in final VCZ
-            "czv_mirror_sqrs_{}",
-            "czv_flip_wf_{}",
-            "czv_incl_q_phase_in_cz_{}",
-        }
-        # Copy all relevant parameters
-        for par_name in par_names:
-            par_val = that_flux_lm.get(par_name.format(that_which_gate))
-            self.set(par_name.format(this_which_gate), par_val)
-
-        # It is assumed `self` is the low freq. qubit
-        self.set("czv_q_ph_corr_only_{}".format(this_which_gate), True)
-
-        for flux_lm in [self, that_flux_lm]:
-            flux_lm.generate_standard_waveforms()
-
-        if plot_waveforms:
-            self.plot_cz_waveforms(
-                [self.name.split("_")[-1], that_qubit],
-                [this_which_gate, that_which_gate]
-            )
-
-    # Here for convenience, no need to be a method
-    def align_vcz_q_phase_corr_with(
-        self,
-        this_which_gate: str,
-        that_qubit: str,
-        that_which_gate: str,
-        allow_any_comb: bool = False,
-        plot_waveforms: bool = True,
-        **plt_kw
-    ):
-        """
-        Copies all the relevant parameters from the other flux_lm such
-        that the beginning of the corrections match on both. By coping all the
-        parameters of the waveform we ensure that the waveform will be generated in
-        the exact way regarding timing at the individual sample points level.
-        """
-        that_flux_lm = self.find_instrument("flux_lm_{}".format(that_qubit))
-
-        opt_1 = (this_which_gate == "NE") and (that_which_gate == "SW")
-        opt_2 = (this_which_gate == "NW") and (that_which_gate == "SE")
-        if not (opt_1 or opt_2):
-            # To avoid stupid mistakes
-            msg = "Are you sure you wanted to match `{} {}` with `{} {}`?".format(
-                self.name, this_which_gate, that_flux_lm.name, that_which_gate
-            )
-            log.error(msg)
-            if not allow_any_comb:
-                raise Exception("Aborting copying parameters!")
-
-        that_gen_par_name = "cz_wf_generator_{}".format(that_which_gate)
-        this_gen_par_name = "cz_wf_generator_{}".format(this_which_gate)
-
-        that_wf_generator_name = that_flux_lm.get(that_gen_par_name)
-        this_wf_generator_name = self.get(this_gen_par_name)
-        if this_wf_generator_name != that_wf_generator_name:
-            raise Exception("Both waveform generators must be the same!")
-
-        this_f_is_for = "vcz_simplified_waveform"
-        if that_wf_generator_name != this_f_is_for:
-            raise Exception("This alignment work only with `" + this_f_is_for + "` waveform generator! "
-                "Check `{}` and see also `align_vcz_q_phase_corr_with`".format(that_gen_par_name))
-
-        par_names = {
-            "vcz_time_middle_{}",
-            "vcz_time_single_sq_{}",
-            "vcz_time_before_q_ph_corr_{}",
-            "vcz_use_amp_fine_{}"
-        }
-        # Copy all relevant parameters
-        for par_name in par_names:
-            par_val = that_flux_lm.get(par_name.format(that_which_gate))
-            self.set(par_name.format(this_which_gate), par_val)
-
-        # It is assumed `self` is the low freq. qubit
-        self.set("vcz_amp_sq_{}".format(this_which_gate), 0)
-
-        for flux_lm in [self, that_flux_lm]:
-            flux_lm.generate_standard_waveforms()
-
-        if plot_waveforms:
-            self.plot_cz_waveforms(
-                [self.name.split("_")[-1], that_qubit],
-                [this_which_gate, that_which_gate],
-                **plt_kw
-            )
 
 
 class QWG_Flux_LutMan(HDAWG_Flux_LutMan):

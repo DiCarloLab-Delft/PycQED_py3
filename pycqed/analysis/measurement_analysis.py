@@ -277,14 +277,14 @@ class MeasurementAnalysis(object):
             names = self.get_key('sweep_parameter_names')
 
             ind = names.index(key)
-            values = self.g['Data'].value[:, ind]
+            values = self.g['Data'][()][:, ind]
         elif key in self.get_key('value_names'):
             names = self.get_key('value_names')
             ind = (names.index(key) +
                    len(self.get_key('sweep_parameter_names')))
-            values = self.g['Data'].value[:, ind]
+            values = self.g['Data'][()][:, ind]
         else:
-            values = self.g[key][()] # changed deprecated self.g[key].value => self.g[key][()]
+            values = self.g[key][()]  # changed deprecated self.g[key].value => self.g[key][()]
         # Makes sure all data is np float64
         return np.asarray(values, dtype=np.float64)
 
@@ -3784,12 +3784,12 @@ class SSRO_Analysis(MeasurementAnalysis):
                                               bins=n_bins,
                                               range=[[I_min, I_max],
                                                      [Q_min, Q_max]],
-                                              normed=True)
+                                              density=True)
         H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
                                               bins=n_bins,
                                               range=[[I_min, I_max, ],
                                                      [Q_min, Q_max, ]],
-                                              normed=True)
+                                              density=True)
 
         # this part performs 2D gaussian fits and calculates coordinates of the
         # maxima
@@ -4150,10 +4150,10 @@ class SSRO_Analysis(MeasurementAnalysis):
             fig, axes = plt.subplots(figsize=(7, 4))
             n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=40,
                                             label='1 I', histtype='step',
-                                            color='red', normed=False)
+                                            color='red', density=False)
             n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=40,
                                             label='0 I', histtype='step',
-                                            color='blue', normed=False)
+                                            color='blue', density=False)
             pylab.clf()
             # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50),
             #                          normed=1)
@@ -4284,7 +4284,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.y1_0 = y1_0
         self.y1_1 = y1_1
 
-
     def plot_2D_histograms(self, shots_I_0, shots_Q_0, shots_I_1, shots_Q_1,
                            **kw):
         cmap = kw.pop('cmap', 'viridis')
@@ -4299,12 +4298,12 @@ class SSRO_Analysis(MeasurementAnalysis):
                                               bins=n_bins,
                                               range=[[I_min, I_max],
                                                      [Q_min, Q_max]],
-                                              normed=True)
+                                              density=True)
         H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
                                               bins=n_bins,
                                               range=[[I_min, I_max, ],
                                                      [Q_min, Q_max, ]],
-                                              normed=True)
+                                              density=True)
 
         fig, axarray = plt.subplots(nrows=1, ncols=2)
         axarray[0].tick_params(axis='both', which='major',
@@ -4316,7 +4315,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         axarray[0].set_title('2D histogram, pi pulse')
         im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest',
-                                origin='low', aspect='auto',
+                                origin='lower', aspect='auto',
                                 extent=[xedges1[0], xedges1[-1],
                                         yedges1[0], yedges1[-1]], cmap=cmap)
 
@@ -4332,7 +4331,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         # plotting 2D histograms of mmts with no pulse
         axarray[1].set_title('2D histogram, no pi pulse')
         im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest',
-                                origin='low', aspect='auto',
+                                origin='lower', aspect='auto',
                                 extent=[xedges0[0], xedges0[-1], yedges0[0],
                                         yedges0[-1]], cmap=cmap)
 
@@ -4389,7 +4388,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
                                                    max(max(I_shots), 1e-6)],
                                                   [min(min(Q_shots), -1e-6),
                                                    max(max(Q_shots), 1e-6)]],
-                                           normed=True)
+                                           density=True)
         self.H = H
         self.xedges = xedges
         self.yedges = yedges
@@ -4561,7 +4560,7 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
             self.units = self.value_units[0]
 
     def histogram_shots(self, shots):
-        hist, bins = np.histogram(shots, bins=90, normed=True)
+        hist, bins = np.histogram(shots, bins=90, density=True)
         # 0.7 bin widht is a sensible default for plotting
         centers = (bins[:-1] + bins[1:]) / 2
         return hist, bins, centers

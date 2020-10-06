@@ -24,7 +24,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement import calibration_toolbox as cal_toolbox
 from pycqed.measurement.openql_experiments.openql_helpers import \
-    load_range_of_oql_programs
+    load_range_of_oql_programs, load_range_of_oql_programs_from_filenames
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
@@ -34,6 +34,7 @@ import pytest
 import cma
 from pycqed.measurement.optimization import nelder_mead
 import datetime
+import multiprocessing
 
 # Imported for a type check
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
@@ -239,6 +240,13 @@ class CCLight_Transmon(Qubit):
                        ' readout pulse and the instruction that triggers the '
                        'acquisition. The positive number means that the '
                        'acquisition is started after the pulse is send.'))
+        self.add_parameter(
+            'ro_pulse_delay', unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(0, 1e-6),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('The delay time for the readout pulse'))
 
         self.add_parameter(
             'ro_acq_mixer_phi', unit='degree',
@@ -803,7 +811,8 @@ class CCLight_Transmon(Qubit):
         self._prep_cw_spec()
         # source is turned on in measure spec when needed
         self.instr_LO_mw.get_instr().off()
-        self.instr_spec_source.get_instr().off()
+        if self.instr_spec_source() != None:
+            self.instr_spec_source.get_instr().off()
         if self.instr_spec_source_2() != None:
             self.instr_spec_source_2.get_instr().off()
 
@@ -815,7 +824,8 @@ class CCLight_Transmon(Qubit):
         else:
             marker_source = 'ext'
 
-        self.instr_spec_source.get_instr().power(self.spec_pow())
+        if self.instr_spec_source() != None:
+            self.instr_spec_source.get_instr().power(self.spec_pow())
 
     def prepare_readout(self, CW=False):
         """
@@ -1022,6 +1032,8 @@ class CCLight_Transmon(Qubit):
                       self.ro_pulse_length())
             ro_lm.set('M_amp_R{}'.format(idx),
                       ro_amp)
+            ro_lm.set('M_delay_R{}'.format(idx),
+                      self.ro_pulse_delay())
             ro_lm.set('M_phi_R{}'.format(idx),
                       self.ro_pulse_phi())
             ro_lm.set('M_down_length0_R{}'.format(idx),
@@ -1142,7 +1154,8 @@ class CCLight_Transmon(Qubit):
             self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
-        self.instr_spec_source.get_instr().off()
+        if self.instr_spec_source() is not None:
+            self.instr_spec_source.get_instr().off()
         self.instr_LO_mw.get_instr().on()
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.instr_LO_mw.get_instr().frequency.set(
@@ -3000,7 +3013,8 @@ class CCLight_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC(),
-            trigger_idx=0 if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
+            # trigger_idx=0 if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
+            trigger_idx=1,
             wait_time_ns=wait_time_ns)
 
         CCL.eqasm_program(p.filename)
@@ -4273,14 +4287,14 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
 
         if initial_steps is None:
-            initial_steps: list = [0.05, 0.05]
+            initial_steps: list = [0.05, 0.05, 1e6]
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
 
         if parameter_list is None:
-            parameter_list = ['G_amp', 'D_amp']
-            # parameter_list = ['G_amp', 'D_amp','freq']
+            # parameter_list = ['G_amp', 'D_amp']
+            parameter_list = ['G_amp', 'D_amp','freq']
 
         mw_lutman = self.instr_LutMan_MW.get_instr()
 
@@ -4300,7 +4314,6 @@ class CCLight_Transmon(Qubit):
                 sweep_pars.append(D_amp_par)
             elif par == 'freq':
                 sweep_pars.append(freq_par)
-
             else:
                 raise NotImplementedError(
                     "Parameter {} not recognized".format(par))
@@ -5617,10 +5630,16 @@ class CCLight_Transmon(Qubit):
             return a
 
     def measure_single_qubit_randomized_benchmarking(
-            self, nr_cliffords=2**np.arange(12), nr_seeds=100,
+            self, nr_cliffords=2**np.arange(12),
+            nr_seeds=100,
             MC=None,
-            recompile: bool = 'as needed', prepare_for_timedomain: bool = True,
-            ignore_f_cal_pts: bool = False, ro_acq_weight_type: str = "optimal IQ"):
+            recompile: bool = 'as needed',
+            prepare_for_timedomain: bool = True,
+            ro_acq_weight_type: str = "optimal IQ",
+            compile_only: bool = False,
+            pool=None,  # a multiprocessing.Pool()
+            rb_tasks=None  # used after called with `compile_only=True`
+    ):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -5654,9 +5673,6 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        counter_param = ManualParameter('name_ctr', initial_value=0)
-        programs = []
-
         # Settings that have to be changed....
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
@@ -5676,53 +5692,77 @@ class CCLight_Transmon(Qubit):
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
 
-        t0 = time.time()
         net_cliffords = [0, 3]  # always measure double sided
-        print('Generating {} RB programs'.format(nr_seeds))
-        for i in range(nr_seeds):
-            p = cl_oql.randomized_benchmarking(
-                qubits=[self.cfg_qubit_nr()],
-                nr_cliffords=nr_cliffords,
-                net_cliffords=net_cliffords,  # always measure double sided
-                nr_seeds=1,
-                platf_cfg=self.cfg_openql_platform_fn(),
-                program_name='RB_s{}_ncl{}_net{}_{}'.format(
-                    i, nr_cliffords, net_cliffords, self.name),
-                recompile=recompile)
-            programs.append(p)
-            print('Generated {} RB programs in {:.1f}s'.format(
-                i+1, time.time()-t0), end='\r')
-        print('Succesfully generated {} RB programs in {:.1f}s'.format(
-            nr_seeds, time.time()-t0))
+
+        def send_rb_tasks(pool_):
+            tasks_inputs = []
+            for i in range(nr_seeds):
+                task_dict = dict(
+                    qubits=[self.cfg_qubit_nr()],
+                    nr_cliffords=nr_cliffords,
+                    net_cliffords=net_cliffords,  # always measure double sided
+                    nr_seeds=1,
+                    platf_cfg=self.cfg_openql_platform_fn(),
+                    program_name='RB_s{}_ncl{}_net{}_{}'.format(
+                        i, nr_cliffords, net_cliffords, self.name),
+                    recompile=recompile
+                )
+                tasks_inputs.append(task_dict)
+            # pool.starmap_async can be used for positional arguments
+            # but we are using a wrapper
+            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+
+            return rb_tasks
+
+        if compile_only:
+            assert pool is not None
+            rb_tasks = send_rb_tasks(pool)
+            return rb_tasks
+
+        if rb_tasks is None:
+            # Using `with ...:` makes sure the other processes will be terminated
+            # avoid starting too mane processes,
+            # nr_processes = None will start as many as the PC can handle
+            nr_processes = None if recompile else 1
+            with multiprocessing.Pool(nr_processes) as pool:
+                rb_tasks = send_rb_tasks(pool)
+                cl_oql.wait_for_rb_tasks(rb_tasks)
+
+        print(rb_tasks)
+        programs_filenames = rb_tasks.get()
+
+        counter_param = ManualParameter('name_ctr', initial_value=0)
         prepare_function_kwargs = {
             'counter_param': counter_param,
-            'programs': programs,
+            'programs_filenames': programs_filenames,
             'CC': self.instr_CC.get_instr()}
 
         # to include calibration points
         sweep_points = np.append(
             # repeat twice because of net clifford being 0 and 3
             np.repeat(nr_cliffords, 2),
-            [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2 +
-            [nr_cliffords[-1]+2.5]*2,
+            [nr_cliffords[-1] + .5] * 2 + [nr_cliffords[-1] + 1.5] * 2 +
+            [nr_cliffords[-1] + 2.5] * 2,
         )
 
         d = self.int_log_det
-        d.prepare_function = load_range_of_oql_programs
+        d.prepare_function = load_range_of_oql_programs_from_filenames
         d.prepare_function_kwargs = prepare_function_kwargs
-        reps_per_seed = 4094//len(sweep_points)
-        d.nr_shots = reps_per_seed*len(sweep_points)
+        reps_per_seed = 4094 // len(sweep_points)
+        d.nr_shots = reps_per_seed * len(sweep_points)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
 
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
         MC.set_detector_function(d)
-        MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix,
+        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix,
                exp_metadata={'bins': sweep_points})
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
-            label='RB_', ignore_f_cal_pts=ignore_f_cal_pts)
+            label='RB_',
+            rates_I_quad_ch_idx=0,
+            cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2))
         return a
 
     def measure_randomized_benchmarking_old(self, nr_cliffords=2**np.arange(12),

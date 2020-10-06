@@ -15,18 +15,18 @@ mainLoop:                                               #
   # slot=1, instrument='ro_1', group=0': signal='[dummy]'
  # last bundle of kernel, will pad outputs to match durations
   # slot=1, instrument='ro_1': lastStartCycle=0, start_cycle=1, slotDurationInCycles=300
-[1]             seq_out         0x00000000,301          # cycle 0-301: padding on 'ro_2'
-[2]             seq_out         0x00000000,301          # cycle 0-301: padding on 'mw_0'
-[3]             seq_out         0x00000000,301          # cycle 0-301: padding on 'flux_0'
-[4]             seq_out         0x00000000,301          # cycle 0-301: padding on 'mw_1'
+[0]             seq_out         0x00000000,301          # cycle 0-301: padding on 'ro_2'
+[1]             seq_out         0x00000000,301          # cycle 0-301: padding on 'mw_0'
+[2]             seq_out         0x00000000,301          # cycle 0-301: padding on 'flux_0'
+[3]             seq_out         0x00000000,301          # cycle 0-301: padding on 'mw_1'
 # sequence
-[6]             seq_out         0x00000000,20           # 00000000000000000000000000000000
-[6]             seq_out         0x82498249,2            # 10000010010010011000001001001001
-[6]             seq_out         0x84928492,2            # 10000100100100101000010010010010
-[6]             seq_out         0x86DB86DB,2            # 10000110110110111000011011011011
-[6]             seq_out         0x89248924,2            # 10001001001001001000100100100100
-[6]             seq_out         0x8B6D8B6D,2            # 10001011011011011000101101101101
-[6]             seq_out         0x8DB68DB6,2            # 10001101101101101000110110110110
-[6]             seq_out         0x8FFF8FFF,2            # 10001111111111111000111111111111
+[4]             seq_out         0x00000000,20           # 00000000000000000000000000000000
+[4]             seq_out         0x82498249,2            # 10000010010010011000001001001001
+[4]             seq_out         0x84928492,2            # 10000100100100101000010010010010
+[4]             seq_out         0x86DB86DB,2            # 10000110110110111000011011011011
+[4]             seq_out         0x89248924,2            # 10001001001001001000100100100100
+[4]             seq_out         0x8B6D8B6D,2            # 10001011011011011000101101101101
+[4]             seq_out         0x8DB68DB6,2            # 10001101101101101000110110110110
+[4]             seq_out         0x8FFF8FFF,2            # 10001111111111111000111111111111
 
                 jmp             @mainLoop               # loop indefinitely

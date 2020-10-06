@@ -1729,7 +1729,6 @@ class RTE_analysis(ba.BaseDataAnalysis):
 ######################################
 # Plotting functions
 ######################################
-
 def calc_assignment_prob_matrix(combinations, digitized_data):
 
     assignment_prob_matrix = np.zeros((len(combinations), len(combinations)))
@@ -2238,6 +2237,7 @@ def plot_mux_transients_optimal(Time,
 
     fig.tight_layout()
 
+
 def plot_single_parity_histogram(Histogram_data: list,
                                  para_hist: dict,
                                  threshold: float,
@@ -2336,8 +2336,3 @@ def plot_RTE_histogram(qubit_label: str,
     fig = ax.get_figure()
     fig.suptitle('{}'.format(timestamp), y=1.05)
     fig.tight_layout()
-
-
-
-
-

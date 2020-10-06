@@ -23,6 +23,7 @@ from pycqed.measurement.waveform_control_CC.qasm_compiler_helpers import \
     get_timepoints_from_label
 
 
+@unittest.skip(reason="As decided in #635 this tests are considered non-important")
 class Test_compiler(unittest.TestCase):
 
     @classmethod
@@ -277,6 +278,7 @@ class Test_compiler(unittest.TestCase):
         self.assertEqual(qumis_instrs[0], qumis_instrs[1])
 
 
+@unittest.skip(reason="As decided in #635 this tests are considered non-important")
 class Test_single_qubit_seqs(unittest.TestCase):
 
     @classmethod
@@ -430,6 +432,7 @@ class Test_single_qubit_seqs(unittest.TestCase):
                 compiler.qumis_instructions.count('trigger 0000001, 3'), 15)
 
 
+@unittest.skip(reason="As decided in #635 this tests are considered non-important")
 class Test_multi_qubit_seqs(unittest.TestCase):
 
     @classmethod
@@ -483,6 +486,7 @@ class Test_multi_qubit_seqs(unittest.TestCase):
         compiler.timing_event_list
 
 
+@unittest.skip(reason="As decided in #635 this tests are considered non-important")
 class Capturing(list):
 
     def __enter__(self):

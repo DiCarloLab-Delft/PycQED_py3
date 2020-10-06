@@ -1,6 +1,7 @@
 import json
 from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _flux_lutmap
 
+
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
                     flux_pulse_duration: int=40,
@@ -62,7 +63,7 @@ def generate_config(filename: str,
                    ("q14", "q16"), ("q16", "q14")
                    ]
 
-    """ 
+    """
     CC_light compiler is still used in QCC, but simply with different number of qubits
     assigned and a different topology definition (flux_tuples)
     """
@@ -227,6 +228,7 @@ def generate_config(filename: str,
 
             # Decomposition of two qubit flux interations as single-qubit flux
             # operations without parking pulses
+            # Implicit parking pulses added for Surface-4
             # Edge 0/24
             "cz q0, q2": ['sf_cz_ne q2', 'sf_cz_sw q0'],
             "cz q2, q0": ['sf_cz_ne q2', 'sf_cz_sw q0'],
@@ -239,10 +241,10 @@ def generate_config(filename: str,
             "cz q6, q2": ['sf_cz_nw q6', 'sf_cz_se q2'],
             # Edge 6/30
             "cz q3, q6": ['sf_cz_ne q6', 'sf_cz_sw q3'],
-            "cz q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3'], 
+            "cz q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3'],
             # Edge 2/26
             "cz q1, q4": ['sf_cz_ne q4', 'sf_cz_sw q1'],
-            "cz q4, q1": ['sf_cz_ne q4', 'sf_cz_sw q1'], 
+            "cz q4, q1": ['sf_cz_ne q4', 'sf_cz_sw q1'],
             # Edge 3/27
             "cz q1, q5": ['sf_cz_nw q5', 'sf_cz_se q1'],
             "cz q5, q1": ['sf_cz_nw q5', 'sf_cz_se q1'],
@@ -268,11 +270,11 @@ def generate_config(filename: str,
             "cz q7, q10": ['sf_cz_nw q10', 'sf_cz_se q7'],
             "cz q10, q7": ['sf_cz_nw q10', 'sf_cz_se q7'],
             # Edge 13/37
-            "cz q8, q10": ['sf_cz_ne q10', 'sf_cz_sw q8'],
-            "cz q10, q8": ['sf_cz_ne q10', 'sf_cz_sw q8'],
+            "cz q8, q10": ['sf_cz_ne q10', 'sf_cz_sw q8', 'sf_park q11'],
+            "cz q10, q8": ['sf_cz_ne q10', 'sf_cz_sw q8', 'sf_park q11'],
             # Edge 14/38
-            "cz q8, q11": ['sf_cz_nw q11', 'sf_cz_se q8'],
-            "cz q11, q8": ['sf_cz_nw q11', 'sf_cz_se q8'],
+            "cz q8, q11": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q10'],
+            "cz q11, q8": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q10'],
             # Edge 15/39
             "cz q9, q11": ['sf_cz_ne q11', 'sf_cz_sw q9'],
             "cz q11, q9": ['sf_cz_ne q11', 'sf_cz_sw q9'],
@@ -318,10 +320,10 @@ def generate_config(filename: str,
             "cz_park q6, q2": ['sf_cz_nw q6', 'sf_cz_se q2', 'sf_park q3'],
             # Edge 6/30
             "cz_park q3, q6": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'],
-            "cz_park q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'], 
+            "cz_park q6, q3": ['sf_cz_ne q6', 'sf_cz_sw q3', 'sf_park q2'],
             # Edge 2/26
             "cz_park q1, q4": ['sf_cz_ne q4', 'sf_cz_sw q1'],
-            "cz_park q4, q1": ['sf_cz_ne q4', 'sf_cz_sw q1'], 
+            "cz_park q4, q1": ['sf_cz_ne q4', 'sf_cz_sw q1'],
             # Edge 3/27
             "cz_park q1, q5": ['sf_cz_nw q5', 'sf_cz_se q1', 'sf_park q2'],
             "cz_park q5, q1": ['sf_cz_nw q5', 'sf_cz_se q1', 'sf_park q2'],

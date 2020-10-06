@@ -2,11 +2,11 @@ from importlib import reload
 from pycqed.measurement import measurement_control as mc
 
 import adaptive
-from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman_dev as flm
+from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman_vcz as flm
 
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ_v2 as scCZ_v2
 from pycqed.simulations import cz_superoperator_simulation_functions_v2 as czf_v2
-from pycqed.measurement.waveform_control_CC import waveforms_flux_dev as wfl_dev
+from pycqed.measurement.waveform_control_CC import waveforms_vcz as wf_vcz
 
 from pycqed.analysis_v2 import measurement_analysis as ma2
 
@@ -23,7 +23,7 @@ import logging
 
 reload(scCZ_v2)
 reload(czf_v2)
-reload(wfl_dev)
+reload(wf_vcz)
 
 np.set_printoptions(threshold=np.inf)
 log = logging.getLogger(__name__)
@@ -116,38 +116,75 @@ def f_to_parallelize_v2(arglist):
                 exp_metadata=exp_metadata,
             )
 
-    if not sim_control_CZ.cluster():
-        coha = ma2.Conditional_Oscillation_Heatmap_Analysis(
-            label=additional_pars["label"],
-            close_figs=True,
-            extract_only=False,
-            plt_orig_pnts=True,
-            plt_contour_L1=True,
-            plt_contour_phase=True,
-            plt_optimal_values=True,
-            plt_optimal_values_max=1,
-            find_local_optimals=True,
-            plt_clusters=False,
-            cluster_from_interp=False,
-            # Saturate colors to limits of interest
-            clims={
-                'L1': [0, 5],
-                "Cost func": [0., 100]
-            },
-            target_cond_phase=180,
-            # Thse allow to select the best points
-            phase_thr=7,
-            L1_thr=.5,
-            clustering_thr=0.15,
-            # These allow to generate the boundaries of the optimal regions
-            # that can be used as boundaries for LearnerND/LearnerND_Minimizer
-            gen_optima_hulls=True,
-            plt_optimal_hulls=True,
-            hull_L1_thr=.5,
-            hull_phase_thr=7,
-            # In case we do linear sweeps
-            interp_grid_data=False
-        )
+
+    elif exp_metadata["mode"] == "contour_scan":
+        
+        from pycqed.analysis_v2.tools import contours2d as c2d
+        from pycqed.measurement import sweep_functions as swf
+
+        timestamp = sim_control_CZ.timestamp_for_contour()
+        coha_for_contour = ma2.Conditional_Oscillation_Heatmap_Analysis(
+                    t_start=timestamp,
+                    t_stop=timestamp,
+                    close_figs=True,
+                    extract_only=False,
+                    plt_orig_pnts=True,
+                    plt_contour_L1=False,
+                    plt_contour_phase=True,
+                    plt_optimal_values=True,
+                    plt_optimal_values_max=1,
+                    find_local_optimals=True,
+                    plt_clusters=False,
+                    cluster_from_interp=False,
+                    clims={
+                        "Cost func": [0., 100],
+                        "missing fraction": [0, 30],
+                        "offset difference": [0, 30]
+                    },
+                    target_cond_phase=180,
+                    phase_thr=15,
+                    L1_thr=5,
+                    clustering_thr=0.15,
+                    gen_optima_hulls=True,
+                    hull_L1_thr=10,
+                    hull_phase_thr=20,
+                    plt_optimal_hulls=True,
+                    save_cond_phase_contours=[180],
+                )
+
+        c_180 = coha_for_contour.proc_data_dict["quantities_of_interest"]["cond_phase_contours"]["180"]["0"]
+        hull = coha_for_contour.proc_data_dict["quantities_of_interest"]["hull_vertices"]["0"]
+
+        c_180_in_hull = c2d.pnts_in_hull(pnts=c_180, hull=hull)
+        if c_180_in_hull[0][0] > c_180_in_hull[-1][0]:
+            c_180_in_hull = np.flip(c_180_in_hull, axis=0)
+
+        swf_2d_contour = swf.SweepAlong2DContour(getattr(fluxlutman, "vcz_amp_sq_{}".format(which_gate)), 
+                                                 getattr(fluxlutman, "vcz_amp_fine_{}".format(which_gate)), 
+                                                 c_180_in_hull)
+        MC.set_sweep_function(swf_2d_contour)
+        MC.set_sweep_points(np.linspace(0, 1, 40))
+
+        if sim_control_CZ.cluster():
+            dat = MC.run(
+                additional_pars["label"]+"_cluster",
+                mode="1D",
+                exp_metadata=exp_metadata,
+            )
+
+        else:
+            if additional_pars["long_name"]:
+                dat = MC.run(
+                    additional_pars["label"],
+                    mode="1D",
+                    exp_metadata=exp_metadata,
+                )
+            else:
+                dat = MC.run(
+                "contour_scan",
+                mode="1D",
+                exp_metadata=exp_metadata,
+            )
 
     fluxlutman.close()
     fluxlutman_static.close()
@@ -179,7 +216,7 @@ def compute_propagator(arglist):
     )  # waveform is generated according to sampling rate of AWG
 
     wf_generator = getattr(
-        wfl_dev,
+        wf_vcz,
         fluxlutman.get("cz_wf_generator_{}".format(which_gate))
     )
 
@@ -196,6 +233,13 @@ def compute_propagator(arglist):
     # [2020-05-30] probably not needed anymore
     amp = amp * sim_control_CZ.voltage_scaling_factor()
 
+    # For fine tuning of the waiting in the middle for matching sim-exp or studying interference fringes
+    if sim_control_CZ.artificial_waiting_at_sweetspot() != 0 and not sim_control_CZ.get("optimize_const_amp"):
+        index_middle = np.where(amp[1:] == 0)[0][0] + 1
+        amp = np.insert(amp, index_middle, np.zeros(sim_control_CZ.artificial_waiting_at_sweetspot()))
+        intervals_list = np.insert(intervals_list, index_middle, np.zeros(sim_control_CZ.artificial_waiting_at_sweetspot()) + sim_step_new)
+        tlist_new = np.concatenate((tlist_new, np.arange(1, sim_control_CZ.artificial_waiting_at_sweetspot()+1)*sim_step_new + tlist_new[-1]))
+
     # Apply distortions
     if sim_control_CZ.distortions():
         amp_final = czf_v2.distort_amplitude(
@@ -206,7 +250,7 @@ def compute_propagator(arglist):
         )
     else:
         amp_final = amp
-    # czf_v2.plot(x_plot_vec=[np.array(tlist_new)*1e9, np.array(tlist_new)*1e9],y_plot_vec=[fluxlutman.calc_amp_to_freq(amp, '01', which_gate=which_gate) / 1e9, 
+    # czf_v2.plot(x_plot_vec=[np.array(tlist_new)*1e9, np.array(tlist_new)*1e9],y_plot_vec=[fluxlutman.calc_amp_to_freq(amp, '01', which_gate=which_gate) / 1e9,
     #                                                                                    fluxlutman.calc_amp_to_freq(amp_final, '01', which_gate=which_gate) / 1e9],
     #                          title='Pulse with and without distortions',
     #                          xlabel='Time (ns)',ylabel='Frequency (GHz)',
@@ -326,6 +370,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             "cond_phase21",
             "cond_phase03",
             "cond_phase20",
+            "vcz_amp_sq",
+            "vcz_amp_fine",
+            "population_transfer_01_10"
         ]
         self.value_units = [
             "a.u.",
@@ -351,6 +398,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             "deg",
             "deg",
             "deg",
+            "a.u.",
+            "a.u.",
+            "a.u."
         ]
 
         self.qois = qois
@@ -499,6 +549,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 t_final=t_final,
                 fluxlutman=self.fluxlutman,
                 fluxlutman_static=self.fluxlutman_static,
+                sim_control_CZ=self.sim_control_CZ,
                 which_gate=self.sim_control_CZ.which_gate(),
             )
 
@@ -537,6 +588,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 qoi["cond_phase21"],
                 qoi["cond_phase03"],
                 qoi["cond_phase20"],
+                self.fluxlutman.get("vcz_amp_sq_{}".format(self.sim_control_CZ.which_gate())),
+                self.fluxlutman.get("vcz_amp_fine_{}".format(self.sim_control_CZ.which_gate())),
+                qoi["population_transfer_01_10"]
             ]
             qoi_vec = np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
@@ -579,6 +633,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             qoi_plot[0, 20],
             qoi_plot[0, 21],
             qoi_plot[0, 22],
+            qoi_plot[0, 23],
+            qoi_plot[0, 24],
+            qoi_plot[0, 25]
         ]
         if self.qois != "all":
             return np.array(return_values)[self.qoi_mask]

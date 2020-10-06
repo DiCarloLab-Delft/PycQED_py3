@@ -804,7 +804,7 @@ def pro_avfid_superoperator_phasecorrected(U, phases):
         return np.real(qtp.average_gate_fidelity(U, target=U_target_diffdims))
 
 
-def offset_difference_and_missing_fraction(U):
+def offset_difference_and_missing_fraction(U, fluxlutman, fluxlutman_static, sim_control_CZ, which_gate):
 
     X90 = bloch_sphere_rotation(np.pi / 2, [1, 0, 0])
     X90_q0 = qubit_to_2qutrit_unitary(X90, "right")
@@ -817,6 +817,32 @@ def offset_difference_and_missing_fraction(U):
         [],
         [],
     ]  # [[q0 NOT pi pulsed],[q1 NOT pi pulsed],[q0 pi pulsed],[q1 pi pulsed]]
+
+    if sim_control_CZ.measurement_time() != 0:
+        # Obtain jump operators for Lindblad equation
+        c_ops = return_jump_operators(
+            sim_control_CZ=sim_control_CZ,
+            amp_final=[0],
+            fluxlutman=fluxlutman,
+            which_gate=which_gate,
+        )
+        # Compute propagator
+        ampdamp_meas_superop = time_evolution_new(
+            c_ops=c_ops,
+            sim_control_CZ=sim_control_CZ,
+            fluxlutman_static=fluxlutman_static,
+            fluxlutman=fluxlutman,
+            fluxbias_q1=0,
+            amp=[0],
+            sim_step=1/fluxlutman.sampling_rate()/sim_control_CZ.simstep_div(),
+            intervals_list=[sim_control_CZ.measurement_time()],
+            which_gate=which_gate,
+        )
+        if c_ops == []:
+            ampdamp_meas_superop = qtp.to_super(ampdamp_meas_superop)
+    else:
+        ampdamp_meas_superop = 1
+
     for pi_pulse in [False, True]:
 
         n_samples = 100
@@ -834,7 +860,7 @@ def offset_difference_and_missing_fraction(U):
             if U.type == "oper":
                 U = qtp.to_super(U)
 
-            U_tot = post_operations * U * pre_operations
+            U_tot = ampdamp_meas_superop * post_operations * U * pre_operations
 
             population_in_0_q0 = (
                 U_tot[
@@ -1158,7 +1184,7 @@ def time_evolution_new(
 
 
 def simulate_quantities_of_interest_superoperator_new(
-    U, t_final, fluxlutman, fluxlutman_static, which_gate: str = "NE"
+    U, t_final, fluxlutman, fluxlutman_static, sim_control_CZ, which_gate: str = "NE"
 ):
     """
     Calculates the quantities of interest from the propagator (either unitary or superoperator)
@@ -1189,7 +1215,11 @@ def simulate_quantities_of_interest_superoperator_new(
     )
     # print('avgatefid_compsubspace',avgatefid_compsubspace)
     offset_difference, missing_fraction = offset_difference_and_missing_fraction(
-        U_final
+        U_final,
+        fluxlutman = fluxlutman,
+        fluxlutman_static = fluxlutman_static,
+        sim_control_CZ = sim_control_CZ,
+        which_gate = which_gate
     )
 
     population_transfer_12_21 = average_population_transfer_subspace_to_subspace(
@@ -1240,6 +1270,10 @@ def simulate_quantities_of_interest_superoperator_new(
     phase_diff_12_02 = (phases[6] - phases[4] - phase_q1) % 360
     phase_diff_21_20 = (phases[7] - phases[5] - phase_q0) % 360
 
+    population_transfer_01_10 = average_population_transfer_subspace_to_subspace(
+        U_final, states_in=[[0, 1]], states_out=[[1, 0]]
+    )
+
     return {
         "phi_cond": phi_cond,
         "L1": L1,
@@ -1263,6 +1297,7 @@ def simulate_quantities_of_interest_superoperator_new(
         "cond_phase20": cond_phase20,
         "population_transfer_12_21": population_transfer_12_21,
         "population_transfer_12_03": population_transfer_12_03,
+        "population_transfer_01_10": population_transfer_01_10
     }
 
 

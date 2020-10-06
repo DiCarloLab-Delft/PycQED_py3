@@ -1093,7 +1093,7 @@ class QWGMultiDevices:
     def dio_calibration(cc, qwgs: List[QuTech_AWG_Module],
             verbose: bool = False):
         """
-        Calibrate multiple QWG using a CCLight
+        Calibrate multiple QWG using a CCLight, QCC or other CC-like devices
         First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
         master.
         On failure of calibration an exception is raised.
@@ -1102,12 +1102,12 @@ class QWGMultiDevices:
         Note: Will use the QWG_DIO_Calibration.qisa, cs.txt and qisa_opcodes.qmap
         files to assemble a  calibration program for the CCLight. These files
         should be located in the _QWG subfolder in the path of this file.
-        :param ccl: CCLight device, connection has to be active
+        :param cc: CC-like device, connection has to be active
         :param qwgs: List of QWG which will be calibrated, all QWGs are expected to have an active connection
         :param verbose: Print the DIO calibration rapport of all QWGs
         :return: None
         """
-        
+
         # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
         for qwg in qwgs:
             qwg.stop()
@@ -1121,15 +1121,21 @@ class QWGMultiDevices:
         _qwg_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '_QWG'))
 
-        if "CCL" in cc.IDN()['model']:
+        # [2020-07-08] the "model" can be sometimes "Model"...
+        # this assumes there are no duplicate entries (e.g. upper/lower case)
+        case_insensitive_IDN_keys = {k.lower(): k for k in cc.IDN().keys()}
+
+        if "CCL" in cc.IDN()[case_insensitive_IDN_keys['model']]:
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qisa_opcodes.qmap')
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QWG_DIO_Calibration.qisa')
-        else:
+        elif "QCC" in cc.IDN()[case_insensitive_IDN_keys['model']]:
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qcc_qisa_opcodes.qmap')
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QCC_DIO_Calibration.qisa')
-    
+        else:
+            raise TypeError("CC model not recognized!")
+
         old_cs = cc.control_store()
         old_qisa_opcode = cc.qisa_opcode()
 
@@ -1168,7 +1174,6 @@ class QWGMultiDevices:
         #Set the control store
         cc.control_store(old_cs)
         cc.qisa_opcode(old_qisa_opcode)
-
 
 
 class Mock_QWG(QuTech_AWG_Module):
@@ -1234,4 +1239,7 @@ class Mock_QWG(QuTech_AWG_Module):
         pass
 
     def start(self):
+        pass
+
+    def close(self):  # prevent calling IPInstrument:close()
         pass

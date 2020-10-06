@@ -2,7 +2,6 @@ from collections.abc import Iterable
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.measurement.hdf5_data as h5d
 import numpy as np
-
 import logging
 
 log = logging.getLogger(__name__)
@@ -10,8 +9,6 @@ log = logging.getLogger(__name__)
 # ######################################################################
 # Utilities for evaluating points before starting the runner
 # ######################################################################
-
-
 def evaluate_X(learner, X, x_scale=None):
     """
     Evaluates the learner's sampling function at the given point

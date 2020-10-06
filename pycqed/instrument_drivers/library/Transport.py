@@ -93,9 +93,10 @@ class FileTransport(Transport):
                  in_file_name: str = '') -> None:
         """
         input/output from/to file to support driver testing
+        FIXME: we now have inject() instead of in_file_name
         """
         self._out_file = open(out_file_name, "wb+")
-
+        self._inject_data = '1'  # response to "*OPC?"
     def close(self) -> None:
         self._out_file.close()
 
@@ -107,12 +108,31 @@ class FileTransport(Transport):
         self._out_file.write(data)
 
     def read_binary(self, size: int) -> bytes:
-        pass # FIXME: implement
+        return self._inject_data.encode('utf-8')
 
     def readline(self) -> str:
-        pass # FIXME: implement
+        return self._inject_data
+
+    def inject(self, data: bytes) -> None:
+        """
+        inject data to be returned by read*. Same data can be read multiple times
+        """
+        self._inject_data = data
 
 
 
 class DummyTransport(Transport):
-    pass # NB: only supports output (which goes nowhere) for now
+    def __init__(self) -> None:
+        self._inject_data = '1'  # response to "*OPC?"
+
+    def read_binary(self, size: int) -> bytes:
+        return self._inject_data.encode('utf-8')
+
+    def readline(self) -> str:
+        return self._inject_data
+
+    def inject(self, data: bytes) -> None:
+        """
+        inject data to be returned by read*. Same data can be read multiple times
+        """
+        self._inject_data = data

@@ -47,7 +47,6 @@ from adaptive.learner import SKOptLearner
 
 # Optimizer based on adaptive sampling
 from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
-from pycqed.utilities.learnerND_optimize import LearnerND_Optimize
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer
 import pycqed.utilities.learner_utils as lu
 from . import measurement_control_helpers as mch
@@ -208,6 +207,11 @@ class MeasurementControl(Instrument):
         self.Learner_Minimizer_detected = False
         self.CMA_detected = False
 
+        # Setting this to true adds 5s to each experiment
+        # If possible set to False as default but mind that for now many
+        # Analysis rely on the old snapshot
+        self.save_legacy_snapshot = True
+
     ##############################################
     # Functions used to control the measurements #
     ##############################################
@@ -288,13 +292,13 @@ class MeasurementControl(Instrument):
                     if "bins" in exp_metadata.keys():
                         self.plotting_bins = exp_metadata["bins"]
 
-                if mode is not "adaptive":
+                if mode != "adaptive":
                     try:
                         # required for 2D plotting and data storing.
                         # try except because some swf get the sweep points in the
                         # prepare statement. This needs a proper fix
                         self.xlen = len(self.get_sweep_points())
-                    except:
+                    except Exception:
                         self.xlen = 1
                 if self.mode == "1D":
                     self.measure()
@@ -554,8 +558,7 @@ class MeasurementControl(Instrument):
                                 self.adaptive_function, self.learner
                             )
                         elif (
-                            issubclass(self.adaptive_function, LearnerND_Optimize)
-                            or issubclass(self.adaptive_function, Learner1D_Minimizer)
+                            issubclass(self.adaptive_function, Learner1D_Minimizer)
                             or issubclass(self.adaptive_function, LearnerND_Minimizer)
                         ):
                             # Because this is also an optimizer we save the result
@@ -616,6 +619,7 @@ class MeasurementControl(Instrument):
 
     def measure_hard(self):
         new_data = np.array(self.detector_function.get_values()).astype(np.float64).T
+
         ###########################
         # Shape determining block #
         ###########################
@@ -1053,6 +1057,7 @@ class MeasurementControl(Instrument):
                             self.curves[i]["config"]["x"] = x
                             self.curves[i]["config"]["y"] = y
                             i += 1
+
                             if (
                                 self.Learner_Minimizer_detected
                                 and y_ind == self.par_idx
@@ -2022,7 +2027,6 @@ class MeasurementControl(Instrument):
             res_dict = {"xopt": result.Xi[opt_indx], "fopt": result.yi[opt_indx]}
         elif (
             is_subclass(adaptive_function, Learner1D_Minimizer)
-            or is_subclass(adaptive_function, LearnerND_Optimize)
             or is_subclass(adaptive_function, LearnerND_Minimizer)
         ):
             # result = learner
@@ -2036,7 +2040,7 @@ class MeasurementControl(Instrument):
             xopt = X[opt_indx]
             res_dict = {
                 "xopt": np.array(xopt)
-                if is_subclass(adaptive_function, LearnerND_Optimize)
+                if is_subclass(adaptive_function, LearnerND_Minimizer)
                 or is_subclass(adaptive_function, Learner1D_Minimizer)
                 else xopt,
                 "fopt": Y[opt_indx],
@@ -2076,24 +2080,35 @@ class MeasurementControl(Instrument):
                 "full_name",
                 "val_mapping",
             }
-            cleaned_snapshot = delete_keys_from_dict(snap, exclude_keys)
+            cleaned_snapshot = delete_keys_from_dict(
+                # complex values are not supported in hdf5
+                # converting to string avoids annoying warnings (but necessary
+                # for other cases), maybe this should be done at the level of
+                # `h5d.write_dict_to_hdf5` but would somewhat messy anyway as
+                # there are a lot of checks related to saving and parsing
+                # other types in `h5d.read_dict_from_hdf5`
+                # `gen.load_settings_onto_instrument_v2` works properly as it
+                # will try to evaluate a string if a parameter type is not str
+                # but was saved as a string
+                snap, keys=exclude_keys, types_to_str={complex})
 
             h5d.write_dict_to_hdf5(cleaned_snapshot, entry_point=snap_grp)
 
-            # Below is old style saving of snapshot, exists for the sake of
-            # preserving deprecated functionality
-            set_grp = data_object.create_group("Instrument settings")
-            inslist = dict_to_ordered_tuples(self.station.components)
-            for (iname, ins) in inslist:
-                instrument_grp = set_grp.create_group(iname)
-                par_snap = ins.snapshot()["parameters"]
-                parameter_list = dict_to_ordered_tuples(par_snap)
-                for (p_name, p) in parameter_list:
-                    try:
-                        val = str(p["value"])
-                    except KeyError:
-                        val = ""
-                    instrument_grp.attrs[p_name] = str(val)
+            if self.save_legacy_snapshot:
+                # Below is old style saving of snapshot, exists for the sake of
+                # preserving deprecated functionality
+                set_grp = data_object.create_group("Instrument settings")
+                inslist = dict_to_ordered_tuples(self.station.components)
+                for (iname, ins) in inslist:
+                    instrument_grp = set_grp.create_group(iname)
+                    par_snap = ins.snapshot()["parameters"]
+                    parameter_list = dict_to_ordered_tuples(par_snap)
+                    for (p_name, p) in parameter_list:
+                        try:
+                            val = str(p["value"])
+                        except KeyError:
+                            val = ""
+                        instrument_grp.attrs[p_name] = str(val)
 
     def save_MC_metadata(self, data_object=None, *args):
         """

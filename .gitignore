@@ -131,6 +131,9 @@ $RECYCLE.BIN/
 *.png
 pycqed/measurement/openql_experiments/output/*
 *.qmap
+# a file containing hashes is used to check if RB recompilation is needed
+*.qisa.hashes
+
 
 # data files
 # test data files should be explicitly added by hand (overriding .gitignore)
