@@ -215,10 +215,14 @@ def compute_propagator(arglist):
         sim_step / subdivisions_of_simstep
     )  # waveform is generated according to sampling rate of AWG
 
-    wf_generator = getattr(
-        wf_vcz,
-        fluxlutman.get("cz_wf_generator_{}".format(which_gate))
-    )
+    wf_generator_name = fluxlutman.get("cz_wf_generator_{}".format(which_gate))
+    if hasattr(wf_vcz, wf_generator_name):
+        wf_generator = getattr(
+            wf_vcz,
+            fluxlutman.get("cz_wf_generator_{}".format(which_gate))
+        )
+    else:
+        wf_generator = fluxlutman._cz_wf_generators_dict[wf_generator_name]
 
     wfd = wf_generator(
         fluxlutman=fluxlutman,
