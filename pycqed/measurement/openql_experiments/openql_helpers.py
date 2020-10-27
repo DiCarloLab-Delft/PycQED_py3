@@ -65,7 +65,7 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
         logging.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
 
     # determine extension of generated file
-    if p.eqasm_compiler == 'eqasm_backend_cc':  # NB: field .eqasm_compiler is set by create_program()
+    if p.eqasm_compiler == 'eqasm_backend_cc':
         ext = '.vq1asm'  # CC
     else:
         ext = '.qisa'  # CC-light, QCC
@@ -107,7 +107,7 @@ def compile(p, quiet: bool = True):
         # attribute is added to program to help finding the output files
         p.filename = join(p.output_dir, p.name + ext)
 
-    return p  # FIXME: returned unchanged, kept for compatibility for now   
+    return p  # FIXME: returned unchanged, kept for compatibility for now  (PR #638)
 
 
 def is_compatible_openql_version_cc() -> bool:

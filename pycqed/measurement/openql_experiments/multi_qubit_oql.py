@@ -828,11 +828,15 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
     # adding the calibration points
     # add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
-    with suppress_stdout():
-        p.compile()
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_option('output_dir')
-    p.filename = join(p.output_dir, p.name + '.qisa') # FIXME: platform dependency, use openql_helpers
+    if 0:  # FIXME: remove after testing PR #638
+        with suppress_stdout():
+            p.compile()
+        # attribute get's added to program to help finding the output files
+        p.output_dir = ql.get_option('output_dir')
+        p.filename = join(p.output_dir, p.name + '.qisa') # FIXME: platform dependency, use openql_helpers
+    else:
+        p = oqh.compile(p)
+
     return p
 
 # FIMXE: merge into the real chevron seq
