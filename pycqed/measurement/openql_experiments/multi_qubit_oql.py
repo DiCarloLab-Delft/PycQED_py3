@@ -832,7 +832,7 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
         p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_option('output_dir')
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    p.filename = join(p.output_dir, p.name + '.qisa') # FIXME: platform dependency, use openql_helpers
     return p
 
 # FIMXE: merge into the real chevron seq

@@ -186,10 +186,6 @@ def randomized_benchmarking(
     """
     p = oqh.create_program(program_name, platf_cfg)
 
-    # attribute get's added to program to help finding the output files
-    p.filename = os.path.join(p.output_dir, p.name + '.vq1asm')  # FIXME: platform dependency
-    #p.filename = os.path.join(p.output_dir, p.name + ".qisa")  # FIXME: platform dependency
-
     this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
@@ -511,7 +507,7 @@ def character_benchmarking(
     p = oqh.create_program(program_name, platf_cfg)
 
     # attribute get's added to program to help finding the output files
-    p.filename = os.path.join(p.output_dir, p.name + ".qisa")
+    p.filename = os.path.join(p.output_dir, p.name + ".qisa")  # FIXME: platform dependent
 
     this_file = inspect.getfile(inspect.currentframe())
 
