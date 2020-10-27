@@ -46,9 +46,10 @@ reload(mux)
 # import pycqed.analysis_v2.gate_set_tomography_analysis as gsa
 # reload(gsa)
 
-import pycqed.analysis_v2.fluxing_analysis as fla
-reload(fla)
-
+# import pycqed.analysis_v2.fluxing_analysis as fla
+# reload(fla)
+import pycqed.analysis_v2.multiplexed_readout_analysis as mra
+reload(mra)
 import pycqed.analysis_v2.timing_cal_analysis as ta
 reload(ta)
 
@@ -63,8 +64,8 @@ from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,
     Basic2DAnalysis, Basic2DInterpolatedAnalysis)
 from pycqed.analysis_v2.timedomain_analysis import (
-    FlippingAnalysis, Intersect_Analysis,
-    Oscillation_Analysis, Crossing_Analysis,
+    FlippingAnalysis, EFRabiAnalysis, Intersect_Analysis,  # CZ_1QPhaseCal_Analysis,
+    Oscillation_Analysis, ComplexRamseyAnalysis, Crossing_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,
     Grovers_TwoQubitAllStates_Analysis)
 from pycqed.analysis_v2.readout_analysis import (
@@ -109,7 +110,6 @@ from pycqed.analysis_v2.randomized_benchmarking_analysis import (
     InterleavedRandomizedBenchmarkingParkingAnalysis)
 from pycqed.analysis_v2.gate_set_tomography_analysis import \
     GST_SingleQubit_DataExtraction, GST_TwoQubit_DataExtraction
-
 
 from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis,\
     Conditional_Oscillation_Heatmap_Analysis, interp_to_1D_arr,\

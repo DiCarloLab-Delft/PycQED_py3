@@ -114,9 +114,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         a.get_naming_and_values()
 
         if "bins" in a.data_file["Experimental Data"]["Experimental Metadata"].keys():
-            bins = a.data_file["Experimental Data"]["Experimental Metadata"][
-                "bins"
-            ][()]
+            bins = a.data_file["Experimental Data"]["Experimental Metadata"]["bins"][()]
 
             num_cal_pnts = len(self.cal_pnts_in_dset)
 
@@ -896,9 +894,7 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
         a.get_naming_and_values()
 
         if "bins" in a.data_file["Experimental Data"]["Experimental Metadata"].keys():
-            bins = a.data_file["Experimental Data"]["Experimental Metadata"][
-                "bins"
-            ][()]
+            bins = a.data_file["Experimental Data"]["Experimental Metadata"]["bins"][()]
             self.raw_data_dict["ncl"] = bins[:-7:10]  # 7 calibration points
             self.raw_data_dict["bins"] = bins
 
@@ -1452,9 +1448,13 @@ class InterleavedRandomizedBenchmarkingAnalysis(ba.BaseDataAnalysis):
         rates_I_quad_ch_idxs: list = [0, 2],
         ignore_f_cal_pts: bool = False,
         plot_label="",
+        extract_only=False,
     ):
         super().__init__(
-            do_fitting=True, close_figs=close_figs, options_dict=options_dict
+            do_fitting=True,
+            close_figs=close_figs,
+            options_dict=options_dict,
+            extract_only=extract_only,
         )
         self.ts_base = ts_base
         self.ts_int = ts_int

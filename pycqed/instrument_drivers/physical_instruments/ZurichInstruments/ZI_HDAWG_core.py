@@ -203,7 +203,7 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     # AWGS/0/SEQUENCER/MEMORYUSAGE
     # AWGS/0/WAVEFORM/MEMORYUSAGE
 
-    def check_errors(self):
+    def check_errors(self, errors_to_ignore=None):
         errors = json.loads(self.getv('raw/error/json/errors'))
 
         # If this is the first time we are called, log the detected errors, but don't raise
@@ -214,12 +214,13 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         else:
             raise_exceptions = True
 
-        # First report if anything has changed
-        if errors['new_errors'] > 0:
-            log.warning('{}: Found {} new errors'.format(self.devname, errors['new_errors']))
-
         # Asserted in case errors were found
         found_errors = False
+
+        # Combine errors_to_ignore with commandline
+        _errors_to_ignore = self._errors_to_ignore
+        if errors_to_ignore is not None:
+            _errors_to_ignore += errors_to_ignore
 
         # Go through the errors and update our structure, raise exceptions if anything changed
         for m in errors['messages']:
@@ -235,15 +236,13 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
                     'message' : message}
                 log.warning(f'{self.devname}: Code {code}: "{message}" ({severity})')
             else:
-                # Optionally skip the error completely
-                if code in self._errors_to_ignore:
-                    log.warning(f'{self.devname}: {message} ({code}/{severity})')
-                    continue
-
                 # Check if there are new errors
                 if code not in self._errors or count > self._errors[code]['count']:
-                    log.error(f'{self.devname}: {message} ({code}/{severity})')
-                    found_errors = True
+                    if code in _errors_to_ignore:
+                        log.warning(f'{self.devname}: {message} ({code}/{severity})')
+                    else:
+                        log.error(f'{self.devname}: {message} ({code}/{severity})')
+                        found_errors = True
 
                 if code in self._errors:
                     self._errors[code]['count'] = count

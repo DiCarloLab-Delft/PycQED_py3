@@ -619,6 +619,7 @@ class MeasurementControl(Instrument):
 
     def measure_hard(self):
         new_data = np.array(self.detector_function.get_values()).astype(np.float64).T
+
         ###########################
         # Shape determining block #
         ###########################
@@ -1056,6 +1057,7 @@ class MeasurementControl(Instrument):
                             self.curves[i]["config"]["x"] = x
                             self.curves[i]["config"]["y"] = y
                             i += 1
+
                             if (
                                 self.Learner_Minimizer_detected
                                 and y_ind == self.par_idx

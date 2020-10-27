@@ -106,8 +106,8 @@ def compute_betas_weight1(qubit_state_avg, matrix_B, num_qubits, cal_point_seg_s
                        format(2**(num_qubits-1-i), '#0{}b'.format(num_qubits+2))[2:]]
         op_id_list = [int(op, 2) for op in op_list_bin]
         op_idx_w1[i, :] = op_id_list
-        print(op_id_list,op_idx_w1)
 
+        # print(op_id_list,op_idx_w1)
         submatrix_B = matrix_B[op_id_list, :]
         inv_subB = np.linalg.pinv(submatrix_B).transpose()
         betas_w1[i, :] = inv_subB @ qubit_state_avg[i, cal_point_seg_start:]
@@ -161,4 +161,5 @@ def rotate_operator(op, bases):
             raise ValueError("Tomo::operator_rotation Measurement operator is not undestood {} in {}".format(op_letter,op))
     operator_str_base4 = rotated_op_str.replace('I', '0').replace('X', '1').replace('Y', '2').replace('Z', '3')
     rotated_op_idx = int(operator_str_base4,4) # transforms this into the integer in base 10
+    
     return rotated_op_idx, rotated_op_str
