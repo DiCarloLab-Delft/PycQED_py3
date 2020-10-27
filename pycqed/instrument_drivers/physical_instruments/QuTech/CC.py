@@ -238,7 +238,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
         elif dio_mode == "flux":
             # based on ZI_HDAWG8.py::_prepare_CC_dio_calibration_hdawg and examples/CC_examples/flux_calibration.vq1asm
-            #
+            # FIXME: hardcoded slots, this is OpenQL output
             cc_prog = """
             # CC_BACKEND_VERSION 0.2.4
             # OPENQL_VERSION 0.8.0
