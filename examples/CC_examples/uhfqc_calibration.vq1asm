@@ -24,4 +24,6 @@ mainLoop:                                               #
 [4]             seq_out         0x00000000,11
 [5]             seq_out         0x00000000,11
 [6]             seq_out         0x00000000,11
+[7]             seq_out         0x00000000,11
+[8]             seq_out         0x00000000,11
                 jmp             @mainLoop

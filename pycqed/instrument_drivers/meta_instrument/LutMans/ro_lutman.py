@@ -49,14 +49,12 @@ class Base_RO_LutMan(Base_LutMan):
                 raise NotImplementedError(
                     'Hardcoded for feedline 0 and 1 of Surface-7')
         elif feedline_map == 'S17':
-
             if self._feedline_number == 0:
-                self._resonator_codeword_bit_mapping = [13, 16]
+                self._resonator_codeword_bit_mapping = [6, 7]
             elif self._feedline_number == 1:
-                self._resonator_codeword_bit_mapping = [
-                    1, 4, 5, 7, 8, 10, 11, 14, 15]
+                self._resonator_codeword_bit_mapping = [3, 4, 5]
             elif self._feedline_number == 2:
-                self._resonator_codeword_bit_mapping = [0, 2, 3, 6, 9, 12]
+                self._resonator_codeword_bit_mapping = [0, 1, 2]
             else:
                 # FIXME: copy/paste error
                 raise NotImplementedError(
@@ -146,6 +144,10 @@ class Base_RO_LutMan(Base_LutMan):
                                vals=vals.Numbers(0, 1),
                                parameter_class=ManualParameter,
                                initial_value=0.1)
+            self.add_parameter('M_delay_R{}'.format(res), unit='V',
+                               vals=vals.Numbers(0, 500e-9),
+                               parameter_class=ManualParameter,
+                               initial_value=0)
             self.add_parameter('M_final_amp_R{}'.format(res), unit='V',
                                vals=vals.Numbers(0, 1),
                                parameter_class=ManualParameter,
@@ -255,7 +257,7 @@ class Base_RO_LutMan(Base_LutMan):
             M = create_pulse(shape=self.pulse_primitive_shape(),
                              amplitude=self.get('M_amp_R{}'.format(res)),
                              length=up_len,
-                             delay=0,
+                             delay=self.get('M_delay_R{}'.format(res)),
                              phase=self.get('M_phi_R{}'.format(res)),
                              sampling_rate=sampling_rate)
             res_wave_dict['M_simple_R{}'.format(res)] = M

@@ -113,7 +113,8 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
                  interface: str = '1GbE',
                  server: str = 'localhost',
                  port = 8004,
-                 num_codewords: int = 32, **kw) -> None:
+                 num_codewords: int = 32,
+                 **kw) -> None:
         """
         Input arguments:
             name:           (str) name of the instrument as seen by the user
@@ -175,6 +176,13 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
             delay to be used on the DIO although that is not generally recommended.
         """
         super()._add_extra_parameters()
+
+        self.add_parameter(
+            'cfg_sideband_mode', initial_value='static',
+            vals=validators.Enum('static', 'real-time'), docstring=(
+                'Used in the _codeword_table_preamble method to determine what'
+                'format to use for the setWaveDIO command in the AWG sequence.'),
+            parameter_class=ManualParameter)
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
@@ -313,8 +321,14 @@ while (1) {
             csvname_l = self.devname + '_' + wf_l
             csvname_r = self.devname + '_' + wf_r
 
-            program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
-                dio_cw, csvname_l, csvname_r)
+            if self.cfg_sideband_mode() == 'static':
+                program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
+                    dio_cw, csvname_l, csvname_r)
+            elif self.cfg_sideband_mode() == 'real-time':
+                program += 'setWaveDIO({}, 1, 2, \"{}\", 1, 2, \"{}\");\n'.format(
+                    dio_cw, csvname_l, csvname_r)
+            else:
+                raise Exception("Unknown modulation type: '{}'".format(self.cfg_sideband_mode()))
 
         return program
 

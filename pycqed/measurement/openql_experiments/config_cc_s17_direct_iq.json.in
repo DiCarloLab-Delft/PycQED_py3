@@ -132,7 +132,7 @@
 						[7,6,5,4,3,2,1,0],                // group 0
 						[23,22,21,20,19,18,17,16]           // group 1
 					],
-					"trigger_bits": [31,15]
+					"trigger_bits": [31]
 				},
 				"awg8-mw-direct-iq": {				      // just I&Q to generate microwave without VSM. HDAWG8: "new_novsm_microwave"
 					"control_bits": [
@@ -141,7 +141,7 @@
 						[22,21,20,19,18,17,16],           // group 2. NB: starts at bit 16 so twin-QWG can also support it
 						[29,28,27,26,25,24,23]            // group 4
 					],
-					"trigger_bits": [31,15]
+					"trigger_bits": [31]
 				},
 				"awg8-flux": {							   // ZI_HDAWG8.py::cfg_codeword_protocol() == 'flux'
                     // NB: please note that internally one AWG unit handles 2 channels, which requires special handling of the waveforms
@@ -155,7 +155,7 @@
 						[24,23,22],
 						[27,26,25]                        // group 7
 					],
-					"trigger_bits": [31,15]
+					"trigger_bits": [31]
 				},
 				"awg8-flux-vector-8": {				       // single code word for 8 flux channels. FIXME: no official mode yet
 					"control_bits": [
@@ -193,15 +193,9 @@
                     {   "type": "mw",
                         "operand_idx": 0,
                         "value": [
-                            "{gateName}-{instrumentName}:{instrumentGroup}-gi",
-                            "{gateName}-{instrumentName}:{instrumentGroup}-gq",
-                            "{gateName}-{instrumentName}:{instrumentGroup}-di",
-                            "{gateName}-{instrumentName}:{instrumentGroup}-dq"
+                            "{gateName}-{instrumentName}:{instrumentGroup}-i",
+                            "{gateName}-{instrumentName}:{instrumentGroup}-q"
                         ]
-                    },
-                    {   "type": "switch",
-                        "operand_idx": 0,
-                        "value": ["dummy"]                                  // NB: no actual signal is generated
                     }
                 ],
                 "two-qubit-flux": [
@@ -214,6 +208,12 @@
                         "value": ["flux-1-{qubit}"]
                     }
                     // FIXME: CZ(a,b) and CZ(a,c) requires different waveforms on a
+                ],
+                "single-qubit-flux": [
+                	{	"type": "flux",
+                		"operand_idx": 0,
+                		"value": ["flux-0-{qubit}"]
+                	}
                 ]
             },  // signals
 
@@ -225,19 +225,7 @@
                 // FIXME: must match 'resources/meas_units' if resource constraint scheduler is used
 				{
 					"name": "ro_0",
-                    "qubits": [[6], [11], [], [], [], [], [], [], []],
-                    "ref_signals_type": "measure",
-					"ref_instrument_definition": "zi-uhfqa",
-                    "ref_control_mode": "uhfqa-9ch",
-					"controller": {
-						"name": "cc",	// FIXME
-						"slot": 0,
-						"io_module": "CC-CONN-DIO"
-					}
-				},
-				{
-					"name": "ro_1",
-                    "qubits": [[0], [1], [2], [3], [7], [8], [12], [13], [15]],
+                    "qubits": [[6], [7], [], [], [], [], [], [], []],
                     "ref_signals_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
@@ -248,8 +236,8 @@
 					}
 				},
 				{
-					"name": "ro_2",
-                    "qubits": [[4], [5], [9], [10], [14], [16], [], [], []],
+					"name": "ro_1",
+                    "qubits": [[3], [4], [5], [], [], [], [], [], []],
                     "ref_signals_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
@@ -259,33 +247,28 @@
 						"io_module": "CC-CONN-DIO"
 					}
 				},
+				{
+					"name": "ro_2",
+                    "qubits": [[0], [1], [2], [], [], [], [], [], []],
+                    "ref_signals_type": "measure",
+					"ref_instrument_definition": "zi-uhfqa",
+                    "ref_control_mode": "uhfqa-9ch",
+					"controller": {
+						"name": "cc",	// FIXME
+						"slot": 3,
+						"io_module": "CC-CONN-DIO"
+					}
+				},
 
 				// microwave.
                 // FIXME: must match 'resources/qwgs' if resource constraint scheduler is used
 				{
 					"name": "mw_0",
                     "qubits": [                                             // data qubits:
-                        [0],
-                        [1],
-                        [2],
-                        [3]
-                    ],
-                    "ref_signals_type": "mw",
-					"ref_instrument_definition": "zi-hdawg",
-                    "ref_control_mode": "awg8-mw-direct-iq",
-					"controller": {
-						"name": "cc",	// FIXME
-						"slot": 3,
-						"io_module": "CC-CONN-DIO-DIFF"
-					}
-				},
-				{
-					"name": "mw_1",
-                    "qubits": [                                             // ancilla qubits:
-                        [4],
-                        [5],
-                        [6],
-                        [7]
+                        [1,5],
+                        [0,4,7],
+                        [2,3,6],
+                        [8]
                     ],
                     "ref_signals_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
@@ -297,12 +280,12 @@
 					}
 				},
 				{
-					"name": "mw_2",
-                    "qubits": [                                             // data qubits:
-                        [8],
+					"name": "mw_1",
+                    "qubits": [                                             // ancilla qubits:
                         [9],
                         [10],
-                        [11]
+                        [11],
+                        [12]
                     ],
                     "ref_signals_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
@@ -314,26 +297,26 @@
 					}
 				},
 				{
-					"name": "mw_3",
-                    "qubits": [                                             // ancilla qubits:
-                        [12],
+					"name": "mw_2",
+                    "qubits": [                                             // data qubits:
                         [13],
                         [14],
-                        [15]
+                        [15],
+                        [16]
                     ],
                     "ref_signals_type": "mw",
 					"ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-mw-direct-iq",
 					"controller": {
 						"name": "cc",	// FIXME
-						"slot": 6,
+						"slot": 9,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
 				{
-					"name": "mw_4",
+					"name": "mw_3",
                     "qubits": [                                             // ancilla qubits:
-                        [16],
+                        [],
                         [],
                         [],
                         []
@@ -343,7 +326,24 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
 					"controller": {
 						"name": "cc",	// FIXME
-						"slot": 7,
+						"slot": 10,
+						"io_module": "CC-CONN-DIO-DIFF"
+					}
+				},
+				{
+					"name": "mw_4",
+                    "qubits": [                                             // ancilla qubits:
+                        [],
+                        [],
+                        [],
+                        []
+                    ],
+                    "ref_signals_type": "mw",
+					"ref_instrument_definition": "zi-hdawg",
+                    "ref_control_mode": "awg8-mw-direct-iq",
+					"controller": {
+						"name": "cc",	// FIXME
+						"slot": 11,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
@@ -357,7 +357,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
 					"controller": {
 						"name": "cc",	// FIXME
-						"slot": 8,
+						"slot": 6,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
@@ -370,7 +370,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
 					"controller": {
 						"name": "cc",	// FIXME
-						"slot": 9,
+						"slot": 7,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				},
@@ -383,7 +383,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
 					"controller": {
 						"name": "cc",	// FIXME
-						"slot": 10,
+						"slot": 8,
 						"io_module": "CC-CONN-DIO-DIFF"
 					}
 				}

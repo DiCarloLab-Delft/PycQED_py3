@@ -1714,8 +1714,6 @@ while (1) {
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False, repetitions=1):
         log.info('Calibrating DIO delays')
         if verbose: print("Calibrating DIO delays")
-        if feedline is None:
-            raise ziUHFQCDIOCalibrationError('No feedline specified for calibration')
 
         CC_model = CC.IDN()['model']
         if 'QCC' in CC_model:
