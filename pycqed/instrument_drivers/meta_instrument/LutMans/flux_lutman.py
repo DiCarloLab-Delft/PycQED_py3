@@ -454,6 +454,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         corr_samples = int(corr_len*self.sampling_rate())
 
         #FIXME unused: corr_max_amp = self.get('cz_phase_corr_max_amp_%s' % which_gate)
+        #FIXME: line below fails because parameter is part of class HDAWG_Flux_LutMan_Adiabatic, whereas this is class HDAWG_Flux_LutMan (PR #638)
         buffer_before = self.get('cz_phase_corr_buffer_%s' % which_gate)
 
         q_J2 = self.get('q_J2_%s' % which_gate)
