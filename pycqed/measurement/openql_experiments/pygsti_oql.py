@@ -29,10 +29,6 @@ def openql_program_from_pygsti_expList(expList, program_name: str,
 
     p = oqh.create_program(program_name, platf_cfg)
 
-    if 0:  # FIXME: remove after testing PR #638
-        # N.B. program name added before compilation as it is used in a check
-        p.filename = join(p.output_dir, p.name + '.qisa')  # FIXME: platform dependency on CClight
-
     if oqh.check_recompilation_needed(p.filename, platf_cfg, recompile):
 
         for i, gatestring in enumerate(expList):

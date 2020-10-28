@@ -70,9 +70,8 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
     else:
         ext = '.qisa'  # CC-light, QCC
 
-    # add filename to help finding the output files
+    # add filename to help finding the output files. NB: file is created by calling compile()
     p.filename = join(p.output_dir, p.name + ext)
-
     return p
 
 
@@ -97,15 +96,6 @@ def compile(p, quiet: bool = True):
     else:  # show warnings
         ql.set_option('log_level', 'LOG_WARNING')
         p.compile()
-
-    if 0: # FIXME: moved to create_program()
-        # determine extension of generated file
-        if p.eqasm_compiler == 'eqasm_backend_cc':  # NB: field .eqasm_compiler is set by create_program()
-            ext = '.vq1asm'  # CC
-        else:
-            ext = '.qisa'  # CC-light, QCC
-        # attribute is added to program to help finding the output files
-        p.filename = join(p.output_dir, p.name + ext)
 
     return p  # FIXME: returned unchanged, kept for compatibility for now  (PR #638)
 
