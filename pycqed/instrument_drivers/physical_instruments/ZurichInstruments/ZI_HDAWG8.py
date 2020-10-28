@@ -361,7 +361,7 @@ while (1) {
             # 2: 'high', 1: 'low', 0: 'no valid needed'
             self.set('awgs_{}_dio_valid_polarity'.format(awg_nr), 2)
 
-            # Set the bit index of the strobe signal (TOGGLE_DS),
+            # Set the bit index of the strobe signal (TOGGLE_DS):
             self.set('awgs_{}_dio_strobe_index'.format(awg_nr), 30)
 
             # Configure edge triggering for the strobe/toggle bit signal:
@@ -371,7 +371,7 @@ while (1) {
             # No special requirements regarding waveforms by default
             self._clear_readonly_waveforms(awg_nr)
 
-            if 0:
+            if 0:  # FIXME: remove after testing PR #621
                 num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
                 dio_mode_list = {
                     'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
