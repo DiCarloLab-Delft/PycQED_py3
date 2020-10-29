@@ -181,6 +181,7 @@ class Test_Mock_CCL(unittest.TestCase):
 
             eps = 0.05
             if self.CCL_qubit.cfg_with_vsm():
+                # FIXME: shown to sometimes fail (PR #638)
                 assert self.CCL_qubit.mw_vsm_G_amp() == pytest.approx(
                         self.CCL_qubit.mock_mw_amp180(), abs=eps)
             else:
