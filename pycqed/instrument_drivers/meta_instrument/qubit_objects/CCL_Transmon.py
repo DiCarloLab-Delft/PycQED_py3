@@ -1217,7 +1217,7 @@ class CCLight_Transmon(Qubit):
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
                         self.mw_mixer_offs_DQ())
         else:
-            MW_LutMan.mw_amp180(1)
+            # MW_LutMan.mw_amp180(1) #why
             MW_LutMan.channel_amp(self.mw_channel_amp())
             if self._using_QWG():
                 # case without VSM and with QWG
@@ -2964,7 +2964,8 @@ class CCLight_Transmon(Qubit):
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
         # Set marker mode off for CW:
-        spec_source.pulsemod_state('Off')
+        if not spec_source.get_idn()['model']=='E8257D':
+            spec_source.pulsemod_state('Off')
 
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
@@ -4856,7 +4857,9 @@ class CCLight_Transmon(Qubit):
             times = np.arange(0, self.T2_star()*4, stepsize)
 
         if artificial_detuning is None:
-            artificial_detuning = 3/times[-1]
+          # artificial_detuning = 0
+            # raise ImplementationError("Artificial detuning does not work, currently uses real detuning")
+            # artificial_detuning = 3/times[-1]
             artificial_detuning = 5/times[-1]
 
         # append the calibration points, times are for location in plot
@@ -4872,7 +4875,8 @@ class CCLight_Transmon(Qubit):
         # adding 'artificial' detuning by detuning the qubit LO
         if freq_qubit is None:
             freq_qubit = self.freq_qubit()
-        # # this should have no effect if artificial detuning = 0
+        # # this should have no effect if artificial detuning = 0. This is a bug,
+        # This is real detuning, not artificial detuning
         self.instr_LO_mw.get_instr().set(
             'frequency', freq_qubit -
             self.mw_freq_mod.get() + artificial_detuning)
@@ -4915,6 +4919,92 @@ class CCLight_Transmon(Qubit):
                     'frequency': a.qubit_frequency,
                 }
                 return res
+
+
+    def measure_complex_ramsey(self, times=None, MC=None,
+                       freq_qubit: float = None,
+                       label: str = '',
+                       prepare_for_timedomain=True,
+                       analyze=True, close_fig=True, update=True,
+                       detector=False,
+                       double_fit=False,
+                       test_beating=True):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # default timing
+        if times is None:
+            # funny default is because there is no real time sideband
+            # modulation
+            stepsize = max((self.T2_star()*4/61)//(abs(self.cfg_cycle_time()))
+                           * abs(self.cfg_cycle_time()), 40e-9)
+            times = np.arange(0, self.T2_star()*4, stepsize)
+
+
+
+        # append the calibration points, times are for location in plot
+        dt = times[1] - times[0]
+        times = np.concatenate([np.repeat(times,2),
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt)])
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        # adding 'artificial' detuning by detuning the qubit LO
+        if freq_qubit is None:
+            freq_qubit = self.freq_qubit()
+        # # this should have no effect if artificial detuning = 0. This is a bug,
+        # This is real detuning, not artificial detuning
+
+
+        p = sqo.complex_Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
+                       platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Time', unit='s')
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+
+        d = self.int_avg_det
+        MC.set_detector_function(d)
+        MC.run('complex_Ramsey'+label+self.msmt_suffix)
+        if analyze:
+            a = ma2.ComplexRamseyAnalysis(label='complex_Ramsey', close_figs=True)
+            if update:
+                fit_res = a.fit_dicts['exp_fit']['fit_res']  
+                fit_frequency = fit_res.params['frequency'].value
+                freq_qubit = self.freq_qubit()
+                self.freq_qubit(freq_qubit + fit_frequency)
+            # if test_beating and a.fit_res.chisqr > 0.4:
+            #     logging.warning('Found double frequency in Ramsey: large '
+            #                     'deviation found in single frequency fit.'
+            #                     'Trying double frequency fit.')
+            #     double_fit = True
+            # if update:
+            #     self.T2_star(a.T2_star['T2_star'])
+            # if double_fit:
+            #     b = ma.DoubleFrequency()
+            #     res = {
+            #         'T2star1': b.tau1,
+            #         'T2star2': b.tau2,
+            #         'frequency1': b.f1,
+            #         'frequency2': b.f2
+            #     }
+            #     return res
+
+            # else:
+            #     res = {
+            #         'T2star': a.T2_star['T2_star'],
+            #         'frequency': a.qubit_frequency,
+            #     }
+            #     return res
+
 
     def measure_msmt_induced_dephasing(self, MC=None, sequence='ramsey',
                                        label: str = '',
@@ -5062,6 +5152,293 @@ class CCLight_Transmon(Qubit):
             if update:
                 self.T2_echo(a.fit_res.params['tau'].value)
             return a
+
+    def measure_CPMG(self, times=None, orders=None, MC=None, sweep='tau',
+                      analyze=True, close_fig=True, update=False,
+                      label: str = '', prepare_for_timedomain=True):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        
+        # default timing
+        if times is None and sweep == 'tau':
+            # funny default is because there is no real time sideband
+            # modulation
+            stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time()))
+                           * abs(self.cfg_cycle_time()), 20e-9)
+            times = np.arange(0, self.T2_echo()*4, stepsize*2)
+
+        if orders is None and sweep == 'tau':
+            orders = 2
+        if orders<1 and sweep =='tau':
+            raise ValueError(
+               'Orders must be larger than 1')
+
+
+
+
+        # append the calibration points, times are for location in plot
+        if sweep == 'tau':
+            dt = times[1] - times[0]
+            times = np.concatenate([times,
+                                    (times[-1]+1*dt,
+                                     times[-1]+2*dt,
+                                        times[-1]+3*dt,
+                                        times[-1]+4*dt)])
+        elif sweep == 'order':
+            dn = orders[1] - orders[0]
+            orders = np.concatenate([orders,
+                                    (orders[-1]+1*dn,
+                                     orders[-1]+2*dn,
+                                        orders[-1]+3*dn,
+                                        orders[-1]+4*dn)])
+        # # Checking if pulses are on 20 ns grid
+        if sweep == 'tau':
+            if not all([np.round((t*1e9)/(2*orders)) % (self.cfg_cycle_time()*1e9) == 0 for
+                      t in times]):
+                raise ValueError('timesteps must be multiples of 40e-9')
+        elif sweep == 'order':
+            if not np.round(times/2) % (self.cfg_cycle_time()*1e9) == 0:
+                raise ValueError('timesteps must be multiples of 40e-9')
+
+        # # Checking if pulses are locked to the pulse modulation
+        if sweep == 'tau':
+            if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9)
+                        == 0 for t in times]):
+                raise ValueError(
+                    'timesteps must be multiples of 2 modulation periods')
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+        if sweep == 'tau':
+            print(times)
+            p = sqo.CPMG(times, orders, qubit_idx=self.cfg_qubit_nr(),
+                         platf_cfg=self.cfg_openql_platform_fn())
+            s = swf.OpenQL_Sweep(openql_program=p,
+                         CCL=self.instr_CC.get_instr(),
+                         parameter_name="Time", unit="s")
+        elif sweep == 'order':
+            p = sqo.CPMG_SO(times, orders, qubit_idx=self.cfg_qubit_nr(),
+                         platf_cfg=self.cfg_openql_platform_fn())
+            s = swf.OpenQL_Sweep(openql_program=p,
+                                 CCL=self.instr_CC.get_instr(),
+                                 parameter_name="Order", unit="")
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        if sweep == 'tau':
+            MC.set_sweep_points(times)
+        elif sweep == 'order':
+            MC.set_sweep_points(orders)
+        MC.set_detector_function(d)
+        if sweep == 'tau':
+            msmt_title = 'CPMG_order_'+str(orders)+label+self.msmt_suffix
+        elif sweep == 'order':
+            msmt_title = 'CPMG_tauN_'+str(times)+label+self.msmt_suffix
+        MC.run(msmt_title)
+        if analyze:
+            # N.B. v1.5 analysis
+            if sweep == 'tau':
+                a = ma.Echo_analysis_V15(label='CPMG', auto=True, close_fig=True)
+                if update:
+                    self.T2_echo(a.fit_res.params['tau'].value)
+            elif sweep == 'order':
+                a = ma2.Single_Qubit_TimeDomainAnalysis(label='CPMG', auto=True, close_fig=True)
+
+            return a
+
+
+    def measure_spin_locking_simple(self, times=None, MC=None,
+                     analyze=True, close_fig=True, update=True,
+                     label: str = '', prepare_for_timedomain=True,
+                     tomo=False):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # default timing
+        if times is None:
+            # funny default is because there is no real time sideband
+            # modulation
+            stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time()))
+                           * abs(self.cfg_cycle_time()), 20e-9)
+            times = np.arange(0, self.T2_echo()*4, stepsize*2)
+
+        # append the calibration points, times are for location in plot
+        dt = times[1] - times[0]
+        if tomo:
+            times = np.concatenate([np.repeat(times,3),
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt,
+                                    times[-1]+5*dt,
+                                    times[-1]+6*dt)])
+        else:
+            times = np.concatenate([times,
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt)])
+
+        # # Checking if pulses are on 20 ns grid
+        if not all([np.round(t*1e9) % (self.cfg_cycle_time()*1e9) == 0 for
+                    t in times]):
+            raise ValueError('timesteps must be multiples of 20e-9')
+
+        # # Checking if pulses are locked to the pulse modulation
+        if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9)
+                    == 0 for t in times]):
+            raise ValueError(
+                'timesteps must be multiples of 2 modulation periods')
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_square_waves_to_AWG_lookuptable()
+        p = sqo.spin_lock_simple(times, qubit_idx=self.cfg_qubit_nr(),
+                     platf_cfg=self.cfg_openql_platform_fn(), tomo=tomo)
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name="Time", unit="s")
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('spin_lock_simple'+label+self.msmt_suffix)
+        
+        if analyze:
+            a = ma.T1_Analysis(label='spin_lock_simple', auto=True, close_fig=True)
+            return a
+
+
+    def measure_spin_locking_echo(self, times=None, MC=None,
+                     analyze=True, close_fig=True, update=True,
+                     label: str = '', prepare_for_timedomain=True):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # default timing
+        if times is None:
+            # funny default is because there is no real time sideband
+            # modulation
+            stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time()))
+                           * abs(self.cfg_cycle_time()), 20e-9)
+            times = np.arange(0, self.T2_echo()*4, stepsize*2)
+
+        # append the calibration points, times are for location in plot
+        dt = times[1] - times[0]
+        times = np.concatenate([times,
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt)])
+
+        # # Checking if pulses are on 20 ns grid
+        if not all([np.round(t*1e9) % (self.cfg_cycle_time()*1e9) == 0 for
+                    t in times]):
+            raise ValueError('timesteps must be multiples of 20e-9')
+
+        # # Checking if pulses are locked to the pulse modulation
+        if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9)
+                    == 0 for t in times]):
+            raise ValueError(
+                'timesteps must be multiples of 2 modulation periods')
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_square_waves_to_AWG_lookuptable()
+        p = sqo.spin_lock_echo(times, qubit_idx=self.cfg_qubit_nr(),
+                     platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name="Time", unit="s")
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('spin_lock_echo'+label+self.msmt_suffix)
+        
+        if analyze:
+            a = ma.T1_Analysis(label='spin_lock_echo', auto=True, close_fig=True)
+            return a
+
+
+    def measure_rabi_frequency(self, times=None, MC=None,
+                     analyze=True, close_fig=True, update=True,
+                     label: str = '', prepare_for_timedomain=True,
+                     tomo=False):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # default timing
+        if times is None:
+            # funny default is because there is no real time sideband
+            # modulation
+            stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time()))
+                           * abs(self.cfg_cycle_time()), 40e-9)
+            times = np.arange(0, self.T2_echo()*4, stepsize*2)
+
+        # append the calibration points, times are for location in plot
+        dt = times[1] - times[0]
+        if tomo:
+            times = np.concatenate([np.repeat(times,3),
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt,
+                                    times[-1]+5*dt,
+                                    times[-1]+6*dt)])
+        else:
+            times = np.concatenate([times,
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt)])
+
+        # # # Checking if pulses are on 20 ns grid
+        # if not all([np.round(t*1e9) % (self.cfg_cycle_time()*1e9) == 0 for
+        #             t in times]):
+        #     raise ValueError('timesteps must be multiples of 40e-9')
+
+        # # # Checking if pulses are locked to the pulse modulation
+        # if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9)
+        #             == 0 for t in times]):
+        #     raise ValueError(
+        #         'timesteps must be multiples of 2 modulation periods')
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_square_waves_to_AWG_lookuptable()
+        p = sqo.rabi_frequency(times, qubit_idx=self.cfg_qubit_nr(),
+                     platf_cfg=self.cfg_openql_platform_fn(), tomo=tomo)
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name="Time", unit="s")
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('rabi_frequency'+label+self.msmt_suffix)
+        
+        if analyze:
+            a = ma.Echo_analysis_V15(label='rabi_frequency', auto=True, close_fig=True)
+            return a
+
 
     def measure_flipping(self, number_of_flips=np.arange(0, 40, 2), equator=True,
                          MC=None, analyze=True, close_fig=True, update=False,
@@ -5490,8 +5867,36 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
         MC.run('ef_rabi'+label+self.msmt_suffix)
         if analyze:
-            a = ma.Rabi_Analysis(close_main_fig=close_fig, label='ef_rabi')
-            return a
+            a2 = ma2.EFRabiAnalysis(close_figs=True, label='ef_rabi')
+            # if update:
+            #     ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
+            #     self.ef_amp180(a2.proc_data_dict['ef_pi_amp'])
+            return a2
+
+    def calibrate_ef_rabi(self,
+                        amps: list = np.linspace(-.8, .8, 18),
+                        recovery_pulse: bool = True,
+                        MC=None, label: str = '',
+                        analyze=True, close_fig=True,
+                        prepare_for_timedomain=True, update=True):
+        """
+        Calibrates the pi pulse of the ef/12 transition using
+         a rabi oscillation of the ef/12 transition.
+
+        Modulation frequency of the "ef" pusles is controlled through the
+        `anharmonicity` parameter of the qubit object.
+        Hint: the expected pi-pulse amplitude of the ef/12 transition is ~1/2
+            the pi-pulse amplitude of the ge/01 transition.
+        """
+        a2 = self.measure_ef_rabi(amps = amps,
+                        recovery_pulse = recovery_pulse,
+                        MC = MC, label = label,
+                        analyze = analyze, close_fig = close_fig,
+                        prepare_for_timedomain = prepare_for_timedomain)
+        if update:
+            ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
+            self.mw_ef_amp(a2.proc_data_dict['ef_pi_amp'])
+
 
     def measure_gst_1Q(self,
                        shots_per_meas: int,

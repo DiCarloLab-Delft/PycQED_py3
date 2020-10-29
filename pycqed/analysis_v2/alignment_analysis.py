@@ -43,7 +43,7 @@ class AlignmentAnalysis(ba.BaseDataAnalysis):
 
         # Now prepare the 2-D plot
 
-        options_dict_fine={'scan_label':'fine',
+        options_dict_fine={'scan_label':'Resonator_scan',
                            'exact_label_match':False}
         reso_amps = ResonatorSpectroscopy(t_start=self.t_start, t_stop=self.t_stop,
                               extract_only=True,

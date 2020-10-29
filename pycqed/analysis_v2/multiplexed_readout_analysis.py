@@ -6,6 +6,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
+from pycqed.analysis_v2.tools import matplotlib_utils as mpl_utils
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
     cmap_to_alpha, cmap_first_to_alpha
@@ -1945,27 +1946,27 @@ def plot_single_qubit_histogram(data, ax, para_hist,
         textstr = '\n'.join((
             r'SNR    :       %.2f' % \
                 (qoi['Post_SNR'], ),
-            r'$F_{assign}$  :    %.2f%%       p(g|$\pi$) : %.2f%%' % \
+            r'$F_{assign}$  :    %.2f$\%%$       p(g|$\pi$) : %.2f$\%%$' % \
                 (qoi['Post_F_a']*1e2, qoi['Post_relaxation_events']*1e2, ),
-            r'$F_{discr}$    :    %.2f%%       p(e|$0$) : %.2f%%' % \
+            r'$F_{discr}$    :    %.2f$\%%$       p(e|$0$) : %.2f$\%%$' % \
                 (qoi['Post_F_d']*1e2,  qoi['Post_residual_excitation']*1e2, )))
     else:
         textstr = '\n'.join((
             r'SNR    :       %.2f' % \
                 (qoi['SNR'], ),
-            r'$F_{assign}$  :    %.2f%%       p(g|$\pi$) : %.2f%%' % \
+            r'$F_{assign}$  :    %.2f$\%%$       p(g|$\pi$) : %.2f$\%%$' % \
                 (qoi['F_a']*1e2, qoi['relaxation_events']*1e2, ),
-            r'$F_{discr}$    :    %.2f%%       p(e|$0$) : %.2f%%' % \
+            r'$F_{discr}$    :    %.2f$\%%$       p(e|$0$) : %.2f$\%%$' % \
                 (qoi['F_d']*1e2,  qoi['residual_excitation']*1e2, )))
     props = dict(boxstyle='round', facecolor='whitesmoke', alpha=1)
     ax.text(0.01, 1.35, textstr, transform=ax.transAxes, fontsize= 9,
            verticalalignment='top', bbox=props)
 
-    f.suptitle('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
+    f.suptitle(mpl_utils.latex_friendly_str('Mux_ssro_{}_{}'.format(qubit_label, timestamp)))
     if flag == False:
         ax.legend(loc=0, fontsize=7)
         if post_selection is True:
-            f.suptitle('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp))
+            f.suptitle(mpl_utils.latex_friendly_str('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp)))
 
     f.tight_layout()
 
@@ -2018,9 +2019,9 @@ def plot_single_qubit_CDF(data, ax, para_hist,
 
     if flag == False:
         if post_selection:
-            ax.set_title('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp))
+            ax.set_title(mpl_utils.latex_friendly_str('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp)))
         else:
-            ax.set_title('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
+            ax.set_title(mpl_utils.latex_friendly_str('Mux_ssro_{}_{}'.format(qubit_label, timestamp)))
         ax.legend(loc=0, fontsize=7)
     f.tight_layout()
 
@@ -2071,7 +2072,7 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
         ax.plot(bin_centers, cnts, label=key, color=col)
     ax.axvline(x=threshold, label=r'$\mathrm{threshold}_{assign}$',
                ls='--', linewidth=1., color='black', alpha=.75)
-    ax.set_xlabel(value_name.decode('utf-8'))
+    ax.set_xlabel(mpl_utils.latex_friendly_str(value_name.decode('utf-8')))
     ax.set_ylabel('Counts')
     l = ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
         qubit_labels), prop={'size': 4})
@@ -2079,9 +2080,9 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
 
     if flag == False:
         if post_selection is True:
-            ax.set_title('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp))
+            ax.set_title(mpl_utils.latex_friendly_str('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp)))
         else:
-            ax.set_title('Mux_ssro_{}_{}'.format(qubit_label, timestamp))
+            ax.set_title(mpl_utils.latex_friendly_str('Mux_ssro_{}_{}'.format(qubit_label, timestamp)))
         l = ax.legend(loc=(1.05, .01),
                       title='Prepared state\n{}'.format(qubit_labels),
                       prop={'size': 4})
@@ -2130,13 +2131,13 @@ def plot_transients(time_data,
 
     ax[0].plot(time_data, data_ch_0, '-', color='C0', linewidth=1)
     ax[0].set_xlim(left=0, right=time_data[-1])
-    set_ylabel(ax[0], 'Channel_0 amplitude', 'a.u.')
+    set_ylabel(ax[0], mpl_utils.latex_friendly_str('Channel_0 amplitude'), 'a.u.')
 
     ax[1].plot(time_data, data_ch_1, '-', color='indianred', linewidth=1)
-    set_ylabel(ax[1], 'Channel_1 amplitude', 'a.u.')
+    set_ylabel(ax[1], mpl_utils.latex_friendly_str('Channel_1 amplitude'), 'a.u.')
     set_xlabel(ax[1], 'Time', 's')
 
-    fig.suptitle('{} Mux_transients_{}'.format(timestamp, qubit_label),
+    fig.suptitle(mpl_utils.latex_friendly_str('{} Mux_transients_{}'.format(timestamp, qubit_label)),
         y=1.05)
     fig.tight_layout()
 
@@ -2293,7 +2294,7 @@ def plot_single_parity_histogram(Histogram_data: list,
     ax.text(1.025, .95, textstr, transform=ax.transAxes, fontsize= 15,
            verticalalignment='top', bbox=props)
 
-    fig.suptitle('{} Qubit {} parity check'.format(timestamp, qubit_label_A),
+    fig.suptitle(mpl_utils.latex_friendly_str('{} Qubit {} parity check'.format(timestamp, qubit_label_A)),
                  y=1.05, fontsize=16)
 
 def plot_RTE_histogram(qubit_label: str,
@@ -2334,5 +2335,5 @@ def plot_RTE_histogram(qubit_label: str,
 
     ax.legend()
     fig = ax.get_figure()
-    fig.suptitle('{}'.format(timestamp), y=1.05)
+    fig.suptitle(mpl_utils.latex_friendly_str('{}'.format(timestamp)), y=1.05)
     fig.tight_layout()

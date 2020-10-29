@@ -19,7 +19,7 @@ double_col_figsize = (6.9, golden_mean*6.9)
 thesis_col_figsize = (12.2/2.54, golden_mean*12.2/2.54)
 
 
-def set_xlabel(axis, label, unit=None, **kw):
+def set_xlabel(axis, label, unit=None, latexify_ticks=False, **kw):
     """
     Add a unit aware x-label to an axis object.
 
@@ -34,18 +34,19 @@ def set_xlabel(axis, label, unit=None, **kw):
         xticks = axis.get_xticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(xticks)), unit=unit)
+        tick_str = '{:.4g}' if not latexify_ticks else r'${:.4g}$'
         formatter = matplotlib.ticker.FuncFormatter(
-            lambda x, pos: '{:.4g}'.format(x*scale_factor))
+            lambda x, pos: tick_str.format(x * scale_factor))
 
         axis.xaxis.set_major_formatter(formatter)
 
-        axis.set_xlabel(label+' ({})'.format(unit), **kw)
+        axis.set_xlabel(label + ' ({})'.format(unit), **kw)
     else:
         axis.set_xlabel(label, **kw)
     return axis
 
 
-def set_ylabel(axis, label, unit=None, **kw):
+def set_ylabel(axis, label, unit=None, latexify_ticks=False, **kw):
     """
     Add a unit aware y-label to an axis object.
 
@@ -60,12 +61,13 @@ def set_ylabel(axis, label, unit=None, **kw):
         yticks = axis.get_yticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(yticks)), unit=unit)
+        tick_str = '{:.6g}' if not latexify_ticks else r'${:.6g}$'
         formatter = matplotlib.ticker.FuncFormatter(
-            lambda x, pos: '{:.6g}'.format(x*scale_factor))
+            lambda x, pos: tick_str.format(x * scale_factor))
 
         axis.yaxis.set_major_formatter(formatter)
 
-        axis.set_ylabel(label+' ({})'.format(unit), **kw)
+        axis.set_ylabel(label + ' ({})'.format(unit), **kw)
     else:
         axis.set_ylabel(label, **kw)
     return axis
@@ -123,7 +125,7 @@ def SI_prefix_and_scale_factor(val, unit=None):
                 if plt.rcParams['text.usetex'] and prefix == 'μ':
                     prefix = r'$\mu$'
 
-            return 10 ** -prefix_power,  prefix + unit
+            return 10 ** -prefix_power, prefix + unit
         except (KeyError, TypeError):
             pass
 

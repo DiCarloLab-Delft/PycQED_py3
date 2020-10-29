@@ -513,6 +513,388 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             }
 
 
+
+class EFRabiAnalysis(Single_Qubit_TimeDomainAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 close_figs: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         close_figs=close_figs,
+                         extract_only=extract_only, do_fitting=True)
+        self.single_timestamp = True
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
+                            'sweep_points': 'sweep_points',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        # This analysis makes a hardcoded assumption on the calibration points
+        self.options_dict['cal_points'] = [list(range(-4, -2)),
+                                           list(range(-2, 0))]
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        # Even though we expect an exponentially damped oscillation we use
+        # a simple cosine as this gives more reliable fitting and we are only
+        # interested in extracting the frequency of the oscillation
+        cos_mod = lmfit.Model(fit_mods.CosFunc)
+
+        guess_pars = fit_mods.Cos_guess(
+            model=cos_mod, t=self.raw_data_dict['sweep_points'][:-4],
+            data=self.proc_data_dict['corr_data'][:-4])
+
+        # This enforces the oscillation to start at the equator
+        # and ensures that any over/under rotation is absorbed in the
+        # frequency
+        guess_pars['amplitude'].value = 0.5
+        guess_pars['amplitude'].vary = True
+        guess_pars['amplitude'].min = -10
+        guess_pars['amplitude'].max = 10
+        guess_pars['offset'].value = 0.5
+        guess_pars['offset'].vary = True
+        guess_pars['phase'].value = 0
+        guess_pars['phase'].vary = False
+
+        self.fit_dicts['cos_fit'] = {
+            'fit_fn': fit_mods.CosFunc,
+            'fit_xvals': {'t': self.raw_data_dict['sweep_points'][:-4]},
+            'fit_yvals': {'data': self.proc_data_dict['corr_data'][:-4]},
+            'guess_pars': guess_pars}
+
+
+    def analyze_fit_results(self):
+        sf_cos = self._get_ef_pi_amp()
+        self.proc_data_dict['ef_pi_amp'] = sf_cos
+
+        msg = r'$\pi$-ef amp '
+        msg += ': {:.4f}\n'.format(sf_cos)
+        
+
+        self.raw_data_dict['scale_factor_msg'] = msg
+        # TODO: save scale factor to file
+        return sf_cos
+
+
+    def _get_ef_pi_amp(self):
+
+        frequency = self.fit_dicts['cos_fit']['fit_res'].params['frequency']
+        # calculate the pi pulse amplitude using 2* pi *f* amp = pi/2
+        ef_pi_amp = 1/(2*frequency)
+
+        return ef_pi_amp
+
+
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['sweep_points'],
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': self.raw_data_dict['xunit'][0],  # does not do anything yet
+            'yvals': self.proc_data_dict['corr_data'],
+            'ylabel': 'Normalized data',
+            'yunit': '',
+            'setlabel': 'data',
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.raw_data_dict['measurementstring']),
+            'do_legend': True,
+            'legend_pos': 'best'}
+
+        if self.do_fitting:
+
+            self.plot_dicts['cos_fit'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['cos_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'cos fit',
+                'do_legend': True,
+                'legend_pos': 'best'}
+
+            self.plot_dicts['pi_amp'] = {
+                'plotfn': self.plot_line,
+                'ax_id': 'main',
+                'xvals': [self.proc_data_dict['ef_pi_amp']],
+                # 'xlabel': self.raw_data_dict['xlabel'][0],
+                'xunit': self.raw_data_dict['xunit'],  # does not do anything yet
+                'yvals': [fit_mods.CosFunc(self.proc_data_dict['ef_pi_amp'],
+                    **self.fit_dicts['cos_fit']['fit_res'].best_values)],
+                'marker':'o',
+                'line_kws':{'markersize':10}}
+            self.plot_dicts['text_msg'] = {
+                'ax_id': 'main',
+                'ypos': 0.15,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'text_string': self.raw_data_dict['scale_factor_msg']}
+
+
+
+
+class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 close_figs: bool=True, auto=True,do_fitting=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         close_figs=close_figs,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        self.single_timestamp = True
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
+                            'sweep_points': 'sweep_points',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        # This analysis makes a hardcoded assumption on the calibration points
+        self.options_dict['cal_points'] = [list(range(-4, -2)),
+                                           list(range(-2, 0))]
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        """
+        selects the relevant acq channel based on "ch_idx_A" and "ch_idx_B"
+        specified in the options dict. If ch_idx_A and ch_idx_B are the same
+        it will unzip the data.
+        """
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+        # The channel containing the data must be specified in the options dict
+        indices_I = np.hstack([np.arange(0,len(self.proc_data_dict['sweep_points'])-4,2),
+                     np.arange(len(self.proc_data_dict['sweep_points'])-4,
+                               len(self.proc_data_dict['sweep_points']))])
+        self.proc_data_dict['data_I_I'] = self.proc_data_dict['measured_values'][0][indices_I]
+        self.proc_data_dict['data_Q_I'] = self.proc_data_dict['measured_values'][1][indices_I]
+        self.proc_data_dict['plot_times_I'] = self.proc_data_dict['sweep_points'][indices_I]
+        self.proc_data_dict['data0_I_I'] = np.mean(self.proc_data_dict['data_I_I'][-4:-2])
+        self.proc_data_dict['data0_Q_I'] = np.mean(self.proc_data_dict['data_Q_I'][-4:-2])
+
+        indices_Q = np.hstack([np.arange(1,len(self.proc_data_dict['sweep_points'])-4,2),
+                     np.arange(len(self.proc_data_dict['sweep_points'])-4,
+                               len(self.proc_data_dict['sweep_points']))])
+        self.proc_data_dict['data_I_Q'] = self.proc_data_dict['measured_values'][0][indices_Q]
+        self.proc_data_dict['data_Q_Q'] = self.proc_data_dict['measured_values'][1][indices_Q]
+        self.proc_data_dict['plot_times_Q'] = self.proc_data_dict['sweep_points'][indices_Q]
+        self.proc_data_dict['data0_I_Q'] = np.mean(self.proc_data_dict['data_I_Q'][-4:-2])
+        self.proc_data_dict['data0_Q_Q'] = np.mean(self.proc_data_dict['data_Q_Q'][-4:-2])
+
+        self.proc_data_dict['data_A_I'] = np.sqrt((self.proc_data_dict['data_I_I']-self.proc_data_dict['data0_I_I'])**2 + 
+                                              (self.proc_data_dict['data_Q_I']-self.proc_data_dict['data0_Q_I'])**2)
+        self.proc_data_dict['data_A_Q'] = np.sqrt((self.proc_data_dict['data_I_Q']-self.proc_data_dict['data0_I_Q'])**2 + 
+                                              (self.proc_data_dict['data_Q_Q']-self.proc_data_dict['data0_Q_Q'])**2)        
+        self.proc_data_dict['data0_A_I'] = np.mean(self.proc_data_dict['data_A_I'][-4:-2])
+        self.proc_data_dict['data1_A_I'] = np.mean(self.proc_data_dict['data_A_I'][-2:])
+        self.proc_data_dict['dataA_I_avg'] = np.mean([self.proc_data_dict['data0_A_I'],
+                                                        self.proc_data_dict['data1_A_I']])
+        self.proc_data_dict['dataA_I_amp'] = self.proc_data_dict['data1_A_I'] - self.proc_data_dict['data0_A_I']
+
+        self.proc_data_dict['data0_A_Q'] = np.mean(self.proc_data_dict['data_A_Q'][-4:-2])
+        self.proc_data_dict['data1_A_Q'] = np.mean(self.proc_data_dict['data_A_Q'][-2:])
+        self.proc_data_dict['dataA_Q_avg'] = np.mean([self.proc_data_dict['data0_A_Q'],
+                                                        self.proc_data_dict['data1_A_Q']])
+        self.proc_data_dict['dataA_Q_amp'] = self.proc_data_dict['data1_A_Q'] - self.proc_data_dict['data0_A_Q']
+
+        self.proc_data_dict['plot_data_A_I'] = (self.proc_data_dict['data_A_I'] - self.proc_data_dict['dataA_I_avg'])/\
+                                            self.proc_data_dict['dataA_I_amp']*2
+        self.proc_data_dict['plot_data_A_Q'] = (self.proc_data_dict['data_A_Q'] - self.proc_data_dict['dataA_Q_avg'])/\
+                                            self.proc_data_dict['dataA_Q_amp']*2
+
+        self.proc_data_dict['phase'] = np.unwrap(np.arctan2(self.proc_data_dict['plot_data_A_Q'][:-4],self.proc_data_dict['plot_data_A_I'][:-4]))
+        self.proc_data_dict['amp'] = np.hstack([np.sqrt(self.proc_data_dict['plot_data_A_Q'][:-4]**2+self.proc_data_dict['plot_data_A_I'][:-4]**2),
+                 np.abs(self.proc_data_dict['plot_data_A_Q'][-4:])])
+
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        
+
+        phase_guess_fit = np.polyfit(self.proc_data_dict['plot_times_I'][:-4],
+                                     self.proc_data_dict['phase'],1,
+                                     w=self.proc_data_dict['amp'][:-4])
+        freq_guess, phase_guess = phase_guess_fit
+        t_index = np.argmin(abs(self.proc_data_dict['amp'][:-4]-np.exp(-1)))
+        tau_guess = self.proc_data_dict['plot_times_I'][:-4][t_index]
+        complex_guess = {}
+        complex_guess['amplitude'] = {'value':1,
+                    'min':0,
+                    'max':10,
+                    'vary':True}
+        complex_guess['offset'] = {'value':0,
+                    'min':-10,
+                    'max':10,
+                    'vary':False}
+        complex_guess['phase'] = {'value':phase_guess,
+                    'min':-np.pi,
+                    'max':np.pi,
+                    'vary':True}
+        complex_guess['frequency'] = {'value':freq_guess/2/np.pi,
+                    'vary':True}
+        complex_guess['tau'] = {'value':tau_guess,
+                    'min':0,
+                    'vary':True}
+
+
+        complex_data = np.add(self.proc_data_dict['plot_data_A_I'],
+                            1.j*self.proc_data_dict['plot_data_A_Q'])
+        self.fit_dicts['exp_fit'] = {'fit_fn': fit_mods.ExpDampOscFuncComplex,
+                                      'guess_dict':complex_guess,
+                                      'fit_yvals': {'data': complex_data},
+                                      'fit_xvals': {'t': self.proc_data_dict['plot_times_I']},
+                                      'fitting_type':'minimize'}
+
+    # def analyze_fit_results(self):
+    #     sf_cos = self._get_ef_pi_amp()
+    #     self.proc_data_dict['ef_pi_amp'] = sf_cos
+
+    #     msg = r'$\pi$-ef amp '
+    #     msg += ': {:.4f}\n'.format(sf_cos)
+        
+
+    #     self.raw_data_dict['scale_factor_msg'] = msg
+    #     # TODO: save scale factor to file
+    #     return sf_cos
+
+
+
+
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['plot_times_I'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0],  # does not do anything yet
+            'yvals': self.proc_data_dict['plot_data_A_I'],
+            'ylabel': 'Normalized data',
+            'yunit': '',
+            'setlabel': '<x>',
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.raw_data_dict['measurementstring']),
+            'do_legend': True,
+            'legend_pos': 'best'}
+        self.plot_dicts['mainQ'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'main',
+            'xvals': self.proc_data_dict['plot_times_Q'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0],  # does not do anything yet
+            'yvals': self.proc_data_dict['plot_data_A_Q'],
+            'ylabel': 'Normalized data',
+            'yunit': '',
+            'setlabel': '<y>',
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.raw_data_dict['measurementstring']),
+            'do_legend': True,
+            'legend_pos': 'best'}
+        self.plot_dicts['Phase'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['plot_times_I'][:-4],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0],  # does not do anything yet
+            'yvals': self.proc_data_dict['phase'],
+            'ylabel': 'Phase',
+            'yunit': 'rad',
+            'setlabel': 'Phase',
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.raw_data_dict['measurementstring']),
+            'do_legend': True,
+            'legend_pos': 'best'}
+
+        self.plot_dicts['Amp'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['plot_times_I'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0],  # does not do anything yet
+            'yvals': self.proc_data_dict['amp'],
+            'ylabel': 'Coherence',
+            'yunit': '',
+            'setlabel': 'coherence',
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.raw_data_dict['measurementstring']),
+            'do_legend': True,
+            'legend_pos': 'best'}
+        if self.do_fitting:
+
+            self.plot_dicts['exp_fit_real'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'output_mod_fn':np.real,
+                'fit_res': self.fit_dicts['exp_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'exp fit real part',
+                'do_legend': True,
+                'legend_pos': 'best'}
+            self.plot_dicts['exp_fit_imag'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'output_mod_fn':np.imag,
+                'fit_res': self.fit_dicts['exp_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'exp fit real part',
+                'do_legend': True,
+                'legend_pos': 'best'}
+
+            self.plot_dicts['exp_fit_amp'] = {
+                'ax_id': 'Amp',
+                'plotfn': self.plot_fit,
+                'output_mod_fn':np.abs,
+                'fit_res': self.fit_dicts['exp_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'fit amp',
+                'do_legend': True,
+                'legend_pos': 'best'}
+
+            self.plot_dicts['exp_fit_phase'] = {
+                'ax_id': 'Phase',
+                'plotfn': self.plot_fit,
+                'output_mod_fn':lambda a: np.unwrap(np.angle(a)),
+                'fit_res': self.fit_dicts['exp_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'fit phase',
+                'do_legend': True,
+                'legend_pos': 'best'}
+            # self.plot_dicts['pi_amp'] = {
+            #     'plotfn': self.plot_line,
+            #     'ax_id': 'main',
+            #     'xvals': [self.proc_data_dict['ef_pi_amp']],
+            #     # 'xlabel': self.raw_data_dict['xlabel'][0],
+            #     'xunit': self.raw_data_dict['xunit'],  # does not do anything yet
+            #     'yvals': [fit_mods.CosFunc(self.proc_data_dict['ef_pi_amp'],
+            #         **self.fit_dicts['cos_fit']['fit_res'].best_values)],
+            #     'marker':'o',
+            #     'line_kws':{'markersize':10}}
+            # self.plot_dicts['text_msg'] = {
+            #     'ax_id': 'main',
+            #     'ypos': 0.15,
+            #     'plotfn': self.plot_text,
+            #     'box_props': 'fancy',
+            #     'text_string': self.raw_data_dict['scale_factor_msg']}
+
+
+
+
+
+
+
 class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
     """
     Analysis to extract the intercept of two parameters.
