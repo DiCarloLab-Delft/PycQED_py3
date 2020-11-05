@@ -159,6 +159,22 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         t1 = time.time()
         log.info(f'{self.devname}: Initialized ZI_HDAWG in {t1 - t0}s')
 
+    def _gen_set_awgs_outputs_amplitude(self, awg, ch):
+        """
+        Create a function for mapping setting awgs_N_outputs_M_amplitude to the new nodes.
+        """
+        def _set_awgs_outputs_amplitude(value):
+            self.set(f'awgs_{awg}_outputs_{ch}_gains_{ch}', value)
+        return _set_awgs_outputs_amplitude
+    
+    def _gen_get_awgs_outputs_amplitude(self, awg, ch):
+        """
+        Create a function for mapping getting awgs_N_outputs_M_amplitude to the new nodes.
+        """
+        def _get_awgs_outputs_amplitude():
+            return self.get(f'awgs_{awg}_outputs_{ch}_gains_{ch}')
+        return _get_awgs_outputs_amplitude
+
     def _add_extra_parameters(self):
         """
         We add a few additional custom parameters on top of the ones defined in the device files. These are:
@@ -174,6 +190,8 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
             process in order for the instrument to reliably sample data from the CC. Can be used to detect
             unexpected changes in timing of the entire system. The parameter can also be used to force a specific
             delay to be used on the DIO although that is not generally recommended.
+        awgs_[0-3]_outputs_[0-1]_amplitude - dummy node mapping to the awgs/[0-3]/outputs/[0-1]/gains/[0-1] node
+            to maintain compatibility
         """
         super()._add_extra_parameters()
 
@@ -200,6 +218,16 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
                     'to be applied on the DIO interface in order to achieve reliable sampling'
                     ' of the codewords. The valid range is 0 to 15.',
                     vals=validators.Ints())
+
+        for i in range(4):
+            for ch in range(2):
+                self.add_parameter(f'awgs_{i}_outputs_{ch}_amplitude',
+                            set_cmd=self._gen_set_awgs_outputs_amplitude(i, ch),
+                            get_cmd=self._gen_get_awgs_outputs_amplitude(i, ch),
+                            unit='FS',
+                            label=f'AWG {i} output {ch} amplitude (legacy, deprecated)',
+                            docstring=f'Configures the amplitude in full scale units of AWG {i} output {ch} (zero-indexed). Note: this parameter is deprecated, use awgs_{ch}_outputs_{ch}_gains_{ch} instead',
+                            vals=validators.Numbers())
 
     def snapshot_base(self, update: bool=False,
                       params_to_skip_update =None,

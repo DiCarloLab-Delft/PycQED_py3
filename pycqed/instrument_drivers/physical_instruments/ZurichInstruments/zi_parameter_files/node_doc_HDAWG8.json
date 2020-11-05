@@ -253,22 +253,29 @@
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "AWGS/0/OUTPUTS/0/AMPLITUDE": {
-        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
-        "Node": "AWGS/0/OUTPUTS/0/AMPLITUDE",
+    "AWGS/0/OUTPUTS/0/GAINS/0": {
+        "Description": "Amplitude in units of full scale of AWG 1 Output 1 towards signal output 1. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/0/OUTPUTS/0/GAINS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "AWGS/0/OUTPUTS/0/GAINS/1": {
+        "Description": "Amplitude in units of full scale of AWG 1 Output 1 towards signal output 2. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/0/OUTPUTS/0/GAINS/1",
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
     },
     "AWGS/0/OUTPUTS/0/ENABLES/0": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 1 Output 1 currently outputting towards signal output 1.",
         "Node": "AWGS/0/OUTPUTS/0/ENABLES/0",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
     "AWGS/0/OUTPUTS/0/ENABLES/1": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 1 Output 1 currently outputting towards signal output 2.",
         "Node": "AWGS/0/OUTPUTS/0/ENABLES/1",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
@@ -408,22 +415,29 @@
         "Type": "Integer (enumerated)",
         "Unit": "None"
     },
-    "AWGS/0/OUTPUTS/1/AMPLITUDE": {
-        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
-        "Node": "AWGS/0/OUTPUTS/1/AMPLITUDE",
+    "AWGS/0/OUTPUTS/1/GAINS/0": {
+        "Description": "Amplitude in units of full scale of AWG 1 Output 2 towards signal output 1. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/0/OUTPUTS/1/GAINS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "AWGS/0/OUTPUTS/1/GAINS/1": {
+        "Description": "Amplitude in units of full scale of AWG 1 Output 2 towards signal output 2. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/0/OUTPUTS/1/GAINS/1",
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
     },
     "AWGS/0/OUTPUTS/1/ENABLES/0": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 1 Output 2 currently outputting towards signal output 1.",
         "Node": "AWGS/0/OUTPUTS/1/ENABLES/0",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
     "AWGS/0/OUTPUTS/1/ENABLES/1": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 1 Output 2 currently outputting towards signal output 2.",
         "Node": "AWGS/0/OUTPUTS/1/ENABLES/1",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
@@ -1071,22 +1085,29 @@
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "AWGS/1/OUTPUTS/0/AMPLITUDE": {
-        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
-        "Node": "AWGS/1/OUTPUTS/0/AMPLITUDE",
+    "AWGS/1/OUTPUTS/0/GAINS/0": {
+        "Description": "Amplitude in units of full scale of AWG 2 Output 1 towards signal output 3. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/1/OUTPUTS/0/GAINS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "AWGS/1/OUTPUTS/0/GAINS/1": {
+        "Description": "Amplitude in units of full scale of AWG 2 Output 1 towards signal output 4. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/1/OUTPUTS/0/GAINS/1",
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
     },
     "AWGS/1/OUTPUTS/0/ENABLES/0": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 2 Output 1 currently outputting towards signal output 3.",
         "Node": "AWGS/1/OUTPUTS/0/ENABLES/0",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
     "AWGS/1/OUTPUTS/0/ENABLES/1": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 2 Output 1 currently outputting towards signal output 4.",
         "Node": "AWGS/1/OUTPUTS/0/ENABLES/1",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
@@ -1226,22 +1247,29 @@
         "Type": "Integer (enumerated)",
         "Unit": "None"
     },
-    "AWGS/1/OUTPUTS/1/AMPLITUDE": {
-        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
-        "Node": "AWGS/1/OUTPUTS/1/AMPLITUDE",
+    "AWGS/1/OUTPUTS/1/GAINS/0": {
+        "Description": "Amplitude in units of full scale of AWG 2 Output 2 towards signal output 3. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/1/OUTPUTS/1/GAINS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "AWGS/1/OUTPUTS/1/GAINS/1": {
+        "Description": "Amplitude in units of full scale of AWG 2 Output 2 towards signal output 4. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/1/OUTPUTS/1/GAINS/1",
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
     },
     "AWGS/1/OUTPUTS/1/ENABLES/0": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 2 Output 2 currently outputting towards signal output 3.",
         "Node": "AWGS/1/OUTPUTS/1/ENABLES/0",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
     "AWGS/1/OUTPUTS/1/ENABLES/1": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 2 Output 2 currently outputting towards signal output 4.",
         "Node": "AWGS/1/OUTPUTS/1/ENABLES/1",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
@@ -1889,22 +1917,29 @@
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "AWGS/2/OUTPUTS/0/AMPLITUDE": {
-        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
-        "Node": "AWGS/2/OUTPUTS/0/AMPLITUDE",
+    "AWGS/2/OUTPUTS/0/GAINS/0": {
+        "Description": "Amplitude in units of full scale of AWG 3  Output 1 towards signal output 5. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/2/OUTPUTS/0/GAINS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "AWGS/2/OUTPUTS/0/GAINS/1": {
+        "Description": "Amplitude in units of full scale of AWG 3 Output 1 towards signal output 5. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/2/OUTPUTS/0/GAINS/1",
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
     },
     "AWGS/2/OUTPUTS/0/ENABLES/0": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 3 Output 1 currently outputting towards signal output 5.",
         "Node": "AWGS/2/OUTPUTS/0/ENABLES/0",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
     "AWGS/2/OUTPUTS/0/ENABLES/1": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 3 Output 1 currently outputting towards signal output 6.",
         "Node": "AWGS/2/OUTPUTS/0/ENABLES/1",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
@@ -2044,22 +2079,29 @@
         "Type": "Integer (enumerated)",
         "Unit": "None"
     },
-    "AWGS/2/OUTPUTS/1/AMPLITUDE": {
-        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
-        "Node": "AWGS/2/OUTPUTS/1/AMPLITUDE",
+    "AWGS/2/OUTPUTS/1/GAINS/0": {
+        "Description": "Amplitude in units of full scale of AWG 3 Output 2 towards signal output 5. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/2/OUTPUTS/1/GAINS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "AWGS/2/OUTPUTS/1/GAINS/1": {
+        "Description": "Amplitude in units of full scale of AWG 3 Output 2 towards signal output 5. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/2/OUTPUTS/1/GAINS/1",
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
     },
     "AWGS/2/OUTPUTS/1/ENABLES/0": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 3 Output 2 currently outputting towards signal output 5.",
         "Node": "AWGS/2/OUTPUTS/1/ENABLES/0",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
     "AWGS/2/OUTPUTS/1/ENABLES/1": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 3 Output 2 currently outputting towards signal output 6.",
         "Node": "AWGS/2/OUTPUTS/1/ENABLES/1",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
@@ -2707,22 +2749,29 @@
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "AWGS/3/OUTPUTS/0/AMPLITUDE": {
-        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
-        "Node": "AWGS/3/OUTPUTS/0/AMPLITUDE",
+    "AWGS/3/OUTPUTS/0/GAINS/0": {
+        "Description": "Amplitude in units of full scale of AWG 4 Output 1 towards signal output 7. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/3/OUTPUTS/0/GAINS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "AWGS/3/OUTPUTS/0/GAINS/1": {
+        "Description": "Amplitude in units of full scale of AWG 4 Output 1 towards signal output 8. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/3/OUTPUTS/0/GAINS/1",
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
     },
     "AWGS/3/OUTPUTS/0/ENABLES/0": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 4 Output 1 currently outputting towards signal output 7.",
         "Node": "AWGS/3/OUTPUTS/0/ENABLES/0",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
     "AWGS/3/OUTPUTS/0/ENABLES/1": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 4 Output 1 currently outputting towards signal output 8.",
         "Node": "AWGS/3/OUTPUTS/0/ENABLES/1",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
@@ -2862,22 +2911,29 @@
         "Type": "Integer (enumerated)",
         "Unit": "None"
     },
-    "AWGS/3/OUTPUTS/1/AMPLITUDE": {
-        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
-        "Node": "AWGS/3/OUTPUTS/1/AMPLITUDE",
+    "AWGS/3/OUTPUTS/1/GAINS/0": {
+        "Description": "Amplitude in units of full scale of AWG 4 Output 2 towards signal output 7. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/3/OUTPUTS/1/GAINS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "AWGS/3/OUTPUTS/1/GAINS/1": {
+        "Description": "Amplitude in units of full scale of AWG 4 Output 2 towards signal output 8. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "AWGS/3/OUTPUTS/1/GAINS/1",
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
     },
     "AWGS/3/OUTPUTS/1/ENABLES/0": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 4 Output 2 currently outputting towards signal output 7.",
         "Node": "AWGS/3/OUTPUTS/1/ENABLES/0",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
     "AWGS/3/OUTPUTS/1/ENABLES/1": {
-        "Description": "Enables the driving of the given AWG output channel.",
+        "Description": "AWG 4 Output 2 currently outputting towards signal output 8.",
         "Node": "AWGS/3/OUTPUTS/1/ENABLES/1",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
