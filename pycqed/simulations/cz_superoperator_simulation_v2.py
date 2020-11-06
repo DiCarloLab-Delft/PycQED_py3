@@ -376,7 +376,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             "cond_phase20",
             "vcz_amp_sq",
             "vcz_amp_fine",
-            "population_transfer_01_10"
+            "population_transfer_01_10",
+            "population_20_state"
         ]
         self.value_units = [
             "a.u.",
@@ -404,7 +405,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             "deg",
             "a.u.",
             "a.u.",
-            "a.u."
+            "a.u.",
+            "%"
         ]
 
         self.qois = qois
@@ -594,7 +596,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 qoi["cond_phase20"],
                 self.fluxlutman.get("vcz_amp_sq_{}".format(self.sim_control_CZ.which_gate())),
                 self.fluxlutman.get("vcz_amp_fine_{}".format(self.sim_control_CZ.which_gate())),
-                qoi["population_transfer_01_10"]
+                qoi["population_transfer_01_10"],
+                qoi["population_20_state"] * 100
             ]
             qoi_vec = np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
@@ -639,7 +642,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             qoi_plot[0, 22],
             qoi_plot[0, 23],
             qoi_plot[0, 24],
-            qoi_plot[0, 25]
+            qoi_plot[0, 25],
+            qoi_plot[0, 26]
         ]
         if self.qois != "all":
             return np.array(return_values)[self.qoi_mask]
