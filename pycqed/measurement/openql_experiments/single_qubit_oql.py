@@ -383,6 +383,42 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
+def complex_Ramsey(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit Ramsey sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Ramsey element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    p = oqh.create_program("complex_Ramsey", platf_cfg)
+
+    prerotations = ['rx90','rym90']
+    timeloop = times[:-4][::2]
+    for i, time in enumerate(timeloop):
+        for rot in prerotations:
+            k = oqh.create_kernel("Ramsey_" + rot + "_{}".format(i), p)
+            k.prepz(qubit_idx)
+            wait_nanoseconds = int(round(time/1e-9))
+            k.gate('rx90', [qubit_idx])
+            k.gate("wait", [qubit_idx], wait_nanoseconds)
+            k.gate(rot, [qubit_idx])
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+
+    p = oqh.compile(p)
+    return p
+
+
 def echo(times, qubit_idx: int, platf_cfg: str):
     """
     Single qubit Echo sequence.
@@ -426,6 +462,261 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     p = oqh.compile(p)
     return p
 
+def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit CPMG sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    p = oqh.create_program("CPMG", platf_cfg)
+
+    for i, time in enumerate(times[:-4]):
+
+        k = oqh.create_kernel("CPMG_{}".format(i), p)
+        k.prepz(qubit_idx)
+        # nr_clocks = int(time/20e-9/2)
+
+        wait_nanoseconds = int(round((time/1e-9)/(2*order)))
+        k.gate('rx90', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        for j in range(order-1):
+            k.gate('ry180', [qubit_idx])
+            k.gate("wait", [qubit_idx], 2*wait_nanoseconds)
+        k.gate('ry180', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        # angle = (i*40)%360
+        # cw_idx = angle//20 + 9
+        # if angle == 0:
+        k.gate('rx90', [qubit_idx])
+        # else:
+        #     k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
+
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+
+    p = oqh.compile(p)
+    return p
+
+
+def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit CPMG sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    p = oqh.create_program("CPMG_SO", platf_cfg)
+
+    for i, order in enumerate(orders[:-4]):
+
+        k = oqh.create_kernel("CPMG_SO_{}".format(i), p)
+        k.prepz(qubit_idx)
+        # nr_clocks = int(time/20e-9/2)
+
+        wait_nanoseconds = int(round((tauN/1e-9)/2))
+        k.gate('rx90', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        for j in range(order-1):
+            k.gate('ry180', [qubit_idx])
+            k.gate("wait", [qubit_idx], 2*wait_nanoseconds)
+        k.gate('ry180', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        # angle = (i*40)%360
+        # cw_idx = angle//20 + 9
+        # if angle == 0:
+        k.gate('rx90', [qubit_idx])
+        # else:
+        #     k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
+
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+
+    p = oqh.compile(p)
+    return p
+
+def spin_lock_simple(times, qubit_idx: int, platf_cfg: str, 
+                     mw_gate_duration: float = 40e-9, 
+                     tomo: bool = False):
+    """
+    Single qubit Echo sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    p = oqh.create_program("spin_lock_simple", platf_cfg)
+    # Poor mans tomography:
+    if tomo:
+        tomo_gates = ['I','rX180','rX12']
+    else:
+        tomo_gates = ['I']
+
+    if tomo:
+        timeloop = times[:-6][::3]
+    else:
+        timeloop = times[:-4]
+
+    for i, time in enumerate(timeloop):
+        for tomo_gate in tomo_gates:
+            k = oqh.create_kernel("spin_lock_simple" + "_tomo_" + tomo_gate + "_{}".format(i), p)
+            k.prepz(qubit_idx)
+            # nr_clocks = int(time/20e-9/2)
+            square_us_cycles = np.floor(time/1e-6).astype(int)
+            square_ns_cycles = np.round((time%1e-6)/mw_gate_duration).astype(int)
+            # print("square_us_cycles", square_us_cycles)
+            # print("square_us_cycles", square_ns_cycles)
+            k.gate('rYm90', [qubit_idx])
+            for suc in range(square_us_cycles):
+                k.gate('cw_10', [qubit_idx]) # make sure that the square pulse lasts 1us
+            for snc in range(square_ns_cycles):
+                k.gate('cw_11', [qubit_idx]) # make sure that the square pulse lasts mw_gate_duration ns
+            k.gate('rYm90', [qubit_idx])
+            if tomo:
+                k.gate(tomo_gate,[qubit_idx])
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx, f_state_cal_pts=tomo)
+    p = oqh.compile(p)
+    return p
+
+
+def rabi_frequency(times, qubit_idx: int, platf_cfg: str, 
+                    mw_gate_duration: float = 40e-9,
+                    tomo: bool = False):
+    """
+    Rabi Sequence consising out of sequence of square pulses
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    p = oqh.create_program("rabi_frequency", platf_cfg)
+
+    if tomo:
+        tomo_gates = ['I','rX180','rX12']
+    else:
+        tomo_gates = ['I']
+
+    if tomo:
+        timeloop = times[:-6][::3]
+    else:
+        timeloop = times[:-4]
+
+    for i, time in enumerate(timeloop):
+        for tomo_gate in tomo_gates:
+            k = oqh.create_kernel("rabi_frequency"+ "_tomo_" + tomo_gate + "{}".format(i), p)
+            k.prepz(qubit_idx)
+            # nr_clocks = int(time/20e-9/2)
+            square_us_cycles = np.floor((time+1e-10)/1e-6).astype(int)
+            leftover_us = (time-square_us_cycles*1e-6)
+            square_ns_cycles = np.floor((leftover_us+1e-10)/mw_gate_duration).astype(int)
+            leftover_ns = (leftover_us-square_ns_cycles*mw_gate_duration)
+            print(leftover_us)
+            print(leftover_ns)
+            mwlutman_index = np.round((leftover_ns+1e-10)/4e-9).astype(int)
+            print(mwlutman_index)
+            print("square_us_cycles", square_us_cycles)
+            print("square_ns_cycles", square_ns_cycles)
+            for suc in range(square_us_cycles):
+                k.gate('cw_10', [qubit_idx]) # make sure that the square pulse lasts 1us
+            for snc in range(square_ns_cycles):
+                k.gate('cw_11', [qubit_idx]) # make sure that the square pulse lasts mw_gate_duration ns
+            k.gate('cw_{}'.format(mwlutman_index+11), [qubit_idx])
+            if tomo:
+                k.gate(tomo_gate,[qubit_idx])
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx, f_state_cal_pts=tomo)
+
+    p = oqh.compile(p)
+    return p
+
+
+def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit Echo sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    p = oqh.create_program("spin_lock_echo", platf_cfg)
+
+    for i, time in enumerate(times[:-4]):
+
+        k = oqh.create_kernel("spin_lock_echo{}".format(i), p)
+        k.prepz(qubit_idx)
+        # nr_clocks = int(time/20e-9/2)
+        square_us_cycles = np.floor(time/1e-6).astype(int)
+        square_ns_cycles = np.round((time%1e-6)/mw_gate_duration).astype(int)
+        wait_nanoseconds = 1
+        # print("square_us_cycles", square_us_cycles)
+        # print("square_us_cycles", square_ns_cycles)
+        k.gate('rYm90', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.gate('rx180', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        for suc in range(square_us_cycles):
+            k.gate('cw_10', [qubit_idx]) # make sure that the square pulse lasts 1us
+        for snc in range(square_ns_cycles):
+            k.gate('cw_11', [qubit_idx]) # make sure that the square pulse lasts mw_gate_duration ns
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.gate('rx180', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.gate('rYm90', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+
+    p = oqh.compile(p)
+    return p
 
 def idle_error_rate_seq(nr_of_idle_gates,
                         states: list,
@@ -982,7 +1273,7 @@ def ef_rabi_seq(q0: int,
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([amps, cal_pts_idx])
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
+    # FIXME: remove try-except, when lwe depend hardly on >=openql-0.6
     try:
         p.set_sweep_points(p.sweep_points)
     except TypeError:

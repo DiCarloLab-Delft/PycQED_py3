@@ -215,10 +215,14 @@ def compute_propagator(arglist):
         sim_step / subdivisions_of_simstep
     )  # waveform is generated according to sampling rate of AWG
 
-    wf_generator = getattr(
-        wf_vcz,
-        fluxlutman.get("cz_wf_generator_{}".format(which_gate))
-    )
+    wf_generator_name = fluxlutman.get("cz_wf_generator_{}".format(which_gate))
+    if hasattr(wf_vcz, wf_generator_name):
+        wf_generator = getattr(
+            wf_vcz,
+            fluxlutman.get("cz_wf_generator_{}".format(which_gate))
+        )
+    else:
+        wf_generator = fluxlutman._cz_wf_generators_dict[wf_generator_name]
 
     wfd = wf_generator(
         fluxlutman=fluxlutman,
@@ -372,7 +376,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             "cond_phase20",
             "vcz_amp_sq",
             "vcz_amp_fine",
-            "population_transfer_01_10"
+            "population_transfer_01_10",
+            "population_20_state"
         ]
         self.value_units = [
             "a.u.",
@@ -400,7 +405,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             "deg",
             "a.u.",
             "a.u.",
-            "a.u."
+            "a.u.",
+            "%"
         ]
 
         self.qois = qois
@@ -590,7 +596,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 qoi["cond_phase20"],
                 self.fluxlutman.get("vcz_amp_sq_{}".format(self.sim_control_CZ.which_gate())),
                 self.fluxlutman.get("vcz_amp_fine_{}".format(self.sim_control_CZ.which_gate())),
-                qoi["population_transfer_01_10"]
+                qoi["population_transfer_01_10"],
+                qoi["population_20_state"] * 100
             ]
             qoi_vec = np.array(quantities_of_interest)
             qoi_plot.append(qoi_vec)
@@ -635,7 +642,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             qoi_plot[0, 22],
             qoi_plot[0, 23],
             qoi_plot[0, 24],
-            qoi_plot[0, 25]
+            qoi_plot[0, 25],
+            qoi_plot[0, 26]
         ]
         if self.qois != "all":
             return np.array(return_values)[self.qoi_mask]

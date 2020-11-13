@@ -38,6 +38,8 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
         - Adds the output_dir as an attribute "p.output_dir"
 
     """
+
+    # create OpenQL Program object see https://openql.readthedocs.io/en/latest/api/Program.html
     platf = Platform('OpenQL_Platform', platf_cfg)
     nqubits = platf.get_qubit_number()
     p = Program(pname,
@@ -45,12 +47,13 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
                 nqubits,
                 nregisters)
 
+    # add information to the Program object (FIXME: better create new type, seems to duplicate qubit_count and creg_count)
     p.platf = platf
     p.output_dir = ql.get_option('output_dir')
     p.nqubits = platf.get_qubit_number()
     p.nregisters = nregisters
 
-    # detect OpenQL backend ('eqasm_compiler') used
+    # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
     p.eqasm_compiler = ''
     with open(platf_cfg) as f:
         for line in f:
@@ -61,6 +64,14 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
     if p.eqasm_compiler == '':
         logging.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
 
+    # determine extension of generated file
+    if p.eqasm_compiler == 'eqasm_backend_cc':
+        ext = '.vq1asm'  # CC
+    else:
+        ext = '.qisa'  # CC-light, QCC
+
+    # add filename to help finding the output files. NB: file is created by calling compile()
+    p.filename = join(p.output_dir, p.name + ext)
     return p
 
 
@@ -86,14 +97,7 @@ def compile(p, quiet: bool = True):
         ql.set_option('log_level', 'LOG_WARNING')
         p.compile()
 
-    # determine extension of generated file
-    if p.eqasm_compiler == 'eqasm_backend_cc':  # NB: field .eqasm_compiler is set by p.compile()
-        ext = '.vq1asm'  # CC
-    else:
-        ext = '.qisa'  # CC-light, QCC
-    # attribute is added to program to help finding the output files
-    p.filename = join(p.output_dir, p.name + ext)
-    return p
+    return p  # FIXME: returned unchanged, kept for compatibility for now  (PR #638)
 
 
 def is_compatible_openql_version_cc() -> bool:

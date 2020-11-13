@@ -249,7 +249,7 @@ class Base_MW_LutMan(Base_LutMan):
                            parameter_class=ManualParameter)
         self.add_parameter('mw_amp180', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
-                           initial_value=0.1)
+                           initial_value=1.0)
         self.add_parameter('mw_amp90_scale',
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
@@ -278,6 +278,10 @@ class Base_MW_LutMan(Base_LutMan):
         self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 1e-6),
                            parameter_class=ManualParameter,
                            initial_value=0)
+        # square pulse duratio for larger pulses
+        self.add_parameter('sq_pulse_duration', unit='s', vals=vals.Numbers(0, 1e-6),
+                           parameter_class=ManualParameter,
+                           initial_value=40e-9)
 
         self.add_parameter(
             'mw_modulation', vals=vals.Numbers(), unit='Hz',
@@ -375,15 +379,19 @@ class Base_MW_LutMan(Base_LutMan):
                 # Apperently the VSM LutMan has both parameters, so make sure
                 # we detect on the one only available in the VSM. Otherwise, we
                 # won't get the needed four waveforms.
+                if 'duration' in waveform.keys():
+                    sq_pulse_duration = waveform['duration']
+                else: 
+                    sq_pulse_duration = self.sq_pulse_duration()
                 if 'sq_G_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square_VSM(
                         amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
-                        length=self.mw_gauss_width()*4,
+                        length=sq_pulse_duration,#self.mw_gauss_width()*4,
                         f_modulation=self.mw_modulation(),
                         sampling_rate=self.sampling_rate())
                 elif 'sq_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square(
-                        amp=self.sq_amp(), length=self.mw_gauss_width()*4,
+                        amp=self.sq_amp(), length=sq_pulse_duration,
                         f_modulation=self.mw_modulation(),  phase=0,
                         motzoi=0, sampling_rate=self.sampling_rate())
                 else:
@@ -434,6 +442,25 @@ class Base_MW_LutMan(Base_LutMan):
         for i, (phase) in enumerate(phases):
             lm[i+9] = {"name": "rPhi90",    "theta": 90,
                        "phi": phase, "type": "ge"}
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+    def load_square_waves_to_AWG_lookuptable(self):
+        """
+        Loads square pulses onto the AWG lookuptable.
+        """
+
+        self.set_default_lutmap()
+        lm = self.LutMap()
+        lm[10] = {"name": "square",
+                    "type": "square",
+                    "duration": 1e-6}
+        lm[11] = {"name": "cw_11",
+                    "type": "square"}
+        for i in range(12,21):
+            div = i-12
+            lm[i] = {"name": "cw_{}".format(i),
+                        "type": "square",
+                        "duration": 40e-9*(i-11)/10}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,

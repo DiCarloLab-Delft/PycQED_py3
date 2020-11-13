@@ -94,6 +94,9 @@ class SCPI(IPInstrument):
     def getOperationComplete(self):
         return self.ask('*OPC?')
 
+    def get_operation_complete(self):  # FIXME: PR #638, all naming should be changed to snake_case
+        return self.ask('*OPC?')
+
     def getOptions(self):
         return self.ask('*OPT?')
 

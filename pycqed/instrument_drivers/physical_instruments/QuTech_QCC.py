@@ -550,9 +550,12 @@ class dummy_QCC(QCC):
         self._persistent = ''
 
     def get_idn(self):
-        return {'driver': str(self.__class__), 'name': self.name}
+        return {'driver': str(self.__class__), 'name': self.name, 'model': 'QCC'}
 
     def getOperationComplete(self):
+        return True
+
+    def get_operation_complete(self):  # FIXME PR #638
         return True
 
     def add_standard_parameters(self):

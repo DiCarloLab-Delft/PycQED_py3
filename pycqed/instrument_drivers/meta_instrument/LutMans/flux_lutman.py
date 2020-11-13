@@ -453,15 +453,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         corr_amp = self.get('cz_phase_corr_amp_%s' % which_gate)
         corr_samples = int(corr_len*self.sampling_rate())
 
-        corr_max_amp = self.get('cz_phase_corr_max_amp_%s' % which_gate)
+        #FIXME unused: corr_max_amp = self.get('cz_phase_corr_max_amp_%s' % which_gate)
+        #FIXME: line below fails because parameter is part of class HDAWG_Flux_LutMan_Adiabatic, whereas this is class HDAWG_Flux_LutMan (PR #638)
         buffer_before = self.get('cz_phase_corr_buffer_%s' % which_gate)
 
         q_J2 = self.get('q_J2_%s' % which_gate)
-        czd_signs = self.get('czd_signs_%s' % which_gate)
-        phase_corr_l1 = self.get('cz_phase_corr_l1_%s' % which_gate)
-        phase_corr_l2 = self.get('cz_phase_corr_l2_%s' % which_gate)
+        #FIXME unused: czd_signs = self.get('czd_signs_%s' % which_gate)
+        #FIXME unused: phase_corr_l1 = self.get('cz_phase_corr_l1_%s' % which_gate)
+        #FIXME unused: phase_corr_l2 = self.get('cz_phase_corr_l2_%s' % which_gate)
 
-        dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
+        #FIXME unused: dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
 
         cw_idx = self._get_cw_from_wf_name('cz_%s'%which_gate)
         #print(self.LutMap()[cw_idx]['type'])
@@ -474,10 +475,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                                      state_B=state_B,
                                      which_gate=which_gate)
         # Beware theta in radian!
-        theta_i = wfl.eps_to_theta(eps_i, g=q_J2)
+        #FIXME unused: theta_i = wfl.eps_to_theta(eps_i, g=q_J2)
 
         nr_samples_buffer = int(np.round(buffer_before * self.sampling_rate()))
-        buffer_vec = np.zeros(nr_samples_buffer)
+        #FIXME unused: buffer_vec = np.zeros(nr_samples_buffer)
 
         # First the offset to guarantee net-zero integral
         if is_double_sided and not np.isnan(cz_integral):
@@ -1774,7 +1775,6 @@ class HDAWG_Flux_LutMan_Adiabatic(Base_Flux_LutMan):
                            parameter_class=ManualParameter)
 
         # CODEWORD 8: CUSTOM
-
         self.add_parameter(
             'custom_wf',
             initial_value=np.array([]),
