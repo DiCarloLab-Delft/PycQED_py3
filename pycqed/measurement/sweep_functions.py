@@ -1326,7 +1326,9 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.qubit._prep_ro_sources()
         if self.reload_marked_sequence:
             # reload the meaningfull sequence
+            self.cc.stop()
             self.cc.eqasm_program(self.sequence_file.filename)
+            self.cc.start()
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()
         self.cc.start()

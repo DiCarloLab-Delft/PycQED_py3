@@ -2872,6 +2872,7 @@ class CCLight_Transmon(Qubit):
             MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single.always_prepare = True
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Qubit_dac_scan'+self.msmt_suffix, mode='2D')
         if analyze:
