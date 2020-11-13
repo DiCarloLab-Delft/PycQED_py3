@@ -491,30 +491,34 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         AWG = self.AWG.get_instr()
 
         if self.cfg_sideband_mode() == 'static':
-            for awg_ch in [self.channel_I(), self.channel_Q()]:
-                awg_nr = (awg_ch-1)//2
-                ch_pair = (awg_ch-1) % 2
+          awg_nr = (self.channel_I()-1)//2
+          # Enforce assumption that channel I precedes channel Q and share AWG
+          assert awg_nr == (self.channel_Q()-1)//2
+          assert self.channel_I() < self.channel_Q()
 
-                # Parameter 'awgs_{}_outputs_{}_amplitude' is mapped to parameter
-                # 'awgs/{}/outputs/{}/gains/0' for compatibility
-                AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair), val)
-                #AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
-                #AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), val)
+          AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
+          AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), 0)
+          AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), 0)
+          AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
 
         # In case of sideband modulation mode 'real-time', amplitudes have to be set
         # according to modulation matrix
         elif self.cfg_sideband_mode() == 'real-time':
-            # Enforce assumption that channel I precedes channel Q
-            assert self.channel_I() < self.channel_Q()
-            assert (self.channel_I())//2 < (self.channel_Q())//2
-
-            awg_nr = (self.channel_I()-1)//2
-            # AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
-            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, 0), val)
-            #AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), val)
-            #AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr+1, 1), (-1/self.mixer_alpha())*val)
-            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, 1), (-1.0/self.mixer_alpha())*val)
-            #AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr+1, 1), (1/self.mixer_alpha())*val)
+          awg_nr = (self.channel_I()-1)//2
+          # Enforce assumption that channel I precedes channel Q and share AWG
+          assert awg_nr == (self.channel_Q()-1)//2
+          assert self.channel_I() < self.channel_Q()
+            
+          if self.mixer_alpha()<=1:
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), self.mixer_alpha()*val)
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), self.mixer_alpha()*val)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), -val)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
+          else:
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), val)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), (-1/self.mixer_alpha())*val)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), (1/self.mixer_alpha())*val)
         else:
             raise KeyError('Unexpected value for parameter sideband mode.')
 
@@ -522,18 +526,31 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         AWG = self.AWG.get_instr()
         vals = []
         if self.cfg_sideband_mode() == 'static':
-            for awg_ch in [self.channel_I(), self.channel_Q()]:
-                awg_nr = (awg_ch-1)//2
-                ch_pair = (awg_ch-1) % 2
-                vals.append(
-                  AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair)))
+            awg_nr = (self.channel_I()-1)//2
+            # Enforce assumption that channel I precedes channel Q and share AWG
+            assert awg_nr == (self.channel_Q()-1)//2
+            assert self.channel_I() < self.channel_Q()
+
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
+            assert vals[0]==vals[4]
+            assert vals[1]==vals[2]==0
+
         # In case of sideband modulation mode 'real-time', amplitudes have to be set
         # according to modulation matrix
         elif self.cfg_sideband_mode() == 'real-time':
-            vals.append(AWG.get('awgs_0_outputs_0_amplitude'))
-            vals.append(AWG.get('awgs_0_outputs_1_amplitude'))
+            awg_nr = (self.channel_I()-1)//2
+            # Enforce assumption that channel I precedes channel Q and share AWG
+            assert awg_nr == (self.channel_Q()-1)//2
+            assert self.channel_I() < self.channel_Q()
 
-        # assert vals[0] == vals[1]
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
+
         return vals[0]
 
     def load_waveform_onto_AWG_lookuptable(
