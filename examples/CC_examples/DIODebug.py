@@ -36,9 +36,9 @@ opt_codewords = False
 arg = 1
 while arg < len(sys.argv):
     val = sys.argv[arg]
-    if val == "-l":
+    if val == "-L":
         opt_set_lvds = True
-    elif val == "-c":
+    elif val == "-C":
         opt_set_cmos = True
     elif val == '-s':
         opt_dio_snapshot = True

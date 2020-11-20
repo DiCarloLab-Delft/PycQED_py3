@@ -538,7 +538,7 @@ while (1) {
         if mask_value is None:
             mask_value = self.geti('awgs/{}/dio/mask/value'.format(awg_nr))
 
-        cw_mask      = mask_value << self.geti('awgs/{}/dio/mask/shift'.format(awg_nr))
+        cw_mask      = mask_value #<< self.geti('awgs/{}/dio/mask/shift'.format(awg_nr))
 
         for i in range(timeout):
             valid = True
