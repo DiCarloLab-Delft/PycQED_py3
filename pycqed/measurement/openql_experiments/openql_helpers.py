@@ -104,7 +104,7 @@ def is_compatible_openql_version_cc() -> bool:
     """
     test whether OpenQL version is compatible with Central Controller
     """
-    return ql.get_version() >= '0.8.1.dcl-4'  # we need latest configuration file changes"
+    return ql.get_version() >= '0.8.1.dcl-4'  # we need latest configuration file changes
 
 #############################################################################
 # Calibration points
