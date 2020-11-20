@@ -115,7 +115,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
 
-    k.prepz(qubit_idx)
+    # k.prepz(qubit_idx)
     for i in range(nr_clocks):
         # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
         # control works. By repeating it the duration can be controlled.

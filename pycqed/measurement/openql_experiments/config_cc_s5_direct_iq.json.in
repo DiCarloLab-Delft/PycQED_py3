@@ -566,7 +566,7 @@
             "cc_light_instr": "square",
             "cc": {
                 "signal_ref": "single-qubit-mw",
-                "static_codeword_override": 0
+                "static_codeword_override": 10
             }
         },
         "spec": {
