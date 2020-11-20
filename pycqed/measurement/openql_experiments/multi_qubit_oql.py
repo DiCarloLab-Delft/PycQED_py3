@@ -593,8 +593,8 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
     Sequence to measure the residual (ZZ) interaction between two qubits.
     Procedure is described in M18TR.
 
-        (q0) --X90----(tau/2)---Y180-(tau/2)-Xm90--RO
-        (qs) --[X180]-(tau/2)-[X180]-(tau/2)-------RO
+        (q0) --X90----(tau)---Y180-(tau)-Y90--RO
+        (qs) --[X180]-(tau)-[X180]-(tau)-------RO
 
     Input pars:
         times:           the list of waiting times in s for each Echo element
@@ -620,12 +620,12 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
         k.prepz(q0)
         for q_s in q_spectator_idx:
             k.prepz(q_s)
-        wait_nanoseconds = int(round(time/1e-9/2))
+        wait_nanoseconds = int(round(time/1e-9))
         k.gate('rx90', [q0])
         for i_s, q_s in enumerate(q_spectator_idx):
             k.gate(gate_spec[i_s], [q_s])
         k.gate("wait", all_qubits, wait_nanoseconds)
-        k.gate('ry180', [q0])
+        k.gate('rx180', [q0])
         for i_s, q_s in enumerate(q_spectator_idx):
             k.gate(gate_spec[i_s], [q_s])
         k.gate("wait", all_qubits, wait_nanoseconds)
@@ -1635,7 +1635,10 @@ def conditional_oscillation_seq(q0: int, q1: int,
                             'flux_codeword_park "{}" not allowed'.format(
                                 flux_codeword_park))
                 else:
-                    k.gate('wait', [q0, q1], disabled_cz_duration)
+                    k.gate("wait", [], 0) #alignment workaround
+                    # k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
+                    k.gate('wait', [q0,q1], 50)
+                    k.gate("wait", [], 0) #alignment workaround
 
                 k.gate("wait", [], 0)
 
@@ -1671,6 +1674,12 @@ def conditional_oscillation_seq(q0: int, q1: int,
             # #################################################################
             # Measurement
             # #################################################################
+            if case == 'excitation':
+                gate = 'rx180' if single_q_gates_replace is None else single_q_gates_replace
+                k.gate("wait", [], 0) #alignment workaround
+                k.gate(gate, [q1])
+                # k.gate('i', [q0])
+                # k.gate("wait", [], 0)
 
             k.measure(q0)
             k.measure(q1)

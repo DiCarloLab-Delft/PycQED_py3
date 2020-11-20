@@ -39,9 +39,9 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           # tolerance=0.01)+
             self.add_node(Qubit.name + ' Frequency Fine',
                           calibrate_function=Qubit.name +
-                            '.calibrate_frequency_ramsey',
-                          check_function=Qubit.name + '.check_ramsey',
-                          tolerance=0.1e-3)
+                            '.calibrate_frequency_ramsey')
+                          # check_function=Qubit.name + '.check_ramsey',
+                          # tolerance=0.1e-3)
             self.add_node(Qubit.name + ' f_12 estimate',
                           calibrate_function=Qubit.name +
                             '.find_anharmonicity_estimate')

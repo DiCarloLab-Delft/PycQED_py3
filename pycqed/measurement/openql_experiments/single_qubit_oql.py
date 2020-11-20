@@ -93,7 +93,7 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
 
 
 def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
-                           platf_cfg: str, trigger_idx: int,
+                           platf_cfg: str, trigger_idx: int, trigger_idx_2: int = None,
                            wait_time_ns: int = 0, cc: str = 'CCL'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
@@ -115,12 +115,19 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
 
+    # k.prepz(qubit_idx)
     for i in range(nr_clocks):
         # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
         # control works. By repeating it the duration can be controlled.
         k.gate(spec_instr, [trigger_idx])
+        if trigger_idx_2 is not None:
+            k.gate(spec_instr, [trigger_idx_2])
+            k.wait([trigger_idx, trigger_idx_2], 0)
+
     if trigger_idx != qubit_idx:
         k.wait([trigger_idx, qubit_idx], 0)
+        if trigger_idx_2 is not None:
+            k.wait([trigger_idx_2], 0)
     k.wait([qubit_idx], wait_time_ns)
     k.measure(qubit_idx)
     p.add_kernel(k)

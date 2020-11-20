@@ -1326,11 +1326,65 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.qubit._prep_ro_sources()
         if self.reload_marked_sequence:
             # reload the meaningfull sequence
+            self.cc.stop()
             self.cc.eqasm_program(self.sequence_file.filename)
+            self.cc.start()
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()
         self.cc.start()
 
+class Nested_spec_source_pow(Soft_Sweep):
+    """
+    Sets a parameter and performs a "find_resonator_frequency" measurement
+    after setting the parameter.
+    """
+    def __init__(self, qubit, nested_MC, par, reload_sequence=False,
+                 cc=None, sequence_file=None, **kw):
+        super().__init__(**kw)
+        self.qubit = qubit
+        self.par = par
+        self.nested_MC = nested_MC
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+        self.reload_marked_sequence = reload_sequence
+        self.sequence_file = sequence_file
+        self.cc = cc
+
+    def set_parameter(self, val):
+        spec_source = self.qubit.instr_spec_source.get_instr()
+        spec_source.power.set(val)
+        if self.reload_marked_sequence:
+            # reload the meaningfull sequence
+            self.cc.eqasm_program(self.sequence_file.filename)
+        spec_source.on()
+        self.cc.start()
+
+class Nested_amp_ro(Soft_Sweep):
+    """
+    Sets a parameter and performs a "find_resonator_frequency" measurement
+    after setting the parameter.
+    """
+    def __init__(self, qubit, nested_MC, par, reload_sequence=False,
+                 cc=None, sequence_file=None, **kw):
+        super().__init__(**kw)
+        self.qubit = qubit
+        self.par = par
+        self.nested_MC = nested_MC
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+        self.reload_marked_sequence = reload_sequence
+        self.sequence_file = sequence_file
+        self.cc = cc
+
+    def set_parameter(self, val):
+        self.par(val)
+        self.qubit._prep_ro_pulse(CW=True)
+        if self.reload_marked_sequence:
+            # reload the meaningfull sequence
+            self.cc.eqasm_program(self.sequence_file.filename)
+        self.cc.start()
 
 class tim_flux_latency_sweep(Soft_Sweep):
     def __init__(self, device):

@@ -1248,8 +1248,6 @@ class Qubit(Instrument):
             stepsize (float):
                 smalles stepsize in ns for which to run ramsey experiments.
         """
-
-        self.ro_acq_averages(2**10)
         cur_freq = self.freq_qubit()
         # Steps don't double to be more robust against aliasing
         for n in steps:

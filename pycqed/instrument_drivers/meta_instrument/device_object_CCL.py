@@ -517,7 +517,7 @@ class DeviceCCL(Instrument):
         # is used to drive all readout lines.
         LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
         LO.frequency.set(self.ro_lo_freq())
-        LO.power(self.ro_pow_LO())
+        #LO.power(self.ro_pow_LO())
         LO.on()
 
         for qb_name in qubits:
@@ -529,7 +529,10 @@ class DeviceCCL(Instrument):
 
             LO_q = qb.instr_LO_ro.get_instr()
             if LO_q is not LO:
-                raise ValueError("Expect a single LO to drive all feedlines")
+                LO_q.frequency.set(self.ro_lo_freq())
+                #LO_q.power(self.ro_pow_LO())
+                LO_q.on()
+                #raise ValueError("Expect a single LO to drive all feedlines")
 
     def _prep_ro_assign_weights(self, qubits):
         """

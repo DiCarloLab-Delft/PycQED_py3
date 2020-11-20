@@ -1725,8 +1725,6 @@ setTrigger(0);
 #         if verbose: print("Calibrating DIO delays")
 #
 #         CC_model = CC.IDN()['model']
-#         if feedline is None and 'CCL' in CC_model:
-#             raise ziUHFQCDIOCalibrationError('No feedline specified for calibration')
 #
 #         if 'QCC' in CC_model:
 #             self._prepare_QCC_dio_calibration(

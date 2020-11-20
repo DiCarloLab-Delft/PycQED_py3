@@ -9381,6 +9381,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             flux, **fit_res.best_values,
             flux_state=True), 'y-', label='fit')
 
+        print(fit_res.params['g'])
         g_legend = r'{} = {:.2f}$\pm${:.2f} MHz'.format(
             coupling_label,
             fit_res.params['g'] * 1e-6, fit_res.params['g'].stderr * 1e-6)
