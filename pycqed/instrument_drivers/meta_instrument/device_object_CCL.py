@@ -32,7 +32,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
 )
 #from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
-from pycqed.instrument_drivers.physical_instruments.QuTechCC import QuTechCC
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
 
 from pycqed.utilities import learner1D_minimizer as l1dm

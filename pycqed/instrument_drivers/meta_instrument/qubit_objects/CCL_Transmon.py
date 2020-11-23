@@ -5643,18 +5643,8 @@ class CCLight_Transmon(Qubit):
             self, nr_cliffords=2**np.arange(12),
             nr_seeds=100,
             MC=None,
-<<<<<<< HEAD
-            recompile: bool = 'as needed',
-            prepare_for_timedomain: bool = True,
-            ro_acq_weight_type: str = "optimal IQ",
-            compile_only: bool = False,
-            pool=None,  # a multiprocessing.Pool()
-            rb_tasks=None  # used after called with `compile_only=True`
-    ):
-=======
             recompile: bool = 'as needed', prepare_for_timedomain: bool = True,
             ignore_f_cal_pts: bool = False):
->>>>>>> feature/hdawg_amp_interface
         """
         Measures randomized benchmarking decay including second excited state
         population.

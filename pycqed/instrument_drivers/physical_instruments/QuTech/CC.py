@@ -232,7 +232,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             dio_mask = 0x80FF80FF  # TRIG=0x8000000, TRIG_1=0x00008000, CWs=0x00FF00FF
 
 
-        elif dio_mode == "awg8-mw-direct_iq" or dio_mode == "novsm_microwave":
+        elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
             #FIXME: only toggles 5 out 7 codeword bits
 
             cc_prog = """
@@ -280,7 +280,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             dio_mask = 0x8F9F8F9F  # TRIG=0x8000000, TRIG_2=0x00008000, CWs=0x0F9F0F9F
 
 
-        elif dio_mode == "awg8_flux" or dio_mode == "flux":
+        elif dio_mode == "awg8-flux" or dio_mode == "flux":
             # based on ZI_HDAWG8.py::_prepare_CC_dio_calibration_hdawg and examples/CC_examples/flux_calibration.vq1asm
             # FIXME: hardcoded slots, this is OpenQL output
             cc_prog = """
