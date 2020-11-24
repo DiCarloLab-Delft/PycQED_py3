@@ -49,7 +49,10 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
 
     # add information to the Program object (FIXME: better create new type, seems to duplicate qubit_count and creg_count)
     p.platf = platf
-    p.output_dir = ql.get_option('output_dir')
+    if 1:  # FIXME: workaround for OpenQL returning different value
+        p.output_dir = output_dir
+    else:
+        p.output_dir = ql.get_option('output_dir')
     p.nqubits = platf.get_qubit_number()
     p.nregisters = nregisters
 
