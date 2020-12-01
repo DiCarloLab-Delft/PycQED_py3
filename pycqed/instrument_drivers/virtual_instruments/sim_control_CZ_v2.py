@@ -232,6 +232,14 @@ class SimControlCZ_v2(Instrument):
             initial_value=0,
         )
 
+        self.add_parameter(
+            "fluxbias_mean",
+            docstring="FB: used for scans wrt the fluxbias at one specific point in the landscape",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=0,
+        )
+
         # for ramsey/Rabi simulations
 
         self.add_parameter(

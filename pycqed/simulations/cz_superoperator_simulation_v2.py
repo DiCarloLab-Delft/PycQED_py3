@@ -186,6 +186,34 @@ def f_to_parallelize_v2(arglist):
                 exp_metadata=exp_metadata,
             )
 
+    elif exp_metadata["mode"] == "fluxbias_scan":
+
+        MC.set_sweep_function(
+                getattr(sim_control_CZ, "fluxbias_mean")
+        )
+        MC.set_sweep_points(np.arange(-3000e-6, 3001e-6, 50e-6))
+
+        if sim_control_CZ.cluster():
+            dat = MC.run(
+                additional_pars["label"]+"_cluster",
+                mode="1D",
+                exp_metadata=exp_metadata,
+            )
+
+        else:
+            if additional_pars["long_name"]:
+                dat = MC.run(
+                    additional_pars["label"],
+                    mode="1D",
+                    exp_metadata=exp_metadata,
+                )
+            else:
+                dat = MC.run(
+                "contour_scan",
+                mode="1D",
+                exp_metadata=exp_metadata,
+            )
+
     fluxlutman.close()
     fluxlutman_static.close()
     sim_control_CZ.close()
@@ -428,7 +456,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
     def acquire_data_point(self, **kw):
 
         # Discretize average (integral) over a Gaussian distribution
-        mean = 0
+        mean_q0 = self.sim_control_CZ.fluxbias_mean()
+        mean_q1 = 0
         sigma_q0 = self.sim_control_CZ.sigma_q0()
         sigma_q1 = (
             self.sim_control_CZ.sigma_q1()
@@ -453,10 +482,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                     samplingpoints_gaussian_q0[1] - samplingpoints_gaussian_q0[0]
                 )
                 values_gaussian_q0 = czf_v2.gaussian(
-                    samplingpoints_gaussian_q0, mean, sigma_q0
+                    samplingpoints_gaussian_q0, mean_q0, sigma_q0
                 )
             else:
-                samplingpoints_gaussian_q0 = np.array([0])
+                samplingpoints_gaussian_q0 = np.array([mean_q0])
                 delta_x_q0 = 1
                 values_gaussian_q0 = np.array([1])
             if sigma_q1 != 0:
@@ -467,10 +496,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                     samplingpoints_gaussian_q1[1] - samplingpoints_gaussian_q1[0]
                 )
                 values_gaussian_q1 = czf_v2.gaussian(
-                    samplingpoints_gaussian_q1, mean, sigma_q1
+                    samplingpoints_gaussian_q1, mean_q1, sigma_q1
                 )
             else:
-                samplingpoints_gaussian_q1 = np.array([0])
+                samplingpoints_gaussian_q1 = np.array([mean_q1])
                 delta_x_q1 = 1
                 values_gaussian_q1 = np.array([1])
 
