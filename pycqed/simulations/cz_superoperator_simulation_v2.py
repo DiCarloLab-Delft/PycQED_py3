@@ -476,7 +476,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             # If sigma=0 there's no need for sampling
             if sigma_q0 != 0:
                 samplingpoints_gaussian_q0 = np.linspace(
-                    -5 * sigma_q0, 5 * sigma_q0, n_sampling_gaussian
+                    -5 * sigma_q0 + mean_q0, 5 * sigma_q0 + mean_q0, n_sampling_gaussian
                 )  # after 5 sigmas we cut the integral
                 delta_x_q0 = (
                     samplingpoints_gaussian_q0[1] - samplingpoints_gaussian_q0[0]
@@ -490,7 +490,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 values_gaussian_q0 = np.array([1])
             if sigma_q1 != 0:
                 samplingpoints_gaussian_q1 = np.linspace(
-                    -5 * sigma_q1, 5 * sigma_q1, n_sampling_gaussian
+                    -5 * sigma_q1 + mean_q1, 5 * sigma_q1 + mean_q1, n_sampling_gaussian
                 )  # after 5 sigmas we cut the integral
                 delta_x_q1 = (
                     samplingpoints_gaussian_q1[1] - samplingpoints_gaussian_q1[0]
