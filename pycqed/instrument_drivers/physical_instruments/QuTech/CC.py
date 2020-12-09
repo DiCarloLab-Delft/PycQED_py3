@@ -186,7 +186,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     # FIXME: move to CCCore? or CC_DIOCAL
     ##########################################################################
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+    def set_seqbar_cnt(self, dio_mask: int, expected_sequence: List, port: int=0):
         self.calibrate_dio(port, expected_bits=dio_mask)
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
