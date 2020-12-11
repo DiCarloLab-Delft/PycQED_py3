@@ -2748,8 +2748,6 @@ def Two_qubit_RTE_pipelined(QX:int, QZ:int, QZ_d:int, platf_cfg: str,
     p = oqh.compile(p)
     return p
 
-
-
 def Ramsey_cross(wait_time: int,
                  angles: list,
                  q_rams: int,
@@ -2857,3 +2855,53 @@ def TEST_RTE(QX:int , QZ:int, platf_cfg: str,
 
     p = oqh.compile(p)
     return p
+
+def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = True,analyze = True):
+    """
+    Used for AllXY measurement and calibration for multiple qubits simultaneously.
+    args:
+
+    qubits_idx:     list of qubit indeces
+    qubits:         list of qubit names
+    platf_cfg:      
+    double_points:  measure each gate combination twice
+    analyze:        
+
+    """
+      
+    p = oqh.create_program("Multi_qubit_AllXY_", platf_cfg)
+
+    allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+             ['rx180', 'ry180'], ['ry180', 'rx180'],
+             ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+             ['ry90', 'rx90'], ['rx90', 'ry180'], ['ry90', 'rx180'],
+             ['rx180', 'ry90'], ['ry180', 'rx90'], ['rx90', 'rx180'],
+             ['rx180', 'rx90'], ['ry90', 'ry180'], ['ry180', 'ry90'],
+             ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+             ['ry90', 'ry90']]
+
+    # this should be implicit
+    # FIXME: remove try-except, when we depend hard on >=openql-0.6
+    try:
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+
+    for i, xy in enumerate(allXY):
+        if double_points:
+            js = 2
+        else:
+            js = 1
+        for j in range(js):
+            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
+            for qubit in qubits_idx:
+              k.prepz(qubit)
+              k.gate(xy[0], [qubit])
+              k.gate(xy[1], [qubit])
+              k.measure(qubit)
+            p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+    
