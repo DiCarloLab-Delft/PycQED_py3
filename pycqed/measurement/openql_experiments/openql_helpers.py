@@ -40,6 +40,9 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
     """
 
     # create OpenQL Program object see https://openql.readthedocs.io/en/latest/api/Program.html
+    if 1: # FIXME: workaround for OpenQL 0.8.1.dev4 re-setting option
+        ql.set_option('output_dir', output_dir)
+
     platf = Platform('OpenQL_Platform', platf_cfg)
     nqubits = platf.get_qubit_number()
     p = Program(pname,
@@ -49,7 +52,7 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
 
     # add information to the Program object (FIXME: better create new type, seems to duplicate qubit_count and creg_count)
     p.platf = platf
-    if 1:  # FIXME: workaround for OpenQL returning different value
+    if 1:  # FIXME: workaround for OpenQL 0.8.1.dev4 returning different value
         p.output_dir = output_dir
     else:
         p.output_dir = ql.get_option('output_dir')
