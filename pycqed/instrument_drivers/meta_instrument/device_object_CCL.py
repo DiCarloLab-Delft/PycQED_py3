@@ -522,7 +522,7 @@ class DeviceCCL(Instrument):
         # is used to drive all readout lines.
         LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
         LO.frequency.set(self.ro_lo_freq())
-        #LO.power(self.ro_pow_LO())
+        LO.power(self.ro_pow_LO())
         LO.on()
 
         for qb_name in qubits:
@@ -4308,6 +4308,44 @@ class DeviceCCL(Instrument):
 
         self._dag = dag
         return dag
+
+
+    def measure_multi_AllXY(self, qubits: list = None ,MC=None, termination_opt=0.08):
+
+        if qubits is None: 
+            qubits = self.qubits()
+        self.ro_acq_weight_type('optimal')
+        self.ro_pow_LO(25)
+        self.prepare_for_timedomain(qubits=qubits)
+
+        qubits_idx = []
+        for q in qubits:
+            q_ob = self.find_instrument(q)
+            q_nr = q_ob.cfg_qubit_nr()
+            qubits_idx.append(q_nr)
+
+        p = mqo.multi_qubit_AllXY(qubits_idx=qubits_idx,
+                                  platf_cfg=self.cfg_openql_platform_fn())
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.get_int_avg_det(qubits=qubits)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(42))
+        MC.set_detector_function(d)
+        MC.run('Multi_AllXY_'+'_'.join(qubits))
+        a = ma2.Multi_AllXY_Analysis(qubits = qubits)
+        
+        dev = 0 
+        for Q in qubits:
+            dev += a.proc_data_dict['deviation_{}'.format(Q)]
+            if dev > len(qubits)*termination_opt:
+                return False
+            else:
+                return True
+
 
 
 def _acq_ch_map_to_IQ_ch_map(acq_ch_map):

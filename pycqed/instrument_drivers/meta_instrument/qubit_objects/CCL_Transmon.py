@@ -1335,10 +1335,10 @@ class CCLight_Transmon(Qubit):
             f_start = self.freq_qubit()
 
         # Set high power and averages to be sure we find the peak.
-        self.spec_pow(-30)
-        self.ro_pulse_amp_CW(0.025)
-        old_avg = self.ro_acq_averages()
-        self.ro_acq_averages(2**15)
+        # self.spec_pow(-30)
+        # self.ro_pulse_amp_CW(0.025)
+        # old_avg = self.ro_acq_averages()
+        # self.ro_acq_averages(2**15)
         # Repeat measurement while no peak is found:
         success = False
         f_center = f_start
@@ -1399,7 +1399,7 @@ class CCLight_Transmon(Qubit):
                 else:
                     success = True
 
-        self.ro_acq_averages(old_avg)
+        # self.ro_acq_averages(old_avg)
         if update:
             if use_max:
                 self.freq_qubit(analysis_spec.peaks['peak'])
@@ -1456,13 +1456,13 @@ class CCLight_Transmon(Qubit):
             freq_center = self.freq_qubit()
             freq_range = 50e6
             freqs = np.arange(freq_center - freq_range, freq_center + freq_range,
-                              0.5e6)
+                              1e6)
         if dac_values is None:
             if self.fl_dc_I0() is not None:
                 dac_values = np.linspace(self.fl_dc_I0() - 1e-3,
                                          self.fl_dc_I0() + 1e-3, 8)
             else:
-                dac_values = np.linspace(-1e3, 1e-3, 8)
+                dac_values = np.linspace(-0.5e3, 0.5e-3, 10)
 
         if fluxChan is None:
             if self.fl_dc_ch() is not None:
@@ -1480,7 +1480,7 @@ class CCLight_Transmon(Qubit):
                                                   mode=spec_mode,
                                                   nested_resonator_calibration=False,
                                                   # nested_resonator_calibration_use_min=False,
-                                                  resonator_freqs=np.arange(-5e6, 5e6, 0.1e6)+self.freq_res())
+                                                  resonator_freqs=np.arange(-5e6, 5e6, 0.2e6)+self.freq_res())
 
             timestamp = a_tools.get_timestamps_in_range(t_start,
                                                         label='Qubit_dac_scan' +
@@ -2815,7 +2815,7 @@ class CCLight_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn(),
-                trigger_idx=0)
+                trigger_idx=9)
         else:
             p = sqo.pulsed_spec_seq(
                 qubit_idx=self.cfg_qubit_nr(),
