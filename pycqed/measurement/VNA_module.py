@@ -36,7 +36,7 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     if start_freq != None and stop_freq != None:
         MC_instr.set_sweep_function(swf.ZNB_VNA_sweep(VNA_instr,
                                                       start_freq=start_freq,
-                                                      stop_freq=stop_freq,
+                                                      stop_freq=stop_fre
                                                       npts=nbr_points,
                                                       force_reset=True))
     elif center_freq != None and span != None:

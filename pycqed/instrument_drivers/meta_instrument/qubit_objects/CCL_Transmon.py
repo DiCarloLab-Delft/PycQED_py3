@@ -1152,7 +1152,7 @@ class CCLight_Transmon(Qubit):
             self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
-        self.instr_spec_source.get_instr().off()
+        # self.instr_spec_source.get_instr().off()
         self.instr_LO_mw.get_instr().on()
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.instr_LO_mw.get_instr().frequency.set(

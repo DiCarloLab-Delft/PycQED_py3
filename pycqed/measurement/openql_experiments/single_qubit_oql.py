@@ -544,6 +544,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str):
         if initialize:
             k.measure(qubit_idx)
         k.gate('rx180', [qubit_idx])
+        k.gate('wait', [], 0)
         k.measure(qubit_idx)
         p.add_kernel(k)
 

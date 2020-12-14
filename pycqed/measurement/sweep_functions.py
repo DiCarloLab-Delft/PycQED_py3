@@ -1212,6 +1212,37 @@ class FLsweep(Soft_Sweep):
         self.AWG.start()
         return
 
+# FIXME: remove after use for Surface-7
+class QWG_mw_sweep(Soft_Sweep):
+    """
+    Special sweep function for QWG MW pulse params.
+
+    Args:
+        lm: mw_lutman which sweep should act on (pass as object, not name string)
+        waveform_name: name of the waveform to change, eg. "9", "10" (pass as int)
+        par: parameter of the waveform to sweep, eg. "phi", "theta" (pass as string)
+    """
+    def __init__(self, lm, par, waveform_name):
+        super().__init__()
+        self.lm = lm
+        self.par = par
+        self.waveform_name = waveform_name
+        self.parameter_name = par
+        self.unit = 'deg'
+        self.name = par
+
+        self.AWG = self.lm.AWG.get_instr()
+        self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
+
+    def set_parameter(self, val):
+        # Just in case there is some resolution or number precision differences
+        # when setting the value
+        self.lm.LutMap()[self.waveform_name][self.par] = val
+        self.AWG.stop()
+        self.lm.load_waveform_onto_AWG_lookuptable(
+            self.waveform_name, regenerate_waveforms=True)
+        self.AWG.start()
+
 
 class Nested_resonator_tracker(Soft_Sweep):
     """

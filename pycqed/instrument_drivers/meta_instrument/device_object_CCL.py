@@ -8,6 +8,7 @@ import datetime
 from collections import OrderedDict
 import multiprocessing
 from importlib import reload
+from copy import deepcopy
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -483,11 +484,15 @@ class DeviceCCL(Instrument):
             qubits (list of str):
                 list of qubit names that have to be prepared
         """
-        log.info("Configuring readout for {}".format(qubits))
-        self._prep_ro_sources(qubits=qubits)
-        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits)
-        self._prep_ro_integration_weights(qubits=qubits)
-        self._prep_ro_pulses(qubits=qubits)
+        i_qubits = deepcopy(qubits)
+        if 'X' in i_qubits and 'X_dummy' not in i_qubits:
+            i_qubits[i_qubits.index('X')] = 'X_dummy'
+
+        log.info("Configuring readout for {}".format(i_qubits))
+        self._prep_ro_sources(qubits=i_qubits)
+        acq_ch_map = self._prep_ro_assign_weights(qubits=i_qubits)
+        self._prep_ro_integration_weights(qubits=i_qubits)
+        self._prep_ro_pulses(qubits=i_qubits)
 
         self._prep_ro_instantiate_detectors(qubits=qubits, acq_ch_map=acq_ch_map)
 
@@ -741,9 +746,9 @@ class DeviceCCL(Instrument):
         for ro_lm in ro_lms:
             # list comprehension should result in a list with each
             # individual resonator + the combination of all simultaneously
-            resonator_combs = [[r] for r in resonators_in_lm[ro_lm.name]] + [
-                resonators_in_lm[ro_lm.name]
-            ]
+            resonator_combs = [[r] for r in resonators_in_lm[ro_lm.name]] +\
+                [resonators_in_lm[ro_lm.name]]# +\
+                # [[r1,r2] for r1 in resonators_in_lm[ro_lm.name] for r2 in resonators_in_lm[ro_lm.name] if r1>r2 ]
             log.info(
                 "Setting resonator combinations for {} to {}".format(
                     ro_lm.name, resonator_combs
@@ -1029,6 +1034,7 @@ class DeviceCCL(Instrument):
         verbose=True,
         disable_metadata=False,
         extract_only=False,
+        offset_phase_calibration: int = 0,
     ):
         """
         Measures the "conventional cost function" for the CZ gate that
@@ -1100,7 +1106,7 @@ class DeviceCCL(Instrument):
                 # we hardcode the X on the ef transition to CW 31 here.
                 lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
                 # load_phase_pulses will also upload other waveforms
-                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+                mw_lutman.load_phase_pulses_to_AWG_lookuptable(phases=np.arange(0,360,20)+offset_phase_calibration)
                 mw_lutman.load_waveforms_onto_AWG_lookuptable(
                     regenerate_waveforms=True)
 
@@ -1126,7 +1132,8 @@ class DeviceCCL(Instrument):
             flux_codeword_park=flux_codeword_park,
             cz_repetitions=cz_repetitions,
             parked_qubit_seq=parked_qubit_seq,
-            disable_parallel_single_q_gates=disable_parallel_single_q_gates
+            disable_parallel_single_q_gates=disable_parallel_single_q_gates,
+            offset_phase_calibration=offset_phase_calibration
         )
 
         s = swf.OpenQL_Sweep(
@@ -1172,6 +1179,248 @@ class DeviceCCL(Instrument):
             extract_only=extract_only)
 
         return a
+
+    def measure_weight2_parity_conditional_oscillation(
+            self,
+            data_qubits: list,
+            ancilla: str,
+            Ramsey_qubit:str =None,
+            phase_offset: int = 0,
+            echo_ancilla: bool = False,
+            MC=None,
+            analyze=True):
+
+        """
+        Measure the 4 conditional oscillation curves of a weight-2 parity check.
+
+        Args:
+            data_qubits: List of data qubits involved in the parity check in the
+                          the order [<D_H>, <D_L>].
+
+            ancilla: Ancilla qubit name.
+
+            Ramsey_qubit: Qubit ramseyed in the conditional oscillation
+                          experiment.
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        QH = self.find_instrument(data_qubits[0])
+        QL = self.find_instrument(data_qubits[1])
+        QA = self.find_instrument(ancilla)
+        if Ramsey_qubit != None:
+            QR_idx = self.find_instrument(Ramsey_qubit).cfg_qubit_nr()
+            q_ramsey_idx = [QH.name, QA.name, QL.name].index(Ramsey_qubit) + 1
+        else:
+            QR_idx = None
+            q_ramsey_idx = 2
+            Ramsey_qubit = QA.name
+
+        mw_lutman_name = self.find_instrument(Ramsey_qubit).instr_LutMan_MW()
+        mw_lutman = self.find_instrument(mw_lutman_name)
+        mw_lutman.load_phase_pulses_to_AWG_lookuptable(
+                   phases=np.arange(0,360,20)+phase_offset)
+
+        qubits = [data_qubits[0]]+[ancilla]+[data_qubits[1]]
+        self.prepare_for_timedomain(qubits=qubits)
+
+        p = mqo.two_qubit_conditional_oscillation_seq(
+            qH=QH.cfg_qubit_nr(),
+            qA=QA.cfg_qubit_nr(),
+            qL=QL.cfg_qubit_nr(),
+            ramsey_qubit=QR_idx,
+            echo=echo_ancilla,
+            platf_cfg=self.cfg_openql_platform_fn())
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr())
+
+        d = self.get_int_avg_det(qubits=qubits)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_detector_function(d)
+        MC.run('Parity_conditional_oscillation_{}_{}_{}'.format(QH.name, QA.name, QL.name))
+        if analyze:
+            ma2.pca.Weight2_conditional_oscillation_analysis(q_ramsey_idx=q_ramsey_idx,
+                                                             Ramsey_qubit=Ramsey_qubit)
+
+    def measure_weight4_parity_conditional_oscillation(
+            self,
+            data_qubits: list,
+            ancilla: str,
+            Ramsey_qubit:str =None,
+            phase_offset: int = 0,
+            MC=None,
+            analyze=True):
+
+        """
+        Measure the 4 conditional oscillation curves of a weight-2 parity check.
+
+        Args:
+            data_qubits: List of data qubits involved in the parity check in the
+                          the order [<D_H>, <D_L>].
+
+            ancilla: Ancilla qubit name.
+
+            Ramsey_qubit: Qubit ramseyed in the conditional oscillation
+                          experiment.
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        QH1 = self.find_instrument(data_qubits[0])
+        QH2 = self.find_instrument(data_qubits[1])
+        QL1 = self.find_instrument(data_qubits[2])
+        QL2 = self.find_instrument(data_qubits[3])
+        QA = self.find_instrument(ancilla)
+        if Ramsey_qubit != None:
+            QR_idx = self.find_instrument(Ramsey_qubit).cfg_qubit_nr()
+            q_ramsey_idx = [QH1.name, QL1.name, QL2.name,
+                            QA.name, QH2.name].index(Ramsey_qubit) + 1
+        else:
+            QR_idx = None
+            q_ramsey_idx = 4
+            Ramsey_qubit = QA.name
+
+        mw_lutman_name = self.find_instrument(Ramsey_qubit).instr_LutMan_MW()
+        mw_lutman = self.find_instrument(mw_lutman_name)
+        mw_lutman.load_phase_pulses_to_AWG_lookuptable(
+                   phases=np.arange(0,360,20)+phase_offset)
+
+        qubits = [data_qubits[0], data_qubits[2], data_qubits[3],
+                  ancilla, data_qubits[1]]
+        self.prepare_for_timedomain(qubits=qubits)
+
+        p = mqo.four_qubit_conditional_oscillation_seq(
+                qH1=QH1.cfg_qubit_nr(),
+                qH2=QH2.cfg_qubit_nr(),
+                qA=QA.cfg_qubit_nr(),
+                qL1=QL1.cfg_qubit_nr(),
+                qL2=QL2.cfg_qubit_nr(),
+                ramsey_qubit=QR_idx,
+                platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr())
+        d = self.get_int_avg_det(qubits=[QH1, QL1, QA, QL2, QH2])
+        d.set_child_attr('nr_shots', 4096)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_detector_function(d)
+        MC.run('Parity_conditional_oscillation_{}_{}_{}_{}_{}'.format(
+                QH1.name, QH2.name, QA.name, QL1.name, QL2.name))
+        if analyze:
+            ma2.pca.Weight4_conditional_oscillation_analysis(q_ramsey_idx=q_ramsey_idx,
+                                                             Ramsey_qubit=Ramsey_qubit)
+
+    def measure_ramsey_oscillation(
+            self,
+            q_meas: str,
+            q_rams: str,
+            echo_time: int,
+            echo_phase: int,
+            q_meas_state: str='0',
+            MC=None,
+            analyze=True):
+        '''
+        Function for calibration of weight-4 parity checks
+        '''
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # Assert qubits have the same acquisition instrument
+        Q_rams = self.find_instrument(q_rams)
+        Q_meas = self.find_instrument(q_meas)
+        awg_1 = self.find_instrument(Q_rams.instr_LutMan_RO()).AWG()
+        awg_2 = self.find_instrument(Q_meas.instr_LutMan_RO()).AWG()
+        # nr of shots triggered must be different if using different instruments
+        if awg_1 != awg_2:
+            nr_shots = 1
+        else:
+            nr_shots = 2
+
+        Q_rams_idx = self.find_instrument(q_rams).cfg_qubit_nr()
+        Q_meas_idx = self.find_instrument(q_meas).cfg_qubit_nr()
+
+        # Load phase into mw lutman
+        Q_rams_lutman = self.find_instrument(Q_rams.instr_LutMan_MW())
+        Q_rams_lutman.LutMap()[29]['phi'] = echo_phase
+        Q_rams_lutman.load_phase_pulses_to_AWG_lookuptable(phases=np.arange(0,360,20)+90)
+        Q_rams_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.prepare_for_timedomain(qubits=[q_meas, q_rams])
+
+        # p = mqo.Ramsey_cross_2(q_rams=Q_rams_idx,
+        #                        q_meas=Q_meas_idx,
+        #                        platf_cfg=self.cfg_openql_platform_fn(),
+        #                        echo=True,
+        #                        wait_time=echo_time,
+        #                        nr_shots=nr_shots,
+        #                        initial_state=q_meas_state)
+
+        p = mqo.Ramsey_cross_3(q_rams=Q_rams_idx,
+                               q_meas=Q_meas_idx,
+                               platf_cfg=self.cfg_openql_platform_fn(),
+                               echo=True,
+                               wait_time=echo_time,
+                               nr_shots=nr_shots,
+                               initial_state=q_meas_state)
+
+        s = swf.OpenQL_Sweep(
+                openql_program=p,
+                CCL=self.instr_CC.get_instr())
+        d = self.get_int_avg_det(qubits=[q_meas, q_rams])
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_detector_function(d)
+        MC.run('Ramsey_meas_echo_{}_{}_time_{}ns_angle{}_state_{}'.format(\
+                           q_meas, q_rams, echo_time, echo_phase, q_meas_state))
+        if analyze:
+            a=ma2.pca.Single_Oscillation_analysis(Ramsey_qubit=Q_rams.name,
+                                                  nr_shots=nr_shots)
+            return a.qoi
+
+    def calibrate_weight4_echo(self,
+            q_meas: str,
+            q_rams: str,
+            echo_time: int,
+            echo_phase: int,
+            q_meas_state: str='0',
+            MC=None,
+            analyze=True):
+
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubits)
+
+        q0_name = qubits[-1]
+
+        counter_par = ManualParameter("counter", unit="#")
+        counter_par(0)
+
+        gate_separation_par = ManualParameter("gate separation", unit="s")
+        gate_separation_par(20e-9)
+
+        d = det.Function_Detector(
+            get_function=self._measure_sliding_pulse_phase,
+            value_names=["Phase", "stderr"],
+            value_units=["deg", "deg"],
+            msmt_kw={
+                "disable_initial_pulse": disable_initial_pulse,
+                "qubits": qubits,
+                "counter_par": [counter_par],
+                "gate_separation_par": [gate_separation_par],
+                "nested_MC": nested_MC,
+                "flux_cw": flux_cw,
+            },
+        )
+
+        MC.set_sweep_function(gate_separation_par)
+        MC.set_sweep_points(times)
+
+        MC.set_detector_function(d)
+        MC.run("")
+
 
     def measure_two_qubit_grovers_repeated(
         self,
@@ -1867,13 +2116,14 @@ class DeviceCCL(Instrument):
             qubits, result_logging_mode=result_logging_mode
         )
 
+        # FIXME: this check was taken out to allow hack in fluxing during measurement
         # This assumes qubit names do not contain spaces
-        det_qubits = [v.split()[-1] for v in d.value_names]
-        if (qubits != det_qubits) and (self.ro_acq_weight_type() == 'optimal'):
-            # this occurs because the detector groups qubits per feedline.
-            # If you do not pay attention, this will mess up the analysis of
-            # this experiment.
-            raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
+        # det_qubits = [v.split()[-1] for v in d.value_names]
+        # if (qubits != det_qubits) and (self.ro_acq_weight_type() == 'optimal'):
+        #     # this occurs because the detector groups qubits per feedline.
+        #     # If you do not pay attention, this will mess up the analysis of
+        #     # this experiment.
+        #     raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
 
         shots_per_meas = int(
             np.floor(np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases
@@ -2054,8 +2304,8 @@ class DeviceCCL(Instrument):
             raise ValueError("q_target must be included in qubits.")
         # Ensure all qubits use same acquisition instrument
         instruments = [self.find_instrument(q).instr_acquisition() for q in qubits]
-        if instruments[1:] != instruments[:-1]:
-            raise ValueError("All qubits must have common acquisition instrument")
+        # if instruments[1:] != instruments[:-1]:
+        #     raise ValueError("All qubits must have common acquisition instrument")
 
         qubits_nr = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
         q_target_nr = self.find_instrument(q_target).cfg_qubit_nr()
@@ -2945,6 +3195,7 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
         MC.run(label)
         ma2.Basic1DAnalysis()
+        # ma2.Cryoscope_v2_Analysis(label=label, qubit=q0)
 
     def measure_cryoscope_vs_amp(
         self,

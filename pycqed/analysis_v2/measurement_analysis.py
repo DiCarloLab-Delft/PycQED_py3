@@ -55,6 +55,8 @@ reload(ta)
 import pycqed.analysis_v2.multiplexed_readout_analysis as mra
 reload(mra)
 
+import pycqed.analysis_v2.parity_check_analysis as pca
+reload(pca)
 # from pycqed.analysis_v2.base_analysis import  # remove me if everything still works*
 from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,

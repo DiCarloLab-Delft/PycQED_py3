@@ -5,21 +5,25 @@ from collections import OrderedDict
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
+import copy
 
 
 default_mw_lutmap = {
-    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
-    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0 , "type" : "ge"},
-    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90, "type" : "ge"},
-    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0 , "type" : "ge"},
-    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90, "type" : "ge"},
-    5  : {"name" : "rXm90" , "theta" : -90      , "phi" : 0 , "type" : "ge"},
-    6  : {"name" : "rYm90" , "theta" : -90      , "phi" : 90, "type" : "ge"},
-    7  : {"name" : "rPhi90", "theta" : 90       , "phi" : 0 , "type" : "ge"},
-    8  : {"name" : "spec"  , "type"  : "spec"}  ,
-    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0 , "type" : "ef"},
-    10 : {"name" : "square", "type"  : "square"},
-
+    0  : {"name" : "I"          , "theta" : 0        , "phi" : 0 , "type" : "ge"},
+    1  : {"name" : "rX180"      , "theta" : 180      , "phi" : 0 , "type" : "ge"},
+    2  : {"name" : "rY180"      , "theta" : 180      , "phi" : 90, "type" : "ge"},
+    3  : {"name" : "rX90"       , "theta" : 90       , "phi" : 0 , "type" : "ge"},
+    4  : {"name" : "rY90"       , "theta" : 90       , "phi" : 90, "type" : "ge"},
+    5  : {"name" : "rXm90"      , "theta" : -90      , "phi" : 0 , "type" : "ge"},
+    6  : {"name" : "rYm90"      , "theta" : -90      , "phi" : 90, "type" : "ge"},
+    7  : {"name" : "rPhi90"     , "theta" : 90       , "phi" : 0 , "type" : "ge"},
+    8  : {"name" : "spec"       , "type"  : "spec"}  ,
+    9  : {"name" : "rX12"       , "theta" : 180      , "phi" : 0 , "type" : "ef"},
+    10 : {"name" : "square"     , "type"  : "square"},
+    30 : {"name" : "correction" , "theta" : 90       , "phi" : 0 , "type" : "ge"},
+    29 : {"name" : "echo_corr"  , "theta" : 180      , "phi" : 0 , "type" : "ge"},
+    31 : {"name" : "theta_gate" , "theta" : 10       , "phi" : 0 , "type" : "ge"},
+    28 : {"name" :"correction_S", "theta" : 90       , "phi" : 0 , "type" : "ge"}
 }
 
 valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square'}
@@ -86,7 +90,7 @@ class Base_MW_LutMan(Base_LutMan):
 
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
-        self.LutMap(default_mw_lutmap.copy())
+        self.LutMap(copy.deepcopy(default_mw_lutmap))
 
     def codeword_idx_to_parnames(self, cw_idx: int):
         """Convert a codeword_idx to a list of par names for the waveform."""
@@ -196,7 +200,7 @@ class Base_MW_LutMan(Base_LutMan):
                 if waveform['theta'] == 90:
                     amp = self.mw_amp180()*self.mw_amp90_scale()
                 elif waveform['theta'] == -90:
-                    amp = - self.mw_amp180() * self.mw_amp90_scale() 
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
                 else:
                     amp = theta_to_amp(theta=waveform['theta'],
                                        amp180=self.mw_amp180())

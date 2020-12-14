@@ -248,6 +248,8 @@ class Multi_Detector_UHF(Multi_Detector):
             detector.arm()
             detector.UHFQC.sync()
 
+        time.sleep(1)
+
         # Run (both in parallel and implicitly)
         self.detectors[0].AWG.start()
 
@@ -2263,6 +2265,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
             if self.prepare_function is not None:
                 self.prepare_function()
 
+        self.UHFQC.qas_0_integration_length(
+            int(self.integration_length*(self.UHFQC.clock_freq())))
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(
             samples=self.nr_shots, averages=1, channels=self.channels, mode='rl')

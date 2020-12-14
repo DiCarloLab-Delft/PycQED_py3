@@ -225,7 +225,7 @@
                 // FIXME: must match 'resources/meas_units' if resource constraint scheduler is used
 				{
 					"name": "ro_0",
-                    "qubits": [[6], [11], [], [], [], [], [], [], []],
+                    "qubits": [[13], [16], [], [], [], [], [], [], []],
                     "ref_signals_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
@@ -237,7 +237,7 @@
 				},
 				{
 					"name": "ro_1",
-                    "qubits": [[0], [1], [2], [3], [7], [8], [12], [13], [15]],
+                    "qubits": [[1], [4], [5], [7], [8], [10], [11], [14], [15]],
                     "ref_signals_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
@@ -249,7 +249,7 @@
 				},
 				{
 					"name": "ro_2",
-                    "qubits": [[4], [5], [9], [10], [14], [16], [], [], []],
+                    "qubits": [[0], [2], [3], [6], [9], [12], [], [], []],
                     "ref_signals_type": "measure",
 					"ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",

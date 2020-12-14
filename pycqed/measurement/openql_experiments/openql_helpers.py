@@ -241,7 +241,8 @@ def add_multi_q_cal_points(
     combinations: list = ["00", "01", "10", "11"],
     reps_per_cal_pnt: int = 1,
     f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
-    return_comb=False
+    return_comb=False,
+    initialize=False
 ):
     """
     Add a list of kernels containing calibration points in the program `p`
@@ -274,6 +275,9 @@ def add_multi_q_cal_points(
 
         for q_state, q in zip(comb, qubits):
             k.prepz(q)
+            if initialize:
+                k.measure(q)
+                k.gate("wait", [q], 300)
             for gate in state_to_gates[q_state]:
                 k.gate(gate, [q])
         k.gate("wait", [], 0)  # alignment

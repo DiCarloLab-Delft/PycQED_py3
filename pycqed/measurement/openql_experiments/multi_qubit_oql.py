@@ -76,7 +76,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
     p = oqh.create_program("multi_qubit_off_on", platf_cfg)
 
     for i, comb in enumerate(combinations):
-        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+        k = oqh.create_kernel('Prep_{}'.format(i), p)
 
         # 1. Prepare qubits in 0
         for q in qubits:
@@ -86,7 +86,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
         if initialize:
             for q in qubits:
                 k.measure(q)
-            k.gate('wait', qubits, 0)
+            k.gate('wait', [], 0)
 
         # 3. prepare desired state
         for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
@@ -97,12 +97,13 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
             elif state == '2':
                 k.gate('rx180', [target_qubit])
                 k.gate('rx12', [target_qubit])
+            # k.gate('wait', [], 0)
         # 4. measurement of all qubits
-        k.gate('wait', qubits, 0)
+        k.gate('wait', [], 0)
         # Used to ensure timing is aligned
         for q in qubits:
             k.measure(q)
-        k.gate('wait', qubits, 0)
+        k.gate('wait', [], 0)
         p.add_kernel(k)
 
     p = oqh.compile(p)
@@ -476,6 +477,59 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
 
     p = oqh.compile(p)
     return p
+
+def multi_qubit_AllXY(Qubits_idx: list, platf_cfg: str, double_points: bool = True):
+    """
+    Single qubit AllXY sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+        double_points:  if true repeats every element twice
+                        intended for evaluating the noise at larger time scales
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    p = oqh.create_program("Multi_qubit_AllXY", platf_cfg)
+
+    allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+             ['rx180', 'ry180'], ['ry180', 'rx180'],
+             ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+             ['ry90', 'rx90'], ['rx90', 'ry180'], ['ry90', 'rx180'],
+             ['rx180', 'ry90'], ['ry180', 'rx90'], ['rx90', 'rx180'],
+             ['rx180', 'rx90'], ['ry90', 'ry180'], ['ry180', 'ry90'],
+             ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+             ['ry90', 'ry90']]
+
+    # this should be implicit
+    # FIXME: remove try-except, when we depend hard on >=openql-0.6
+    try:
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+
+    for i, xy in enumerate(allXY):
+        if double_points:
+            js = 2
+        else:
+            js = 1
+        for j in range(js):
+            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
+            for qubit in Qubits_idx:
+              k.prepz(qubit)
+              k.gate(xy[0], [qubit])
+              k.gate(xy[1], [qubit])
+              k.measure(qubit)
+            p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
 
 
 def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
@@ -1246,19 +1300,19 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
     return p
 
 def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
-                                    echo: bool=False,
-                                    number_of_repetitions: int = 10,
-                                    initialization_msmt: bool=False,
-                                    initial_states=[['0','0'], ['0','1'], ['1','1',], ['1','0']],
-                                    flux_codeword: str = 'cz',
-                                    # flux_codeword1: str = 'cz',
-                                    parity_axes=['ZZ'], tomo=False,
-                                    tomo_after=False,
-                                    ro_time=500e-9,
-                                    echo_during_ancilla_mmt: bool=False,
-                                    idling_time: float=40e-9,
-                                    idling_time_echo: float=20e-9,
-                                    idling_rounds: int=0):
+                           echo: bool=False,
+                           number_of_repetitions: int = 10,
+                           initialization_msmt: bool=False,
+                           initial_states=[['0','0'], ['0','1'], ['1','1',], ['1','0']],
+                           flux_codeword: str = 'cz',
+                           # flux_codeword1: str = 'cz',
+                           parity_axes=['ZZ'], tomo=False,
+                           tomo_after=False,
+                           ro_time=500e-9,
+                           echo_during_ancilla_mmt: bool=False,
+                           idling_time: float=40e-9,
+                           idling_time_echo: float=20e-9,
+                           idling_rounds: int=0):
     """
     Implements a circuit for repeated parity checks on two qubits.
 
@@ -1290,7 +1344,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
     p = oqh.create_program("two_qubit_parity_check", platf_cfg)
     data_qubits=[qD0,qD1]
     if tomo:
-        tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
+        tomo_gates = ['i', 'rx180', 'rx90', 'rxm90', 'ry90', 'rym90']
     else:
         tomo_gates = ['False']
 
@@ -1381,8 +1435,8 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
                 #tomography
                 if tomo:
                     k.gate("wait", [qD1, qD0], 0) #alignment workaround
-                    k.gate(p_q0, [qD1])
-                    k.gate(p_q1, [qD0])
+                    k.gate(p_q1, [qD1])
+                    k.gate(p_q0, [qD0])
                     k.gate("wait", [qD1, qD0], 0) #alignment workaround
                 # measure
                 if not tomo_after:
@@ -1411,6 +1465,1994 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int, platf_cfg: str,
     p = oqh.compile(p)
     return p
 
+def multi_qubit_parity_check(Data_qubits: list,
+                             qA: int,
+                             platf_cfg: str,
+                             initialization_msmt: bool = False,
+                             flux_codeword: str = 'cz'
+                            ):
+
+    print('new')
+    p = oqh.create_program("Multi_qubit_parity_check", platf_cfg)
+
+    n = len(Data_qubits)
+    initial_states = [ '{:0{}b}'.format(i, n) for i in range(n**2) ]
+    for initial_state in initial_states:
+        k = oqh.create_kernel(
+            'Parity_check_'+initial_state,p)
+        for q in Data_qubits:
+            k.prepz(q)
+        k.prepz(qA)
+        if initialization_msmt:
+            for q in Data_qubits:
+                k.measure(q)
+            k.measure(qA)
+
+        k.gate("wait", [], 0)
+
+        #state preparation
+        for i, s in enumerate(initial_state):
+            if s == '1':
+                k.gate('ry180', [Data_qubits[i]])
+            elif s == '+':
+                k.gate('ry90', [Data_qubits[i]])
+            elif s == '-':
+                k.gate('rym90', [Data_qubits[i]])
+            elif s == 'i':
+                ks.gate('rx90', [Data_qubits[i]])
+            elif s == '-i':
+                k.gate('rxm90', [Data_qubits[i]])
+            elif s == '0':
+                pass
+            else:
+                raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+        #parity measurement(s)
+        k.gate("wait", [], 0)
+        k.gate('rym90', [qA])
+        k.gate("wait", [], 0)
+
+        # for q in Data_qubits[:2]:
+        #     k.gate(flux_codeword, [q, qA])
+        #     k.gate("wait", [], 0)
+
+        # k.gate("wait", [], 0)
+        # k.gate("rx180", [qA])
+        # k.gate("wait", [], 0)
+
+        # for q in Data_qubits[2:]:
+        #     k.gate(flux_codeword, [q, qA])
+        #     k.gate("wait", [], 0)
+
+         # CZ gates
+        k.gate('cz', [qA, Data_qubits[0]])
+        # k.gate('ry180', [qH1])
+        # k.gate('ry180', [qH1])
+        # k.gate('i'    , [qH1])
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA, Data_qubits[2]])
+        k.gate('rx180', [Data_qubits[0]])
+        k.gate('rx180', [Data_qubits[0]])
+        k.gate('i', [Data_qubits[0]])
+        k.gate('wait', [], 0)
+        k.gate('rx180', [qA])
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA, Data_qubits[1]])
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA, Data_qubits[3]])
+        k.gate('wait', [], 0)
+
+        k.gate('ry90', [qA])
+        k.gate("wait", [], 0)
+
+        k.measure(qA)
+        for q in Data_qubits:
+            k.measure(q)
+
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+def parity_assessment_seq(qA: int,
+                          qA2: int,
+                          qD1: int,
+                          qD2: int,
+                          qD3: int,
+                          qD4: int,
+                          platf_cfg: str):
+
+    print('new')
+    p = oqh.create_program("Parity_assessment_routine", platf_cfg)
+
+    k = oqh.create_kernel('Single_parity_check', p)
+    # state initialization
+    k.prepz(qA)
+    k.prepz(qD1)
+    k.prepz(qD2)
+    k.prepz(qD3)
+    k.prepz(qD4)
+    k.gate('wait', [], 0)
+
+    ###############
+    # X-Parity
+    ###############
+    k.gate('rym90', [qA])
+    k.gate('rym90', [qD1])
+    k.gate('rym90', [qD2])
+    k.gate('rym90', [qD3])
+    k.gate('rym90', [qD4])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qD2]) # CZ X-D2
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qD1]) # CZ X-D1
+    k.gate('rx180', [qD2])  # echo D2
+    k.gate('rx180', [qD2])  # echo D2
+    k.gate('i', [qD2])
+    k.gate('wait', [], 0)
+    k.gate('rx180', [qA])   # echo ancilla
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qD4]) # CZ X-D4
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qD3]) # CZ X-D3
+    k.gate('wait', [], 0)
+    k.gate('correction', [qA])
+    k.gate('correction', [qD1])
+    k.gate('correction', [qD2])
+    k.gate('correction', [qD3])
+    k.gate('correction', [qD4])
+    k.gate('wait', [], 0)
+    ##############
+    # Echo
+    ##############
+    k.gate('wait', [], 0)
+    k.gate('echo_corr', [qD1])
+    k.gate("wait", [qD1], 160)
+    k.gate('echo_corr', [qD2])
+    k.gate("wait", [qD2], 60)
+    k.gate('echo_corr', [qD3])
+    k.gate("wait", [qD3], 280)
+    k.gate('echo_corr', [qD4])
+    k.gate("wait", [qD4], 300)
+    k.measure(qA)
+    k.measure(12)
+    k.measure(10)
+    k.gate('wait', [], 0)
+
+    k.measure(qD1)  # measure data qubits
+    k.measure(qD2)  #
+    k.measure(qD3)  #
+    k.measure(qD4)  #
+    k.gate('wait', [], 0)
+    p.add_kernel(k)
+
+
+    k = oqh.create_kernel('Repeated_parity_check', p)
+    # state initialization
+    k.prepz(qA)
+    k.prepz(qD1)
+    k.prepz(qD2)
+    k.prepz(qD3)
+    k.prepz(qD4)
+    k.gate('wait', [], 0)
+    # XXXX-Parity check
+    for i in range(2):
+        ###############
+        # X-Parity
+        ###############
+        k.gate('rym90', [qA])
+        k.gate('rym90', [qD1])
+        k.gate('rym90', [qD2])
+        k.gate('rym90', [qD3])
+        k.gate('rym90', [qD4])
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA, qD2]) # CZ X-D2
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA, qD1]) # CZ X-D1
+        k.gate('rx180', [qD2])  # echo D2
+        k.gate('rx180', [qD2])  # echo D2
+        k.gate('i', [qD2])
+        k.gate('wait', [], 0)
+        k.gate('rx180', [qA])   # echo ancilla
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA, qD4]) # CZ X-D4
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA, qD3]) # CZ X-D3
+        k.gate('wait', [], 0)
+        k.gate('correction', [qA])
+        k.gate('correction', [qD1])
+        k.gate('correction', [qD2])
+        k.gate('correction', [qD3])
+        k.gate('correction', [qD4])
+        k.gate('wait', [], 0)
+        ##############
+        # Echo
+        ##############
+        k.gate('wait', [], 0)
+        k.gate('echo_corr', [qD1])
+        k.gate("wait", [qD1], 160)
+        k.gate('echo_corr', [qD2])
+        k.gate("wait", [qD2], 60)
+        k.gate('echo_corr', [qD3])
+        k.gate("wait", [qD3], 280)
+        k.gate('echo_corr', [qD4])
+        k.gate("wait", [qD4], 300)
+        k.measure(qA)
+        k.measure(12)
+        k.measure(10)
+        k.gate('wait', [], 0)
+
+    k.measure(qD1)  # measure data qubits
+    k.measure(qD2)  #
+    k.measure(qD3)  #
+    k.measure(qD4)  #
+    k.gate('wait', [], 0)
+    p.add_kernel(k)
+
+    k1 = oqh.create_kernel('zero_measurement', p)
+    k1.prepz(qA)
+    k1.prepz(qD1)
+    k1.prepz(qD2)
+    k1.prepz(qD3)
+    k1.prepz(qD4)
+    k1.gate('wait', [], 0)
+    k1.measure(qD1)
+    k1.measure(qD2)
+    k1.measure(qD3)
+    k1.measure(qD4)
+    k1.measure(qA)
+    k1.gate('wait', [], 0)
+    p.add_kernel(k1)
+
+    k = oqh.create_kernel('one_measurement', p)
+    k.prepz(qA)
+    k.prepz(qD1)
+    k.prepz(qD2)
+    k.prepz(qD3)
+    k.prepz(qD4)
+    k.gate('wait', [], 0)
+    # k.gate('rx180', [qA])
+    k.gate('rx180', [qD1])
+    k.gate('rx180', [qD2])
+    k.gate('rx180', [qD3])
+    k.gate('rx180', [qD4])
+    k.gate('wait', [], 0)
+    k.measure(qD1)
+    k.measure(qD2)
+    k.measure(qD3)
+    k.measure(qD4)
+    k.measure(qA)
+    k.gate('wait', [], 0)
+    p.add_kernel(k)
+
+    k = oqh.create_kernel('idle_measurement', p)
+    for i in range(1):
+        k.gate('wait', [], 200)
+        k.measure(qD1)
+        k.measure(qD2)
+        k.measure(qD3)
+        k.measure(qD4)
+        k.measure(qA)
+        k.gate('wait', [], 0)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+def surface_3(qD0: int, qD1: int, qA: int, qA2: int,
+              platf_cfg: str,
+              echo: bool=False,
+              number_of_repetitions: int = 10,
+              initialization_msmt: bool=False,
+              initial_states=[['0','0'], ['0','1'], ['1','1',], ['1','0']],
+              flux_codeword: str = 'cz',
+              # flux_codeword1: str = 'cz',
+              parity_axes=['ZZ'], tomo=False,
+              tomo_after=False,
+              ro_time_0=500e-9,
+              ro_time_1=500e-9,
+              echo_during_ancilla_mmt: bool=False,
+              idling_time: float=40e-9,
+              idling_time_echo: float=20e-9,
+              idling_rounds: int=0,
+              cal_points: int=7,
+              idle_meas: int=0):
+
+    print('new')
+    p = oqh.create_program("Surface_3", platf_cfg)
+    data_qubits=[qD0,qD1]
+
+    if tomo:
+        tomo_gates = ['i', 'rx180', 'rx90', 'rxm90', 'ry90', 'rym90']
+    else:
+        tomo_gates = ['False']
+
+    for p_q1 in tomo_gates:
+        for p_q0 in tomo_gates:
+            for initial_state in initial_states:
+                k = oqh.create_kernel(
+                    'Surface_3_'+initial_state[0]+initial_state[1]+'_tomo0_'+p_q0+'_tomo1_'+p_q1,p)
+                k.prepz(qD0)
+                k.prepz(qD1)
+                k.prepz(qA)
+                # k.prepz(qA2)
+                #initialization
+                if initialization_msmt:
+                    k.gate("wait", [], 0) #alignment workaround
+                    # k.measure(qD0)
+                    # k.measure(qD1)
+                    k.measure(qA)
+                    if echo_during_ancilla_mmt:
+                        k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
+                    k.gate('wait', [qD0, qD1, qA], int(100)) #adding additional wait time to ensure good initialization
+                    k.gate("wait", [], 0) #alignment workaround
+                #state preparation
+                for i, initial_state_q in enumerate(initial_state):
+                    if initial_state_q == '1':
+                        k.gate('ry180', [data_qubits[i]])
+                    elif initial_state_q == '+':
+                        k.gate('ry90', [data_qubits[i]])
+                    elif initial_state_q == '-':
+                        k.gate('rym90', [data_qubits[i]])
+                    elif initial_state_q == 'i':
+                        k.gate('rx90', [data_qubits[i]])
+                    elif initial_state_q == '-i':
+                        k.gate('rxm90', [data_qubits[i]])
+                    elif initial_state_q == '0':
+                        pass
+                    else:
+                        raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+                #parity measurement(s)
+                for i in range(number_of_repetitions):
+                    for j, parity_axis in enumerate(parity_axes):
+                        k.gate("wait", [], 0) #alignment workaround
+                        if parity_axis=='XX':
+                            k.gate('rym90', [qD0])
+                            k.gate('rym90', [qD1])
+                            # k.gate("wait", [], 0) #alignment workaround
+                        if parity_axis=='YY':
+                            k.gate('rxm90', [qD0])
+                            k.gate('rxm90', [qD1])
+                            # k.gate("wait", [], 0) #alignment workaround
+
+                        k.gate('rym90', [qA])
+
+                        k.gate("wait", [], 0) #alignment workaround
+                        k.gate(flux_codeword, [qA, qD0])
+                        k.gate("wait", [], 0)
+                        k.gate('rx180', [qD0])
+                        k.gate('rx180', [qD1])
+                        k.gate("wait", [], 0)
+                        k.gate(flux_codeword, [qA, qD1])
+                        k.gate("wait", [], 0) #alignment workaround
+
+                        k.gate('rym90', [qA])
+
+                        if parity_axis=='XX':
+                            k.gate('ry90', [qD0])
+                            k.gate('ry90', [qD1])
+                            k.gate("wait", [], 0) #alignment workaround
+                        elif parity_axis=='YY':
+                            k.gate('rx90', [qD0])
+                            k.gate('rx90', [qD1])
+                            k.gate("wait", [], 0) #alignment workaround
+                        if (j != len(parity_axes)-1) or (tomo_after): #last mmt can be multiplexed
+                            k.gate("wait", [], 0)
+                            k.measure(qA)
+                            if echo_during_ancilla_mmt:
+                                k.gate('rx180', [qD0])
+                                k.gate('wait', [qD0], int(140))
+                                k.gate('rx180', [qD0])
+                                k.gate('wait', [qD0], int(140))
+                                k.gate('rx180', [qD0])
+                                k.gate('wait', [qD0], int(140))
+
+                                # k.gate('rx180', [qD0])
+                                # k.gate('wait', [qD0], int(80))
+                                # k.gate('rx180', [qD0])
+                                # k.gate('wait', [qD0], int(80))
+                                # k.gate('rx180', [qD0])
+                                # k.gate('wait', [qD0], int(80))
+                                # k.gate('rx180', [qD0])
+                                # k.gate('wait', [qD0], int(80))
+                                # k.gate('rx180', [qD0])
+                                # k.gate('wait', [qD0], int(100))
+
+                                k.gate('rx180', [qD1])
+                                k.gate('wait', [qD1], int(ro_time_1*1e9))
+
+                                # k.gate('rx180', [qD1])
+                                # k.gate('wait', [qD1], int(220))
+                                # k.gate('rx180', [qD1])
+                                # k.gate('wait', [qD1], int(220))
+                                # k.gate('rx180', [qD1])
+                                # k.gate('rx180', [qD0])
+                                # k.gate('rx180', [qD1])
+                                # k.gate('wait', [qD0], int(ro_time_0*1e9))
+                                # k.gate('wait', [qD1], int(ro_time_1*1e9))
+
+                k.gate("wait", [], 0) #separating parity from tomo
+                #tomography
+                if tomo:
+                    k.gate("wait", [qD1, qD0], 0) #alignment workaround
+                    k.gate(p_q1, [qD1])
+                    k.gate(p_q0, [qD0])
+                    k.gate("wait", [qD1, qD0], 0) #alignment workaround
+                # measure
+                if not tomo_after:
+                    k.gate("wait", [], 0) #alignment workaround
+                    k.measure(qA)
+                k.measure(qD0)
+                k.measure(qD1)
+                p.add_kernel(k)
+
+    if tomo:
+        #only add calbration points when doing tomography
+        interleaved_delay=ro_time_0
+        if echo_during_ancilla_mmt:
+            interleaved_delay=ro_time_0
+        if tomo_after:
+            p = oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=cal_points, measured_qubits=[qD0, qD1])#,
+                                         # interleaved_measured_qubits=[qA],
+                                         # interleaved_delay=interleaved_delay,
+                                         # nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes))
+            if idle_meas != 0:
+                k = oqh.create_kernel('Idle measurements', p)
+                for i in range(idle_meas):
+                    k.measure(qA)
+                    k.gate("wait", [qA], 100)
+                p.add_kernel(k)
+        else:
+            p = oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=cal_points, measured_qubits=[qD0, qD1])
+
+    p = oqh.compile(p)
+    return p
+
+
+def surface_4(qD0: int, qD1: int, qAX: int, qAZ: int, platf_cfg: str,
+              echo: bool=False,
+              number_of_repetitions: int = 10,
+              initialization_msmt: bool=False,
+              initial_states=[['+','0']],
+              flux_codeword: str = 'cz',
+              tomo=False,
+              tomo_after=False,
+              ro_time_0=500e-9,
+              ro_time_1=500e-9,
+              echo_during_ancilla_mmt: bool=False,
+              echo_during_parity: bool=False,
+              idling_time: float=40e-9,
+              idling_time_echo: float=20e-9,
+              idling_rounds: int=0,
+              cal_points: int=7,
+              idle_meas: int=0):
+
+    print('new')
+    p = oqh.create_program("Surface_4", platf_cfg)
+    data_qubits=[qD0,qD1]
+
+    if tomo:
+        tomo_gates = ['i', 'rx180', 'rx90', 'rxm90', 'ry90', 'rym90']
+    else:
+        tomo_gates = ['False']
+
+    for p_q1 in tomo_gates:
+        for p_q0 in tomo_gates:
+            for initial_state in initial_states:
+                k = oqh.create_kernel(
+                    'Surface_4_'+initial_state[0]+initial_state[1]+'_tomo0_'+p_q0+'_tomo1_'+p_q1,p)
+                k.prepz(qD0)
+                k.prepz(qD1)
+                k.prepz(qAZ)
+                k.prepz(qAX)
+                #initialization
+                if initialization_msmt:
+                    k.gate("wait", [], 0) #alignment workaround
+                    # k.measure(qD0)
+                    # k.measure(qD1)
+                    k.measure(qA)
+                    if echo_during_ancilla_mmt:
+                        k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
+                    k.gate('wait', [qD0, qD1, qA], int(100)) #adding additional wait time to ensure good initialization
+                    k.gate("wait", [], 0) #alignment workaround
+                #state preparation
+                for i, initial_state_q in enumerate(initial_state):
+                    if initial_state_q == '1':
+                        k.gate('ry180', [data_qubits[i]])
+                    elif initial_state_q == '+':
+                        k.gate('ry90', [data_qubits[i]])
+                    elif initial_state_q == '-':
+                        k.gate('rym90', [data_qubits[i]])
+                    elif initial_state_q == 'i':
+                        k.gate('rx90', [data_qubits[i]])
+                    elif initial_state_q == '-i':
+                        k.gate('rxm90', [data_qubits[i]])
+                    elif initial_state_q == '0':
+                        pass
+                    else:
+                        raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+                #parity measurement(s)
+                for i in range(number_of_repetitions):
+                    k.gate("wait", [], 0)
+
+                    # X-parity operations
+                    k.gate('rym90', [qD0])
+                    k.gate('rym90', [qD1])
+                    k.gate('rym90', [qAZ])
+                    k.gate("wait", [], 0)
+                    k.gate(flux_codeword, [qAZ, qD0])
+                    k.gate("wait", [], 0)
+                    k.gate('rx180', [qD0])
+                    k.gate('rx180', [qD1])
+                    k.gate("wait", [], 0)
+                    k.gate(flux_codeword, [qAZ, qD1])
+                    k.gate("wait", [], 0)
+                    k.gate('rym90', [qAZ])
+                    k.gate('ry90', [qD0])
+                    k.gate('ry90', [qD1])
+                    k.gate("wait", [], 0)
+
+                    # Z-parity operations
+                    k.gate('rym90', [qAX])
+                    k.gate("wait", [], 0)
+                    k.gate(flux_codeword, [qAX, qD0])
+                    k.gate("wait", [], 0)
+                    k.gate('rx180', [qD0])
+                    k.gate('rx180', [qD1])
+                    k.gate("wait", [], 0)
+                    k.gate(flux_codeword, [qAX, qD1])
+                    k.gate("wait", [], 0)
+                    k.gate('rym90', [qAX])
+                    k.gate("wait", [], 0)
+
+                    if (i is not number_of_repetitions-1) or (tomo_after): #last mmt can be multiplexed
+                        k.gate("wait", [], 0)
+                        k.measure(qAZ)
+                        k.measure(qAX)
+                        if echo_during_ancilla_mmt:
+
+                            k.gate('rx180', [qD0])
+                            k.gate('wait', [qD0], int(140))
+                            k.gate('rx180', [qD0])
+                            k.gate('wait', [qD0], int(140))
+                            k.gate('rx180', [qD0])
+                            k.gate('wait', [qD0], int(140))
+
+                            # k.gate('rx180', [qD1])
+                            # k.gate('wait', [qD1], int(140))
+                            # k.gate('rx180', [qD1])
+                            # k.gate('wait', [qD1], int(140))
+                            # k.gate('rx180', [qD1])
+                            # k.gate('wait', [qD1], int(140))
+
+                            # k.gate('rx180', [qD0])
+                            # k.gate('wait', [qD0], int(ro_time_0*1e9))
+                            k.gate('rx180', [qD1])
+                            k.gate('wait', [qD1], int(ro_time_1*1e9))
+
+                            # #CPMG D0
+                            # n = 6
+                            # Twait = 600/n - 20
+                            # k.gate('ry90', [qD0])
+                            # k.gate('wait', [qD0], int(Twait/2))
+                            # k.gate('rx180', [qD0])
+                            # for i in range(n-1):
+                            #     k.gate('wait', [qD0], int(Twait))
+                            #     k.gate('rx180', [qD0])
+                            # k.gate('wait', [qD0], int(Twait/2))
+                            # k.gate('rym90', [qD0])
+
+                            # # CPMG D1
+                            # n = 1
+                            # Twait = 600/n - 20
+                            # k.gate('ry90', [qD1])
+                            # k.gate('wait', [qD1], int(Twait/2))
+                            # k.gate('rx180', [qD1])
+                            # for i in range(n-1):
+                            #     k.gate('wait', [qD1], int(Twait))
+                            #     k.gate('rx180', [qD1])
+                            # k.gate('wait', [qD1], int(Twait/2))
+                            # k.gate('rym90', [qD1])
+
+
+                k.gate("wait", [], 0) #separating parity from tomo
+                #tomography
+                if tomo:
+                    k.gate("wait", [qD1, qD0], 0) #alignment workaround
+                    k.gate(p_q1, [qD1])
+                    k.gate(p_q0, [qD0])
+                    k.gate("wait", [qD1, qD0], 0) #alignment workaround
+                # measure
+                if not tomo_after:
+                    k.gate("wait", [], 0) #alignment workaround
+                    k.measure(qAZ)
+                    k.measure(qAX)
+                k.measure(qD0)
+                k.measure(qD1)
+                p.add_kernel(k)
+
+    if tomo:
+        #only add calbration points when doing tomography
+        interleaved_delay=ro_time_0
+        if echo_during_ancilla_mmt:
+            interleaved_delay=ro_time_0
+        if tomo_after:
+            p = oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=cal_points, measured_qubits=[qD0, qD1])#,
+                                         # interleaved_measured_qubits=[qA],
+                                         # interleaved_delay=interleaved_delay,
+                                         # nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes))
+            if idle_meas != 0:
+                k = oqh.create_kernel('Idle measurements', p)
+                for i in range(idle_meas):
+                    k.measure(qA)
+                    k.gate("wait", [qA], 100)
+                p.add_kernel(k)
+        else:
+            p = oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=cal_points, measured_qubits=[qD0, qD1])#,
+
+    p = oqh.compile(p)
+    return p
+
+
+def surface_4_pipelined(qD0: int, qD1: int,
+                        qAX: int, qAZ: int,
+                        qAX_d: int, qAZ_d: int,
+                        ro_time: float,
+                        platf_cfg: str,
+                        number_of_repetitions: int = 1,
+                        initial_states=[['+','0']],
+                        flux_codeword: str = 'cz',
+                        tomo=False,
+                        echo_time_1:float=200,
+                        echo_time_2:float=200,
+                        cal_points: int=7,
+                        idle_meas: int=0):
+
+    print('new')
+    p = oqh.create_program("Surface_4_pip", platf_cfg)
+    data_qubits=[qD0,qD1]
+
+    if tomo:
+        tomo_gates = ['i', 'rx180', 'rx90', 'rxm90', 'ry90', 'rym90']
+    else:
+        tomo_gates = ['False']
+
+    for p_q1 in tomo_gates:
+        for p_q0 in tomo_gates:
+            for initial_state in initial_states:
+                k = oqh.create_kernel(
+                    'Surface_4_'+initial_state[0]+initial_state[1]+'_tomo0_'+p_q0+'_tomo1_'+p_q1,p)
+                k.prepz(qD0)
+                k.prepz(qD1)
+                k.prepz(qAZ)
+                k.prepz(qAX)
+
+                #state preparation
+                for i, initial_state_q in enumerate(initial_state):
+                    if initial_state_q == '1':
+                        k.gate('ry180', [data_qubits[i]])
+                    elif initial_state_q == '+':
+                        k.gate('ry90', [data_qubits[i]])
+                    elif initial_state_q == '-':
+                        k.gate('rym90', [data_qubits[i]])
+                    elif initial_state_q == 'i':
+                        k.gate('rx90', [data_qubits[i]])
+                    elif initial_state_q == '-i':
+                        k.gate('rxm90', [data_qubits[i]])
+                    elif initial_state_q == '0':
+                        pass
+                    else:
+                        raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+                #parity measurement(s)
+                for i in range(number_of_repetitions):
+
+                    k.gate("wait", [], 0)
+
+                    # Trigger measurements on dummy qubits
+                    k.measure(qAZ_d)
+                    k.measure(qAX_d)
+
+                    # X-parity operations
+                    k.gate('rym90', [qD0])
+                    k.gate('rym90', [qD1])
+                    k.gate('rym90', [qAZ])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate(flux_codeword, [qAZ, qD0])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate("rx180", [qD0])
+                    k.gate("rx180", [qD1])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate(flux_codeword, [qAZ, qD1])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate('rym90', [qAZ])
+                    k.gate('ry90', [qD0])
+                    k.gate('ry90', [qD1])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+
+                    # # wait time between parity operations
+                    # k.gate("wait", [qD0, qD1, qAX, qAZ], ro_time-220)
+                    # Echo sequence 2
+                    k.gate("wait", [qD0], echo_time_1)
+                    k.gate("rx180", [qD0])
+                    k.gate("wait", [qD0], 400-echo_time_1)
+                    k.gate("wait", [qD1], echo_time_2)
+                    k.gate("rx180", [qD1])
+                    k.gate("wait", [qD1], 400-echo_time_2)
+
+                    # Z-parity operations
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate('rym90', [qAX])
+                    # k.gate('rym90', [qD0])
+                    # k.gate('rym90', [qD1])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate(flux_codeword, [qAX, qD0])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate("rx180", [qD0])
+                    k.gate("rx180", [qD1])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate(flux_codeword, [qAX, qD1])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+                    k.gate('rym90', [qAX])
+                    # k.gate('ry90', [qD0])
+                    # k.gate('ry90', [qD1])
+                    k.gate("wait", [qD0, qD1, qAX, qAZ], 0)
+
+                k.gate("wait", [], 0)
+
+                #tomography
+                if tomo:
+                    k.gate("wait", [qD1, qD0], 0)
+                    k.gate(p_q1, [qD1])
+                    k.gate(p_q0, [qD0])
+                    k.gate("wait", [qD1, qD0], 0)
+                    k.measure(qD0)
+                    k.measure(qD1)
+                    k.measure(qAX_d) # last missing measurement for final Z-parity
+                p.add_kernel(k)
+
+    if tomo:
+        p = oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=cal_points, measured_qubits=[qD0, qD1])
+
+    p = oqh.compile(p)
+    return p
+
+def Four_Qubit_tomo(qD1: int, qD2: int,
+                    qD3: int, qD4: int,
+                    qA1: int, qA2: int, qA3: int,
+                    platf_cfg: str,
+                    initial_states=[['0', '0', '0', '0']],
+                    pipelined = False,
+                    theta_gate=False,
+                    idle_meas=0):
+
+    print('new')
+    p = oqh.create_program("Four_Qubit_tomo", platf_cfg)
+
+    tomo_gates = ['i', 'rym90', 'rx90']
+
+    data_qubits=[qD1, qD2, qD3, qD4]
+
+    for p_q4 in tomo_gates:
+        for p_q3 in tomo_gates:
+            for p_q2 in tomo_gates:
+                for p_q1 in tomo_gates:
+                    for initial_state in initial_states:
+                        k = oqh.create_kernel(
+                            'Tomo__tomo1_'+p_q1+'_tomo2_'+p_q2+'_tomo3_'+p_q3+'_tomo4_'+p_q4, p)
+                        k.prepz(qD1)
+                        k.prepz(qD2)
+                        k.prepz(qD3)
+                        k.prepz(qD4)
+                        k.prepz(qA1)
+                        # k.prepz(qA2)
+                        k.prepz(qA3)
+                        k.gate("wait", [], 0)
+
+                        #state preparation
+                        for i, initial_state_q in enumerate(initial_state):
+                            if initial_state_q == '1':
+                                k.gate('ry180', [data_qubits[i]])
+                            elif initial_state_q == '+':
+                                k.gate('ry90', [data_qubits[i]])
+                            elif initial_state_q == '-':
+                                k.gate('rym90', [data_qubits[i]])
+                            elif initial_state_q == 'i':
+                                k.gate('rx90', [data_qubits[i]])
+                            elif initial_state_q == '-i':
+                                k.gate('rxm90', [data_qubits[i]])
+                            elif initial_state_q == '0':
+                                pass
+                            else:
+                                raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+
+                        k.gate("wait", [], 0)
+                        if theta_gate:
+                            k.gate('theta_gate', [qD1])
+                            k.gate('theta_gate', [qD3])
+                            k.gate("wait", [], 0)
+
+                        if not pipelined:
+                            ########################################################
+                            # Parallel
+                            ########################################################
+                            ###############
+                            # X-Parity
+                            ###############
+                            k.gate('rym90', [qA2])
+                            k.gate('rym90', [qD1])
+                            k.gate('rym90', [qD2])
+                            k.gate('rym90', [qD3])
+                            k.gate('rym90', [qD4])
+                            k.gate('wait', [], 0)
+                            k.gate('cz', [qA2, qD2]) # CZ X-D2
+                            k.gate('wait', [], 0)
+                            k.gate('cz', [qA2, qD1]) # CZ X-D1
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('i', [qD2])
+                            k.gate('wait', [], 0)
+                            k.gate('rx180', [qA2])   # echo ancilla
+                            k.gate('wait', [], 0)
+                            k.gate('cz', [qA2, qD4]) # CZ X-D4
+                            k.gate('wait', [], 0)
+                            k.gate('cz', [qA2, qD3]) # CZ X-D3
+                            k.gate('wait', [], 0)
+                            k.gate('correction', [qA2])
+                            k.gate('correction', [qD1])
+                            k.gate('correction', [qD2])
+                            k.gate('correction', [qD3])
+                            k.gate('correction', [qD4])
+                            k.gate('wait', [], 0)
+
+                            ###############
+                            # Z-Parity
+                            ###############
+                            k.gate('rym90', [qA1])
+                            k.gate('rym90', [qA3])
+                            k.gate("wait", [], 0)
+                            k.gate('cz', [qA3, qD2]) # without parking
+                            k.gate('cz', [qD1, qA1])
+                            k.gate("wait", [], 0)
+                            k.gate('cz', [qD4, qA3])
+                            k.gate('cz', [qD3, qA1])
+                            k.gate("wait", [], 0)
+                            k.gate('ry90', [qA1])
+                            k.gate('ry90', [qA3])
+                            k.gate("wait", [], 0)
+
+                            ##############
+                            # Echo
+                            ##############
+                            k.gate('wait', [], 0)
+                            k.gate('echo_corr', [qD1])
+                            k.gate("wait", [qD1], 160)
+                            k.gate('echo_corr', [qD2])
+                            k.gate("wait", [qD2], 60)
+                            k.gate('echo_corr', [qD3])
+                            k.gate("wait", [qD3], 280)
+                            k.gate('echo_corr', [qD4])
+                            k.gate("wait", [qD4], 300)
+                            k.measure(qA1)
+                            k.measure(qA2)
+                            k.measure(qA3)
+                            # k.gate('rx180', [qD1])
+                            # k.gate("wait", [qD1], 360)
+                            # k.gate('rx180', [qD2])
+                            # k.gate("wait", [qD2], 360)
+                            # k.gate('rx180', [qD3])
+                            # k.gate("wait", [qD3], 520)
+                            # k.gate('rx180', [qD4])
+                            # k.gate("wait", [qD4], 520)
+                            k.gate('wait', [], 0)
+
+                            #tomography
+                            k.gate("wait", [qD1, qD2, qD3, qD4], 0)
+                            k.gate(p_q1, [qD1])
+                            k.gate(p_q2, [qD2])
+                            k.gate(p_q3, [qD3])
+                            k.gate(p_q4, [qD4])
+                            k.gate("wait", [qD1, qD2, qD3, qD4], 0)
+
+                            k.gate("wait", [], 0)
+                            k.measure(qD1)
+                            k.measure(qD2)
+                            k.measure(qD3)
+                            k.measure(qD4)
+                            k.gate("wait", [], 0)
+
+                        else:
+                            # for i in range(2):
+                            ########################################################
+                            # Pipelined
+                            ########################################################
+                            ###############
+                            # X-Parity
+                            ###############
+                            k.measure(4) # Qubit Z1_trig
+                            k.measure(6) # Qubit Z2_trig
+                            k.measure(1) # Qubit X_trig
+                            k.gate('wait', [1, 4, 6], 280)
+                            k.gate('rym90', [qA2])
+                            k.gate('rym90', [qD1])
+                            k.gate('rym90', [qD2])
+                            k.gate('rym90', [qD3])
+                            k.gate('rym90', [qD4])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD2]) # CZ X-D2
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD1]) # CZ X-D1
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('i', [qD2])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('rx180', [qA2])   # echo ancilla
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD4]) # CZ X-D4
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD3]) # CZ X-D3
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('cz', [qA2, qD3]) # CZ X-D3
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('cz', [qA2, qD1]) # CZ X-D1
+                            # k.gate('rx180', [qD2])  # echo D2
+                            # k.gate('rx180', [qD2])  # echo D2
+                            # k.gate('i', [qD2])
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('rx180', [qA2])   # echo ancilla
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('cz', [qA2, qD4]) # CZ X-D4
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('cz', [qA2, qD2]) # CZ X-D2
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('correction', [qA2])
+                            k.gate('correction', [qD1])
+                            k.gate('correction', [qD2])
+                            k.gate('correction', [qD3])
+                            k.gate('correction', [qD4])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+
+                            ##############
+                            # Echo
+                            ##############
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate("wait", [qD1], 160)
+                            k.gate('echo_corr', [qD1])
+                            k.gate("wait", [qD1], 360-180)
+                            k.gate("wait", [qD2], 160)
+                            k.gate('echo_corr', [qD2])
+                            k.gate("wait", [qD2], 360-180)
+                            k.gate("wait", [qD3], 160)
+                            k.gate('echo_corr', [qD3])
+                            k.gate("wait", [qD3], 360-180)
+                            k.gate("wait", [qD4], 160)
+                            k.gate('echo_corr', [qD4])
+                            k.gate("wait", [qD4], 360-180)
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate('i', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+
+
+                            ###############
+                            # Z-Parity
+                            ###############
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate('rym90', [qA1])
+                            k.gate('rym90', [qA3])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA3, qD2]) # without parking
+                            k.gate('cz', [qD1, qA1])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qD4, qA3])
+                            k.gate('cz', [qD3, qA1])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('ry90', [qA1])
+                            k.gate('ry90', [qA3])
+                            k.gate("wait", [], 0)
+
+                            k.gate('rx180', [qD1]) # XL gate
+                            k.gate('rx180', [qD3]) #
+                            # k.gate('rx180', [qD1]) # ZL gate
+                            # k.gate('rx180', [qD2]) #
+                            # k.gate('ry180', [qD3]) #
+                            # k.gate('ry180', [qD4]) #
+                            k.gate("wait", [], 0)  #
+
+                            ###############
+                            # X-Parity
+                            ###############
+                            k.measure(4) # Qubit Z1_trig
+                            k.measure(6) # Qubit Z2_trig
+                            k.measure(1) # Qubit X_trig
+                            k.gate('wait', [1, 4, 6], 280)
+                            k.gate('rym90', [qA2])
+                            k.gate('rym90', [qD1])
+                            k.gate('rym90', [qD2])
+                            k.gate('rym90', [qD3])
+                            k.gate('rym90', [qD4])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD2]) # CZ X-D2
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD1]) # CZ X-D1
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('i', [qD2])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('rx180', [qA2])   # echo ancilla
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD4]) # CZ X-D4
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD3]) # CZ X-D3
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('cz', [qA2, qD3]) # CZ X-D3
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('cz', [qA2, qD1]) # CZ X-D1
+                            # k.gate('rx180', [qD2])  # echo D2
+                            # k.gate('rx180', [qD2])  # echo D2
+                            # k.gate('i', [qD2])
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('rx180', [qA2])   # echo ancilla
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('cz', [qA2, qD4]) # CZ X-D4
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            # k.gate('cz', [qA2, qD2]) # CZ X-D2
+                            # k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('correction', [qA2])
+                            k.gate('correction', [qD1])
+                            k.gate('correction', [qD2])
+                            k.gate('correction', [qD3])
+                            k.gate('correction', [qD4])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+
+                            ##############
+                            # Echo
+                            ##############
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate("wait", [qD1], 160)
+                            k.gate('echo_corr', [qD1])
+                            k.gate("wait", [qD1], 360-180)
+                            k.gate("wait", [qD2], 160)
+                            k.gate('echo_corr', [qD2])
+                            k.gate("wait", [qD2], 360-180)
+                            k.gate("wait", [qD3], 160)
+                            k.gate('echo_corr', [qD3])
+                            k.gate("wait", [qD3], 360-180)
+                            k.gate("wait", [qD4], 160)
+                            k.gate('echo_corr', [qD4])
+                            k.gate("wait", [qD4], 360-180)
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate('i', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+
+
+                            ###############
+                            # Z-Parity
+                            ###############
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate('rym90', [qA1])
+                            k.gate('rym90', [qA3])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA3, qD2]) # without parking
+                            k.gate('cz', [qD1, qA1])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qD4, qA3])
+                            k.gate('cz', [qD3, qA1])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('ry90', [qA1])
+                            k.gate('ry90', [qA3])
+                            k.gate("wait", [], 0)
+
+                            #tomography
+                            k.gate("wait", [qD1, qD2, qD3, qD4], 0)
+                            k.gate(p_q1, [qD1])
+                            k.gate(p_q2, [qD2])
+                            k.gate(p_q3, [qD3])
+                            k.gate(p_q4, [qD4])
+                            k.gate("wait", [qD1, qD2, qD3, qD4], 0)
+
+                            k.gate("wait", [], 0)
+                            k.measure(qD1)
+                            k.measure(qD2)
+                            k.measure(qD3)
+                            k.measure(qD4)
+                            k.measure(qA1)
+                            k.measure(qA3)
+                            k.gate("wait", [], 0)
+                            #######################################################
+
+                        p.add_kernel(k)
+
+    p = oqh.add_multi_q_cal_points(p, qubits=[qD1, qD2, qD3, qD4], combinations=[ s1+s2+s3+s4 for s1 in ['0', '1']
+                                                                                              for s2 in ['0', '1']
+                                                                                              for s3 in ['0', '1']
+                                                                                              for s4 in ['0', '1']],
+                                   initialize=False)
+
+    if idle_meas != 0 :
+        k = oqh.create_kernel('idle_meas', p)
+        k.prepz(qD1)
+        k.prepz(qD2)
+        k.prepz(qD3)
+        k.prepz(qD4)
+        for i in range(idle_meas):
+            k.measure(qD1)
+            k.measure(qD2)
+            k.measure(qD3)
+            k.measure(qD4)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+def S_gate_seq_tomo(qD1: int, qD2: int,
+                    qD3: int, qD4: int,
+                    qA1: int, qA2: int, qA3: int,
+                    platf_cfg: str,
+                    initial_states=[['0', '0', '0', '0']],
+                    double_round=False,
+                    idle_meas=0):
+
+    print('new')
+    p = oqh.create_program("S_gate_seq", platf_cfg)
+
+    tomo_gates = ['i', 'rym90', 'rx90']
+
+    data_qubits=[qD1, qD2, qD3, qD4]
+
+    for p_q4 in tomo_gates:
+        for p_q3 in tomo_gates:
+            for p_q2 in tomo_gates:
+                for p_q1 in tomo_gates:
+                    for initial_state in initial_states:
+                        k = oqh.create_kernel(
+                            'Tomo__tomo1_'+p_q1+'_tomo2_'+p_q2+'_tomo3_'+p_q3+'_tomo4_'+p_q4, p)
+                        k.prepz(qD1)
+                        k.prepz(qD2)
+                        k.prepz(qD3)
+                        k.prepz(qD4)
+                        # k.prepz(qA1)
+                        # k.prepz(qA2)
+                        # k.prepz(qA3)
+                        k.gate("wait", [], 0)
+
+                        #state preparation
+                        for i, initial_state_q in enumerate(initial_state):
+                            if initial_state_q == '1':
+                                k.gate('ry180', [data_qubits[i]])
+                            elif initial_state_q == '+':
+                                k.gate('ry90', [data_qubits[i]])
+                            elif initial_state_q == '-':
+                                k.gate('rym90', [data_qubits[i]])
+                            elif initial_state_q == 'i':
+                                k.gate('rx90', [data_qubits[i]])
+                            elif initial_state_q == '-i':
+                                k.gate('rxm90', [data_qubits[i]])
+                            elif initial_state_q == '0':
+                                pass
+                            else:
+                                raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+
+                        k.gate("wait", [], 0)
+
+                        ###############
+                        # X-Parity
+                        ###############
+                        k.measure(4) # Qubit Z1_trig
+                        k.measure(6) # Qubit Z2_trig
+                        k.measure(1) # Qubit X_trig
+                        k.gate('wait', [1, 4, 6], 280)
+                        k.gate('rym90', [qA2])
+                        k.gate('rym90', [qD1])
+                        k.gate('rym90', [qD2])
+                        k.gate('rym90', [qD3])
+                        k.gate('rym90', [qD4])
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD2]) # CZ X-D2
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD1]) # CZ X-D1
+                        k.gate('rx180', [qD2])  # echo D2
+                        k.gate('rx180', [qD2])  # echo D2
+                        k.gate('i', [qD2])
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('rx180', [qA2])   # echo ancilla
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD4]) # CZ X-D4
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD3]) # CZ X-D3
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('correction', [qA2])
+                        k.gate('correction', [qD1])
+                        k.gate('correction', [qD2])
+                        k.gate('correction', [qD3])
+                        k.gate('correction', [qD4])
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+
+                        ##############
+                        # Echo
+                        ##############
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                        k.gate("wait", [qD1], 160)
+                        k.gate('echo_corr', [qD1])
+                        k.gate("wait", [qD1], 360-180)
+                        k.gate("wait", [qD2], 160)
+                        k.gate('echo_corr', [qD2])
+                        k.gate("wait", [qD2], 360-180)
+                        k.gate("wait", [qD3], 160)
+                        k.gate('echo_corr', [qD3])
+                        k.gate("wait", [qD3], 360-180)
+                        k.gate("wait", [qD4], 160)
+                        k.gate('echo_corr', [qD4])
+                        k.gate("wait", [qD4], 360-180)
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                        k.gate('i', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+
+                        ###############
+                        # Z-Parity
+                        ###############
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                        k.gate('rym90', [qA1])
+                        k.gate('rym90', [qA3])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA3, qD2]) # without parking
+                        k.gate('cz', [qD1, qA1])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qD4, qA3])
+                        k.gate('cz', [qD3, qA1])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('ry90', [qA1])
+                        k.gate('ry90', [qA3])
+                        k.gate("wait", [], 0)
+
+                        ###################
+                        # Logical S
+                        ###################
+                        k.measure(4) # Qubit Z1_trig
+                        k.measure(6) # Qubit Z2_trig
+                        k.measure(1) # Qubit X_trig
+                        k.gate('cw_26', [qA2])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qD1, qA2])
+                        k.gate('rx180', [qD2])
+                        k.gate('rx180', [qD2])
+                        k.gate('i', [qD2])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('rx180', [qA2])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD2])
+                        k.gate('rx180', [qD1])
+                        k.gate('rx180', [qD1])
+                        k.gate('i', [qD1])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('correction_S', [qA2])
+                        k.gate('correction_S', [qD1])
+                        k.gate('correction_S', [qD2])
+                        k.gate('correction_S', [qD3])
+                        k.gate('correction_S', [qD4])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 360)
+                        k.gate("wait", [], 0)
+
+                        if double_round:
+                            ###############
+                            # X-Parity
+                            ###############
+                            k.measure(4) # Qubit Z1_trig
+                            k.measure(6) # Qubit Z2_trig
+                            k.measure(1) # Qubit X_trig
+                            k.gate('wait', [1, 4, 6], 280)
+                            k.gate('rym90', [qA2])
+                            k.gate('rym90', [qD1])
+                            k.gate('rym90', [qD2])
+                            k.gate('rym90', [qD3])
+                            k.gate('rym90', [qD4])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD2]) # CZ X-D2
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD1]) # CZ X-D1
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('i', [qD2])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('rx180', [qA2])   # echo ancilla
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD4]) # CZ X-D4
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD3]) # CZ X-D3
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('correction', [qA2])
+                            k.gate('correction', [qD1])
+                            k.gate('correction', [qD2])
+                            k.gate('correction', [qD3])
+                            k.gate('correction', [qD4])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+
+                            ##############
+                            # Echo
+                            ##############
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate("wait", [qD1], 160)
+                            k.gate('echo_corr', [qD1])
+                            k.gate("wait", [qD1], 360-180)
+                            k.gate("wait", [qD2], 160)
+                            k.gate('echo_corr', [qD2])
+                            k.gate("wait", [qD2], 360-180)
+                            k.gate("wait", [qD3], 160)
+                            k.gate('echo_corr', [qD3])
+                            k.gate("wait", [qD3], 360-180)
+                            k.gate("wait", [qD4], 160)
+                            k.gate('echo_corr', [qD4])
+                            k.gate("wait", [qD4], 360-180)
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate('i', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+
+                            ###############
+                            # Z-Parity
+                            ###############
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate('rym90', [qA1])
+                            k.gate('rym90', [qA3])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA3, qD2]) # without parking
+                            k.gate('cz', [qD1, qA1])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qD4, qA3])
+                            k.gate('cz', [qD3, qA1])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('ry90', [qA1])
+                            k.gate('ry90', [qA3])
+                            k.gate("wait", [], 0)
+
+                        # tomography
+                        k.gate("wait", [qD1, qD2, qD3, qD4], 0)
+                        k.gate(p_q1, [qD1])
+                        k.gate(p_q2, [qD2])
+                        k.gate(p_q3, [qD3])
+                        k.gate(p_q4, [qD4])
+                        k.gate("wait", [qD1, qD2, qD3, qD4], 0)
+                        # measurement
+                        k.gate("wait", [], 0)
+                        k.measure(qD1)
+                        k.measure(qD2)
+                        k.measure(qD3)
+                        k.measure(qD4)
+                        k.measure(qA1)
+                        k.measure(qA3)
+                        k.gate("wait", [], 0)
+
+                        p.add_kernel(k)
+
+    p = oqh.add_multi_q_cal_points(p, qubits=[qD1, qD2, qD3, qD4], combinations=[ s1+s2+s3+s4 for s1 in ['0', '1']
+                                                                                              for s2 in ['0', '1']
+                                                                                              for s3 in ['0', '1']
+                                                                                              for s4 in ['0', '1']])
+    if idle_meas != 0 :
+        k = oqh.create_kernel('idle_meas', p)
+        k.prepz(qD1)
+        k.prepz(qD2)
+        k.prepz(qD3)
+        k.prepz(qD4)
+        for i in range(idle_meas):
+            k.measure(qD1)
+            k.measure(qD2)
+            k.measure(qD3)
+            k.measure(qD4)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+def X_gate_seq_tomo(qD1: int, qD2: int,
+                    qD3: int, qD4: int,
+                    qA1: int, qA2: int, qA3: int,
+                    platf_cfg: str,
+                    initial_states=[['0', '0', '0', '0']],
+                    double_round=False,
+                    idle_meas=0):
+
+    print('new')
+    p = oqh.create_program("S_gate_seq", platf_cfg)
+
+    tomo_gates = ['i', 'rym90', 'rx90']
+
+    data_qubits=[qD1, qD2, qD3, qD4]
+
+    for p_q4 in tomo_gates:
+        for p_q3 in tomo_gates:
+            for p_q2 in tomo_gates:
+                for p_q1 in tomo_gates:
+                    for initial_state in initial_states:
+                        k = oqh.create_kernel(
+                            'Tomo__tomo1_'+p_q1+'_tomo2_'+p_q2+'_tomo3_'+p_q3+'_tomo4_'+p_q4, p)
+                        k.prepz(qD1)
+                        k.prepz(qD2)
+                        k.prepz(qD3)
+                        k.prepz(qD4)
+                        # k.prepz(qA1)
+                        # k.prepz(qA2)
+                        # k.prepz(qA3)
+                        k.gate("wait", [], 0)
+
+                        #state preparation
+                        for i, initial_state_q in enumerate(initial_state):
+                            if initial_state_q == '1':
+                                k.gate('ry180', [data_qubits[i]])
+                            elif initial_state_q == '+':
+                                k.gate('ry90', [data_qubits[i]])
+                            elif initial_state_q == '-':
+                                k.gate('rym90', [data_qubits[i]])
+                            elif initial_state_q == 'i':
+                                k.gate('rx90', [data_qubits[i]])
+                            elif initial_state_q == '-i':
+                                k.gate('rxm90', [data_qubits[i]])
+                            elif initial_state_q == '0':
+                                pass
+                            else:
+                                raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+
+                        k.gate("wait", [], 0)
+
+                        ###############
+                        # X-Parity
+                        ###############
+                        k.measure(4) # Qubit Z1_trig
+                        k.measure(6) # Qubit Z2_trig
+                        k.measure(1) # Qubit X_trig
+                        k.gate('wait', [1, 4, 6], 280)
+                        k.gate('rym90', [qA2])
+                        k.gate('rym90', [qD1])
+                        k.gate('rym90', [qD2])
+                        k.gate('rym90', [qD3])
+                        k.gate('rym90', [qD4])
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD2]) # CZ X-D2
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD1]) # CZ X-D1
+                        k.gate('rx180', [qD2])  # echo D2
+                        k.gate('rx180', [qD2])  # echo D2
+                        k.gate('i', [qD2])
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('rx180', [qA2])   # echo ancilla
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD4]) # CZ X-D4
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD3]) # CZ X-D3
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('correction', [qA2])
+                        k.gate('correction', [qD1])
+                        k.gate('correction', [qD2])
+                        k.gate('correction', [qD3])
+                        k.gate('correction', [qD4])
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+
+                        ##############
+                        # Echo
+                        ##############
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                        k.gate("wait", [qD1], 160)
+                        k.gate('echo_corr', [qD1])
+                        k.gate("wait", [qD1], 360-180)
+                        k.gate("wait", [qD2], 160)
+                        k.gate('echo_corr', [qD2])
+                        k.gate("wait", [qD2], 360-180)
+                        k.gate("wait", [qD3], 160)
+                        k.gate('echo_corr', [qD3])
+                        k.gate("wait", [qD3], 360-180)
+                        k.gate("wait", [qD4], 160)
+                        k.gate('echo_corr', [qD4])
+                        k.gate("wait", [qD4], 360-180)
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                        k.gate('i', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+                        k.gate('sf_park', [11])
+
+                        ###############
+                        # Z-Parity
+                        ###############
+                        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                        k.gate('rym90', [qA1])
+                        k.gate('rym90', [qA3])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA3, qD2]) # without parking
+                        k.gate('cz', [qD1, qA1])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qD4, qA3])
+                        k.gate('cz', [qD3, qA1])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('ry90', [qA1])
+                        k.gate('ry90', [qA3])
+                        k.gate("wait", [], 0)
+
+                        ###################
+                        # Logical S
+                        ###################
+                        k.measure(4) # Qubit Z1_trig
+                        k.measure(6) # Qubit Z2_trig
+                        k.measure(1) # Qubit X_trig
+                        k.gate('cw_26', [qA2])
+                        k.gate('ry90', [qD1])
+                        k.gate('ry90', [qD3])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qD1, qA2])
+                        k.gate('rx180', [qD3])
+                        k.gate('rx180', [qD3])
+                        k.gate('i', [qD3])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('rx180', [qA2])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('cz', [qA2, qD3])
+                        k.gate('rx180', [qD1])
+                        k.gate('rx180', [qD1])
+                        k.gate('i', [qD1])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('correction_S', [qA2])
+                        k.gate('cw_26', [qD1])
+                        k.gate('cw_26', [qD3])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                        k.gate('correction_S', [qD1])
+                        k.gate('correction_S', [qD2])
+                        k.gate('correction_S', [qD3])
+                        k.gate('correction_S', [qD4])
+                        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 340)
+                        k.gate("wait", [], 0)
+
+                        if double_round:
+                            ###############
+                            # X-Parity
+                            ###############
+                            k.measure(4) # Qubit Z1_trig
+                            k.measure(6) # Qubit Z2_trig
+                            k.measure(1) # Qubit X_trig
+                            k.gate('wait', [1, 4, 6], 280)
+                            k.gate('rym90', [qA2])
+                            k.gate('rym90', [qD1])
+                            k.gate('rym90', [qD2])
+                            k.gate('rym90', [qD3])
+                            k.gate('rym90', [qD4])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD2]) # CZ X-D2
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD1]) # CZ X-D1
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('rx180', [qD2])  # echo D2
+                            k.gate('i', [qD2])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('rx180', [qA2])   # echo ancilla
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD4]) # CZ X-D4
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA2, qD3]) # CZ X-D3
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('correction', [qA2])
+                            k.gate('correction', [qD1])
+                            k.gate('correction', [qD2])
+                            k.gate('correction', [qD3])
+                            k.gate('correction', [qD4])
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+
+                            ##############
+                            # Echo
+                            ##############
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate("wait", [qD1], 160)
+                            k.gate('echo_corr', [qD1])
+                            k.gate("wait", [qD1], 360-180)
+                            k.gate("wait", [qD2], 160)
+                            k.gate('echo_corr', [qD2])
+                            k.gate("wait", [qD2], 360-180)
+                            k.gate("wait", [qD3], 160)
+                            k.gate('echo_corr', [qD3])
+                            k.gate("wait", [qD3], 360-180)
+                            k.gate("wait", [qD4], 160)
+                            k.gate('echo_corr', [qD4])
+                            k.gate("wait", [qD4], 360-180)
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate('i', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+                            k.gate('sf_park', [11])
+
+                            ###############
+                            # Z-Parity
+                            ###############
+                            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+                            k.gate('rym90', [qA1])
+                            k.gate('rym90', [qA3])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qA3, qD2]) # without parking
+                            k.gate('cz', [qD1, qA1])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('cz', [qD4, qA3])
+                            k.gate('cz', [qD3, qA1])
+                            k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+                            k.gate('ry90', [qA1])
+                            k.gate('ry90', [qA3])
+                            k.gate("wait", [], 0)
+
+                        # tomography
+                        k.gate("wait", [qD1, qD2, qD3, qD4], 0)
+                        k.gate(p_q1, [qD1])
+                        k.gate(p_q2, [qD2])
+                        k.gate(p_q3, [qD3])
+                        k.gate(p_q4, [qD4])
+                        k.gate("wait", [qD1, qD2, qD3, qD4], 0)
+                        # measurement
+                        k.gate("wait", [], 0)
+                        k.measure(qD1)
+                        k.measure(qD2)
+                        k.measure(qD3)
+                        k.measure(qD4)
+                        k.measure(qA1)
+                        k.measure(qA3)
+                        k.gate("wait", [], 0)
+
+                        p.add_kernel(k)
+
+    p = oqh.add_multi_q_cal_points(p, qubits=[qD1, qD2, qD3, qD4], combinations=[ s1+s2+s3+s4 for s1 in ['0', '1']
+                                                                                              for s2 in ['0', '1']
+                                                                                              for s3 in ['0', '1']
+                                                                                              for s4 in ['0', '1']])
+    if idle_meas != 0 :
+        k = oqh.create_kernel('idle_meas', p)
+        k.prepz(qD1)
+        k.prepz(qD2)
+        k.prepz(qD3)
+        k.prepz(qD4)
+        for i in range(idle_meas):
+            k.measure(qD1)
+            k.measure(qD2)
+            k.measure(qD3)
+            k.measure(qD4)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+def surface_7(qD1: int, qD2: int,
+              qD3: int, qD4: int,
+              qA1: int, qA2: int, qA3: int,
+              rounds: int,
+              platf_cfg: str,
+              initial_state=['0', '0', '0', '0'],
+              idle_meas=0):
+
+    print('new')
+    p = oqh.create_program("Surface_7", platf_cfg)
+
+    tomo_gates = ['i', 'rym90', 'rx90']
+
+    data_qubits=[qD1, qD2, qD3, qD4]
+
+    k = oqh.create_kernel(
+            'Tomo__tomo1_', p)
+    k.prepz(qD1)
+    k.prepz(qD2)
+    k.prepz(qD3)
+    k.prepz(qD4)
+    k.prepz(qA1)
+    k.prepz(qA2)
+    k.prepz(qA3)
+    k.gate("wait", [], 0)
+
+    #state preparation
+    for i, initial_state_q in enumerate(initial_state):
+        if initial_state_q == '1':
+            k.gate('ry180', [data_qubits[i]])
+        elif initial_state_q == '+':
+            k.gate('ry90', [data_qubits[i]])
+        elif initial_state_q == '-':
+            k.gate('rym90', [data_qubits[i]])
+        elif initial_state_q == 'i':
+            k.gate('rx90', [data_qubits[i]])
+        elif initial_state_q == '-i':
+            k.gate('rxm90', [data_qubits[i]])
+        elif initial_state_q == '0':
+            pass
+        else:
+            raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+    k.gate("wait", [], 0)
+
+    for i in range(rounds):
+
+        ###############
+        # X-Parity
+        ###############
+        k.gate('rym90', [qA2])
+        k.gate('rym90', [qD1])
+        k.gate('rym90', [qD2])
+        k.gate('rym90', [qD3])
+        k.gate('rym90', [qD4])
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA2, qD2]) # CZ X-D2
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA2, qD1]) # CZ X-D1
+        k.gate('rx180', [qD2])  # echo D2
+        k.gate('rx180', [qD2])  # echo D2
+        k.gate('i', [qD2])
+        k.gate('wait', [], 0)
+        k.gate('rx180', [qA2])   # echo ancilla
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA2, qD4]) # CZ X-D4
+        k.gate('wait', [], 0)
+        k.gate('cz', [qA2, qD3]) # CZ X-D3
+        k.gate('wait', [], 0)
+        k.gate('correction', [qA2])
+        k.gate('correction', [qD1])
+        k.gate('correction', [qD2])
+        k.gate('correction', [qD3])
+        k.gate('correction', [qD4])
+        k.gate('wait', [], 0)
+
+        ###############
+        # Z-Parity
+        ###############
+        k.gate('rym90', [qA1])
+        k.gate('rym90', [qA3])
+        k.gate("wait", [], 0)
+        k.gate('cz', [qA3, qD2]) # without parking
+        k.gate('cz', [qD1, qA1])
+        k.gate("wait", [], 0)
+        k.gate('cz', [qD4, qA3])
+        k.gate('cz', [qD3, qA1])
+        k.gate("wait", [], 0)
+        k.gate('ry90', [qA1])
+        k.gate('ry90', [qA3])
+        k.gate("wait", [], 0)
+
+        ##############
+        # Echo
+        ##############
+        k.gate('wait', [], 0)
+        k.gate('echo_corr', [qD1])
+        k.gate("wait", [qD1], 160)
+        k.gate('echo_corr', [qD2])
+        k.gate("wait", [qD2], 60)
+        k.gate('echo_corr', [qD3])
+        k.gate("wait", [qD3], 280)
+        k.gate('echo_corr', [qD4])
+        k.gate("wait", [qD4], 300)
+        k.measure(qA1)
+        k.measure(qA2)
+        k.measure(qA3)
+        k.gate('wait', [], 0)
+
+    k.gate("wait", [], 0)
+    # k.gate('ry90', [qD1])
+    # k.gate('ry90', [qD2])
+    # k.gate('ry90', [qD3])
+    # k.gate('ry90', [qD4])
+    k.measure(qD1)
+    k.measure(qD2)
+    k.measure(qD3)
+    k.measure(qD4)
+    k.gate("wait", [], 0)
+
+    p.add_kernel(k)
+
+    # p = oqh.add_multi_q_cal_points(p, qubits=[qD1, qD2, qD3, qD4], combinations=[ s1+s2+s3+s4 for s1 in ['0', '1']
+    #                                                                                           for s2 in ['0', '1']
+    #                                                                                           for s3 in ['0', '1']
+    #                                                                                           for s4 in ['0', '1']],
+    #                                initialize=False)
+
+    if idle_meas != 0 :
+        k = oqh.create_kernel('idle_meas', p)
+        k.prepz(qD1)
+        k.prepz(qD2)
+        k.prepz(qD3)
+        k.prepz(qD4)
+        for i in range(idle_meas):
+            k.measure(qD1)
+            k.measure(qD2)
+            k.measure(qD3)
+            k.measure(qD4)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+def surface_7_pipelined(qD1: int, qD2: int,
+                        qD3: int, qD4: int,
+                        qA1: int, qA2: int, qA3: int,
+                        rounds: int,
+                        platf_cfg: str,
+                        initial_state=['0', '0', '0', '0'],
+                        theta_gate = False,
+                        hooked=False,
+                        idle_meas=0):
+
+    print('new')
+    p = oqh.create_program("Surface_7_pipelined", platf_cfg)
+
+    data_qubits=[qD1, qD2, qD3, qD4]
+
+    k = oqh.create_kernel('Multiround_experiment', p)
+    k.prepz(qD1)
+    k.prepz(qD2)
+    k.prepz(qD3)
+    k.prepz(qD4)
+    k.prepz(qA1)
+    k.prepz(qA2)
+    k.prepz(qA3)
+    k.gate("wait", [], 0)
+
+    #state preparation
+    for i, initial_state_q in enumerate(initial_state):
+        if initial_state_q == '1':
+            k.gate('ry180', [data_qubits[i]])
+        elif initial_state_q == '+':
+            k.gate('ry90', [data_qubits[i]])
+        elif initial_state_q == '-':
+            k.gate('rym90', [data_qubits[i]])
+        elif initial_state_q == 'i':
+            k.gate('rx90', [data_qubits[i]])
+        elif initial_state_q == '-i':
+            k.gate('rxm90', [data_qubits[i]])
+        elif initial_state_q == '0':
+            pass
+        else:
+            raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
+    k.gate("wait", [], 0)
+
+    for i in range(rounds):
+
+        ###############
+        # X-Parity
+        ###############
+        k.measure(4) # Qubit Z1_trig
+        k.measure(6) # Qubit Z2_trig
+        k.measure(1) # Qubit X_trig
+        k.gate('wait', [1, 4, 6], 280)
+        k.gate('rym90', [qA2])
+        k.gate('rym90', [qD1])
+        k.gate('rym90', [qD2])
+        k.gate('rym90', [qD3])
+        k.gate('rym90', [qD4])
+        if hooked:
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('cz', [qA2, qD3]) # CZ X-D3
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('cz', [qA2, qD1]) # CZ X-D1
+            k.gate('rx180', [qD2])  # echo D2
+            k.gate('rx180', [qD2])  # echo D2
+            k.gate('i', [qD2])
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('rx180', [qA2])   # echo ancilla
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('cz', [qA2, qD4]) # CZ X-D4
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('cz', [qA2, qD2]) # CZ X-D2
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+        else:
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('cz', [qA2, qD2]) # CZ X-D2
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('cz', [qA2, qD1]) # CZ X-D1
+            k.gate('rx180', [qD2])  # echo D2
+            k.gate('rx180', [qD2])  # echo D2
+            k.gate('i', [qD2])
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('rx180', [qA2])   # echo ancilla
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('cz', [qA2, qD4]) # CZ X-D4
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+            k.gate('cz', [qA2, qD3]) # CZ X-D3
+            k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+        k.gate('correction', [qA2])
+        k.gate('correction', [qD1])
+        k.gate('correction', [qD2])
+        k.gate('correction', [qD3])
+        k.gate('correction', [qD4])
+        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+
+        ##############
+        # Echo
+        ##############
+        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+        k.gate("wait", [qD1], 160)
+        k.gate('echo_corr', [qD1])
+        k.gate("wait", [qD1], 360-180)
+        k.gate("wait", [qD2], 160)
+        k.gate('echo_corr', [qD2])
+        k.gate("wait", [qD2], 360-180)
+        k.gate("wait", [qD3], 160)
+        k.gate('echo_corr', [qD3])
+        k.gate("wait", [qD3], 360-180)
+        k.gate("wait", [qD4], 160)
+        k.gate('echo_corr', [qD4])
+        k.gate("wait", [qD4], 360-180)
+        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+        k.gate('i', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+
+
+        ###############
+        # Z-Parity
+        ###############
+        k.gate('wait', [qD1, qD2, qD3, qD4, qA1, qA3], 0)
+        k.gate('rym90', [qA1])
+        k.gate('rym90', [qA3])
+        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+        k.gate('cz', [qA3, qD2]) # without parking
+        k.gate('cz', [qD1, qA1])
+        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+        k.gate('cz', [qD4, qA3])
+        k.gate('cz', [qD3, qA1])
+        k.gate("wait", [qD1, qD2, qD3, qD4, qA1, qA2, qA3], 0)
+        k.gate('ry90', [qA1])
+        k.gate('ry90', [qA3])
+        k.gate("wait", [], 0)
+        if theta_gate:
+            if i != rounds-1:
+                k.gate('theta_gate', [qD2])
+                k.gate("wait", [], 0)
+
+    k.gate("wait", [], 0)
+    # k.gate('ry90', [qD1])
+    # k.gate('ry90', [qD2])
+    # k.gate('ry90', [qD3])
+    # k.gate('ry90', [qD4])
+    # k.gate("wait", [], 0)
+    k.measure(qD1)
+    k.measure(qD2)
+    k.measure(qD3)
+    k.measure(qD4)
+    k.measure(qA1)
+    k.measure(qA3)
+    k.gate("wait", [], 0)
+
+    p.add_kernel(k)
+
+    if idle_meas != 0 :
+        k = oqh.create_kernel('idle_meas', p)
+        k.gate('wait', [qD1, qD2, qD3, qD4], 200)
+        for i in range(idle_meas):
+            k.measure(qD1)
+            k.measure(qD2)
+            k.measure(qD3)
+            k.measure(qD4)
+        p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
 
 def conditional_oscillation_seq(q0: int, q1: int,
                                 q2: int = None, q3: int = None,
@@ -1426,7 +3468,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
                                 flux_codeword: str = 'cz',
                                 flux_codeword_park: str = None,
                                 parked_qubit_seq: str = 'ground',
-                                disable_parallel_single_q_gates: bool = False):
+                                disable_parallel_single_q_gates: bool = False,
+                                offset_phase_calibration=0):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -1495,15 +3538,19 @@ def conditional_oscillation_seq(q0: int, q1: int,
                         k.gate("wait", [], 0)
 
             for q in ramsey_qubits:
-                k.gate("rx90", [q])
+                k.gate("rym90", [q])
                 if disable_parallel_single_q_gates:
                     k.gate("wait", [], 0)
 
+            # # k.gate("wait", [], 0) # HARD CODED FOR
+            # k.gate("rx180", [10]) # TUNE UP# SURFACE-4
+            # #                       # TUNE UP
+
             k.gate("wait", [], 0)  # alignment workaround
 
-            # #################################################################
-            # Flux pulses
-            # #################################################################
+            ##################################################################
+            #Flux pulses
+            ##################################################################
 
             k.gate('wait', [], wait_time_before_flux)
 
@@ -1511,7 +3558,28 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 if not disable_cz:
                     # Parallel flux pulses below
 
-                    k.gate(flux_codeword, [q0, q1])
+                    k.gate("wait", [], 0)          # HARD CODED FOR
+                    k.gate(flux_codeword, [11, 9])  # SURFACE-4
+                    k.gate("wait", [], 0)          # TUNE UP
+
+                    k.gate("wait", [], 0)          # HARD CODED FOR
+                    k.gate(flux_codeword, [11, 8]) # SURFACE-4
+                    k.gate("rx180", [9])           # TUNE UP
+                    k.gate("rx180", [9])
+                    k.gate("i",     [9])
+                    k.gate("wait", [], 0)
+
+                    k.gate("wait", [], 0) # TUNE UP
+                    k.gate("rx180", [11])
+                    k.gate("wait", [], 0) # HARD CODED FOR
+
+                    k.gate("wait", [], 0)           # HARD CODE FOR
+                    k.gate(flux_codeword, [11, 15]) # SURFACE-4
+                    k.gate("wait", [], 0)           # TUNE UP
+
+                    k.gate("wait", [], 0)           # HARD CODE FOR
+                    k.gate(flux_codeword, [11, 14]) # SURFACE-4
+                    k.gate("wait", [], 0)           # TUNE UP
 
                     # in case of parking and parallel cz
                     if flux_codeword_park == 'cz':
@@ -1547,12 +3615,12 @@ def conditional_oscillation_seq(q0: int, q1: int,
             # special because the cw phase pulses go in mult of 20 deg
             cw_idx = angle // 20 + 9
             phi_gate = None
-            if angle == 90:
-                phi_gate = 'ry90'
-            elif angle == 0:
-                phi_gate = 'rx90'
-            else:
-                phi_gate = 'cw_{:02}'.format(cw_idx)
+            # if angle == 90+offset_phase_calibration:
+            #     phi_gate = 'rx90'
+            # elif angle == offset_phase_calibration:
+            #     phi_gate = 'rym90'
+            # else:
+            phi_gate = 'cw_{:02}'.format(cw_idx)
 
             for q in ramsey_qubits:
                 k.gate(phi_gate, [q])
@@ -1600,6 +3668,275 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
     p.set_sweep_points(p.sweep_points)
 
+    return p
+
+
+def two_qubit_conditional_oscillation_seq(qH: int,
+                                          qA: int,
+                                          qL: int,
+                                          platf_cfg: str = None,
+                                          angles=np.arange(0, 360, 20),
+                                          ramsey_qubit: int = None,
+                                          echo: bool = False,
+                                          cases: list = ['00', '01', '10', '11']):
+
+    p = oqh.create_program("two_qubit_conditional_oscillation", platf_cfg)
+
+    # These angles correspond to special pi/2 pulses in the lutman
+    for i, angle in enumerate(angles):
+        for case in cases:
+            k = oqh.create_kernel("k{}_{}".format(case, angle), p)
+
+            # Qubit initialization
+            k.prepz(qH)
+            k.prepz(qA)
+            k.prepz(qL)
+            k.gate('wait', [], 0)
+
+            if ramsey_qubit is None:
+                control_qubits = [qH, qL]
+                ramsey_qubit = qA
+            else:
+                ramsey_qubit_idx = [qH, qA, qL].index(ramsey_qubit)
+                control_qubits = [qH, qA, qL]
+                control_qubits.pop(ramsey_qubit_idx)
+            # prepare state of control qubits
+            for i, state in enumerate(case):
+                if state == '1':
+                    k.gate('rx180', [control_qubits[i]])
+                else:
+                    pass
+            k.gate("rx90", [ramsey_qubit])
+            k.gate('wait', [], 0)
+
+            # CZ gates
+            k.gate('cz', [qH, qA])
+            k.gate('rx180', [14])
+            k.gate('rx180', [14])
+            k.gate('i', [14])
+            k.gate('wait', [], 0)
+            if echo:
+                k.gate('rx180', [qA])
+                k.gate('wait', [], 0)
+            k.gate('cz', [qA, qL])
+            k.gate('rx180', [8])
+            k.gate('rx180', [8])
+            k.gate('i', [8])
+            k.gate('wait', [], 0)
+
+            # Return state of control qubits
+            for i, state in enumerate(case):
+                if state == '1':
+                    k.gate('rx180', [control_qubits[i]])
+                else:
+                    pass
+
+            # cw_idx corresponds to special hardcoded angles in the lutman
+            # special because the cw phase pulses go in mult of 20 deg
+            cw_idx = angle // 20 + 9
+            phi_gate = None
+            phi_gate = 'cw_{:02}'.format(cw_idx)
+            k.gate(phi_gate, [ramsey_qubit])
+            k.gate('wait', [], 0)
+
+            # #################################################################
+            # Measurement
+            # #################################################################
+
+            k.measure(qH)
+            k.measure(qA)
+            k.measure(qL)
+            p.add_kernel(k)
+
+    states = ["000", "001", "010", "011", "100", "101", "110", "111"]
+    qubits = [qA, qH, qL]
+    oqh.add_multi_q_cal_points(
+        p, qubits=qubits,
+        combinations=states, return_comb=False)
+
+    p = oqh.compile(p)
+
+    cal_pts_idx = [361, 362, 363, 364, 365, 366, 367, 368]
+
+    p.sweep_points = np.concatenate(
+        [np.repeat(angles, len(cases)), cal_pts_idx])
+    p.set_sweep_points(p.sweep_points)
+
+    return p
+
+
+def four_qubit_conditional_oscillation_seq(qH1: int,
+                                           qH2: int,
+                                           qA: int,
+                                           qL1: int,
+                                           qL2: int,
+                                           ramsey_qubit: int = None,
+                                           platf_cfg: str = None,
+                                           angles=np.arange(0, 360, 20),
+                                           cases: list = ['0000', '0001', '0010', '0011',
+                                                          '0100', '0101', '0110', '0111',
+                                                          '1000', '1001', '1010', '1011',
+                                                          '1100', '1101', '1110', '1111']):
+
+    p = oqh.create_program("four_qubit_conditional_oscillation", platf_cfg)
+
+    # These angles correspond to special pi/2 pulses in the lutman
+    for i, angle in enumerate(angles):
+        for case in cases:
+            k = oqh.create_kernel("k{}_{}".format(case, angle), p)
+
+            # Qubit initialization
+            k.prepz(qH1)
+            k.prepz(qH2)
+            k.prepz(qA)
+            k.prepz(qL1)
+            k.prepz(qL2)
+            k.gate('wait', [], 0)
+
+            if ramsey_qubit is None:
+                control_qubits = [qH1, qH2, qL1, qL2]
+                ramsey_qubit = qA
+            else:
+                control_qubits = [qH1, qH2, qA, qL1, qL2]
+                idx = control_qubits.index(ramsey_qubit)
+                del control_qubits[idx]
+
+            # prepare state of control qubits
+            for i, state in enumerate(case):
+                if state == '1':
+                    k.gate('rx180', [control_qubits[i]])
+                else:
+                    pass
+            k.gate("rym90", [ramsey_qubit])
+            k.gate('wait', [], 0)
+
+            # CZ gates
+            k.gate('cz', [qA, qH2])
+            k.gate('wait', [], 0)
+            k.gate('cz', [qA, qH1])
+            k.gate('rx180', [qH2])
+            k.gate('rx180', [qH2])
+            k.gate('i', [qH2])
+            k.gate('wait', [], 0)
+            k.gate('rx180', [qA])
+            k.gate('wait', [], 0)
+            k.gate('cz', [qA, qL2])
+            k.gate('wait', [], 0)
+            k.gate('cz', [qA, qL1])
+            k.gate('wait', [], 0)
+
+            # Return state of control qubits
+            for i, state in enumerate(case):
+                if state == '1':
+                    k.gate('rx180', [control_qubits[i]])
+                else:
+                    pass
+
+            # cw_idx = angle_2[i] // 20 + 9
+            cw_idx = angle // 20 + 9
+            phi_gate = 'cw_{:02}'.format(cw_idx)
+            k.gate(phi_gate, [ramsey_qubit])
+            k.gate('wait', [], 0)
+
+            # #################################################################
+            # Measurement
+            # #################################################################
+
+            k.measure(qH1)
+            k.measure(qH2)
+            k.measure(qA)
+            k.measure(qL1)
+            k.measure(qL2)
+            p.add_kernel(k)
+
+    # states = ["00000", "00000", "00010", "00011", "00100", "00101", "00110", "00111"]#,
+    # #           "01000", "01001", "01010", "01011", "01100", "01101", "01110", "01111",
+    # #           "10000", "10001", "10010", "10011", "10100", "10101", "10110", "10111",
+    # #           "11000", "11001", "11010", "11011", "11100", "11101", "11110", "11111"]
+    # qubits = [qA, qH1, qH2, qL1, qL2]
+    # oqh.add_multi_q_cal_points(
+    #     p, qubits=qubits,
+    #     combinations=states, return_comb=False)
+
+    p = oqh.compile(p)
+
+    cal_pts_idx = []# [361+i for i in range(8)]
+
+    p.sweep_points = np.concatenate(
+        [np.repeat(angles, len(cases)), cal_pts_idx])
+    p.set_sweep_points(p.sweep_points)
+
+    return p
+
+def phase_correction_calibration_seq(qH1: int,
+                                     qH2: int,
+                                     qA: int,
+                                     qL1: int,
+                                     qL2: int,
+                                     platf_cfg: str,
+                                     ramsey_qubit: int = None):
+
+    p = oqh.create_program("four_qubit_conditional_oscillation", platf_cfg)
+
+    k = oqh.create_kernel("Control_off", p)
+    k.prepz(qH1)
+    k.prepz(qH2)
+    k.prepz(qA)
+    k.prepz(qL1)
+    k.prepz(qL2)
+    k.gate('wait', [], 0)
+    k.gate("rx90", [ramsey_qubit])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qH2])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qH1])
+    k.gate('ry180', [qH2])
+    k.gate('ry180', [qH2])
+    k.gate('i', [qH2])
+    k.gate('wait', [], 0)
+    k.gate('rx180', [qA])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qL2])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qL1])
+    k.gate('wait', [], 0)
+    k.gate('correction', [ramsey_qubit])
+    k.gate('wait', [], 0)
+    k.measure(qA)
+    k.measure(ramsey_qubit)
+    p.add_kernel(k)
+
+    k = oqh.create_kernel("Control_on", p)
+    k.prepz(qH1)
+    k.prepz(qH2)
+    k.prepz(qA)
+    k.prepz(qL1)
+    k.prepz(qL2)
+    k.gate('wait', [], 0)
+    k.gate("rx90", [ramsey_qubit])
+    k.gate('rx180', [qA])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qH2])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qH1])
+    k.gate('ry180', [qH2])
+    k.gate('ry180', [qH2])
+    k.gate('i', [qH2])
+    k.gate('wait', [], 0)
+    k.gate('rx180', [qA])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qL2])
+    k.gate('wait', [], 0)
+    k.gate('cz', [qA, qL1])
+    k.gate('wait', [], 0)
+    k.gate('correction', [ramsey_qubit])
+    k.gate('rx180', [qA])
+    k.gate('wait', [], 0)
+    k.measure(qA)
+    k.measure(ramsey_qubit)
+    p.add_kernel(k)
+
+    p = oqh.compile(p)
     return p
 
 
@@ -2635,22 +4972,22 @@ def Two_qubit_RTE_pipelined(QX:int, QZ:int, QZ_d:int, platf_cfg: str,
 
 
 
-def Ramsey_cross(wait_time: int,
-                 angles: list,
-                 q_rams: int,
+def Ramsey_cross(q_rams: int,
                  q_meas: int,
-                 echo: bool,
                  platf_cfg: str,
+                 echo: bool = True,
+                 wait_time: int= 0,
+                 angles: list = np.arange(0,360, 20),
                  initial_state: str = '0'):
     """
     q_target is ramseyed
     q_spec is measured
 
     """
-    p = oqh.create_program("Ramsey_msmt_induced_dephasing", platf_cfg)
+    p = oqh.create_program("Ramsey_msmt_induced_shift", platf_cfg)
 
-    for i, angle in enumerate(angles[:-4]):
-        cw_idx = angle//20 + 9
+    for i, angle in enumerate(angles[:]):
+
         k = oqh.create_kernel("Ramsey_azi_"+str(angle), p)
 
         k.prepz(q_rams)
@@ -2658,40 +4995,235 @@ def Ramsey_cross(wait_time: int,
         k.gate("wait", [], 0)
 
         k.gate('rx90', [q_rams])
-        # k.gate("wait", [], 0)
-        k.measure(q_rams)
-        if echo:
-            k.gate("wait", [q_rams], round(wait_time/2)-20)
-            k.gate('rx180', [q_rams])
-            k.gate("wait", [q_rams], round(wait_time/2))
-        else:
-            k.gate("wait", [q_rams], wait_time-20)
-        if angle == 90:
-            k.gate('ry90', [q_rams])
-        elif angle == 0:
-            k.gate('rx90', [q_rams])
-        else:
-            k.gate('cw_{:02}'.format(cw_idx), [q_rams])
-
-
-        # k.measure(q_rams)
         if initial_state == '1':
             k.gate('rx180', [q_meas])
-        k.measure(q_meas)
-        if echo:
-            k.gate("wait", [q_meas], wait_time+20)
-        else:
-            k.gate("wait", [q_meas], wait_time)
 
         k.gate("wait", [], 0)
+        k.measure(q_meas)
+        k.measure(12)
+
+        if echo:
+            k.gate('ry180', [q_rams])
+            k.gate("wait", [q_rams], round(wait_time))
+        k.gate("wait", [], 0)
+
+        cw_idx = angle // 20 + 9
+        k.gate('cw_{:02}'.format(cw_idx), [q_rams])
+        k.measure(q_rams)
+        k.measure(q_meas)
 
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p, qubit_idx=q_rams)
+    oqh.add_single_qubit_cal_points(p, qubit_idx=q_rams,
+                                    measured_qubits=[q_rams, q_meas])
+
+    p.sweep_points = np.concatenate((np.repeat(angles,2), [360, 370, 380, 390]))
+    p.set_sweep_points(p.sweep_points)
 
     p = oqh.compile(p)
     return p
+
+def Ramsey_cross_2(q_rams: int,
+                 q_meas: int,
+                 platf_cfg: str,
+                 echo: bool = True,
+                 wait_time: int= 0,
+                 angles: list = np.arange(0,360, 20),
+                 nr_shots: int=2,
+                 initial_state: str = '0'):
+    """
+    q_target is ramseyed
+    q_spec is measured
+
+    """
+    p = oqh.create_program("Ramsey_msmt_induced_shift", platf_cfg)
+
+    for i, angle in enumerate(angles[:]):
+
+        k = oqh.create_kernel("Ramsey_azi_"+str(angle), p)
+
+        k.prepz(q_rams)
+        k.prepz(q_meas)
+        k.gate("wait", [], 0)
+
+        k.gate("rym90", [q_meas])
+        if initial_state == '1':
+            k.gate("rx180", [q_rams])
+        k.gate('wait', [], 0)
+
+        ##############
+        # X parity
+        ##############
+        # k.gate('wait', [], 0)
+        # k.gate('cz', [11, 9])
+        # k.gate('wait', [], 0)
+        # k.gate('cz', [11, 8])
+        # k.gate('rx180', [9])
+        # k.gate('rx180', [9])
+        # k.gate('i', [9])
+        # k.gate('wait', [], 0)
+        # k.gate('rx180', [11])
+        # k.gate('wait', [], 0)
+        # k.gate('cz', [11, 15])
+        # k.gate('wait', [], 0)
+        # k.gate('cz', [11, 14])
+        # k.gate('wait', [], 0)
+        # k.gate('correction', [q_rams])
+        # k.gate('correction', [q_meas])
+        # k.gate("wait", [], 0)
+
+        ##############
+        # Z parity
+        ##############
+        k.gate("wait", [], 0)
+        k.gate('cz', [12,  9]) # without parking
+        k.gate('cz', [ 8, 10])
+        k.gate("wait", [], 0)
+        k.gate('cz', [15, 12])
+        k.gate('cz', [14, 10])
+        k.gate("wait", [], 0)
+        k.gate('ry90', [q_meas])
+        k.gate('ry90', [q_rams])
+        k.gate("wait", [], 0)
+
+
+        k.measure(q_meas)
+
+        if echo:
+            k.gate('echo_corr', [q_rams])
+            k.gate("wait", [q_rams], round(wait_time))
+        k.gate("wait", [], 0)
+
+        cw_idx = angle // 20 + 9
+        k.gate('cw_{:02}'.format(cw_idx), [q_rams])
+        k.measure(q_rams)
+
+        p.add_kernel(k)
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p, qubit_idx=q_rams,
+                                    measured_qubits=[q_rams, q_meas])
+
+    p.sweep_points = np.concatenate((np.repeat(angles, nr_shots), [360, 370, 380, 390]))
+    p.set_sweep_points(p.sweep_points)
+
+    p = oqh.compile(p)
+    return p
+
+
+
+def Ramsey_cross_3(q_rams: int,
+                 q_meas: int,
+                 platf_cfg: str,
+                 echo: bool = True,
+                 wait_time: int= 0,
+                 angles: list = np.arange(0,360, 20),
+                 nr_shots: int=2,
+                 initial_state: str = '0'):
+    """
+    q_target is ramseyed
+    q_spec is measured
+    calibrate phase of echo for pipelined surface-7
+
+    """
+    p = oqh.create_program("Ramsey_msmt_induced_shift", platf_cfg)
+
+    for i, angle in enumerate(angles[:]):
+
+        k = oqh.create_kernel("Ramsey_azi_"+str(angle), p)
+
+        k.prepz(q_rams)
+        k.prepz(q_meas)
+        k.gate("wait", [], 0)
+
+        if initial_state == '1':
+            k.gate("rx180", [q_rams])
+        k.gate('wait', [], 0)
+
+        ########################################################
+        # Pipelined
+        ########################################################
+        ###############
+        # X-Parity
+        ###############
+        # k.measure(4) # Qubit Z1_trig
+        # k.measure(6) # Qubit Z2_trig
+        k.measure(1) # Qubit X_trig
+        k.gate('wait', [1, 4, 6], 280)
+        k.gate('rym90', [11])
+        k.gate('wait', [8, 9, 14, 15, 10, 11, 12], 0)
+        k.gate('cz', [11, 9]) # CZ X-D2
+        k.gate('wait', [8, 9, 14, 15, 10, 11, 12], 0)
+        k.gate('cz', [11, 8]) # CZ X-D1
+        k.gate('rx180', [9])  # echo D2
+        k.gate('rx180', [9])  # echo D2
+        k.gate('i', [9])
+        k.gate('wait', [8, 9, 14, 15, 10, 11, 12], 0)
+        k.gate('rx180', [11])   # echo ancilla
+        k.gate('wait', [8, 9, 14, 15, 10, 11, 12], 0)
+        k.gate('cz', [11, 15]) # CZ X-D4
+        k.gate('wait', [8, 9, 14, 15, 10, 11, 12], 0)
+        k.gate('cz', [11, 14]) # CZ X-D3
+        k.gate('wait', [8, 9, 14, 15, 10, 11, 12], 0)
+        k.gate('correction', [11])
+        k.gate('ry90', [q_rams])
+        k.gate('wait', [8, 9, 14, 15, 10, 11, 12], 0)
+
+        ##############
+        # Echo
+        ##############
+        k.gate('wait', [8, 9, 14, 15, 10, 12], 0)
+        k.gate("wait", [q_rams], wait_time)
+        k.gate('echo_corr', [q_rams])
+        k.gate("wait", [q_rams], 360-20-wait_time)
+        k.gate('wait', [8, 9, 14, 15, 10, 12], 0)
+        k.gate('i', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+        k.gate('sf_park', [11])
+
+
+        ###############
+        # Z-Parity
+        ###############
+        k.gate('wait', [8, 9, 14, 15, 10, 12], 0)
+        # k.gate('rym90', [10])
+        # k.gate('rym90', [12])
+        k.gate('i', [12])
+        k.gate("wait", [8, 9, 14, 15, 10, 11, 12], 0)
+        k.gate('cz', [12, 9]) # without parking
+        k.gate('cz', [8, 10])
+        k.gate("wait", [8, 9, 14, 15, 10, 11, 12], 0)
+        k.gate('cz', [15, 12])
+        k.gate('cz', [14, 10])
+        k.gate("wait", [8, 9, 14, 15, 10, 11, 12], 0)
+        # k.gate('ry90', [10])
+        # k.gate('ry90', [12])
+        k.gate('i', [12])
+
+        cw_idx = angle // 20 + 9
+        k.gate('cw_{:02}'.format(cw_idx), [q_rams])
+        k.gate("wait", [], 0)
+
+        k.measure(q_rams)
+
+        p.add_kernel(k)
+
+    # adding the calibration points
+    oqh.add_single_qubit_cal_points(p, qubit_idx=q_rams,
+                                    measured_qubits=[q_rams, q_meas])
+
+    p.sweep_points = np.concatenate((np.repeat(angles, nr_shots), [360, 370, 380, 390]))
+    p.set_sweep_points(p.sweep_points)
+
+    p = oqh.compile(p)
+    return p
+
+
 
 def TEST_RTE(QX:int , QZ:int, platf_cfg: str,
              measurements:int):
@@ -2739,6 +5271,56 @@ def TEST_RTE(QX:int , QZ:int, platf_cfg: str,
         k.measure(QZ)
 
     p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+
+
+
+def off_on_fluxed(qubit_idx: int,
+                  qubit_dummy_idx: int,
+                  pulse_comb: str,
+                  platf_cfg: str):
+    """
+    Performs an 'off_on' sequence on the qubit specified.
+        off: (RO) - prepz -      - RO
+        on:  (RO) - prepz - x180 - RO
+    Args:
+        qubit_idx (int) :
+        pulse_comb (list): What pulses to play valid options are
+            "off", "on", "off_on"
+        initialize (bool): if True does an extra initial measurement to
+            post select data.
+        platf_cfg (str) : filepath of OpenQL platform config file
+
+    Pulses can be optionally enabled by putting 'off', respectively 'on' in
+    the pulse_comb string.
+    """
+    p = oqh.create_program('off_on_fluxed', platf_cfg)
+
+    # # Off
+    if 'off' in pulse_comb.lower():
+        k = oqh.create_kernel("off", p)
+        k.prepz(qubit_idx)
+        k.gate('wait', [], 0)
+        k.measure(qubit_dummy_idx)
+        k.gate('sf_park', [qubit_idx])
+        k.gate('wait', [qubit_idx], 120)
+        p.add_kernel(k)
+
+    if 'on' in pulse_comb.lower():
+        k = oqh.create_kernel("on", p)
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
+        k.gate('wait', [], 0)
+        k.measure(qubit_dummy_idx)
+        k.gate('sf_park', [qubit_idx])
+        k.gate('wait', [qubit_idx], 120)
+        p.add_kernel(k)
+
+    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
+        raise ValueError()
 
     p = oqh.compile(p)
     return p

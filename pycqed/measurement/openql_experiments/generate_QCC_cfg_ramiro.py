@@ -214,6 +214,22 @@ def generate_config(filename: str,
         },
 
         "gate_decomposition": {
+            "correction_S %0": ["cw_28 %0"],
+            "correction %0": ["cw_30 %0"],
+            "echo_corr %0": ["cw_29 %0"],
+            "theta_gate %0": ["cw_31 %0"],
+            "measure q11": ["measure q5","sf_park q11","sf_park q11",
+                "sf_park q11","sf_park q11","sf_park q11","sf_park q11",
+                "sf_park q11","sf_park q11","i q11","i q11","i q11"],
+            # "measure q11": ["measure q1","i q11","i q11","i q11","i q11","i q11",     # Used to calibrate optimal weights
+            #                             "i q11","i q11","i q11","i q11","i q11",      #
+            #                             "i q11","i q11","i q11","i q11","i q11",      #
+            #                             "sf_park q11","sf_park q11","sf_park q11",    #
+            #                             "sf_park q11","sf_park q11","sf_park q11",    #
+            #                             "sf_park q11","sf_park q11","i q11",          #
+            #                             "i q11","i q11"],                             #
+            # "rx180 q1": ["rx180 q11"],                                                #
+            "rx180 q4": ["rx180 q10"],                                                #
             "x %0": ["rx180 %0"],
             "y %0": ["ry180 %0"],
             "roty90 %0": ["ry90 %0"],
@@ -276,10 +292,12 @@ def generate_config(filename: str,
             "cz q8, q11": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q10'],
             "cz q11, q8": ['sf_cz_nw q11', 'sf_cz_se q8', 'sf_park q10'],
             # Edge 15/39
-            "cz q9, q11": ['sf_cz_ne q11', 'sf_cz_sw q9'],
-            "cz q11, q9": ['sf_cz_ne q11', 'sf_cz_sw q9'],
+            "cz q9, q11": ['sf_cz_ne q11', 'sf_cz_sw q9', 'sf_park q12'],
+            "cz q11, q9": ['sf_cz_ne q11', 'sf_cz_sw q9', 'sf_park q12'],
             # Edge 16/40
-            "cz q9, q12": ['sf_cz_nw q12', 'sf_cz_se q9'],
+            "cz q9, q12": ['sf_cz_nw q12', 'sf_cz_se q9', 'sf_park q11'],
+            # "cz q12, q9": ['sf_cz_nw q12', 'sf_cz_se q9', 'sf_park q11'],
+            # "cz q9, q12": ['sf_cz_nw q12', 'sf_cz_se q9'],
             "cz q12, q9": ['sf_cz_nw q12', 'sf_cz_se q9'],
             # Edge 17/41
             "cz q10, q13": ['sf_cz_ne q13', 'sf_cz_sw q10'],
@@ -288,11 +306,11 @@ def generate_config(filename: str,
             "cz q10, q14": ['sf_cz_nw q14', 'sf_cz_se q10'],
             "cz q14, q10": ['sf_cz_nw q14', 'sf_cz_se q10'],
             # Edge 19/43
-            "cz q11, q14": ['sf_cz_ne q14', 'sf_cz_sw q11'],
-            "cz q14, q11": ['sf_cz_ne q14', 'sf_cz_sw q11'],
+            "cz q11, q14": ['sf_cz_ne q14', 'sf_cz_sw q11', 'sf_park q15'],
+            "cz q14, q11": ['sf_cz_ne q14', 'sf_cz_sw q11', 'sf_park q15'],
             # Edge 20/44
-            "cz q11, q15": ['sf_cz_nw q15', 'sf_cz_se q11'],
-            "cz q15, q11": ['sf_cz_nw q15', 'sf_cz_se q11'],
+            "cz q11, q15": ['sf_cz_nw q15', 'sf_cz_se q11', 'sf_park q14'],
+            "cz q15, q11": ['sf_cz_nw q15', 'sf_cz_se q11', 'sf_park q14'],
             # Edge 21/45
             "cz q12, q15": ['sf_cz_ne q15', 'sf_cz_sw q12'],
             "cz q15, q12": ['sf_cz_ne q15', 'sf_cz_sw q12'],
@@ -429,7 +447,8 @@ def generate_config(filename: str,
         }
 
     # Create a measurement operation for all 17 qubits
-    for q in qubits:
+    for q in ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10',
+             'q12', 'q13', 'q14', 'q15', 'q16']:
         cfg["instructions"]["measure {}".format(q)] = {
             "duration": ro_duration,
             "latency": ro_latency,

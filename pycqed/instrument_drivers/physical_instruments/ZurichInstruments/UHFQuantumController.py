@@ -1717,7 +1717,7 @@ while (1) {
         if feedline is None:
             raise ziUHFQCDIOCalibrationError('No feedline specified for calibration')
 
-        CC_model = CC.IDN()['model']
+        CC_model = CC.IDN()['Model']
         if 'QCC' in CC_model:
             self._prepare_QCC_dio_calibration(
                 QCC=CC, verbose=verbose)
