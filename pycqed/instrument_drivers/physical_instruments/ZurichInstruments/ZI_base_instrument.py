@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import re
+from datetime import datetime
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators
@@ -290,52 +291,55 @@ class MockDAQServer():
 
         # Update connected status
         self.nodes['/zi/devices/connected']['value'] = self.device
-        self.nodes['/' + self.device +
-                   '/features/devtype'] = {'type': 'String', 'value': self.devtype}
-        self.nodes['/' + self.device +
-                   '/system/fwrevision'] = {'type': 'Integer', 'value': 99999}
-        self.nodes['/' + self.device +
-                   '/system/fpgarevision'] = {'type': 'Integer', 'value': 99999}
-        self.nodes['/' + self.device +
-                   '/system/slaverevision'] = {'type': 'Integer', 'value': 99999}
+
+        # Set the LabOne revision
+        self.nodes['/zi/about/revision'] = {'type': 'Integer', 'value': 200802104}
+
+        self.nodes[f'/{self.device}/features/devtype'] = {'type': 'String', 'value': self.devtype}
+        self.nodes[f'/{self.device}/system/fwrevision'] = {'type': 'Integer', 'value': 99999}
+        self.nodes[f'/{self.device}/system/fpgarevision'] = {'type': 'Integer', 'value': 99999}
+        self.nodes[f'/{self.device}/system/slaverevision'] = {'type': 'Integer', 'value': 99999}
 
         if self.devtype == 'UHFQA':
-            self.nodes['/' + self.device +
-                       '/features/options'] = {'type': 'String', 'value': 'QA\nAWG'}
+            self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'QA\nAWG'}
             for i in range(16):
-                self.nodes['/' + self.device + '/awgs/0/waveform/waves/' +
-                           str(i)] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/awgs/0/waveform/waves/{i}'] = {'type': 'ZIVectorData', 'value': np.array([])}
             for i in range(10):
-                self.nodes['/' + self.device + '/qas/0/integration/weights/' +
-                           str(i) + '/real'] = {'type': 'ZIVectorData', 'value': np.array([])}
-                self.nodes['/' + self.device + '/qas/0/integration/weights/' +
-                           str(i) + '/imag'] = {'type': 'ZIVectorData', 'value': np.array([])}
-                self.nodes['/' + self.device + '/qas/0/result/data/' +
-                           str(i) + '/wave'] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/qas/0/integration/weights/{i}/real'] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/qas/0/integration/weights/{i}/imag'] = {'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/qas/0/result/data/{i}/wave'] = {'type': 'ZIVectorData', 'value': np.array([])}
+            self.nodes[f'/{self.device}/raw/dios/0/delay'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/drive'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/mode'] = {'type': 'Integer', 'value': 0}
         elif self.devtype == 'HDAWG8':
-            self.nodes['/' + self.device +
-                       '/features/options'] = {'type': 'String', 'value': 'PC\nME'}
-            self.nodes['/' + self.device + '/raw/error/json/errors'] = {
+            self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'PC\nME'}
+            self.nodes[f'/{self.device}/raw/error/json/errors'] = {
                 'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
-            self.nodes['/' + self.device +
-                       '/raw/error/blinkseverity'] = {'type': 'Integer', 'value': 0}
-            self.nodes['/' + self.device +
-                       '/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
-            self.nodes['/' + self.device +
-                       '/raw/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
+            for i in range(32):
+                self.nodes['/' + self.device +
+                        '/raw/dios/0/delays/' + str(i) + '/value'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/raw/error/blinkseverity'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
             for awg_nr in range(4):
                 for i in range(32):
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
+                    self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
+                    self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
+                    self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
-                    self.nodes['/' + self.device + '/awgs/' + str(awg_nr) + '/waveform/waves/' + str(i)] = {
+                    self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
             for sigout_nr in range(8):
-                self.nodes['/' + self.device + '/sigouts/' + str(sigout_nr) + '/precompensation/fir/coefficients'] = {
+                self.nodes[f'/{self.device}/sigouts/{sigout_nr}/precompensation/fir/coefficients'] = {
                     'type': 'ZIVectorData', 'value': np.array([])}
+            self.nodes[f'/{self.device}/dios/0/mode'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
+            self.nodes[f'/{self.device}/dios/0/drive'] = {'type': 'Integer', 'value': 0}
+            for dio_nr in range(32):
+                self.nodes[f'/{self.device}/raw/dios/0/delays/{dio_nr}/value'] = {'type': 'Integer', 'value': 0}
 
     def listNodesJSON(self, path):
         pass
@@ -476,6 +480,12 @@ class MockDAQServer():
         if path in self.poll_nodes:
             self.poll_nodes.remove(path)
 
+    def sync(self):
+        """The sync method does not need to do anything as there are no
+        device delays to deal with when using the mock server.
+        """
+        pass
+
     def _load_parameter_file(self, filename: str):
         """
         Takes in a node_doc JSON file auto generates paths based on
@@ -606,6 +616,7 @@ class ZI_base_instrument(Instrument):
                  port: int= 8004,
                  apilevel: int= 5,
                  num_codewords: int= 0,
+                 logfile:str = None,
                  **kw) -> None:
         """
         Input arguments:
@@ -616,6 +627,7 @@ class ZI_base_instrument(Instrument):
             port            (int) the port to connect to for the ziDataServer (don't change)
             apilevel        (int) the API version level to use (don't change unless you know what you're doing)
             num_codewords   (int) the number of codeword-based waveforms to prepare
+            logfile         (str) file name where all commands should be logged
         """
         t0 = time.time()
         super().__init__(name=name, **kw)
@@ -686,6 +698,8 @@ class ZI_base_instrument(Instrument):
         self._add_codeword_waveform_parameters(num_codewords)
         # Create other neat parameters
         self._add_extra_parameters()
+        # A list of all subscribed paths
+        self._subscribed_paths = []
 
         # Structure for storing errors
         self._errors = None
@@ -693,6 +707,12 @@ class ZI_base_instrument(Instrument):
         self._errors_to_ignore = []
         # Make initial error check
         self.check_errors()
+
+        # Optionally setup log file
+        if logfile is not None:
+            self._logfile = open(logfile, 'w')
+        else:
+            self._logfile = None
 
         # Show some info
         serial = self.get('features_serial')
@@ -1203,29 +1223,44 @@ class ZI_base_instrument(Instrument):
         else:
             logging.warning(f"{self.devname}: No program configured for awg_nr {awg_nr}.")
 
+    def _write_cmd_to_logfile(self, cmd):
+        if self._logfile is not None:
+            now = datetime.now()
+            now_str = now.strftime("%d/%m/%Y %H:%M:%S")
+            self._logfile.write(f'#{now_str}\n')
+            self._logfile.write(f'{self.name}.{cmd}\n')
+
+    def _flush_logfile(self):
+        if self._logfile is not None:
+            self._logfile.flush()
+
     ##########################################################################
     # Public methods: node helpers
     ##########################################################################
 
     def setd(self, path, value) -> None:
+        self._write_cmd_to_logfile(f'daq.setDouble("{path}", {value})')
         self.daq.setDouble(self._get_full_path(path), value)
 
     def getd(self, path):
         return self.daq.getDouble(self._get_full_path(path))
 
     def seti(self, path, value) -> None:
+        self._write_cmd_to_logfile(f'daq.setDouble("{path}", {value})')
         self.daq.setInt(self._get_full_path(path), value)
 
     def geti(self, path):
         return self.daq.getInt(self._get_full_path(path))
 
     def sets(self, path, value) -> None:
+        self._write_cmd_to_logfile(f'daq.setString("{path}", {value})')
         self.daq.setString(self._get_full_path(path), value)
 
     def gets(self, path):
         return self.daq.getString(self._get_full_path(path))
 
     def setc(self, path, value) -> None:
+        self._write_cmd_to_logfile(f'daq.setComplex("{path}", {value})')
         self.daq.setComplex(self._get_full_path(path), value)
 
     def getc(self, path):
@@ -1234,8 +1269,10 @@ class ZI_base_instrument(Instrument):
     def setv(self, path, value) -> None:
         # Handle absolute path
         if self.use_setVector:
+            self._write_cmd_to_logfile(f'daq.setVector("{path}", np.array({np.array2string(value, separator=",")}))')
             self.daq.setVector(self._get_full_path(path), value)
         else:
+            self._write_cmd_to_logfile(f'daq.vectorWrite("{path}", np.array({np.array2string(value, separator=",")}))')
             self.daq.vectorWrite(self._get_full_path(path), value)
 
     def getv(self, path):
@@ -1259,11 +1296,22 @@ class ZI_base_instrument(Instrument):
 
         return None
 
-    def subs(self, path) -> None:
-        self.daq.subscribe(self._get_full_path(path))
+    def subs(self, path:str) -> None:
+        full_path = self._get_full_path(path)
+        if full_path not in self._subscribed_paths:
+            self._subscribed_paths.append(full_path)
+        self.daq.subscribe(full_path)
 
-    def unsubs(self, path) -> None:
-        self.daq.unsubscribe(self._get_full_path(path))
+    def unsubs(self, path:str=None) -> None:
+        if path is None:
+            for path in self._subscribed_paths:
+                self.daq.unsubscribe(path)
+            self._subscribed_paths.clear()
+        else:
+            full_path = self._get_full_path(path)
+            if full_path in self._subscribed_paths:
+                del self._subscribed_paths[self._subscribed_paths.index(full_path)]
+            self.daq.unsubscribe(full_path)
 
     def poll(self, poll_time=0.1):
         return self.daq.poll(poll_time, 500, 4, True)
@@ -1328,7 +1376,7 @@ class ZI_base_instrument(Instrument):
             pass
         super().close()
 
-    def check_errors(self) -> None:
+    def check_errors(self, errors_to_ignore=None) -> None:
         raise NotImplementedError('Virtual method with no implementation!')
 
     def clear_errors(self) -> None:
@@ -1382,8 +1430,10 @@ class ZI_base_instrument(Instrument):
             log.info(f'{self.devname}: Configuring AWG {awg_nr}...')
 
             self._awgModule.set('awgModule/index', awg_nr)
+            self._write_cmd_to_logfile(f"_awgModule.set('awgModule/index', {awg_nr})")
             self._awgModule.set(
                 'awgModule/compiler/sourcestring', program_string)
+            self._write_cmd_to_logfile(f"_awgModule.set('awgModule/compiler/sourcestring', \'\'\'{program_string}\'\'\')")
 
             succes_msg = 'File successfully uploaded'
 

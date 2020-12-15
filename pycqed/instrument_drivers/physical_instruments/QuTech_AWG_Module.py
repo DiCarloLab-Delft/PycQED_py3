@@ -1115,8 +1115,7 @@ class QWGMultiDevices:
         if not cc:
             raise ValueError("Cannot calibrate QWGs; No CC provided")
 
-        if cc.ask("QUTech:RUN?") == '1':
-            cc.stop()
+        cc.stop()
 
         _qwg_path = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '_QWG'))
@@ -1128,23 +1127,25 @@ class QWGMultiDevices:
         if "CCL" in cc.IDN()[case_insensitive_IDN_keys['model']]:
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qisa_opcodes.qmap')
-            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QWG_DIO_Calibration.qisa')
+            sequencer_program =os.path.join(_qwg_path,'QWG_DIO_Calibration.qisa')
         elif "QCC" in cc.IDN()[case_insensitive_IDN_keys['model']]:
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qcc_qisa_opcodes.qmap')
-            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QCC_DIO_Calibration.qisa')
+            sequencer_program = os.path.join(_qwg_path,'QCC_DIO_Calibration.qisa')
+        elif 'cc' in cc.IDN()[case_insensitive_IDN_keys['model']]:
+            sequencer_program = os.path.join(_qwg_path,'cc_dio_calibration.vq1asm')
         else:
             raise TypeError("CC model not recognized!")
 
-        old_cs = cc.control_store()
-        old_qisa_opcode = cc.qisa_opcode()
+        if "CCL" in cc.IDN()[case_insensitive_IDN_keys['model']] or\
+           "QCC" in cc.IDN()[case_insensitive_IDN_keys['model']]:
+            old_cs = cc.control_store()
+            old_qisa_opcode = cc.qisa_opcode()
+            cc.control_store(cs_qwg_dio_calibrate)
+            cc.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
 
-        cc.control_store(cs_qwg_dio_calibrate)
-        cc.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
-
-        cc.eqasm_program(qisa_qwg_dio_calibrate)
+        cc.eqasm_program(sequencer_program)
         cc.start()
-        cc.getOperationComplete()
 
         if not qwgs:
             raise ValueError("Can not calibrate QWGs; No QWGs provided")
@@ -1171,9 +1172,11 @@ class QWGMultiDevices:
                 print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
         cc.stop()
 
-        #Set the control store
-        cc.control_store(old_cs)
-        cc.qisa_opcode(old_qisa_opcode)
+        if "CCL" in cc.IDN()[case_insensitive_IDN_keys['model']] or\
+           "QCC" in cc.IDN()[case_insensitive_IDN_keys['model']]:
+            #Set the control store
+            cc.control_store(old_cs)
+            cc.qisa_opcode(old_qisa_opcode)
 
 
 class Mock_QWG(QuTech_AWG_Module):
