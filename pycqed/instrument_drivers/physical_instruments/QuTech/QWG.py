@@ -11,14 +11,11 @@
                 - connect using ssh e.g., "ssh root@192.168.0.10"
                 - view log using "tail -f /var/log/qwg.log"
     Bugs:       - requires QWG software version > 1.5.0, which isn't officially released yet
-    Todo:       - cleanup after https://github.com/QCoDeS/Qcodes/pull/1653  NB: was merged 20190807
-                - cleanup after https://github.com/QCoDeS/Qcodes/issues/236  NB: looks stale
 """
 
 import os
 import numpy as np
 import logging
-#import json
 from typing import List, Sequence, Dict
 
 from .QWGCore import QWGCore
@@ -94,9 +91,6 @@ class QWG(QWGCore, Instrument):
         self._dev_desc.mvals_trigger_impedance = vals.Enum(50),
         self._dev_desc.mvals_trigger_level = vals.Numbers(0, 5.0)
 
-        # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        self._params_exclude_snapshot = []
-        self._params_to_skip_update = []
         self._add_parameters()
 #        self.connect_message()
 
@@ -212,12 +206,9 @@ class QWG(QWGCore, Instrument):
                 get_cmd=triglev_cmd + '?',
                 set_cmd=triglev_cmd + ' {}',
                 vals=self._dev_desc.mvals_trigger_level,
-                get_parser=float)
-#                snapshot_exclude=True)
+                get_parser=float,
+                snapshot_exclude=True)
                 # FIXME: docstring
-
-            # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-            self._params_exclude_snapshot.append(triglev_name)
 
         # Single parameters
         self.add_parameter(
@@ -239,10 +230,8 @@ class QWG(QWGCore, Instrument):
                     cw_param,
                     get_cmd=cw_cmd+'?',
                     set_cmd=cw_cmd+' "{:s}"',
-                    vals=vals.Strings())
-#                    snapshot_exclude=True)
-                # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-                self._params_exclude_snapshot.append(cw_param)
+                    vals=vals.Strings(),
+                    snapshot_exclude=True)
 
         # self.add_parameter(
         #     'get_system_status',
@@ -272,13 +261,13 @@ class QWG(QWGCore, Instrument):
             label='Codeword protocol',
             get_cmd=self._get_codeword_protocol,
             set_cmd=self._set_codeword_protocol,
-            vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
+            #vals=vals.Enum('MICROWAVE', 'FLUX', 'MICROWAVE_NO_VSM'),
             docstring=_codeword_protocol_doc + '\nEffective immediately when sent')
         # FIXME: HDAWG uses cfg_codeword_protocol, with different options
 
         docst = 'Specifies a waveform for a specific codeword. \n' \
                 'The channel number corresponds' \
-                ' to the channel as indicated on the device (1 is lowest).'
+                ' to the channel as indicated on the device (counting from 1).'
         for j in range(self._dev_desc.numChannels):
             for cw in range(self._dev_desc.numCodewords):
                 ch = j + 1
@@ -292,11 +281,8 @@ class QWG(QWGCore, Instrument):
                         self._set_cw_waveform, ch, cw),
                     get_cmd=_gen_get_func_2par(
                         self._get_cw_waveform, ch, cw),
-                    #                    snapshot_exclude=True,
+                    snapshot_exclude=True,
                     docstring=docst)
-                # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-                self._params_exclude_snapshot.append(parname)
-
 
     ##########################################################################
     # QCoDeS parameter definitions: DIO
@@ -338,81 +324,6 @@ class QWG(QWGCore, Instrument):
                       'See dio_calibrate() parameter\n'
                       'Effective immediately when sent' # FIXME: no way, not a HandshakeParameter
             )
-
-
-    ##########################################################################
-    # QCoDeS override for InstrumentBase
-    ##########################################################################
-
-    def snapshot_base(self, update=False,
-                      params_to_skip_update: Sequence[str] = None,
-                      params_to_exclude: Sequence[str] = None) -> Dict:
-        """
-        State of the instrument as a JSON-compatible dict.
-
-        Args:
-            update: If True, update the state by querying the
-                instrument. If False, just use the latest values in memory.
-            params_to_skip_update: List of parameter names that will be skipped
-                in update even if update is True. This is useful if you have
-                parameters that are slow to update but can be updated in a
-                different way (as in the qdac)
-            params_to_exclude: List of parameter names that will be excluded from the snapshot
-
-        Returns:
-            dict: base snapshot
-        """
-
-        if params_to_skip_update is None:
-            params_to_skip_update = self._params_to_skip_update
-
-        # FIXME: Enable when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        # snap = super().snapshot_base(update=update,
-        #                              params_to_skip_update=params_to_skip_update)
-        # return snap
-
-        # FIXME: Workaround, remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
-        if params_to_exclude is None:
-            params_to_exclude = self._params_exclude_snapshot
-        #
-        snap = {
-            "functions": {name: func.snapshot(update=update)
-                          for name, func in self.functions.items()},
-            "submodules": {name: subm.snapshot(update=update)
-                           for name, subm in self.submodules.items()},
-            "__class__": full_class(self)
-        }
-
-        snap['parameters'] = {}
-        for name, param in self.parameters.items():
-            if params_to_exclude and name in params_to_exclude:
-                continue
-            if params_to_skip_update and name in params_to_skip_update:
-                update_par = False
-            else:
-                update_par = update
-
-            try:
-                snap['parameters'][name] = param.snapshot(update=update_par)
-            except:
-                # really log this twice. Once verbose for the UI and once
-                # at lower level with more info for file based loggers
-                log.info("Snapshot: Could not update parameter: {}".format(name))
-                self.log.info(f"Details for Snapshot:",
-                              exc_info=True)
-                snap['parameters'][name] = param.snapshot(update=False)
-
-        for attr in set(self._meta_attrs):
-            if hasattr(self, attr):
-                snap[attr] = getattr(self, attr)
-        snap['port'] = self._port
-        snap['confirmation'] = self._confirmation
-        snap['address'] = self._address
-        snap['terminator'] = self._terminator
-        snap['timeout'] = self._timeout
-        snap['persistent'] = self._persistent
-        return snap
-        # FIXME: End remove
 
     ##########################################################################
     # QCoDeS parameter helpers
@@ -460,13 +371,13 @@ class QWG(QWGCore, Instrument):
             raise ValueError(f"Invalid protocol: actual: {protocol_name}, expected: {allowed_protocols}")
 
         for ch, bitMap in enumerate(protocol):
-            self.set(f"ch{ch + 1}_bit_map", bitMap)
+            self._set_bit_map(ch, bitMap)
 
     def _get_codeword_protocol(self):
         channels_bit_maps = []
         result = "Custom"  # Default, if no protocol matches
         for ch in range(1, self._dev_desc.numChannels + 1):
-            channels_bit_maps.append(list(map(int, self.get(f"ch{ch}_bit_map"))))
+            channels_bit_maps.append(list(map(int, self.get(f"ch{ch}_bit_map"))))   # FIXME: ch{}bitmap was removed
 
         for prtc_name, prtc_bit_map in self.codeword_protocols.items():
             if channels_bit_maps == prtc_bit_map:

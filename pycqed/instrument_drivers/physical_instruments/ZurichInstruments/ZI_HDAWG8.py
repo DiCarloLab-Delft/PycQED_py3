@@ -240,6 +240,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
                             docstring=f'Configures the amplitude in full scale units of AWG {i} output {ch} (zero-indexed). Note: this parameter is deprecated, use awgs_{ch}_outputs_{ch}_gains_{ch} instead',
                             vals=validators.Numbers())
 
+    # FIXME: why the override, does not seem necessary now QCoDeS PRs 1161/1163 have been merged
     def snapshot_base(self, update: bool=False,
                       params_to_skip_update =None,
                       params_to_exclude = None ):
