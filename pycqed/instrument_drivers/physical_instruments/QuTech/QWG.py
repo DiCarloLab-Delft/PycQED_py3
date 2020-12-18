@@ -6,7 +6,8 @@
                 edited by Adriaan Rol, Gerco Versloot
     Purpose:    QCoDeS instrument driver for Qutech QWG
     Usage:
-    Notes:      This file replaces QuTech_AWG_Module.py
+    Notes:      Must use QWGCore.py to write SCPI syntax to QWG
+                This file replaces QuTech_AWG_Module.py
                 It is possible to view the QWG log using ssh. To do this:
                 - connect using ssh e.g., "ssh root@192.168.0.10"
                 - view log using "tail -f /var/log/qwg.log"
@@ -25,7 +26,6 @@ from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import Parameter
 from qcodes.instrument.parameter import Command
 from qcodes import validators as vals
-from qcodes.utils.helpers import full_class
 
 log = logging.getLogger(__name__)
 
@@ -102,32 +102,28 @@ class QWG(QWGCore, Instrument):
         # Channel pair parameters
         for i in range(self._dev_desc.numChannels//2):
             ch_pair = i*2+1
-            sfreq_cmd = f'qutech:output{ch_pair}:frequency'
-            sph_cmd = f'qutech:output{ch_pair}:phase'
             self.add_parameter(
                 f'ch_pair{ch_pair}_sideband_frequency',
                 parameter_class=HandshakeParameter,
                 unit='Hz',
                 label=('Sideband frequency channel pair {} (Hz)'.format(i)),
-                get_cmd=sfreq_cmd + '?',
-                set_cmd=sfreq_cmd + ' {}',
+                get_cmd=_gen_get_func_1par(self.get_sideband_frequency, ch_pair),
+                set_cmd=_gen_set_func_1par(self.set_sideband_frequency, ch_pair),
                 vals=vals.Numbers(-300e6, 300e6),
                 get_parser=float,
-                docstring='Set the frequency of the sideband modulator\n'
-                          'Resolution: ~0.23 Hz\n'
-                          'Effective immediately when sent')
+                docstring='Frequency of the sideband modulator\n'
+                          'Resolution: ~0.23 Hz')
 
             self.add_parameter(
                 f'ch_pair{ch_pair}_sideband_phase',
                 parameter_class=HandshakeParameter,
                 unit='deg',
                 label=('Sideband phase channel pair {} (deg)'.format(i)),
-                get_cmd=sph_cmd + '?',
-                set_cmd=sph_cmd + ' {}',
+                get_cmd=_gen_get_func_1par(self.get_sideband_phase, ch_pair),
+                set_cmd=_gen_set_func_1par(self.set_sideband_phase, ch_pair),
                 vals=vals.Numbers(-180, 360),
                 get_parser=float,
-                docstring='Sideband phase differance between channels\n'
-                          'Effective immediately when sent')
+                docstring='Sideband phase difference between channels')
 
             self.add_parameter(
                 f'ch_pair{ch_pair}_transform_matrix',
@@ -136,71 +132,58 @@ class QWG(QWGCore, Instrument):
                 label=('Transformation matrix channel pair {}'.format(i)),
                 get_cmd=_gen_get_func_1par(self._get_matrix, ch_pair),
                 set_cmd=_gen_set_func_1par(self._set_matrix, ch_pair),
-                # NB range is not a hardware limit
-                vals=vals.Arrays(-2, 2, shape=(2, 2)),
-                docstring='transformation matrix per channel pair.\n'
-                          'Used for mixer correction\n'
-                          'Effective immediately when sent')
+                vals=vals.Arrays(-2, 2, shape=(2, 2)),                  # NB range is not a hardware limit
+                docstring='Transformation matrix for mixer correction per channel pair')
 
         # Channel parameters
         for ch in range(1, self._dev_desc.numChannels+1):
-            amp_cmd = f'SOUR{ch}:VOLT:LEV:IMM:AMPL'
-            offset_cmd = f'SOUR{ch}:VOLT:LEV:IMM:OFFS'
-            state_cmd = f'OUTPUT{ch}:STATE'
-            waveform_cmd = f'SOUR{ch}:WAV'
-
-            # Compatibility: 5014, QWG
             self.add_parameter(
                 f'ch{ch}_state',
-                label=f'Status channel {ch}',
-                get_cmd=state_cmd + '?',
-                set_cmd=state_cmd + ' {}',
+                label=f'Output state channel {ch}',
+                get_cmd=_gen_get_func_1par(self.get_output_state, ch),
+                set_cmd=_gen_set_func_1par(self.set_output_state, ch),
                 val_mapping={True: '1', False: '0'},
                 vals=vals.Bool(),
                 docstring='Enables or disables the output of channels\n'
-                          'Default: Disabled\n'
-                          'Effective immediately when sent') # FIXME: no way, not a HandshakeParameter
+                          'Default: Disabled')
 
             self.add_parameter(
                 f'ch{ch}_amp',
                 parameter_class=HandshakeParameter,
                 label=f'Channel {ch} Amplitude ',
                 unit='Vpp',
-                get_cmd=amp_cmd + '?',
-                set_cmd=amp_cmd + ' {:.6f}',
+                get_cmd=_gen_get_func_1par(self.set_amplitude, ch),
+                set_cmd=_gen_set_func_1par(self.get_amplitude, ch),
                 vals=vals.Numbers(-1.6, 1.6),
                 get_parser=float,
-                docstring=f'Amplitude channel {ch} (Vpp into 50 Ohm) \n'
-                          'Effective immediately when sent')
+                docstring=f'Amplitude channel {ch} (Vpp into 50 Ohm)')
 
             self.add_parameter(
                 f'ch{ch}_offset',
                 # parameter_class=HandshakeParameter, FIXME: was commented out
                 label=f'Offset channel {ch}',
                 unit='V',
-                get_cmd=offset_cmd + '?',
-                set_cmd=offset_cmd + ' {:.3f}',
+                get_cmd=_gen_get_func_1par(self.set_offset, ch),
+                set_cmd=_gen_set_func_1par(self.get_offset, ch),
                 vals=vals.Numbers(-.25, .25),
                 get_parser=float,
-                docstring = f'Offset channel {ch}\n'
-                            'Effective immediately when sent')  # FIXME: only if HandshakeParameter
+                docstring = f'Offset channel {ch}')
 
             self.add_parameter(
                 f'ch{ch}_default_waveform',
-                get_cmd=waveform_cmd+'?',
-                set_cmd=waveform_cmd+' "{}"',
-                vals=vals.Strings())
+                get_cmd=_gen_get_func_1par(self.set_waveform, ch),
+                set_cmd=_gen_set_func_1par(self.get_waveform, ch),
                 # FIXME: docstring
+                vals=vals.Strings())
 
             # end for(ch...
 
         # Triggers parameter
         for trigger in range(1, self._dev_desc.numTriggers+1):
             triglev_cmd = f'qutech:trigger{trigger}:level'
-            triglev_name = f'tr{trigger}_trigger_level'
             # individual trigger level per trigger input:
             self.add_parameter(
-                triglev_name,
+                f'tr{trigger}_trigger_level',
                 unit='V',
                 label=f'Trigger level channel {trigger} (V)',
                 get_cmd=triglev_cmd + '?',

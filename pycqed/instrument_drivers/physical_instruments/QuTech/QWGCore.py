@@ -170,6 +170,38 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         #self.check_errors()
 
     ##########################################################################
+    #  Output functions (AWG5014 compatible)
+    ##########################################################################
+
+    def set_output_state(self, ch: int) -> None:
+        self._transport.write(f'OUTPUT{ch}:STATE')
+
+    def get_output_state(self, ch: int) -> float:
+        return self._ask_float(f'OUTPUT{ch}:STATE?')
+
+    ##########################################################################
+    #  Source functions (AWG5014 compatible)
+    ##########################################################################
+
+    def set_amplitude(self, ch: int, amp: float) -> None:
+        self._transport.write(f'SOUR{ch}:VOLT:LEV:IMM:AMPL {amp:.6f}') #FIXME
+
+    def get_amplitude(self, ch: int) -> float:
+        return self._ask_float(f'SOUR{ch}:VOLT:LEV:IMM:AMPL?')
+
+    def set_offset(self, ch: int, offset: float) -> None:
+        self._transport.write(f'SOUR{ch}:VOLT:LEV:IMM:OFFS {offset:.3f}')
+
+    def get_offset(self, ch: int) -> float:
+        return self._ask_float(f'SOUR{ch}:VOLT:LEV:IMM:OFFS?')
+
+    def set_waveform(self, ch: int, waveform: str) -> None:
+        self._transport.write(f'SOUR{ch}:WAV "{waveform}"')
+
+    def get_waveform(self, ch: int) -> str:
+        return self._ask(f'SOUR{ch}:WAV?')
+
+    ##########################################################################
     #  WLIST (Waveform list) functions (AWG5014 compatible)
     ##########################################################################
 
@@ -308,12 +340,23 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     # QWG specific
     ##########################################################################
 
+    def set_sideband_frequency(self, ch_pair: int) -> None:
+        self._transport.write(f'qutech:output{ch_pair}:frequency')
+
+    def get_sideband_frequency(self, ch_pair: int) -> float:
+        return self._ask_float(f'qutech:output{ch_pair}:frequency?')
+
+    def set_sideband_phase(self, ch_pair: int) -> None:
+        self._transport.write(f'qutech:output{ch_pair}:phase')
+
+    def get_sideband_phase(self, ch_pair: int) -> float:
+        return self._ask_float(f'qutech:output{ch_pair}:phase?')
+
     def sync_sideband_generators(self) -> None:
         """
-        Synchronize both sideband generators, i.e. restart them with phase=0
+        Synchronize both sideband generators, i.e. restart them with initial phase
         """
         self._transport.write('QUTEch:OUTPut:SYNCsideband')
-
 
     ##########################################################################
     # DIO support
