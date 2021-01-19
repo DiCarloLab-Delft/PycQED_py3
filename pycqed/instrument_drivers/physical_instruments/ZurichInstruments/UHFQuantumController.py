@@ -131,7 +131,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     # Constants definitions from "node_doc_UHFQA.json"
     DIOS_0_MODE_MANUAL = 0  # "0": "Manual setting of the DIO output value.",
     DIOS_0_MODE_AWG_SEQ = 1  # "1": "Enables setting of DIO output values by AWG sequencer commands.",
-    DIOS_0_MODE_AWG_WAV = 2  # "2": "Enables the output of AWG waveform data as digital pattern on the DIO connector."
+    DIOS_0_MODE_AWG_WAV = 2  # "2": "Enables the output of AWG waveform data as digital pattern on the DIO connector." FIXME: LabOne says: "QA result"
     # FIXME: comments in this file state: QuExpress thresholds on DIO (mode == 2)
 
     DIOS_0_EXTCLK_50MHZ = 2  # FIXME: not in "node_doc_UHFQA.json"
@@ -1702,43 +1702,8 @@ setTrigger(0);
         }
         '''
         self.configure_awg_from_string(0, program)
-        self.seti('awgs/0/enable', 1)
-# FIXME: merge conflict 20200914, remove after testing
-# =======
-# var A = 0xffff0000;
-# var B = 0x00000000;
-#
-# while (1) {
-#   setDIO(A);
-#   wait(2);
-#   setDIO(B);
-#   wait(2);
-# }
-# '''
-#         HDAWG.configure_awg_from_string(0, program)
-#         HDAWG.seti('awgs/0/enable', 1)
-#
-#         self._dio_calibration_mask = 0x7fff
-#
-#     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False, repetitions=1):
-#         log.info('Calibrating DIO delays')
-#         if verbose: print("Calibrating DIO delays")
-#
-#         CC_model = CC.IDN()['model']
-#
-#         if 'QCC' in CC_model:
-#             self._prepare_QCC_dio_calibration(
-#                 QCC=CC, verbose=verbose)
-#         elif 'CCL' in CC_model:
-#             self._prepare_CCL_dio_calibration(
-#                 CCL=CC, feedline=feedline, verbose=verbose)
-#         elif 'HDAWG8' in CC_model:
-#             self._prepare_HDAWG8_dio_calibration(HDAWG=CC, verbose=verbose)
-#         elif 'cc' in CC_model:
-#             self._prepare_CC_dio_calibration(CC=CC, verbose=verbose)
-#         else:
-#             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
-# >>>>>>> 641201a8a200706d6cebaf4c98c6ee240d32cf79
+        # FIXME: set uhfqa0.dios_0_mode(uhfqa0.DIOS_0_MODE_AWG_SEQ), but reset after the calibration is done
+        self.seti('awgs/0/enable', 1)  # FIXME: check success, use start()?
 
         dio_mask = 0x00000CFF
         expected_sequence = []
