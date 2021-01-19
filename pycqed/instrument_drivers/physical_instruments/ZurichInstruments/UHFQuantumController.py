@@ -285,7 +285,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
 
         # Configure the codeword protocol
         if self._use_dio:
-            self.dios_0_mode(2)  # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
+            self.dios_0_mode(self.DIOS_0_MODE_AWG_WAV)  # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
             self.dios_0_drive(0x3)  # Drive DIO bits 15 to 0
             self.dios_0_extclk(self.DIOS_0_EXTCLK_50MHZ)  # 50 MHz clocking of the DIO
             self.awgs_0_dio_strobe_slope(0)  # no edge, replaced by dios_0_extclk(2)
@@ -1534,7 +1534,7 @@ setTrigger(0);
         self.sigouts_1_on(1)
 
         # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
-        self.dios_0_mode(2)
+        self.dios_0_mode(self.DIOS_0_MODE_AWG_WAV)
         # Drive DIO bits 31 to 16
         self.dios_0_drive(0xc)
 
