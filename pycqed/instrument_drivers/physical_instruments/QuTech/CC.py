@@ -209,12 +209,12 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # DIO[14]       TOGGLE_DS_1     unused
             # DIO[7:0]      CW_1		    CW_1
             #
-            
+
             .DEF 		cw_31_01	0x801F8001          # TRIG_2, CW_2=31, TRIG_1, CW_1=1
             .DEF 		incr		0xFFFF0001          # CW_2++, CW_1--: -0x00010000 + 0x00000001
             .DEF		duration	4			        # 20 ns periods
-            .DEF 		loopCnt		31               	# 
-            
+            .DEF 		loopCnt		31               	#
+
             repeat:
                     move		$cw_31_01,R0
                     move		$loopCnt,R1               	# loop counter
@@ -233,7 +233,6 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
 
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
-            #FIXME: only toggles 5 out 7 codeword bits
 
             cc_prog = """
             ### DIO protocol definition:
@@ -257,12 +256,12 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # TRIG_1    0x0000 8000
             # TRIG_2    0x8000 0000
             # sum       0x8081 8081
-            
+
             .DEF        cw          0x80008000         # see above
             .DEF        incr        0x00810081
             .DEF        duration    4                  # 20 ns periods
-            .DEF        loopCnt     32                 # 
-            
+            .DEF        loopCnt     128                #
+
             repeat:
                     move        $cw,R0
                     move        $loopCnt,R1                 # loop counter
@@ -271,7 +270,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                     loop        R1,@inner
                     jmp         @repeat
             """
-            sequence_length = 32
+            sequence_length = 128
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)),
                                  (1, list(staircase_sequence)),
@@ -284,7 +283,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # based on ZI_HDAWG8.py::_prepare_CC_dio_calibration_hdawg and examples/CC_examples/flux_calibration.vq1asm
             # FIXME: hardcoded slots, this is OpenQL output
             cc_prog = """
-            mainLoop:                                               
+            mainLoop:
                         seq_out         0x00000000,20           # 00000000000000000000000000000000
                         seq_out         0x82498249,2            # 10000010010010011000001001001001
                         seq_out         0x84928492,2            # 10000100100100101000010010010010
