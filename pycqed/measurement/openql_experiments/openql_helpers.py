@@ -71,7 +71,8 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
         logging.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
 
     # determine extension of generated file
-    if p.eqasm_compiler == 'eqasm_backend_cc':
+    #if p.eqasm_compiler == 'eqasm_backend_cc':
+    if 1: # FIXME: workaround for OpenQL 0.8.1.dev4 resetting values
         ext = '.vq1asm'  # CC
     else:
         ext = '.qisa'  # CC-light, QCC
