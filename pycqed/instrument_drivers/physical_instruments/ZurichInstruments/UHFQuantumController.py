@@ -203,7 +203,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                          **kw)
 
         # Disable disfunctional parameters from snapshot
-        self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable'])
+        self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable']) # FIXME: duplicates prior statement
 
         # Set default waveform length to 20 ns at 1.8 GSa/s
         self._default_waveform_length = 32
