@@ -187,6 +187,16 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     ##########################################################################
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        # FIXME: does not match with uhfqa_prog, which requires single trigger
+        cc_prog = inspect.cleandoc("""
+        # program: UHFQA trigger program
+        .DEF    wait        9
+
+        loop:   seq_out     0x03FF0000,1            # NB: TRIG=0x00010000, CW[8:0]=0x03FE0000
+                seq_out     0x0,$wait
+                jmp         @loop
+        """)
+        self.assemble_and_start(cc_prog)
         self.calibrate_dio(port, expected_bits=dio_mask)
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:

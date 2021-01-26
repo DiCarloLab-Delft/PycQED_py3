@@ -1689,23 +1689,24 @@ setTrigger(0);
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         # NB: ignoring dio_mode and port, because we have single mode only
-        # FIXME: does not seem to produce data in sync with 10 MHz/50 MHz
-        program = '''
-        var A = 0x00000CFF; // DV=0x0001, CW=0x0CF7
-        var B = 0x00000000;
-
+        program = """
+        // program: triggered upstream DIO calibration program
+        const period = 18;          // 18*4.44 ns = 80 ns, NB: 40 ns is not attainable
+        const n1 = 3;               // ~20 ns high time
+        const n2 = period-n1-2-1;   // penalties: 2*setDIO, 1*loop
+        waitDIOTrigger();
         while (1) {
-            setDIO(A);
-            wait(2);
-            setDIO(B);
-            wait(2);
+            setDIO(0x000003FF);     // DV=0x0001, RSLT[8:0]=0x03FE.
+            wait(n1);
+            setDIO(0x00000000);
+            wait(n2);
         }
-        '''
+        """
         self.configure_awg_from_string(0, program)
         # FIXME: set uhfqa0.dios_0_mode(uhfqa0.DIOS_0_MODE_AWG_SEQ), but reset after the calibration is done
         self.seti('awgs/0/enable', 1)  # FIXME: check success, use start()?
 
-        dio_mask = 0x00000CFF
+        dio_mask = 0x000003FF
         expected_sequence = []
         return dio_mask,expected_sequence
 
