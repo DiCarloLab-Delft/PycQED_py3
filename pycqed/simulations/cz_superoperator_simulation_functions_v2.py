@@ -1116,7 +1116,7 @@ def time_evolution_new(
         )  # line here to quickly switch off the use of S
 
     w_q1 = q_freq_10  # we 'save' the input value of w_q1
-    if sim_control_CZ.sigma_q1() != 0:
+    if fluxbias_q1 != 0:
         w_q1_sweetspot = sim_control_CZ.w_q1_sweetspot()
         if w_q1 > w_q1_sweetspot:
             log.warning(

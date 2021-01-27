@@ -214,6 +214,34 @@ def f_to_parallelize_v2(arglist):
                 exp_metadata=exp_metadata,
             )
 
+    elif exp_metadata["mode"] == "fluxbias_scan_q1":
+
+        MC.set_sweep_function(
+                getattr(sim_control_CZ, "fluxbias_mean_q1")
+        )
+        MC.set_sweep_points(np.arange(20000e-6, 30001e-6, 10000e-6))
+
+        if sim_control_CZ.cluster():
+            dat = MC.run(
+                additional_pars["label"]+"_cluster",
+                mode="1D",
+                exp_metadata=exp_metadata,
+            )
+
+        else:
+            if additional_pars["long_name"]:
+                dat = MC.run(
+                    additional_pars["label"],
+                    mode="1D",
+                    exp_metadata=exp_metadata,
+                )
+            else:
+                dat = MC.run(
+                "contour_scan",
+                mode="1D",
+                exp_metadata=exp_metadata,
+            )
+
     fluxlutman.close()
     fluxlutman_static.close()
     sim_control_CZ.close()
@@ -291,7 +319,7 @@ def compute_propagator(arglist):
     # The fluxbias_q0 affects the pulse shape after the distortions have been taken into account
     # [2020-05-30] the waveform generator includes corrections if desired
     # WARNING: shift_due_to_fluxbias is not ready for waveforms that include the distortions
-    if sim_control_CZ.sigma_q0() != 0:
+    if fluxbias_q0 != 0:
         amp_final = czf_v2.shift_due_to_fluxbias_q0(
             fluxlutman=fluxlutman,
             amp_final=amp_final,
@@ -457,7 +485,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         # Discretize average (integral) over a Gaussian distribution
         mean_q0 = self.sim_control_CZ.fluxbias_mean()
-        mean_q1 = 0
+        mean_q1 = self.sim_control_CZ.fluxbias_mean_q1()
         sigma_q0 = self.sim_control_CZ.sigma_q0()
         sigma_q1 = (
             self.sim_control_CZ.sigma_q1()

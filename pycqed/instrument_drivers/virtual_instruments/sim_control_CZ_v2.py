@@ -234,7 +234,15 @@ class SimControlCZ_v2(Instrument):
 
         self.add_parameter(
             "fluxbias_mean",
-            docstring="FB: used for scans wrt the fluxbias at one specific point in the landscape",
+            docstring="FB: used for scans wrt the fluxbias at one specific point in the landscape, for fluxing qubit",
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(),
+            initial_value=0,
+        )
+
+        self.add_parameter(
+            "fluxbias_mean_q1",
+            docstring="FB: used for scans wrt the fluxbias at one specific point in the landscape, for static qubit",
             parameter_class=ManualParameter,
             vals=vals.Numbers(),
             initial_value=0,
