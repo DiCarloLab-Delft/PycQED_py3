@@ -616,7 +616,8 @@ class ZI_base_instrument(Instrument):
                  port: int= 8004,
                  apilevel: int= 5,
                  num_codewords: int= 0,
-                 logfile:str = None,
+                 awg_module: bool=True,
+                 logfile: str = None,
                  **kw) -> None:
         """
         Input arguments:
@@ -626,6 +627,7 @@ class ZI_base_instrument(Instrument):
             server          (str) the host where the ziDataServer is running
             port            (int) the port to connect to for the ziDataServer (don't change)
             apilevel        (int) the API version level to use (don't change unless you know what you're doing)
+            awg_module      (bool) create an awgModule
             num_codewords   (int) the number of codeword-based waveforms to prepare
             logfile         (str) file name where all commands should be logged
         """
@@ -682,20 +684,24 @@ class ZI_base_instrument(Instrument):
             raise
 
         # Create modules
-        self._awgModule = self.daq.awgModule()
-        self._awgModule.set('awgModule/device', device)
-        self._awgModule.execute()
+        if awg_module:
+          self._awgModule = self.daq.awgModule()
+          self._awgModule.set('awgModule/device', device)
+          self._awgModule.execute()
+          
+          # Will hold information about all configured waveforms
+          self._awg_waveforms = {}
 
-        # Will hold information about all configured waveforms
-        self._awg_waveforms = {}
+          # Asserted when AWG needs to be reconfigured
+          self._awg_needs_configuration = [False]*(self._num_channels()//2)
+          self._awg_program = [None]*(self._num_channels()//2)
+          
+          # Create waveform parameters
+          self._num_codewords = 0
+          self._add_codeword_waveform_parameters(num_codewords)
+        else:
+          self._awgModule = None
 
-        # Asserted when AWG needs to be reconfigured
-        self._awg_needs_configuration = [False]*(self._num_channels()//2)
-        self._awg_program = [None]*(self._num_channels()//2)
-
-        # Create waveform parameters
-        self._num_codewords = 0
-        self._add_codeword_waveform_parameters(num_codewords)
         # Create other neat parameters
         self._add_extra_parameters()
         # A list of all subscribed paths
