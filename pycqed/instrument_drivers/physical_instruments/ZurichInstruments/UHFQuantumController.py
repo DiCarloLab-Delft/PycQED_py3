@@ -1717,33 +1717,54 @@ setTrigger(0);
         log.info(f"{self.devname}: Calibrating DIO protocol")
         self.assure_ext_clock()
 
-        for awg in [0]:
-            if not self._ensure_activity(awg, mask_value=dio_mask):
-                raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
+        # Get the integration length and result enable settings to be able to
+        # restore them later
+        integration_length = self.get('qas_0_integration_length')
+        result_enable = self.get('qas_0_result_enable')
+        monitor_enable = self.get('qas_0_monitor_enable')
+        awg_enable = self.get('awgs_0_enable')
 
-        valid_delays = self._find_valid_delays(awg, mask_value=dio_mask)
-        if len(valid_delays) == 0:
-            raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
+        try:
+          self.set('qas_0_integration_length', 4)
+          self.set('qas_0_result_enable', 0)
+          self.set('qas_0_monitor_enable', 0)
+          self.set('awgs_0_enable', 0)
+          
+          for awg in [0]:
+              if not self._ensure_activity(awg, mask_value=dio_mask):
+                  raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
-        # Find center of first valid region
-        subseq = [[]]
-        for e in valid_delays:
-            if not subseq[-1] or subseq[-1][-1] == e - 1:
-                subseq[-1].append(e)
-            else:
-                subseq.append([e])
+          valid_delays = self._find_valid_delays(awg, mask_value=dio_mask)
+          if len(valid_delays) == 0:
+              raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
 
-        subseq = max(subseq, key=len)
-        delay = len(subseq)//2 + subseq[0]
+          # Find center of first valid region
+          subseq = [[]]
+          for e in valid_delays:
+              if not subseq[-1] or subseq[-1][-1] == e - 1:
+                  subseq[-1].append(e)
+              else:
+                  subseq.append([e])
 
-        # Print information
-        log.info(f"{self.devname}: Valid delays are {valid_delays}")
+          subseq = max(subseq, key=len)
+          delay = len(subseq)//2 + subseq[0]
 
-        # And configure the delays
-        self._set_dio_calibration_delay(delay)
+          # Print information
+          log.info(f"{self.devname}: Valid delays are {valid_delays}")
 
-        # Clear all detected errors (caused by DIO timing calibration)
-        self.check_errors(errors_to_ignore=['AWGDIOTIMING'])
+          # And configure the delays
+          self._set_dio_calibration_delay(delay)
+
+          # Clear all detected errors (caused by DIO timing calibration)
+          self.check_errors(errors_to_ignore=['AWGDIOTIMING'])
+        
+        finally:
+          # Restore settings either in case of an exception or if the DIO
+          # routine finishes correctly
+          self.set('qas_0_integration_length', integration_length)
+          self.set('qas_0_result_enable', result_enable)
+          self.set('qas_0_monitor_enable', monitor_enable)
+          self.set('awgs_0_enable', awg_enable)
 
     ##########################################################################
     # DIO calibration functions for *CC*
