@@ -113,7 +113,8 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
                  interface: str = '1GbE',
                  server: str = 'localhost',
                  port = 8004,
-                 num_codewords: int = 32, **kw) -> None:
+                 num_codewords: int = 32,
+                 **kw) -> None:
         """
         Input arguments:
             name:           (str) name of the instrument as seen by the user
@@ -158,6 +159,22 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
         t1 = time.time()
         log.info(f'{self.devname}: Initialized ZI_HDAWG in {t1 - t0}s')
 
+    def _gen_set_awgs_outputs_amplitude(self, awg, ch):
+        """
+        Create a function for mapping setting awgs_N_outputs_M_amplitude to the new nodes.
+        """
+        def _set_awgs_outputs_amplitude(value):
+            self.set(f'awgs_{awg}_outputs_{ch}_gains_{ch}', value)
+        return _set_awgs_outputs_amplitude
+    
+    def _gen_get_awgs_outputs_amplitude(self, awg, ch):
+        """
+        Create a function for mapping getting awgs_N_outputs_M_amplitude to the new nodes.
+        """
+        def _get_awgs_outputs_amplitude():
+            return self.get(f'awgs_{awg}_outputs_{ch}_gains_{ch}')
+        return _get_awgs_outputs_amplitude
+
     def _add_extra_parameters(self):
         """
         We add a few additional custom parameters on top of the ones defined in the device files. These are:
@@ -173,8 +190,17 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
             process in order for the instrument to reliably sample data from the CC. Can be used to detect
             unexpected changes in timing of the entire system. The parameter can also be used to force a specific
             delay to be used on the DIO although that is not generally recommended.
+        awgs_[0-3]_outputs_[0-1]_amplitude - dummy node mapping to the awgs/[0-3]/outputs/[0-1]/gains/[0-1] node
+            to maintain compatibility
         """
         super()._add_extra_parameters()
+
+        self.add_parameter(
+            'cfg_sideband_mode', initial_value='static',
+            vals=validators.Enum('static', 'real-time'), docstring=(
+                'Used in the _codeword_table_preamble method to determine what'
+                'format to use for the setWaveDIO command in the AWG sequence.'),
+            parameter_class=ManualParameter)
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
@@ -192,6 +218,16 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core):
                     'to be applied on the DIO interface in order to achieve reliable sampling'
                     ' of the codewords. The valid range is 0 to 15.',
                     vals=validators.Ints())
+
+        for i in range(4):
+            for ch in range(2):
+                self.add_parameter(f'awgs_{i}_outputs_{ch}_amplitude',
+                            set_cmd=self._gen_set_awgs_outputs_amplitude(i, ch),
+                            get_cmd=self._gen_get_awgs_outputs_amplitude(i, ch),
+                            unit='FS',
+                            label=f'AWG {i} output {ch} amplitude (legacy, deprecated)',
+                            docstring=f'Configures the amplitude in full scale units of AWG {i} output {ch} (zero-indexed). Note: this parameter is deprecated, use awgs_{ch}_outputs_{ch}_gains_{ch} instead',
+                            vals=validators.Numbers())
 
     def snapshot_base(self, update: bool=False,
                       params_to_skip_update =None,
@@ -313,8 +349,14 @@ while (1) {
             csvname_l = self.devname + '_' + wf_l
             csvname_r = self.devname + '_' + wf_r
 
-            program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
-                dio_cw, csvname_l, csvname_r)
+            if self.cfg_sideband_mode() == 'static':
+                program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
+                    dio_cw, csvname_l, csvname_r)
+            elif self.cfg_sideband_mode() == 'real-time':
+                program += 'setWaveDIO({}, 1, 2, \"{}\", 1, 2, \"{}\");\n'.format(
+                    dio_cw, csvname_l, csvname_r)
+            else:
+                raise Exception("Unknown modulation type: '{}'".format(self.cfg_sideband_mode()))
 
         return program
 
@@ -333,13 +375,7 @@ while (1) {
             self.sync()
 
         # Use 50 MHz DIO clocking
-        if self.geti('/zi/about/revision') < 200802104:
-          # Old-style nodes (used before 20.08)
-          self.seti('raw/dios/0/extclk', 1)
-        else:
-          # New node: Select a specific DIO mode (which configures various
-          # other bits and pieces accordingly)
-          self.seti('dios/0/mode', 2)
+        self.seti('raw/dios/0/extclk', 1)
 
         # Configure the DIO interface and the waveforms
         for awg_nr in range(int(self._num_channels()//2)):
@@ -485,8 +521,7 @@ while (1) {
         self._dio_calibration_delay = value
 
         # And configure the delays
-        for i in range(32):
-            self.setd(f'raw/dios/0/delays/{i}/value', self._dio_calibration_delay)
+        self.setd('raw/dios/0/delays/*', self._dio_calibration_delay)
 
     def _get_dio_calibration_delay(self):
         return self._dio_calibration_delay
@@ -721,10 +756,10 @@ while (1) {
 
         elif self.cfg_codeword_protocol() == 'novsm_microwave':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                                      '..', 'examples','CC_examples',
-                                      'hdawg_calibration_7bit.vq1asm'))
+                                '..', 'examples','CC_examples',
+                                'hdawg_calibration.vq1asm'))
 
-            sequence_length = 128
+            sequence_length = 32
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)), \
                                  (1, list(staircase_sequence)), \
@@ -843,6 +878,16 @@ while (1) {
 
         subseq = max(subseq, key=len)
         delay = len(subseq)//2 + subseq[0]
+
+        # subseq = [[]]
+        # for e in valid_delays:
+        #     if not subseq[-1] or subseq[-1][-1] == e - 1:
+        #         subseq[-1].append(e)
+        #     else:
+        #         subseq.append([e])
+
+        # subseq = max(subseq, key=len)
+        # delay = len(subseq)//2 + subseq[0]
 
         # Print information
         if verbose: print("  Valid delays are {}".format(valid_delays))

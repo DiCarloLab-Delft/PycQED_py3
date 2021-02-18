@@ -2075,7 +2075,8 @@ class DeviceCCL(Instrument):
                                       q_target: str,
                                       update=True,
                                       verify=True,
-                                      averages=2**15
+                                      averages=2**15,
+                                      return_analysis=True
                                       ):
 
         """
@@ -2126,7 +2127,10 @@ class DeviceCCL(Instrument):
                 Q_target._prep_ro_instantiate_detectors()
                 ssro_dict= self.measure_ssro_single_qubit(qubits=qubits,
                                                           q_target=q_target)
-            return ssro_dict
+            if return_analysis:
+                return ssro_dict
+            else:
+                return True
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
@@ -5249,6 +5253,7 @@ class DeviceCCL(Instrument):
             self.find_instrument(lutman).set_inspire_lutmap()
         self.prepare_for_timedomain(qubits=self.qubits())
         self.find_instrument(self.instr_MC()).soft_avg(1)
+        return True
 
 def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
     acq_ch_map_IQ = {}
