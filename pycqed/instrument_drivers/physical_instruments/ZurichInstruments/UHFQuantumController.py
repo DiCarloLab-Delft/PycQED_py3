@@ -131,7 +131,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     # Constants definitions from "node_doc_UHFQA.json"
     DIOS_0_MODE_MANUAL = 0  # "0": "Manual setting of the DIO output value.",
     DIOS_0_MODE_AWG_SEQ = 1  # "1": "Enables setting of DIO output values by AWG sequencer commands.",
-    DIOS_0_MODE_AWG_WAV = 2  # "2": "Enables the output of AWG waveform data as digital pattern on the DIO connector."
+    DIOS_0_MODE_AWG_WAV = 2  # "2": "Enables the output of AWG waveform data as digital pattern on the DIO connector." FIXME: LabOne says: "QA result"
     # FIXME: comments in this file state: QuExpress thresholds on DIO (mode == 2)
 
     DIOS_0_EXTCLK_50MHZ = 2  # FIXME: not in "node_doc_UHFQA.json"
@@ -203,7 +203,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                          **kw)
 
         # Disable disfunctional parameters from snapshot
-        self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable'])
+        self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable']) # FIXME: duplicates prior statement
 
         # Set default waveform length to 20 ns at 1.8 GSa/s
         self._default_waveform_length = 32
@@ -285,7 +285,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
 
         # Configure the codeword protocol
         if self._use_dio:
-            self.dios_0_mode(2)  # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
+            self.dios_0_mode(self.DIOS_0_MODE_AWG_WAV)  # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
             self.dios_0_drive(0x3)  # Drive DIO bits 15 to 0
             self.dios_0_extclk(self.DIOS_0_EXTCLK_50MHZ)  # 50 MHz clocking of the DIO
             self.awgs_0_dio_strobe_slope(0)  # no edge, replaced by dios_0_extclk(2)
@@ -1125,6 +1125,9 @@ repeat (loop_cnt) {"""
     // Generate waveforms based on codeword output
     switch (cw) {"""
         # Add each of the cases
+        # FIXME: note that the actual wave timing (i.e. trigger latency) depends on the number of cases, because the
+        #  switch statement generates a tree of if's internally. Consequentially, the maximum repetition rate also depends
+        #  on the number of cases.
         for case in self._cases:
             self._awg_program[0] += """
         case 0x{:08x}: playWave({}, {});""".format(case << 17, zibase.gen_waveform_name(0, case), zibase.gen_waveform_name(1, case))
@@ -1534,7 +1537,7 @@ setTrigger(0);
         self.sigouts_1_on(1)
 
         # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode == 1)
-        self.dios_0_mode(2)
+        self.dios_0_mode(self.DIOS_0_MODE_AWG_WAV)
         # Drive DIO bits 31 to 16
         self.dios_0_drive(0xc)
 
@@ -1689,58 +1692,24 @@ setTrigger(0);
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         # NB: ignoring dio_mode and port, because we have single mode only
-        # FIXME: does not seem to produce data in sync with 10 MHz/50 MHz
-        program = '''
-        var A = 0x00000CFF; // DV=0x0001, CW=0x0CF7
-        var B = 0x00000000;
-
+        program = """
+        // program: triggered upstream DIO calibration program
+        const period = 18;          // 18*4.44 ns = 80 ns, NB: 40 ns is not attainable
+        const n1 = 3;               // ~20 ns high time
+        const n2 = period-n1-2-1;   // penalties: 2*setDIO, 1*loop
+        waitDIOTrigger();
         while (1) {
-            setDIO(A);
-            wait(2);
-            setDIO(B);
-            wait(2);
+            setDIO(0x000003FF);     // DV=0x0001, RSLT[8:0]=0x03FE.
+            wait(n1);
+            setDIO(0x00000000);
+            wait(n2);
         }
-        '''
+        """
         self.configure_awg_from_string(0, program)
-        self.seti('awgs/0/enable', 1)
-# FIXME: merge conflict 20200914, remove after testing
-# =======
-# var A = 0xffff0000;
-# var B = 0x00000000;
-#
-# while (1) {
-#   setDIO(A);
-#   wait(2);
-#   setDIO(B);
-#   wait(2);
-# }
-# '''
-#         HDAWG.configure_awg_from_string(0, program)
-#         HDAWG.seti('awgs/0/enable', 1)
-#
-#         self._dio_calibration_mask = 0x7fff
-#
-#     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False, repetitions=1):
-#         log.info('Calibrating DIO delays')
-#         if verbose: print("Calibrating DIO delays")
-#
-#         CC_model = CC.IDN()['model']
-#
-#         if 'QCC' in CC_model:
-#             self._prepare_QCC_dio_calibration(
-#                 QCC=CC, verbose=verbose)
-#         elif 'CCL' in CC_model:
-#             self._prepare_CCL_dio_calibration(
-#                 CCL=CC, feedline=feedline, verbose=verbose)
-#         elif 'HDAWG8' in CC_model:
-#             self._prepare_HDAWG8_dio_calibration(HDAWG=CC, verbose=verbose)
-#         elif 'cc' in CC_model:
-#             self._prepare_CC_dio_calibration(CC=CC, verbose=verbose)
-#         else:
-#             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
-# >>>>>>> 641201a8a200706d6cebaf4c98c6ee240d32cf79
+        # FIXME: set uhfqa0.dios_0_mode(uhfqa0.DIOS_0_MODE_AWG_SEQ), but reset after the calibration is done
+        self.seti('awgs/0/enable', 1)  # FIXME: check success, use start()?
 
-        dio_mask = 0x00000CFF
+        dio_mask = 0x000003FF
         expected_sequence = []
         return dio_mask,expected_sequence
 

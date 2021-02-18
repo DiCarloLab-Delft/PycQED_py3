@@ -111,7 +111,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
 
 def single_qubit_off_on(qubits: list,
                         qtarget,
-                        initialize: bool, 
+                        initialize: bool,
                         platf_cfg: str):
 
     n_qubits = len(qubits)
@@ -668,7 +668,7 @@ def Cryoscope(
         p:              OpenQL Program object containing
 
     """
-    
+
     p = oqh.create_program("Cryoscope", platf_cfg)
     buffer_nanoseconds1 = int(round(buffer_time1 / 1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2 / 1e-9))
@@ -2362,7 +2362,7 @@ def two_qubit_state_tomography(qubit_idxs,
     measurement_pre_rotations = ['II', 'IF', 'FI', 'FF']
     bases = ['X', 'Y', 'Z']
 
-    ## Explain this ? 
+    ## Explain this ?
     bases_comb = [basis_0+basis_1 for basis_0 in bases for basis_1 in bases]
     combinations = []
     combinations += [b+'-'+c for b in bases_comb for c in measurement_pre_rotations]
@@ -2379,11 +2379,11 @@ def two_qubit_state_tomography(qubit_idxs,
                 k.prepz(q_idx)
 
             # Choose a bell state and set the corresponding preparation pulses
-            if bell_state is not None: 
+            if bell_state is not None:
                         #
                 # Q1 |0> --- P1 --o-- A1 -- R1 -- M
                 #                 |
-                # Q0 |0> --- P0 --o-- I  -- R0 -- M 
+                # Q0 |0> --- P0 --o-- I  -- R0 -- M
 
                 if bell_state == 0:  # |Phi_m>=|00>-|11>
                     prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
@@ -2864,13 +2864,13 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
 
     qubits_idx:     list of qubit indeces
     qubits:         list of qubit names
-    platf_cfg:      
+    platf_cfg:
     double_points:  measure each gate combination twice
-    analyze:        
+    analyze:
 
     """
-      
-    p = oqh.create_program("Multi_qubit_AllXY_", platf_cfg)
+
+    p = oqh.create_program("Multi_qubit_AllXY", platf_cfg)
 
     allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
              ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -2905,4 +2905,3 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
 
     p = oqh.compile(p)
     return p
-    

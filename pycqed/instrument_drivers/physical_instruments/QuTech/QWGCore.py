@@ -138,44 +138,68 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     #  AWG control functions (AWG5014 compatible)
     ##########################################################################
 
-    def start(self):
+    def start(self, block: bool = True) -> None:
         """
         Activates output on channels with the current settings. When started this function will check for
         possible warnings
         """
+        # FIXME: cleanup
         # run_mode = self.run_mode()
         # if run_mode == 'NONE':
         #     raise RuntimeError('No run mode is specified')
         self._transport.write('awgcontrol:run:immediate')
+        if block:
+            self.get_operation_complete()
 
-        #self._get_errors()
+        #self.check_errors()
 
         # status = self.get_system_status()
         # warn_msg = self._detect_underdrive(status)
         # if(len(warn_msg) > 0):
         #     warnings.warn(', '.join(warn_msg))
 
-    def stop(self):
+    def stop(self, block: bool = True) -> None:
         """
         Shutdown output on channels. When stopped will check for errors or overflow (FIXME: does it)
         """
+        # FIXME: cleanup
         self._transport.write('awgcontrol:stop:immediate')
+        if block:
+            self.get_operation_complete()
 
-        #self._get_errors()
+        #self.check_errors()
 
-    def _get_errors(self):
-        """
-        The SCPI protocol by default does not return errors. Therefore the user needs
-        to ask for errors. This function retrieves all errors and will raise them.
-        """
-        errNr = self.get_system_error_count()
+    ##########################################################################
+    #  Output functions (AWG5014 compatible)
+    ##########################################################################
 
-        if errNr > 0:
-            errMgs = []
-            for _ in range(errNr):
-                errMgs.append(self.get_error())
-            raise RuntimeError(f'{repr(self)}: ' + ', '.join(errMgs))
-            # FIXME: is raising a potentially very long string useful?
+    def set_output_state(self, ch: int) -> None:
+        self._transport.write(f'OUTPUT{ch}:STATE')
+
+    def get_output_state(self, ch: int) -> float:
+        return self._ask_float(f'OUTPUT{ch}:STATE?')
+
+    ##########################################################################
+    #  Source functions (AWG5014 compatible)
+    ##########################################################################
+
+    def set_amplitude(self, ch: int, amp: float) -> None:
+        self._transport.write(f'SOUR{ch}:VOLT:LEV:IMM:AMPL {amp:.6f}') #FIXME
+
+    def get_amplitude(self, ch: int) -> float:
+        return self._ask_float(f'SOUR{ch}:VOLT:LEV:IMM:AMPL?')
+
+    def set_offset(self, ch: int, offset: float) -> None:
+        self._transport.write(f'SOUR{ch}:VOLT:LEV:IMM:OFFS {offset:.3f}')
+
+    def get_offset(self, ch: int) -> float:
+        return self._ask_float(f'SOUR{ch}:VOLT:LEV:IMM:OFFS?')
+
+    def set_waveform(self, ch: int, waveform: str) -> None:
+        self._transport.write(f'SOUR{ch}:WAV "{waveform}"')
+
+    def get_waveform(self, ch: int) -> str:
+        return self._ask(f'SOUR{ch}:WAV?')
 
     ##########################################################################
     #  WLIST (Waveform list) functions (AWG5014 compatible)
@@ -192,9 +216,6 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         return self._ask(f'wlist:name? {idx:d}')
 
     def get_wlist(self) -> List:
-        """
-        NB: takes a few seconds on 5014: our fault or Tek's?
-        """
         size = self.get_wlist_size()
         wlist = []                                  # empty list
         for k in range(size):                       # build list of names
@@ -319,12 +340,23 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     # QWG specific
     ##########################################################################
 
+    def set_sideband_frequency(self, ch_pair: int) -> None:
+        self._transport.write(f'qutech:output{ch_pair}:frequency')
+
+    def get_sideband_frequency(self, ch_pair: int) -> float:
+        return self._ask_float(f'qutech:output{ch_pair}:frequency?')
+
+    def set_sideband_phase(self, ch_pair: int) -> None:
+        self._transport.write(f'qutech:output{ch_pair}:phase')
+
+    def get_sideband_phase(self, ch_pair: int) -> float:
+        return self._ask_float(f'qutech:output{ch_pair}:phase?')
+
     def sync_sideband_generators(self) -> None:
         """
-        Synchronize both sideband generators, i.e. restart them with phase=0
+        Synchronize both sideband generators, i.e. restart them with initial phase
         """
         self._transport.write('QUTEch:OUTPut:SYNCsideband')
-
 
     ##########################################################################
     # DIO support
@@ -365,7 +397,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         Get DIO all suitable indexes. The array is ordered by most preferable index first
         """
-        return _int_to_array(self._ask('DIO:INDexes?'))
+        return self._int_to_array(self._ask('DIO:INDexes?'))
 
 
     def dio_calibrated_inputs(self) -> int:
@@ -444,7 +476,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         self._transport.write(f'DAC{ch}:BITmap')
 
     def get_bitmap(self, ch: int) -> List:
-        return _int_to_array(self._ask(f'DAC{ch}:BITmap?'))
+        return self._int_to_array(self._ask(f'DAC{ch}:BITmap?'))
 
 
     ##########################################################################
@@ -454,7 +486,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         raise RuntimeError("QWG cannot output calibration data")
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0) -> None:
         self.dio_calibrate()    # FIXME: integrate
 
     ##########################################################################

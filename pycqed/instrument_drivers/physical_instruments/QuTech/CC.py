@@ -187,6 +187,16 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     ##########################################################################
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        # FIXME: does not match with uhfqa_prog, which requires single trigger
+        cc_prog = inspect.cleandoc("""
+        # program: UHFQA trigger program
+        .DEF    wait        9
+
+        loop:   seq_out     0x03FF0000,1            # NB: TRIG=0x00010000, CW[8:0]=0x03FE0000
+                seq_out     0x0,$wait
+                jmp         @loop
+        """)
+        self.assemble_and_start(cc_prog)
         self.calibrate_dio(port, expected_bits=dio_mask)
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
@@ -209,12 +219,12 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # DIO[14]       TOGGLE_DS_1     unused
             # DIO[7:0]      CW_1		    CW_1
             #
-            
+
             .DEF 		cw_31_01	0x801F8001          # TRIG_2, CW_2=31, TRIG_1, CW_1=1
             .DEF 		incr		0xFFFF0001          # CW_2++, CW_1--: -0x00010000 + 0x00000001
             .DEF		duration	4			        # 20 ns periods
-            .DEF 		loopCnt		31               	# 
-            
+            .DEF 		loopCnt		31               	#
+
             repeat:
                     move		$cw_31_01,R0
                     move		$loopCnt,R1               	# loop counter
@@ -233,7 +243,6 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
 
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
-            #FIXME: only toggles 5 out 7 codeword bits
 
             cc_prog = """
             ### DIO protocol definition:
@@ -257,12 +266,12 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # TRIG_1    0x0000 8000
             # TRIG_2    0x8000 0000
             # sum       0x8081 8081
-            
+
             .DEF        cw          0x80008000         # see above
             .DEF        incr        0x00810081
             .DEF        duration    4                  # 20 ns periods
-            .DEF        loopCnt     32                 # 
-            
+            .DEF        loopCnt     128                #
+
             repeat:
                     move        $cw,R0
                     move        $loopCnt,R1                 # loop counter
@@ -271,7 +280,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                     loop        R1,@inner
                     jmp         @repeat
             """
-            sequence_length = 32
+            sequence_length = 128
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)),
                                  (1, list(staircase_sequence)),
@@ -284,7 +293,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # based on ZI_HDAWG8.py::_prepare_CC_dio_calibration_hdawg and examples/CC_examples/flux_calibration.vq1asm
             # FIXME: hardcoded slots, this is OpenQL output
             cc_prog = """
-            mainLoop:                                               
+            mainLoop:
                         seq_out         0x00000000,20           # 00000000000000000000000000000000
                         seq_out         0x82498249,2            # 10000010010010011000001001001001
                         seq_out         0x84928492,2            # 10000100100100101000010010010010
