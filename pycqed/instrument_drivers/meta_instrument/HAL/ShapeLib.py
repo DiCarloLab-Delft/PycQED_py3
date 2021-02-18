@@ -2,15 +2,28 @@
 import logging
 from typing import Sequence, Optional, Dict, Union, Callable, Any, List
 
+from qcodes import Instrument
 from qcodes.instrument.base import InstrumentBase
 from qcodes.instrument.parameter import ManualParameter
 from qcodes import validators as vals
+
+from pycqed.measurement.waveform_control_CC import waveform as wf
+
 
 log = logging.getLogger(__name__)
 
 
 
-# FIXME: use add_submodule?
+
+# FIXME: naming; shape/pulse/waveform/...
+
+class Shape(InstrumentBase):
+    def __init__(self, name: str):
+        super().__init__(name)
+        # FIXME: implement
+
+    def wave(self, **kwargs: Any):
+        raise RuntimeError("call overridden method")
 
 
 """
@@ -36,14 +49,6 @@ class QuantumDevice:
 
 
 
-# FIXME: naming; shape/pulse/waveform/...
-
-class Shape(InstrumentBase):
-    def __init__(self):
-        pass  # FIXME: implement
-
-    def wave(self, **kwargs: Any):
-        raise RuntimeError("call overridden method")
 
 """
 
@@ -68,10 +73,13 @@ def theta_to_amp(theta: float, amp180: float):
 
 # parameters shared by several pulse types
 # FIXME: split according to scope: channel/instrument/setup
-@QuantumDevice.register_shape
+#@QuantumDevice.register_shape
 class WaveformParameters(Shape):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, name: str):
+        super().__init__(name)
+
+        self.wf_func = wf.mod_gauss
+        self.spec_func = wf.block_pulse
 
         # from
         self.add_parameter(
@@ -82,6 +90,7 @@ class WaveformParameters(Shape):
             initial_value=0)
 
         # from Base_LutMan
+        # FIXME: instrument property
         self.add_parameter(
             "sampling_rate",
             unit="Hz",
@@ -102,8 +111,8 @@ class WaveformParameters(Shape):
 
 # GroundExcited
 class ge(Shape):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, name: str):
+        super().__init__(name)
 
         self.add_parameter(
             'mw_amp180',
@@ -138,30 +147,30 @@ class ge(Shape):
     # based on generate_standard_waveforms()
     def wave(self, theta: float, phi: float, wp: WaveformParameters):
         if self.cfg_sideband_mode() == 'static':
-            f_modulation = self.mw_modulation()  # FIXME
+            f_modulation = self.mw_modulation  # FIXME
         else:
             f_modulation = 0
 
         if theta == 90:
-            amp = self.mw_amp180() * self.mw_amp90_scale()
+            amp = self.mw_amp180 * self.mw_amp90_scale
         elif theta == -90:
-            amp = - self.mw_amp180() * self.mw_amp90_scale()
+            amp = - self.mw_amp180 * self.mw_amp90_scale
         else:
-            amp = theta_to_amp(theta=theta, amp180=self.mw_amp180())
-        return self.wf_func(
+            amp = theta_to_amp(theta=theta, amp180=self.mw_amp180)
+        return wp.wf_func(
             amp=amp,
             phase=phi,
-            sigma_length=self.mw_gauss_width(),
+            sigma_length=self.mw_gauss_width,
             f_modulation=f_modulation,
-            sampling_rate=wp.sampling_rate(),
-            motzoi=self.mw_motzoi(),
-            delay=wp.pulse_delay())
+            sampling_rate=wp.sampling_rate,
+            motzoi=self.mw_motzoi,
+            delay=wp.pulse_delay)
 
 
 # second excited
 class ef(Shape):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, name: str):
+        super().__init__(name)
 
         self.add_parameter(
             'mw_ef_modulation',
@@ -180,15 +189,15 @@ class ef(Shape):
 
     # based on generate_standard_waveforms()
     def wave(self, theta: float, phi: float, wp: WaveformParameters):
-        amp = theta_to_amp(theta=theta, amp180=self.mw_ef_amp180())
-        return self.wf_func(
+        amp = theta_to_amp(theta=theta, amp180=self.mw_ef_amp180)
+        return wp.wf_func(
             amp=amp,
             phase=phi,
-            sigma_length=self.mw_gauss_width(),  # FIXME
-            f_modulation=self.mw_ef_modulation(),
-            sampling_rate=wp.sampling_rate(),
+            sigma_length=self.mw_gauss_width,  # FIXME
+            f_modulation=self.mw_ef_modulation,
+            sampling_rate=wp.sampling_rate,
             motzoi=0,
-            delay=wp.pulse_delay())
+            delay=wp.pulse_delay)
 
 
 """
