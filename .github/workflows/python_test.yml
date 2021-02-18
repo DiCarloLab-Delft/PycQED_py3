@@ -28,7 +28,7 @@ jobs:
         git clone -b feature/cc/feedback https://github.com/DiCarloLab-Delft/OpenQL.git
         cd OpenQL
         git submodule update --init --recursive
-        pip install -v
+        pip install -v .
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
