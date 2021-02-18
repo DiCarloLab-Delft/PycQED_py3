@@ -140,7 +140,7 @@ if 1:
             for initialization_msmt in [False, True]:
                 p = mqo.two_qubit_parity_check(
                     qD0=0,
-                    qD1=0,
+                    qD1=0,  # FIXME: makes no sense, but configuration file lacks proper edges
                     qA=2,
                     initialization_msmt=initialization_msmt,
                     platf_cfg=self.config_fn)
@@ -227,6 +227,17 @@ if 1:
 
             def test_multi_qubit_off_on(self):
                 pytest.skip("test_multi_qubit_off_on() gives signalconflict (FIXME)")
+
+            def test_two_qubit_parity_check(self):
+                for initialization_msmt in [False, True]:
+                    p = mqo.two_qubit_parity_check(
+                        qD0=0,
+                        qD1=1,
+                        qA=2,
+                        initialization_msmt=initialization_msmt,
+                        platf_cfg=self.config_fn)
+                    self.assertEqual(p.name, 'two_qubit_parity_check')
+
     else:
         class Test_multi_qubit_oql_CC_incompatible_openql_version(unittest.TestCase):
             @unittest.skip('OpenQL version does not support CC')

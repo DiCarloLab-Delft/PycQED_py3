@@ -52,40 +52,6 @@ mainLoop:                                               #
 [2]             seq_out         0x801E801E,2            # 10000000000111101000000000011110
 [2]             seq_out         0x801F801F,2            # 10000000000111111000000000011111
 [2]             seq_out         0x00000000,18           # 00000000000000000000000000000000
-[3]             seq_out         0x00000000,2 
-[3]             seq_out         0x80008000,2 
-[3]             seq_out         0x80018001,2 
-[3]             seq_out         0x80028002,2 
-[3]             seq_out         0x80038003,2 
-[3]             seq_out         0x80048004,2 
-[3]             seq_out         0x80058005,2 
-[3]             seq_out         0x80068006,2 
-[3]             seq_out         0x80078007,2 
-[3]             seq_out         0x80088008,2 
-[3]             seq_out         0x80098009,2 
-[3]             seq_out         0x800A800A,2 
-[3]             seq_out         0x800B800B,2 
-[3]             seq_out         0x800C800C,2 
-[3]             seq_out         0x800D800D,2 
-[3]             seq_out         0x800E800E,2 
-[3]             seq_out         0x800F800F,2 
-[3]             seq_out         0x80108010,2 
-[3]             seq_out         0x80118011,2 
-[3]             seq_out         0x80128012,2 
-[3]             seq_out         0x80138013,2 
-[3]             seq_out         0x80148014,2 
-[3]             seq_out         0x80158015,2 
-[3]             seq_out         0x80168016,2 
-[3]             seq_out         0x80178017,2 
-[3]             seq_out         0x80188018,2 
-[3]             seq_out         0x80198019,2 
-[3]             seq_out         0x801A801A,2 
-[3]             seq_out         0x801B801B,2 
-[3]             seq_out         0x801C801C,2 
-[3]             seq_out         0x801D801D,2 
-[3]             seq_out         0x801E801E,2 
-[3]             seq_out         0x801F801F,2 
-[3]             seq_out         0x00000000,18
 # digIn=2
 [4]             seq_out         0x00000000,301          # cycle 0-301: padding on 'mw_1'
 [5]             seq_out         0x00000000,301          # cycle 0-301: padding on 'flux_0'

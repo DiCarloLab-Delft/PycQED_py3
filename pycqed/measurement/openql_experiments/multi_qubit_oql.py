@@ -111,7 +111,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
 
 def single_qubit_off_on(qubits: list,
                         qtarget,
-                        initialize: bool, 
+                        initialize: bool,
                         platf_cfg: str):
 
     n_qubits = len(qubits)
@@ -593,8 +593,8 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
     Sequence to measure the residual (ZZ) interaction between two qubits.
     Procedure is described in M18TR.
 
-        (q0) --X90----(tau/2)---Y180-(tau/2)-Xm90--RO
-        (qs) --[X180]-(tau/2)-[X180]-(tau/2)-------RO
+        (q0) --X90----(tau)---Y180-(tau)-Y90--RO
+        (qs) --[X180]-(tau)-[X180]-(tau)-------RO
 
     Input pars:
         times:           the list of waiting times in s for each Echo element
@@ -620,12 +620,12 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
         k.prepz(q0)
         for q_s in q_spectator_idx:
             k.prepz(q_s)
-        wait_nanoseconds = int(round(time/1e-9/2))
+        wait_nanoseconds = int(round(time/1e-9))
         k.gate('rx90', [q0])
         for i_s, q_s in enumerate(q_spectator_idx):
             k.gate(gate_spec[i_s], [q_s])
         k.gate("wait", all_qubits, wait_nanoseconds)
-        k.gate('ry180', [q0])
+        k.gate('rx180', [q0])
         for i_s, q_s in enumerate(q_spectator_idx):
             k.gate(gate_spec[i_s], [q_s])
         k.gate("wait", all_qubits, wait_nanoseconds)
@@ -649,7 +649,7 @@ def Cryoscope(
     qubit_idx: int,
     buffer_time1=0,
     buffer_time2=0,
-    flux_cw: str = 'fl_cw_02',
+    flux_cw: str = 'fl_cw_06',
     twoq_pair=[2, 0],
     platf_cfg: str = '',
     cc: str = 'CCL',
@@ -668,7 +668,7 @@ def Cryoscope(
         p:              OpenQL Program object containing
 
     """
-    
+
     p = oqh.create_program("Cryoscope", platf_cfg)
     buffer_nanoseconds1 = int(round(buffer_time1 / 1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2 / 1e-9))
@@ -942,7 +942,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         k.gate("wait", [], 0)  # alignment workaround
         k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
         if qubit_idx_park is not None:
-            k.gate('fl_cw_06', [qubit_idx_park])  # square pulse
+            k.gate('fl_cw_05', [qubit_idx_park])  # square pulse
         k.gate("wait", [], 0)  # alignment workaround
     elif cc.upper() == 'QCC' or cc.upper() == 'CC':
         k.gate("wait", [], 0)  # alignment workaround
@@ -1635,7 +1635,10 @@ def conditional_oscillation_seq(q0: int, q1: int,
                             'flux_codeword_park "{}" not allowed'.format(
                                 flux_codeword_park))
                 else:
-                    k.gate('wait', [q0, q1], disabled_cz_duration)
+                    k.gate("wait", [], 0) #alignment workaround
+                    # k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
+                    k.gate('wait', [q0,q1], 50)
+                    k.gate("wait", [], 0) #alignment workaround
 
                 k.gate("wait", [], 0)
 
@@ -1671,6 +1674,13 @@ def conditional_oscillation_seq(q0: int, q1: int,
             # #################################################################
             # Measurement
             # #################################################################
+            if case == 'excitation':
+                gate = 'rx180' 
+                # if single_q_gates_replace is None else single_q_gates_replace
+                k.gate("wait", [], 0) #alignment workaround
+                k.gate(gate, [q1])
+                # k.gate('i', [q0])
+                # k.gate("wait", [], 0)
 
             k.measure(q0)
             k.measure(q1)
@@ -2352,7 +2362,7 @@ def two_qubit_state_tomography(qubit_idxs,
     measurement_pre_rotations = ['II', 'IF', 'FI', 'FF']
     bases = ['X', 'Y', 'Z']
 
-    ## Explain this ? 
+    ## Explain this ?
     bases_comb = [basis_0+basis_1 for basis_0 in bases for basis_1 in bases]
     combinations = []
     combinations += [b+'-'+c for b in bases_comb for c in measurement_pre_rotations]
@@ -2369,11 +2379,11 @@ def two_qubit_state_tomography(qubit_idxs,
                 k.prepz(q_idx)
 
             # Choose a bell state and set the corresponding preparation pulses
-            if bell_state is not None: 
+            if bell_state is not None:
                         #
                 # Q1 |0> --- P1 --o-- A1 -- R1 -- M
                 #                 |
-                # Q0 |0> --- P0 --o-- I  -- R0 -- M 
+                # Q0 |0> --- P0 --o-- I  -- R0 -- M
 
                 if bell_state == 0:  # |Phi_m>=|00>-|11>
                     prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
@@ -2739,8 +2749,6 @@ def Two_qubit_RTE_pipelined(QX:int, QZ:int, QZ_d:int, platf_cfg: str,
     p = oqh.compile(p)
     return p
 
-
-
 def Ramsey_cross(wait_time: int,
                  angles: list,
                  q_rams: int,
@@ -2845,6 +2853,55 @@ def TEST_RTE(QX:int , QZ:int, platf_cfg: str,
         k.measure(QZ)
 
     p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = True,analyze = True):
+    """
+    Used for AllXY measurement and calibration for multiple qubits simultaneously.
+    args:
+
+    qubits_idx:     list of qubit indeces
+    qubits:         list of qubit names
+    platf_cfg:
+    double_points:  measure each gate combination twice
+    analyze:
+
+    """
+
+    p = oqh.create_program("Multi_qubit_AllXY", platf_cfg)
+
+    allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+             ['rx180', 'ry180'], ['ry180', 'rx180'],
+             ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+             ['ry90', 'rx90'], ['rx90', 'ry180'], ['ry90', 'rx180'],
+             ['rx180', 'ry90'], ['ry180', 'rx90'], ['rx90', 'rx180'],
+             ['rx180', 'rx90'], ['ry90', 'ry180'], ['ry180', 'ry90'],
+             ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+             ['ry90', 'ry90']]
+
+    # this should be implicit
+    # FIXME: remove try-except, when we depend hard on >=openql-0.6
+    try:
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
+    except TypeError:
+        # openql-0.5 compatibility
+        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+
+    for i, xy in enumerate(allXY):
+        if double_points:
+            js = 2
+        else:
+            js = 1
+        for j in range(js):
+            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
+            for qubit in qubits_idx:
+              k.prepz(qubit)
+              k.gate(xy[0], [qubit])
+              k.gate(xy[1], [qubit])
+              k.measure(qubit)
+            p.add_kernel(k)
 
     p = oqh.compile(p)
     return p

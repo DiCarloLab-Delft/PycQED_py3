@@ -316,7 +316,7 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
-    def find_resonators(self, start_freq=6.9e9, stop_freq=8e9, VNA_power=-40,
+    def find_resonators(self, start_freq=6.8e9, stop_freq=8e9, VNA_power=-40,
                         bandwidth=200, timeout=200, f_step=1e6, with_VNA=None,
                         verbose=True):
         """
@@ -651,7 +651,7 @@ class Qubit(Instrument):
                 powers = np.linspace(-20, 0.1, 3)
                 f_step = 100e3
             else:
-                powers = np.arange(-40, 0.1, 10)
+                powers = np.arange(-60, 0.1, 5)
                 f_step = 100e3
 
             if with_VNA:
@@ -1105,7 +1105,7 @@ class Qubit(Instrument):
                 close_fig=close_fig)
         return analysis_spec.fitted_freq
 
-    def calibrate_spec_pow(self, freqs=None, start_power=-35, power_step = 5,
+    def calibrate_spec_pow(self, freqs=None, start_power=-55, power_step = 5,
                            threshold=0.5, verbose=True):
         """
         Finds the optimal spectroscopy power for qubit spectroscopy (not pulsed)
@@ -1248,8 +1248,6 @@ class Qubit(Instrument):
             stepsize (float):
                 smalles stepsize in ns for which to run ramsey experiments.
         """
-
-        self.ro_acq_averages(2**10)
         cur_freq = self.freq_qubit()
         # Steps don't double to be more robust against aliasing
         for n in steps:

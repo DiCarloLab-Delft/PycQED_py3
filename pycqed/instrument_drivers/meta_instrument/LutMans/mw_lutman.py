@@ -338,7 +338,7 @@ class Base_MW_LutMan(Base_LutMan):
                 if waveform['theta'] == 90:
                     amp = self.mw_amp180()*self.mw_amp90_scale()
                 elif waveform['theta'] == -90:
-                    amp = - self.mw_amp180() * self.mw_amp90_scale() 
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
                 else:
                     amp = theta_to_amp(theta=waveform['theta'],
                                        amp180=self.mw_amp180())
@@ -381,7 +381,7 @@ class Base_MW_LutMan(Base_LutMan):
                 # won't get the needed four waveforms.
                 if 'duration' in waveform.keys():
                     sq_pulse_duration = waveform['duration']
-                else: 
+                else:
                     sq_pulse_duration = self.sq_pulse_duration()
                 if 'sq_G_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square_VSM(
@@ -442,6 +442,20 @@ class Base_MW_LutMan(Base_LutMan):
         for i, (phase) in enumerate(phases):
             lm[i+9] = {"name": "rPhi90",    "theta": 90,
                        "phi": phase, "type": "ge"}
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+    def load_x_pulses_to_AWG_lookuptable(self,
+                                             phases=np.arange(0, 360, 20)):
+        """
+        Loads rPhi90 pulses onto the AWG lookuptable.
+        """
+
+        if (len(phases) > 18):
+            raise ValueError('max 18 amplitude values can be provided')
+        lm = self.LutMap()
+        for i, (phase) in enumerate(phases):
+            lm[i+9] = {"name": "rPhi90",    "theta": phase,
+                       "phi": 0, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     def load_square_waves_to_AWG_lookuptable(self):
@@ -648,13 +662,12 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # HDAWG while using real-time modulation (because of mixer amplitude imbalance corrections)
         self.channel_amp_value = 0
 
-
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
         # Parameters for a square pulse
         self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
-                           initial_value=0.5)   
+                           initial_value=0.5)
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -791,6 +804,96 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
 
+    def generate_standard_waveforms(
+            self, apply_predistortion_matrix: bool=True):
+        self._wave_dict = OrderedDict()
+
+        if self.cfg_sideband_mode() == 'static':
+            f_modulation = self.mw_modulation()
+        elif self.cfg_sideband_mode() == 'real-time':
+            f_modulation = 0
+            if ((self.channel_I()-1)//2 != (self.channel_Q()-1)//2):
+                raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
+
+            self.AWG.get_instr().set('oscs_{}_freq'.format((self.channel_I()-1)//2),
+                                     self.mw_modulation())
+        else:
+            raise KeyError('Unexpected argument for cfg_sideband_mode')
+
+        # lutmap is expected to obey lutmap mw schema
+        for idx, waveform in self.LutMap().items():
+            if waveform['type'] == 'ge':
+                if waveform['theta'] == 90:
+                    amp = self.mw_amp180()*self.mw_amp90_scale()
+                elif waveform['theta'] == -90:
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
+                else:
+                    amp = theta_to_amp(theta=waveform['theta'],
+                                       amp180=self.mw_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=f_modulation,
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=self.mw_motzoi(),
+                    delay=self.pulse_delay())
+            elif waveform['type'] == 'ef':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_ef_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=self.mw_ef_modulation(),
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=0,
+                    delay=self.pulse_delay())
+            elif waveform['type'] == 'raw-drag':
+                self._wave_dict[idx] = self.wf_func(
+                    **waveform["drag_pars"])
+            elif waveform['type'] == 'spec':
+                self._wave_dict[idx] = self.spec_func(
+                    amp=self.spec_amp(),
+                    length=self.spec_length(),
+                    sampling_rate=self.sampling_rate(),
+                    delay=0,
+                    phase=0)
+            elif waveform['type'] == 'square':
+                # Using a slightly different construction as above
+                # as the call signatures of these functions is different.
+                # Apperently the VSM LutMan has both parameters, so make sure
+                # we detect on the one only available in the VSM. Otherwise, we
+                # won't get the needed four waveforms.
+                if 'sq_G_amp' in self.parameters:
+                    self._wave_dict[idx] = wf.mod_square_VSM(
+                        amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
+                        length=self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation(),
+                        sampling_rate=self.sampling_rate())
+                elif 'sq_amp' in self.parameters:
+                    self._wave_dict[idx] = wf.mod_square(
+                        amp=self.sq_amp(), length=self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation(),  phase=0,
+                        motzoi=0, sampling_rate=self.sampling_rate())
+                else:
+                    raise KeyError('Expected parameter "sq_amp" to exist')
+            else:
+                raise ValueError
+
+        # Add predistortions + test
+        if (self.mixer_apply_predistortion_matrix() and apply_predistortion_matrix and
+          self.cfg_sideband_mode() == 'static'):
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
+        return self._wave_dict
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+            M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
+                                              self.mixer_phi())
+            for key, val in wave_dict.items():
+                wave_dict[key] = np.dot(M, val)
+            return wave_dict
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 

@@ -651,10 +651,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 # Totalized shots
                 if self.post_selection == True:
                     fig, axs = plt.subplots(nrows=2, ncols=3,
-                                            figsize=(13,8), dpi=200)
+                                            figsize=(13,8), dpi=150)
                     axs = axs.ravel()
                 else:
-                    fig, axs = plt.subplots(ncols=3, figsize=(13,4), dpi=200)
+                    fig, axs = plt.subplots(ncols=3, figsize=(13,4), dpi=150)
                 fig.patch.set_alpha(0)
                 self.axs_dict['mux_ssro_totalshots_{}'.format(qubit_label)]=axs
                 self.figs['mux_ssro_totalshots_{}'.format(qubit_label)] = fig
@@ -785,7 +785,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             q_target_idx = qubit_labels.index(self.q_target)
             q_target_ch = Channels[q_target_idx]
             if self.post_selection is True:
-                fig1, ax1 = plt.subplots(figsize=(5,4), dpi=200)
+                fig1, ax1 = plt.subplots(figsize=(5,4), dpi=150)
                 fig1.patch.set_alpha(0)
                 self.axs_dict['mux_ssro_histogram_{}_post'.format(self.q_target)]=ax1
                 self.figs['mux_ssro_histogram_{}_post'.format(self.q_target)]=fig1
@@ -810,7 +810,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     'qoi': self.qoi[q_target_ch],
                     'post_selection':True
                 }
-                fig2, ax2 = plt.subplots(figsize=(5,4), dpi=200)
+                fig2, ax2 = plt.subplots(figsize=(5,4), dpi=150)
                 fig2.patch.set_alpha(0)
                 self.axs_dict['mux_ssro_cdf_{}_post'.format(self.q_target)]=ax2
                 self.figs['mux_ssro_cdf_{}_post'.format(self.q_target)]=fig2
@@ -835,7 +835,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     'qoi': self.qoi[q_target_ch],
                     'post_selection': True
                 }
-                fig3, ax3 = plt.subplots(figsize=(5,4), dpi=200)
+                fig3, ax3 = plt.subplots(figsize=(5,4), dpi=150)
                 fig3.patch.set_alpha(0)
                 self.axs_dict['mux_ssro_crosstalk_{}_post'.format(self.q_target)]=ax3
                 self.figs['mux_ssro_crosstalk_{}_post'.format(self.q_target)]=fig3
@@ -860,7 +860,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     'qoi': self.qoi[q_target_ch],
                     'post_selection':True
                 }
-            fig1, ax1 = plt.subplots(figsize=(5,4), dpi=200)
+            fig1, ax1 = plt.subplots(figsize=(5,4), dpi=150)
             fig1.patch.set_alpha(0)
             self.axs_dict['mux_ssro_histogram_{}'.format(self.q_target)]=ax1
             self.figs['mux_ssro_histogram_{}'.format(self.q_target)]=fig1
@@ -884,7 +884,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 'timestamp': self.timestamp,
                 'qoi': self.qoi[q_target_ch]
             }
-            fig2, ax2 = plt.subplots(figsize=(5,4), dpi=200)
+            fig2, ax2 = plt.subplots(figsize=(5,4), dpi=150)
             fig2.patch.set_alpha(0)
             self.axs_dict['mux_ssro_cdf_{}'.format(self.q_target)]=ax2
             self.figs['mux_ssro_cdf_{}'.format(self.q_target)]=fig2
@@ -908,7 +908,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 'timestamp': self.timestamp,
                 'qoi': self.qoi[q_target_ch]
             }
-            fig3, ax3 = plt.subplots(figsize=(5,4), dpi=200)
+            fig3, ax3 = plt.subplots(figsize=(5,4), dpi=150)
             fig3.patch.set_alpha(0)
             self.axs_dict['mux_ssro_crosstalk_{}'.format(self.q_target)]=ax3
             self.figs['mux_ssro_crosstalk_{}'.format(self.q_target)]=fig3
@@ -991,7 +991,7 @@ class Multiplexed_Transient_Analysis(ba.BaseDataAnalysis):
     def prepare_plots(self):
 
         self.axs_dict = {}
-        fig, axs = plt.subplots(nrows=2, sharex='col', figsize=(7, 5), dpi=200)
+        fig, axs = plt.subplots(nrows=2, sharex='col', figsize=(7, 5), dpi=150)
         fig.patch.set_alpha(0)
         self.axs_dict['MUX_transients'] = axs
         self.figs['MUX_transients'] = fig
@@ -1444,7 +1444,7 @@ class Single_qubit_parity_analysis(ba.BaseDataAnalysis):
 
         self.axs_dict = {}
 
-        fig, axs = plt.subplots(figsize=(7,5), dpi=200)
+        fig, axs = plt.subplots(figsize=(7,5), dpi=150)
         fig.patch.set_alpha(0)
         self.axs_dict['Parity_check_{}'.format(self.q_A)]=axs
         self.figs['Parity_check_{}'.format(self.q_A)] = fig
@@ -1701,7 +1701,7 @@ class RTE_analysis(ba.BaseDataAnalysis):
             qb_name = ch.split(' ')[-1]
             if qb_name == 'I' or qb_name == 'Q':
                 label = ch.split(' ')[-2]
-            fig, axs = plt.subplots(figsize=(7,3), dpi=200)
+            fig, axs = plt.subplots(figsize=(7,3), dpi=150)
             fig.patch.set_alpha(0)
             self.axs_dict['RTE_{}_{}_errors'.format(qb_name, self.error_type)]=axs
             self.figs['RTE_{}_{}_errors'.format(qb_name, self.error_type)] = fig
@@ -2075,19 +2075,19 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
                ls='--', linewidth=1., color='black', alpha=.75)
     ax.set_xlabel(mpl_utils.latex_friendly_str(value_name.decode('utf-8')))
     ax.set_ylabel('Counts')
-    l = ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
-        qubit_labels), prop={'size': 4})
-    l.get_title().set_fontsize('5')
+    # l = ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
+    #     qubit_labels), prop={'size': 4})
+    # l.get_title().set_fontsize('5')
 
     if flag == False:
         if post_selection is True:
             ax.set_title(mpl_utils.latex_friendly_str('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp)))
         else:
             ax.set_title(mpl_utils.latex_friendly_str('Mux_ssro_{}_{}'.format(qubit_label, timestamp)))
-        l = ax.legend(loc=(1.05, .01),
-                      title='Prepared state\n{}'.format(qubit_labels),
-                      prop={'size': 4})
-        l.get_title().set_fontsize('4')
+        # l = ax.legend(loc=(1.05, .01),
+        #               title='Prepared state\n{}'.format(qubit_labels),
+        #               prop={'size': 4})
+        # l.get_title().set_fontsize('4')
 
     f.tight_layout()
 

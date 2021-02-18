@@ -1,0 +1,24 @@
+PycQED Changelog
+
+Legend:
++ Added feature
+* Improved/changed feature, compatible
+# Change that breaks existing interface
+- Bug fixed
+! Known issue / missing feature
+. Generic bullet
+
+
+v0.3 - Work In Progress
+# redesigned DIO timing calibration interface (PR #621):
+    . DIO modes now defined in instrument_drivers/library/DIO.py instead of individual instrument drivers
+    . usage: see examples/CC_examples/CC_demo_mux.py "DIO.calibrate"
+# support for Central Controller software v0.2.2 (older versions not supported)
+    . requires OpenQL > 0.8.1.dev4
+. FIXME: many more changes, please document
+
+v0.2 - 20191213
+. second public release
+
+v0.1 - 20161012
+. initial public release

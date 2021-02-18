@@ -1,3 +1,4 @@
+
 import time
 import logging
 import numpy as np
@@ -13,6 +14,8 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.utilities.general import gen_sweep_pts
+from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
+    mk_optimize_res_loss_func
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
     mk_minimization_loss_func, mk_minimization_goal_func
 
@@ -231,7 +234,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter(
-            'ro_acq_delay', unit='s',
+            'ro_acq_delay',  unit='s',
             label='Readout acquisition delay',
             vals=vals.Numbers(min_value=0),
             initial_value=0,
@@ -249,7 +252,7 @@ class CCLight_Transmon(Qubit):
             docstring=('The delay time for the readout pulse'))
 
         self.add_parameter(
-            'ro_acq_mixer_phi', unit='degree',
+            'ro_acq_mixer_phi',  unit='degree',
             label='Readout mixer phi',
             vals=vals.Numbers(),
             initial_value=0,
@@ -258,7 +261,7 @@ class CCLight_Transmon(Qubit):
                        'real time'))
 
         self.add_parameter(
-            'ro_acq_mixer_alpha', unit='',
+            'ro_acq_mixer_alpha',  unit='',
             label='Readout mixer alpha',
             vals=vals.Numbers(min_value=0.8),
             initial_value=1,
@@ -267,7 +270,7 @@ class CCLight_Transmon(Qubit):
                        'real time'))
 
         self.add_parameter(
-            'ro_acq_input_average_length', unit='s',
+            'ro_acq_input_average_length',  unit='s',
             label='Readout acquisition delay',
             vals=vals.Numbers(min_value=0, max_value=4096/1.8e9),
             initial_value=4096/1.8e9,
@@ -312,10 +315,10 @@ class CCLight_Transmon(Qubit):
             initial_value=0,
             parameter_class=ManualParameter)
         self.add_parameter('ro_acq_integration_length_weigth_function', vals=vals.Numbers(
-            min_value=0, max_value=4096 / 1.8e9),
+            min_value=0, max_value=4096/1.8e9),
             docstring=(
             'sets weight function elements to 0 beyond this time'),
-            initial_value=4096 / 1.8e9,
+            initial_value=4096/1.8e9,
             parameter_class=ManualParameter)
 
         # self.add_parameter('cal_pt_zero',
@@ -495,11 +498,8 @@ class CCLight_Transmon(Qubit):
             lutman = self.find_instrument(self.instr_LutMan_MW())
             AWG = lutman.find_instrument(lutman.AWG())
             if self._using_QWG():
-                if val != 0.0:
-                    logging.warning(
-                        'CCL transmon is using QWG. mw_fine_delay not supported!'
-                        'Adding zeros to waveforms. Intended for delays measurement only!')
-                lutman.pulse_delay(val)
+                logging.warning(
+                    'CCL transmon is using QWG. mw_fine_delay not supported.')
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_Q()-1), val)
@@ -959,9 +959,28 @@ class CCLight_Transmon(Qubit):
 
         return int_avg_det
 
+    # def _prep_ro_sources(self):
+    #     LO = self.instr_LO_ro.get_instr()
+    #     LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+    #     LO.on()
+    #     LO.power(self.ro_pow_LO())
+
+
     def _prep_ro_sources(self):
-        LO = self.instr_LO_ro.get_instr()
-        LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+        if self.instr_LutMan_RO.get_instr().LO_freq is not None:
+          log.info('Warning: This qubit is using a fixed RO LO frequency.')
+          LO = self.instr_LO_ro.get_instr()
+          Lo_Lutman = self.instr_LutMan_RO.get_instr()
+          LO_freq = Lo_Lutman.LO_freq
+          LO.frequency.set(LO_freq)
+          mod_freq = self.ro_freq() - LO_freq
+          self.ro_freq_mod(mod_freq)
+          log.info("Setting modulation freq of {} to {}".format(self.name, mod_freq))
+
+        else:
+          LO = self.instr_LO_ro.get_instr()
+          LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+
         LO.on()
         LO.power(self.ro_pow_LO())
 
@@ -1154,11 +1173,22 @@ class CCLight_Transmon(Qubit):
             self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
+        # if self.instr_spec_source() is not None:
+        #     self.instr_spec_source.get_instr().off()
+        # self.instr_LO_mw.get_instr().on()
+        # self.instr_LO_mw.get_instr().pulsemod_state(False)
+        # # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
+        # self.instr_LO_mw.get_instr().frequency.set(
+        #     self.freq_qubit.get() - self.mw_freq_mod.get())
+
+        # self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
+
         MW_LutMan = self.instr_LutMan_MW.get_instr()
 
         if self.instr_spec_source() is not None:
             self.instr_spec_source.get_instr().off()
         self.instr_LO_mw.get_instr().on()
+        self.instr_LO_mw.get_instr().pulsemod_state(False)
 
         if MW_LutMan.cfg_sideband_mode() == 'static':
             # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
@@ -1193,6 +1223,8 @@ class CCLight_Transmon(Qubit):
 
         # used for ef pulsing
         MW_LutMan.mw_ef_amp180(self.mw_ef_amp())
+        # MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
+        #                            self.anharmonicity())
         if MW_LutMan.cfg_sideband_mode() != 'real-time':
           MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
                                    self.anharmonicity())
@@ -1364,10 +1396,10 @@ class CCLight_Transmon(Qubit):
             f_start = self.freq_qubit()
 
         # Set high power and averages to be sure we find the peak.
-        self.spec_pow(-30)
-        self.ro_pulse_amp_CW(0.025)
-        old_avg = self.ro_acq_averages()
-        self.ro_acq_averages(2**15)
+        # self.spec_pow(-30)
+        # self.ro_pulse_amp_CW(0.025)
+        # old_avg = self.ro_acq_averages()
+        # self.ro_acq_averages(2**15)
         # Repeat measurement while no peak is found:
         success = False
         f_center = f_start
@@ -1428,7 +1460,7 @@ class CCLight_Transmon(Qubit):
                 else:
                     success = True
 
-        self.ro_acq_averages(old_avg)
+        # self.ro_acq_averages(old_avg)
         if update:
             if use_max:
                 self.freq_qubit(analysis_spec.peaks['peak'])
@@ -1485,13 +1517,13 @@ class CCLight_Transmon(Qubit):
             freq_center = self.freq_qubit()
             freq_range = 50e6
             freqs = np.arange(freq_center - freq_range, freq_center + freq_range,
-                              0.5e6)
+                              1e6)
         if dac_values is None:
             if self.fl_dc_I0() is not None:
                 dac_values = np.linspace(self.fl_dc_I0() - 1e-3,
                                          self.fl_dc_I0() + 1e-3, 8)
             else:
-                dac_values = np.linspace(-1e3, 1e-3, 8)
+                dac_values = np.linspace(-0.5e3, 0.5e-3, 10)
 
         if fluxChan is None:
             if self.fl_dc_ch() is not None:
@@ -1509,7 +1541,7 @@ class CCLight_Transmon(Qubit):
                                                   mode=spec_mode,
                                                   nested_resonator_calibration=False,
                                                   # nested_resonator_calibration_use_min=False,
-                                                  resonator_freqs=np.arange(-5e6, 5e6, 0.1e6)+self.freq_res())
+                                                  resonator_freqs=np.arange(-5e6, 5e6, 0.2e6)+self.freq_res())
 
             timestamp = a_tools.get_timestamps_in_range(t_start,
                                                         label='Qubit_dac_scan' +
@@ -1631,11 +1663,11 @@ class CCLight_Transmon(Qubit):
             # Standard estimate, negative by convention
             anharmonicity = self.anharmonicity()
 
-        f12_estimate = self.freq_qubit()*2 + anharmonicity
+        f02_estimate = self.freq_qubit()*2 + anharmonicity
 
         if freqs is None:
-            freq_center = f12_estimate/2
-            freq_range = 100e6
+            freq_center = f02_estimate/2
+            freq_range = 175e6
             freqs = np.arange(freq_center-1/2*freq_range, self.freq_qubit()+1/2*freq_range,
                               0.5e6)
         old_spec_pow = self.spec_pow()
@@ -2241,9 +2273,10 @@ class CCLight_Transmon(Qubit):
     def calibrate_ssro_pulse_duration(self, MC=None,
                                       nested_MC=None,
                                       amps=None,
+                                     amp_lim=None,
                                       times= None,
                                       use_adaptive: bool = True,
-                                      n_points: int = 150,
+                                      n_points: int = 80,
                                       analyze: bool = True,
                                       update: bool = True):
         '''
@@ -2290,7 +2323,8 @@ class CCLight_Transmon(Qubit):
 
         if amps is None:
             amps = np.linspace(.01,.25,11)
-
+        if amp_lim is None:
+           amp_lim = (0.01, 0.2)
         ######################
         # Experiment
         ######################
@@ -2311,7 +2345,7 @@ class CCLight_Transmon(Qubit):
                 {'adaptive_function': LearnerND_Minimizer,
                  'goal': lambda l: goal(l) or l.npoints > n_points,
                  'loss_per_simplex': loss_per_simplex,
-                 'bounds': [(10e-9, 400e-9), (0.01, 0.3)],
+                 'bounds': [(10e-9, 400e-9), amp_lim],
                  'minimize': False
                  })
             nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
@@ -2787,7 +2821,8 @@ class CCLight_Transmon(Qubit):
                                          analyze=True, fluxChan=None, close_fig=True,
                                          nested_resonator_calibration=False,
                                          nested_resonator_calibration_use_min=False,
-                                         resonator_freqs=None):
+                                         resonator_freqs=None,
+                                         trigger_idx= None):
         """
         Performs the qubit spectroscopy while changing the current applied
         to the flux bias line.
@@ -2842,6 +2877,8 @@ class CCLight_Transmon(Qubit):
             logging.error('Mode {} not recognized'.format(mode))
         if MC is None:
             MC = self.instr_MC.get_instr()
+        if trigger_idx is None:
+            trigger_idx = self.cfg_qubit_nr()
 
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
@@ -2850,7 +2887,7 @@ class CCLight_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn(),
-                trigger_idx=0)
+                trigger_idx=trigger_idx)
         else:
             p = sqo.pulsed_spec_seq(
                 qubit_idx=self.cfg_qubit_nr(),
@@ -3010,7 +3047,8 @@ class CCLight_Transmon(Qubit):
     def measure_spectroscopy_pulsed_marked(self, freqs, MC=None,
                                            analyze=True, close_fig=True,
                                            label='',
-                                           prepare_for_continuous_wave=True):
+                                           prepare_for_continuous_wave=True,
+                                           trigger_idx = None):
         """
         Performs a spectroscopy experiment by triggering the spectroscopy source
         with a CCLight trigger.
@@ -3030,6 +3068,9 @@ class CCLight_Transmon(Qubit):
 
         wait_time_ns = self.spec_wait_time()*1e9
 
+        if trigger_idx is None:
+          trigger_idx = self.cfg_qubit_nr()
+
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq_marked(
@@ -3037,8 +3078,7 @@ class CCLight_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC(),
-            # trigger_idx=0 if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
-            trigger_idx=1,
+            trigger_idx=trigger_idx if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
             wait_time_ns=wait_time_ns)
 
         CCL.eqasm_program(p.filename)
@@ -3320,7 +3360,7 @@ class CCLight_Transmon(Qubit):
     def measure_anharmonicity(self, freqs_01=None, freqs_12=None, f_01_power=None,
                               f_12_power=None,
                               MC=None, spec_source_2=None,
-                              mode='pulsed_marked'):
+                              mode='pulsed_marked',step_size:int= 1e6):
         """
         Measures the qubit spectroscopy as a function of frequency of the two
         driving tones. The qubit transitions are observed when frequency of one
@@ -3353,22 +3393,30 @@ class CCLight_Transmon(Qubit):
         # if f_12_power == None:
         #     f_12_power = f_01_power+20
         if freqs_01 is None:
-            freqs_01 = self.freq_qubit()+np.arange(-30e6, 30.1e6, 1e6)
+            freqs_01 = self.freq_qubit()+np.arange(-20e6, 20.1e6, step_size)
         if freqs_12 is None:
             freqs_12 = self.freq_qubit() + self.anharmonicity() + \
-                np.arange(-30e6, 30.1e6, 1e6)
+                np.arange(-20e6, 20.1e6, 1e6)
         f_anharmonicity = np.mean(freqs_01) - np.mean(freqs_12)
         if f_01_power == None:
             f_01_power = self.spec_pow()
         if f_12_power == None:
-            f_12_power = f_01_power+20
+            f_12_power = f_01_power+5
         print('f_anharmonicity estimation', f_anharmonicity)
         print('f_12 estimations', np.mean(freqs_12))
         CCL = self.instr_CC.get_instr()
-        p = sqo.pulsed_spec_seq(
-            qubit_idx=self.cfg_qubit_nr(),
-            spec_pulse_length=self.spec_pulse_length(),
-            platf_cfg=self.cfg_openql_platform_fn())
+        if mode == 'pulsed_marked':
+          p = sqo.pulsed_spec_seq_marked(
+              qubit_idx=self.cfg_qubit_nr(),
+              spec_pulse_length=self.spec_pulse_length(),
+              platf_cfg=self.cfg_openql_platform_fn(),
+              trigger_idx=0,
+              trigger_idx_2=9)
+        else:
+          p = sqo.pulsed_spec_seq(
+              qubit_idx=self.cfg_qubit_nr(),
+              spec_pulse_length=self.spec_pulse_length(),
+              platf_cfg=self.cfg_openql_platform_fn())
         CCL.eqasm_program(p.filename)
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3462,6 +3510,7 @@ class CCLight_Transmon(Qubit):
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source = self.instr_spec_source.get_instr()
+        old_spec_pow = self.spec_pow()
 
         self.prepare_for_continuous_wave()
         self.int_avg_det_single._set_real_imag(False)
@@ -3491,7 +3540,7 @@ class CCLight_Transmon(Qubit):
         ma.TwoD_Analysis(auto=True)
         spec_source.off()
         spec_source_2.off()
-        self.spec_pow(old_spec_pow1)
+        self.spec_pow(old_spec_pow)
 
         # if analyze:
         #     a = ma.Three_Tone_Spectroscopy_Analysis(label='Two_tone',  f01=np.mean(freqs_01), f12=np.mean(freqs_12))
@@ -4037,7 +4086,7 @@ class CCLight_Transmon(Qubit):
                 "Change readout demodulation to SSB.")
 
         saved_param = self.ro_pulse_amp()
-        self.ro_pulse_amp(self.ro_pulse_amp_CW())
+        #self.ro_pulse_amp(self.ro_pulse_amp_CW())
         self.prepare_for_timedomain()
 
         # off/on switching is achieved by turning the MW source on and
@@ -5005,7 +5054,7 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma2.ComplexRamseyAnalysis(label='complex_Ramsey', close_figs=True)
             if update:
-                fit_res = a.fit_dicts['exp_fit']['fit_res']  
+                fit_res = a.fit_dicts['exp_fit']['fit_res']
                 fit_frequency = fit_res.params['frequency'].value
                 freq_qubit = self.freq_qubit()
                 self.freq_qubit(freq_qubit + fit_frequency)
@@ -5190,7 +5239,7 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        
+
         # default timing
         if times is None and sweep == 'tau':
             # funny default is because there is no real time sideband
@@ -5340,7 +5389,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('spin_lock_simple'+label+self.msmt_suffix)
-        
+
         if analyze:
             a = ma.T1_Analysis(label='spin_lock_simple', auto=True, close_fig=True)
             return a
@@ -5396,7 +5445,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('spin_lock_echo'+label+self.msmt_suffix)
-        
+
         if analyze:
             a = ma.T1_Analysis(label='spin_lock_echo', auto=True, close_fig=True)
             return a
@@ -5462,7 +5511,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('rabi_frequency'+label+self.msmt_suffix)
-        
+
         if analyze:
             a = ma.Echo_analysis_V15(label='rabi_frequency', auto=True, close_fig=True)
             return a
@@ -5666,13 +5715,9 @@ class CCLight_Transmon(Qubit):
             self, nr_cliffords=2**np.arange(12),
             nr_seeds=100,
             MC=None,
-            recompile: bool = 'as needed',
-            prepare_for_timedomain: bool = True,
-            ro_acq_weight_type: str = "optimal IQ",
-            compile_only: bool = False,
-            pool=None,  # a multiprocessing.Pool()
-            rb_tasks=None  # used after called with `compile_only=True`
-    ):
+            recompile: bool = 'as needed', prepare_for_timedomain: bool = True,
+            ignore_f_cal_pts: bool = False, compile_only: bool = False,
+            rb_tasks=None):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -5709,7 +5754,7 @@ class CCLight_Transmon(Qubit):
         # Settings that have to be changed....
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        self.ro_acq_weight_type(ro_acq_weight_type)
+        self.ro_acq_weight_type('SSB')
         self.ro_acq_digitized(False)
 
         if prepare_for_timedomain:
@@ -6654,3 +6699,75 @@ class CCLight_Transmon(Qubit):
         return ct.freq_to_amp_root_parabola(freq=freq,
                                             poly_coeffs=self.fl_dc_polycoeff(),
                                             **kw)
+
+
+    def set_target_freqency(self,target_frequency = 6e9,
+                            sweetspot_current = None,
+                            sweetspot_frequency = None,
+                            phi0 =30e-3,
+                            Ec=270e6,
+                            span_res=30e6,
+                            span_q=0.5e9,
+                            step_q = 1e6,
+                            step_res= 0.5e6,
+                            I_correct= 0.1e-3,
+                            accuracy= 0.1e9,
+                            fine_tuning= False):
+        """
+        Fluxing a qubit to a targeted frequency based on an estimation using the fluxarc.
+
+        Args: target_frequency (float)
+                  frequency at which you want to bias the qubit in Hz
+
+              sweetspot_current (float)
+                  current at sweetspot frequency in A
+              sweetspot_frequency (float)
+                  qubit frequency at sweetspot in Hz
+              phi0 (float)
+                  value of phi0 (length of fluxarc) in A
+              Ec (float)
+                  Value of Ec in Hz (estimated as 270 MHz)
+        """
+
+        # if target_frequency is None:
+        #   if self.name
+        if sweetspot_current is None:
+          sweetspot_current = self.fl_dc_I0()
+        if sweetspot_frequency is None:
+          sweetspot_frequency = self.freq_max()
+        I=phi0/np.pi*np.arccos(((target_frequency+Ec)/(sweetspot_frequency+Ec))**2)+sweetspot_current
+        print('Baised current at target is {}'.format(I))
+        fluxcurrent = self.instr_FluxCtrl.get_instr()
+        fluxcurrent.set(self.fl_dc_ch(),I)
+        center_res = self.freq_res()
+        center_q = target_frequency
+        if fine_tuning is False:
+          res =self.find_resonator_frequency(freqs=np.arange(-span_res/2,span_res/2,step_res)+center_res,update=True)
+          if res == self.freq_res():
+            print(self.freq_res())
+          else:
+            res2=self.find_resonator_frequency(freqs=np.arange(-span_res,span_res,step_res)+center_res,update=True)
+            if res2== self.freq_res():
+              print(self.freqs(res))
+            else:
+              raise ValueError('Resonator {} cannot be found at target frequency'.format(self.name))
+          f = self.find_frequency(freqs=np.arange(-span_q/2,span_q/2,step_q)+center_q,update=True)
+          if f :
+            print('Qubit frequency at target is {}'.format(self.freq_qubit()))
+          else:
+            f2 = self.find_frequency(freqs=np.arange(-span_q,span_q,step_q)+center_q)
+            if f2==True:
+              print('Qubit frequency at target is {}'.format(self.freq_qubit()))
+            else:
+              raise ValueError('Qubit {} cannot be found at target frequency'.format(self.name))
+        else:
+          while abs(self.freq_qubit() - target_frequency) > accuracy:
+            if self.freq_qubit() - target_frequency > 0:
+              I = I + I_correct
+            else:
+              I = I - I_correct
+            print(I)
+            fluxcurrent.set(self.fl_dc_ch(), I)
+            self.find_resonator_frequency(freqs=np.arange(-span_res/2,span_res/2,step_res)+center_res)
+            self.find_frequency(freqs=np.arange(-span_q/5,span_q/5,step_q)+center_q)
+            return True

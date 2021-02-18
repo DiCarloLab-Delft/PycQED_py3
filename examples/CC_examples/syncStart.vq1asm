@@ -1,0 +1,3 @@
+mainLoop:       seq_bar       
+				seq_out         0x80010000,10           # trigger HDAWG & UHFQA
+                jmp             @mainLoop               # loop indefinitely
