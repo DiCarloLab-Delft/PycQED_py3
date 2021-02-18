@@ -25,6 +25,8 @@ jobs:
         sleep 3
     - name: Install openql
       run: |
+        python -m pip install --upgrade pip
+        pip install setuptools
         git clone -b feature/cc/feedback https://github.com/DiCarloLab-Delft/OpenQL.git
         cd OpenQL
         git submodule update --init --recursive
