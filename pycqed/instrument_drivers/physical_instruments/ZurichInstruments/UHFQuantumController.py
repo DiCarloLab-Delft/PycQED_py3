@@ -1125,6 +1125,9 @@ repeat (loop_cnt) {"""
     // Generate waveforms based on codeword output
     switch (cw) {"""
         # Add each of the cases
+        # FIXME: note that the actual wave timing (i.e. trigger latency) depends on the number of cases, because the
+        #  switch statement generates a tree of if's internally. Consequentially, the maximum repetition rate also depends
+        #  on the number of cases.
         for case in self._cases:
             self._awg_program[0] += """
         case 0x{:08x}: playWave({}, {});""".format(case << 17, zibase.gen_waveform_name(0, case), zibase.gen_waveform_name(1, case))
