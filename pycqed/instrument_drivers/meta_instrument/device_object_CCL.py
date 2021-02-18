@@ -1106,7 +1106,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
 
-        measured_qubits = ['X', 'D3', 'D4', 'Z1', 'D1']
+        measured_qubits = [q0,q1]
         if q2 is not None:
             measured_qubits.append(q2)
         if q3 is not None:
