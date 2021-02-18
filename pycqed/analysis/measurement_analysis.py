@@ -2448,7 +2448,7 @@ class Echo_analysis_V15(TD_Analysis):
             amplitude_guess = 1
             damped_osc_mod.set_param_hint('amplitude',
                                           value=amplitude_guess,
-                                          min=0.4,
+                                          min=0.0,
                                           max=4.0)
             damped_osc_mod.set_param_hint('tau',
                                           value=x[1]*10,

@@ -543,7 +543,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
         self.auxins_0_averaging(8)
 
     def acquisition_arm(self, single=True) -> None:
-        # time.sleep(0.01)
+        time.sleep(0.01)
         self.awgs_0_single(single)
         self.start()
 

@@ -649,7 +649,7 @@ def Cryoscope(
     qubit_idx: int,
     buffer_time1=0,
     buffer_time2=0,
-    flux_cw: str = 'fl_cw_02',
+    flux_cw: str = 'fl_cw_06',
     twoq_pair=[2, 0],
     platf_cfg: str = '',
     cc: str = 'CCL',
@@ -942,7 +942,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_park: int,
         k.gate("wait", [], 0)  # alignment workaround
         k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
         if qubit_idx_park is not None:
-            k.gate('fl_cw_06', [qubit_idx_park])  # square pulse
+            k.gate('fl_cw_05', [qubit_idx_park])  # square pulse
         k.gate("wait", [], 0)  # alignment workaround
     elif cc.upper() == 'QCC' or cc.upper() == 'CC':
         k.gate("wait", [], 0)  # alignment workaround
@@ -1675,7 +1675,8 @@ def conditional_oscillation_seq(q0: int, q1: int,
             # Measurement
             # #################################################################
             if case == 'excitation':
-                gate = 'rx180' if single_q_gates_replace is None else single_q_gates_replace
+                gate = 'rx180' 
+                # if single_q_gates_replace is None else single_q_gates_replace
                 k.gate("wait", [], 0) #alignment workaround
                 k.gate(gate, [q1])
                 # k.gate('i', [q0])

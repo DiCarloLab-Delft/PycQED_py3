@@ -516,20 +516,22 @@ class DeviceCCL(Instrument):
         # This device object works under the assumption that a single LO
         # is used to drive all readout lines.
         LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
-        LO.frequency.set(self.ro_lo_freq())
+        LO_lutman = self.find_instrument(qubits[0]).instr_LutMan_RO.get_instr()
+        LO.frequency.set(LO_lutman.LO_freq)
         LO.power(self.ro_pow_LO())
         LO.on()
 
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
+            ro_lutman = qb.instr_LutMan_RO.get_instr()
             # set RO modulation to use common LO frequency
-            mod_freq = qb.ro_freq() - self.ro_lo_freq()
+            mod_freq = qb.ro_freq() - ro_lutman.LO_freq
             log.info("Setting modulation freq of {} to {}".format(qb_name, mod_freq))
             qb.ro_freq_mod(mod_freq)
 
             LO_q = qb.instr_LO_ro.get_instr()
             if LO_q is not LO:
-                LO_q.frequency.set(self.ro_lo_freq())
+                LO_q.frequency.set(ro_lutman.LO_freq)
                 #LO_q.power(self.ro_pow_LO())
                 LO_q.on()
                 #raise ValueError("Expect a single LO to drive all feedlines")
@@ -725,10 +727,10 @@ class DeviceCCL(Instrument):
                 [resonators_in_lm[ro_lm.name]]
             log.info('Setting resonator combinations for {} to {}'.format(
                 ro_lm.name, resonator_combs))
-
+            
             # FIXME: temporary fix so device object doesnt mess with 
             #       the resonator combinations. Better strategy should be implemented
-            #ro_lm.resonator_combinations(resonator_combs)
+            ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
     def get_correlation_detector(self, qubits: list,

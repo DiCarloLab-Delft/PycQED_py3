@@ -1031,8 +1031,8 @@ class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
             "legend_pos": "upper right",
         }
 
-        if self.normalized_probability:
-            self.plot_dicts["main"]["yrange"] = (0, 1)
+        # if self.normalized_probability:
+        #     self.plot_dicts["main"]["yrange"] = (0, 1)
 
         self.plot_dicts["on"] = {
             "plotfn": self.plot_line,
