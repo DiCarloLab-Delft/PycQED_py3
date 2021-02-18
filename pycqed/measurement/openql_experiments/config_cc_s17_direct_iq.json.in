@@ -1082,35 +1082,12 @@
         },
 
         // aditions for feedback
-        "_wait_dsm": {
-            "duration": 100,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "cc": {
-                "signal": []
-            }
-        },
-        "if_1_break": {
-			"duration": 100,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"cc": {
-				"signal": [],
-				"pragma": {
-                    "break": 1
-				}
-			}
-		},
-		"if_0_break": {
-			"duration": 100,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"cc": {
-				"signal": [],
-				"pragma": {
-                    "break": 0
-				}
-			}
-		},
-		"_wait_uhfqa": {
-            "duration": 20000,
+
+        // uhfqc 9 state declaration latency is reported to be 261 ns
+        // retrigger rate of the device is dependent on case statement in uhfqc
+        // sequencer, therefore dependent on the resonator combinations used
+        "_wait_uhfqa": {
+            "duration": 720,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "signal": []
@@ -1127,6 +1104,33 @@
 						"value": []
 					}
                 ]
+			}
+		},
+        "_wait_dsm": {
+            "duration": 80,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc": {
+                "signal": []
+            }
+        },
+        "if_1_break": {
+			"duration": 60,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 1
+				}
+			}
+		},
+		"if_0_break": {
+			"duration": 60,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 0
+				}
 			}
 		}
 	},	// end of "instructions"

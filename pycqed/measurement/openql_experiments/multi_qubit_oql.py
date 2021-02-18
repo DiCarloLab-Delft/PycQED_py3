@@ -1675,7 +1675,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
             # Measurement
             # #################################################################
             if case == 'excitation':
-                gate = 'rx180' if single_q_gates_replace is None else single_q_gates_replace
+                gate = 'rx180'
                 k.gate("wait", [], 0) #alignment workaround
                 k.gate(gate, [q1])
                 # k.gate('i', [q0])

@@ -338,7 +338,7 @@ class Base_MW_LutMan(Base_LutMan):
                 if waveform['theta'] == 90:
                     amp = self.mw_amp180()*self.mw_amp90_scale()
                 elif waveform['theta'] == -90:
-                    amp = - self.mw_amp180() * self.mw_amp90_scale() 
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
                 else:
                     amp = theta_to_amp(theta=waveform['theta'],
                                        amp180=self.mw_amp180())
@@ -381,7 +381,7 @@ class Base_MW_LutMan(Base_LutMan):
                 # won't get the needed four waveforms.
                 if 'duration' in waveform.keys():
                     sq_pulse_duration = waveform['duration']
-                else: 
+                else:
                     sq_pulse_duration = self.sq_pulse_duration()
                 if 'sq_G_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square_VSM(
@@ -442,6 +442,20 @@ class Base_MW_LutMan(Base_LutMan):
         for i, (phase) in enumerate(phases):
             lm[i+9] = {"name": "rPhi90",    "theta": 90,
                        "phi": phase, "type": "ge"}
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+    def load_x_pulses_to_AWG_lookuptable(self,
+                                             phases=np.arange(0, 360, 20)):
+        """
+        Loads rPhi90 pulses onto the AWG lookuptable.
+        """
+
+        if (len(phases) > 18):
+            raise ValueError('max 18 amplitude values can be provided')
+        lm = self.LutMap()
+        for i, (phase) in enumerate(phases):
+            lm[i+9] = {"name": "rPhi90",    "theta": phase,
+                       "phi": 0, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     def load_square_waves_to_AWG_lookuptable(self):
@@ -650,7 +664,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # Parameters for a square pulse
         self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
-                           initial_value=0.5)   
+                           initial_value=0.5)
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -673,7 +687,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
           # Enforce assumption that channel I precedes channel Q and share AWG
           assert awg_nr == (self.channel_Q()-1)//2
           assert self.channel_I() < self.channel_Q()
-            
+
           if self.mixer_alpha()<=1:
             AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), self.mixer_alpha()*val)
             AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), self.mixer_alpha()*val)
@@ -823,7 +837,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 if waveform['theta'] == 90:
                     amp = self.mw_amp180()*self.mw_amp90_scale()
                 elif waveform['theta'] == -90:
-                    amp = - self.mw_amp180() * self.mw_amp90_scale() 
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
                 else:
                     amp = theta_to_amp(theta=waveform['theta'],
                                        amp180=self.mw_amp180())
