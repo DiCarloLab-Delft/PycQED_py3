@@ -1890,6 +1890,7 @@ class DeviceCCL(Instrument):
             q_target: str,
             nr_shots: int = 2**13,  # 8192
             prepare_for_timedomain: bool = True,
+            second_excited_state: bool = False,
             result_logging_mode='raw',
             initialize: bool = False,
             analyze=True,
@@ -1924,6 +1925,9 @@ class DeviceCCL(Instrument):
 
         # off and on, not including post selection init measurements yet
         nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        if second_excited_state:
+            nr_cases = 3 ** len(qubits)
+            
         if initialize == True:
             nr_shots = 4 * nr_shots
         else:
@@ -1939,7 +1943,7 @@ class DeviceCCL(Instrument):
 
         p = mqo.multi_qubit_off_on(qubit_idxs,
                                    initialize=initialize,
-                                   second_excited_state=False,
+                                   second_excited_state=second_excited_state,
                                    platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
@@ -2076,7 +2080,8 @@ class DeviceCCL(Instrument):
                                       q_target: str,
                                       update=True,
                                       verify=True,
-                                      averages=2**15
+                                      averages=2**15,
+                                      return_analysis=True
                                       ):
 
         """
@@ -2127,7 +2132,10 @@ class DeviceCCL(Instrument):
                 Q_target._prep_ro_instantiate_detectors()
                 ssro_dict= self.measure_ssro_single_qubit(qubits=qubits,
                                                           q_target=q_target)
-            return ssro_dict
+            if return_analysis:
+                return ssro_dict
+            else:
+                return True
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
@@ -2912,9 +2920,11 @@ class DeviceCCL(Instrument):
         self,
         q0: str,
         amps,
+        flux_cw: str = 'fl_cw_06',
         duration: float = 100e-9,
         amp_parameter: str = "channel",
         MC=None,
+        twoq_pair=[2, 0],
         label="Cryoscope",
         max_delay: float = "auto",
         prepare_for_timedomain: bool = True,
@@ -2970,12 +2980,8 @@ class DeviceCCL(Instrument):
 
         if amp_parameter == "channel":
             sw = fl_lutman.cfg_awg_channel_amplitude
-            flux_cw = "fl_cw_06"
-
         elif amp_parameter == "dac":
             sw = swf.FLsweep(fl_lutman, fl_lutman.sq_amp, waveform_name="square")
-            flux_cw = "fl_cw_06"
-
         else:
             raise ValueError(
                 'amp_parameter "{}" should be either '
@@ -2986,6 +2992,7 @@ class DeviceCCL(Instrument):
             q0idx,
             buffer_time1=0,
             buffer_time2=max_delay,
+            twoq_pair=twoq_pair,
             flux_cw=flux_cw,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
@@ -5132,7 +5139,8 @@ class DeviceCCL(Instrument):
 
                 # Use ch_to_analyze as 5 for parking phase
                 a_obj = ma2.Crossing_Analysis(label=label,
-                                            options_dict={'ch_idx': 5, 'target_crossing': 0})
+                                            ch_idx='Park Phase OFF',
+                                            target_crossing=0)
                 crossed_value = a_obj.proc_data_dict['root']
                 park_flux_lm.park_amp(crossed_value)
                 park_flux_lm.park_amp_minus(-crossed_value)
@@ -5190,7 +5198,8 @@ class DeviceCCL(Instrument):
 
                     # Use ch_to_analyze as 4 for single qubit phases ('Q0 phase')
                     a_obj = ma2.Crossing_Analysis(label=label,
-                                                  options_dict={'ch_idx': 4, 'target_crossing': 0})
+                                                ch_idx='Q0 phase', 
+                                                target_crossing=0)
                     crossed_value = a_obj.proc_data_dict['root']
                     getattr(flux_lm, 'cz_phase_corr_amp_' + gate )(crossed_value)
 
@@ -5239,7 +5248,8 @@ class DeviceCCL(Instrument):
 
             # Use ch_to_analyze as 4 for single qubit phases ('Q0 phase')
             a_obj = ma2.Crossing_Analysis(label=label,
-                                          options_dict={'ch_idx': 1, 'target_crossing': 180})
+                                          ch_idx='Conditional phase',
+                                          target_crossing=180)
             crossed_value = a_obj.proc_data_dict['root']
             getattr(flux_lm, 'cz_theta_f_' + gate )(crossed_value)
 
@@ -5248,6 +5258,7 @@ class DeviceCCL(Instrument):
             self.find_instrument(lutman).set_inspire_lutmap()
         self.prepare_for_timedomain(qubits=self.qubits())
         self.find_instrument(self.instr_MC()).soft_avg(1)
+        return True
 
     def measure_multi_AllXY(self, qubits: list = None ,MC=None, termination_opt=0.08):
 

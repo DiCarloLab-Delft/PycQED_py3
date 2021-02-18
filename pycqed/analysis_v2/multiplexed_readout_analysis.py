@@ -234,6 +234,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 F_vs_th = (1-(1-abs(norm_cumsum_0-norm_cumsum_1))/2)
                 opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
                 opt_idx = int(round(np.average(opt_idxs)))
+                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i])) 
                 self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_raw'] = \
                     F_vs_th[opt_idx]
                 self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'] = \
@@ -982,10 +983,10 @@ class Multiplexed_Transient_Analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
 
-        self.proc_data_dict['Time_data'] = self.raw_data_dict['data'][:, 0]
-        self.proc_data_dict['Channel_0_data'] = self.raw_data_dict['data'][:, 1]
-        self.proc_data_dict['Channel_1_data'] = self.raw_data_dict['data'][:, 2]
-
+        length = int(len(self.raw_data_dict['data'][:, 0])/2)
+        self.proc_data_dict['Time_data'] = np.arange(length)/1.8e9
+        self.proc_data_dict['Channel_0_data'] = self.raw_data_dict['data'][:, 1][:length]
+        self.proc_data_dict['Channel_1_data'] = self.raw_data_dict['data'][:, 2][:length]
 
     def prepare_plots(self):
 

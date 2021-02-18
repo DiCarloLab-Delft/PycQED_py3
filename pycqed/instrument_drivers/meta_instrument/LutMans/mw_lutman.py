@@ -223,7 +223,7 @@ class Base_MW_LutMan(Base_LutMan):
         self.LutMap(default_mw_lutmap.copy())
 
     def set_inspire_lutmap(self):
-        """Set the default lutmap for standard microwave drive pulses."""
+        """Set the default lutmap for expanded microwave drive pulses."""
         self.LutMap(inspire_mw_lutmap.copy())
 
     def codeword_idx_to_parnames(self, cw_idx: int):
@@ -387,13 +387,13 @@ class Base_MW_LutMan(Base_LutMan):
                     self._wave_dict[idx] = wf.mod_square_VSM(
                         amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
                         length=sq_pulse_duration,#self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation(),
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
                         sampling_rate=self.sampling_rate())
                 elif 'sq_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square(
                         amp=self.sq_amp(), length=sq_pulse_duration,
-                        f_modulation=self.mw_modulation(),  phase=0,
-                        motzoi=0, sampling_rate=self.sampling_rate())
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
             else:
@@ -401,7 +401,7 @@ class Base_MW_LutMan(Base_LutMan):
 
         # Add predistortions + test
         if (self.mixer_apply_predistortion_matrix()
-                and apply_predistortion_matrix):
+                and apply_predistortion_matrix and self.cfg_sideband_mode != 'real-time'):
             self._wave_dict = self.apply_mixer_predistortion_corrections(
                 self._wave_dict)
         return self._wave_dict
