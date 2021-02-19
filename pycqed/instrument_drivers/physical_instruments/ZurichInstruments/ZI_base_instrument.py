@@ -243,7 +243,8 @@ class MockDAQServer():
     just entries in a 'dict') based on the device name that is used when
     connecting to a device. These nodes differ depending on the instrument
     type, which is determined by the number in the device name: dev2XXX are
-    UHFQA instruments and dev8XXX are HDAWG8 instruments.
+    UHFQA instruments, dev8XXX are HDAWG8 instruments, dev10XXX are PQSC
+    instruments.
     """
 
     def __init__(self, server, port, apilevel, verbose=False):
@@ -279,6 +280,8 @@ class MockDAQServer():
             self.devtype = 'UHFQA'
         elif self.device.lower().startswith('dev8'):
             self.devtype = 'HDAWG8'
+        elif self.device.lower().startswith('dev10'):
+            self.devtype = 'PQSC'
 
         # Add paths
         filename = os.path.join(os.path.dirname(os.path.abspath(
@@ -340,6 +343,9 @@ class MockDAQServer():
             self.nodes[f'/{self.device}/dios/0/drive'] = {'type': 'Integer', 'value': 0}
             for dio_nr in range(32):
                 self.nodes[f'/{self.device}/raw/dios/0/delays/{dio_nr}/value'] = {'type': 'Integer', 'value': 0}
+        elif self.devtype == 'PQSC':
+            self.nodes[f'/{self.device}/raw/error/json/errors'] = {
+                'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
 
     def listNodesJSON(self, path):
         pass
