@@ -452,7 +452,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx180', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
-        #k.gate('rx90', [qubit_idx])
+        # k.gate('rx90', [qubit_idx])
         angle = (i*40) % 360
         cw_idx = angle//20 + 9
         if angle == 0:

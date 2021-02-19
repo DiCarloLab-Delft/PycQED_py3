@@ -29,7 +29,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     def __init__(self,
                  name: str,
                  transport: Transport,
-                 num_ccio: int=9,
+                 num_ccio: int=11,
                  ccio_slots_driving_vsm: List[int] = None  # NB: default can not be '[]' because that is a mutable default argument
                  ) -> None:
         super().__init__(name, transport) # calls CCCore

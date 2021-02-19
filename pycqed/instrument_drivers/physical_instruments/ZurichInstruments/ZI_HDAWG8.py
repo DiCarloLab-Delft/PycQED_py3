@@ -177,7 +177,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
         def _set_awgs_outputs_amplitude(value):
             self.set(f'awgs_{awg}_outputs_{ch}_gains_{ch}', value)
         return _set_awgs_outputs_amplitude
-    
+
     def _gen_get_awgs_outputs_amplitude(self, awg, ch):
         """
         Create a function for mapping getting awgs_N_outputs_M_amplitude to the new nodes.
@@ -387,13 +387,7 @@ while (1) {
             self.sync()
 
         # Use 50 MHz DIO clocking
-        if self.geti('/zi/about/revision') < 200802104:
-          # Old-style nodes (used before 20.08)
-          self.seti('raw/dios/0/extclk', 1)
-        else:
-          # New node: Select a specific DIO mode (which configures various
-          # other bits and pieces accordingly)
-          self.seti('dios/0/mode', 2)
+        self.seti('raw/dios/0/extclk', 1)
 
         # Configure the DIO interface and the waveforms
         for awg_nr in range(int(self._num_channels()//2)):
@@ -548,8 +542,7 @@ while (1) {
         self._dio_calibration_delay = value
 
         # And configure the delays
-        for i in range(32):
-            self.setd(f'raw/dios/0/delays/{i}/value', self._dio_calibration_delay)
+        self.setd('raw/dios/0/delays/*', self._dio_calibration_delay)
 
     def _get_dio_calibration_delay(self):
         return self._dio_calibration_delay
@@ -790,10 +783,10 @@ while (1) {
 
         elif self.cfg_codeword_protocol() == 'novsm_microwave':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                                      '..', 'examples','CC_examples',
-                                      'hdawg_calibration_7bit.vq1asm'))
+                                '..', 'examples','CC_examples',
+                                'hdawg_calibration.vq1asm'))
 
-            sequence_length = 128
+            sequence_length = 32
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)), \
                                  (1, list(staircase_sequence)), \
@@ -859,6 +852,16 @@ while (1) {
 
         subseq = max(subseq, key=len)
         delay = len(subseq)//2 + subseq[0]
+
+        # subseq = [[]]
+        # for e in valid_delays:
+        #     if not subseq[-1] or subseq[-1][-1] == e - 1:
+        #         subseq[-1].append(e)
+        #     else:
+        #         subseq.append([e])
+
+        # subseq = max(subseq, key=len)
+        # delay = len(subseq)//2 + subseq[0]
 
         # Print information
         log.info(f"Valid delays are {valid_delays}")

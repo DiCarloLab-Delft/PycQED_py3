@@ -130,7 +130,7 @@ _control_modes = {
             [24, 23, 22],
             [27, 26, 25]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [31,15]
     }
 }
 

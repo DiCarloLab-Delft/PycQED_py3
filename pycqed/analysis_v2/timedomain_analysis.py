@@ -1031,8 +1031,8 @@ class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
             "legend_pos": "upper right",
         }
 
-        if self.normalized_probability:
-            self.plot_dicts["main"]["yrange"] = (0, 1)
+        # if self.normalized_probability:
+        #     self.plot_dicts["main"]["yrange"] = (0, 1)
 
         self.plot_dicts["on"] = {
             "plotfn": self.plot_line,
@@ -1828,18 +1828,25 @@ class Crossing_Analysis(ba.BaseDataAnalysis):
 
         self.target_crossing = target_crossing
         self.ch_idx = ch_idx
-
         self.numeric_params = []
         if auto:
             self.run_analysis()
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
-        ch_idx = self.ch_idx
+        if str(self.ch_idx).isdigit():
+            ch_idx = ch_idx
+        else:
+            ch_idx = list(
+               self.raw_data_dict["measured_values_ord_dict"].keys()).index(str(self.ch_idx))
 
+        # print('Fitting Crossing to {}'.format(list(
+        #     self.raw_data_dict["measured_values_ord_dict"].keys()
+        # )[ch_idx]))
+
+        self.proc_data_dict["xvals"] = self.raw_data_dict["xvals"][0]
         self.proc_data_dict["ylabel"] = self.raw_data_dict["value_names"][0][ch_idx]
         self.proc_data_dict["yunit"] = self.raw_data_dict["value_units"][0][ch_idx]
-        self.proc_data_dict["xvals"] = self.raw_data_dict["xvals"][0]
         self.proc_data_dict["yvals"] = list(
             self.raw_data_dict["measured_values_ord_dict"].values()
         )[ch_idx][0]
@@ -1872,10 +1879,12 @@ class Crossing_Analysis(ba.BaseDataAnalysis):
         min_xrange = np.min(self.proc_data_dict["xvals"])
         max_xrange = np.max(self.proc_data_dict["xvals"])
         is_root_in_range = np.where(
-            np.logical_and(roots > min_xrange, roots < max_xrange), True, False
+            np.logical_and(roots >= min_xrange, roots <= max_xrange), True, False
         )
 
-        # check whethere there is roots within range
+        # check whether there is roots within range
+        # print(roots,is_root_in_range)
+        # print('Fitlered',roots[is_root_in_range])
         roots_available_within_range = roots[is_root_in_range][0]
         if roots_available_within_range > 0:  # sums Trues as 1, Falses as 0
             self.proc_data_dict["root"] = roots[is_root_in_range][

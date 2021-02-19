@@ -223,7 +223,7 @@ class Base_MW_LutMan(Base_LutMan):
         self.LutMap(default_mw_lutmap.copy())
 
     def set_inspire_lutmap(self):
-        """Set the default lutmap for standard microwave drive pulses."""
+        """Set the default lutmap for expanded microwave drive pulses."""
         self.LutMap(inspire_mw_lutmap.copy())
 
     def codeword_idx_to_parnames(self, cw_idx: int):
@@ -338,7 +338,7 @@ class Base_MW_LutMan(Base_LutMan):
                 if waveform['theta'] == 90:
                     amp = self.mw_amp180()*self.mw_amp90_scale()
                 elif waveform['theta'] == -90:
-                    amp = - self.mw_amp180() * self.mw_amp90_scale() 
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
                 else:
                     amp = theta_to_amp(theta=waveform['theta'],
                                        amp180=self.mw_amp180())
@@ -381,19 +381,19 @@ class Base_MW_LutMan(Base_LutMan):
                 # won't get the needed four waveforms.
                 if 'duration' in waveform.keys():
                     sq_pulse_duration = waveform['duration']
-                else: 
+                else:
                     sq_pulse_duration = self.sq_pulse_duration()
                 if 'sq_G_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square_VSM(
                         amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
                         length=sq_pulse_duration,#self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation(),
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
                         sampling_rate=self.sampling_rate())
                 elif 'sq_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square(
                         amp=self.sq_amp(), length=sq_pulse_duration,
-                        f_modulation=self.mw_modulation(),  phase=0,
-                        motzoi=0, sampling_rate=self.sampling_rate())
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
             else:
@@ -401,7 +401,7 @@ class Base_MW_LutMan(Base_LutMan):
 
         # Add predistortions + test
         if (self.mixer_apply_predistortion_matrix()
-                and apply_predistortion_matrix):
+                and apply_predistortion_matrix and self.cfg_sideband_mode != 'real-time'):
             self._wave_dict = self.apply_mixer_predistortion_corrections(
                 self._wave_dict)
         return self._wave_dict
@@ -442,6 +442,20 @@ class Base_MW_LutMan(Base_LutMan):
         for i, (phase) in enumerate(phases):
             lm[i+9] = {"name": "rPhi90",    "theta": 90,
                        "phi": phase, "type": "ge"}
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+    def load_x_pulses_to_AWG_lookuptable(self,
+                                             phases=np.arange(0, 360, 20)):
+        """
+        Loads rPhi90 pulses onto the AWG lookuptable.
+        """
+
+        if (len(phases) > 18):
+            raise ValueError('max 18 amplitude values can be provided')
+        lm = self.LutMap()
+        for i, (phase) in enumerate(phases):
+            lm[i+9] = {"name": "rPhi90",    "theta": phase,
+                       "phi": 0, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     def load_square_waves_to_AWG_lookuptable(self):
@@ -644,58 +658,56 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             docstring=('using the channel amp as additional'
                        'parameter to allow rabi-type experiments without'
                        'wave reloading. Should not be using VSM'))
+        # Setting variable to track channel amplitude since it cannot be directly extracted from
+        # HDAWG while using real-time modulation (because of mixer amplitude imbalance corrections)
+        self.channel_amp_value = 0
 
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
         # Parameters for a square pulse
         self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
-                           initial_value=0.5)   
+                           initial_value=0.5)
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
+        awg_nr = (self.channel_I()-1)//2
+        # Enforce assumption that channel I preceeds channel Q and share AWG
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+        self.channel_amp_value = val
 
         if self.cfg_sideband_mode() == 'static':
-          awg_nr = (self.channel_I()-1)//2
-          # Enforce assumption that channel I precedes channel Q and share AWG
-          assert awg_nr == (self.channel_Q()-1)//2
-          assert self.channel_I() < self.channel_Q()
-
-          AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
-          AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), 0)
-          AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), 0)
-          AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), 0)
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), 0)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
 
         # In case of sideband modulation mode 'real-time', amplitudes have to be set
         # according to modulation matrix
         elif self.cfg_sideband_mode() == 'real-time':
-          awg_nr = (self.channel_I()-1)//2
-          # Enforce assumption that channel I precedes channel Q and share AWG
-          assert awg_nr == (self.channel_Q()-1)//2
-          assert self.channel_I() < self.channel_Q()
-            
-          if self.mixer_alpha()<=1:
-            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), self.mixer_alpha()*val)
-            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), self.mixer_alpha()*val)
-            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), -val)
-            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
-          else:
-            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
-            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), val)
-            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), (-1/self.mixer_alpha())*val)
-            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), (1/self.mixer_alpha())*val)
+            if self.mixer_alpha()<=1:
+                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), self.mixer_alpha()*val)
+                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), -val)
+                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), self.mixer_alpha()*val)
+                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
+            else:
+                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
+                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), (-1/self.mixer_alpha())*val)
+                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), val)
+                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), (1/self.mixer_alpha())*val)
         else:
             raise KeyError('Unexpected value for parameter sideband mode.')
 
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
+        awg_nr = (self.channel_I()-1)//2
+        # Enforce assumption that channel I precedes channel Q and share AWG
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+
         vals = []
         if self.cfg_sideband_mode() == 'static':
-            awg_nr = (self.channel_I()-1)//2
-            # Enforce assumption that channel I precedes channel Q and share AWG
-            assert awg_nr == (self.channel_Q()-1)//2
-            assert self.channel_I() < self.channel_Q()
-
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0)))
@@ -706,15 +718,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # In case of sideband modulation mode 'real-time', amplitudes have to be set
         # according to modulation matrix
         elif self.cfg_sideband_mode() == 'real-time':
-            awg_nr = (self.channel_I()-1)//2
-            # Enforce assumption that channel I precedes channel Q and share AWG
-            assert awg_nr == (self.channel_Q()-1)//2
-            assert self.channel_I() < self.channel_Q()
-
-            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
-            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
-            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
-            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
+            vals.append(self.channel_amp_value)
 
         return vals[0]
 
@@ -758,15 +762,14 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # Uploading the codeword program (again) is needed to link the new
         # waveforms in case the user has changed the codeword mode.
         if force_load_sequencer_program:
-            # Enforce assumption that channel I precedes channel Q
-            assert self.channel_I() < self.channel_Q()
-            assert (self.channel_I())//2 < (self.channel_Q())//2
-
             # This ensures only the channels that are relevant get reconfigured
             if 'channel_GI' in self.parameters:
                 awgs = [self.channel_GI()//2, self.channel_DI()//2]
             else:
                 awgs = [self.channel_I()//2]
+                # Enforce assumption that channel I precedes channel Q
+                assert self.channel_I() < self.channel_Q()
+                assert (self.channel_I())//2 < (self.channel_Q())//2
 
             self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 
@@ -789,8 +792,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             self.AWG.get_instr().set('sines_{}_harmonic'.format(self.channel_I()-1), 1)
             self.AWG.get_instr().set('sines_{}_harmonic'.format(self.channel_Q()-1), 1)
             # Create respective cossine/sin signals for modulation through phase-shift
-            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_I()-1), 0)
-            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_Q()-1), 90)
+            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_I()-1), 90)
+            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_Q()-1), 0)
             # Create correct modulation modeI
             self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 3)
             self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 4)
@@ -823,7 +826,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 if waveform['theta'] == 90:
                     amp = self.mw_amp180()*self.mw_amp90_scale()
                 elif waveform['theta'] == -90:
-                    amp = - self.mw_amp180() * self.mw_amp90_scale() 
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
                 else:
                     amp = theta_to_amp(theta=waveform['theta'],
                                        amp180=self.mw_amp180())

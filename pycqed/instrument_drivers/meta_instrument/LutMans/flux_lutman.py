@@ -1829,6 +1829,8 @@ class HDAWG_Flux_LutMan_Adiabatic(Base_Flux_LutMan):
         else:
             #print('picked 20 for {}'.format(which_gate))
             state_B = '20'
+            # if corr_max_amp>0:
+            #     raise ValueError(' recognized')
         eps_i = self.calc_amp_to_eps(0, state_A='11',
                                      state_B=state_B,
                                      which_gate=which_gate)
@@ -1854,6 +1856,9 @@ class HDAWG_Flux_LutMan_Adiabatic(Base_Flux_LutMan):
         # Now the sinusoidal step for phase acquisition
         if is_double_sided:
             signs = czd_signs
+            # Correction max amp should be negative for low-frequency qubits
+            # This is because they are getting away from avoided crossing, not getting closer
+            # So theta_f < theta_i
             theta_f = theta_i + corr_max_amp*corr_amp
             phase_corr_theta = wfl.martinis_flux_pulse_v2(
                 corr_len/2, theta_i=theta_i,

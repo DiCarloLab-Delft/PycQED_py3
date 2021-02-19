@@ -1116,7 +1116,7 @@ def time_evolution_new(
         )  # line here to quickly switch off the use of S
 
     w_q1 = q_freq_10  # we 'save' the input value of w_q1
-    if sim_control_CZ.sigma_q1() != 0:
+    if fluxbias_q1 != 0:
         w_q1_sweetspot = sim_control_CZ.w_q1_sweetspot()
         if w_q1 > w_q1_sweetspot:
             log.warning(
@@ -1273,6 +1273,9 @@ def simulate_quantities_of_interest_superoperator_new(
     population_transfer_01_10 = average_population_transfer_subspace_to_subspace(
         U_final, states_in=[[0, 1]], states_out=[[1, 0]]
     )
+    population_20_state = average_population_transfer_subspace_to_subspace(
+        U_final, states_in=[[1, 1]], states_out=[[2, 0]]
+    )
 
     return {
         "phi_cond": phi_cond,
@@ -1297,7 +1300,8 @@ def simulate_quantities_of_interest_superoperator_new(
         "cond_phase20": cond_phase20,
         "population_transfer_12_21": population_transfer_12_21,
         "population_transfer_12_03": population_transfer_12_03,
-        "population_transfer_01_10": population_transfer_01_10
+        "population_transfer_01_10": population_transfer_01_10,
+        "population_20_state": population_20_state
     }
 
 

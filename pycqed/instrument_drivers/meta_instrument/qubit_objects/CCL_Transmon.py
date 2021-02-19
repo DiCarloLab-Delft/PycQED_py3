@@ -959,9 +959,28 @@ class CCLight_Transmon(Qubit):
 
         return int_avg_det
 
+    # def _prep_ro_sources(self):
+    #     LO = self.instr_LO_ro.get_instr()
+    #     LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+    #     LO.on()
+    #     LO.power(self.ro_pow_LO())
+
+
     def _prep_ro_sources(self):
-        LO = self.instr_LO_ro.get_instr()
-        LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+        if self.instr_LutMan_RO.get_instr().LO_freq is not None:
+          log.info('Warning: This qubit is using a fixed RO LO frequency.')
+          LO = self.instr_LO_ro.get_instr()
+          Lo_Lutman = self.instr_LutMan_RO.get_instr()
+          LO_freq = Lo_Lutman.LO_freq
+          LO.frequency.set(LO_freq)
+          mod_freq = self.ro_freq() - LO_freq
+          self.ro_freq_mod(mod_freq)
+          log.info("Setting modulation freq of {} to {}".format(self.name, mod_freq))
+
+        else:
+          LO = self.instr_LO_ro.get_instr()
+          LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+
         LO.on()
         LO.power(self.ro_pow_LO())
 
@@ -1154,13 +1173,37 @@ class CCLight_Transmon(Qubit):
             self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
+        # if self.instr_spec_source() is not None:
+        #     self.instr_spec_source.get_instr().off()
+        # self.instr_LO_mw.get_instr().on()
+        # self.instr_LO_mw.get_instr().pulsemod_state(False)
+        # # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
+        # self.instr_LO_mw.get_instr().frequency.set(
+        #     self.freq_qubit.get() - self.mw_freq_mod.get())
+
+        # self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
+
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+
         if self.instr_spec_source() is not None:
             self.instr_spec_source.get_instr().off()
         self.instr_LO_mw.get_instr().on()
         self.instr_LO_mw.get_instr().pulsemod_state(False)
-        # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
-        self.instr_LO_mw.get_instr().frequency.set(
-            self.freq_qubit.get() - self.mw_freq_mod.get())
+
+        if MW_LutMan.cfg_sideband_mode() == 'static':
+            # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
+            self.instr_LO_mw.get_instr().frequency.set(
+                self.freq_qubit.get() - self.mw_freq_mod.get())
+        elif MW_LutMan.cfg_sideband_mode() == 'real-time':
+            # For historic reasons, will maintain the change qubit frequency here in
+            # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
+            if ((MW_LutMan.channel_I()-1)//2 != (MW_LutMan.channel_Q()-1)//2):
+                raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
+            self.mw_freq_mod(self.freq_qubit.get() - self.instr_LO_mw.get_instr().frequency.get())
+            MW_LutMan.AWG.get_instr().set('oscs_{}_freq'.format((MW_LutMan.channel_I()-1)//2),
+                self.mw_freq_mod.get())
+        else:
+            raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
 
         self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
 
@@ -1180,8 +1223,13 @@ class CCLight_Transmon(Qubit):
 
         # used for ef pulsing
         MW_LutMan.mw_ef_amp180(self.mw_ef_amp())
-        MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
+        # MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
+        #                            self.anharmonicity())
+        if MW_LutMan.cfg_sideband_mode() != 'real-time':
+          MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
                                    self.anharmonicity())
+        else:
+          MW_LutMan.mw_ef_modulation(self.anharmonicity())
 
         # 3. Does case-dependent things:
         #                mixers offset+skewness
@@ -1967,9 +2015,13 @@ class CCLight_Transmon(Qubit):
                 def load_square():
                     AWG = mw_lutman.AWG.get_instr()
                     AWG.stop()
+                    # When using real-time modulation, mixer_alpha is encoded in channel amplitudes.
+                    # Loading amplitude ensures new amplitude will be calculated with mixer_alpha.
+                    if mw_lutman.cfg_sideband_mode() == 'real-time':
+                        mw_lutman._set_channel_amp(mw_lutman._get_channel_amp())
+
                     # Codeword 10 is hardcoded in the generate CCL config
                     # mw_lutman.load_waveform_realtime(wave_id='square')
-
                     mw_lutman.load_waveforms_onto_AWG_lookuptable(
                         force_load_sequencer_program=False)
                     AWG.start()
@@ -1993,8 +2045,10 @@ class CCLight_Transmon(Qubit):
                                         'maxfevals': maxfevals}}  # Should be enough for mixer skew
 
             MC.set_sweep_functions([alpha, phi])
+            #MC.set_sweep_function(alpha)
             MC.set_detector_function(detector)  # sets test_detector
             MC.set_adaptive_function_parameters(ad_func_pars)
+            MC.set_sweep_points(np.linspace(0,2,300))
             MC.run(
                 name='Spurious_sideband_{}{}'.format(
                     mixer_ch, self.msmt_suffix),
@@ -2219,9 +2273,10 @@ class CCLight_Transmon(Qubit):
     def calibrate_ssro_pulse_duration(self, MC=None,
                                       nested_MC=None,
                                       amps=None,
+                                     amp_lim=None,
                                       times= None,
                                       use_adaptive: bool = True,
-                                      n_points: int = 150,
+                                      n_points: int = 80,
                                       analyze: bool = True,
                                       update: bool = True):
         '''
@@ -2268,7 +2323,8 @@ class CCLight_Transmon(Qubit):
 
         if amps is None:
             amps = np.linspace(.01,.25,11)
-
+        if amp_lim is None:
+           amp_lim = (0.01, 0.2)
         ######################
         # Experiment
         ######################
@@ -2289,7 +2345,7 @@ class CCLight_Transmon(Qubit):
                 {'adaptive_function': LearnerND_Minimizer,
                  'goal': lambda l: goal(l) or l.npoints > n_points,
                  'loss_per_simplex': loss_per_simplex,
-                 'bounds': [(10e-9, 400e-9), (0.01, 0.3)],
+                 'bounds': [(10e-9, 400e-9), amp_lim],
                  'minimize': False
                  })
             nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
@@ -2765,7 +2821,8 @@ class CCLight_Transmon(Qubit):
                                          analyze=True, fluxChan=None, close_fig=True,
                                          nested_resonator_calibration=False,
                                          nested_resonator_calibration_use_min=False,
-                                         resonator_freqs=None):
+                                         resonator_freqs=None,
+                                         trigger_idx= None):
         """
         Performs the qubit spectroscopy while changing the current applied
         to the flux bias line.
@@ -2820,6 +2877,8 @@ class CCLight_Transmon(Qubit):
             logging.error('Mode {} not recognized'.format(mode))
         if MC is None:
             MC = self.instr_MC.get_instr()
+        if trigger_idx is None:
+            trigger_idx = self.cfg_qubit_nr()
 
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
@@ -2828,7 +2887,7 @@ class CCLight_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn(),
-                trigger_idx=9)
+                trigger_idx=trigger_idx)
         else:
             p = sqo.pulsed_spec_seq(
                 qubit_idx=self.cfg_qubit_nr(),
@@ -2988,7 +3047,8 @@ class CCLight_Transmon(Qubit):
     def measure_spectroscopy_pulsed_marked(self, freqs, MC=None,
                                            analyze=True, close_fig=True,
                                            label='',
-                                           prepare_for_continuous_wave=True):
+                                           prepare_for_continuous_wave=True,
+                                           trigger_idx = None):
         """
         Performs a spectroscopy experiment by triggering the spectroscopy source
         with a CCLight trigger.
@@ -3008,6 +3068,9 @@ class CCLight_Transmon(Qubit):
 
         wait_time_ns = self.spec_wait_time()*1e9
 
+        if trigger_idx is None:
+          trigger_idx = self.cfg_qubit_nr()
+
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq_marked(
@@ -3015,7 +3078,7 @@ class CCLight_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC(),
-            trigger_idx=9 if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
+            trigger_idx=trigger_idx if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
             wait_time_ns=wait_time_ns)
 
         CCL.eqasm_program(p.filename)
@@ -4215,7 +4278,7 @@ class CCLight_Transmon(Qubit):
     def allxy_GBT(self, MC=None,
                   label: str = '',
                   analyze=True, close_fig=True,
-                  prepare_for_timedomain=True,termination_opt=0.04):
+                  prepare_for_timedomain=True,termination_opt=0.02):
         '''#
         This function is the same as measure AllXY, but with a termination limit
         This termination limit is as a system metric to evalulate the calibration
@@ -4860,8 +4923,7 @@ class CCLight_Transmon(Qubit):
 
         # default timing
         if times is None:
-            # funny default is because there is no real time sideband
-            # modulation
+            # funny default is because there is no real time sideband modulation
             stepsize = max((self.T2_star()*4/61)//(abs(self.cfg_cycle_time()))
                            * abs(self.cfg_cycle_time()), 40e-9)
             times = np.arange(0, self.T2_star()*4, stepsize)
@@ -4885,8 +4947,9 @@ class CCLight_Transmon(Qubit):
         # adding 'artificial' detuning by detuning the qubit LO
         if freq_qubit is None:
             freq_qubit = self.freq_qubit()
-        # # this should have no effect if artificial detuning = 0. This is a bug,
-        # This is real detuning, not artificial detuning
+        # this should have no effect if artificial detuning = 0. This is a bug,
+        # this is real detuning, not artificial detuning
+        old_frequency = self.instr_LO_mw.get_instr().get('frequency')
         self.instr_LO_mw.get_instr().set(
             'frequency', freq_qubit -
             self.mw_freq_mod.get() + artificial_detuning)
@@ -4902,6 +4965,10 @@ class CCLight_Transmon(Qubit):
         d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('Ramsey'+label+self.msmt_suffix)
+
+        # Restore old frequency value
+        self.instr_LO_mw.get_instr().set('frequency', old_frequency)
+
         if analyze:
             a = ma.Ramsey_Analysis(auto=True, close_fig=True,
                                    freq_qubit=freq_qubit,
@@ -4987,7 +5054,7 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma2.ComplexRamseyAnalysis(label='complex_Ramsey', close_figs=True)
             if update:
-                fit_res = a.fit_dicts['exp_fit']['fit_res']  
+                fit_res = a.fit_dicts['exp_fit']['fit_res']
                 fit_frequency = fit_res.params['frequency'].value
                 freq_qubit = self.freq_qubit()
                 self.freq_qubit(freq_qubit + fit_frequency)
@@ -5131,20 +5198,20 @@ class CCLight_Transmon(Qubit):
                                     times[-1]+3*dt,
                                     times[-1]+4*dt)])
 
+        mw_lutman = self.instr_LutMan_MW.get_instr()
         # # Checking if pulses are on 20 ns grid
         if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for
                     t in times]):
             raise ValueError('timesteps must be multiples of 40e-9')
 
         # # Checking if pulses are locked to the pulse modulation
-        if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9)
-                    == 0 for t in times]):
+        if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9) == 0 for t in times]) and\
+         mw_lutman.cfg_sideband_mode() != 'real-time':
             raise ValueError(
                 'timesteps must be multiples of 2 modulation periods')
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-        mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),
                      platf_cfg=self.cfg_openql_platform_fn())
@@ -5172,7 +5239,7 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        
+
         # default timing
         if times is None and sweep == 'tau':
             # funny default is because there is no real time sideband
@@ -5322,7 +5389,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('spin_lock_simple'+label+self.msmt_suffix)
-        
+
         if analyze:
             a = ma.T1_Analysis(label='spin_lock_simple', auto=True, close_fig=True)
             return a
@@ -5378,7 +5445,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('spin_lock_echo'+label+self.msmt_suffix)
-        
+
         if analyze:
             a = ma.T1_Analysis(label='spin_lock_echo', auto=True, close_fig=True)
             return a
@@ -5444,7 +5511,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('rabi_frequency'+label+self.msmt_suffix)
-        
+
         if analyze:
             a = ma.Echo_analysis_V15(label='rabi_frequency', auto=True, close_fig=True)
             return a
@@ -5519,10 +5586,12 @@ class CCLight_Transmon(Qubit):
             scale_factor_cos = a._get_scale_factor_cos()
             scale_factor_line = a._get_scale_factor_line()
 
-            if chisqr_cos < chisqr_line:
-                scale_factor = scale_factor_cos
-            else:
-                scale_factor = scale_factor_line
+            # FIXME: hardcoded solution to imperfect correction selection
+            # if chisqr_cos < chisqr_line:
+            #     scale_factor = scale_factor_cos
+            # else:
+            #     scale_factor = scale_factor_line
+            scale_factor = scale_factor_line
 
             if abs(scale_factor-1) < 2e-3:
                 print('Pulse amplitude accurate within 0.2%. Amplitude not updated.')
@@ -5544,12 +5613,15 @@ class CCLight_Transmon(Qubit):
         This function is to measure flipping sequence for whaterver nr_of times
         a function needs to be run to calibrate the Pi and Pi/2 Pulse.
         Right now this method will always return true no matter what
-        Later we can add a conidition as a check.
+        Later we can add a condition as a check.
         '''
         for i in range(nr_sequence):
-            self.measure_flipping(update=True)
-        # we can add a condition later
-        return True
+            a = self.measure_flipping(update=True)
+            scale_factor = a._get_scale_factor_line()
+            if abs(1-scale_factor)<0.0005:
+                return True
+        else:
+          return False
 
     def measure_motzoi(self, motzoi_amps=None,
                        prepare_for_timedomain: bool = True,
@@ -5644,7 +5716,8 @@ class CCLight_Transmon(Qubit):
             nr_seeds=100,
             MC=None,
             recompile: bool = 'as needed', prepare_for_timedomain: bool = True,
-            ignore_f_cal_pts: bool = False):
+            ignore_f_cal_pts: bool = False, compile_only: bool = False,
+            rb_tasks=None):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -6636,9 +6709,9 @@ class CCLight_Transmon(Qubit):
                             span_res=30e6,
                             span_q=0.5e9,
                             step_q = 1e6,
-                            step_res= 0.5e6, 
-                            I_correct= 0.1e-3, 
-                            accuracy= 0.1e9, 
+                            step_res= 0.5e6,
+                            I_correct= 0.1e-3,
+                            accuracy= 0.1e9,
                             fine_tuning= False):
         """
         Fluxing a qubit to a targeted frequency based on an estimation using the fluxarc.
@@ -6654,13 +6727,13 @@ class CCLight_Transmon(Qubit):
                   value of phi0 (length of fluxarc) in A
               Ec (float)
                   Value of Ec in Hz (estimated as 270 MHz)
-        """   
+        """
 
-        # if target_frequency is None: 
-        #   if self.name 
-        if sweetspot_current is None: 
+        # if target_frequency is None:
+        #   if self.name
+        if sweetspot_current is None:
           sweetspot_current = self.fl_dc_I0()
-        if sweetspot_frequency is None: 
+        if sweetspot_frequency is None:
           sweetspot_frequency = self.freq_max()
         I=phi0/np.pi*np.arccos(((target_frequency+Ec)/(sweetspot_frequency+Ec))**2)+sweetspot_current
         print('Baised current at target is {}'.format(I))
@@ -6689,7 +6762,7 @@ class CCLight_Transmon(Qubit):
               raise ValueError('Qubit {} cannot be found at target frequency'.format(self.name))
         else:
           while abs(self.freq_qubit() - target_frequency) > accuracy:
-            if self.freq_qubit() - target_frequency > 0:  
+            if self.freq_qubit() - target_frequency > 0:
               I = I + I_correct
             else:
               I = I - I_correct
