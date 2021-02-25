@@ -1,13 +1,13 @@
-
 import logging
 from typing import Sequence, Optional, Dict, Union, Callable, Any, List
+
+from pycqed.measurement.waveform_control_CC import waveform as wf
 
 from qcodes import Instrument
 from qcodes.instrument.base import InstrumentBase
 from qcodes.instrument.parameter import ManualParameter
 from qcodes import validators as vals
 
-from pycqed.measurement.waveform_control_CC import waveform as wf
 
 
 log = logging.getLogger(__name__)
@@ -114,6 +114,7 @@ class ge(Shape):
     def __init__(self, name: str):
         super().__init__(name)
 
+        # FIXME: remove "mw_" prefixes
         self.add_parameter(
             'mw_amp180',
             unit='frac',
