@@ -691,22 +691,22 @@ class ZI_base_instrument(Instrument):
 
         # Create modules
         if awg_module:
-          self._awgModule = self.daq.awgModule()
-          self._awgModule.set('awgModule/device', device)
-          self._awgModule.execute()
-          
-          # Will hold information about all configured waveforms
-          self._awg_waveforms = {}
+            self._awgModule = self.daq.awgModule()
+            self._awgModule.set('awgModule/device', device)
+            self._awgModule.execute()
 
-          # Asserted when AWG needs to be reconfigured
-          self._awg_needs_configuration = [False]*(self._num_channels()//2)
-          self._awg_program = [None]*(self._num_channels()//2)
-          
-          # Create waveform parameters
-          self._num_codewords = 0
-          self._add_codeword_waveform_parameters(num_codewords)
+            # Will hold information about all configured waveforms
+            self._awg_waveforms = {}
+
+            # Asserted when AWG needs to be reconfigured
+            self._awg_needs_configuration = [False]*(self._num_channels()//2)
+            self._awg_program = [None]*(self._num_channels()//2)
+
+            # Create waveform parameters
+            self._num_codewords = 0
+            self._add_codeword_waveform_parameters(num_codewords)
         else:
-          self._awgModule = None
+            self._awgModule = None
 
         # Create other neat parameters
         self._add_extra_parameters()
