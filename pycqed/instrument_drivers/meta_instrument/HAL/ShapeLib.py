@@ -1,6 +1,7 @@
 import logging
 from typing import Sequence, Optional, Dict, Union, Callable, Any, List
 
+#import pycqed
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
 from qcodes import Instrument

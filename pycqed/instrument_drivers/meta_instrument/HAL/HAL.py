@@ -36,6 +36,9 @@ class Sequencer(Element):
     def stop(self):
         raise RuntimeError("call overridden method")
 
+    def program(self, src: str):
+        raise RuntimeError("call overridden method")
+
 
 # Arbitrary Waveform Generator
 class AWG(Element):
@@ -93,6 +96,11 @@ class SignalGenerator(Element):
         # FIXME: add more
 
     def on(self):
+        """
+        switches SG on. Blocking call, all parameters must have settled and SG must be ready after call.
+        FIXME: must also be efficient
+        :return:
+        """
         raise RuntimeError("call overridden method")
 
     def off(self):
@@ -168,7 +176,9 @@ Threshold
 
     Composite Elements
     
-FIXME: how to associate a composite element with an instrument unit/group
+FIXME: how to associate a composite element with an instrument unit/group:
+- instrument driver can inherit from CE
+- should allow replacing submodules by other instruments 
 
 """
 
@@ -179,26 +189,32 @@ class FluxOutput(Element): # BasebandOutput?
     pass
 
 class MicrowaveOutput(Element):
-    def __init__(self, name: str):
+    def __init__(self, name: str, json):
         super().__init__(name)
 
-        awg = AWG("awg") # FIXME: should be final AWG, names must be unique
-        self.add_submodule('awg', awg)
-        seq = Sequencer('seq')
-        self.add_submodule('seq', seq)
+        self._awg = AWG("awg")
+        self.add_submodule('awg', self._awg)
+        self._seq = Sequencer('seq')
+        self.add_submodule('seq', self._seq)
         # sideband modulator
         # AM
         # PM
-        mixer_corr = MixerCorrection('mc')
-        self.add_submodule('mixer_corr', mixer_corr)
-        lo = SignalGenerator('lo')
-        self.add_submodule('lo', lo)
+        self._mixer_corr = MixerCorrection('mc')
+        self.add_submodule('mixer_corr', self._mixer_corr)
+        self._lo = SignalGenerator('lo')
+        self.add_submodule('lo', self._lo)
+
+    def arm(self):
+        self._lo.on()
+        self._awg.start()
 
     def on(self):
-        pass # FIXME: switch relavant sub_modules
+        self._seq.start()
 
     def off(self):
-        pass # FIXME: switch relavant sub_modules
+        self._lo.off()  # FIXME: or (optionally) keep on for optimal latency when quickly switching on and off
+        self._seq.stop()
+        self._awg.stop()
 
     def get_transfer(self):
         """
@@ -282,8 +298,10 @@ class HAL:
     def register_element(self, element: Element):   # or just inherit from HAL
         pass    # FIXME: implement
 
-    def from_JSON(self, json: str, simul: bool=False):
-        pass    # FIXME: implement
+    def from_JSON(self, config, simul: bool=False):
+        for instr in config["instruments"]:
+            print(instr["name"], instr["class"])
+
 
     def open(self):
         pass    # FIXME: implement
@@ -292,6 +310,11 @@ class HAL:
         pass    # FIXME: implement
 
     def start(self):    # add parameter for user intent to limit instruments that need to be controlled
+        # optimize latency. So first start everything apart from sequencers, then do a get_operation_complete() on
+        # all, then start sequencers
+        self._arm()
+        self._get_operation_complete()
+        self._on()
         pass    # FIXME: implement
 
     def stop(self):
@@ -300,108 +323,15 @@ class HAL:
     def has_hw_sideband_modulation(self): # or provide software implementation in base class
         pass    # FIXME: implement
 
+    def _get_operation_complete(self):
+        pass    # FIXME: implement
 
+    def _arm(self):
+        pass    # FIXME: implement
 
+    def _on(self):
+        pass    # FIXME: implement
 
-# this should also be usable for OpenQL (or other compilers)
-# FIXME: allow instruments within instruments?
-
-hal_configuration = """
-    instruments [
-        {
-            "name": "ro_1",
-            "class": "UHFQC",
-            "init": {
-                "device": "dev2216",
-                "use_dio": true
-            },
-            "locations": [["q0.readout"], ["q2.readout"], ["q3.readout"], ["q4.readout"]],
-        },
-        {   "name": "ro_1_tx_lo",
-            "class": "RohdeSchwarz_SGS100A",
-            "init": {
-                "address": "TCPIP0::192.168.0.73"
-            },
-            "locations": [
-                [   "q0.readout.tx.lo", 
-                    "q2.readout.tx.lo", 
-                    "q3.readout.tx.lo", 
-                    "q4.readout.tx.lo"
-                ]
-            ]
-        },
-        {
-            "name": "mw_1",
-            "class":"ZI_HDAWG8",
-            "init": {
-                "device": "dev8070"
-            },
-            "locations": [["q0.mw"], ["q2.mw"], ["q3.mw"], ["q4.mw"]],
-        },
-        {   "name": "mw_1_lo",
-            "class": "RohdeSchwarz_SGS100A",
-            "init": {
-                "address": "TCPIP0::192.168.0.74"
-            },
-            "locations": [
-                [   "q0.mw.lo", 
-                    "q2.mw.lo", 
-                    "q3.mw.lo", 
-                    "q4.mw.lo"
-                ]
-            ]
-        },
-        {
-            "name": "flux_0",
-            "class":"ZI_HDAWG8",
-            "init": {
-                "device": "dev8070"
-            },
-            "locations": [["q0.flux"], ["q2.flux"], ["q3.flux"], ["q4.flux"], [], [], [], []],
-        },
-        {
-            "name": "cc",
-            "class":"CC",
-            "init": {
-                "class": "IPTransport",
-                "init": TBD
-            },
-            "locations": [],    // define locations per slot, how to link to connected instrument, link to name?
-        },
-        {
-            "name": "qwg_12",
-            "class":"QuTech_AWG_Module",
-            "init": {
-                "address": "192.168.0.50"
-            },
-            "locations": [],
-        },
-        {
-            "name": "fluxcurrent",
-            "class":"QuTech_SPI_S4g_FluxCurrent",
-            "init": {
-                "address": "COM9",
-                "channel_map": {
-                   "FBL_D1": (15, 0),
-                   "FBL_D2": (15, 1),
-                   "FBL_D3": (15, 2),
-                   "FBL_D4": (15, 3),
-                   "FBL_X" : (4, 0),
-                   "FBL_Z1": (4, 1),
-                   "FBL_Z2": (4, 2),
-                }
-            },
-            "locations": [],
-        },
-        {
-            "name": "",
-            "class":"",
-            "init": {
-            },
-            "locations": [],
-        }
-    ]
-"""
 
 
 
