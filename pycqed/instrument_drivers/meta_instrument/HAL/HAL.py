@@ -98,7 +98,7 @@ class SignalGenerator(Element):
     def on(self):
         """
         switches SG on. Blocking call, all parameters must have settled and SG must be ready after call.
-        FIXME: must also be efficient
+        FIXME: must also be efficient, see HAL below for different idea
         :return:
         """
         raise RuntimeError("call overridden method")
@@ -189,7 +189,7 @@ class FluxOutput(Element): # BasebandOutput?
     pass
 
 class MicrowaveOutput(Element):
-    def __init__(self, name: str, json):
+    def __init__(self, name: str):
         super().__init__(name)
 
         self._awg = AWG("awg")
@@ -293,7 +293,7 @@ FIXME: notes:
 
 class HAL:
     def __init__(self):
-        pass    # FIXME: implement
+        self._instruments = []
 
     def register_element(self, element: Element):   # or just inherit from HAL
         pass    # FIXME: implement

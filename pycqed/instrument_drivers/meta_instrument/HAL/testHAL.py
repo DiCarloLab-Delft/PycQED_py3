@@ -22,10 +22,12 @@ with open("HAL_config.json", "r") as fp:
 h = hal.HAL()
 h.from_JSON(cfg)
 
-if 0:
-    mw = hal.MicrowaveOutput("mwo", cfg)
-    mw.parameters
+if 1:
+    mw = hal.MicrowaveOutput("mwo")
     mw.lo.frequency = 4e9
-    mw.snapshot()
-    mw.submodules
+    print(mw.snapshot())
+    ##print(mw.print_readable_snapshot())
+
+    #print(mw.parameters)
+    print(mw.submodules)
 
