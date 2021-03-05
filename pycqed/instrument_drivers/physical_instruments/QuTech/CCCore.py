@@ -59,6 +59,14 @@ class CCCore(SCPIBase):
         self.check_errors()
         log.debug('done checking for SCPI errors on CC')
 
+    def print_event(self) -> None:
+        super().print_event()
+        self._print_item("status_questionable_frequency_event", self.get_status_questionable_frequency_event())
+
+    def print_status(self) -> None:
+        super().print_status()
+        self._print_item("status_questionable_frequency_condition", self.get_status_questionable_frequency_condition())
+
     ##########################################################################
     # CC SCPI protocol wrapper functions
     ##########################################################################

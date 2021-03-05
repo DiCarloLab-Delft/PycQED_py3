@@ -14,6 +14,8 @@
 """
 
 import logging
+from typing import Tuple, List
+
 from .Transport import Transport
 
 log = logging.getLogger(__name__)
@@ -41,6 +43,46 @@ class SCPIBase:
             raise RuntimeError("SCPI errors found")
 
     ##########################################################################
+    # Status printing, override for instruments that extend standard status
+    ##########################################################################
+
+    def _print_item(self, name: str, val: int, lookup: List[Tuple[int, str]] = None) -> None:
+        if val != 0:
+            print(f"{name} = {val}")     # FIXME: pad str
+            if lookup is not None:
+                for item in lookup:
+                    if val & item[0]:
+                        print(f"    {item[1]}")
+
+    def print_status_byte(self) -> None:
+        self._print_item("status_byte", self.get_status_byte(), self._stb_lookup)
+
+    def print_event_status_register(self) -> None:
+        self._print_item("event_status_register", self.get_event_status_register(), self._esr_lookup)
+
+    def print_status_questionable_condition(self) -> None:
+        self._print_item("status_questionable_condition", self.get_status_questionable_condition(), self._stat_qeus_lookup)
+
+    def print_status_questionable_event(self) -> None:
+        self._print_item("status_questionable_event", self.get_status_questionable_event(), self._stat_qeus_lookup)
+
+    def print_status_operation_condition(self) -> None:
+        self._print_item("status_operation_condition", self.get_status_operation_condition(), self._stat_oper_lookup)
+
+    def print_status_operation_event(self) -> None:
+        self._print_item("status_operation_event", self.get_status_operation_event(), self._stat_oper_lookup)
+
+    def print_status(self) -> None:
+        self.print_status_byte()
+        self.print_status_questionable_condition()
+        self.print_status_operation_condition()
+
+    def print_event(self) -> None:
+        self.print_event_status_register()
+        self.print_status_questionable_event()
+        self.print_status_operation_event()
+
+    ##########################################################################
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
     ##########################################################################
 
@@ -50,11 +92,11 @@ class SCPIBase:
     def set_event_status_enable(self, value: int) -> None:
         self._transport.write('*ESE %d' % value)
 
-    def get_event_status_enable(self) -> str:
-        return self._ask('*ESE?')
+    def get_event_status_enable(self) -> int:
+        return self._ask_int('*ESE?')
 
-    def get_event_status_register(self) -> str:
-        return self._ask('*ESR?')
+    def get_event_status_register(self) -> int:
+        return self._ask_int('*ESR?')
 
     def get_identity(self) -> str:
         return self._ask('*IDN?')
@@ -88,6 +130,7 @@ class SCPIBase:
         self._transport.write('*WAI')
 
     def reset(self) -> None:
+        # reset *settings* to default
         self._transport.write('*RST')
 
     ##########################################################################
@@ -189,6 +232,16 @@ class SCPIBase:
     # IEEE488.2 status constants
     ##########################################################################
 
+    # bits for *STB
+    STB_R01                     = 0x01    # Not used
+    STB_PRO                     = 0x02    # Protection Event Flag
+    STB_QMA                     = 0x04    # Error/Event queue message available
+    STB_QES                     = 0x08    # Questionable status
+    STB_MAV                     = 0x10    # Message Available
+    STB_ESR                     = 0x20    # Standard Event Status Register
+    STB_SRQ                     = 0x40    # Service Request
+    STB_OPS                     = 0x80    # Operation Status Flag
+
     # bits for *ESR and *ESE
     ESR_OPERATION_COMPLETE      = 0x01
     ESR_REQUEST_CONTROL         = 0x02
@@ -200,7 +253,6 @@ class SCPIBase:
     ESR_POWER_ON                = 0x80
 
     # bits for STATus:OPERation
-    # FIXME: add the function
     STAT_OPER_CALIBRATING       = 0x0001    # The instrument is currently performing a calibration
     STAT_OPER_SETTLING          = 0x0002    # The instrument is waiting for signals it controls to stabilize enough to begin measurements
     STAT_OPER_RANGING           = 0x0004    # The instrument is currently changing its range
@@ -213,7 +265,6 @@ class SCPIBase:
     STAT_OPER_PROG_RUNNING      = 0x4000    # A user-defined program is currently in the run state
 
     # bits for STATus:QUEStionable
-    # FIXME: add the function
     STAT_QUES_VOLTAGE           = 0x0001
     STAT_QUES_CURRENT           = 0x0002
     STAT_QUES_TIME              = 0x0004
@@ -225,6 +276,56 @@ class SCPIBase:
     STAT_QUES_CALIBRATION       = 0x0100
     STAT_QUES_INST_SUMMARY      = 0x2000
     STAT_QUES_COMMAND_WARNING   = 0x4000
+
+
+    _stb_lookup = [
+        (STB_R01, "Reserved"),
+        (STB_PRO, "Protection event"),
+        (STB_QMA, "Error/event queue message available"),
+        (STB_QES, "Questionable status"),
+        (STB_MAV, "Message available"),
+        (STB_ESR, "Event status register"),    # ??
+        (STB_SRQ, "Service request"),
+        (STB_OPS, "Operatin status flag")
+    ]
+
+    _esr_lookup = [
+        (ESR_OPERATION_COMPLETE, "Operation complete"),
+        (ESR_REQUEST_CONTROL, "Request control"),
+        (ESR_QUERY_ERROR, "Query error"),
+        (ESR_DEVICE_DEPENDENT_ERROR, "Device dependent error"),
+        (ESR_EXECUTION_ERROR, "Execution error"),
+        (ESR_COMMAND_ERROR, "Command error"),
+        (ESR_USER_REQUEST, "User request"),
+        (ESR_POWER_ON, "Power on")
+    ]
+
+    _stat_oper_lookup = [
+        (STAT_OPER_CALIBRATING, "Calibrating"),
+        (STAT_OPER_SETTLING, "Settling"),
+        (STAT_OPER_RANGING, "Changing range"),
+        (STAT_OPER_SWEEPING, "Sweeping"),
+        (STAT_OPER_MEASURING, "Measuring"),
+        (STAT_OPER_WAIT_TRIG, "Waiting for trigger"),
+        (STAT_OPER_WAIT_ARM, "Waiting for arm"),
+        (STAT_OPER_CORRECTING, "Corrceting"),
+        (STAT_OPER_INST_SUMMARY, "Instrument summary"),
+        (STAT_OPER_PROG_RUNNING, "Program running"),
+    ]
+
+    _stat_qeus_lookup = [
+        (STAT_QUES_VOLTAGE, "Voltage"),
+        (STAT_QUES_CURRENT, "Current"),
+        (STAT_QUES_TIME, "Time"),
+        (STAT_QUES_POWER, "Power"),
+        (STAT_QUES_TEMPERATURE, "Temperature"),
+        (STAT_QUES_FREQUENCY, "Frequency"),
+        (STAT_QUES_PHASE, "Phase"),
+        (STAT_QUES_MODULATION, "Modulation"),
+        (STAT_QUES_CALIBRATION, "Calibration"),
+        (STAT_QUES_INST_SUMMARY, "Instrument summary"),
+        (STAT_QUES_COMMAND_WARNING, "Command warning")
+    ]
 
     ##########################################################################
     # static methods

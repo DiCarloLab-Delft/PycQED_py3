@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import os
 import logging
 import sys
 
@@ -25,7 +24,7 @@ log.info('connecting to CC')
 cc = CC('cc', IPTransport(ip))
 cc.init()
 
-if 1:
+if 0:
     cc.debug_marker_out(0, cc.UHFQA_TRIG)
     cc.debug_marker_out(1, cc.UHFQA_TRIG)
     #cc.debug_marker_out(8, cc.HDAWG_TRIG)
@@ -34,3 +33,10 @@ log.info(f'uploading {filename} and starting CC')
 with open(filename, 'r') as f:
     prog = f.read()
 cc.assemble_and_start(prog)
+
+err_cnt = cc.get_system_error_count()
+for i in range(err_cnt):
+    print(cc.get_error())
+
+cc.print_event()
+cc.print_status()
