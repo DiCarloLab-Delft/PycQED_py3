@@ -189,6 +189,33 @@ class CCCore(SCPIBase):
     def get_status_questionable_frequency_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')
 
+
+    def get_status_questionable_instrument_condition(self) -> int:
+        return self._ask_int('STATus:QUEStionable:INSTrument:CONDition?')
+
+    def get_status_questionable_instrument_event(self) -> int:
+        return self._ask_int('STATus:QUEStionable:INSTrument:EVENt?')
+
+    def set_status_questionable_instrument_enable(self, val) -> None:
+        self._transport.write(f'STATus:QUEStionable:INSTrument:ENABle {val}')
+
+    def get_status_questionable_instrument_enable(self) -> int:
+        return self._ask_int('STATus:QUEStionable:INSTrument:ENABle?')
+
+
+    def get_status_questionable_instrument_isummary_condition(self, ccio: int) -> int:
+        return self._ask_int(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}:CONDition?')
+
+    def get_status_questionable_instrument_isummary_event(self, ccio: int) -> int:
+        return self._ask_int(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}:EVENt?')
+
+    def set_status_questionable_instrument_isummary_enable(self, ccio: int, val) -> None:
+        self._transport.write(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}:ENABle {val}')
+
+    def get_status_questionable_instrument_isummary_enable(self, ccio: int) -> int:
+        return self._ask_int(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}:ENABle?')
+
+
     ##########################################################################
     # constants
     ##########################################################################
