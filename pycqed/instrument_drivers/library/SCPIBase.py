@@ -54,8 +54,10 @@ class SCPIBase:
                     if val & item[0]:
                         print(f"    {item[1]}")
 
-    def print_status_byte(self) -> None:
-        self._print_item("status_byte", self.get_status_byte(), self._stb_lookup)
+    def print_status_byte(self) -> int:
+        stb = self.get_status_byte()
+        self._print_item("status_byte", stb, self._stb_lookup)
+        return stb
 
     def print_event_status_register(self) -> None:
         self._print_item("event_status_register", self.get_event_status_register(), self._esr_lookup)
@@ -72,13 +74,24 @@ class SCPIBase:
     def print_status_operation_event(self) -> None:
         self._print_item("status_operation_event", self.get_status_operation_event(), self._stat_oper_lookup)
 
-    def print_status(self) -> None:
-        self.print_status_byte()
-        self.print_status_questionable_condition()
-        self.print_status_operation_condition()
+    def print_status(self, full: bool=False) -> None:
+        """
+        Walk the SCPI status tree and print non-zero items
+        """
+        stb = self.get_status_byte()
+        if full or stb != 0:
+            self._print_item("status_byte", stb, self._stb_lookup)
+
+        if full or stb & self.STB_ESR:
+            self.print_event_status_register()
+
+        if full or stb & self.STB_QES:
+            self.print_status_questionable_condition()
+
+        if full or stb & self.STB_OPS:
+            self.print_status_operation_condition()
 
     def print_event(self) -> None:
-        self.print_event_status_register()
         self.print_status_questionable_event()
         self.print_status_operation_event()
 
@@ -242,6 +255,17 @@ class SCPIBase:
     STB_SRQ                     = 0x40    # Service Request
     STB_OPS                     = 0x80    # Operation Status Flag
 
+    _stb_lookup = [
+        (STB_R01, "Reserved"),
+        (STB_PRO, "Protection event"),
+        (STB_QMA, "Error/event queue message available"),
+        (STB_QES, "Questionable status"),
+        (STB_MAV, "Message available"),
+        (STB_ESR, "Event status register"),    # ??
+        (STB_SRQ, "Service request"),
+        (STB_OPS, "Operatin status flag")
+    ]
+
     # bits for *ESR and *ESE
     ESR_OPERATION_COMPLETE      = 0x01
     ESR_REQUEST_CONTROL         = 0x02
@@ -251,6 +275,17 @@ class SCPIBase:
     ESR_COMMAND_ERROR           = 0x20
     ESR_USER_REQUEST            = 0x40
     ESR_POWER_ON                = 0x80
+
+    _esr_lookup = [
+        (ESR_OPERATION_COMPLETE, "Operation complete"),
+        (ESR_REQUEST_CONTROL, "Request control"),
+        (ESR_QUERY_ERROR, "Query error"),
+        (ESR_DEVICE_DEPENDENT_ERROR, "Device dependent error"),
+        (ESR_EXECUTION_ERROR, "Execution error"),
+        (ESR_COMMAND_ERROR, "Command error"),
+        (ESR_USER_REQUEST, "User request"),
+        (ESR_POWER_ON, "Power on")
+    ]
 
     # bits for STATus:OPERation
     STAT_OPER_CALIBRATING       = 0x0001    # The instrument is currently performing a calibration
@@ -264,42 +299,6 @@ class SCPIBase:
     STAT_OPER_INST_SUMMARY      = 0x2000    # One of n multiple logical instruments is reporting OPERational status
     STAT_OPER_PROG_RUNNING      = 0x4000    # A user-defined program is currently in the run state
 
-    # bits for STATus:QUEStionable
-    STAT_QUES_VOLTAGE           = 0x0001
-    STAT_QUES_CURRENT           = 0x0002
-    STAT_QUES_TIME              = 0x0004
-    STAT_QUES_POWER             = 0x0008
-    STAT_QUES_TEMPERATURE       = 0x0010
-    STAT_QUES_FREQUENCY         = 0x0020
-    STAT_QUES_PHASE             = 0x0040
-    STAT_QUES_MODULATION        = 0x0080
-    STAT_QUES_CALIBRATION       = 0x0100
-    STAT_QUES_INST_SUMMARY      = 0x2000
-    STAT_QUES_COMMAND_WARNING   = 0x4000
-
-
-    _stb_lookup = [
-        (STB_R01, "Reserved"),
-        (STB_PRO, "Protection event"),
-        (STB_QMA, "Error/event queue message available"),
-        (STB_QES, "Questionable status"),
-        (STB_MAV, "Message available"),
-        (STB_ESR, "Event status register"),    # ??
-        (STB_SRQ, "Service request"),
-        (STB_OPS, "Operatin status flag")
-    ]
-
-    _esr_lookup = [
-        (ESR_OPERATION_COMPLETE, "Operation complete"),
-        (ESR_REQUEST_CONTROL, "Request control"),
-        (ESR_QUERY_ERROR, "Query error"),
-        (ESR_DEVICE_DEPENDENT_ERROR, "Device dependent error"),
-        (ESR_EXECUTION_ERROR, "Execution error"),
-        (ESR_COMMAND_ERROR, "Command error"),
-        (ESR_USER_REQUEST, "User request"),
-        (ESR_POWER_ON, "Power on")
-    ]
-
     _stat_oper_lookup = [
         (STAT_OPER_CALIBRATING, "Calibrating"),
         (STAT_OPER_SETTLING, "Settling"),
@@ -312,6 +311,19 @@ class SCPIBase:
         (STAT_OPER_INST_SUMMARY, "Instrument summary"),
         (STAT_OPER_PROG_RUNNING, "Program running"),
     ]
+
+    # bits for STATus:QUEStionable
+    STAT_QUES_VOLTAGE           = 0x0001
+    STAT_QUES_CURRENT           = 0x0002
+    STAT_QUES_TIME              = 0x0004
+    STAT_QUES_POWER             = 0x0008
+    STAT_QUES_TEMPERATURE       = 0x0010
+    STAT_QUES_FREQUENCY         = 0x0020
+    STAT_QUES_PHASE             = 0x0040
+    STAT_QUES_MODULATION        = 0x0080
+    STAT_QUES_CALIBRATION       = 0x0100
+    STAT_QUES_INST_SUMMARY      = 0x2000
+    STAT_QUES_COMMAND_WARNING   = 0x4000
 
     _stat_qeus_lookup = [
         (STAT_QUES_VOLTAGE, "Voltage"),
@@ -339,4 +351,3 @@ class SCPIBase:
         digit_cnt_str = str(len(byte_cnt_str))
         bin_header_str = '#' + digit_cnt_str + byte_cnt_str
         return bin_header_str
-

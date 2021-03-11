@@ -23,15 +23,6 @@ log = logging.getLogger(__name__)
 
 
 class CCCore(SCPIBase):
-
-    MAX_PROG_STR_LEN = 40*1024*1024-1024  # size of CC input buffer, minus some room for command. FIXME: get from instrument
-
-    # trace units
-    TRACE_CCIO_DEV_IN = 0
-    TRACE_CCIO_DEV_OUT = 1
-    TRACE_CCIO_BP_IN = 2
-    TRACE_CCIO_BP_OUT = 3
-
     ##########################################################################
     # 'public' functions for the end user
     ##########################################################################
@@ -59,13 +50,21 @@ class CCCore(SCPIBase):
         self.check_errors()
         log.debug('done checking for SCPI errors on CC')
 
-    def print_event(self) -> None:
-        super().print_event()
-        self._print_item("status_questionable_frequency_event", self.get_status_questionable_frequency_event())
+    ##########################################################################
+    # overloaded status printing functions
+    ##########################################################################
 
-    def print_status(self) -> None:
-        super().print_status()
-        self._print_item("status_questionable_frequency_condition", self.get_status_questionable_frequency_condition())
+    def print_status_questionable_condition(self) -> None:
+        sqc = self.get_status_questionable_condition()
+        self._print_item("status_questionable_condition", sqc, self._stat_qeus_lookup)
+        if sqc & self.STAT_QUES_FREQUENCY:
+            self._print_item("status_questionable_frequency_condition", self.get_status_questionable_frequency_condition())
+
+    def print_status_questionable_event(self) -> None:
+        sqe = self.get_status_questionable_event()
+        self._print_item("status_questionable_event", sqe, self._stat_qeus_lookup)
+        if sqe & self.STAT_QUES_FREQUENCY:
+            self._print_item("status_questionable_frequency_event", self.get_status_questionable_frequency_event())
 
     ##########################################################################
     # CC SCPI protocol wrapper functions
@@ -220,6 +219,14 @@ class CCCore(SCPIBase):
     # constants
     ##########################################################################
 
+    MAX_PROG_STR_LEN = 40*1024*1024-1024  # size of CC input buffer, minus some room for command. FIXME: get from instrument
+
+    # trace units
+    TRACE_CCIO_DEV_IN = 0
+    TRACE_CCIO_DEV_OUT = 1
+    TRACE_CCIO_BP_IN = 2
+    TRACE_CCIO_BP_OUT = 3
+
     # HDAWG DIO/marker bit definitions: CC output
     HDAWG_TOGGLE_DS = 30
     HDAWG_TRIG = 31
@@ -239,3 +246,75 @@ class CCCore(SCPIBase):
     # UHFQA DIO/marker bit definitions: CC input
     UHFQA_DV = 0
     UHFQA_RSLT = range(1,10)
+
+    ##########################################################################
+    # status constants
+    ##########################################################################
+
+    # stat_qeus extensions
+    # SCPI standard: "bit 9 through 13 are available to designer"
+    STAT_QUES_CONFIG            = 0x0200
+    STAT_QUES_BPLINK            = 0x0400
+    STAT_QUES_DIO               = 0x0800 # NB: CCIO only
+
+    # overload _stat_ques_lookup FIXME:  not a class variable
+    _stat_ques_lookup = [
+        (STAT_QUES_CONFIG, "Configuration error"),
+        (STAT_QUES_BPLINK, "Backplane link error"),
+        (STAT_QUES_DIO, "DIO interface error")
+    ] + super()._stat_ques_lookup
+
+    # stat_ques_freq
+    SQF_CLK_SRC_INTERN          = 0x0001
+    SQF_PLL_UNLOCK              = 0x0002
+    SQF_CLK_MUX_SWITCH          = 0x0004
+
+    _cc_stat_ques_freq_lookup = [
+        (SQF_CLK_SRC_INTERN, "FPGA uses internal clock (not locked to external reference)"),
+        (SQF_PLL_UNLOCK, "PLL unlocked (external reference missing)"),
+        (SQF_CLK_MUX_SWITCH, "FPGA clock multiplexer has switched")
+    ]
+
+    # stat_ques_config
+    SQC_EEPROM_CCIOCORE         = 0x0001
+    SQC_EEPROM_ENCLUSTRA        = 0x0002
+    SQC_INCONSISTENT_IP_ADDRESS = 0x0004
+
+    _cc_stat_ques_config_lookup = [
+        (SQC_EEPROM_CCIOCORE, "CCIO/CCCORE EEPROM contents invalid"),
+        (SQC_EEPROM_ENCLUSTRA, "Enclustra FPGA module EEPROM contents invalid"),
+        (SQC_INCONSISTENT_IP_ADDRESS, "IP address is inconsistent with hardware slot ID")
+    ]
+
+    # stat_ques_bplink : Backplane link status
+    SQB_NO_SIGNAL               = 0x0001
+    SQB_INSUF_TIMING_MARGIN     = 0x0002
+    SQB_CAL_FAILED              = 0x0004
+    SQB_DESYNC                  = 0x0008
+    SQB_PARITY_ERROR            = 0x0010
+    SQB_REPEATER_OVERFLOW       = 0x4000 # NB: CCCORE only
+
+    _cc_stat_ques_bplink_lookup = [
+        (SQB_NO_SIGNAL, "No signal detected during backplane link timing calibration"),
+        (SQB_INSUF_TIMING_MARGIN, "Insufficient timing margin during backplane link timing calibration"),
+        (SQB_CAL_FAILED, "Backplane link timing calibration failed"),
+        (SQB_DESYNC, ""),
+        (SQB_PARITY_ERROR, ""),
+        (SQB_REPEATER_OVERFLOW, "Overflow on CCCORE backplane link repeater")
+    ]
+
+    # stat_ques_diocal : DIO timing calibration status (CCIO only)
+    SQD_NO_SIGNAL               = 0x0001
+    SQD_INSUF_TIMING_MARGIN     = 0x0002
+    SQD_BITS_INACTIVE           = 0x0004
+    SQD_NOT_CALIBRATED          = 0x0008
+    SQD_TIMING_ERROR            = 0x0010
+
+    _cc_stat_ques_diocal_lookup = [
+        (SQD_NO_SIGNAL, "No signal detected during DIO timing calibration"),
+        (SQD_INSUF_TIMING_MARGIN, "Insufficient timing margin during DIO timing calibration"),
+        (SQD_BITS_INACTIVE, "Required bits were inactive during DIO timing calibration"),
+        (SQD_NOT_CALIBRATED, "DIO timing calibration not yet performed (successfully)"),
+        (SQD_TIMING_ERROR, "Runtime DIO timing violation found")
+    ]
+    
