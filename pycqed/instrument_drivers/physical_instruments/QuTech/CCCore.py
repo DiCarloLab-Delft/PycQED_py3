@@ -58,7 +58,20 @@ class CCCore(SCPIBase):
         sqc = self.get_status_questionable_condition()
         self._print_item("status_questionable_condition", sqc, self._stat_qeus_lookup)
         if sqc & self.STAT_QUES_FREQUENCY:
-            self._print_item("status_questionable_frequency_condition", self.get_status_questionable_frequency_condition())
+            self._print_item("status_questionable_frequency_condition", self.get_status_questionable_frequency_condition(), )
+
+        if sqc & self.STAT_QUES_CONFIG:
+            self._print_item("", self.get_stat(), )
+
+        if sqc & self.STAT_QUES_BPLINK:
+            self._print_item("", self.(), )
+
+        if sqc & self.STAT_QUES_DIO:
+            self._print_item("", self.(), )
+
+        if sqc & self.STAT_QUES_INST_SUMMARY:
+            sqis =  self.get_status_questionable_instrument_condition()
+            self._print_item("", self.(), )
 
     def print_status_questionable_event(self) -> None:
         sqe = self.get_status_questionable_event()
@@ -75,8 +88,8 @@ class CCCore(SCPIBase):
         upload sequence program string
         """
         # check size, because overrunning gives irrecoverable errors. FIXME: move to Transport
-        if len(program_string) > self.MAX_PROG_STR_LEN:
-            raise RuntimeError('source program size {len(program_string)} exceeds maximum of {self.MAX_PROG_STR_LEN}')
+        if len(program_string) > self._MAX_PROG_STR_LEN:
+            raise RuntimeError('source program size {len(program_string)} exceeds maximum of {self._MAX_PROG_STR_LEN}')
 
         hdr = 'QUTech:SEQuence:PROGram:ASSEMble ' # NB: include space as separator for binblock parameter
         bin_block = program_string.encode('ascii')
@@ -219,7 +232,7 @@ class CCCore(SCPIBase):
     # constants
     ##########################################################################
 
-    MAX_PROG_STR_LEN = 40*1024*1024-1024  # size of CC input buffer, minus some room for command. FIXME: get from instrument
+    _MAX_PROG_STR_LEN = 40*1024*1024-1024  # size of CC input buffer, minus some room for command. FIXME: get from instrument
 
     # trace units
     TRACE_CCIO_DEV_IN = 0
@@ -257,7 +270,7 @@ class CCCore(SCPIBase):
     STAT_QUES_BPLINK            = 0x0400
     STAT_QUES_DIO               = 0x0800 # NB: CCIO only
 
-    # overload _stat_ques_lookup FIXME:  not a class variable
+    # overload _stat_ques_lookup
     _stat_ques_lookup = [
         (STAT_QUES_CONFIG, "Configuration error"),
         (STAT_QUES_BPLINK, "Backplane link error"),
@@ -298,8 +311,8 @@ class CCCore(SCPIBase):
         (SQB_NO_SIGNAL, "No signal detected during backplane link timing calibration"),
         (SQB_INSUF_TIMING_MARGIN, "Insufficient timing margin during backplane link timing calibration"),
         (SQB_CAL_FAILED, "Backplane link timing calibration failed"),
-        (SQB_DESYNC, ""),
-        (SQB_PARITY_ERROR, ""),
+        (SQB_DESYNC, "Synchronization error on backplane link"),
+        (SQB_PARITY_ERROR, "Parity error on backplane link"),
         (SQB_REPEATER_OVERFLOW, "Overflow on CCCORE backplane link repeater")
     ]
 
@@ -317,4 +330,3 @@ class CCCore(SCPIBase):
         (SQD_NOT_CALIBRATED, "DIO timing calibration not yet performed (successfully)"),
         (SQD_TIMING_ERROR, "Runtime DIO timing violation found")
     ]
-    
