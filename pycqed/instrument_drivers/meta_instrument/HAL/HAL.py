@@ -179,6 +179,7 @@ Threshold
 FIXME: how to associate a composite element with an instrument unit/group:
 - instrument driver can inherit from CE
 - should allow replacing submodules by other instruments 
+- no, instrument driver creates CEs for resources that are present
 
 """
 
@@ -338,7 +339,7 @@ class HAL:
 
 """
 HAL-driver
--   must be child of Element
+-   must be child of Element. No, see above: creates elements
 -   init should not fail (e.g. because instrument is not responding or has some trouble), because that stops us from
     creating HAL object (properly)
     -   add open() for that, which should be configurable from JSON. Or: keep parameters in init, but postpone
@@ -349,6 +350,9 @@ HAL-driver
     (.awg[], .lo[], .acq.[]) and thus contain part of structure (or allow configuration for that)
 -   adaptation/shim driver to rename parameters (and functions). Renaming, so there is only one storage location. May
     need some glue around parameters/add_parameter to allow redefinition of parameters
+-   functions
+    -   get_output_latency
+    -
 
 
 VSM = vsm.QuTechVSMModule(name='VSM', address='192.168.0.10', port=5025)
