@@ -1,0 +1,682 @@
+//{
+    // File:    common_instructions.json.in
+    // notes:   this file specifies commonalities between different setups for key "instructions"
+    //          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
+	// author: 	Wouter Vlothuizen e.a.
+
+//	"instructions": {
+        // based on PyqQED_py3 'mw_lutman.py' and 'generate_CCL_cfg.py':
+        "i": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "i",
+            "cc": {
+//                "ref_signal": "single-qubit-mw",
+                "signal": [],   // no signal, to prevent conflicts with other gates (NB: will output nothing because VSM stays off)
+                "static_codeword_override": [0]
+            }
+        },
+        "rx45": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x",
+            "cc": {
+                "ref_signal": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
+                "static_codeword_override": [13]
+            }
+        },
+        "rx180": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x",
+            "cc": {
+                "ref_signal": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
+                "static_codeword_override": [1]
+            }
+        },
+        "ry180": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [2]
+            }
+        },
+        "rx90": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [3]
+            }
+        },
+        "ry90": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "y90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [4]
+            }
+        },
+        "rxm90": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "xm90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [5]
+            }
+        },
+        "rym90": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "ym90",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [6]
+            }
+        },
+
+
+        "cz_park": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "cz",
+            "cc": {
+                "signal": [
+                    {   "type": "flux",
+                        "operand_idx": 0,                                   // control
+                        "value": ["flux-0-{qubit}"]
+                    },
+                    {   "type": "flux",
+                        "operand_idx": 1,                                   // target
+                        "value": ["flux-1-{qubit}"]
+                    },
+                    {   "type": "flux",
+                        "operand_idx": 2,                                   // park
+                        "value": ["park_cz-{qubit}"]
+                    }
+                ],
+                "static_codeword_override": [0,0,0]   // FIXME
+            }
+        },
+
+        // additions from 'CC-software-implementation.docx'
+        // flux pulses, see:
+        // - https://github.com/QE-Lab/OpenQL/issues/176
+        // - https://github.com/QE-Lab/OpenQL/issues/224
+        // - https://github.com/QE-Lab/OpenQL/pull/238
+
+        "park_cz" : { // park signal with same length as cz gate
+            "duration" : @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc_light_instr": "park_cz",
+            "type": "measure",      // FIXME
+            "cc": {
+                "signal": [
+                    {   "type": "flux",
+                        "operand_idx": 0,
+                        "value": ["park_cz-{qubit}"]
+                    }
+                ],
+                "static_codeword_override": [0]   // FIXME
+            }
+        },
+
+        "park_measure" : { // park signal with same length as measurement
+            "duration" : @RO_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc": {
+                "signal": [
+                    {   "type": "flux",
+                        "operand_idx": 0,
+                        "value": ["park_measure-{qubit}"]
+                    }
+                ],
+                "static_codeword_override": [0]   // FIXME
+            }
+        },
+
+
+        // based on PyqQED_py3 'generate_CCL_cfg.py':
+        "prepz": {
+            "duration": @INIT_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "readout",
+            "cc_light_instr": "prepz",
+            "cc": {
+//                "ref_signal": "single-qubit-mw"
+                "signal": [],    // FIXME: no signal, pycQED::test_multi_qubit_oql_CC.py fails otherwise on scheduling issues
+                "static_codeword_override": [0]   // FIXME
+            }
+        },
+
+        "measure": {
+            "duration": @RO_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "readout",
+            "cc_light_instr": "measz",
+            "cc": {
+                "signal": [
+                    {   "type": "measure",
+                        "operand_idx": 0,
+                        "value": ["dummy"]          // Future extension: specify output and weight, and generate code word
+                    }
+                ],
+                "static_codeword_override": [0]   // FIXME
+            }
+        },
+
+        // additions for pycQED::test_single_qubit_oql_CC.py
+        // FIXME: contents untested
+        "square": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "square",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [10]
+            }
+        },
+        "spec": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "spec",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [0]
+            }
+        },
+        "rx12": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "rx12",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [0]
+            }
+        },
+        // cw_00 .. cw_31
+        "cw_00": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_00",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [0]
+            }
+        },
+        "cw_01": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_01",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [1]
+            }
+        },
+        "cw_02": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_02",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [2]
+            }
+        },
+        "cw_03": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_03",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [3]
+            }
+        },
+        "cw_04": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_04",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [4]
+            }
+        },
+        "cw_05": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_05",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [5]
+            }
+        },
+        "cw_06": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_06",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [6]
+            }
+        },
+        "cw_07": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_07",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [7]
+            }
+        },
+        "cw_08": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_08",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [8]
+            }
+        },
+        "cw_09": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_09",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [9]
+            }
+        },
+        "cw_10": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_10",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [10]
+            }
+        },
+        "cw_11": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_11",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [11]
+            }
+        },
+        "cw_12": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_12",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [12]
+            }
+        },
+        "cw_13": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_13",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [13]
+            }
+        },
+        "cw_14": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_14",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [14]
+            }
+        },
+        "cw_15": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_15",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [15]
+            }
+        },
+        "cw_16": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_16",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [16]
+            }
+        },
+        "cw_17": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_17",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [17]
+            }
+        },
+        "cw_18": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_18",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [18]
+            }
+        },
+        "cw_19": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_19",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [19]
+            }
+        },
+        "cw_20": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_20",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [20]
+            }
+        },
+        "cw_21": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_21",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [21]
+            }
+        },
+        "cw_22": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_22",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [22]
+            }
+        },
+        "cw_23": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_23",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [23]
+            }
+        },
+        "cw_24": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_24",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [24]
+            }
+        },
+        "cw_25": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_25",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [25]
+            }
+        },
+        "cw_26": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_26",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [26]
+            }
+        },
+        "cw_27": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_27",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [27]
+            }
+        },
+        "cw_28": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_28",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [28]
+            }
+        },
+        "cw_29": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_29",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [29]
+            }
+        },
+        "cw_30": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_30",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [30]
+            }
+        },
+        "cw_31": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_31",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [31]
+            }
+        },
+        // fl_cw_00 .. fl_cw_07
+        "fl_cw_00": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "fl_cw_00",
+            "cc": {
+                "ref_signal": "two-qubit-flux",
+                "static_codeword_override": [0,0]   // FIXME
+            }
+        },
+        "fl_cw_01": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "fl_cw_01",
+            "cc": {
+                "ref_signal": "two-qubit-flux",
+                "static_codeword_override": [1]
+            }
+        },
+        "fl_cw_02": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "fl_cw_02",
+            "cc": {
+                "ref_signal": "two-qubit-flux",
+                "static_codeword_override": [2]
+            }
+        },
+        "fl_cw_03": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "fl_cw_03",
+            "cc": {
+                "ref_signal": "two-qubit-flux",
+                "static_codeword_override": [3]
+            }
+        },
+        "fl_cw_04": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "fl_cw_04",
+            "cc": {
+                "ref_signal": "two-qubit-flux",
+                "static_codeword_override": [4]
+            }
+        },
+        "fl_cw_05": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "fl_cw_05",
+            "cc": {
+                "ref_signal": "two-qubit-flux",
+                "static_codeword_override": [5]
+            }
+        },
+        "fl_cw_06": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "fl_cw_06",
+            "cc": {
+                "ref_signal": "two-qubit-flux",
+                "static_codeword_override": [6]
+            }
+        },
+        "fl_cw_07": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "fl_cw_07",
+            "cc": {
+                "ref_signal": "two-qubit-flux",
+                "static_codeword_override": [7]
+            }
+        },
+
+        // single qubit flux hacks (compatible with QCC demo/flux lutman)
+        "sf_square": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [6]
+            }
+        },
+
+
+
+        // aditions for feedback
+        "_wait_dsm": {
+            "duration": 280,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc": {
+                "signal": []
+            }
+        },
+        "if_1_break": {
+			"duration": 60,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 1
+				}
+			}
+		},
+		"if_0_break": {
+			"duration": 60,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 0
+				}
+			}
+		},
+		"_wait_uhfqa": {
+            "duration": 720,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc": {
+                "signal": []
+            }
+        },
+        "_dist_dsm": {
+			"duration": 20,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+			    "readout_mode": "feedback",
+				"signal": [
+					{	"type": "measure",
+						"operand_idx": 0,
+						"value": []
+					}
+                ]
+			}
+		}
+
+//	},	// end of "instructions"
+
+
