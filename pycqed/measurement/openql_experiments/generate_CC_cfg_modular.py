@@ -56,7 +56,9 @@ def generate_config_modular(
             incl_path = Path(in_filename).parent / m.group(1)
             print(f"including file '{incl_path}")
             include = incl_path.read_text()
+            cfg = cfg + f"//--- start of include file '{incl_path}' ---\n"
             cfg = cfg + include
+            cfg = cfg + f"//--- end of include file '{incl_path}' ---\n"
 
 
     cfg = cfg.replace('@MW_DURATION@', str(mw_pulse_duration))

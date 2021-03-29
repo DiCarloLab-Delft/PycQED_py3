@@ -94,10 +94,8 @@
                     {   "type": "mw",
                         "operand_idx": 0,
                         "value": [
-                            "{gateName}-{instrumentName}:{instrumentGroup}-gi",
-                            "{gateName}-{instrumentName}:{instrumentGroup}-gq",
-                            "{gateName}-{instrumentName}:{instrumentGroup}-di",
-                            "{gateName}-{instrumentName}:{instrumentGroup}-dq"
+                            "{gateName}-{instrumentName}:{instrumentGroup}-i",
+                            "{gateName}-{instrumentName}:{instrumentGroup}-q"
                         ]
                     }
                 ],
@@ -113,11 +111,12 @@
                 ],
                 "single-qubit-flux": [
                     {   "type": "flux",
-                        "operand_idx": 0,                                   // control
+                        "operand_idx": 0,
                         "value": ["flux-0-{qubit}"]
                     }
                 ]
             }  // signals
+
 //		}  // eqasm_backend_cc
 //	},  // hardware_settings
 //}
