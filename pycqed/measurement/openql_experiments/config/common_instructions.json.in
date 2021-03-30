@@ -5,7 +5,7 @@
 
 //{
 //	"instructions": {
-        // based on PyqQED_py3 'mw_lutman.py' and 'generate_CCL_cfg.py':
+        // based on PyqQED_py3 'mw_lutman.py' (matches default_mw_lutmap) and 'generate_CCL_cfg.py':
         "i": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
@@ -14,19 +14,23 @@
                 "static_codeword_override": [0]
             }
         },
-        "rx45": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "cc": {
-                "ref_signal": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
-                "static_codeword_override": [13]
-            }
-        },
         "rx180": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
-                "ref_signal": "single-qubit-mw",
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "ge",
+                            "parameters": {
+                                "theta": 180,
+                                "phi": 0
+                            }
+                        }
+                    }
+                ],
                 "static_codeword_override": [1]
             }
         },
@@ -34,7 +38,19 @@
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
-                "ref_signal": "single-qubit-mw",
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "ge",
+                            "parameters": {
+                                "theta": 180,
+                                "phi": 90
+                            }
+                        }
+                    }
+                ],
                 "static_codeword_override": [2]
             }
         },
@@ -42,7 +58,19 @@
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
-                "ref_signal": "single-qubit-mw",
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "ge",
+                            "parameters": {
+                                "theta": 90,
+                                "phi": 0
+                            }
+                        }
+                    }
+                ],
                 "static_codeword_override": [3]
             }
         },
@@ -50,7 +78,19 @@
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
-                "ref_signal": "single-qubit-mw",
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "ge",
+                            "parameters": {
+                                "theta": 90,
+                                "phi": 90
+                            }
+                        }
+                    }
+                ],
                 "static_codeword_override": [4]
             }
         },
@@ -58,7 +98,19 @@
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
-                "ref_signal": "single-qubit-mw",
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "ge",
+                            "parameters": {
+                                "theta": -90,
+                                "phi": 0
+                            }
+                        }
+                    }
+                ],
                 "static_codeword_override": [5]
             }
         },
@@ -66,10 +118,100 @@
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
-                "ref_signal": "single-qubit-mw",
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "ge",
+                            "parameters": {
+                                "theta": -90,
+                                "phi": 90
+                            }
+                        }
+                    }
+                ],
                 "static_codeword_override": [6]
             }
         },
+        // FIXME: missing codewords
+        "spec": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "spec",
+                            "parameters": {
+                            }
+                        }
+                    }
+                ],
+                "static_codeword_override": [8]
+            }
+        },
+        "rx12": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "ef",
+                            "parameters": {
+                                "theta": 180,
+                                "phi": 0
+                            }
+                        }
+                    }
+                ],
+                "static_codeword_override": [9]
+            }
+        },
+        "square": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "square",
+                            "parameters": {
+                            }
+                        }
+                    }
+                ],
+                "static_codeword_override": [10]
+            }
+        },
+        "rx45": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": {
+                            "func": "ge",
+                            "parameters": {
+                                "theta": 45,
+                                "phi": 0
+                            }
+                        }
+                    }
+                ],
+                "static_codeword_override": [13]
+            }
+        },
+
 
 
         // based on PyqQED_py3 'generate_CCL_cfg.py':
@@ -77,8 +219,8 @@
             "duration": @INIT_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
-                "signal": [],    // FIXME: no signal, pycQED::test_multi_qubit_oql_CC.py fails otherwise on scheduling issues
-                "static_codeword_override": [0]   // FIXME
+                "signal": [],    // FIXME: no signal
+                "static_codeword_override": [0]
             }
         },
 
@@ -96,33 +238,6 @@
             }
         },
 
-
-        // additions for pycQED::test_single_qubit_oql_CC.py
-        // FIXME: contents untested
-        "square": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [10]
-            }
-        },
-        "spec": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [0]
-            }
-        },
-        "rx12": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [0]
-            }
-        },
 
         // additions for measurements using real time feedback
 		"_wait_uhfqa": {
