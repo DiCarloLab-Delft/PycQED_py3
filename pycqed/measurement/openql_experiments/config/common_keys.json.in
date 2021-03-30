@@ -1,10 +1,9 @@
+// File:    common_keys.json.in
+// notes:   this file specifies commonalities between different setups for key "hardware_settings"
+//          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
+// author: 	Wouter Vlothuizen e.a.
+
 //{
-    // File:    common_keys.json.in
-    // notes:   this file specifies commonalities between different setups for key "hardware_settings"
-    //          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
-	// author: 	Wouter Vlothuizen e.a.
-
-
     // NB: the "topology" keyword must be present, but the contents are only interpreted by
     // the CC-light 'resource constraint' scheduler
     "topology": {
@@ -15,4 +14,3 @@
     "resources": {
     }
 //}
-

@@ -1,9 +1,9 @@
-//{
-    // File:    common_instructions.json.in
-    // notes:   this file specifies commonalities between different setups for key "instructions"
-    //          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
-	// author: 	Wouter Vlothuizen e.a.
+// File:    common_instructions.json.in
+// notes:   this file specifies commonalities between different setups for key "instructions"
+//          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
+// author: 	Wouter Vlothuizen e.a.
 
+//{
 //	"instructions": {
         // based on PyqQED_py3 'mw_lutman.py' and 'generate_CCL_cfg.py':
         "i": {
@@ -12,7 +12,6 @@
             "type": "mw",
             "cc_light_instr": "i",
             "cc": {
-//                "ref_signal": "single-qubit-mw",
                 "signal": [],   // no signal, to prevent conflicts with other gates (NB: will output nothing because VSM stays off)
                 "static_codeword_override": [0]
             }
@@ -626,8 +625,6 @@
             }
         },
 
-
-
         // aditions for feedback
         "_wait_dsm": {
             "duration": 280,
@@ -676,7 +673,4 @@
                 ]
 			}
 		}
-
 //	},	// end of "instructions"
-
-

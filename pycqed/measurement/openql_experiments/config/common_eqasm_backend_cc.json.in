@@ -1,10 +1,10 @@
+// File:    common_eqasm_backend_cc.json.in
+// notes:   this file specifies commonalities between different setups for key "eqasm_backend_cc"
+//          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
+// author: 	Wouter Vlothuizen e.a.
+
+
 //{
-    // File:    common_eqasm_backend_cc.json.in
-    // notes:   this file specifies commonalities between different setups for key "eqasm_backend_cc"
-    //          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
-	// author: 	Wouter Vlothuizen e.a.
-
-
 //	"hardware_settings": {
 //		"eqasm_backend_cc": {
 			"instrument_definitions": {
@@ -120,4 +120,3 @@
 //		}  // eqasm_backend_cc
 //	},  // hardware_settings
 //}
-

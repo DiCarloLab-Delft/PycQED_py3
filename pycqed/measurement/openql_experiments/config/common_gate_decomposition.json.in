@@ -1,11 +1,11 @@
-//{
-    // File:    common_gate_decomposition.json.in
-    // notes:   this file specifies commonalities between different setups for key "gate_decomposition"
-    //          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
-	// author: 	Wouter Vlothuizen e.a.
+// File:    common_gate_decomposition.json.in
+// notes:   this file specifies commonalities between different setups for key "gate_decomposition"
+//          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
+// author: 	Wouter Vlothuizen e.a.
 
-	// extracted from PyqQED_py3 'generate_CCL_cfg.py'
-//  	"gate_decomposition": {
+//{
+//  "gate_decomposition": {
+	    // extracted from PyqQED_py3 'generate_CCL_cfg.py'
         "x %0": ["rx180 %0"],
         "y %0": ["ry180 %0"],
         "roty90 %0": ["ry90 %0"],
@@ -63,6 +63,5 @@
 		"rx180alpha2 %0": ["cw_25 %0"],
         "rphim2theta %0": ["cw_28 %0"]
 
-//  	},  // gate_decomposition
+//  },  // gate_decomposition
 //}
-
