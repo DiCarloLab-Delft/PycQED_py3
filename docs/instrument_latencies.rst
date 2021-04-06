@@ -9,6 +9,10 @@ Feedback latencies in QuSurf architecture
         -   Latency [ns]
         -   Condition
         -   Description
+    *   -   **Central Controller**
+        -
+        -
+        -
     *   -   tCcInputDio
         -   ~23
         -
@@ -53,10 +57,14 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
-    *   -
+    *   -   **HDAWG**
         -
         -
         -
+    *   -   tHdawgSyncDio
+        -   ~10 (0-20)
+        -
+        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
     *   -   tHdawgTriggerDio
         -   180
         -   HDAWG8 v2, filter disabled, no output delay
@@ -89,10 +97,26 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
+    *   -   **UHFQA**
+        -
+        -
+        -
+    *   -   tUhfqaSyncDio
+        -   ~10 (0-20)
+        -
+        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
     *   -   tUhfqaTriggerDio
         -
         -
         -   delay from DIO trigger to first analog output. Depends on number of codeword possibilities in sequencing program
+    *   -   tUhfqaOutputDelay
+        -   0-TBD
+        -
+        -   output delay configurable by user
+    *   -
+        -
+        -
+        -
     *   -   tUhfqa5stateDiscr
         -   168
         -   UHFQA-5, no bypass
@@ -128,11 +152,19 @@ Feedback latencies in QuSurf architecture
     *   -   tUhfqaHoldoff
         -
         -
-        -
+        -   TBW
     *   -
         -
         -
         -
+    *   -   **QWG**
+        -
+        -
+        -
+    *   -   tQwgSyncDio
+        -   ~10 (0-20)
+        -
+        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
     *   -   tQwgTriggerDio
         -   80
         -   using LVDS input
@@ -141,7 +173,7 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
-    *   -
+    *   -   **VSM**
         -
         -
         -
@@ -157,6 +189,14 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
+    *   -   **System**
+        -
+        -
+        -
+    *   -   tSysReadoutRoundtrip
+        -   ~40 ?
+        -
+        -   round trip delay from UHFQA signal output to UHFQA signal input: cables, mixers, filters, amplifiers
 
 FIXME:
 
@@ -170,4 +210,10 @@ Information sources:
 -   tUhfqaReadoutProcessing: mail Niels H. 20210317, replaces ziUHFQA_UserManual.pdf (revision 21.02.01)
 -   tUhf*: QuSurf_MetricsTables_201015-Please-update-for-TEM5.docx
 -   tQwg*: 20171511_pitch_qwg_final.pptx
+
+Notes:
+
+-   20210319: measurement with CC from TRACE_DEV_OUT to TRACE_DEV_IN takes 1370 ns (274 ticks of 5 ns), with a measurement
+    output signal duration of 780 ns (39 * 20 ns)), so total overhead is 1370 - 780 = 590 ns
+    (tCcOutputDio + tCable + tUhfqaTriggerDio + tUhfqaReadoutProcessing + tCable + tCcInputDio)
 
