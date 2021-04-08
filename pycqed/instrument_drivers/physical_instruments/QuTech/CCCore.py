@@ -58,20 +58,23 @@ class CCCore(SCPIBase):
         sqc = self.get_status_questionable_condition()
         self._print_item("status_questionable_condition", sqc, self._stat_qeus_lookup)
         if sqc & self.STAT_QUES_FREQUENCY:
-            self._print_item("status_questionable_frequency_condition", self.get_status_questionable_frequency_condition(), )
+            self._print_item("status_questionable_frequency_condition", self.get_status_questionable_frequency_condition(), self._cc_stat_ques_freq_lookup)
 
-        if sqc & self.STAT_QUES_CONFIG:
-            self._print_item("", self.get_stat(), )
-
-        if sqc & self.STAT_QUES_BPLINK:
-            self._print_item("", self.(), )
-
-        if sqc & self.STAT_QUES_DIO:
-            self._print_item("", self.(), )
+        # if sqc & self.STAT_QUES_CONFIG:
+        #     self._print_item("", self.get_status(), )
+        #
+        # if sqc & self.STAT_QUES_BPLINK:
+        #     self._print_item("", self.(), )
+        #
+        # if sqc & self.STAT_QUES_DIO:
+        #     self._print_item("", self.(), )
 
         if sqc & self.STAT_QUES_INST_SUMMARY:
-            sqis =  self.get_status_questionable_instrument_condition()
-            self._print_item("", self.(), )
+            sqic =  self.get_status_questionable_instrument_condition()
+            self._print_item("status_questionable_instrument_condition", sqic)
+            # for ccio in range(13):
+            #     sqiic = self.get_status_questionable_instrument_isummary_condition(ccio)
+            #     self._print_item("ccio[{ccio}]", sqiic)
 
     def print_status_questionable_event(self) -> None:
         sqe = self.get_status_questionable_event()
@@ -275,7 +278,7 @@ class CCCore(SCPIBase):
         (STAT_QUES_CONFIG, "Configuration error"),
         (STAT_QUES_BPLINK, "Backplane link error"),
         (STAT_QUES_DIO, "DIO interface error")
-    ] + super()._stat_ques_lookup
+    ] # FIXME: + super()._stat_ques_lookup
 
     # stat_ques_freq
     SQF_CLK_SRC_INTERN          = 0x0001

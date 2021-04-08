@@ -40,7 +40,7 @@ class SCPIBase:
             log.error(f"{self._name}: Found {err_cnt} SCPI errors:")
             for _ in range(err_cnt):
                 log.error(self.get_error())
-            raise RuntimeError("SCPI errors found")
+            raise RuntimeError(f"{self._name}: SCPI errors found")
 
     ##########################################################################
     # Status printing, override for instruments that extend standard status
