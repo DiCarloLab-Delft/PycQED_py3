@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 ### setup logging before all imports (before any logging is done as to prevent a default root logger)
-import CC_logging
+#import CC_logging
 
 import logging
 import sys

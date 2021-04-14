@@ -48,7 +48,7 @@ class SCPIBase:
 
     def _print_item(self, name: str, val: int, lookup: List[Tuple[int, str]] = None) -> None:
         if val != 0:
-            print(f"{name} = {val}")     # FIXME: pad str
+            print(f"{name} = 0x{val:04X}")     # FIXME: pad str
             if lookup is not None:
                 for item in lookup:
                     if val & item[0]:
@@ -63,10 +63,10 @@ class SCPIBase:
         self._print_item("event_status_register", self.get_event_status_register(), self._esr_lookup)
 
     def print_status_questionable_condition(self) -> None:
-        self._print_item("status_questionable_condition", self.get_status_questionable_condition(), self._stat_qeus_lookup)
+        self._print_item("status_questionable_condition", self.get_status_questionable_condition(), self._stat_ques_lookup)
 
     def print_status_questionable_event(self) -> None:
-        self._print_item("status_questionable_event", self.get_status_questionable_event(), self._stat_qeus_lookup)
+        self._print_item("status_questionable_event", self.get_status_questionable_event(), self._stat_ques_lookup)
 
     def print_status_operation_condition(self) -> None:
         self._print_item("status_operation_condition", self.get_status_operation_condition(), self._stat_oper_lookup)
@@ -325,7 +325,7 @@ class SCPIBase:
     STAT_QUES_INST_SUMMARY      = 0x2000
     STAT_QUES_COMMAND_WARNING   = 0x4000
 
-    _stat_qeus_lookup = [
+    _stat_ques_lookup = [
         (STAT_QUES_VOLTAGE, "Voltage"),
         (STAT_QUES_CURRENT, "Current"),
         (STAT_QUES_TIME, "Time"),
