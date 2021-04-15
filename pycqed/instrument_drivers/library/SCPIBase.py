@@ -261,9 +261,9 @@ class SCPIBase:
         (STB_QMA, "Error/event queue message available"),
         (STB_QES, "Questionable status"),
         (STB_MAV, "Message available"),
-        (STB_ESR, "Event status register"),    # ??
+        (STB_ESR, "Event status register"),
         (STB_SRQ, "Service request"),
-        (STB_OPS, "Operatin status flag")
+        (STB_OPS, "Operation status flag")
     ]
 
     # bits for *ESR and *ESE
