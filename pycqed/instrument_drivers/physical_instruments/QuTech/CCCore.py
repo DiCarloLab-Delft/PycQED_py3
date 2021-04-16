@@ -54,41 +54,36 @@ class CCCore(SCPIBase):
     # overloaded status printing functions
     ##########################################################################
 
-    def print_status_questionable_condition(self) -> None:
+    def print_status_questionable(self, cond: bool=False) -> None:
         ### local CCCORE status
-        sqc = self.get_status_questionable_condition()
-        self._print_item("status_questionable_condition", sqc, self._stat_ques_lookup)
-        if sqc & self.STAT_QUES_FREQUENCY:
-            self._print_item("cccore frequency", self.get_status_questionable_frequency_condition(), self._cc_stat_ques_freq_lookup)
-        if sqc & self.STAT_QUES_BPLINK:
-            self._print_item("cccore bplink", self.get_status_questionable_bplink_condition(), self._cc_stat_ques_bplink_lookup)
-        if sqc & self.STAT_QUES_CONFIG:
-            self._print_item("cccore config", self.get_status_questionable_config_condition(), self._cc_stat_ques_config_lookup)
+        sq = self.get_status_questionable(cond)
+        self._print_item("status_questionable", sq, self._stat_ques_lookup)
+        if sq & self.STAT_QUES_FREQUENCY:
+            self._print_item("cccore frequency", self.get_status_questionable_frequency(cond), self._cc_stat_ques_freq_lookup)
+        if sq & self.STAT_QUES_BPLINK:
+            self._print_item("cccore bplink", self.get_status_questionable_bplink(cond), self._cc_stat_ques_bplink_lookup)
+        if sq & self.STAT_QUES_CONFIG:
+            self._print_item("cccore config", self.get_status_questionable_config(cond), self._cc_stat_ques_config_lookup)
         ### remote CCIO status
-        if sqc & self.STAT_QUES_INST_SUMMARY:
+        if sq & self.STAT_QUES_INST_SUMMARY:
             # get mask of instruments reporting condition
-            sqic =  self.get_status_questionable_instrument_condition()
-            self._print_item("status_questionable_instrument_condition", sqic)
+            sqi =  self.get_status_questionable_instrument(cond)
+            self._print_item("status_questionable_instrument_condition", sqi)
 
             # display condition for reporting instruments
             for ccio in range(13):
-                if 1<<ccio & sqic:
-                    sqiic = self.get_status_questionable_instrument_isummary_condition(ccio)
-                    self._print_item(f"ccio[{ccio}]", sqiic, self._stat_ques_lookup)
-                    if sqiic & self.STAT_QUES_FREQUENCY:
-                        self._print_item("freq", self.get_status_questionable_instrument_idetail_freq_condition(ccio), self._cc_stat_ques_freq_lookup)
-                    if sqiic & self.STAT_QUES_BPLINK:
-                        self._print_item("bplink", self.get_status_questionable_instrument_idetail_bplink_condition(ccio), self._cc_stat_ques_bplink_lookup)
-                    if sqiic & self.STAT_QUES_CONFIG:
-                        self._print_item("config", self.get_status_questionable_instrument_idetail_config_condition(ccio), self._cc_stat_ques_config_lookup)
-                    if sqiic & self.STAT_QUES_DIO:
-                        self._print_item("dio", self.get_status_questionable_instrument_idetail_diocal_condition(ccio), self._cc_stat_ques_diocal_lookup)
+                if 1<<ccio & sqi:
+                    sqii = self.get_status_questionable_instrument_isummary(ccio, cond)
+                    self._print_item(f"ccio[{ccio}]", sqii, self._stat_ques_lookup)
+                    if sqii & self.STAT_QUES_FREQUENCY:
+                        self._print_item("freq", self.get_status_questionable_instrument_idetail_freq(ccio, cond), self._cc_stat_ques_freq_lookup)
+                    if sqii & self.STAT_QUES_BPLINK:
+                        self._print_item("bplink", self.get_status_questionable_instrument_idetail_bplink(ccio, cond), self._cc_stat_ques_bplink_lookup)
+                    if sqii & self.STAT_QUES_CONFIG:
+                        self._print_item("config", self.get_status_questionable_instrument_idetail_config(ccio, cond), self._cc_stat_ques_config_lookup)
+                    if sqii & self.STAT_QUES_DIO:
+                        self._print_item("dio", self.get_status_questionable_instrument_idetail_diocal(ccio, cond), self._cc_stat_ques_diocal_lookup)
 
-    def print_status_questionable_event(self) -> None:
-        sqe = self.get_status_questionable_event()
-        self._print_item("status_questionable_event", sqe, self._stat_ques_lookup)
-        if sqe & self.STAT_QUES_FREQUENCY:
-            self._print_item("status_questionable_frequency_event", self.get_status_questionable_frequency_event())
 
     ##########################################################################
     # CC SCPI protocol wrapper functions
@@ -200,82 +195,64 @@ class CCCore(SCPIBase):
             self.get_operation_complete()
 
     ### status functions ###
-    def get_status_questionable_frequency_condition(self) -> int:
-        return self._ask_int('STATus:QUEStionable:FREQ:CONDition?')
-    def get_status_questionable_frequency_event(self) -> int:
-        return self._ask_int('STATus:QUEStionable:FREQ:EVENt?')
+    def get_status_questionable_frequency(self, cond: bool=False) -> int:
+        return self._get_status('STATus:QUEStionable:FREQ', cond)
     def set_status_questionable_frequency_enable(self, val) -> None:
         self._transport.write(f'STATus:QUEStionable:FREQ:ENABle {val}')
     def get_status_questionable_frequency_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:FREQ:ENABle?')
 
-    def get_status_questionable_config_condition(self) -> int:
-        return self._ask_int('STATus:QUEStionable:CONFig:CONDition?')
-    def get_status_questionable_config_event(self) -> int:
-        return self._ask_int('STATus:QUEStionable:CONFig:EVENt?')
+    def get_status_questionable_config(self, cond: bool=False) -> int:
+        return self._get_status('STATus:QUEStionable:CONFig', cond)
     def set_status_questionable_config_enable(self, val) -> None:
         self._transport.write(f'STATus:QUEStionable:CONFig:ENABle {val}')
     def get_status_questionable_config_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:CONFig:ENABle?')
 
-    def get_status_questionable_bplink_condition(self) -> int:
-        return self._ask_int('STATus:QUEStionable:BPLINK:CONDition?')
-    def get_status_questionable_bplink_event(self) -> int:
-        return self._ask_int('STATus:QUEStionable:BPLINK:EVENt?')
+    def get_status_questionable_bplink(self, cond: bool=False) -> int:
+        return self._get_status('STATus:QUEStionable:BPLINK', cond)
     def set_status_questionable_bplink_enable(self, val) -> None:
         self._transport.write(f'STATus:QUEStionable:BPLINK:ENABle {val}')
     def get_status_questionable_bplink_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:BPLINK:ENABle?')
 
-    def get_status_questionable_instrument_condition(self) -> int:
-        return self._ask_int('STATus:QUEStionable:INSTrument:CONDition?')
-    def get_status_questionable_instrument_event(self) -> int:
-        return self._ask_int('STATus:QUEStionable:INSTrument:EVENt?')
+    def get_status_questionable_instrument(self, cond: bool=False) -> int:
+        return self._get_status('STATus:QUEStionable:INSTrument', cond)
     def set_status_questionable_instrument_enable(self, val) -> None:
         self._transport.write(f'STATus:QUEStionable:INSTrument:ENABle {val}')
     def get_status_questionable_instrument_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:INSTrument:ENABle?')
 
-    def get_status_questionable_instrument_isummary_condition(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}:CONDition?')
-    def get_status_questionable_instrument_isummary_event(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}:EVENt?')
+    def get_status_questionable_instrument_isummary(self, ccio: int, cond: bool=False) -> int:
+        return self._get_status(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}', cond)
     def set_status_questionable_instrument_isummary_enable(self, ccio: int, val) -> None:
         self._transport.write(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}:ENABle {val}')
     def get_status_questionable_instrument_isummary_enable(self, ccio: int) -> int:
         return self._ask_int(f'STATus:QUEStionable:INSTrument:ISUMmary{ccio}:ENABle?')
 
-    def get_status_questionable_instrument_idetail_freq_condition(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:FREQ:CONDition?')
-    def get_status_questionable_instrument_idetail_freq_event(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:FREQ:EVENt?')
+    def get_status_questionable_instrument_idetail_freq(self, ccio: int, cond: bool=False) -> int:
+        return self._get_status(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:FREQ', cond)
     def set_status_questionable_instrument_idetail_freq_enable(self, ccio: int, val) -> None:
         self._transport.write(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:FREQ:ENABle {val}')
     def get_status_questionable_instrument_idetail_freq_enable(self, ccio: int) -> int:
         return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:FREQ:ENABle?')
 
-    def get_status_questionable_instrument_idetail_config_condition(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:CONFig:CONDition?')
-    def get_status_questionable_instrument_idetail_config_event(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:CONFig:EVENt?')
+    def get_status_questionable_instrument_idetail_config(self, ccio: int, cond: bool=False) -> int:
+        return self._get_status(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:CONFig', cond)
     def set_status_questionable_instrument_idetail_config_enable(self, ccio: int, val) -> None:
         self._transport.write(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:CONFig:ENABle {val}')
     def get_status_questionable_instrument_idetail_config_enable(self, ccio: int) -> int:
         return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:CONFig:ENABle?')
 
-    def get_status_questionable_instrument_idetail_bplink_condition(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:BPLINK:CONDition?')
-    def get_status_questionable_instrument_idetail_bplink_event(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:BPLINK:EVENt?')
+    def get_status_questionable_instrument_idetail_bplink(self, ccio: int, cond: bool=False) -> int:
+        return self._get_status(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:BPLINK', cond)
     def set_status_questionable_instrument_idetail_bplink_enable(self, ccio: int, val) -> None:
         self._transport.write(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:BPLINK:ENABle {val}')
     def get_status_questionable_instrument_idetail_bplink_enable(self, ccio: int) -> int:
         return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:BPLINK:ENABle?')
 
-    def get_status_questionable_instrument_idetail_diocal_condition(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:DIOcal:CONDition?')
-    def get_status_questionable_instrument_idetail_diocal_event(self, ccio: int) -> int:
-        return self._ask_int(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:DIOcal:EVENt?')
+    def get_status_questionable_instrument_idetail_diocal(self, ccio: int, cond: bool=False) -> int:
+        return self._get_status(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:DIOcal', cond)
     def set_status_questionable_instrument_idetail_diocal_enable(self, ccio: int, val) -> None:
         self._transport.write(f'STATus:QUEStionable:INSTrument:IDETail{ccio}:DIOcal:ENABle {val}')
     def get_status_questionable_instrument_idetail_diocal_enable(self, ccio: int) -> int:

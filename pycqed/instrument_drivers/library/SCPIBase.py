@@ -62,38 +62,28 @@ class SCPIBase:
     def print_event_status_register(self) -> None:
         self._print_item("event_status_register", self.get_event_status_register(), self._esr_lookup)
 
-    def print_status_questionable_condition(self) -> None:
-        self._print_item("status_questionable_condition", self.get_status_questionable_condition(), self._stat_ques_lookup)
+    def print_status_questionable(self, cond: bool=False) -> None:
+        self._print_item("status_questionable", self.get_status_questionable(cond), self._stat_ques_lookup)
 
-    def print_status_questionable_event(self) -> None:
-        self._print_item("status_questionable_event", self.get_status_questionable_event(), self._stat_ques_lookup)
+    def print_status_operation(self, cond: bool=False) -> None:
+        self._print_item("status_operation", self.get_status_operation(cond), self._stat_oper_lookup)
 
-    def print_status_operation_condition(self) -> None:
-        self._print_item("status_operation_condition", self.get_status_operation_condition(), self._stat_oper_lookup)
-
-    def print_status_operation_event(self) -> None:
-        self._print_item("status_operation_event", self.get_status_operation_event(), self._stat_oper_lookup)
-
-    def print_status(self, full: bool=False) -> None:
+    def print_status(self, cond: bool=False) -> None:
         """
         Walk the SCPI status tree and print non-zero items
         """
         stb = self.get_status_byte()
-        if full or stb != 0:
+        if cond or stb != 0:
             self._print_item("status_byte", stb, self._stb_lookup)
 
-        if full or stb & self.STB_ESR:
+        if cond or stb & self.STB_ESR:
             self.print_event_status_register()
 
-        if full or stb & self.STB_QES:
-            self.print_status_questionable_condition()
+        if cond or stb & self.STB_QES:
+            self.print_status_questionable(cond)
 
-        if full or stb & self.STB_OPS:
-            self.print_status_operation_condition()
-
-    def print_event(self) -> None:
-        self.print_status_questionable_event()
-        self.print_status_operation_event()
+        if cond or stb & self.STB_OPS:
+            self.print_status_operation(cond)
 
     ##########################################################################
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard
@@ -165,11 +155,12 @@ class SCPIBase:
         return self._ask('system:version?')
 
 
-    def get_status_questionable_condition(self) -> int:
-        return self._ask_int('STATus:QUEStionable:CONDition?')
+    def _get_status(self, base: str, cond: bool) -> int:
+        type = 'CONDition' if cond else 'EVENt'
+        return self._ask_int(f'{base}:{type}?')
 
-    def get_status_questionable_event(self) -> int:
-        return self._ask_int('STATus:QUEStionable:EVENt?')
+    def get_status_questionable(self, cond: bool=False) -> int:
+        return self._get_status('STATus:QUEStionable', cond)
 
     def set_status_questionable_enable(self, val) -> None:
         self._transport.write('STATus:QUEStionable:ENABle {}'.format(val))
@@ -178,11 +169,8 @@ class SCPIBase:
         return self._ask_int('STATus:QUEStionable:ENABle?')
 
 
-    def get_status_operation_condition(self) -> int:
-        return self._ask_int('STATus:OPERation:CONDition?')
-
-    def get_status_operation_event(self) -> int:
-        return self._ask_int('STATus:OPERation:EVENt?')
+    def get_status_operation(self, cond: bool=False) -> int:
+        return self._get_status('STATus:OPERation', cond)
 
     def set_status_operation_enable(self, val) -> None:
         self._transport.write('STATus:OPERation:ENABle {}'.format(val))

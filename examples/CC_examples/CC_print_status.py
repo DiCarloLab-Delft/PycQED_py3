@@ -21,5 +21,9 @@ log.setLevel(logging.INFO)
 log.info('connecting to CC')
 cc = CC('cc', IPTransport(ip))
 
-cc.print_event()
+print('print_status: Condition')
 cc.print_status(True)
+
+print('print_status: Event')
+cc.print_status(False)
+
