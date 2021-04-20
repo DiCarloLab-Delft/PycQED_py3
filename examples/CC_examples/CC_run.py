@@ -45,7 +45,7 @@ for filename in filenames:
 
     err_cnt = cc.get_system_error_count()
     for i in range(err_cnt):
-        print(cc.get_error())
+        print(cc.get_system_error())
 
 cc.print_event()
 cc.print_status()

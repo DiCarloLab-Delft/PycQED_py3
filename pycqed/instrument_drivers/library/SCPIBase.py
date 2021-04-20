@@ -31,15 +31,15 @@ class SCPIBase:
 
     def init(self) -> None:
         self.reset()
-        self.clear_status()
         self.status_preset()
+        self.clear_status() # NB: must be after status_preset
 
     def check_errors(self) -> None:
         err_cnt = self.get_system_error_count()
         if err_cnt>0:
             log.error(f"{self._name}: Found {err_cnt} SCPI errors:")
             for _ in range(err_cnt):
-                log.error(self.get_error())
+                log.error(self.get_system_error())
             raise RuntimeError(f"{self._name}: SCPI errors found")
 
     ##########################################################################
@@ -114,7 +114,7 @@ class SCPIBase:
         return self._ask('*OPT?')
 
     def service_request_enable(self, value: int) -> None:
-        self._transport.write('*SRE %d' % value)
+        self._transport.write(f'*SRE {value}')
 
     def get_service_request_enable(self) -> int:
         return self._ask_int('*SRE?')
@@ -140,7 +140,7 @@ class SCPIBase:
     # Required SCPI commands (SCPI std V1999.0 4.2.1)
     ##########################################################################
 
-    def get_error(self) -> str:
+    def get_system_error(self) -> str:
         """ Returns:    '0,"No error"' or <error message>
         """
         return self._ask('system:err?')
@@ -155,15 +155,11 @@ class SCPIBase:
         return self._ask('system:version?')
 
 
-    def _get_status(self, base: str, cond: bool) -> int:
-        type = 'CONDition' if cond else 'EVENt'
-        return self._ask_int(f'{base}:{type}?')
-
     def get_status_questionable(self, cond: bool=False) -> int:
         return self._get_status('STATus:QUEStionable', cond)
 
     def set_status_questionable_enable(self, val) -> None:
-        self._transport.write('STATus:QUEStionable:ENABle {}'.format(val))
+        self._transport.write(f'STATus:QUEStionable:ENABle {val}')
 
     def get_status_questionable_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:ENABle?')
@@ -173,7 +169,7 @@ class SCPIBase:
         return self._get_status('STATus:OPERation', cond)
 
     def set_status_operation_enable(self, val) -> None:
-        self._transport.write('STATus:OPERation:ENABle {}'.format(val))
+        self._transport.write(f'STATus:OPERation:ENABle {val}')
 
     def get_status_operation_enable(self) -> int:
         return self._ask_int('STATus:OPERation:ENABle?')
@@ -202,7 +198,7 @@ class SCPIBase:
         header_a = self._transport.read_binary(2)                        # read '#N'
         header_a_str = header_a.decode()
         if header_a_str[0] != '#':
-            s = 'SCPI header error: received {}'.format(header_a)
+            s = f'SCPI header error: received {header_a}'
             raise RuntimeError(s)
         digit_cnt = int(header_a_str[1])
         header_b = self._transport.read_binary(digit_cnt)
@@ -214,6 +210,10 @@ class SCPIBase:
     ##########################################################################
     # Helpers
     ##########################################################################
+
+    def _get_status(self, base: str, cond: bool) -> int:
+        type = 'CONDition' if cond else 'EVENt'
+        return self._ask_int(f'{base}:{type}?')
 
     def _ask(self, cmd_str: str) -> str:
         self._transport.write(cmd_str)

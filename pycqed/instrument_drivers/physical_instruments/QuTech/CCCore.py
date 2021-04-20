@@ -33,26 +33,14 @@ class CCCore(SCPIBase):
         super().__init__(name, transport)
 
     ##########################################################################
-    # convenience functions
+    # overloaded SCPIBase functions
     ##########################################################################
 
-    def assemble(self, program_string: str) -> None:
-        self.sequence_program_assemble(program_string)  # NB: takes ~1.1 s for RB with 2048 Cliffords (1 measurement only)
-        if self.get_assembler_success() != 1:
-            sys.stderr.write('assembly error log:\n{}\n'.format(self.get_assembler_log()))
-            raise RuntimeError('assembly failed')
-
-    def assemble_and_start(self, program_string: str) -> None:
-        self.assemble(program_string)
-        log.debug('starting CC')
-        self.start()
-        log.debug('checking for SCPI errors on CC')
-        self.check_errors()
-        log.debug('done checking for SCPI errors on CC')
-
-    ##########################################################################
-    # overloaded status printing functions
-    ##########################################################################
+    def init(self) -> None:
+        super().init()
+        # switch on event reporting that's off by default (as required by the SCPI standard)
+        self.set_status_questionable_enable(0x7FFF)
+        self.set_status_operation_enable(0x7FFF)
 
     def print_status_questionable(self, cond: bool=False) -> None:
         ### local CCCORE status
@@ -84,6 +72,24 @@ class CCCore(SCPIBase):
                     if sqii & self.STAT_QUES_DIO:
                         self._print_item("dio", self.get_status_questionable_instrument_idetail_diocal(ccio, cond), self._cc_stat_ques_diocal_lookup)
 
+
+    ##########################################################################
+    # convenience functions
+    ##########################################################################
+
+    def assemble(self, program_string: str) -> None:
+        self.sequence_program_assemble(program_string)  # NB: takes ~1.1 s for RB with 2048 Cliffords (1 measurement only)
+        if self.get_assembler_success() != 1:
+            sys.stderr.write('assembly error log:\n{}\n'.format(self.get_assembler_log()))
+            raise RuntimeError('assembly failed')
+
+    def assemble_and_start(self, program_string: str) -> None:
+        self.assemble(program_string)
+        log.debug('starting CC')
+        self.start()
+        log.debug('checking for SCPI errors on CC')
+        self.check_errors()
+        log.debug('done checking for SCPI errors on CC')
 
     ##########################################################################
     # CC SCPI protocol wrapper functions

@@ -24,6 +24,8 @@ cc = CC('cc', IPTransport(ip))
 print('print_status: Condition')
 cc.print_status(True)
 
+# FIXME: red LOCK LED remains on after unlocking and relocking  
+
 print('print_status: Event')
 cc.print_status(False)
 
