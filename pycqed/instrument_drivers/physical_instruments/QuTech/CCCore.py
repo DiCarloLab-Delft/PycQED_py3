@@ -36,8 +36,9 @@ class CCCore(SCPIBase):
     # overloaded SCPIBase functions
     ##########################################################################
 
-    def init(self) -> None:
-        super().init()
+    def status_preset(self) -> None:
+        super().status_preset()
+
         # switch on event reporting that's off by default (as required by the SCPI standard)
         self.set_status_questionable_enable(0x7FFF)
         self.set_status_operation_enable(0x7FFF)

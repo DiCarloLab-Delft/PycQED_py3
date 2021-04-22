@@ -3,7 +3,7 @@
     Author:     Wouter Vlothuizen, TNO/QuTech
     Purpose:    self contained base class for SCPI ('Standard Commands for Programmable Instruments') commands, with
                 selectable transport
-    Usage:      don't use directly, use a derived class (e.g. Qutech_CC)
+    Usage:      don't use directly, use a derived class (e.g. Qutech::CC)
     Notes:
     Bugs:
     Changelog:
@@ -45,14 +45,6 @@ class SCPIBase:
     ##########################################################################
     # Status printing, override for instruments that extend standard status
     ##########################################################################
-
-    def _print_item(self, name: str, val: int, lookup: List[Tuple[int, str]] = None) -> None:
-        if val != 0:
-            print(f"{name} = 0x{val:04X}")     # FIXME: pad str
-            if lookup is not None:
-                for item in lookup:
-                    if val & item[0]:
-                        print(f"    {item[1]}")
 
     def print_status_byte(self) -> int:
         stb = self.get_status_byte()
@@ -208,8 +200,16 @@ class SCPIBase:
         return bin_block
 
     ##########################################################################
-    # Helpers
+    # Private helpers
     ##########################################################################
+
+    def _print_item(self, name: str, val: int, lookup: List[Tuple[int, str]] = None) -> None:
+        if val != 0:
+            print(f"{name} = 0x{val:04X}")     # FIXME: pad str
+            if lookup is not None:
+                for item in lookup:
+                    if val & item[0]:
+                        print(f"    {item[1]}")
 
     def _get_status(self, base: str, cond: bool) -> int:
         type = 'CONDition' if cond else 'EVENt'
