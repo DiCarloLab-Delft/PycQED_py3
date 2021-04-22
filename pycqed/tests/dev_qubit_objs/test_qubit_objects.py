@@ -34,7 +34,7 @@ from openql import openql as ql
 
 Dummy_VSM_not_fixed = False
 
-
+@unittest.skip('FIXME: disabled, see PR #634 and PR #635 (marked as important)')  # too many problems
 class Test_CCL(unittest.TestCase):
 
     @classmethod
