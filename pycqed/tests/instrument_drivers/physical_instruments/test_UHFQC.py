@@ -55,8 +55,8 @@ class Test_UHFQC(unittest.TestCase):
                             ('wave_ch1_cw002', 'wave_ch2_cw002'),
                             ('wave_ch1_cw014', 'wave_ch2_cw014')]
 
+    @unittest.skip('FIXME: disabled, see PR #634 and PR #635 (marked as important)')
     def test_dynamic_waveform_upload(self):
-
         Test_UHFQC.uhf.wave_ch1_cw000(np.ones(48))
 
         # resetting the compilation count to ensure test is self contained

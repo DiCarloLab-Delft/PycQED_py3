@@ -132,7 +132,7 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         k = oqh.create_kernel('my_kernel', p)
         self.assertEqual(k.name, 'my_kernel')
 
-
+    @unittest.skip('FIXME: disabled, see PR #634 and PR #635 (marked as important)')
     def test_compile(self):
         """
         Only tests the compile helper by compiling an empty file.
