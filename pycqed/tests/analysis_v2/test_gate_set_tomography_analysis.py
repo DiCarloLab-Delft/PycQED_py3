@@ -24,6 +24,7 @@ class Test_GST_data_extraction_analysis(unittest.TestCase):
         val_m1 = list(ds.values())[-2].allcounts
         self.assertDictEqual(exp_val_m1, val_m1)
 
+    @unittest.skip('FIXME: disabled, see PR #634')
     def test_GST_TwoQubit_DataExtraction(self):
         a = ma.GST_TwoQubit_DataExtraction(label='155752_Two_qubit_GST')
         ds = a.proc_data_dict['dataset']

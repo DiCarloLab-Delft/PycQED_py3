@@ -457,6 +457,7 @@ class Test_Device_obj(unittest.TestCase):
         assert uhf.qas_0_thresholds_5_correlation_enable() == 0
         assert uhf.qas_0_thresholds_5_correlation_source() == 0
 
+    @unittest.skip('FIXME: disabled, see PR #634')
     def test_prepare_ro_pulses_resonator_combinations(self):
         # because not all combinations are supported the default is to
         # support
