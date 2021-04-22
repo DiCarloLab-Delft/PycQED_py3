@@ -15,6 +15,7 @@ v0.3 - Work In Progress
     . usage: see examples/CC_examples/CC_demo_mux.py "DIO.calibrate"
 # support for Central Controller software v0.2.2 (older versions not supported)
     . requires OpenQL > 0.8.1.dev4
+# removed support for deprecated hardware (PR #620)
 . FIXME: many more changes, please document
 
 v0.2 - 20191213
