@@ -15,6 +15,7 @@ class Test_GST_data_extraction_analysis(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
 
+    @unittest.skip('FIXME: disabled, see PR #634')
     def test_GST_SingleQubit_DataExtraction(self):
         a = ma.GST_SingleQubit_DataExtraction(label='131808_Single_qubit_GST')
         ds = a.proc_data_dict['dataset']
