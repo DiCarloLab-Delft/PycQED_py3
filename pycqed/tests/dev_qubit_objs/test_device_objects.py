@@ -339,7 +339,7 @@ class Test_Device_obj(unittest.TestCase):
         assert self.CC.dio6_out_delay() == 0
         assert self.CC.dio7_out_delay() == 7
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_lo_freqs_config(self):
         # Test that the modulation frequencies of all qubits
         # are set correctly.
@@ -370,7 +370,7 @@ class Test_Device_obj(unittest.TestCase):
             self.device.prepare_readout(qubits=qubits)
         q.instr_LO_ro(self.MW1.name)
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_assign_weights(self):
         self.device.ro_lo_freq(6e9)
 
@@ -403,7 +403,7 @@ class Test_Device_obj(unittest.TestCase):
         assert qb.ro_acq_weight_chI() == 5
         assert qb.ro_acq_weight_chQ() == 6
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_assign_weights_order_matters(self):
         # Test that the order of the channels is as in the order iterated over
         qubits = ["q2", "q3", "q0"]
@@ -415,7 +415,7 @@ class Test_Device_obj(unittest.TestCase):
         assert qb.ro_acq_weight_chI() == 1
         assert qb.ro_acq_weight_chQ() == 2
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_assign_weights_IQ_counts_double(self):
         qubits = ["q2", "q3", "q0", "q13", "q16"]
         self.device.ro_acq_weight_type("SSB")
@@ -429,14 +429,14 @@ class Test_Device_obj(unittest.TestCase):
         assert qb.ro_acq_weight_chI() == 2
         assert qb.ro_acq_weight_chQ() == 3
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_assign_weights_too_many_raises(self):
         qubits = self.device.qubits()
         self.device.ro_acq_weight_type("SSB")
         with pytest.raises(ValueError):
             self.device.prepare_readout(qubits=qubits)
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_resets_UHF(self):
         uhf = self.device.find_instrument("UHFQC_2")
 
@@ -457,7 +457,7 @@ class Test_Device_obj(unittest.TestCase):
         assert uhf.qas_0_thresholds_5_correlation_enable() == 0
         assert uhf.qas_0_thresholds_5_correlation_source() == 0
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_ro_pulses_resonator_combinations(self):
         # because not all combinations are supported the default is to
         # support
@@ -480,7 +480,7 @@ class Test_Device_obj(unittest.TestCase):
             exp_res_combs2 = [[0]]
         assert res_combs2 == exp_res_combs2
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_ro_pulses_lutman_pars_updated(self):
         q = self.device.find_instrument("q5")
         q.ro_pulse_amp(0.4)
@@ -493,7 +493,7 @@ class Test_Device_obj(unittest.TestCase):
         ro_amp = self.ro_lutman_1.M_amp_R5()
         assert ro_amp == 0.2
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prep_ro_input_avg_det(self):
         qubits = self.device.qubits()
         self.device.ro_acq_weight_type("optimal")
@@ -530,7 +530,7 @@ class Test_Device_obj(unittest.TestCase):
             "UHFQC_0 ch1",
         ]
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_ro_instantiate_detectors_int_avg(self):
         qubits = ["q13", "q16", "q1", "q5", "q0"]
         self.device.ro_acq_weight_type("optimal")
@@ -576,7 +576,7 @@ class Test_Device_obj(unittest.TestCase):
         # Note that the order of channels gets ordered per feedline
         # because of the way the multi detector works
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_ro_instantiate_detectors_int_logging(self):
         qubits = ["q13", "q16", "q1", "q5", "q0"]
         self.device.ro_acq_weight_type("optimal")

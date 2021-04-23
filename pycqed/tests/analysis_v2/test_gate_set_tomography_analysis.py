@@ -15,7 +15,7 @@ class Test_GST_data_extraction_analysis(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_GST_SingleQubit_DataExtraction(self):
         a = ma.GST_SingleQubit_DataExtraction(label='131808_Single_qubit_GST')
         ds = a.proc_data_dict['dataset']
@@ -24,7 +24,7 @@ class Test_GST_data_extraction_analysis(unittest.TestCase):
         val_m1 = list(ds.values())[-2].allcounts
         self.assertDictEqual(exp_val_m1, val_m1)
 
-    @unittest.skip('FIXME: disabled, see PR #634')
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_GST_TwoQubit_DataExtraction(self):
         a = ma.GST_TwoQubit_DataExtraction(label='155752_Two_qubit_GST')
         ds = a.proc_data_dict['dataset']

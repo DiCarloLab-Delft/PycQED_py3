@@ -136,7 +136,7 @@ if 1:
                 platf_cfg=self.config_fn)
             self.assertEqual(p.name, 'two_qubit_DJ')
 
-        @unittest.skip('FIXME: disabled, see PR #634 and PR #635 (marked as important)')
+        @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')
         def test_two_qubit_parity_check(self):
             for initialization_msmt in [False, True]:
                 p = mqo.two_qubit_parity_check(
