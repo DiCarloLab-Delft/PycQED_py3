@@ -44,6 +44,7 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor)
 
+# FIXME: remove
 try:
     from nathan_plotting_tools import *
 except:
