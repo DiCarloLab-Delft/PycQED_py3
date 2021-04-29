@@ -44,15 +44,17 @@ class CCCore(SCPIBase):
         self.set_status_operation_enable(0x7FFF)
 
     def print_status_questionable(self, cond: bool=False) -> None:
-        ### local CCCORE status
+        ### combined CC status (combination of CCCORE and CCIO modules)
         sq = self.get_status_questionable(cond)
         self._print_item("status_questionable", sq, self._stat_ques_lookup)
+
         if sq & self.STAT_QUES_FREQUENCY:
             self._print_item("cccore frequency", self.get_status_questionable_frequency(cond), self._cc_stat_ques_freq_lookup)
         if sq & self.STAT_QUES_BPLINK:
             self._print_item("cccore bplink", self.get_status_questionable_bplink(cond), self._cc_stat_ques_bplink_lookup)
         if sq & self.STAT_QUES_CONFIG:
             self._print_item("cccore config", self.get_status_questionable_config(cond), self._cc_stat_ques_config_lookup)
+
         ### remote CCIO status
         if sq & self.STAT_QUES_INST_SUMMARY:
             # get mask of instruments reporting condition
@@ -72,6 +74,15 @@ class CCCore(SCPIBase):
                         self._print_item("config", self.get_status_questionable_instrument_idetail_config(ccio, cond), self._cc_stat_ques_config_lookup)
                     if sqii & self.STAT_QUES_DIO:
                         self._print_item("dio", self.get_status_questionable_instrument_idetail_diocal(ccio, cond), self._cc_stat_ques_diocal_lookup)
+
+
+    def print_status_operation(self, cond: bool=False) -> None:
+        ### combined CC status (combination of CCCORE and CCIO modules)
+        so = self.get_status_operation(cond)
+        self._print_item("status_operation", so, self._stat_oper_lookup)
+
+        if so & self.STAT_OPER_RUN:
+            self._print_item("run status", self.get_status_opxxx(cond), self._cc_stat_ques_freq_lookup)
 
 
     ##########################################################################
@@ -102,7 +113,7 @@ class CCCore(SCPIBase):
         """
         # check size, because overrunning gives irrecoverable errors. FIXME: move to Transport
         if len(program_string) > self._MAX_PROG_STR_LEN:
-            raise RuntimeError('source program size {len(program_string)} exceeds maximum of {self._MAX_PROG_STR_LEN}')
+            raise RuntimeError(f'source program size {len(program_string)} exceeds maximum of {self._MAX_PROG_STR_LEN}')
 
         hdr = 'QUTech:SEQuence:PROGram:ASSEMble ' # NB: include space as separator for binblock parameter
         bin_block = program_string.encode('ascii')
@@ -366,4 +377,35 @@ class CCCore(SCPIBase):
         (SQD_BITS_INACTIVE, "Required bits were inactive during DIO timing calibration"),
         (SQD_NOT_CALIBRATED, "DIO timing calibration not yet performed (successfully)"),
         (SQD_TIMING_ERROR, "Runtime DIO timing violation found")
+    ]
+
+    # stat_oper extensions
+    # SCPI standard: "bit 8 through 12 are available to designer"
+    STAT_OPER_RUN               = 0x0100
+
+    # stat_oper_run : Q1 run status
+    # normal states: inactive
+    SOR_IDLE                    = 0x0002
+    SOR_REACHED_STOP            = 0x0004
+    SOR_FORCED_STOP             = 0x0008
+    # normal states: active
+    SOR_RUNNING                 = 0x0010
+    # error states: q1
+    SOR_ILLEGAL_INSTR           = 0x0020
+    # error states: rt_exec
+    SOR_SEQ_OUT_EMPTY           = 0x0040
+    SOR_SEQ_IN_EMPTY            = 0x0080
+    SOR_ILLEGAL_INSTR_RT        = 0x0100
+    SOR_INVALID_SM_ACCESS       = 0x0200
+
+    _cc_stat_oper_run_lookup = [
+        (SOR_IDLE, "idle"),
+        (SOR_REACHED_STOP, "program reached stop instruction"),
+        (SOR_FORCED_STOP, "stop forced by user"),
+        (SOR_RUNNING, "running"),
+        (SOR_ILLEGAL_INSTR, ""),
+        (SOR_SEQ_OUT_EMPTY, ""),
+        (SOR_SEQ_IN_EMPTY, ""),
+        (SOR_ILLEGAL_INSTR_RT, ""),
+        (SOR_INVALID_SM_ACCESS, ""),
     ]
