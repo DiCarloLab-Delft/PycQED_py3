@@ -5,7 +5,7 @@
 [![codecov](https://codecov.io/gh/DiCarloLab-Delft/PycQED_py3/branch/master/graph/badge.svg)](https://codecov.io/gh/DiCarloLab-Delft/PycQED_py3)
 
 A Python-based measurement environment for circuit-QED experiments by the
-[DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/),
+[DiCarlo group](https://qutech.nl/lab/dicarlo-lab-welcome/) at [QuTech](http://qutech.nl/),
 Delft University of Technology.
 This module is build on top of [QCoDeS](http://qcodes.github.io/Qcodes/) and
 is not intended as a stand-alone
