@@ -11,6 +11,7 @@ import logging
 import numpy as np
 import pycqed
 import json
+import copy
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 
@@ -161,7 +162,7 @@ class ZI_PQSC(zibase.ZI_base_instrument):
         found_errors = False
 
         # Combine errors_to_ignore with commandline
-        _errors_to_ignore = self._errors_to_ignore
+        _errors_to_ignore = copy.copy(self._errors_to_ignore)
         if errors_to_ignore is not None:
             _errors_to_ignore += errors_to_ignore
 
