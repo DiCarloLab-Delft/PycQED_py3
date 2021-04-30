@@ -1,6 +1,5 @@
 # PycQED
 [![Build Status](https://github.com/DiCarloLab-Delft/pycqed_py3/workflows/Build%20Status/badge.svg)](https://github.com/DiCarloLab-Delft/pycqed_py3/actions)
-10.5281/zenodo.3574563
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3574563.svg)](https://zenodo.org/record/3574563)
 [![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger)
 [![codecov](https://codecov.io/gh/DiCarloLab-Delft/PycQED_py3/branch/master/graph/badge.svg)](https://codecov.io/gh/DiCarloLab-Delft/PycQED_py3)
