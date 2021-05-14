@@ -109,6 +109,10 @@ Feedback latencies in QuSurf architecture
         -
         -
         -   delay from DIO trigger to first analog output. Depends on number of codeword possibilities in sequencing program
+    *   -   tUhfqaWaveformPlay
+        -   0-TBD
+        -
+        -   duration of the output waveform set by user
     *   -   tUhfqaOutputDelay
         -   0-TBD
         -
@@ -129,6 +133,10 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
+    *   -   tUhfqaIntegrationTime
+        -   0-TBD
+        -
+        -   integration time set by user
     *   -   tUhfqaReadoutProcessing
         -   135.5
         -   Deskew, Rotation, and Crosstalk units bypassed
