@@ -26,6 +26,6 @@ cc.print_status(True)
 
 # FIXME: red LOCK LED remains on after unlocking and relocking  
 
-print('print_status: Event')
+print('\nprint_status: Event')
 cc.print_status(False)
 

@@ -82,7 +82,7 @@ class CCCore(SCPIBase):
         self._print_item("status_operation", so, self._stat_oper_lookup)
 
         if so & self.STAT_OPER_RUN:
-            self._print_item("run status", self.get_status_opxxx(cond), self._cc_stat_ques_freq_lookup)
+            self._print_item("run status", self.get_status_operation_run(cond), self._cc_stat_oper_run_lookup)
 
 
     ##########################################################################
@@ -234,6 +234,14 @@ class CCCore(SCPIBase):
     def get_status_questionable_bplink_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:BPLINK:ENABle?')
 
+    def get_status_operation_run(self, cond: bool=False) -> int:
+        return self._get_status('STATus:OPERation:RUN', cond)
+    def set_status_operation_run_enable(self, val) -> None:
+        self._transport.write(f'STATus:OPERation:RUN:ENABle {val}')
+    def get_status_operation_run_enable(self) -> int:
+        return self._ask_int('STATus:OPERation:RUN:ENABle?')
+
+
     def get_status_questionable_instrument(self, cond: bool=False) -> int:
         return self._get_status('STATus:QUEStionable:INSTrument', cond)
     def set_status_questionable_instrument_enable(self, val) -> None:
@@ -383,7 +391,13 @@ class CCCore(SCPIBase):
     # SCPI standard: "bit 8 through 12 are available to designer"
     STAT_OPER_RUN               = 0x0100
 
+    # 'overload' _stat_oper_lookup
+    _stat_oper_lookup = [
+        (STAT_OPER_RUN, "Run")
+    ]  + SCPIBase._stat_oper_lookup
+
     # stat_oper_run : Q1 run status
+    SQR_UNDEFINED               = 0x0001
     # normal states: inactive
     SOR_IDLE                    = 0x0002
     SOR_REACHED_STOP            = 0x0004
@@ -399,6 +413,7 @@ class CCCore(SCPIBase):
     SOR_INVALID_SM_ACCESS       = 0x0200
 
     _cc_stat_oper_run_lookup = [
+        (SQR_UNDEFINED, "undefined (should normally not be seen)"),
         (SOR_IDLE, "idle"),
         (SOR_REACHED_STOP, "program reached stop instruction"),
         (SOR_FORCED_STOP, "stop forced by user"),
