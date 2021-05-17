@@ -387,7 +387,7 @@ while (1) {
             self.sync()
 
         # Use 50 MHz DIO clocking
-        self.seti('raw/dios/0/extclk', 1)
+        self.seti('dios/0/mode', 2)
 
         # Configure the DIO interface and the waveforms
         for awg_nr in range(int(self._num_channels()//2)):

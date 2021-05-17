@@ -1251,4 +1251,4 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
 
 
 def roundup1024(n):
-    return int(np.ceil(n / 1024) * 1024)
+    return int(np.ceil(n / 144) * 144)

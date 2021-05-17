@@ -1927,7 +1927,7 @@ class DeviceCCL(Instrument):
         nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
         if second_excited_state:
             nr_cases = 3 ** len(qubits)
-            
+
         if initialize == True:
             nr_shots = 4 * nr_shots
         else:
@@ -3498,11 +3498,10 @@ class DeviceCCL(Instrument):
                     flux_codeword=flux_codeword,
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     platf_cfg=self.cfg_openql_platform_fn(),
-                    program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_netcl{}_{}_{}".format(
+                    program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
                         int(i),
                         list(map(int, nr_cliffords)),
                         interleaving_cliffords,
-                        list(map(int, net_cliffords)),
                         qubits[0],
                         qubits[1],
                     ),
@@ -5198,7 +5197,7 @@ class DeviceCCL(Instrument):
 
                     # Use ch_to_analyze as 4 for single qubit phases ('Q0 phase')
                     a_obj = ma2.Crossing_Analysis(label=label,
-                                                ch_idx='Q0 phase', 
+                                                ch_idx='Q0 phase',
                                                 target_crossing=0)
                     crossed_value = a_obj.proc_data_dict['root']
                     getattr(flux_lm, 'cz_phase_corr_amp_' + gate )(crossed_value)
