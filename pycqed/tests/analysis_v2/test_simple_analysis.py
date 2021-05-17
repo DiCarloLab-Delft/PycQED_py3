@@ -45,5 +45,6 @@ class Test_SimpleAnalysis(unittest.TestCase):
                          'offset difference']
         self.assertEqual(fig_keys, exp_list_keys)
 
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_1D_binned_analysis(self):
         a=ma.Basic1DBinnedAnalysis(label='120543_Single_qubit_GST_QL')
