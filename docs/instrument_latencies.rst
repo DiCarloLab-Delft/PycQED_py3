@@ -121,14 +121,6 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
-    *   -   tUhfqa5stateDiscr
-        -   168
-        -   UHFQA-5, no bypass
-        -   state discrimination latency, from TBD to TBD
-    *   -   tUhfqa9stateDiscr
-        -   261
-        -   UHFQA-9, no bypass
-        -   state discrimination latency, from TBD to TBD
     *   -
         -
         -
@@ -216,7 +208,6 @@ Information sources:
 -   tHdawgFilter*: section 4.6.2 of same document
 -   tCc*: CC-SiteVisitVirtual-20200506.pptx
 -   tUhfqaReadoutProcessing: mail Niels H. 20210317, replaces ziUHFQA_UserManual.pdf (revision 21.02.01)
--   tUhf*: QuSurf_MetricsTables_201015-Please-update-for-TEM5.docx
 -   tQwg*: 20171511_pitch_qwg_final.pptx
 
 Notes:
