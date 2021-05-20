@@ -9,6 +9,142 @@ Feedback latencies in QuSurf architecture
         -   Latency [ns]
         -   Condition
         -   Description
+    *   -   **HDAWG**
+        -
+        -
+        -
+    *   -   tHdawgSyncDio
+        -   ~10 (0-20)
+        -   TBC
+        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
+    *   -   tHdawgTriggerDio
+        -   180
+        -   HDAWG8 v2, filter disabled, no output delay
+        -   delay from DIO trigger to first analog output. Depends on arrival time and DIO timing calibration
+    *   -   tHdawgFilter
+        -   30
+        -
+        -   extra delay if the filter is enabled at all (not bypassed)
+    *   -   tHdawgFilterHighPass
+        -   40
+        -
+        -   extra delay if high pass filter is enabled
+    *   -   tHdawgFilterExpComp
+        -   36.67
+        -
+        -   extra delay per enabled exponential compensation filter stage (8 stages available)
+    *   -   tHdawgFilterBounceComp
+        -   13.33
+        -
+        -   extra delay if bounce compensation filter is enabled
+    *   -   tHdawgFilterFir
+        -   56.67
+        -
+        -   extra delay if FIR filter is enabled
+    *   -   tHdawgOutputDelay
+        -   0-TBD
+        -
+        -   output delay configurable by user (/DEV..../SIGOUTS/n/DELAY)
+    *   -
+        -
+        -
+        -
+    *   -   **QWG**
+        -
+        -
+        -
+    *   -   tQwgSyncDio
+        -   ~10 (0-20)
+        -
+        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
+    *   -   tQwgTriggerDio
+        -   80
+        -   using LVDS input
+        -   delay from DIO trigger to first analog output. Includes sideband modulation and mixer correction
+    *   -
+        -
+        -
+        -
+    *   -   **UHFQA:AWG**
+        -
+        -
+        -
+    *   -   tUhfqaSyncDio
+        -   ~10 (0-20)
+        -   TBC
+        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
+    *   -   tUhfqaTriggerDio
+        -   314
+        -   codewords: 5+default, firmware: 67225
+        -   delay from DIO trigger to first analog output. Depends on number of codeword possibilities in sequencing program, and DIO arrival time and calibration
+    *   -   tUhfqaWaveformPlay
+        -   0-TBD
+        -
+        -   duration of the output waveform set by user
+    *   -   tUhfqaOutputDelay
+        -   0-TBD
+        -
+        -   output delay configurable by user
+    *   -
+        -
+        -
+        -
+    *   -   **UHFQA:input**
+        -
+        -
+        -
+    *   -   tUhfqaIntegrationTime
+        -   0-TBD
+        -
+        -   integration time set by user
+    *   -   tUhfqaReadoutProcessing
+        -   135.5
+        -   Deskew, Rotation, and Crosstalk units bypassed
+        -   delay between the end of a readout pulse at the Signal Inputs and the QA Result Trigger on any Trigger output
+    *   -   tUhfqaDeskew
+        -   ~8.8
+        -
+        -   delay introduced by enabling Deskew unit
+    *   -   tUhfqaRotation
+        -   ~57.7
+        -
+        -   delay introduced by enabling Rotation unit
+    *   -   tUhfqaCrosstalk
+        -   ~91.6
+        -
+        -   delay introduced by enabling Crosstalk unit
+    *   -   tUhfqaReadoutProcessing
+        -   293.3
+        -   Deskew, Rotation, and Crosstalk units enabled
+        -   delay between the end of a readout pulse at the Signal Inputs and the QA Result Trigger on any Trigger output
+    *   -
+        -
+        -
+        -
+    *   -   tUhfqaHoldoff
+        -
+        -
+        -   TBW
+    *   -
+        -
+        -
+        -
+    *   -   **VSM**
+        -
+        -
+        -
+    *   -   tVsmDelay
+        -   12
+        -   VSM v3
+        -   delay from digital input to signal starts turning on/off
+    *   -   tVsmTransition
+        -
+        -
+        -   transition time of VSM switch from on to off or vice versa
+    *   -
+        -
+        -
+        -
     *   -   **Central Controller**
         -
         -
@@ -57,134 +193,6 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
-    *   -   **HDAWG**
-        -
-        -
-        -
-    *   -   tHdawgSyncDio
-        -   ~10 (0-20)
-        -
-        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
-    *   -   tHdawgTriggerDio
-        -   180
-        -   HDAWG8 v2, filter disabled, no output delay
-        -   delay from DIO trigger to first analog output
-    *   -   tHdawgFilter
-        -   30
-        -
-        -   extra delay if the filter is enabled at all (not bypassed)
-    *   -   tHdawgFilterHighPass
-        -   40
-        -
-        -   extra delay if high pass filter is enabled
-    *   -   tHdawgFilterExpComp
-        -   36.67
-        -
-        -   extra delay per enabled exponential compensation filter stage (8 stages available)
-    *   -   tHdawgFilterBounceComp
-        -   13.33
-        -
-        -   extra delay if bounce compensation filter is enabled
-    *   -   tHdawgFilterFir
-        -   56.67
-        -
-        -   extra delay if FIR filter is enabled
-    *   -   tHdawgOutputDelay
-        -   0-TBD
-        -
-        -   output delay configurable by user (/DEV..../SIGOUTS/n/DELAY)
-    *   -
-        -
-        -
-        -
-    *   -   **QWG**
-        -
-        -
-        -
-    *   -   tQwgSyncDio
-        -   ~10 (0-20)
-        -
-        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
-    *   -   tQwgTriggerDio
-        -   80
-        -   using LVDS input
-        -   delay from DIO trigger to first analog output. Includes sideband modulation and mixer correction
-    *   -
-        -
-        -
-        -
-    *   -   **UHFQA**
-        -
-        -
-        -
-    *   -   tUhfqaSyncDio
-        -   ~10 (0-20)
-        -
-        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
-    *   -   tUhfqaTriggerDio
-        -   314
-        -   DCL lab (TBW)
-        -   delay from DIO trigger to first analog output. Depends on number of codeword possibilities in sequencing program
-    *   -   tUhfqaWaveformPlay
-        -   0-TBD
-        -
-        -   duration of the output waveform set by user
-    *   -   tUhfqaOutputDelay
-        -   0-TBD
-        -
-        -   output delay configurable by user
-    *   -
-        -
-        -
-        -
-    *   -   tUhfqaIntegrationTime
-        -   0-TBD
-        -
-        -   integration time set by user
-    *   -   tUhfqaReadoutProcessing
-        -   135.5
-        -   Deskew, Rotation, and Crosstalk units bypassed
-        -   delay between the end of a readout pulse at the Signal Inputs and the QA Result Trigger on any Trigger output
-    *   -   tUhfqaDeskew
-        -   ~8.8
-        -
-        -   delay introduced by enabling Deskew unit
-    *   -   tUhfqaRotation
-        -   ~57.7
-        -
-        -   delay introduced by enabling Rotation unit
-    *   -   tUhfqaCrosstalk
-        -   ~91.6
-        -
-        -   delay introduced by enabling Crosstalk unit
-    *   -   tUhfqaReadoutProcessing
-        -   293.3
-        -   Deskew, Rotation, and Crosstalk units enabled
-        -   delay between the end of a readout pulse at the Signal Inputs and the QA Result Trigger on any Trigger output
-    *   -   tUhfqaHoldoff
-        -
-        -
-        -   TBW
-    *   -
-        -
-        -
-        -
-    *   -   **VSM**
-        -
-        -
-        -
-    *   -   tVsmDelay
-        -   12
-        -   VSM v3
-        -   delay from digital input to signal starts turning on/off
-    *   -   tVsmTransition
-        -
-        -
-        -   transition time of VSM switch from on to off or vice versa
-    *   -
-        -
-        -
-        -
     *   -   **System**
         -
         -
@@ -196,12 +204,12 @@ Feedback latencies in QuSurf architecture
 
 Information sources:
 
--   tCc*: CC-SiteVisitVirtual-20200506.pptx
 -   tHdawgTriggerDio: table 5.5 of https://docs.zhinst.com/pdf/ziHDAWG_UserManual.pdf (revision 21.02.0)
 -   tHdawgFilter*: section 4.6.2 of same document
 -   tQwg*: 20171511_pitch_qwg_final.pptx
 -   tUhfqaReadoutProcessing: mail Niels H. 20210317, replaces ziUHFQA_UserManual.pdf (revision 21.02.01)
 -   tUhfqaTriggerDio: measurement Miguel 20210519
+-   tCc*: CC-SiteVisitVirtual-20200506.pptx
 
 
 Notes:
