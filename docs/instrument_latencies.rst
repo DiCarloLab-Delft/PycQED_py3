@@ -97,6 +97,22 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
+    *   -   **QWG**
+        -
+        -
+        -
+    *   -   tQwgSyncDio
+        -   ~10 (0-20)
+        -
+        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
+    *   -   tQwgTriggerDio
+        -   80
+        -   using LVDS input
+        -   delay from DIO trigger to first analog output. Includes sideband modulation and mixer correction
+    *   -
+        -
+        -
+        -
     *   -   **UHFQA**
         -
         -
@@ -106,8 +122,8 @@ Feedback latencies in QuSurf architecture
         -
         -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
     *   -   tUhfqaTriggerDio
-        -
-        -
+        -   314
+        -   DCL lab (TBW)
         -   delay from DIO trigger to first analog output. Depends on number of codeword possibilities in sequencing program
     *   -   tUhfqaWaveformPlay
         -   0-TBD
@@ -117,10 +133,6 @@ Feedback latencies in QuSurf architecture
         -   0-TBD
         -
         -   output delay configurable by user
-    *   -
-        -
-        -
-        -
     *   -
         -
         -
@@ -157,22 +169,6 @@ Feedback latencies in QuSurf architecture
         -
         -
         -
-    *   -   **QWG**
-        -
-        -
-        -
-    *   -   tQwgSyncDio
-        -   ~10 (0-20)
-        -
-        -   synchronize incoming signal on DIO interface to 50 MHz grid. Depends on arrival time and DIO timing calibration
-    *   -   tQwgTriggerDio
-        -   80
-        -   using LVDS input
-        -   delay from DIO trigger to first analog output. Includes sideband modulation and mixer correction
-    *   -
-        -
-        -
-        -
     *   -   **VSM**
         -
         -
@@ -198,17 +194,15 @@ Feedback latencies in QuSurf architecture
         -
         -   round trip delay from UHFQA signal output to UHFQA signal input: cables, mixers, filters, amplifiers
 
-FIXME:
-
-- how does tUhfqa*stateDiscr relate to tUhfqaReadoutProcessing?
-
 Information sources:
 
+-   tCc*: CC-SiteVisitVirtual-20200506.pptx
 -   tHdawgTriggerDio: table 5.5 of https://docs.zhinst.com/pdf/ziHDAWG_UserManual.pdf (revision 21.02.0)
 -   tHdawgFilter*: section 4.6.2 of same document
--   tCc*: CC-SiteVisitVirtual-20200506.pptx
--   tUhfqaReadoutProcessing: mail Niels H. 20210317, replaces ziUHFQA_UserManual.pdf (revision 21.02.01)
 -   tQwg*: 20171511_pitch_qwg_final.pptx
+-   tUhfqaReadoutProcessing: mail Niels H. 20210317, replaces ziUHFQA_UserManual.pdf (revision 21.02.01)
+-   tUhfqaTriggerDio: measurement Miguel 20210519
+
 
 Notes:
 
