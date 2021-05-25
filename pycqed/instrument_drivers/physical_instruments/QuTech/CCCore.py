@@ -49,13 +49,15 @@ class CCCore(SCPIBase):
         self._print_item("status_questionable", sq, self._stat_ques_lookup)
 
         if sq & self.STAT_QUES_FREQUENCY:
-            self._print_item("cccore frequency", self.get_status_questionable_frequency(cond), self._cc_stat_ques_freq_lookup)
+            self._print_item("frequency", self.get_status_questionable_frequency(cond), self._cc_stat_ques_freq_lookup)
         if sq & self.STAT_QUES_BPLINK:
-            self._print_item("cccore bplink", self.get_status_questionable_bplink(cond), self._cc_stat_ques_bplink_lookup)
+            self._print_item("bplink", self.get_status_questionable_bplink(cond), self._cc_stat_ques_bplink_lookup)
         if sq & self.STAT_QUES_CONFIG:
-            self._print_item("cccore config", self.get_status_questionable_config(cond), self._cc_stat_ques_config_lookup)
+            self._print_item("config", self.get_status_questionable_config(cond), self._cc_stat_ques_config_lookup)
+        # FIXME:
+        #  if sq & self.STAT_QUES_DIO:
 
-        ### remote CCIO status
+        ### CCCORE/remote CCIO status
         if sq & self.STAT_QUES_INST_SUMMARY:
             # get mask of instruments reporting condition
             sqi =  self.get_status_questionable_instrument(cond)
