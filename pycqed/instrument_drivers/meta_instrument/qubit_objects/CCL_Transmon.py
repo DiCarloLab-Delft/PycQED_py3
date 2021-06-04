@@ -2066,7 +2066,7 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_mixer_skewness_RO(self, update=True):
         """
-        Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
+        Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive (FIXME: no longer true)
         see calibration toolbox for details
 
         Args:
