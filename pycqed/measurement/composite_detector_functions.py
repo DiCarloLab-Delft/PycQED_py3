@@ -1,11 +1,11 @@
 import numpy as np
 #import time
 from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement import awg_sweep_functions as awg_swf
+#from pycqed.measurement import awg_sweep_functions as awg_swf
 #from pycqed.measurement import CBox_sweep_functions as CB_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
-from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
+#from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.analysis import analysis_toolbox as a_tools
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.waveform_control_CC import QWG_fluxing_seqs as qwfs
@@ -796,70 +796,70 @@ class Chevron_optimization_v1(det.Soft_Detector):
         pass
 
 
-class SWAPN_optimization(det.Soft_Detector):
-
-    '''
-    SWAPN optimization.
-    Wrapper around a SWAPN sequence to create a cost function.
-
-    The kernel object is used to determine the (pre)distortion kernel.
-    It is common to do a sweep over one of the kernel parameters as a sweep
-    function.
-    '''
-
-    def __init__(self, nr_pulses_list, AWG, MC_nested, qubit,
-                 kernel_obj,  cache, cost_choice='sum', **kw):
-
-        super().__init__()
-        self.name = 'swapn_optimization'
-        self.value_names = ['Cost function', 'Single SWAP Fid']
-        self.value_units = ['a.u.', 'ns']
-        self.kernel_obj = kernel_obj
-        self.cache_obj = cache
-        self.AWG = AWG
-        self.MC_nested = MC_nested
-        self.cost_choice = cost_choice
-        self.nr_pulses_list = nr_pulses_list
-        self.qubit = qubit
-
-    def acquire_data_point(self, **kw):
-        # # Update kernel from kernel object
-
-        # # Measure the swapn
-        times_vec = self.nr_pulses_list
-        cal_points = 4
-        lengths_cal = times_vec[-1] + \
-            np.arange(1, 1+cal_points)*(times_vec[1]-times_vec[0])
-        lengths_vec = np.concatenate((times_vec, lengths_cal))
-
-        flux_pulse_pars = self.qubit.get_flux_pars()
-        mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
-
-        repSWAP = awg_swf.SwapN(mw_pulse_pars,
-                                RO_pars,
-                                flux_pulse_pars, AWG=self.AWG,
-                                dist_dict=self.kernel_obj.kernel(),
-                                upload=True)
-        # self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(), 2.)
-        # seq = repSWAP.pre_upload()
-
-        self.MC_nested.set_sweep_function(repSWAP)
-        self.MC_nested.set_sweep_points(lengths_vec)
-
-        self.MC_nested.set_detector_function(self.qubit.int_avg_det_rot)
-        self.AWG.set('ch%d_amp' % self.qubit.fluxing_channel(),
-                     self.qubit.SWAP_amp())
-        self.MC_nested.run('SWAPN_%s' % self.qubit.name)
-
-        # # fit it
-        ma_obj = ma.SWAPN_cost(auto=True, cost_func=self.cost_choice)
-        return ma_obj.cost_val, ma_obj.single_swap_fid
-
-    def prepare(self):
-        pass
-
-    def finish(self):
-        pass
+# class SWAPN_optimization(det.Soft_Detector):
+#
+#     '''
+#     SWAPN optimization.
+#     Wrapper around a SWAPN sequence to create a cost function.
+#
+#     The kernel object is used to determine the (pre)distortion kernel.
+#     It is common to do a sweep over one of the kernel parameters as a sweep
+#     function.
+#     '''
+#
+#     def __init__(self, nr_pulses_list, AWG, MC_nested, qubit,
+#                  kernel_obj,  cache, cost_choice='sum', **kw):
+#
+#         super().__init__()
+#         self.name = 'swapn_optimization'
+#         self.value_names = ['Cost function', 'Single SWAP Fid']
+#         self.value_units = ['a.u.', 'ns']
+#         self.kernel_obj = kernel_obj
+#         self.cache_obj = cache
+#         self.AWG = AWG
+#         self.MC_nested = MC_nested
+#         self.cost_choice = cost_choice
+#         self.nr_pulses_list = nr_pulses_list
+#         self.qubit = qubit
+#
+#     def acquire_data_point(self, **kw):
+#         # # Update kernel from kernel object
+#
+#         # # Measure the swapn
+#         times_vec = self.nr_pulses_list
+#         cal_points = 4
+#         lengths_cal = times_vec[-1] + \
+#             np.arange(1, 1+cal_points)*(times_vec[1]-times_vec[0])
+#         lengths_vec = np.concatenate((times_vec, lengths_cal))
+#
+#         flux_pulse_pars = self.qubit.get_flux_pars()
+#         mw_pulse_pars, RO_pars = self.qubit.get_pulse_pars()
+#
+#         repSWAP = awg_swf.SwapN(mw_pulse_pars,
+#                                 RO_pars,
+#                                 flux_pulse_pars, AWG=self.AWG,
+#                                 dist_dict=self.kernel_obj.kernel(),
+#                                 upload=True)
+#         # self.AWG.set('ch%d_amp'%self.qubit.fluxing_channel(), 2.)
+#         # seq = repSWAP.pre_upload()
+#
+#         self.MC_nested.set_sweep_function(repSWAP)
+#         self.MC_nested.set_sweep_points(lengths_vec)
+#
+#         self.MC_nested.set_detector_function(self.qubit.int_avg_det_rot)
+#         self.AWG.set('ch%d_amp' % self.qubit.fluxing_channel(),
+#                      self.qubit.SWAP_amp())
+#         self.MC_nested.run('SWAPN_%s' % self.qubit.name)
+#
+#         # # fit it
+#         ma_obj = ma.SWAPN_cost(auto=True, cost_func=self.cost_choice)
+#         return ma_obj.cost_val, ma_obj.single_swap_fid
+#
+#     def prepare(self):
+#         pass
+#
+#     def finish(self):
+#         pass
 
 
 # class AllXY_devition_detector_CBox(det.Soft_Detector):
@@ -1390,57 +1390,57 @@ class Tracked_Qubit_Spectroscopy(det.Soft_Detector):
         pass
 
 
-class FluxTrack(det.Soft_Detector):
-    '''
-    '''
-
-    def __init__(self, qubit, device, MC, AWG, cal_points=False, **kw):
-        self.detector_control = 'soft'
-        self.name = 'FluxTrack'
-        self.cal_points = cal_points
-        self.value_names = [r' +/- $F |1\rangle$',
-                            r' + $F |1\rangle$', r' - $F |1\rangle$']
-        self.value_units = ['', '', '']
-        self.qubit = qubit
-        self.AWG = AWG
-        self.MC = MC
-        self.operations_dict = device.get_operation_dict()
-        self.dist_dict = qubit.dist_dict()
-        self.nested_MC = MC
-
-        self.FluxTrack_swf = awg_swf.awg_seq_swf(
-            fsqs.FluxTrack,
-            # parameter_name='Amplitude',
-            unit='V',
-            AWG=self.AWG,
-            fluxing_channels=[self.qubit.fluxing_channel()],
-            awg_seq_func_kwargs={'operation_dict': self.operations_dict,
-                                 'q0': self.qubit.name,
-                                 'cal_points': self.cal_points,
-                                 'distortion_dict': self.dist_dict,
-                                 'upload': True})
-
-    def prepare(self, **kw):
-        self.FluxTrack_swf.prepare()
-        self.FluxTrack_swf.upload = False
-
-    def acquire_data_point(self, *args, **kw):
-            # acquire with MC_nested
-        self.MC.set_sweep_function(self.FluxTrack_swf)
-        self.MC.set_sweep_points(np.arange(2+4*self.cal_points))
-        if self.cal_points:
-            d = self.qubit.int_avg_det_rot
-        else:
-            d = self.qubit.int_avg_det
-
-        self.MC.set_detector_function(d)
-        self.MC.run('FluxTrack_point_%s' % self.qubit.name)
-
-        ma_obj = ma.MeasurementAnalysis(auto=True, label='FluxTrack_point')
-        y_p = ma_obj.measured_values[0, 0]
-        y_m = ma_obj.measured_values[0, 1]
-        y_mean = np.mean([y_p, y_m])
-        return (y_mean, y_p, y_m)
+# class FluxTrack(det.Soft_Detector):
+#     '''
+#     '''
+#
+#     def __init__(self, qubit, device, MC, AWG, cal_points=False, **kw):
+#         self.detector_control = 'soft'
+#         self.name = 'FluxTrack'
+#         self.cal_points = cal_points
+#         self.value_names = [r' +/- $F |1\rangle$',
+#                             r' + $F |1\rangle$', r' - $F |1\rangle$']
+#         self.value_units = ['', '', '']
+#         self.qubit = qubit
+#         self.AWG = AWG
+#         self.MC = MC
+#         self.operations_dict = device.get_operation_dict()
+#         self.dist_dict = qubit.dist_dict()
+#         self.nested_MC = MC
+#
+#         self.FluxTrack_swf = awg_swf.awg_seq_swf(
+#             fsqs.FluxTrack,
+#             # parameter_name='Amplitude',
+#             unit='V',
+#             AWG=self.AWG,
+#             fluxing_channels=[self.qubit.fluxing_channel()],
+#             awg_seq_func_kwargs={'operation_dict': self.operations_dict,
+#                                  'q0': self.qubit.name,
+#                                  'cal_points': self.cal_points,
+#                                  'distortion_dict': self.dist_dict,
+#                                  'upload': True})
+#
+#     def prepare(self, **kw):
+#         self.FluxTrack_swf.prepare()
+#         self.FluxTrack_swf.upload = False
+#
+#     def acquire_data_point(self, *args, **kw):
+#             # acquire with MC_nested
+#         self.MC.set_sweep_function(self.FluxTrack_swf)
+#         self.MC.set_sweep_points(np.arange(2+4*self.cal_points))
+#         if self.cal_points:
+#             d = self.qubit.int_avg_det_rot
+#         else:
+#             d = self.qubit.int_avg_det
+#
+#         self.MC.set_detector_function(d)
+#         self.MC.run('FluxTrack_point_%s' % self.qubit.name)
+#
+#         ma_obj = ma.MeasurementAnalysis(auto=True, label='FluxTrack_point')
+#         y_p = ma_obj.measured_values[0, 0]
+#         y_m = ma_obj.measured_values[0, 1]
+#         y_mean = np.mean([y_p, y_m])
+#         return (y_mean, y_p, y_m)
 
 
 class purity_CZ_detector(det.Soft_Detector):
