@@ -1048,18 +1048,6 @@
             }
         }
 
-	},	// end of "instructions"
-
-
-
-    // NB: the "topology" keyword must be present, but the contents are only interpreted by
-    // the 'resource constraint' scheduler
-    "topology": {
-    },
-
-    // NB: the "resources" keyword must be present, but the contents are only interpreted by
-    // the 'resource constraint' scheduler
-    "resources": {
-    }
+	}	// end of "instructions"
 }
 

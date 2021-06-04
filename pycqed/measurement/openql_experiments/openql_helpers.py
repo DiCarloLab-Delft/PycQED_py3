@@ -104,7 +104,7 @@ def compile(p, quiet: bool = False, extra_openql_options: List[Tuple[str,str]] =
         with suppress_stdout():
             p.compile()
     else:  # show warnings
-        ql.set_option('log_level', 'LOG_WARNING')
+        ql.set_option('log_level', 'LOG_ERROR')
         if extra_openql_options is not None:
             for opt, val in extra_openql_options:
                 ql.set_option(opt, val)

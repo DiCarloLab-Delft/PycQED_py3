@@ -465,7 +465,8 @@ def randomized_benchmarking(
                     measured_qubits=list(qubit_map.values()),
                 )
 
-    p = oqh.compile(p)
+    # p = oqh.compile(p)
+    p = oqh.compile(p, extra_openql_options=[('backend_cc_verbose', 'no')])
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
     os.rename(recompile_dict["tmp_file"], recompile_dict["file"])

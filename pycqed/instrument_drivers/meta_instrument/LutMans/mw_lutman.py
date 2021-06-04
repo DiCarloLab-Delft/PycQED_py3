@@ -22,7 +22,8 @@ default_mw_lutmap = {
     11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90, "type" : "ge"},
     12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
-    14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"}
+    14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
+    30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"}
 }
 
 inspire_mw_lutmap = {
@@ -243,6 +244,20 @@ class Base_MW_LutMan(Base_LutMan):
         self.spec_func = wf.block_pulse
 
         self._add_channel_params()
+        # FIXME: Remove after the end of RUS experiment
+        self.add_parameter('w1', label='Weight 1 for RUS Experiment',
+                           vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        self.add_parameter('w2', label='Weight 2 for RUS Experiment',
+                           vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        self.add_parameter('bias', label='Bias for RUS Experiment',
+                           vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+
         self.add_parameter('cfg_sideband_mode',
                            vals=vals.Enum('real-time', 'static'),
                            initial_value='static',
@@ -686,16 +701,18 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # In case of sideband modulation mode 'real-time', amplitudes have to be set
         # according to modulation matrix
         elif self.cfg_sideband_mode() == 'real-time':
-            if self.mixer_alpha()<=1:
-                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), self.mixer_alpha()*val)
-                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), -val)
-                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), self.mixer_alpha()*val)
-                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
+            g0 = np.tan(np.radians(self.mixer_phi()))
+            g1 = self.mixer_alpha()*1/np.cos(np.radians(self.mixer_phi()))
+
+            if np.abs(g0) > 1.0 or np.abs(g1) > 1.0:
+                scale = 1/(np.max(np.abs(np.array(g0, g1))))
             else:
-                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
-                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), (-1/self.mixer_alpha())*val)
-                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), val)
-                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), (1/self.mixer_alpha())*val)
+                scale = 1
+
+            AWG.set('awgs_{}_outputs_0_gains_0'.format(awg_nr), val*scale)
+            AWG.set('awgs_{}_outputs_0_gains_1'.format(awg_nr), 0)
+            AWG.set('awgs_{}_outputs_1_gains_0'.format(awg_nr), val*g0*scale)
+            AWG.set('awgs_{}_outputs_1_gains_1'.format(awg_nr), val*g1*scale)
         else:
             raise KeyError('Unexpected value for parameter sideband mode.')
 
@@ -795,8 +812,10 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_I()-1), 90)
             self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_Q()-1), 0)
             # Create correct modulation modeI
-            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 3)
-            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 4)
+            # self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 3)
+            # self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 4)
+            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 6)
+            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 6)
         else:
             raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
 
@@ -869,13 +888,13 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     self._wave_dict[idx] = wf.mod_square_VSM(
                         amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
                         length=self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation(),
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
                         sampling_rate=self.sampling_rate())
                 elif 'sq_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square(
                         amp=self.sq_amp(), length=self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation(),  phase=0,
-                        motzoi=0, sampling_rate=self.sampling_rate())
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
             else:
