@@ -2338,12 +2338,7 @@ def sliding_flux_pulses_seq(
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([angles, cal_pts_idx])
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
-    try:
-        p.set_sweep_points(p.sweep_points)
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    p.set_sweep_points(p.sweep_points)
     return p
 
 def two_qubit_state_tomography(qubit_idxs,
@@ -2882,12 +2877,7 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
              ['ry90', 'ry90']]
 
     # this should be implicit
-    # FIXME: remove try-except, when we depend hard on >=openql-0.6
-    try:
-        p.set_sweep_points(np.arange(len(allXY), dtype=float))
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+    p.set_sweep_points(np.arange(len(allXY), dtype=float))
 
     for i, xy in enumerate(allXY):
         if double_points:

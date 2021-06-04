@@ -256,12 +256,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
              ['ry90', 'ry90']]
 
     # this should be implicit
-    # FIXME: remove try-except, when we depend hard on >=openql-0.6
-    try:
-        p.set_sweep_points(np.arange(len(allXY), dtype=float))
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+    p.set_sweep_points(np.arange(len(allXY), dtype=float))
 
     for i, xy in enumerate(allXY):
         if double_points:
@@ -784,12 +779,7 @@ def idle_error_rate_seq(nr_of_idle_gates,
             p.add_kernel(k)
         sweep_points.append(N)
 
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
-    try:
-        p.set_sweep_points(sweep_points)
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(sweep_points, num_sweep_points=len(sweep_points))
+    p.set_sweep_points(sweep_points)
     p.sweep_points = sweep_points
     p = oqh.compile(p)
     return p
@@ -1280,12 +1270,7 @@ def ef_rabi_seq(q0: int,
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([amps, cal_pts_idx])
-    # FIXME: remove try-except, when lwe depend hardly on >=openql-0.6
-    try:
-        p.set_sweep_points(p.sweep_points)
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    p.set_sweep_points(p.sweep_points)
     return p
 
 
@@ -1310,11 +1295,7 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
 
     p = oqh.create_program('Depletion', platf_cfg)
 
-    try:
-        p.set_sweep_points(np.arange(len(allXY), dtype=float))
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+    p.set_sweep_points(np.arange(len(allXY), dtype=float))
 
     if double_points:
         js=2
