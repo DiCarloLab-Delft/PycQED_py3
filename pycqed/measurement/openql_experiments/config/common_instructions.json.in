@@ -97,7 +97,7 @@
                 "static_codeword_override": [6]
             }
         },
-        // FIXME: missing codewords
+        // FIXME: missing codeword 7
         "spec": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],

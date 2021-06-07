@@ -3,7 +3,7 @@
 // author: 	Wouter Vlothuizen e.a.
 
 {
-	"eqasm_compiler" : "eqasm_backend_cc",
+	"eqasm_compiler" : "cc",
 
 	"hardware_settings": {
         "qubit_number": 17,

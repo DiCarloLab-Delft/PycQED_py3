@@ -4,13 +4,11 @@
 // author: 	Wouter Vlothuizen e.a.
 
 //{
-    // NB: the "topology" keyword must be present, but the contents are only interpreted by
-    // the CC-light 'resource constraint' scheduler
+    // NB: the "topology" is optional since OpenQl 0.9, a warning is issued if it does not exist
     "topology": {
     },
 
-    // NB: the "resources" keyword must be present, but the contents are only interpreted by
-    // the CC-light 'resource constraint' scheduler
+    // NB: the "resources" is optional since OpenQl 0.9, a warning is issued if it does not exist
     "resources": {
     }
 //}
