@@ -4,7 +4,7 @@ import time
 #import os
 import numpy as np
 #from pycqed.utilities.general import setInDict
-from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+# from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 #from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
 #import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
 from pycqed.analysis_v2.tools import contours2d as c2d
@@ -639,50 +639,50 @@ class anharmonicity_sweep(Soft_Sweep):
         mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=self.amps)
 
 
-class QX_Hard_Sweep(Hard_Sweep):
-
-    def __init__(self, qxc, filename):  # , num_circuits):
-        super().__init__()
-        self.name = 'QX_Hard_Sweep'
-        self.filename = filename
-        self.__qxc = qxc
-        # self.num_circuits = num_circuits
-        qasm = ql.qasm_loader(filename, qxc.get_nr_qubits())
-        qasm.load_circuits()
-        self.circuits = qasm.get_circuits()
-
-    def get_circuits_names(self):
-        ids = []
-        for c in self.circuits:
-            ids.append(c[0])
-        return ids
-
-    def prepare(self, **kw):
-        # self.CBox.trigger_source('internal')
-        print("QX_Hard_Sweep.prepare() called...")
-        # self.__qxc.create_qubits(2)
-        # for c in self.circuits:
-        #     self.__qxc.create_circuit(c[0], c[1])
-
-
-class QX_RB_Hard_Sweep(Hard_Sweep):
-
-    def __init__(self, qxc, qubits=2):
-        super().__init__()
-        self.name = 'QX_RB_Hard_Sweep'
-        self.qubits = qubits
-        self.__qxc = qxc
-        self.__qxc.create_qubits(2)
-        # qasm = ql.qasm_loader(filename)
-        # qasm.load_circuits()
-        # self.circuits = qasm.get_circuits()
-        # print(self.circuits[0])
-
-    def prepare(self, **kw):
-        # self.CBox.trigger_source('internal')
-        print("QX_Hard_Sweep.prepare() called...")
-        # for c in self.circuits:
-        # self.__qxc.create_circuit(c[0],c[1])
+# class QX_Hard_Sweep(Hard_Sweep):
+#
+#     def __init__(self, qxc, filename):  # , num_circuits):
+#         super().__init__()
+#         self.name = 'QX_Hard_Sweep'
+#         self.filename = filename
+#         self.__qxc = qxc
+#         # self.num_circuits = num_circuits
+#         qasm = ql.qasm_loader(filename, qxc.get_nr_qubits())
+#         qasm.load_circuits()
+#         self.circuits = qasm.get_circuits()
+#
+#     def get_circuits_names(self):
+#         ids = []
+#         for c in self.circuits:
+#             ids.append(c[0])
+#         return ids
+#
+#     def prepare(self, **kw):
+#         # self.CBox.trigger_source('internal')
+#         print("QX_Hard_Sweep.prepare() called...")
+#         # self.__qxc.create_qubits(2)
+#         # for c in self.circuits:
+#         #     self.__qxc.create_circuit(c[0], c[1])
+#
+#
+# class QX_RB_Hard_Sweep(Hard_Sweep):
+#
+#     def __init__(self, qxc, qubits=2):
+#         super().__init__()
+#         self.name = 'QX_RB_Hard_Sweep'
+#         self.qubits = qubits
+#         self.__qxc = qxc
+#         self.__qxc.create_qubits(2)
+#         # qasm = ql.qasm_loader(filename)
+#         # qasm.load_circuits()
+#         # self.circuits = qasm.get_circuits()
+#         # print(self.circuits[0])
+#
+#     def prepare(self, **kw):
+#         # self.CBox.trigger_source('internal')
+#         print("QX_Hard_Sweep.prepare() called...")
+#         # for c in self.circuits:
+#         # self.__qxc.create_circuit(c[0],c[1])
 
 
 # NOTE: AWG_sweeps are located in AWG_sweep_functions

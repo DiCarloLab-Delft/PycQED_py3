@@ -8,13 +8,13 @@ import numpy as np
 import logging
 import time
 from string import ascii_uppercase
-from pycqed.analysis import analysis_toolbox as a_tools
+# from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.fit_toolbox import functions as fn
 from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
-from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+# from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from packaging import version
 import numpy.fft as fft
 
@@ -356,70 +356,70 @@ class Dummy_Detector_Hard(Hard_Detector):
         return data
 
 
-class QX_Hard_Detector(Hard_Detector):
-
-    def __init__(self, qxc, qasm_filenames, p_error=0.004,
-                 num_avg=128, **kw):
-        super().__init__()
-        self.set_kw()
-        self.detector_control = 'hard'
-        self.value_names = []
-        self.value_units = []
-        self.times_called = 0
-        self.__qxc = qxc
-        self.num_avg = num_avg
-        self.num_files = len(qasm_filenames)
-        self.p_error = p_error
-        self.delay = 1
-        self.current = 0
-        self.randomizations = []
-
-        for i in range(self.__qxc.get_nr_qubits()):
-            self.value_names.append("q"+str(i))
-            self.value_units.append('|1>')
-
-        # load files
-        log.info("QX_RB_Hard_Detector : loading qasm files...")
-        for i, file_name in enumerate(qasm_filenames):
-            t1 = time.time()
-            qasm = ql.qasm_loader(file_name, qxc.get_nr_qubits())
-            qasm.load_circuits()
-            circuits = qasm.get_circuits()
-            self.randomizations.append(circuits)
-            # create the circuits on the server
-            t1 = time.time()
-
-            for c in circuits:
-                circuit_name = c[0] + "{}".format(i)
-                self.__qxc.create_circuit(circuit_name, c[1])
-            t2 = time.time()
-            log.info("[+] qasm loading time :", t2-t1)
-
-    def prepare(self, sweep_points):
-        self.sweep_points = sweep_points
-        self.circuits = self.randomizations[self.current]
-
-    def get_values(self):
-        # x = self.sweep_points
-        # only serves to initialize the arrays
-        # data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)])
-        i = 0
-        qubits = self.__qxc.get_nr_qubits()
-
-        data = np.zeros((qubits, len(self.sweep_points)))
-
-        for c in self.circuits:
-            self.__qxc.send_cmd("reset_measurement_averaging")
-            circuit_name = c[0] + "{}".format(self.current)
-            self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
-                                         "depolarizing_channel", self.num_avg)
-            for n in range(qubits):
-                f = self.__qxc.get_measurement_average(n)
-                data[n][i] = f
-            # data[1][i] = f
-            i = i + 1
-        self.current = int((self.current + 1) % self.num_files)
-        return (1-np.array(data))
+# class QX_Hard_Detector(Hard_Detector):
+#
+#     def __init__(self, qxc, qasm_filenames, p_error=0.004,
+#                  num_avg=128, **kw):
+#         super().__init__()
+#         self.set_kw()
+#         self.detector_control = 'hard'
+#         self.value_names = []
+#         self.value_units = []
+#         self.times_called = 0
+#         self.__qxc = qxc
+#         self.num_avg = num_avg
+#         self.num_files = len(qasm_filenames)
+#         self.p_error = p_error
+#         self.delay = 1
+#         self.current = 0
+#         self.randomizations = []
+#
+#         for i in range(self.__qxc.get_nr_qubits()):
+#             self.value_names.append("q"+str(i))
+#             self.value_units.append('|1>')
+#
+#         # load files
+#         log.info("QX_RB_Hard_Detector : loading qasm files...")
+#         for i, file_name in enumerate(qasm_filenames):
+#             t1 = time.time()
+#             qasm = ql.qasm_loader(file_name, qxc.get_nr_qubits())
+#             qasm.load_circuits()
+#             circuits = qasm.get_circuits()
+#             self.randomizations.append(circuits)
+#             # create the circuits on the server
+#             t1 = time.time()
+#
+#             for c in circuits:
+#                 circuit_name = c[0] + "{}".format(i)
+#                 self.__qxc.create_circuit(circuit_name, c[1])
+#             t2 = time.time()
+#             log.info("[+] qasm loading time :", t2-t1)
+#
+#     def prepare(self, sweep_points):
+#         self.sweep_points = sweep_points
+#         self.circuits = self.randomizations[self.current]
+#
+#     def get_values(self):
+#         # x = self.sweep_points
+#         # only serves to initialize the arrays
+#         # data = np.array([np.sin(x / np.pi), np.cos(x/np.pi)])
+#         i = 0
+#         qubits = self.__qxc.get_nr_qubits()
+#
+#         data = np.zeros((qubits, len(self.sweep_points)))
+#
+#         for c in self.circuits:
+#             self.__qxc.send_cmd("reset_measurement_averaging")
+#             circuit_name = c[0] + "{}".format(self.current)
+#             self.__qxc.run_noisy_circuit(circuit_name, self.p_error,
+#                                          "depolarizing_channel", self.num_avg)
+#             for n in range(qubits):
+#                 f = self.__qxc.get_measurement_average(n)
+#                 data[n][i] = f
+#             # data[1][i] = f
+#             i = i + 1
+#         self.current = int((self.current + 1) % self.num_files)
+#         return (1-np.array(data))
 
 
 class Dummy_Shots_Detector(Hard_Detector):
