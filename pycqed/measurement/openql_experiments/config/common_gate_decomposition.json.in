@@ -1,6 +1,6 @@
 // File:    common_gate_decomposition.json.in
 // notes:   this file specifies commonalities between different setups for key "gate_decomposition"
-//          see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
+//          see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
 // author: 	Wouter Vlothuizen e.a.
 
 //{

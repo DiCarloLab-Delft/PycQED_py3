@@ -1,5 +1,5 @@
 // File:    config_cc_s17_direct_iq.json.in
-// notes:   see https://openql.readthedocs.io/en/latest/platform.html#ccplatform for documentation of this file
+// notes:   see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
 // author: 	Wouter Vlothuizen e.a.
 
 {
