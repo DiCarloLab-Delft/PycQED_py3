@@ -32,7 +32,7 @@ def generate_config(filename: str,
     documentation under "configuration_specification".
     """
 
-    qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
+    qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6']
     lut_map = ['i {}', 'rx180 {}', 'ry180 {}', 'rx90 {}', 'ry90 {}',
                'rxm90 {}', 'rym90 {}', 'rphi90 {}', 'spec {}', 'rx12 {}',
                'square {}']
