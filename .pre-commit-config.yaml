@@ -1,0 +1,27 @@
+exclude: 'doc/conf.py'
+
+repos:
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v2.12.0
+    hooks:
+    -   id: pyupgrade
+        # for now don't force to change from %-operator to {}
+        args: [--keep-percent-format, --py36-plus]
+
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.4.0
+    hooks:
+    -   id: check-ast
+    -   id: check-builtin-literals
+    -   id: check-merge-conflict
+    -   id: debug-statements
+    -   id: end-of-file-fixer
+    -   id: mixed-line-ending
+    -   id: trailing-whitespace
+
+-   repo: https://github.com/pre-commit/mirrors-autopep8
+    rev: 'v1.5.6'  # Use the sha / tag you want to point at
+    hooks:
+    -   id: autopep8
+        args: [--max-line-length 120]
+
