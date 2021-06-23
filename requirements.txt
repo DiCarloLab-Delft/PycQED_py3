@@ -19,7 +19,7 @@ matplotlib
 pandas
 PyQt5
 pyqtgraph
-pygsti
+pygsti==0.9.7.5
 pyvisa>=1.8
 numpy
 Cython
