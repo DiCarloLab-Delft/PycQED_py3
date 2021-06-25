@@ -114,15 +114,14 @@ class RIGOL_DS4043(VisaInstrument):
         '''
         super().__init__(name, address, **kwargs)
 
-
         # logging.info(__name__ + ' : Initializing instrument')
         # Instrument.__init__(self, name, tags=['physical', 'source'])
-        self._trig_modes = ['EDGE', 'PULS', 'SLOP','VID', 'PATT', 'RS232',
-            'IIC','SPI', 'CAN', 'FLEX', 'USB']
+        self._trig_modes = ['EDGE', 'PULS', 'SLOP', 'VID', 'PATT', 'RS232',
+                            'IIC', 'SPI', 'CAN', 'FLEX', 'USB']
         self._trig_sources = ['CHAN1', 'CHAN2', 'CHAN3', 'CHAN4',
-            'EXT', 'EXT5', 'ACL']# also D0 - D15
+                              'EXT', 'EXT5', 'ACL']  # also D0 - D15
         self._measure_modes = ['VAVG']
-        self._measurment_par = ['SAV','SCUR','SDEV','SMAX','SMIN']
+        self._measurment_par = ['SAV', 'SCUR', 'SDEV', 'SMAX', 'SMIN']
         self._channels = ['CHAN1', 'CHAN2', 'CHAN3', 'CHAN4']
 
         self._address = address
@@ -133,66 +132,66 @@ class RIGOL_DS4043(VisaInstrument):
         # else:
         #     self._visainstrument = visa.instrument(address, timeout=2)
         self.add_parameter('sample_rate',
-            get_cmd='ACQ:SRAT?',
-            get_parser=float,
-            unit='Hz')
+                           get_cmd='ACQ:SRAT?',
+                           get_parser=float,
+                           unit='Hz')
         self.add_parameter('trigger_mode',
-            get_cmd=':TRIG:MODE?',
-            get_parser=str,
-            set_cmd=self._set_trigger_mode)
+                           get_cmd=':TRIG:MODE?',
+                           get_parser=str,
+                           set_cmd=self._set_trigger_mode)
         self.add_parameter('trigger_level',
-            get_cmd=lambda: self._get_trig_func_par_value(
-                                self.trigger_mode(),
-                                'LEV'),
-            get_parser=float,
-            set_cmd=lambda s: self._set_trig_func_par_value(
-                                self.trigger_mode(),
-                                'LEV',s),
-            unit='V')
+                           get_cmd=lambda: self._get_trig_func_par_value(
+                               self.trigger_mode(),
+                               'LEV'),
+                           get_parser=float,
+                           set_cmd=lambda s: self._set_trig_func_par_value(
+                               self.trigger_mode(),
+                               'LEV', s),
+                           unit='V')
         self.add_parameter('trigger_source',
-            get_cmd= lambda:_get_trig_func_par(self.trigger_mode(),
-                                               'SOUR'),
-            get_parser= str,
-            set_cmd=self._set_trigger_source,
-            unit='')
+                           get_cmd=lambda: _get_trig_func_par(self.trigger_mode(),
+                                                              'SOUR'),
+                           get_parser=str,
+                           set_cmd=self._set_trigger_source,
+                           unit='')
         self.add_parameter('timebase_offset',
-            get_cmd='TIM:OFFS?',
-            get_parser=float,
-            set_cmd='TIM:OFFS {:f}',
-            unit='s')
+                           get_cmd='TIM:OFFS?',
+                           get_parser=float,
+                           set_cmd='TIM:OFFS {:f}',
+                           unit='s')
         self.add_parameter('timebase_scale',
-            get_cmd='TIM:SCAL?',
-            get_parser=float,
-            set_cmd='TIM:SCAL {:f}',
-            unit='s')
+                           get_cmd='TIM:SCAL?',
+                           get_parser=float,
+                           set_cmd='TIM:SCAL {:f}',
+                           unit='s')
         self.add_parameter('measure_mode',
-            get_cmd='TRIG:MODE?',
-            get_parser=str,
-            set_cmd='TIM:SCAL {:f}',
-            unit='s')
+                           get_cmd='TRIG:MODE?',
+                           get_parser=str,
+                           set_cmd='TIM:SCAL {:f}',
+                           unit='s')
         self.add_parameter('measurement_source',
-            get_cmd='MEAS:SOUR?',
-            get_parser=str,
-            set_cmd=self._set_measurement_source,
-            unit='')
+                           get_cmd='MEAS:SOUR?',
+                           get_parser=str,
+                           set_cmd=self._set_measurement_source,
+                           unit='')
         # self.add_parameter('measurement',
         #     flags=Instrument.FLAG_GET,
         #     type=types.FloatType)
         self.add_parameter('current_channel',
-            get_cmd='WAV:SOUR?',
-            get_parser=str,
-            set_cmd=self._set_current_channel,
-            unit='')
+                           get_cmd='WAV:SOUR?',
+                           get_parser=str,
+                           set_cmd=self._set_current_channel,
+                           unit='')
         # self.add_parameter('read_waveform',
         #     type=types.ListType,
         #     flags=Instrument.FLAG_GET, unit='AU',
         #     tags=['measure'])
 
         self.add_parameter('no_points',
-            get_cmd='WAV:POIN?',
-            get_parser=int,
-            set_cmd='WAV:POIN {:d}' ,
-            unit='')
+                           get_cmd='WAV:POIN?',
+                           get_parser=int,
+                           set_cmd='WAV:POIN {:d}',
+                           unit='')
         # self.add_parameter(
         #     'Navg', type=types.IntType, flags=Instrument.FLAG_GETSET,
         #     minval=1, maxval=8192, unit='s')
@@ -210,11 +209,6 @@ class RIGOL_DS4043(VisaInstrument):
         # self._visainstrument.write(':RUN\n')
         # self._visainstrument.write(':AUT\n')
 
-
-
-
-
-
     # parameter functions
     # def do_set_timebase_offset(self, val):
     #     self._visainstrument.write('TIM:OFFS %s'%val)
@@ -226,7 +220,6 @@ class RIGOL_DS4043(VisaInstrument):
     # def do_set_timebase_scale(self,val):
     #     self._visainstrument.write('TIM:SCAL %s'%val)
 
-
     # def do_get_timebase_scale(self):
     #     ans = self._visainstrument.ask('TIM:SCAL?')
     #     return ans
@@ -237,8 +230,6 @@ class RIGOL_DS4043(VisaInstrument):
             self.write(':TRIG:%s' % mode)
         else:
             raise ValueError('invalid mode %s' % mode)
-
-
 
     # def do_set_trigger_level(self, level, mode):
     #     self._set_trig_func_par_value(mode, 'LEV', level)
@@ -252,7 +243,6 @@ class RIGOL_DS4043(VisaInstrument):
             self._set_trig_func_par_value(mode, 'SOUR', source)
         else:
             raise ValueError('invalid mode %s' % mode)
-
 
     # def do_get_trigger_source(self,mode=None):
     #     return self._get_trig_func_par(mode,'SOUR')
@@ -268,9 +258,9 @@ class RIGOL_DS4043(VisaInstrument):
     #     ans = self._visainstrument.ask('WAV:SOUR?')
     #     return ans
 
-    def _set_current_channel(self,val):
+    def _set_current_channel(self, val):
         if val in self._channels:
-            self.write('WAV:SOUR %s'%val)
+            self.write('WAV:SOUR %s' % val)
         else:
             raise ValueError('invalid channel %s' % val)
 
@@ -287,12 +277,10 @@ class RIGOL_DS4043(VisaInstrument):
 
     def _set_measurement_source(self, source, mode=None):
         if source in self._trig_sources:
-            self.write('MEAS:SOUR %s'%source)
+            self.write('MEAS:SOUR %s' % source)
 
         else:
             raise ValueError('invalid source %s' % mode)
-
-
 
     # def do_get_measurement_source(self,mode=None):
     #     return self._visainstrument.ask('MEAS:SOUR?')
@@ -313,7 +301,6 @@ class RIGOL_DS4043(VisaInstrument):
     #     logging.debug('Read current value')
     #     text = self._visainstrument.ask('WAV:DATA?')
     #     return np.double(text.split(',')[:-1])
-
 
     # def reset(self):
     #     self._visainstrument.write(':CLE\n')
@@ -377,8 +364,8 @@ class RIGOL_DS4043(VisaInstrument):
         mode = self._determine_mode(mode)
         string = ':TRIG:%s:%s?' % (mode, par)
         ans = self._visainstrument.ask(string)
-        logging.debug('ask instrument for %s (result %s)' % \
-            (string, ans))
+        logging.debug('ask instrument for %s (result %s)' %
+                      (string, ans))
         return ans
 
 ##################
@@ -421,9 +408,6 @@ class RIGOL_DS4043(VisaInstrument):
     #     return ans
 
 
-
-
-
 ##################
 ### Important! ###
 ##################
@@ -431,12 +415,11 @@ class RIGOL_DS4043(VisaInstrument):
 ### Important! ###
 ##################
 
+    # Ramiro stuff used for the rabi simulations: This can go away with their approval
 
-
-    #Ramiro stuff used for the rabi simulations: This can go away with their approval
-    def read_channels(self,channel_list):
+    def read_channels(self, channel_list):
         self.visawrite(':ACQuire:SRATe?\n')
-        srate = self.sample_rate() #np.double(self.visaread())
+        srate = self.sample_rate()  # np.double(self.visaread())
         data = []
         x_axis = []
         self.prepare_for_readwfm()
@@ -447,7 +430,7 @@ class RIGOL_DS4043(VisaInstrument):
             # self.visawrite(':ACQuire:MDEPth?\n')
             # npoints = np.double(self.visaread())
             ch_out = [0]
-            while(len(ch_out)<13):
+            while(len(ch_out) < 13):
                 # print 'blah'
                 ch = self.readwfm(channel)
                 # print ch
@@ -455,7 +438,7 @@ class RIGOL_DS4043(VisaInstrument):
             # print splitted_var[-1]
             # ch_out = np.array(splitted_var, dtype=np.double)
             # print ch_out.shape
-            step_size = 1./srate#config_parameters[4]*config_parameters[2]/npoints
+            step_size = 1./srate  # config_parameters[4]*config_parameters[2]/npoints
             # start_t = np.double(self.visaread())
 
             # Still dont undestand the scaling of 2*ste_size, we just choose it
@@ -465,7 +448,7 @@ class RIGOL_DS4043(VisaInstrument):
             x_axis.append(axis)
             data.append(ch_out)
 
-        return x_axis,data
+        return x_axis, data
 
     # def prepare_for_readwfm(self):
 
@@ -493,8 +476,7 @@ class RIGOL_DS4043(VisaInstrument):
         buff = (ct.c_ubyte*buff_size)()
         # wfmBuf = (ct. c_char * len(buff)).from_buffer(buff)
 
-        self.visawrite(':WAV:SOURce CHAN%s\n'% channel)
-
+        self.visawrite(':WAV:SOURce CHAN%s\n' % channel)
 
         # self._visainstrument.write(':WAV:RESet\n')
         self._visainstrument.write(':WAV:BEGin\n')
@@ -502,7 +484,7 @@ class RIGOL_DS4043(VisaInstrument):
         reading = True
 
         status = self._visainstrument.read()
-        while (reading and readTim<1):
+        while (reading and readTim < 1):
             if status is 'I':
                 self._visainstrument.write(':WAV:DATA?\n')
                 var = self._visainstrument.read()
@@ -535,8 +517,6 @@ class RIGOL_DS4043(VisaInstrument):
         self._visainstrument.write(':WAV:END\n')
         # self._visainstrument.write(':RUN\n')
         return var
-
-
 
     # def do_set_Navg(self, Navg):
     #     self.Navg = Navg

@@ -12,7 +12,7 @@ from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 
 class QuTech_SPI_S4g_FluxCurrent(Instrument):
     def __init__(self, name: str, address: str,
-                 channel_map: dict, reset_currents: bool=False):
+                 channel_map: dict, reset_currents: bool = False):
         """
         Create an instance of the SPI S4g FluxCurrent instrument.
 

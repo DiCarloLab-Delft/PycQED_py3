@@ -5,11 +5,13 @@ from qcodes.instrument import visa
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
+
 class RTO1024_scope(visa.VisaInstrument):
     '''
     Instrument driver for the Rohde-Schwarz RTO1024 oscilloscope.
     Currently only able to measure signal on Channel 1.
     '''
+
     def __init__(self, name, address=None, timeout=5, terminator='',
                  **kwargs):
         super().__init__(name=name, address=address, timeout=timeout,
@@ -58,7 +60,7 @@ class RTO1024_scope(visa.VisaInstrument):
 
         # Load settings from file
         self.visa_handle.write("MMEM RCL " +
-            "'C:\\Users\\Instrument.RTO-XXXXXX\\Documents\\Data\\1703_Starmon\\Settings_2017-06-06.dfl'")
+                               "'C:\\Users\\Instrument.RTO-XXXXXX\\Documents\\Data\\1703_Starmon\\Settings_2017-06-06.dfl'")
         # Include x-values in output
         self.visa_handle.write('EXPort:WAVeform:INCXvalues ON')
 
@@ -69,7 +71,7 @@ class RTO1024_scope(visa.VisaInstrument):
         '''
         # defines the acquisition no. for run single mode
         self.visa_handle.write('EXPort:WAVeform:INCXvalues ON')
-        self.visa_handle.write('ACQuire:COUNt %s'%str(self.num_averages()))
+        self.visa_handle.write('ACQuire:COUNt %s' % str(self.num_averages()))
         self.visa_handle.write('RUNSingle')
         # Wait until measurement finishes before extracting data.
         # TODO: ask device if operation is complete

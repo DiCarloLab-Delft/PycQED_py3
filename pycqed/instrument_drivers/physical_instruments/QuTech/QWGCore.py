@@ -90,7 +90,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         super().__init__(name, transport)
 
         # AWG properties
-        self._dev_desc = lambda:0  # create empty device descriptor
+        self._dev_desc = lambda: 0  # create empty device descriptor
         self._dev_desc.model = 'QWG'
         self._dev_desc.numChannels = 4
 #        self._dev_desc.numDacBits = 12
@@ -117,10 +117,10 @@ class QWGCore(SCPIBase, DIO.CalInterface):
                 # FIXME: we could be less rude and only disable the new parameters
                 # FIXME: let parameters depend on SW version, and on IORear type
                 log.warning(f"Incompatible driver version of QWG ({self.name}); The version ({version_cur[0]}."
-                                f"{version_cur[1]}.{version_cur[2]}) "
-                                f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
-                                f"parameters will not operate and timeout. Please update the QWG software to "
-                                f"{version_min[0]}.{version_min[1]}.{version_min[2]} or later")
+                            f"{version_cur[1]}.{version_cur[2]}) "
+                            f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
+                            f"parameters will not operate and timeout. Please update the QWG software to "
+                            f"{version_min[0]}.{version_min[1]}.{version_min[2]} or later")
                 self._dev_desc.numMaxCwBits = 7
                 self._dev_desc.numSelectCwInputs = 7
             self._dev_desc.numCodewords = pow(2, self._dev_desc.numSelectCwInputs)
@@ -151,7 +151,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         if block:
             self.get_operation_complete()
 
-        #self.check_errors()
+        # self.check_errors()
 
         # status = self.get_system_status()
         # warn_msg = self._detect_underdrive(status)
@@ -167,7 +167,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         if block:
             self.get_operation_complete()
 
-        #self.check_errors()
+        # self.check_errors()
 
     ##########################################################################
     #  Output functions (AWG5014 compatible)
@@ -184,7 +184,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     ##########################################################################
 
     def set_amplitude(self, ch: int, amp: float) -> None:
-        self._transport.write(f'SOUR{ch}:VOLT:LEV:IMM:AMPL {amp:.6f}') #FIXME
+        self._transport.write(f'SOUR{ch}:VOLT:LEV:IMM:AMPL {amp:.6f}')  # FIXME
 
     def get_amplitude(self, ch: int) -> float:
         return self._ask_float(f'SOUR{ch}:VOLT:LEV:IMM:AMPL?')
@@ -399,7 +399,6 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return self._int_to_array(self._ask('DIO:INDexes?'))
 
-
     def dio_calibrated_inputs(self) -> int:
         """
         'Get all DIO inputs which are calibrated\n'
@@ -422,7 +421,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return bool(self._ask_int('DIO:IB?'))
 
-    def dio_calibration_report(self, extended: bool=False) -> str:
+    def dio_calibration_report(self, extended: bool = False) -> str:
         """
         Return a string containing the latest DIO calibration report (successful and failed calibrations). Includes:
         selected index, dio mode, valid indexes, calibrated DIO bits and the DIO bitDiff table.
@@ -464,7 +463,6 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return self._ask_int(f'QUTEch:TRIGgers{ch}:LOGIcinput?')
 
-
     def set_bitmap(self, ch: int) -> None:
         """
         Codeword bit map for a channel, 14 bits available of which 10 are selectable.
@@ -478,15 +476,14 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     def get_bitmap(self, ch: int) -> List:
         return self._int_to_array(self._ask(f'DAC{ch}:BITmap?'))
 
-
     ##########################################################################
     # overrides for CalInterface interface
     ##########################################################################
 
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+    def output_dio_calibration_data(self, dio_mode: str, port: int = 0) -> Tuple[int, List]:
         raise RuntimeError("QWG cannot output calibration data")
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0) -> None:
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0) -> None:
         self.dio_calibrate()    # FIXME: integrate
 
     ##########################################################################

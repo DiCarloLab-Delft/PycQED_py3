@@ -60,7 +60,7 @@ import time
 import logging
 import inspect
 import numpy as np
-from typing import Tuple,List
+from typing import Tuple, List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.library.DIO as DIO
@@ -90,10 +90,12 @@ class ziUHFQCHoldoffError(Exception):
     sent to these units to solve the problem."""
     pass
 
+
 class ziUHFQCDIOActivityError(Exception):
     """Exception raised when insufficient activity is detected on the bits
     of the DIO to be used for controlling which qubits to measure."""
     pass
+
 
 class ziUHFQCDIOCalibrationError(Exception):
     """Exception raised when the DIO calibration fails, meaning no signal
@@ -203,7 +205,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                          **kw)
 
         # Disable disfunctional parameters from snapshot
-        self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable']) # FIXME: duplicates prior statement
+        self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable'])  # FIXME: duplicates prior statement
 
         # Set default waveform length to 20 ns at 1.8 GSa/s
         self._default_waveform_length = 32
@@ -599,7 +601,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
         return data
 
     def acquisition_get(self, samples, arm=True,
-                         acquisition_time=0.010):
+                        acquisition_time=0.010):
         """
         Waits for the UHFQC to finish a measurement then reads the data.
 
@@ -639,7 +641,7 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
         self.unsubs()
 
 # FIXME: merge conflict 20200918
-#<<<<<<< HEAD
+# <<<<<<< HEAD
 #        for p in self._acquisition_nodes:
 #            self.unsubs(p)
 #        self.unsubs(self._get_full_path('auxins/0/sample'))
@@ -662,10 +664,10 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
                                         rotation_angle=0,
                                         length=4096 / 1.8e9,
                                         scaling_factor=1) -> None:
-# FIXME: merge conflict 20200918
-#=======
-#    def check_errors(self, errors_to_ignore=None) -> None:
-#>>>>>>> ee1ccf208faf635329ea2c979da5757ce4ce8e14
+        # FIXME: merge conflict 20200918
+        # =======
+        #    def check_errors(self, errors_to_ignore=None) -> None:
+        # >>>>>>> ee1ccf208faf635329ea2c979da5757ce4ce8e14
         """
         Sets default integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
@@ -946,14 +948,14 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
             vals=validators.Lists())
 
         self.add_parameter('dio_calibration_delay',
-            set_cmd=self._set_dio_calibration_delay,
-            get_cmd=self._get_dio_calibration_delay,
-            unit='',
-            label='DIO Calibration delay',
-            docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
-            'to be applied on the DIO interface in order to achieve reliable sampling '
-            'of the codewords. The valid range is 0 to 15.',
-            vals=validators.Ints())
+                           set_cmd=self._set_dio_calibration_delay,
+                           get_cmd=self._get_dio_calibration_delay,
+                           unit='',
+                           label='DIO Calibration delay',
+                           docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
+                           'to be applied on the DIO interface in order to achieve reliable sampling '
+                           'of the codewords. The valid range is 0 to 15.',
+                           vals=validators.Ints())
 
     def _codeword_table_preamble(self, awg_nr) -> str:
         """
@@ -988,9 +990,9 @@ class UHFQC(zibase.ZI_base_instrument, DIO.CalInterface):
     # Overriding Qcodes InstrumentBase methods
     ##########################################################################
 
-    def snapshot_base(self, update: bool=False,
-                      params_to_skip_update =None,
-                      params_to_exclude = None ):
+    def snapshot_base(self, update: bool = False,
+                      params_to_skip_update=None,
+                      params_to_exclude=None):
         """
         State of the instrument as a JSON-compatible dict.
         Args:
@@ -1188,7 +1190,6 @@ setUserReg(4, err_cnt);"""
     ##########################################################################
     ##########################################################################
 
-
     ##########################################################################
     # 'public' functions: sequencer functions
     ##########################################################################
@@ -1299,21 +1300,21 @@ setUserReg(4, err_cnt);"""
         self.awgs_0_userregs_2(delay_samples)
         sequence = (
             'var wait_delay = getUserReg(2);\n' +
-            'cvar i = 0;\n'+
+            'cvar i = 0;\n' +
             'const length = {};\n'.format(len(dio_out_vect))
-            )
+        )
         sequence = sequence + _array2vect(dio_out_vect, "dio_out_vect")
         # starting the loop
-        sequence = sequence +(
-            'setDIO(2048); // FIXME: workaround because we cannot use setDIO(0)\n'+
+        sequence = sequence + (
+            'setDIO(2048); // FIXME: workaround because we cannot use setDIO(0)\n' +
             'for (i = 0; i < length; i = i + 1) {\n'
-            ' var dio_out =  dio_out_vect[i];\n'+
+            ' var dio_out =  dio_out_vect[i];\n' +
             ' waitDIOTrigger();\n' +
-            ' setDIO(dio_out);\n'+
+            ' setDIO(dio_out);\n' +
             ' wait(wait_delay);\n' +
-            ' setDIO(2048);\n'+
+            ' setDIO(2048);\n' +
             '}\n'
-            )
+        )
 
         # Define the behavior of our program
         self._reset_awg_program_features()
@@ -1438,7 +1439,7 @@ setTrigger(0);
 
     def awg_debug_acquisition(self, dly=0):
         self._reset_awg_program_features()
-        self._awg_program_features['avg_cnt']  = True
+        self._awg_program_features['avg_cnt'] = True
         self._awg_program_features['loop_cnt'] = True
         self._awg_program_features['wait_dly'] = True
 
@@ -1602,10 +1603,10 @@ setTrigger(0);
         """
         log.debug(f"{self.devname}: Testing DIO activity for AWG {awg_nr}")
 
-        vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
+        vld_mask = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
-        strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
-        strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
+        strb_mask = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
+        strb_slope = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
 
         cw_mask = mask_value  # FIXME: changed parameter to define mask that's already shifted in place << 17
 
@@ -1656,10 +1657,10 @@ setTrigger(0);
         codewords are sampled incorrectly."""
         log.debug("{self.devname}: Finding valid delays")
 
-        vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
+        vld_mask = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
-        strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
-        strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
+        strb_mask = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
+        strb_slope = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
 
         cw_mask = mask_value << 17
 
@@ -1670,7 +1671,7 @@ setTrigger(0);
             combined_mask |= strb_mask
         log.debug(f"{self.devname}:   Using a mask value of 0x{combined_mask:08x}")
 
-        valid_delays= []
+        valid_delays = []
         for delay in range(12):  # NB: 16 steps are available, but 2 periods of 20 ns should suffice
             log.debug(f'{self.devname}:    Testing delay {delay}')
             self.setd('raw/dios/0/delay', delay)  # in 1/300 MHz = 3.33 ns steps
@@ -1690,7 +1691,7 @@ setTrigger(0);
     # overrides for CalInterface interface
     ##########################################################################
 
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+    def output_dio_calibration_data(self, dio_mode: str, port: int = 0) -> Tuple[int, List]:
         # NB: ignoring dio_mode and port, because we have single mode only
         program = """
         // program: triggered upstream DIO calibration program
@@ -1711,9 +1712,9 @@ setTrigger(0);
 
         dio_mask = 0x000003FF
         expected_sequence = []
-        return dio_mask,expected_sequence
+        return dio_mask, expected_sequence
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0):
         log.info(f"{self.devname}: Calibrating DIO protocol")
         self.assure_ext_clock()
 
@@ -1725,46 +1726,46 @@ setTrigger(0);
         awg_enable = self.get('awgs_0_enable')
 
         try:
-          self.set('qas_0_integration_length', 4)
-          self.set('qas_0_result_enable', 0)
-          self.set('qas_0_monitor_enable', 0)
-          self.set('awgs_0_enable', 0)
-          
-          for awg in [0]:
-              if not self._ensure_activity(awg, mask_value=dio_mask):
-                  raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
+            self.set('qas_0_integration_length', 4)
+            self.set('qas_0_result_enable', 0)
+            self.set('qas_0_monitor_enable', 0)
+            self.set('awgs_0_enable', 0)
 
-          valid_delays = self._find_valid_delays(awg, mask_value=dio_mask)
-          if len(valid_delays) == 0:
-              raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
+            for awg in [0]:
+                if not self._ensure_activity(awg, mask_value=dio_mask):
+                    raise ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
 
-          # Find center of first valid region
-          subseq = [[]]
-          for e in valid_delays:
-              if not subseq[-1] or subseq[-1][-1] == e - 1:
-                  subseq[-1].append(e)
-              else:
-                  subseq.append([e])
+            valid_delays = self._find_valid_delays(awg, mask_value=dio_mask)
+            if len(valid_delays) == 0:
+                raise ziUHFQCDIOCalibrationError('DIO calibration failed! No valid delays found')
 
-          subseq = max(subseq, key=len)
-          delay = len(subseq)//2 + subseq[0]
+            # Find center of first valid region
+            subseq = [[]]
+            for e in valid_delays:
+                if not subseq[-1] or subseq[-1][-1] == e - 1:
+                    subseq[-1].append(e)
+                else:
+                    subseq.append([e])
 
-          # Print information
-          log.info(f"{self.devname}: Valid delays are {valid_delays}")
+            subseq = max(subseq, key=len)
+            delay = len(subseq)//2 + subseq[0]
 
-          # And configure the delays
-          self._set_dio_calibration_delay(delay)
+            # Print information
+            log.info(f"{self.devname}: Valid delays are {valid_delays}")
 
-          # Clear all detected errors (caused by DIO timing calibration)
-          self.check_errors(errors_to_ignore=['AWGDIOTIMING'])
-        
+            # And configure the delays
+            self._set_dio_calibration_delay(delay)
+
+            # Clear all detected errors (caused by DIO timing calibration)
+            self.check_errors(errors_to_ignore=['AWGDIOTIMING'])
+
         finally:
-          # Restore settings either in case of an exception or if the DIO
-          # routine finishes correctly
-          self.set('qas_0_integration_length', integration_length)
-          self.set('qas_0_result_enable', result_enable)
-          self.set('qas_0_monitor_enable', monitor_enable)
-          self.set('awgs_0_enable', awg_enable)
+            # Restore settings either in case of an exception or if the DIO
+            # routine finishes correctly
+            self.set('qas_0_integration_length', integration_length)
+            self.set('qas_0_result_enable', result_enable)
+            self.set('qas_0_monitor_enable', monitor_enable)
+            self.set('awgs_0_enable', awg_enable)
 
     ##########################################################################
     # DIO calibration functions for *CC*
@@ -1809,6 +1810,7 @@ if (ro_mode) {
   ro_trig = AWG_INTEGRATION_ARM + AWG_INTEGRATION_TRIGGER;
 }"""
     return preamble
+
 
 def _array2vect(array, name):
     # this function cuts up arrays into several vectors of maximum length 1024 that are joined.

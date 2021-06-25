@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 
 # from: AWG8_staircase_test.ipynb
 # FIXME: superceded by ZI_base_instrument
+
+
 def plot_timing_diagram(data, bits, line_length=30):
     def _plot_lines(ax, pos, *args, **kwargs):
         if ax == 'x':

@@ -39,31 +39,31 @@ class Stroboscope(VisaInstrument):
         super().__init__(name, address, **kwargs)
 
         # Add some global constants
-        self.MAX_DUTY = 698 ## milliseconds
-        self.MAX_PHASE = 698 ## milliseconds
+        self.MAX_DUTY = 698  # milliseconds
+        self.MAX_PHASE = 698  # milliseconds
         self._address = address
         self.visa_handle.baud_rate = 115200
         self.visa_handle.write_termination = '\r'
         self.visa_handle.read_termination = '\r'
 
         self.add_parameter('phase',
-            get_cmd='PHASE?',
-            get_parser=int,
-            set_cmd='PHASE {:d}',
-            vals=vals.Numbers(min_value=0,
-                              max_value=self.MAX_PHASE),
-            unit='ms')
+                           get_cmd='PHASE?',
+                           get_parser=int,
+                           set_cmd='PHASE {:d}',
+                           vals=vals.Numbers(min_value=0,
+                                             max_value=self.MAX_PHASE),
+                           unit='ms')
         self.add_parameter('duty_cycle',
-            get_cmd='DUTY?',
-            get_parser=int,
-            set_cmd='DUTY {:d}',
-            vals=vals.Numbers(min_value=0,
-                              max_value=self.MAX_DUTY),
-            unit='ms')
+                           get_cmd='DUTY?',
+                           get_parser=int,
+                           set_cmd='DUTY {:d}',
+                           vals=vals.Numbers(min_value=0,
+                                             max_value=self.MAX_DUTY),
+                           unit='ms')
         self.add_parameter('locked',
-            get_cmd='LOCK?',
-            get_parser=lambda s: bool(int(s)),
-            label='Trigger locked to pulse tube')
+                           get_cmd='LOCK?',
+                           get_parser=lambda s: bool(int(s)),
+                           label='Trigger locked to pulse tube')
 
         # time.sleep(3)
         # self.get_all()
@@ -87,7 +87,6 @@ class Stroboscope(VisaInstrument):
         self.duty_cycle()
         self.locked()
 
-
     def get_info(self):
         '''
         Get the device descriptor.
@@ -99,4 +98,3 @@ class Stroboscope(VisaInstrument):
         '''
         ans = self._visainstrument.ask('*IDN?')
         return ans
-

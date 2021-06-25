@@ -106,7 +106,6 @@ class SCPIBase:
     def get_system_version(self) -> str:
         return self._ask('system:version?')
 
-
     def get_status_questionable_condition(self) -> int:
         return self._ask_int('STATus:QUEStionable:CONDition?')
 
@@ -118,7 +117,6 @@ class SCPIBase:
 
     def get_status_questionable_enable(self) -> int:
         return self._ask_int('STATus:QUEStionable:ENABle?')
-
 
     def get_status_operation_condition(self) -> int:
         return self._ask_int('STATus:OPERation:CONDition?')
@@ -170,41 +168,41 @@ class SCPIBase:
     ###
 
     # bits for *ESR and *ESE
-    ESR_OPERATION_COMPLETE      = 0x01
-    ESR_REQUEST_CONTROL         = 0x02
-    ESR_QUERY_ERROR             = 0x04
-    ESR_DEVICE_DEPENDENT_ERROR  = 0x08
-    ESR_EXECUTION_ERROR         = 0x10
-    ESR_COMMAND_ERROR           = 0x20
-    ESR_USER_REQUEST            = 0x40
-    ESR_POWER_ON                = 0x80
+    ESR_OPERATION_COMPLETE = 0x01
+    ESR_REQUEST_CONTROL = 0x02
+    ESR_QUERY_ERROR = 0x04
+    ESR_DEVICE_DEPENDENT_ERROR = 0x08
+    ESR_EXECUTION_ERROR = 0x10
+    ESR_COMMAND_ERROR = 0x20
+    ESR_USER_REQUEST = 0x40
+    ESR_POWER_ON = 0x80
 
     # bits for STATus:OPERation
     # FIXME: add the function
-    STAT_OPER_CALIBRATING       = 0x0001    # The instrument is currently performing a calibration
-    STAT_OPER_SETTLING          = 0x0002    # The instrument is waiting for signals it controls to stabilize enough to begin measurements
-    STAT_OPER_RANGING           = 0x0004    # The instrument is currently changing its range
-    STAT_OPER_SWEEPING          = 0x0008    # A sweep is in progress
-    STAT_OPER_MEASURING         = 0x0010    # The instrument is actively measuring
-    STAT_OPER_WAIT_TRIG         = 0x0020    # The instrument is in a “wait for trigger” state of the trigger model
-    STAT_OPER_WAIT_ARM          = 0x0040    # The instrument is in a “wait for arm” state of the trigger model
-    STAT_OPER_CORRECTING        = 0x0080    # The instrument is currently performing a correction
-    STAT_OPER_INST_SUMMARY      = 0x2000    # One of n multiple logical instruments is reporting OPERational status
-    STAT_OPER_PROG_RUNNING      = 0x4000    # A user-defined program is currently in the run state
+    STAT_OPER_CALIBRATING = 0x0001    # The instrument is currently performing a calibration
+    STAT_OPER_SETTLING = 0x0002    # The instrument is waiting for signals it controls to stabilize enough to begin measurements
+    STAT_OPER_RANGING = 0x0004    # The instrument is currently changing its range
+    STAT_OPER_SWEEPING = 0x0008    # A sweep is in progress
+    STAT_OPER_MEASURING = 0x0010    # The instrument is actively measuring
+    STAT_OPER_WAIT_TRIG = 0x0020    # The instrument is in a “wait for trigger” state of the trigger model
+    STAT_OPER_WAIT_ARM = 0x0040    # The instrument is in a “wait for arm” state of the trigger model
+    STAT_OPER_CORRECTING = 0x0080    # The instrument is currently performing a correction
+    STAT_OPER_INST_SUMMARY = 0x2000    # One of n multiple logical instruments is reporting OPERational status
+    STAT_OPER_PROG_RUNNING = 0x4000    # A user-defined program is currently in the run state
 
     # bits for STATus:QUEStionable
     # FIXME: add the function
-    STAT_QUES_VOLTAGE           = 0x0001
-    STAT_QUES_CURRENT           = 0x0002
-    STAT_QUES_TIME              = 0x0004
-    STAT_QUES_POWER             = 0x0008
-    STAT_QUES_TEMPERATURE       = 0x0010
-    STAT_QUES_FREQUENCY         = 0x0020
-    STAT_QUES_PHASE             = 0x0040
-    STAT_QUES_MODULATION        = 0x0080
-    STAT_QUES_CALIBRATION       = 0x0100
-    STAT_QUES_INST_SUMMARY      = 0x2000
-    STAT_QUES_COMMAND_WARNING   = 0x4000
+    STAT_QUES_VOLTAGE = 0x0001
+    STAT_QUES_CURRENT = 0x0002
+    STAT_QUES_TIME = 0x0004
+    STAT_QUES_POWER = 0x0008
+    STAT_QUES_TEMPERATURE = 0x0010
+    STAT_QUES_FREQUENCY = 0x0020
+    STAT_QUES_PHASE = 0x0040
+    STAT_QUES_MODULATION = 0x0080
+    STAT_QUES_CALIBRATION = 0x0100
+    STAT_QUES_INST_SUMMARY = 0x2000
+    STAT_QUES_COMMAND_WARNING = 0x4000
 
     ###
     # static methods
@@ -218,4 +216,3 @@ class SCPIBase:
         digit_cnt_str = str(len(byte_cnt_str))
         bin_header_str = '#' + digit_cnt_str + byte_cnt_str
         return bin_header_str
-

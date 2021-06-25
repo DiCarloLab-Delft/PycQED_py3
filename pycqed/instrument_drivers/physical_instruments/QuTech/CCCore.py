@@ -71,7 +71,7 @@ class CCCore(SCPIBase):
         if len(program_string) > self.MAX_PROG_STR_LEN:
             raise RuntimeError('source program size {len(program_string)} exceeds maximum of {self.MAX_PROG_STR_LEN}')
 
-        hdr = 'QUTech:SEQuence:PROGram:ASSEMble ' # NB: include space as separator for binblock parameter
+        hdr = 'QUTech:SEQuence:PROGram:ASSEMble '  # NB: include space as separator for binblock parameter
         bin_block = program_string.encode('ascii')
         self.bin_block_write(bin_block, hdr)
 
@@ -188,19 +188,19 @@ class CCCore(SCPIBase):
     # HDAWG DIO/marker bit definitions: CC output
     HDAWG_TOGGLE_DS = 30
     HDAWG_TRIG = 31
-    HDAWG_CW = range(0,29)  # NB: bits used depend on mode
+    HDAWG_CW = range(0, 29)  # NB: bits used depend on mode
 
     # QWG DIO/marker bit definitions: CC output
     QWG_TOGGLE_DS = 30
     QWG_TRIG = 31
-    QWG1_CW = range(0,11)
-    QWG2_CW = range(16,27)
+    QWG1_CW = range(0, 11)
+    QWG2_CW = range(16, 27)
 
     # UHFQA DIO/marker bit definitions: CC output
     UHFQA_TOGGLE_DS = 31
     UHFQA_TRIG = 16
-    UHFQA_CW = range(17,26)
+    UHFQA_CW = range(17, 26)
 
     # UHFQA DIO/marker bit definitions: CC input
     UHFQA_DV = 0
-    UHFQA_RSLT = range(1,10)
+    UHFQA_RSLT = range(1, 10)

@@ -17,7 +17,7 @@ import json
 import array
 import numpy as np
 from collections import OrderedDict
-from typing import Tuple,List
+from typing import Tuple, List
 
 from .SCPI import SCPI
 from ._QCC.QCCMicrocode import QCCMicrocode
@@ -531,22 +531,22 @@ class QCC(SCPI, DIO.CalInterface):
         """Configures a QCC with a default program that generates data suitable for DIO calibration. Also starts the QCC."""
 
         cs_filepath = os.path.join(pycqed.__path__[0],
-                'measurement',
-                'openql_experiments',
-                's17', 'cs.txt')
+                                   'measurement',
+                                   'openql_experiments',
+                                   's17', 'cs.txt')
 
         opc_filepath = os.path.join(pycqed.__path__[0],
-                'measurement',
-                'openql_experiments',
-                's17', 'qisa_opcodes.qmap')
+                                    'measurement',
+                                    'openql_experiments',
+                                    's17', 'qisa_opcodes.qmap')
 
         self.control_store(cs_filepath)
         self.qisa_opcode(opc_filepath)
 
         test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','QCC_example',
-                'qisa_test_assembly','ro_calibration.qisa'))
+                                               '..',
+                                               'examples', 'QCC_example',
+                                               'qisa_test_assembly', 'ro_calibration.qisa'))
 
         # Start the QCC with the program configured above
         self.stop()
@@ -569,17 +569,18 @@ class QCC(SCPI, DIO.CalInterface):
             (TODO add support for microwave on DIO5)
         """
         log.info('Calibrating DIO delays')
-        if verbose: print("Calibrating DIO delays")
+        if verbose:
+            print("Calibrating DIO delays")
 
         cs_filepath = os.path.join(pycqed.__path__[0],
-            'measurement',
-            'openql_experiments',
-            's17', 'cs.txt')
+                                   'measurement',
+                                   'openql_experiments',
+                                   's17', 'cs.txt')
 
         opc_filepath = os.path.join(pycqed.__path__[0],
-            'measurement',
-            'openql_experiments',
-            's17', 'qisa_opcodes.qmap')
+                                    'measurement',
+                                    'openql_experiments',
+                                    's17', 'qisa_opcodes.qmap')
 
         # Configure QCC
         self.control_store(cs_filepath)
@@ -588,46 +589,45 @@ class QCC(SCPI, DIO.CalInterface):
         # FIXME: self=HDAWG
         if self.cfg_codeword_protocol() == 'flux':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','QCC_example',
-                'qisa_test_assembly','flux_calibration.qisa'))
+                                                   '..',
+                                                   'examples', 'QCC_example',
+                                                   'qisa_test_assembly', 'flux_calibration.qisa'))
 
             sequence_length = 8
             staircase_sequence = np.arange(1, sequence_length)
 
             # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
-            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (3, list(staircase_sequence+ (staircase_sequence << 3)))]
+            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))),
+                                 (1, list(staircase_sequence + (staircase_sequence << 3))),
+                                 (2, list(staircase_sequence + (staircase_sequence << 3))),
+                                 (3, list(staircase_sequence + (staircase_sequence << 3)))]
 
         elif self.cfg_codeword_protocol() == 'microwave':
 
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','QCC_example',
-                'qisa_test_assembly','withvsm_calibration.qisa'))
+                                                   '..',
+                                                   'examples', 'QCC_example',
+                                                   'qisa_test_assembly', 'withvsm_calibration.qisa'))
 
             sequence_length = 32
             staircase_sequence = range(1, sequence_length)
-            expected_sequence =  [(0, list(staircase_sequence)), \
-                                 (1, list(staircase_sequence)), \
-                                 (2, list(reversed(staircase_sequence))), \
+            expected_sequence = [(0, list(staircase_sequence)),
+                                 (1, list(staircase_sequence)),
+                                 (2, list(reversed(staircase_sequence))),
                                  (3, list(reversed(staircase_sequence)))]
-
 
         elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
 
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..','examples','QCC_example',
-                'qisa_test_assembly','novsm_calibration.qisa'))
+                                                   '..', 'examples', 'QCC_example',
+                                                   'qisa_test_assembly', 'novsm_calibration.qisa'))
 
             sequence_length = 32
             staircase_sequence = range(1, sequence_length)
-            expected_sequence = [(0, list(staircase_sequence)), \
-                                 (1, list(reversed(staircase_sequence))), \
-                                 (2, list(staircase_sequence)), \
-                                 (3, list(reversed(staircase_sequence))) ]
+            expected_sequence = [(0, list(staircase_sequence)),
+                                 (1, list(reversed(staircase_sequence))),
+                                 (2, list(staircase_sequence)),
+                                 (3, list(reversed(staircase_sequence)))]
 
         else:
             raise RuntimeError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
@@ -641,14 +641,14 @@ class QCC(SCPI, DIO.CalInterface):
     # overrides for CalInterface interface
     ##########################################################################
 
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
-        if port==3 or port==4:
+    def output_dio_calibration_data(self, dio_mode: str, port: int = 0) -> Tuple[int, List]:
+        if port == 3 or port == 4:
             # FIXME: incomplete port assumptions
             self._prepare_QCC_dio_calibration_hdawg()
         else:
             self._prepare_QCC_dio_calibration_uhfqa()
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0):
         raise RuntimeError("not implemented")
 
 

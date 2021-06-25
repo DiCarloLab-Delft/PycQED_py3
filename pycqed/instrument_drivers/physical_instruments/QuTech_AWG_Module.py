@@ -218,7 +218,7 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=self._gen_ch_get_func(
                                     self._getMatrix, ch_pair),
                                set_cmd=self._gen_ch_set_func(
-                                    self._setMatrix, ch_pair),
+                                   self._setMatrix, ch_pair),
                                # NB range is not a hardware limit
                                vals=vals.Arrays(-2, 2, shape=(2, 2)),
                                docstring='Q & I transformation per channel pair.\n'
@@ -750,7 +750,7 @@ class QuTech_AWG_Module(SCPI):
         """
         self.write(f'DIO:CALibrate {target_index}')
 
-    def dio_calibration_rapport(self, extended: bool=False) -> str:
+    def dio_calibration_rapport(self, extended: bool = False) -> str:
         """
         Return a string containing the latest DIO calibration rapport (successful and failed calibrations). Includes:
         selected index, dio mode, valid indexes, calibrated DIO bits and the DIO bitDiff table.
@@ -1088,6 +1088,7 @@ class QWGMultiDevices:
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
     Usually all methods are static
     """
+
     def __init__(self, qwgs: List[QuTech_AWG_Module]) -> None:
         self.qwgs = qwgs
 
@@ -1095,7 +1096,7 @@ class QWGMultiDevices:
     def dio_calibration(cc, qwgs: List[QuTech_AWG_Module], verbose: bool = False):
         raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0):
         """
         Calibrate multiple QWG using a CCLight, QCC or other CC-like devices
         First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
@@ -1193,7 +1194,7 @@ class Mock_QWG(QuTech_AWG_Module):
         # self.connect_message()
 
     def add_parameter(self, name: str,
-                      parameter_class: type=Parameter, **kwargs) -> None:
+                      parameter_class: type = Parameter, **kwargs) -> None:
 
         kwargs.pop('get_cmd', None)
         kwargs.pop('set_cmd', None)

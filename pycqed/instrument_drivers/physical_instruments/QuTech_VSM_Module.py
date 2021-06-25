@@ -135,7 +135,7 @@ class QuTechVSMModule(SCPI):
         # Marker breakout board
         self.add_parameter('mbbc_state',
                            docstring='Whether the _marker breakout board_ is '
-                                    'connected to the VSM.',
+                           'connected to the VSM.',
                            get_cmd='MBBC?',
                            vals=validators.Enum('connected', 'disconnected'))
 
@@ -195,13 +195,13 @@ class QuTechVSMModule(SCPI):
         # been set correctly in the VSM in order to correctly use the
         # orthogonalized parameters
         self.add_parameter(
-                            'getCalibrationDataAvailable',
-                            docstring='Use this to check if the calibration data has been '\
-                                      'set correctly in the VSM. Outputs an integer 0 (False), 1 (True)',
-                            get_cmd='CALIBRATIONDATAPATH' + '?',
-                            get_parser=int,
-                            vals=validators.Ints(0,1)
-                        )
+            'getCalibrationDataAvailable',
+            docstring='Use this to check if the calibration data has been '
+            'set correctly in the VSM. Outputs an integer 0 (False), 1 (True)',
+            get_cmd='CALIBRATIONDATAPATH' + '?',
+            get_parser=int,
+            vals=validators.Ints(0, 1)
+        )
 
         # Raw attenuationa and phase
         #  Two input pulses
@@ -295,7 +295,7 @@ class QuTechVSMModule(SCPI):
                                        set_cmd=scpi_name + ' {}',
                                        unit='deg',
                                        get_parser=float,
-                                       vals=validators.Numbers(-125,45))
+                                       vals=validators.Numbers(-125, 45))
 
     def _sync_time_and_add_parameter(self):
         doc_description = 'Parameter to sync the time from user computer to VSM'
@@ -306,9 +306,9 @@ class QuTechVSMModule(SCPI):
         current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
         self.sync_time(current_time_str)
 
-    def snapshot_base(self, update: bool=False,
-                      params_to_skip_update =None, 
-                      params_to_exclude = None ):
+    def snapshot_base(self, update: bool = False,
+                      params_to_skip_update=None,
+                      params_to_exclude=None):
         """
         State of the instrument as a JSON-compatible dict.
         Args:
@@ -322,8 +322,7 @@ class QuTechVSMModule(SCPI):
             dict: base snapshot
         """
 
-
-        if params_to_exclude is None: 
+        if params_to_exclude is None:
             params_to_exclude = self._params_to_exclude
 
         snap = {
@@ -337,7 +336,7 @@ class QuTechVSMModule(SCPI):
         snap['parameters'] = {}
         for name, param in self.parameters.items():
             if params_to_exclude and name in params_to_exclude:
-                pass 
+                pass
             elif params_to_skip_update and name in params_to_skip_update:
                 update_par = False
             else:
@@ -352,6 +351,7 @@ class QuTechVSMModule(SCPI):
             if hasattr(self, attr):
                 snap[attr] = getattr(self, attr)
         return snap
+
 
 class Dummy_QuTechVSMModule(QuTechVSMModule):
 

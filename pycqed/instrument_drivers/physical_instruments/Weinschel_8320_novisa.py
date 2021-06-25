@@ -39,4 +39,4 @@ class Weinschel_8320(Instrument):
         ret = tn.read_until(cmd_encoded, timeout=self.timeout)
         ret = ret.decode('ascii')
         tn.close()
-        return int(ret.split('\r\n')[-3],10)
+        return int(ret.split('\r\n')[-3], 10)

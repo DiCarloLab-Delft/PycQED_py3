@@ -318,7 +318,7 @@ class MockDAQServer():
                 'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
             for i in range(32):
                 self.nodes['/' + self.device +
-                        '/raw/dios/0/delays/' + str(i) + '/value'] = {'type': 'Integer', 'value': 0}
+                           '/raw/dios/0/delays/' + str(i) + '/value'] = {'type': 'Integer', 'value': 0}
             self.nodes[f'/{self.device}/raw/error/blinkseverity'] = {'type': 'Integer', 'value': 0}
             self.nodes[f'/{self.device}/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
             self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
@@ -611,12 +611,12 @@ class ZI_base_instrument(Instrument):
     def __init__(self,
                  name: str,
                  device: str,
-                 interface: str= '1GbE',
-                 server: str= 'localhost',
-                 port: int= 8004,
-                 apilevel: int= 5,
-                 num_codewords: int= 0,
-                 logfile:str = None,
+                 interface: str = '1GbE',
+                 server: str = 'localhost',
+                 port: int = 8004,
+                 apilevel: int = 5,
+                 num_codewords: int = 0,
+                 logfile: str = None,
                  **kw) -> None:
         """
         Input arguments:
@@ -1299,13 +1299,13 @@ class ZI_base_instrument(Instrument):
 
         return None
 
-    def subs(self, path:str) -> None:
+    def subs(self, path: str) -> None:
         full_path = self._get_full_path(path)
         if full_path not in self._subscribed_paths:
             self._subscribed_paths.append(full_path)
         self.daq.subscribe(full_path)
 
-    def unsubs(self, path:str=None) -> None:
+    def unsubs(self, path: str = None) -> None:
         if path is None:
             for path in self._subscribed_paths:
                 self.daq.unsubscribe(path)
@@ -1397,7 +1397,6 @@ class ZI_base_instrument(Instrument):
         """
         self._errors_to_ignore.append(code)
 
-
     def reset_waveforms_zeros(self):
         """
         Sets all waveforms to an array of 48 zeros.
@@ -1414,7 +1413,7 @@ class ZI_base_instrument(Instrument):
         log.info('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
 
     def configure_awg_from_string(self, awg_nr: int, program_string: str,
-                                  timeout: float=15):
+                                  timeout: float = 15):
         """
         Uploads a program string to one of the AWGs in a UHF-QA or AWG-8.
 

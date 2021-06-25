@@ -13,7 +13,7 @@
 import logging
 import numpy as np
 import inspect
-from typing import Tuple,List
+from typing import Tuple, List
 
 from .CCCore import CCCore
 from pycqed.instrument_drivers.library.Transport import Transport
@@ -29,11 +29,11 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     def __init__(self,
                  name: str,
                  transport: Transport,
-                 num_ccio: int=11,
+                 num_ccio: int = 11,
                  ccio_slots_driving_vsm: List[int] = None  # NB: default can not be '[]' because that is a mutable default argument
                  ) -> None:
-        super().__init__(name, transport) # calls CCCore
-        Instrument.__init__(self, name) # calls Instrument
+        super().__init__(name, transport)  # calls CCCore
+        Instrument.__init__(self, name)  # calls Instrument
 
         # user constants
         self._num_ccio = num_ccio  # the number of CCIO modules used
@@ -49,7 +49,6 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
         self._add_parameters(self._num_ccio)
         self._add_compatibility_parameters(self._num_ccio)
-
 
     ##########################################################################
     # QCoDeS parameter definitions
@@ -108,10 +107,10 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                 label='Output Delay of DIO{}'.format(ccio),
                 docstring='This parameter determines the extra output delay introduced for the DIO{} channel (i.e. CCIO slot number)'.format(ccio),
                 unit='20 ns',
-                vals=vals.PermissiveInts(0, 31), # FIXME: CC limit is 2^32-1
+                vals=vals.PermissiveInts(0, 31),  # FIXME: CC limit is 2^32-1
                 set_cmd=_gen_set_func_1par(self._set_dio_delay, ccio)
-#                get_cmd=cmd + '?',
-                )
+                #                get_cmd=cmd + '?',
+            )
 
         # support for 'vsm_channel_delay{}' for CCL_Transmon.py::_set_mw_vsm_delay(), also see calibrate_mw_vsm_delay()
         # NB: CC supports 1/1200 MHz ~= 833 ps resolution
@@ -126,8 +125,8 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                 unit='2.5 ns',
                 vals=vals.PermissiveInts(0, 127),
                 set_cmd=_gen_set_func_1par(self._set_vsm_channel_delay, vsm_ch)
-#                get_cmd=_gen_get_func_1par(self._get_vsm_channel_delay, vsm_ch),
-                )
+                #                get_cmd=_gen_get_func_1par(self._get_vsm_channel_delay, vsm_ch),
+            )
 
         # FIXME: num_append_pts not implemented, use vsm_fall_delay
 
@@ -186,7 +185,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
     # FIXME: move to CCCore? or CC_DIOCAL
     ##########################################################################
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0):
         # FIXME: does not match with uhfqa_prog, which requires single trigger
         cc_prog = inspect.cleandoc("""
         # program: UHFQA trigger program
@@ -199,11 +198,10 @@ class CC(CCCore, Instrument, DIO.CalInterface):
         self.assemble_and_start(cc_prog)
         self.calibrate_dio(port, expected_bits=dio_mask)
 
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+    def output_dio_calibration_data(self, dio_mode: str, port: int = 0) -> Tuple[int, List]:
         # default return values
         expected_sequence = []
         dio_mask = 0x00000000
-
 
         if dio_mode == "awg8-mw-vsm" or dio_mode == 'microwave':  # 'new' QWG compatible microwave mode
             # based on ElecPrj_CC:src/q1asm/qwg_staircase.q1asm
@@ -240,7 +238,6 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                                  (2, list(staircase_sequence)),
                                  (3, list(staircase_sequence))]
             dio_mask = 0x80FF80FF  # TRIG=0x8000000, TRIG_1=0x00008000, CWs=0x00FF00FF
-
 
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
 
@@ -288,7 +285,6 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                                  (3, list(staircase_sequence))]
             dio_mask = 0x8F9F8F9F  # TRIG=0x8000000, TRIG_2=0x00008000, CWs=0x0F9F0F9F
 
-
         elif dio_mode == "awg8-flux" or dio_mode == "flux":
             # based on ZI_HDAWG8.py::_prepare_CC_dio_calibration_hdawg and examples/CC_examples/flux_calibration.vq1asm
             # FIXME: hardcoded slots, this is OpenQL output
@@ -311,9 +307,8 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))),
                                  (1, list(staircase_sequence + (staircase_sequence << 3))),
                                  (2, list(staircase_sequence + (staircase_sequence << 3))),
-                                 (3, list(staircase_sequence+ (staircase_sequence << 3)))]
+                                 (3, list(staircase_sequence + (staircase_sequence << 3)))]
             dio_mask = 0x8FFF8FFF
-
 
         elif dio_mode == "uhfqa":  # FIXME: no official mode yet
             # Based on UHFQuantumController.py::_prepare_CC_dio_calibration_uhfqa and  and examples/CC_examples/uhfqc_calibration.vq1asm
@@ -331,13 +326,15 @@ class CC(CCCore, Instrument, DIO.CalInterface):
         log.debug(f"uploading DIO calibration program for mode '{dio_mode}' to CC")
         self.assemble_and_start(cc_prog)
 
-        return dio_mask,expected_sequence
+        return dio_mask, expected_sequence
 
 ##########################################################################
 # helpers
 ##########################################################################
 
 # helpers for Instrument::add_parameter.set_cmd
+
+
 def _gen_set_func_1par(fun, par1):
     def set_func(val):
         return fun(par1, val)

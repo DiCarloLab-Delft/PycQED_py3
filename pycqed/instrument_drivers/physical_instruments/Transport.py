@@ -36,7 +36,6 @@ class Transport:
         pass
 
 
-
 class IPTransport(Transport):
     """
     Based on: SCPI.py, QCoDeS::IPInstrument
@@ -44,14 +43,14 @@ class IPTransport(Transport):
 
     def __init__(self, host: str,
                  port: int = 5025,
-                 timeout = 30.0,
+                 timeout=30.0,
                  snd_buf_size: int = 512 * 1024) -> None:
         """
         establish connection, e.g. IPTransport('192.168.0.16', 4000)
         """
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(timeout)  # first set timeout (before connect)
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, snd_buf_size) # beef up buffer
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, snd_buf_size)  # beef up buffer
         self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)  # send things immediately
         self._socket.connect((host, port))
 
@@ -107,12 +106,11 @@ class FileTransport(Transport):
         self._out_file.write(data)
 
     def read_binary(self, size: int) -> bytes:
-        pass # FIXME: implement
+        pass  # FIXME: implement
 
     def readline(self) -> str:
-        pass # FIXME: implement
-
+        pass  # FIXME: implement
 
 
 class DummyTransport(Transport):
-    pass # NB: only supports output (which goes nowhere) for now
+    pass  # NB: only supports output (which goes nowhere) for now

@@ -201,7 +201,7 @@ def VISA_str_to_int(message):
 def VISA_str_to_float(message):
     return float(message.strip('\\n'))
 
+
 # Ensuring backwards compatibility
 print('This is the version by Stefano, there is another version in QCoDeS')
 # from .ZNB import ZNB as ZNB20
-

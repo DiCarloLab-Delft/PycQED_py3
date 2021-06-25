@@ -20,7 +20,7 @@ import json
 import array
 import numpy as np
 from collections import OrderedDict
-from typing import Tuple,List
+from typing import Tuple, List
 
 from .SCPI import SCPI
 from ._CCL.CCLightMicrocode import CCLightMicrocode
@@ -53,6 +53,7 @@ CHAR_MAX = +127
 CHAR_MIN = -128
 
 MAX_NUM_INSN = 2**15
+
 
 class CCL(SCPI, DIO.CalInterface):
     """
@@ -244,7 +245,7 @@ class CCL(SCPI, DIO.CalInterface):
             open_file_success = True
         except Exception as e:
             log.info("CC-Light local parameter file {} not found ({})".format(
-                            self.param_file_name, e))
+                self.param_file_name, e))
 
         read_file_success = False
         if open_file_success:
@@ -254,7 +255,7 @@ class CCL(SCPI, DIO.CalInterface):
                 read_file_success = True
             except Exception as e:
                 log.info("Error while reading CC-Light local parameter file."
-                        " Will update it from the hardware.")
+                         " Will update it from the hardware.")
 
         if read_file_success:
             self.saved_param_version = None
@@ -265,20 +266,20 @@ class CCL(SCPI, DIO.CalInterface):
             # check if the saved parameters have the same version number
             # as CC-Light, if yes, return the saved one.
             if (('Embedded Software Build Time' in self.version_info and
-                  (self.version_info['Embedded Software Build Time'] ==
+                 (self.version_info['Embedded Software Build Time'] ==
                   self.saved_param_version)) or
-                self._dummy_instr):
+                    self._dummy_instr):
                 results = file_content["parameters"]
                 return results
             else:
                 log.info("CC-Light local parameter file out of date."
-                    " Will update it from the hardware.")
+                         " Will update it from the hardware.")
 
         try:
             raw_param_string = self.ask('QUTech:PARAMeters?')
         except Exception as e:
             raise ValueError("Failed to retrieve parameter information"
-                " from CC-Light hardware: ", e)
+                             " from CC-Light hardware: ", e)
 
         raw_param_string = raw_param_string.replace('\t', '\n')
 
@@ -286,7 +287,7 @@ class CCL(SCPI, DIO.CalInterface):
             results = json.loads(raw_param_string)["parameters"]
         except Exception as e:
             raise ValueError("Unrecognized parameter information received from "
-                "CC-Light: \n {}".format(raw_param_string))
+                             "CC-Light: \n {}".format(raw_param_string))
 
         try:
             # file.write(raw_param_string)
@@ -294,7 +295,7 @@ class CCL(SCPI, DIO.CalInterface):
             param_dict = json.loads(raw_param_string)
             file = open(self.param_file_name, 'w')
             par_str = json.dumps(param_dict,
-                                  indent=4, sort_keys=True)
+                                 indent=4, sort_keys=True)
             file.write(par_str)
             file.close()
         except Exception as e:
@@ -330,7 +331,7 @@ class CCL(SCPI, DIO.CalInterface):
     def print_control_store(self):
         if self.microcode is None:
             log.info("The microcode unit of CCLight has not been"
-                " initialized yet.")
+                     " initialized yet.")
             return
 
         self.microcode.dump_microcode()
@@ -338,7 +339,7 @@ class CCL(SCPI, DIO.CalInterface):
     def print_qisa_with_control_store(self):
         if self.microcode is None:
             log.info("The microcode unit of CCLight has not been"
-                " initialized yet.")
+                     " initialized yet.")
             return
 
         if self.QISA is None:
@@ -349,7 +350,7 @@ class CCL(SCPI, DIO.CalInterface):
 
         insn_opcodes_str = self.QISA.dumpInstructionsSpecification()
         lines = insn_opcodes_str.split('\n')
-        trimed_lines = [line.strip() for line in lines \
+        trimed_lines = [line.strip() for line in lines
                         if line.startswith('def_q')]
 
         # put every instruction with its opcode into a dict
@@ -378,7 +379,7 @@ class CCL(SCPI, DIO.CalInterface):
 
         print("Instruction      Codewords")
         for key, value in q_arg.items():
-            print('  {:<10s}:  '.format(key), end = '')
+            print('  {:<10s}:  '.format(key), end='')
             self.microcode.print_cs_line_no_header(value)
             print("")
 
@@ -423,10 +424,9 @@ class CCL(SCPI, DIO.CalInterface):
 
         if len(intarray) > MAX_NUM_INSN:
             raise OverflowError("Failed to upload instructions: program length ({})"
-                " exceeds allowed maximum value ({}).".format(len(intarray),
-                    MAX_NUM_INSN))
+                                " exceeds allowed maximum value ({}).".format(len(intarray),
+                                                                              MAX_NUM_INSN))
             return
-
 
         binBlock = bytearray(array.array('L', intarray))
         # print("binblock size:", len(binBlock))
@@ -464,7 +464,7 @@ class CCL(SCPI, DIO.CalInterface):
     def _upload_opcode_qmap(self, filename: str):
         success = self.QISA.loadQuantumInstructions(filename)
         if not success:
-            #logging.warning("Error: ", driver.getLastErrorMessage())  FIXME: invalid code
+            # logging.warning("Error: ", driver.getLastErrorMessage())  FIXME: invalid code
             logging.warning("Failed to load quantum instructions from dictionaries.")
 
         return success
@@ -499,22 +499,22 @@ class CCL(SCPI, DIO.CalInterface):
         """Configures a CCL with a default program that generates data suitable for DIO calibration.
         Also starts the program."""
         cs_filepath = os.path.join(pycqed.__path__[0],
-                'measurement',
-                'openql_experiments',
-                'output', 'cs.txt')
+                                   'measurement',
+                                   'openql_experiments',
+                                   'output', 'cs.txt')
 
         opc_filepath = os.path.join(pycqed.__path__[0],
-                'measurement',
-                'openql_experiments',
-                'output', 'qisa_opcodes.qmap')
+                                    'measurement',
+                                    'openql_experiments',
+                                    'output', 'qisa_opcodes.qmap')
 
         self.control_store(cs_filepath)
         self.qisa_opcode(opc_filepath)
 
         test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','CCLight_example',
-                'qisa_test_assembly','calibration_cws_ro.qisa'))
+                                               '..',
+                                               'examples', 'CCLight_example',
+                                               'qisa_test_assembly', 'calibration_cws_ro.qisa'))
 
         # Start the CCL with the program configured above
         self.eqasm_program(test_fp)
@@ -541,17 +541,18 @@ class CCL(SCPI, DIO.CalInterface):
             (TODO add support for microwave on DIO5)
         """
         log.info('Calibrating DIO delays')
-        if verbose: print("Calibrating DIO delays")
+        if verbose:
+            print("Calibrating DIO delays")
 
         cs_filepath = os.path.join(pycqed.__path__[0],
-            'measurement',
-            'openql_experiments',
-            'output', 'cs.txt')
+                                   'measurement',
+                                   'openql_experiments',
+                                   'output', 'cs.txt')
 
         opc_filepath = os.path.join(pycqed.__path__[0],
-            'measurement',
-            'openql_experiments',
-            'output', 'qisa_opcodes.qmap')
+                                    'measurement',
+                                    'openql_experiments',
+                                    'output', 'qisa_opcodes.qmap')
 
         # Configure CCL
         self.control_store(cs_filepath)
@@ -559,26 +560,26 @@ class CCL(SCPI, DIO.CalInterface):
 
         if self.cfg_codeword_protocol() == 'flux':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..',
-                'examples','CCLight_example',
-                'qisa_test_assembly','calibration_cws_flux.qisa'))
+                                                   '..',
+                                                   'examples', 'CCLight_example',
+                                                   'qisa_test_assembly', 'calibration_cws_flux.qisa'))
 
             sequence_length = 8
             staircase_sequence = np.arange(1, sequence_length)
-            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
-                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
+            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))),
+                                 (1, list(staircase_sequence + (staircase_sequence << 3))),
+                                 (2, list(staircase_sequence + (staircase_sequence << 3))),
                                  (3, list(staircase_sequence))]
         elif self.cfg_codeword_protocol() == 'microwave':
             test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
-                '..','examples','CCLight_example',
-                'qisa_test_assembly','calibration_cws_mw.qisa'))
+                                                   '..', 'examples', 'CCLight_example',
+                                                   'qisa_test_assembly', 'calibration_cws_mw.qisa'))
 
             sequence_length = 32
             staircase_sequence = np.arange(1, sequence_length)
-            expected_sequence = [(0, list(reversed(staircase_sequence))), \
-                                 (1, list(reversed(staircase_sequence))), \
-                                 (2, list(reversed(staircase_sequence))), \
+            expected_sequence = [(0, list(reversed(staircase_sequence))),
+                                 (1, list(reversed(staircase_sequence))),
+                                 (2, list(reversed(staircase_sequence))),
                                  (3, list(reversed(staircase_sequence)))]
 
         else:
@@ -593,8 +594,8 @@ class CCL(SCPI, DIO.CalInterface):
     # overrides for CalInterface interface
     ##########################################################################
 
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
-        if port==3 or port==4:
+    def output_dio_calibration_data(self, dio_mode: str, port: int = 0) -> Tuple[int, List]:
+        if port == 3 or port == 4:
             # FIXME: incomplete port assumptions
             self._prepare_CCL_dio_calibration_hdawg()
         else:

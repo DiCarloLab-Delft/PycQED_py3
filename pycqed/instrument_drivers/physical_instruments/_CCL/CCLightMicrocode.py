@@ -147,12 +147,12 @@ class CCLightMicrocode():
             self.disa_cs_line(cs_line)
 
         print("{:3d} {:6s} ".format(cw_left, "(" +
-                self.type_dict[op_type_left] + ")"),
-                end = '')
+                                    self.type_dict[op_type_left] + ")"),
+              end='')
         if op_type_right != 0:
             print("{:3d} {:6s}  ".format(cw_right, "(" +
-                self.type_dict[op_type_right] + ")"),
-                end = '')
+                                         self.type_dict[op_type_right] + ")"),
+                  end='')
         if condition != 0:
             print("condition: {}".format(condition), end='')
 
@@ -194,7 +194,7 @@ class CCLightMicrocode():
             if cs_line > (1 << 22) - 1:
                 raise ValueError("The maximum value of a cs_line is: 2**22 -1."
                                  "{} is given at position {}.".format(
-                                    cs_line, idx))
+                                     cs_line, idx))
 
     def load_microcode(self, filename):
         try:
@@ -261,7 +261,6 @@ class CCLightMicrocode():
         print("Condition  OpTypeLeft  CW_Left  OptypeRight  CW_Right")
         for i in range(len(cs_line_array)):
             self.print_pure_cs_line(cs_line_array[i])
-
 
     def insert_cs_line(self, line_number, condition, op_type_left,
                        cw_left, op_type_right=0, cw_right=0):

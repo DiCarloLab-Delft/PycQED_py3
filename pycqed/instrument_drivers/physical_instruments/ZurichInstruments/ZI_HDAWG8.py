@@ -86,7 +86,7 @@ import time
 import logging
 import numpy as np
 import re
-from typing import Tuple,List
+from typing import Tuple, List
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
@@ -102,9 +102,11 @@ log = logging.getLogger(__name__)
 # Exceptions
 ##########################################################################
 
+
 class ziDIOActivityError(Exception):
     """Exception raised when no activity is found on the DIO bus during calibration."""
     pass
+
 
 class ziDIOCalibrationError(Exception):
     """Exception raised when DIO calibration fails."""
@@ -114,6 +116,7 @@ class ziDIOCalibrationError(Exception):
 # Class
 ##########################################################################
 
+
 class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
 
     def __init__(self,
@@ -121,7 +124,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
                  device: str,
                  interface: str = '1GbE',
                  server: str = 'localhost',
-                 port = 8004,
+                 port=8004,
                  num_codewords: int = 32,
                  **kw) -> None:
         """
@@ -143,7 +146,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
 
         # show some info
         log.info('{}: DIO interface found in mode {}'
-                 .format(self.devname, 'CMOS' if self.get('dios_0_interface') == 0 else 'LVDS')) # NB: mode is persistent across device restarts
+                 .format(self.devname, 'CMOS' if self.get('dios_0_interface') == 0 else 'LVDS'))  # NB: mode is persistent across device restarts
 
         # Ensure snapshot is fairly small for HDAWGs
         self._snapshot_whitelist = {
@@ -221,29 +224,29 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
             parameter_class=ManualParameter)
 
         self.add_parameter('dio_calibration_delay',
-                    set_cmd=self._set_dio_calibration_delay,
-                    get_cmd=self._get_dio_calibration_delay,
-                    unit='',
-                    label='DIO Calibration delay',
-                    docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
-                    'to be applied on the DIO interface in order to achieve reliable sampling'
-                    ' of the codewords. The valid range is 0 to 15.',
-                    vals=validators.Ints())
+                           set_cmd=self._set_dio_calibration_delay,
+                           get_cmd=self._get_dio_calibration_delay,
+                           unit='',
+                           label='DIO Calibration delay',
+                           docstring='Configures the internal delay in 300 MHz cycles (3.3 ns) '
+                           'to be applied on the DIO interface in order to achieve reliable sampling'
+                           ' of the codewords. The valid range is 0 to 15.',
+                           vals=validators.Ints())
 
         for i in range(4):
             for ch in range(2):
                 self.add_parameter(f'awgs_{i}_outputs_{ch}_amplitude',
-                            set_cmd=self._gen_set_awgs_outputs_amplitude(i, ch),
-                            get_cmd=self._gen_get_awgs_outputs_amplitude(i, ch),
-                            unit='FS',
-                            label=f'AWG {i} output {ch} amplitude (legacy, deprecated)',
-                            docstring=f'Configures the amplitude in full scale units of AWG {i} output {ch} (zero-indexed). Note: this parameter is deprecated, use awgs_{ch}_outputs_{ch}_gains_{ch} instead',
-                            vals=validators.Numbers())
+                                   set_cmd=self._gen_set_awgs_outputs_amplitude(i, ch),
+                                   get_cmd=self._gen_get_awgs_outputs_amplitude(i, ch),
+                                   unit='FS',
+                                   label=f'AWG {i} output {ch} amplitude (legacy, deprecated)',
+                                   docstring=f'Configures the amplitude in full scale units of AWG {i} output {ch} (zero-indexed). Note: this parameter is deprecated, use awgs_{ch}_outputs_{ch}_gains_{ch} instead',
+                                   vals=validators.Numbers())
 
     # FIXME: why the override, does not seem necessary now QCoDeS PRs 1161/1163 have been merged
-    def snapshot_base(self, update: bool=False,
-                      params_to_skip_update =None,
-                      params_to_exclude = None ):
+    def snapshot_base(self, update: bool = False,
+                      params_to_skip_update=None,
+                      params_to_exclude=None):
         """
         State of the instrument as a JSON-compatible dict.
         Args:
@@ -256,7 +259,6 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
         Returns:
             dict: base snapshot
         """
-
 
         if params_to_exclude is None:
             params_to_exclude = self._params_to_exclude
@@ -411,10 +413,10 @@ while (1) {
             if 0:  # FIXME: remove after testing PR #621
                 num_codewords = int(2 ** np.ceil(np.log2(self._num_codewords)))
                 dio_mode_list = {
-                    'identical':            { 'mask': 0xFF, 'shift': [0,  0,  0,  0] },
-                    'microwave':            { 'mask': 0xFF, 'shift': [0,  0,  16, 16] },    # bits [7:0] and [23:16]
-                    'novsm_microwave':      { 'mask': 0x7F, 'shift': [0,  7,  16, 23] },    # bits [6:0], [13:7], [22:16] and [29:23]
-                    'flux':                 { 'mask': 0x3F, 'shift': [0,  6,  16, 22] },    # FIXME: mask for 2 channels
+                    'identical':            {'mask': 0xFF, 'shift': [0,  0,  0,  0]},
+                    'microwave':            {'mask': 0xFF, 'shift': [0,  0,  16, 16]},    # bits [7:0] and [23:16]
+                    'novsm_microwave':      {'mask': 0x7F, 'shift': [0,  7,  16, 23]},    # bits [6:0], [13:7], [22:16] and [29:23]
+                    'flux':                 {'mask': 0x3F, 'shift': [0,  6,  16, 22]},    # FIXME: mask for 2 channels
                 }
                 # FIXME: define DIO modes centrally in device independent way (lsb, width, channelCount)
                 dio_mode = dio_mode_list.get(self.cfg_codeword_protocol())
@@ -427,7 +429,7 @@ while (1) {
                 # FIXME: flux mode sets mask, using 6 bits=2channels
             else:
                 channels = [2*awg_nr, 2*awg_nr+1]
-                shift,mask = DIO.get_shift_and_mask(self.cfg_codeword_protocol(), channels)
+                shift, mask = DIO.get_shift_and_mask(self.cfg_codeword_protocol(), channels)
                 self.set(f'awgs_{awg_nr}_dio_mask_value', mask)
                 self.set(f'awgs_{awg_nr}_dio_mask_shift', shift)
 
@@ -566,15 +568,15 @@ while (1) {
         """
         log.debug(f"Testing DIO activity for AWG {awg_nr}")
 
-        vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
+        vld_mask = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
-        strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
-        strb_slope   = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
+        strb_mask = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
+        strb_slope = self.geti('awgs/{}/dio/strobe/slope'.format(awg_nr))
 
         if mask_value is None:
             mask_value = self.geti('awgs/{}/dio/mask/value'.format(awg_nr))
 
-        cw_mask      = mask_value #<< self.geti('awgs/{}/dio/mask/shift'.format(awg_nr))
+        cw_mask = mask_value  # << self.geti('awgs/{}/dio/mask/shift'.format(awg_nr))
 
         for i in range(timeout):
             valid = True
@@ -613,7 +615,7 @@ while (1) {
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
         log.debug("  Finding valid delays")
-        valid_delays= []
+        valid_delays = []
         for delay in range(16):
             log.debug(f'   Testing delay {delay}')
             self.setd('raw/dios/0/delays/*/value', delay)
@@ -637,7 +639,8 @@ while (1) {
                             last_index = index
                             index = (index + 1) % len(sequence)
                             if cw != sequence[index]:
-                                log.warning("Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(n, cw, sequence[last_index], sequence))
+                                log.warning("Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(
+                                    n, cw, sequence[last_index], sequence))
                                 log.info(f"Detected codeword sequence: {cws}")
                                 valid_sequence = False
                                 break
@@ -806,7 +809,7 @@ while (1) {
     # NB: based on UHFQuantumController.py::_prepare_HDAWG8_dio_calibration
     # FIXME: also requires fiddling with DIO data direction
     # FIXME: is this guaranteed to be synchronous to 10 MHz?
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+    def output_dio_calibration_data(self, dio_mode: str, port: int = 0) -> Tuple[int, List]:
         """
         Configures an HDAWG with a default program that generates data suitable for DIO calibration.
         Also starts the HDAWG.
@@ -827,9 +830,9 @@ while (1) {
 
         dio_mask = 0x7fff0000
         expected_sequence = []
-        return dio_mask,expected_sequence
+        return dio_mask, expected_sequence
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0):
         # FIXME: UHF driver does not use expected_sequence, why the difference
         self.assure_ext_clock()
         self.upload_codeword_program()

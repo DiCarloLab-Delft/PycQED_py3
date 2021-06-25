@@ -112,7 +112,7 @@ class AMI430(IPInstrument):
             self.add_parameter('in_persistent_mode',
                                get_cmd='PERS?',
                                val_mapping={False: 0, True: 1})
-            #FIXME: this throws an error in hdf5.data's write_dict_to_hdf5
+            # FIXME: this throws an error in hdf5.data's write_dict_to_hdf5
             # Exception occurred while writing False:0 of type <class 'int'>
             # "WARNING:root:'bool' object has no attribute 'encode'"
             # Exception occurred while writing True:1 of type <class 'int'>
@@ -124,12 +124,12 @@ class AMI430(IPInstrument):
             # This function is only called from the measurement_control
             # (Technically also from base_analysis, but this does not cause a problem)
 
-            #FIXME: there is a bug here.
-            #The get command returns a string from the AMI interface
-            #The set command needs a boolean to pass to _set_persistent_switch
+            # FIXME: there is a bug here.
+            # The get command returns a string from the AMI interface
+            # The set command needs a boolean to pass to _set_persistent_switch
 
-            #Proposed fixes, need to be tested in a safe environment
-            #Because I'm not sure i this solves it
+            # Proposed fixes, need to be tested in a safe environment
+            # Because I'm not sure i this solves it
             # self.add_parameter('switch_heater_enabled',
             #                    get_cmd='PS?',
             #                    set_cmd=self._set_persistent_switch,
@@ -146,24 +146,19 @@ class AMI430(IPInstrument):
 
             # self.add_parameter('in_persistent_mode',
             #                    get_cmd='PERS?',
-                                # get_parser=int,
+            # get_parser=int,
             #                    val_mapping={False: 0, True: 1})
 
-
-
-        #And this one causes it as well
+        # And this one causes it as well
         self.add_parameter('is_quenched',
                            get_cmd='QU?',
                            val_mapping={False: 0, True: 1})
-        #Proposed fixes, this is the easiest one to test on, since we cannot
+        # Proposed fixes, this is the easiest one to test on, since we cannot
         # screw it up
         # self.add_parameter('is_quenched',
         #            get_cmd='QU?',
         #            get_parser = int
         #            val_mapping={False: 0, True: 1})
-
-
-
 
         self.add_function('reset_quench', call_cmd='QU 0')
         self.add_function('set_quenched', call_cmd='QU 1')
@@ -257,7 +252,6 @@ class AMI430(IPInstrument):
         if self._can_start_ramping():
             # self.pause()
 
-
             # If we have a persistent switch, make sure it is resistive
             if self._persistent_switch:
                 if not self.switch_heater_enabled():
@@ -301,7 +295,6 @@ class AMI430(IPInstrument):
 
         if self._can_start_ramping():
             self.pause()
-
 
             # If we have a persistent switch, make sure it is resistive
             if self._persistent_switch:

@@ -49,6 +49,7 @@ import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_
 
 log = logging.getLogger(__name__)
 
+
 class ZI_HDAWG_core(zibase.ZI_base_instrument):
     """
     This is PycQED/QCoDeS driver driver for the Zurich Instruments HDAWG.
@@ -123,13 +124,16 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
         Checks that sufficient versions of the firmware are available.
         """
         if self.geti('system/fwrevision') < ZI_HDAWG_core.MIN_FWREVISION:
-            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_FWREVISION, self.geti('system/fwrevision')))
+            raise zibase.ziVersionError('Insufficient firmware revision detected! Need {}, got {}!'.format(
+                ZI_HDAWG_core.MIN_FWREVISION, self.geti('system/fwrevision')))
 
         if self.geti('system/fpgarevision') < ZI_HDAWG_core.MIN_FPGAREVISION:
-            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
+            raise zibase.ziVersionError('Insufficient FPGA revision detected! Need {}, got {}!'.format(
+                ZI_HDAWG_core.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
 
         if self.geti('system/slaverevision') < ZI_HDAWG_core.MIN_SLAVEREVISION:
-            raise zibase.ziVersionError('Insufficient FPGA Slave revision detected! Need {}, got {}!'.format(ZI_HDAWG_core.MIN_SLAVEREVISION, self.geti('system/slaverevision')))
+            raise zibase.ziVersionError('Insufficient FPGA Slave revision detected! Need {}, got {}!'.format(
+                ZI_HDAWG_core.MIN_SLAVEREVISION, self.geti('system/slaverevision')))
 
     def _num_channels(self):
         if self.devtype == 'HDAWG8':
@@ -224,16 +228,16 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
         # Go through the errors and update our structure, raise exceptions if anything changed
         for m in errors['messages']:
-            code     = m['code']
-            count    = m['count']
+            code = m['code']
+            count = m['count']
             severity = m['severity']
-            message  = m['message']
+            message = m['message']
 
             if not raise_exceptions:
                 self._errors[code] = {
-                    'count'   : count,
+                    'count': count,
                     'severity': severity,
-                    'message' : message}
+                    'message': message}
                 log.warning(f'{self.devname}: Code {code}: "{message}" ({severity})')
             else:
                 # Check if there are new errors
@@ -248,9 +252,9 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
                     self._errors[code]['count'] = count
                 else:
                     self._errors[code] = {
-                        'count'   : count,
+                        'count': count,
                         'severity': severity,
-                        'message' : message}
+                        'message': message}
 
         if found_errors:
             log.error('Errors detected during run-time!')
