@@ -11,23 +11,22 @@ Revision history:
  *    0.1.0   :            : MSM  : * Modified file for control of QCC and ensure QISA-AS driver v4.0.0 is present
 """
 
-
-from .SCPI import SCPI
-from qcodes.instrument.base import Instrument
-from ._QCC.QCCMicrocode import QCCMicrocode
-from qcodes import Parameter
-from collections import OrderedDict
-from qcodes.instrument.parameter import ManualParameter
-from qcodes import validators as vals
 import os
 import logging
 import json
-import sys
-import traceback
 import array
-import re
-
 import numpy as np
+from collections import OrderedDict
+from typing import Tuple,List
+
+from .SCPI import SCPI
+from ._QCC.QCCMicrocode import QCCMicrocode
+import pycqed
+import pycqed.instrument_drivers.library.DIO as DIO
+
+from qcodes.instrument.base import Instrument
+from qcodes.instrument.parameter import ManualParameter
+from qcodes import validators as vals
 
 
 try:
@@ -54,7 +53,7 @@ CHAR_MIN = -128
 MAX_NUM_INSN = 2**15
 
 
-class QCC(SCPI):
+class QCC(SCPI, DIO.CalInterface):
     """
     This is class is used to serve as the driver between the user and the
     QCC hardware. The class starts by querying the hardware via the
@@ -496,7 +495,7 @@ class QCC(SCPI):
     def _upload_opcode_qmap(self, filename: str):
         success = self.QISA.loadQuantumInstructions(filename)
         if not success:
-            logging.warning("Error: ", driver.getLastErrorMessage())
+            # logging.warning("Error: ", driver.getLastErrorMessage())  FIXME: invalid code
             logging.warning(
                 "Failed to load quantum instructions from dictionaries.")
 
@@ -524,6 +523,134 @@ class QCC(SCPI):
         fn = os.path.join(pathname, base_name + ext)
         return fn
 
+    ##########################################################################
+    # DIO calibration functions imported from UHFQuantumController.py
+    ##########################################################################
+
+    def _prepare_QCC_dio_calibration_uhfqa(self, verbose=False):
+        """Configures a QCC with a default program that generates data suitable for DIO calibration. Also starts the QCC."""
+
+        cs_filepath = os.path.join(pycqed.__path__[0],
+                'measurement',
+                'openql_experiments',
+                's17', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+                'measurement',
+                'openql_experiments',
+                's17', 'qisa_opcodes.qmap')
+
+        self.control_store(cs_filepath)
+        self.qisa_opcode(opc_filepath)
+
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','QCC_example',
+                'qisa_test_assembly','ro_calibration.qisa'))
+
+        # Start the QCC with the program configured above
+        self.stop()
+        self.eqasm_program(test_fp)
+        self.start()
+
+        # Set the DIO calibration mask to enable 9 bit measurement
+        # FIXME: UHF.
+        self._dio_calibration_mask = 0x1ff
+
+    ##########################################################################
+    # DIO calibration functions imported from ZI_HDAWG8.py
+    ##########################################################################
+
+    def _prepare_QCC_dio_calibration_hdawg(self, verbose=False):
+        """
+        Prepares the appropriate program to calibrate DIO and returns
+        expected sequence.
+        N.B. only works for microwave on DIO4 and for Flux on DIO3
+            (TODO add support for microwave on DIO5)
+        """
+        log.info('Calibrating DIO delays')
+        if verbose: print("Calibrating DIO delays")
+
+        cs_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            's17', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            's17', 'qisa_opcodes.qmap')
+
+        # Configure QCC
+        self.control_store(cs_filepath)
+        self.qisa_opcode(opc_filepath)
+
+        # FIXME: self=HDAWG
+        if self.cfg_codeword_protocol() == 'flux':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','QCC_example',
+                'qisa_test_assembly','flux_calibration.qisa'))
+
+            sequence_length = 8
+            staircase_sequence = np.arange(1, sequence_length)
+
+            # expected sequence should be ([9, 18, 27, 36, 45, 54, 63])
+            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (3, list(staircase_sequence+ (staircase_sequence << 3)))]
+
+        elif self.cfg_codeword_protocol() == 'microwave':
+
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','QCC_example',
+                'qisa_test_assembly','withvsm_calibration.qisa'))
+
+            sequence_length = 32
+            staircase_sequence = range(1, sequence_length)
+            expected_sequence =  [(0, list(staircase_sequence)), \
+                                 (1, list(staircase_sequence)), \
+                                 (2, list(reversed(staircase_sequence))), \
+                                 (3, list(reversed(staircase_sequence)))]
+
+
+        elif self.cfg_codeword_protocol() == 'new_novsm_microwave':
+
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..','examples','QCC_example',
+                'qisa_test_assembly','novsm_calibration.qisa'))
+
+            sequence_length = 32
+            staircase_sequence = range(1, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence)), \
+                                 (1, list(reversed(staircase_sequence))), \
+                                 (2, list(staircase_sequence)), \
+                                 (3, list(reversed(staircase_sequence))) ]
+
+        else:
+            raise RuntimeError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
+
+        # Start the QCC with the program configured above
+        self.eqasm_program(test_fp)
+        self.start()
+        return expected_sequence
+
+    ##########################################################################
+    # overrides for CalInterface interface
+    ##########################################################################
+
+    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+        if port==3 or port==4:
+            # FIXME: incomplete port assumptions
+            self._prepare_QCC_dio_calibration_hdawg()
+        else:
+            self._prepare_QCC_dio_calibration_uhfqa()
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        raise RuntimeError("not implemented")
+
 
 class dummy_QCC(QCC):
     """
@@ -550,9 +677,12 @@ class dummy_QCC(QCC):
         self._persistent = ''
 
     def get_idn(self):
-        return {'driver': str(self.__class__), 'name': self.name}
+        return {'driver': str(self.__class__), 'name': self.name, 'model': 'QCC'}
 
     def getOperationComplete(self):
+        return True
+
+    def get_operation_complete(self):  # FIXME PR #638
         return True
 
     def add_standard_parameters(self):

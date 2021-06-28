@@ -50,6 +50,10 @@ reload(mux)
 # reload(fla)
 import pycqed.analysis_v2.multiplexed_readout_analysis as mra
 reload(mra)
+
+import pycqed.analysis_v2.fluxing_analysis as fla
+reload(fla)
+
 import pycqed.analysis_v2.timing_cal_analysis as ta
 reload(ta)
 
@@ -116,3 +120,4 @@ from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis,\
     Chevron_Alignment_Analysis
 
 from pycqed.analysis_v2.cryoscope_v2_analysis import Cryoscope_v2_Analysis
+from pycqed.analysis_v2.multi_allxy import Multi_AllXY_Analysis, plot_Multi_AllXY

@@ -48,7 +48,7 @@ class CCCore(SCPIBase):
     def assemble(self, program_string: str) -> None:
         self.sequence_program_assemble(program_string)  # NB: takes ~1.1 s for RB with 2048 Cliffords (1 measurement only)
         if self.get_assembler_success() != 1:
-            sys.stderr.write('assembly error log:\n{}\n'.format(self.get_assembler_log()))  # FIXME: result is messy
+            sys.stderr.write('assembly error log:\n{}\n'.format(self.get_assembler_log()))
             raise RuntimeError('assembly failed')
 
     def assemble_and_start(self, program_string: str) -> None:
@@ -75,6 +75,12 @@ class CCCore(SCPIBase):
         bin_block = program_string.encode('ascii')
         self.bin_block_write(bin_block, hdr)
 
+    def get_sequence_program_assemble(self) -> str:
+        """
+        download sequence program string
+        """
+        return self._ask_bin('QUTech:SEQuence:PROGram:ASSEMble?').decode('utf-8', 'ignore')
+
     def get_assembler_success(self) -> int:
         return self._ask_int('QUTech:SEQuence:PROGram:ASSEMble:SUCCESS?')
 
@@ -89,8 +95,21 @@ class CCCore(SCPIBase):
         # only possible if CC is stopped
         return self._ask_int(f'QUTech:CCIO{ccio}:Q1REG{reg}')
 
+    def set_seqbar_cnt(self, ccio: int, val: int) -> None:
+        # no need to stop CC
+        self._transport.write(f'QUTech:CCIO{ccio}:SEQBARcnt {val}')
+
     def calibrate_dio(self, ccio: int, expected_bits: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL {expected_bits}')
+
+    def get_calibrate_dio_success(self, ccio: int) -> int:
+        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:SUCCESS?')
+
+    def get_calibrate_dio_read_index(self, ccio: int) -> int:
+        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:READINDEX?')
+
+    def get_calibrate_dio_margin(self, ccio: int) -> int:
+        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:MARGIN?')
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')
@@ -118,6 +137,12 @@ class CCCore(SCPIBase):
 
     def debug_set_ccio_trace_on(self, ccio: int, tu_idx: int) -> None:
         self._transport.write(f'QUTech:DEBUG:CCIO{ccio}:TRACE{tu_idx}:ON')
+
+    def debug_get_ccio_trace(self, ccio: int) -> str:
+        return self._ask_bin(f'QUTech:DEBUG:CCIO{ccio}:TRACE?').decode('utf-8', 'ignore')
+
+    def debug_get_traces(self, ccio_mask: int) -> str:
+        return self._ask_bin(f'QUTech:DEBUG:TRACES? {ccio_mask}').decode('utf-8', 'ignore')
 
     def start(self, block: bool = True) -> None:
         """

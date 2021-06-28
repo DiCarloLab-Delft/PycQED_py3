@@ -44,6 +44,7 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor)
 
+# FIXME: remove
 try:
     from nathan_plotting_tools import *
 except:
@@ -2448,7 +2449,7 @@ class Echo_analysis_V15(TD_Analysis):
             amplitude_guess = 1
             damped_osc_mod.set_param_hint('amplitude',
                                           value=amplitude_guess,
-                                          min=0.4,
+                                          min=0.0,
                                           max=4.0)
             damped_osc_mod.set_param_hint('tau',
                                           value=x[1]*10,
@@ -9381,6 +9382,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             flux, **fit_res.best_values,
             flux_state=True), 'y-', label='fit')
 
+        print(fit_res.params['g'])
         g_legend = r'{} = {:.2f}$\pm${:.2f} MHz'.format(
             coupling_label,
             fit_res.params['g'] * 1e-6, fit_res.params['g'].stderr * 1e-6)

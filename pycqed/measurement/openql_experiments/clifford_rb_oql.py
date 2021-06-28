@@ -110,7 +110,6 @@ def randomized_benchmarking(
                                 3 -> rx180
                                 3*24+3 -> {rx180 q0 | rx180 q1}
                                 4368 -> CZ
-
         max_clifford_idx:   Set's the maximum clifford group index from which
                         to sample random cliffords.
                             Important clifford indices
@@ -118,7 +117,9 @@ def randomized_benchmarking(
                                 576  -> Size of the single qubit like class
                                     contained in the two qubit Cl group
                                 11520 -> Size of the complete two qubit Cl group
-
+                        FIXME: seems useless, because none of the callers set this, and rb.randomized_benchmarking_sequence trims it to the group size
+        flux_codeword:  FIXME: TBW
+        simultaneous_single_qubit_RB: perform single qubit RB on 2 qubits in parallel
         initialize:     if True initializes qubits to 0, disable for restless
                         tuning
         interleaving_cliffords: list of integers which specifies which cliffords
@@ -186,10 +187,6 @@ def randomized_benchmarking(
     """
     p = oqh.create_program(program_name, platf_cfg)
 
-    # attribute get's added to program to help finding the output files
-    p.filename = os.path.join(p.output_dir, p.name + '.vq1asm')  # FIXME: platform dependency
-    #p.filename = os.path.join(p.output_dir, p.name + ".qisa")  # FIXME: platform dependency
-
     this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
@@ -245,6 +242,8 @@ def randomized_benchmarking(
                     not simultaneous_single_qubit_RB
                     and not simultaneous_single_qubit_parking_RB
                 ):
+                    # ############ 1 qubit, or 2 qubits using TwoQubitClifford
+                    # generate sequence
                     for net_clifford in net_cliffords:
                         cl_seq = rb.randomized_benchmarking_sequence(
                             n_cl,
@@ -254,6 +253,8 @@ def randomized_benchmarking(
                             interleaving_cl=interleaving_cl,
                         )
                     net_cl_seq = rb.calculate_net_clifford(cl_seq, Cl)
+
+                    # decompose
                     cl_seq_decomposed = []
                     for cl in cl_seq:
                         # benchmarking only CZ (not as a member of CNOT group)
@@ -265,7 +266,10 @@ def randomized_benchmarking(
                             cl_seq_decomposed.append([("I", ["q0", "q1"])])
                         else:
                             cl_seq_decomposed.append(Cl(cl).gate_decomposition)
+
+                    # generate OpenQL kernel for every net_clifford
                     for net_clifford in net_cliffords:
+                        # create decomposed sequence including recovery
                         recovery_to_idx_clifford = net_cl_seq.get_inverse()
                         recovery_clifford = Cl(net_clifford) * recovery_to_idx_clifford
                         cl_seq_decomposed_with_net = cl_seq_decomposed + [
@@ -283,9 +287,9 @@ def randomized_benchmarking(
 
                         for gates in cl_seq_decomposed_with_net:
                             for g, q in gates:
-                                if isinstance(q, str):
+                                if isinstance(q, str):  # single qubit gate
                                     k.gate(g, [qubit_map[q]])
-                                elif isinstance(q, list):
+                                elif isinstance(q, list):  # 2 qubit gate
                                     if g == "I":
                                         # interleaving an idling with the length of the CZ
                                         k.gate("wait", [], 0)  # alignment
@@ -320,7 +324,8 @@ def randomized_benchmarking(
                             k.measure(qubit_idx)
                         k.gate("wait", [], 0)
                         p.add_kernel(k)
-                elif simultaneous_single_qubit_RB:
+                elif simultaneous_single_qubit_RB:  # FIXME: condition boils down to just 'else'
+                    # ############ 2 qubits using SingleQubitClifford
                     for net_clifford in net_cliffords:
                         k = oqh.create_kernel(
                             "RB_{}Cl_s{}_net{}_inter{}".format(
@@ -348,6 +353,7 @@ def randomized_benchmarking(
 
                                 # FIXME: THIS is a hack because of OpenQL
                                 # scheduling issues #157
+                                # FIXME: OpenQL issue #157 (OpenQL version 0.3 not scheduling properly) was closed in 2018 (OpenQL version 0.5.1)
 
                                 gate_seqs[gsi] += gates
                         # OpenQL #157 HACK
@@ -443,7 +449,6 @@ def randomized_benchmarking(
                     p, qubit_idx=qubits[0], f_state_cal_pts=f_state_cal_pts
                 )
             elif number_of_qubits == 2:
-
                 if f_state_cal_pts:
                     combinations = ["00", "01", "10", "11", "02", "20", "22"]
                 else:
@@ -460,7 +465,8 @@ def randomized_benchmarking(
                     measured_qubits=list(qubit_map.values()),
                 )
 
-    p = oqh.compile(p)
+    # p = oqh.compile(p)
+    p = oqh.compile(p, extra_openql_options=[('backend_cc_verbose', 'no')])
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
     os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
@@ -509,9 +515,6 @@ def character_benchmarking(
     assert len(qubits) == 2
 
     p = oqh.create_program(program_name, platf_cfg)
-
-    # attribute get's added to program to help finding the output files
-    p.filename = os.path.join(p.output_dir, p.name + ".qisa")
 
     this_file = inspect.getfile(inspect.currentframe())
 

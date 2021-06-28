@@ -10,24 +10,26 @@ Revision history:
  *    0.1.0   :            : KKL  : * Created this file.
  *    0.2.0   :            : XFu  : * Refined the intialization process.
  *    0.2.1   : 13-01-2018 : XFu  : * Change the parameters into integer.
+ *    0.2.2   : 20200217   : WJV  : * Added output_dio_calibration_data
 """
 
 
-from .SCPI import SCPI
-from qcodes.instrument.base import Instrument
-from ._CCL.CCLightMicrocode import CCLightMicrocode
-from qcodes import Parameter
-from collections import OrderedDict
-from qcodes.instrument.parameter import ManualParameter
-from qcodes import validators as vals
 import os
 import logging
 import json
-import sys
-import traceback
 import array
-import re
+import numpy as np
+from collections import OrderedDict
+from typing import Tuple,List
 
+from .SCPI import SCPI
+from ._CCL.CCLightMicrocode import CCLightMicrocode
+import pycqed
+import pycqed.instrument_drivers.library.DIO as DIO
+
+from qcodes.instrument.base import Instrument
+from qcodes.instrument.parameter import ManualParameter
+from qcodes import validators as vals
 
 try:
     # qisa_as can be installed from the qisa-as folder in the ElecPrj_CCLight
@@ -52,7 +54,7 @@ CHAR_MIN = -128
 
 MAX_NUM_INSN = 2**15
 
-class CCL(SCPI):
+class CCL(SCPI, DIO.CalInterface):
     """
     This is class is used to serve as the driver between the user and the
     CC-Light hardware. The class starts by querying the hardware via the
@@ -462,7 +464,7 @@ class CCL(SCPI):
     def _upload_opcode_qmap(self, filename: str):
         success = self.QISA.loadQuantumInstructions(filename)
         if not success:
-            logging.warning("Error: ", driver.getLastErrorMessage())
+            #logging.warning("Error: ", driver.getLastErrorMessage())  FIXME: invalid code
             logging.warning("Failed to load quantum instructions from dictionaries.")
 
         return success
@@ -489,6 +491,119 @@ class CCL(SCPI):
         fn = os.path.join(pathname, base_name + ext)
         return fn
 
+    ##########################################################################
+    # DIO calibration functions imported from UHFQuantumController.py
+    ##########################################################################
+
+    def _prepare_CCL_dio_calibration_uhfqa(self, feedline=1, verbose=False):
+        """Configures a CCL with a default program that generates data suitable for DIO calibration.
+        Also starts the program."""
+        cs_filepath = os.path.join(pycqed.__path__[0],
+                'measurement',
+                'openql_experiments',
+                'output', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+                'measurement',
+                'openql_experiments',
+                'output', 'qisa_opcodes.qmap')
+
+        self.control_store(cs_filepath)
+        self.qisa_opcode(opc_filepath)
+
+        test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','CCLight_example',
+                'qisa_test_assembly','calibration_cws_ro.qisa'))
+
+        # Start the CCL with the program configured above
+        self.eqasm_program(test_fp)
+        self.start()
+
+        # Set the DIO calibration mask to enable 5 bit measurement
+        # FIXME: code below: self refers to UHF driver object
+        if feedline == 1:
+            self._dio_calibration_mask = 0x1f
+        elif feedline == 2:
+            self._dio_calibration_mask = 0x3
+        else:
+            raise ValueError('Invalid feedline {} selected for calibration.'.format(feedline))
+
+    ##########################################################################
+    # DIO calibration functions imported from ZI_HDAWG8.py
+    ##########################################################################
+
+    def _prepare_CCL_dio_calibration_hdawg(self, verbose=False):
+        """
+        Prepares the appropriate program to calibrate DIO and returns
+        expected sequence.
+        N.B. only works for microwave on DIO4 and for Flux on DIO3
+            (TODO add support for microwave on DIO5)
+        """
+        log.info('Calibrating DIO delays')
+        if verbose: print("Calibrating DIO delays")
+
+        cs_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            'output', 'cs.txt')
+
+        opc_filepath = os.path.join(pycqed.__path__[0],
+            'measurement',
+            'openql_experiments',
+            'output', 'qisa_opcodes.qmap')
+
+        # Configure CCL
+        self.control_store(cs_filepath)
+        self.qisa_opcode(opc_filepath)
+
+        if self.cfg_codeword_protocol() == 'flux':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..',
+                'examples','CCLight_example',
+                'qisa_test_assembly','calibration_cws_flux.qisa'))
+
+            sequence_length = 8
+            staircase_sequence = np.arange(1, sequence_length)
+            expected_sequence = [(0, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (1, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (2, list(staircase_sequence + (staircase_sequence << 3))), \
+                                 (3, list(staircase_sequence))]
+        elif self.cfg_codeword_protocol() == 'microwave':
+            test_fp = os.path.abspath(os.path.join(pycqed.__path__[0],
+                '..','examples','CCLight_example',
+                'qisa_test_assembly','calibration_cws_mw.qisa'))
+
+            sequence_length = 32
+            staircase_sequence = np.arange(1, sequence_length)
+            expected_sequence = [(0, list(reversed(staircase_sequence))), \
+                                 (1, list(reversed(staircase_sequence))), \
+                                 (2, list(reversed(staircase_sequence))), \
+                                 (3, list(reversed(staircase_sequence)))]
+
+        else:
+            RuntimeError("Can only calibrate DIO protocol for 'flux' or 'microwave' mode!")
+
+        # Start the CCL with the program configured above
+        self.eqasm_program(test_fp)
+        self.start()
+        return expected_sequence
+
+    ##########################################################################
+    # overrides for CalInterface interface
+    ##########################################################################
+
+    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+        if port==3 or port==4:
+            # FIXME: incomplete port assumptions
+            self._prepare_CCL_dio_calibration_hdawg()
+        else:
+            self._prepare_CCL_dio_calibration_uhfqa()
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0):
+        raise RuntimeError("not implemented")
+
+
 class dummy_CCL(CCL):
     """
     Dummy CCL all paramaters are manual and all other methods include pass
@@ -514,9 +629,12 @@ class dummy_CCL(CCL):
         self._persistent = ''
 
     def get_idn(self):
-        return {'driver': str(self.__class__), 'name': self.name}
+        return {'driver': str(self.__class__), 'name': self.name, 'model': 'CCL'}
 
     def getOperationComplete(self):
+        return True
+
+    def get_operation_complete(self):  # FIXME PR #638
         return True
 
     def add_standard_parameters(self):

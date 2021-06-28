@@ -28,7 +28,7 @@ from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 
 from .qubit_object import Transmon
 from .CBox_driven_transmon import CBox_driven_transmon
-# It would be better to inherit from Transmon directly and put all the common
+# FIXME: It would be better to inherit from Transmon directly and put all the common
 # stuff in there but for now I am inheriting from what I already have
 # MAR april 2016
 

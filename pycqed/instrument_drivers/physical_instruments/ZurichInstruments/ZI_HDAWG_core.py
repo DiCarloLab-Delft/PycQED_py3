@@ -42,11 +42,8 @@ Changelog:
 """
 
 import logging
-import os
 import time
-import ctypes
 import json
-from zlib import crc32
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 
@@ -149,6 +146,9 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
 
         log.warning('{}: loading default settings (FIXME: still incomplete)'
                     .format(self.devname))
+
+        # Setting the clock to external
+        self.assure_ext_clock()
 
         # clear output
 

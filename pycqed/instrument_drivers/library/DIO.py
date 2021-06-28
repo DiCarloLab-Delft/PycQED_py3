@@ -66,12 +66,14 @@ _control_modes = {
     # control mode definition, compatible with OpenQL CC backend JSON syntax
 
     # preferred names
+    # NB: modes 'awg8*' are compatible with ZI HDAWG and dual QWG
+    # trigger 15 is only used by dual QWG, requires OpenQL >= 20201218
     "awg8-mw-vsm": {
         "control_bits": [
             [7,6,5,4,3,2,1,0],
             [23,22,21,20,19,18,17,16]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [15,31]
     },
     "awg8-mw-direct-iq": {
         "control_bits": [
@@ -80,7 +82,7 @@ _control_modes = {
             [22,21,20,19,18,17,16],
             [29,28,27,26,25,24,23]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [15,31]
     },
     "awg8-flux": {
         # NB: please note that internally one HDQWG AWG unit handles 2 channels, which requires special handling of the waveforms
@@ -94,7 +96,7 @@ _control_modes = {
             [24,23,22],
             [27,26,25]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [15,31]
     },
 
     ########################################
@@ -128,7 +130,7 @@ _control_modes = {
             [24, 23, 22],
             [27, 26, 25]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [31,15]
     }
 }
 
