@@ -58,10 +58,44 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
             )
 
         # This should be added to the hdf5 datafile but cannot because of the
-        # way that the "new" analysis works.
-
+        # way that the "new" analysis works. Thijs: "? I dont get thiscomment, just
+        # do it like this:"
+        self.proc_data_dict['quantities_of_interest'] = {'Corrected data': self.proc_data_dict['corr_data']}
         # self.add_dataset_to_analysisgroup('Corrected data',
         #                                   self.proc_data_dict['corr_data'])
+
+    def prepare_plots(self):
+        self.plot_dicts["raw_data"] = {
+            "plotfn": self.plot_line,
+            "xvals": self.raw_data_dict["sweep_points"],
+            "xlabel": self.raw_data_dict["xlabel"],
+            "xunit": self.raw_data_dict["xunit"],  # does not do anything yet
+            "yvals": self.proc_data_dict["corr_data"],
+            "ylabel": "Excited state population",
+            "yunit": "",
+            "setlabel": "data",
+            "title": (
+                self.raw_data_dict["timestamp"]
+                + " "
+                + self.raw_data_dict["measurementstring"]
+            ),
+            "do_legend": True,
+            "legend_pos": "upper right",
+        }
+        for i, name in enumerate(pdict_names):
+            combined_name = 'combined_' + name
+            self.axs[combined_name] = axs[i]
+            self.plot_dicts[combined_name] = self.plot_dicts[name].copy()
+            self.plot_dicts[combined_name]['ax_id'] = combined_name
+
+            # shorter label as the axes are now shared
+            self.plot_dicts[combined_name]['ylabel'] = name
+            self.plot_dicts[combined_name]['xlabel'] = None if i in [
+                0, 1, 2, 3] else self.plot_dicts[combined_name]['xlabel']
+            self.plot_dicts[combined_name]['title'] = None if i in [
+                0, 1, 2, 3] else self.plot_dicts[combined_name]['title']
+            self.plot_dicts[combined_name]['touching'] = True
+
 
 
 class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
@@ -638,6 +672,221 @@ class EFRabiAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'plotfn': self.plot_text,
                 'box_props': 'fancy',
                 'text_string': self.raw_data_dict['scale_factor_msg']}
+
+
+
+class DecoherenceAnalysis(Single_Qubit_TimeDomainAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 close_figs: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         close_figs=close_figs,
+                         extract_only=extract_only, do_fitting=True)
+        self.single_timestamp = True
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
+                            'sweep_points': 'sweep_points',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        # This analysis makes a hardcoded assumption on the calibration points
+        self.options_dict['cal_points'] = [list(range(-4, -2)),
+                                           list(range(-2, 0))]
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        # The fitting function is a cosine that decays exponentionally
+
+        # Make model from function
+        mod_Fit_Func = lmfit.Model(fit_mods.ExpGaussDecayCos)
+
+        # Recover parameters to fit over
+        guess_pars = fit_mods.ExpGaussDecayCos_guess(
+        model=mod_Fit_Func, t=self.raw_data_dict['sweep_points'][:-4],
+        data=self.proc_data_dict['corr_data'][:-4])
+
+
+        # Result of the fit
+        fit_res = mod_Fit_Func.fit(self.proc_data_dict['corr_data'][:-4], guess_pars, t = self.raw_data_dict['sweep_points'][:-4])
+
+
+        self.fit_dicts['ExpGaussDecayCos'] = {
+            'fit_fn': fit_mods.ExpGaussDecayCos,
+            'fit_xvals': {'t': self.raw_data_dict['sweep_points'][:-4]},
+            'fit_yvals': {'data': self.proc_data_dict['corr_data'][:-4]},
+            'fit_res': {'res': fit_res},
+            'guess_pars': guess_pars}
+
+        # Chisqr is saved in quantities of interest to see how well the fit works
+        self.proc_data_dict['quantities_of_interest'] = {
+            'Chisqr': {'chisqr' :fit_res.chisqr}}
+
+
+
+
+    def analyze_fit_results(self):
+        sf_cos = self._get_ef_pi_amp()
+        self.proc_data_dict['ef_pi_amp'] = sf_cos
+
+        msg = r'$\pi$-ef amp '
+        msg += ': {:.4f}\n'.format(sf_cos)
+        
+
+        self.raw_data_dict['scale_factor_msg'] = msg
+        # TODO: save scale factor to file
+        return sf_cos
+
+
+    def _get_ef_pi_amp(self):
+
+        frequency = self.fit_dicts['ExpGaussDecayCos']['fit_res'].params['frequency']
+        # calculate the pi pulse amplitude using 2* pi *f* amp = pi/2
+        ef_pi_amp = 1/(2*frequency)
+
+        return ef_pi_amp
+
+
+
+    def prepare_plots(self):
+        self.plot_dicts = OrderedDict()
+
+
+        # Plot the normalized measured data
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['sweep_points'][:-4],
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': self.raw_data_dict['xunit'][0],  # does not do anything yet
+            'yvals': self.proc_data_dict['corr_data'][:-4],
+            'ylabel': 'Normalized Data',
+            # 'yunit': '',
+            'marker': 'o',
+            'linestyle': '-',
+            'setlabel': 'Measured Data',
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.raw_data_dict['measurementstring']),
+            # 'plotsize': (20,10),
+            'do_legend': True,
+            'legend_pos': (1.04,.786),
+            'legend_title': 'hoi'}
+
+
+        # Plot calibration points seperately so it is clear that it isn't just some crappy data
+        self.plot_dicts['calibration'] = {
+            'ax_id': 'main',
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['sweep_points'][-4:],
+            'yvals': self.proc_data_dict['corr_data'][-4:],
+            'marker': 'o',
+            'linestyle': '',
+            'setlabel': 'Calibration Points',
+            'do_legend': True,
+            'legend_pos': (1.04,.786)}
+
+
+
+        if self.do_fitting:
+            # Initialize parameters for pure decay curves (so freq = 0)
+            # Get values of fit and get rid of frequency 
+
+            # First make deepcopy of results
+            pars_decay = deepcopy(self.fit_dicts['ExpGaussDecayCos']['fit_res'].params)
+            # Then get rid of the frequency
+            pars_decay.pop('frequency', None)
+
+            # Wanted to initialize x_vals for decay curve to plot the function ExpGaussDecay_only
+            # But then the legend will freak out
+            # decay_x_vals = np.linspace(self.raw_data_dict['sweep_points'][0],self.raw_data_dict['sweep_points'][-5],1000)
+
+
+
+            # Plot the fit function using the resulted fitted parameters
+            self.plot_dicts['Fit_Func'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['ExpGaussDecayCos']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'linestyle': '-',
+                'setlabel': 'Fit Function',
+                'do_legend': True,
+                'legend_pos': (1.04,.786),}
+
+
+
+            # Pure decay curves
+            # Top curve
+            self.plot_dicts['Decay1'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_line,
+                'xvals': np.linspace(self.raw_data_dict['sweep_points'][0],self.raw_data_dict['sweep_points'][-5],1000),
+                'yvals': fit_mods.ExpGaussDecay_only(np.linspace(self.raw_data_dict['sweep_points'][0],self.raw_data_dict['sweep_points'][-5],1000), *np.array(list(pars_decay.valuesdict().values()))),
+                'marker': '',
+                'color': 'r',
+                'setlabel': '',
+                'linestyle': '-'}
+
+            # Bottom curve
+            pars_decay['amplitude'].value = -pars_decay['amplitude'].value
+
+            self.plot_dicts['Decay2'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_line,
+                'xvals': np.linspace(self.raw_data_dict['sweep_points'][0],self.raw_data_dict['sweep_points'][-5],1000),
+                'yvals': fit_mods.ExpGaussDecay_only(np.linspace(self.raw_data_dict['sweep_points'][0],self.raw_data_dict['sweep_points'][-5],1000), *np.array(list(pars_decay.valuesdict().values()))),
+                'marker': '',
+                'color': 'r',
+                'linestyle': '-',
+                'setlabel': 'Decay Curve',
+                'do_legend': True,
+                'legend_pos': (1.04,.75)}
+
+            del pars_decay
+
+            # Show the fit function that was used
+            self.plot_dicts['Fit_Def'] = {
+                'ax_id': 'main',
+                'ypos': .7,
+                'xpos': 1.04,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'horizontalalignment': 'left',
+                'text_string': 'The fit function is defined as' + '\n' + 
+                 '$A e^{-t\Gamma_{exp} - (t \Gamma_{\phi})^2}\cos(2 \pi f t) + Off$'}
+
+
+
+
+
+            # Cool box showing all fit results and chi_sqr
+            self.plot_dicts['Parameters'] = {
+                'ax_id': 'main',
+                'ypos': .5,
+                'xpos': 1.04,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'horizontalalignment': 'left',
+                # 'text_string': 'Chi = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].chisqr),
+                'text_string': 'Fit results' + '\n'
+                                + '$\chi^2$ = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].chisqr) + '\n'
+                                + '$\Gamma_{exp}$ = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].params['Gexp'].value) + ' $s^{-1}$' + '\n'
+                                + '$\Gamma_{\phi}$ = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].params['Gphi'].value) + ' $s^{-1}$' + '\n'
+                                + 'A = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].params['amplitude'].value) + '\n'
+                                + 'Off = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].params['offset'].value) + '\n'
+                                + 'f = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].params['frequency'].value) + 'Hz'}
+
+
+
 
 
 
