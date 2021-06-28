@@ -1850,7 +1850,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
             if self.AWG is not None:
                 self.AWG.stop()
-                self.AWG.get_operation_complete()
+                # self.AWG.get_operation_complete()
 
             if arm:
                 self.arm()
@@ -1860,7 +1860,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             if self.AWG is not None:
                 self.AWG.start()
                 # FIXME: attempted solution to enforce program upload completion before start
-                self.AWG.get_operation_complete()
+                # self.AWG.get_operation_complete()
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
@@ -1912,7 +1912,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
             # FIXME: attempted solution to enforce program upload completion before start
-            self.AWG.get_operation_complete()
+            # self.AWG.get_operation_complete()
 
         # Determine the number of sweep points and set them
         if sweep_points is None or self.single_int_avg:
@@ -1957,7 +1957,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
             # FIXME: attempted solution to enforce program upload completion before start
-            self.AWG.get_operation_complete()
+            # self.AWG.get_operation_complete()
 
 
 class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
@@ -2238,7 +2238,8 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
             if self.AWG is not None:
                 self.AWG.stop()
-                self.AWG.get_operation_complete()
+                # FIXME: attempted solution to enforce program upload completion before start
+                # self.AWG.get_operation_complete()
 
             if arm:
                 self.arm()
@@ -2248,7 +2249,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             if self.AWG is not None:
                 self.AWG.start()
                 # FIXME: attempted solution to enforce program upload completion before start
-                self.AWG.get_operation_complete()
+                # self.AWG.get_operation_complete()
 
         # Get the data
         data_raw = self.UHFQC.acquisition_poll(
@@ -2268,7 +2269,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
             # FIXME: attempted solution to enforce program upload completion before start
-            self.AWG.get_operation_complete()
+            # self.AWG.get_operation_complete()
 
         if self.prepare_function_kwargs is not None:
             if self.prepare_function is not None:
@@ -2285,7 +2286,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
             # FIXME: attempted solution to enforce program upload completion before start
-            self.AWG.get_operation_complete()
+            # self.AWG.get_operation_complete()
 
 
 class UHFQC_statistics_logging_det(Soft_Detector):
