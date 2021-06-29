@@ -129,7 +129,9 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
 
         # convert dac in flux as unit of Phi_0
         flux = (pdd['dac'] - self.fit_res['dac_arc'].best_values['offset'])\
-            / self.fit_res['dac_arc'].best_values['dac0']
+            / self.fit_res['dac_arc'].best_values['dac0'] # stop taking phi_0 from fit
+        # flux = (pdd['dac'] - self.fit_res['dac_arc'].best_values['offset'])\
+        #     / 0.026 # measured from resonator scans     
         pdd['flux'] = flux
 
         # calculate the derivative vs flux
@@ -294,7 +296,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     """
     Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
     Makes several plots, such as Tx vs time, Tx vs frequency, Tx vs flux, freq vs current etc.
-    Ferforms only up to two fits:
+    Performs only up to two fits:
         - frequency vs current (used to concert current to flux and to calculate
             flux sensitivity |df/dI|; if requested)
         - A/f to Tx vs frequency (to extract Q-factor from T1 measurements; if requested)

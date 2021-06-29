@@ -21,6 +21,7 @@ def CW_tone(qubit_idx: int, platf_cfg: str):
     return p
 
 
+
 def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
     """
     A sequence for calibrating the VSM timing delay.
@@ -448,17 +449,14 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
         wait_nanoseconds = int(round(time/1e-9/2))
-        k.gate('rx90', [qubit_idx])
+        k.gate('ry90', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx180', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
-        # k.gate('rx90', [qubit_idx])
+        # k.gate('rym90', [qubit_idx])
         angle = (i*40) % 360
         cw_idx = angle//20 + 9
-        if angle == 0:
-            k.gate('rx90', [qubit_idx])
-        else:
-            k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
+        k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
 
         k.measure(qubit_idx)
         p.add_kernel(k)

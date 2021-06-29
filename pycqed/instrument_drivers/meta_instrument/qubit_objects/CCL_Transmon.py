@@ -130,11 +130,11 @@ class CCLight_Transmon(Qubit):
         # RO stimulus/pulse parameters #
         ################################
         self.add_parameter('ro_freq',
-                           label='Readout frequency', unit='Hz',
+                           label='Readout frequency', unit='Hz',initial_value=6e9,
                            parameter_class=ManualParameter)
         self.add_parameter('ro_freq_mod',
                            label='Readout-modulation frequency', unit='Hz',
-                           initial_value=-20e6,
+                           initial_value=-70e6,
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pow_LO', label='RO power LO',
                            unit='dBm', initial_value=20,
@@ -1781,7 +1781,7 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_motzoi(self, MC=None, verbose=True, update=True, motzois=None):
         """
-        Calibrates the DRAG coeffcieint value, named motzoi (after Felix Motzoi)
+        Calibrates the DRAG coefficient value, named motzoi (after Felix Motzoi)
         for legacy reasons.
 
         For details see docstring of measure_motzoi method.
@@ -1809,7 +1809,8 @@ class CCLight_Transmon(Qubit):
                 self.mw_motzoi(opt_motzoi)
         return opt_motzoi
 
-    def calibrate_mixer_offsets_drive(self, mixer_channels=['G', 'D'],
+    def calibrate_mixer_offsets_drive(self, SH_module: int = None,
+                                      mixer_channels=['G', 'D'],
                                       update: bool = True, ftarget=-110,
                                       maxiter=300)-> bool:
         """
@@ -1821,6 +1822,10 @@ class CCLight_Transmon(Qubit):
                 No use in no-VSM case
                 With VSM specifies whether to calibrate offsets for both
                 gaussuan 'G' and derivarive 'D' channel
+
+            SH_module (int):
+                VSM module that the Signal Hound is connected to.
+                Should be in the same channel as the qubit.
 
             update (bool):
                 should optimal values be set in the qubit object
@@ -1860,37 +1865,36 @@ class CCLight_Transmon(Qubit):
             VSM = self.instr_VSM.get_instr()
 
             ch_in = self.mw_vsm_ch_in()
-            # module 8 is hardcoded for mixer calibartions (signal hound)
-            VSM.set('mod8_marker_source'.format(ch_in), 'int')
-            VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
+            VSM.set('mod{}_marker_source'.format(module, ch_in), 'int')
+            VSM.set('mod{}_ch{}_marker_state'.format(module, ch_in), 'on')
 
             # Calibrate Gaussian component mixer
             if 'G' in mixer_channels:
-                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 1.0)
-                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.1)
+                VSM.set('mod{}_ch{}_gaussian_amp'.format(module, ch_in), 1.0)
+                VSM.set('mod{}_ch{}_derivative_amp'.format(module, ch_in), 0.1)
                 offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
-                    SH=self.instr_SH.get_instr(),
-                    source=self.instr_LO_mw.get_instr(),
-                    MC=self.instr_MC.get_instr(),
-                    chI_par=chGI_par, chQ_par=chGQ_par,
-                    label='Mixer_offsets_drive_G'+self.msmt_suffix,
-                    ftarget=ftarget, maxiter=maxiter)
+                        SH=self.instr_SH.get_instr(),
+                        source=self.instr_LO_mw.get_instr(),
+                        MC=self.instr_MC.get_instr(),
+                        chI_par=chGI_par, chQ_par=chGQ_par,
+                        label='Mixer_offsets_drive_G'+self.msmt_suffix,
+                        ftarget=ftarget, maxiter=maxiter)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
             if 'D' in mixer_channels:
                 # Calibrate Derivative component mixer
-                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.1)
-                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 1.0)
+                VSM.set('mod{}_ch{}_gaussian_amp'.format(module, ch_in), 0.1)
+                VSM.set('mod{}_ch{}_derivative_amp'.format(module, ch_in), 1.0)
 
                 offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
-                    SH=self.instr_SH.get_instr(),
-                    source=self.instr_LO_mw.get_instr(),
-                    MC=self.instr_MC.get_instr(),
-                    chI_par=chDI_par,
-                    chQ_par=chDQ_par,
-                    label='Mixer_offsets_drive_D'+self.msmt_suffix,
-                    ftarget=ftarget, maxiter=maxiter)
+                        SH=self.instr_SH.get_instr(),
+                        source=self.instr_LO_mw.get_instr(),
+                        MC=self.instr_MC.get_instr(),
+                        chI_par=chDI_par,
+                        chQ_par=chDQ_par,
+                        label='Mixer_offsets_drive_D'+self.msmt_suffix,
+                        ftarget=ftarget, maxiter=maxiter)
                 if update:
                     self.mw_mixer_offs_DI(offset_I)
                     self.mw_mixer_offs_DQ(offset_Q)
@@ -1904,12 +1908,12 @@ class CCLight_Transmon(Qubit):
                 chQ_par = QWG_MW.parameters['ch%s_offset' % chQ]
 
                 offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
-                    SH=self.instr_SH.get_instr(),
-                    source=self.instr_LO_mw.get_instr(),
-                    MC=self.instr_MC.get_instr(),
-                    chI_par=chI_par,
-                    chQ_par=chQ_par,
-                    ftarget=ftarget, maxiter=maxiter)
+                        SH=self.instr_SH.get_instr(),
+                        source=self.instr_LO_mw.get_instr(),
+                        MC=self.instr_MC.get_instr(),
+                        chI_par=chI_par,
+                        chQ_par=chQ_par,
+                        ftarget=ftarget, maxiter=maxiter)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
@@ -1922,12 +1926,12 @@ class CCLight_Transmon(Qubit):
                 chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
                 chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
                 offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
-                    SH=self.instr_SH.get_instr(),
-                    source=self.instr_LO_mw.get_instr(),
-                    MC=self.instr_MC.get_instr(),
-                    chI_par=chGI_par, chQ_par=chGQ_par,
-                    label='Mixer_offsets_drive'+self.msmt_suffix,
-                    ftarget=ftarget, maxiter=maxiter)
+                        SH=self.instr_SH.get_instr(),
+                        source=self.instr_LO_mw.get_instr(),
+                        MC=self.instr_MC.get_instr(),
+                        chI_par=chGI_par, chQ_par=chGQ_par,
+                        label='Mixer_offsets_drive'+self.msmt_suffix,
+                        ftarget=ftarget, maxiter=maxiter)
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
@@ -1935,11 +1939,12 @@ class CCLight_Transmon(Qubit):
         return True
 
     def calibrate_mixer_skewness_drive(self, MC=None,
-                                       mixer_channels: list = ['G', 'D'],
-                                       x0: list = [1.0, 0.0],
-                                       cma_stds: list = [.15, 10],
-                                       maxfevals: int = 250,
-                                       update: bool = True)-> bool:
+                                        SH_module: int = None,
+                                        mixer_channels: list = ['G', 'D'],
+                                        x0: list = [1.0, 0.0],
+                                        cma_stds: list = [.15, 10],
+                                        maxfevals: int = 250,
+                                        update: bool = True)-> bool:
         """
         Calibrates the mixer skewness and updates values in the qubit object.
 
@@ -1951,6 +1956,10 @@ class CCLight_Transmon(Qubit):
                 list of strings indicating what channels to
                 calibrate. In VSM case 'G' and/or 'D' can be specified.
                 In no-VSM case mixer_channels is alway set to ['G'].
+
+            SH_module (int):
+                VSM module that the Signal Hound is connected to.
+                Should be in the same channel as the qubit.
 
             update (bool):
                 if True updates values in the qubit object.
@@ -1977,11 +1986,10 @@ class CCLight_Transmon(Qubit):
             # Open the VSM channel
             VSM = self.instr_VSM.get_instr()
             ch_in = self.mw_vsm_ch_in()
-            # module 8 is hardcoded for use mixer calls (signal hound)
-            VSM.set('mod8_marker_source'.format(ch_in), 'int')
-            VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 1.0)
-            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 1.0)
+            VSM.set('mod{}_marker_source'.format(module, ch_in), 'int')
+            VSM.set('mod{}_ch{}_marker_state'.format(module, ch_in), 'on')
+            VSM.set('mod{}_ch{}_gaussian_amp'.format(module, ch_in), 1.0)
+            VSM.set('mod{}_ch{}_derivative_amp'.format(module, ch_in), 1.0)
         else:
             mixer_channels = ['G']
 
@@ -2078,15 +2086,21 @@ class CCLight_Transmon(Qubit):
                 returns True if succesful. Currently always
                 returns True (i.e., no sanity check implemented)
         """
+        CCL = self.instr_CC.get_instr()
+        p = sqo.CW_RO_sequence(
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        CCL.start()
 
         # using the restless tuning sequence
-        self.prepare_for_timedomain()
-        p = sqo.randomized_benchmarking(
-            self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
-            nr_cliffords=[1],
-            net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
-        self.instr_CC.get_instr().eqasm_program(p.filename)
-        self.instr_CC.get_instr().start()
+        # self.prepare_for_timedomain()
+        # p = sqo.randomized_benchmarking(
+        #     self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
+        #     nr_cliffords=[1],
+        #     net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
+        # self.instr_CC.get_instr().eqasm_program(p.filename)
+        # self.instr_CC.get_instr().start()
 
         LutMan = self.instr_LutMan_RO.get_instr()
         LutMan.mixer_apply_predistortion_matrix(True)
@@ -2785,7 +2799,7 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
         # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
+        CCelf.instr_CC.get_instr()
         CCL.stop()
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
@@ -2915,8 +2929,13 @@ class CCLight_Transmon(Qubit):
         else:
             spec_source = self.instr_spec_source.get_instr()
             spec_source.on()
+            # Set marker mode off for CW:
+            if not spec_source.get_idn()['model']=='E8257D':
+                spec_source.pulsemod_state('Off')
+                
             if mode == 'pulsed_marked':
                 spec_source.pulsemod_state('On')
+
 
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
@@ -4079,7 +4098,7 @@ class CCLight_Transmon(Qubit):
                     "Qubit has no resonator frequency.\
                      \nUpdate freq_res parameter.")
             else:
-                freqs = self.freq_res()+np.arange(-10e6, 5e6, .1e6)
+                freqs = self.freq_res()+np.arange(-10e6, 5e6, .2e6)
 
         if 'optimal' in self.ro_acq_weight_type():
             raise ImplementationError(
@@ -5679,14 +5698,12 @@ class CCLight_Transmon(Qubit):
                 mod_out, ch_in)]
             swf_func = wrap_par_to_swf(D_par, retrieve_value=True)
         else:
+            if motzoi_amps is None:
+                motzoi_amps = np.linspace(-.3, .3, 31)
             if self._using_QWG():
-                if motzoi_amps is None:
-                    motzoi_amps = np.linspace(-.3, .3, 31)
                 swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
                                               LutMan_parameter=MW_LutMan.mw_motzoi)
             else:
-                if motzoi_amps is None:
-                    motzoi_amps = np.linspace(-.3, .3, 31)
                 swf_func = swf.lutman_par(LutMan=MW_LutMan,
                                           LutMan_parameter=MW_LutMan.mw_motzoi)
 

@@ -31,14 +31,14 @@ from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes import validators as vals
 
-try:
+# try:
     # qisa_as can be installed from the qisa-as folder in the ElecPrj_CCLight
     # repostiory. Current version is 2.2.0 (Dec 18 2017)
-    from qisa_as import QISA_Driver, qisa_qmap
-except ImportError as e:
-    # Do not raise error to be able to use a dummy CCL when no assembler
-    # is installed.
-    logging.warning(e)
+from qisa_as import QISA_Driver, qisa_qmap
+# except ImportError as e:
+#     # Do not raise error to be able to use a dummy CCL when no assembler
+#     # is installed.
+    # logging.warning(e)
 
 
 log = logging.getLogger(__name__)

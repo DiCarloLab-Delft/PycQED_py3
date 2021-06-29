@@ -52,11 +52,11 @@ class Base_RO_LutMan(Base_LutMan):
             self.LO_freq = None
 
             if self._feedline_number == 0:
-                self._resonator_codeword_bit_mapping = [13, 16]
+                self._resonator_codeword_bit_mapping = [0,1,2]
             elif self._feedline_number == 1:
                 self._resonator_codeword_bit_mapping = [3,4,5]
             elif self._feedline_number == 2:
-                self._resonator_codeword_bit_mapping = [0,1,2]
+                self._resonator_codeword_bit_mapping = [6,7]
             else:
                 # FIXME: copy/paste error
                 raise NotImplementedError(

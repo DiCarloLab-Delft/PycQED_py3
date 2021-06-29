@@ -303,6 +303,10 @@ def GaussExpDampOscFunc(t, tau, tau_2, frequency, phase, amplitude,
         2 * np.pi * frequency * t + phase) + oscillation_offset) + exponential_offset
 
 
+def GaussExpFunc(t, tau, tau_2, amplitude, exponential_offset):
+    return amplitude * np.exp(-(t / tau_2) ** 2 - (t / tau)) + exponential_offset
+
+
 def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2,
                       amp_1, amp_2,
                       osc_offset_1, osc_offset_2, exponential_offset):
@@ -1263,6 +1267,7 @@ TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
 ExpDecayModel.guess = exp_dec_guess  # todo: fix
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)
 GaussExpDampOscModel = lmfit.Model(GaussExpDampOscFunc)
+GaussExpModel = lmfit.Model(GaussExpFunc)
 ExpDampDblOscModel = lmfit.Model(ExpDampDblOscFunc)
 DoubleExpDampOscModel = lmfit.Model(DoubleExpDampOscFunc)
 HangerAmplitudeModel = lmfit.Model(HangerFuncAmplitude)

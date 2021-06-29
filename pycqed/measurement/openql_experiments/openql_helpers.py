@@ -98,7 +98,7 @@ def compile(p, quiet: bool = False, extra_openql_options: List[Tuple[str,str]] =
     """
     Wrapper around OpenQL Program.compile() method.
     """
-    ql.initialize() # FIXME: reset options, may initialize more functionality in the future
+    # ql.initialize() # FIXME: reset options, may initialize more functionality in the future
     ql.set_option('output_dir', output_dir)
     if quiet:
         with suppress_stdout():

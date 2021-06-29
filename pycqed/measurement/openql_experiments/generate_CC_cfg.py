@@ -17,7 +17,7 @@ def generate_config(out_filename: str,
                     flux_pulse_duration: int = 40,
                     ro_duration: int = 800,
                     init_duration: int = 200000,
-                    in_filename: str = 'config_cc_s17_vsm.json.in'):
+                    in_filename: str = 'config_cc_s17_direct_iq.json.in'):
     """
     Generates a configuration file for OpenQL for use with the CC.
     Args:
