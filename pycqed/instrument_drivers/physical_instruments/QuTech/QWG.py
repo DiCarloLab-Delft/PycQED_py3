@@ -31,6 +31,8 @@ log = logging.getLogger(__name__)
 
 # Note: the HandshakeParameter is a temporary param that should be replaced
 # once qcodes issue #236 is closed
+
+
 class HandshakeParameter(Parameter):
 
     """
@@ -84,8 +86,8 @@ class QWG(QWGCore, Instrument):
                  name: str,
                  transport: Transport
                  ) -> None:
-        super().__init__(name, transport) # calls CCCore
-        Instrument.__init__(self, name) # calls Instrument
+        super().__init__(name, transport)  # calls CCCore
+        Instrument.__init__(self, name)  # calls Instrument
 
         # validator values
         self._dev_desc.mvals_trigger_impedance = vals.Enum(50),
@@ -167,7 +169,7 @@ class QWG(QWGCore, Instrument):
                 set_cmd=_gen_set_func_1par(self.get_offset, ch),
                 vals=vals.Numbers(-.25, .25),
                 get_parser=float,
-                docstring = f'Offset channel {ch}')
+                docstring=f'Offset channel {ch}')
 
             self.add_parameter(
                 f'ch{ch}_default_waveform',
@@ -191,7 +193,7 @@ class QWG(QWGCore, Instrument):
                 vals=self._dev_desc.mvals_trigger_level,
                 get_parser=float,
                 snapshot_exclude=True)
-                # FIXME: docstring
+            # FIXME: docstring
 
         # Single parameters
         self.add_parameter(
@@ -231,7 +233,6 @@ class QWG(QWGCore, Instrument):
         self._add_awg_parameters()
         self._add_codeword_parameters()
         self._add_dio_parameters()  # FIXME: conditional on QWG SW version?
-
 
     ##########################################################################
     # QCoDeS parameter definitions: codewords
@@ -280,7 +281,7 @@ class QWG(QWGCore, Instrument):
             set_cmd='DIO:MODE ' + '{}',
             vals=vals.Enum('MASTER', 'SLAVE'),
             val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
-            docstring=_dio_mode_doc + '\nEffective immediately when sent') # FIXME: no way, not a HandshakeParameter
+            docstring=_dio_mode_doc + '\nEffective immediately when sent')  # FIXME: no way, not a HandshakeParameter
 
         # FIXME: handle through SCPI status
         self.add_parameter(
@@ -293,7 +294,7 @@ class QWG(QWGCore, Instrument):
                       'Result:\n'
                       '\tTrue: DIO is calibrated\n'
                       '\tFalse: DIO is not calibrated'
-            )
+        )
 
         self.add_parameter(
             'dio_active_index',
@@ -305,8 +306,8 @@ class QWG(QWGCore, Instrument):
             vals=vals.Ints(0, 20),
             docstring='Get and set DIO calibration index\n'
                       'See dio_calibrate() parameter\n'
-                      'Effective immediately when sent' # FIXME: no way, not a HandshakeParameter
-            )
+                      'Effective immediately when sent'  # FIXME: no way, not a HandshakeParameter
+        )
 
     ##########################################################################
     # QCoDeS parameter helpers
@@ -443,6 +444,7 @@ def _gen_get_func_2par(fun, par1, par2):
 # Calibration with CC. FIXME: move out of driver
 ##########################################################################
 
+
 class QWGMultiDevices:
     """
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
@@ -478,22 +480,22 @@ class QWGMultiDevices:
         CC_model = cc.IDN()['model']
         if 'QCC' in CC_model:
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
-                'QCC_DIO_Calibration.qisa')
+                                                  'QCC_DIO_Calibration.qisa')
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
-                'qcc_qisa_opcodes.qmap')
+                                                         'qcc_qisa_opcodes.qmap')
         if 'cc' in CC_model:
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
-                'QWG_DIO_Calibration.qisa')
+                                                  'QWG_DIO_Calibration.qisa')
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
-                'qisa_opcodes.qmap')
+                                                         'qisa_opcodes.qmap')
         elif 'CCL' in CC_model:
             qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
-                'QWG_DIO_Calibration.qisa')
+                                                  'QWG_DIO_Calibration.qisa')
             cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
             qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
-                'qisa_opcodes.qmap')
+                                                         'qisa_opcodes.qmap')
         else:
             raise ValueError('CC model ({}) not recognized.'.format(CC_model))
 
@@ -535,6 +537,6 @@ class QWGMultiDevices:
                 print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
         cc.stop()
 
-        #Set the control store
+        # Set the control store
         cc.control_store(old_cs)
         cc.qisa_opcode(old_qisa_opcode)
