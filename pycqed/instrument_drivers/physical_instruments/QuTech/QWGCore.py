@@ -38,6 +38,12 @@ cw_protocols_dio = {
         [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
         [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
 
+    'awg8-mw-direct-iq': [
+        [0, 1, 2, 3, 4, 5, 6],  # Ch1
+        [0, 1, 2, 3, 4, 5, 6],  # Ch2
+        [7, 8, 9, 10, 11, 12, 13],  # Ch3
+        [7, 8, 9, 10, 11, 12, 13]],  # Ch4
+
     'MICROWAVE_NO_VSM': [
         [0, 1, 2, 3, 4, 5, 6],  # Ch1
         [0, 1, 2, 3, 4, 5, 6],  # Ch2
@@ -98,10 +104,11 @@ class QWGCore(SCPIBase, DIO.CalInterface):
 #        self._dev_desc.numMarkers = 8 # FIXME
         self._dev_desc.numTriggers = 8  # FIXME: depends on IORear type
 
-        # Check for driver / QWG compatibility
-        version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
 
         if 0:  # FIXME: configuration based on get_idn
+            # Check for driver / QWG compatibility
+            version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
+
             idn_firmware = self.get_idn()["firmware"]  # NB: called 'version' in QWG source code
             # FIXME: above will make usage of DummyTransport more difficult
             regex = r"swVersion=(\d).(\d).(\d)"
@@ -148,12 +155,21 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         if block:
             self.get_operation_complete()
 
+    def set_run_mode(self, run_mode: str) -> None:
+        """
+        Set run mode, one of: 'NONE', 'CONt', 'SEQ', 'CODeword'
+        """
+        self._transport.write(f'AWGC:RMO {run_mode}')
+
+    def get_run_mode(self) -> str:
+        return self._ask('AWGC:RMO?')
+
     ##########################################################################
     #  Output functions (AWG5014 compatible)
     ##########################################################################
 
-    def set_output_state(self, ch: int) -> None:
-        self._transport.write(f'OUTPUT{ch}:STATE')
+    def set_output_state(self, ch: int, state: int) -> None:
+        self._transport.write(f'OUTPUT{ch}:STATE {state}')
 
     def get_output_state(self, ch: int) -> float:
         return self._ask_float(f'OUTPUT{ch}:STATE?')
@@ -319,14 +335,14 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     # QWG specific
     ##########################################################################
 
-    def set_sideband_frequency(self, ch_pair: int) -> None:
-        self._transport.write(f'qutech:output{ch_pair}:frequency')
+    def set_sideband_frequency(self, ch_pair: int, freq: float) -> None:
+        self._transport.write(f'qutech:output{ch_pair}:frequency {freq}')
 
     def get_sideband_frequency(self, ch_pair: int) -> float:
         return self._ask_float(f'qutech:output{ch_pair}:frequency?')
 
-    def set_sideband_phase(self, ch_pair: int) -> None:
-        self._transport.write(f'qutech:output{ch_pair}:phase')
+    def set_sideband_phase(self, ch_pair: int, phase: float) -> None:
+        self._transport.write(f'qutech:output{ch_pair}:phase {phase}')
 
     def get_sideband_phase(self, ch_pair: int) -> float:
         return self._ask_float(f'qutech:output{ch_pair}:phase?')
@@ -379,7 +395,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         return self._ask_int('DIO:INDexes:ACTive?')
 
     def set_dio_active_index(self, idx: int):
-        self._transport.write('DIO:INDexes:ACTive {idx}')
+        self._transport.write(f'DIO:INDexes:ACTive {idx}')
 
     def get_dio_mode(self) -> str:
         """
@@ -389,7 +405,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         return self.ask('DIO:MODE?')
 
     def set_dio_mode(self, mode:str):
-        self._transport.write('DIO:MODE {mode}')
+        self._transport.write(f'DIO:MODE {mode}')
 
     def get_dio_suitable_indexes(self):
         """

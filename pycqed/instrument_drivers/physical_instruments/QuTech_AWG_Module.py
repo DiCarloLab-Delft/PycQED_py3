@@ -1,3 +1,6 @@
+# This file is deprecated, use:
+# from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG
+
 """
 File:       QuTech_AWG_Module.py
 Author:     Wouter Vlothuizen, TNO/QuTech,
