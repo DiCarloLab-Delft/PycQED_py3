@@ -6,17 +6,18 @@ from pathlib import Path
 import pycqed as pq
 from pycqed.instrument_drivers.library.Transport import FileTransport
 import pycqed.instrument_drivers.library.DIO as DIO
+from pycqed.instrument_drivers.physical_instruments.QuTech.QWGCore import QWGCore
 from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG,QWGMultiDevices
 
 
 class Test_QWG(unittest.TestCase):
-    def test_golden(self):
-        file_name = 'Test_QWG_test_all.scpi.txt'
+    def test_qwg_core(self):
+        file_name = 'Test_QWG_test_qwg_core.scpi.txt'
         test_path = Path('test_output') / file_name
         os.makedirs('test_output', exist_ok=True)
 
         transport = FileTransport(str(test_path))
-        qwg = QWG('qwg', transport)
+        qwg = QWGCore('qwg', transport)
 
         qwg.init()
 
@@ -32,9 +33,7 @@ class Test_QWG(unittest.TestCase):
         qwg.start()
         qwg.stop()
 
-
         transport.close()  # to allow access to file
-        qwg.close()  # release QCoDeS instrument
 
         # check results
         test_output = test_path.read_bytes()
