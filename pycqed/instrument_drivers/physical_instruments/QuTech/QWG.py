@@ -441,20 +441,24 @@ def _gen_get_func_2par(fun, par1, par2):
     return get_func
 
 ##########################################################################
-# Calibration with CC. FIXME: move out of driver
+# Multi device timing calibration
 ##########################################################################
-
 
 class QWGMultiDevices:
     """
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
     Usually all methods are static
     """
+    def __init__(self, qwgs: List[QWG]) -> None:
+        self.qwgs = qwgs
 
     @staticmethod
     def dio_calibration(cc, qwgs: List[QWG], verbose: bool = False):
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
         """
-        Calibrate multiple QWG using a CCLight
+        Calibrate multiple QWG using a CCLight, QCC or other CC-like devices
         First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
         master.
         On failure of calibration an exception is raised.
@@ -463,57 +467,18 @@ class QWGMultiDevices:
         Note: Will use the QWG_DIO_Calibration.qisa, cs.txt and qisa_opcodes.qmap
         files to assemble a  calibration program for the CCLight. These files
         should be located in the _QWG subfolder in the path of this file.
-        :param ccl: CCLight device, connection has to be active
+        :param cc: CC-like device, connection has to be active
         :param qwgs: List of QWG which will be calibrated, all QWGs are expected to have an active connection
         :param verbose: Print the DIO calibration rapport of all QWGs
         :return: None
         """
-        # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
-        for qwg in qwgs:
-            qwg.stop()
-        if not cc:
-            raise ValueError("Cannot calibrate QWGs; No CC provided")
 
-        _qwg_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), '_QWG'))
-
-        CC_model = cc.IDN()['model']
-        if 'QCC' in CC_model:
-            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
-                                                  'QCC_DIO_Calibration.qisa')
-            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
-            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
-                                                         'qcc_qisa_opcodes.qmap')
-        if 'cc' in CC_model:
-            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
-                                                  'QWG_DIO_Calibration.qisa')
-            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
-            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
-                                                         'qisa_opcodes.qmap')
-        elif 'CCL' in CC_model:
-            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,
-                                                  'QWG_DIO_Calibration.qisa')
-            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
-            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,
-                                                         'qisa_opcodes.qmap')
-        else:
-            raise ValueError('CC model ({}) not recognized.'.format(CC_model))
-
-        if cc._ask("QUTech:RUN?") == '1':
-            cc.stop()
-
-        old_cs = cc.control_store()
-        old_qisa_opcode = cc.qisa_opcode()
-
-        cc.control_store(cs_qwg_dio_calibrate)
-        cc.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
-
-        cc.eqasm_program(qisa_qwg_dio_calibrate)
-        cc.start()
-        cc.getOperationComplete()
-
-        if not qwgs:
+        if not self.qwgs:
             raise ValueError("Can not calibrate QWGs; No QWGs provided")
+
+        # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
+        for qwg in self.qwgs:
+            qwg.stop()
 
         def try_errors(qwg):
             try:
@@ -521,7 +486,7 @@ class QWGMultiDevices:
             except Exception as e:
                 raise type(e)(f'{qwg.name}: {e}')
 
-        main_qwg = qwgs[0]
+        main_qwg = self.qwgs[0]
         if main_qwg.dio_mode() is not 'MASTER':
             raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefor it is not save the use it "
                              f"as base QWG for calibration of multiple QWGs.")
@@ -529,14 +494,9 @@ class QWGMultiDevices:
         try_errors(main_qwg)
         active_index = main_qwg.dio_active_index()
 
-        for qwg in qwgs[1:]:
+        for qwg in self.qwgs[1:]:
             qwg.dio_calibrate(active_index)
             try_errors(qwg)
-        if verbose:
-            for qwg in qwgs:
-                print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
-        cc.stop()
 
-        # Set the control store
-        cc.control_store(old_cs)
-        cc.qisa_opcode(old_qisa_opcode)
+        for qwg in self.qwgs:
+            print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
