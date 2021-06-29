@@ -1,5 +1,3 @@
-# FIXME: do not use yet, work in progress
-
 """
     File:       QWG.py
     Author:     Wouter Vlothuizen, TNO/QuTech,
@@ -272,6 +270,8 @@ class QWG(QWGCore, Instrument):
     # QCoDeS parameter definitions: DIO
     ##########################################################################
 
+    # FIXME: use helper functions from QWGCore.py
+
     def _add_dio_parameters(self):
         self.add_parameter(
             'dio_mode',
@@ -349,9 +349,9 @@ class QWG(QWGCore, Instrument):
             protocol_name(string): Name of the predefined protocol
         """
         # function used internally for the parameters because of formatting
-        protocol = self.codeword_protocols.get(protocol_name)
+        protocol = self._codeword_protocol.get(protocol_name)
         if protocol is None:
-            allowed_protocols = ", ".join(f'{protocol_name}' for protocols_name in self.codeword_protocols)
+            allowed_protocols = ", ".join(f'{protocol_name}' for protocols_name in self._codeword_protocol)
             raise ValueError(f"Invalid protocol: actual: {protocol_name}, expected: {allowed_protocols}")
 
         for ch, bitMap in enumerate(protocol):
@@ -363,7 +363,7 @@ class QWG(QWGCore, Instrument):
         for ch in range(1, self._dev_desc.numChannels + 1):
             channels_bit_maps.append(list(map(int, self.get(f"ch{ch}_bit_map"))))   # FIXME: ch{}bitmap was removed
 
-        for prtc_name, prtc_bit_map in self.codeword_protocols.items():
+        for prtc_name, prtc_bit_map in self._codeword_protocol.items():
             if channels_bit_maps == prtc_bit_map:
                 result = prtc_name
                 break
