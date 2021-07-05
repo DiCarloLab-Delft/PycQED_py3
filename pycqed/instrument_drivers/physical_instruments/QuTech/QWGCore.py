@@ -402,7 +402,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         returns "MASter" or "SLAve"
         FIXME: abstract protocol details
         """
-        return self.ask('DIO:MODE?')
+        return self._ask('DIO:MODE?')
 
     def set_dio_mode(self, mode:str):
         self._transport.write(f'DIO:MODE {mode}')
