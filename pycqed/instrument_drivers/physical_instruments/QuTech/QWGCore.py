@@ -478,15 +478,16 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return self._ask_int(f'QUTEch:TRIGgers{ch}:LOGIcinput?')
 
-    def set_bitmap(self, ch: int) -> None:
-        """
-        Codeword bit map for a channel, 14 bits available of which 10 are selectable.
-        The codeword bit map specifies which bits of the codeword (coming from a
-        central controller) are used for the codeword of a channel. This allows to
-        split up the codeword into sections for each channel
-        FIXME: rewrite
-        """
-        self._transport.write(f'DAC{ch}:BITmap')
+    # FIXME: use QWG.py::_set_bit_map
+    # def set_bitmap(self, ch: int) -> None:
+    #     """
+    #     Codeword bit map for a channel, 14 bits available of which 10 are selectable.
+    #     The codeword bit map specifies which bits of the codeword (coming from a
+    #     central controller) are used for the codeword of a channel. This allows to
+    #     split up the codeword into sections for each channel
+    #     FIXME: rewrite
+    #     """
+    #     self._transport.write(f'DAC{ch}:BITmap')
 
     def get_bitmap(self, ch: int) -> List:
         return self._int_to_array(self._ask(f'DAC{ch}:BITmap?'))

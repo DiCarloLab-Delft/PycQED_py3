@@ -357,8 +357,8 @@ class QWG(QWGCore, Instrument):
             allowed_protocols = ", ".join(f'{protocol_name}' for protocols_name in self._codeword_protocol)
             raise ValueError(f"Invalid protocol: actual: {protocol_name}, expected: {allowed_protocols}")
 
-        for ch, bitMap in enumerate(protocol):
-            self._set_bit_map(ch, bitMap)
+        for ch, bit_map in enumerate(protocol):
+            self._set_bit_map(ch, bit_map)
 
     def _get_codeword_protocol(self):
         channels_bit_maps = []
@@ -394,7 +394,7 @@ class QWG(QWGCore, Instrument):
         array_raw = ''
         if bit_map:
             array_raw = ',' + ','.join(str(x) for x in bit_map)
-        self._transport.write(f"DAC{ch}:BITmap {len(bit_map)}{array_raw}")  # FIXME: move to QWGCore
+        self._transport.write(f"DAC{ch+1}:BITmap {len(bit_map)}{array_raw}")  # FIXME: move to QWGCore
 
     # def _JSON_parser(self, msg):
     #     """
@@ -479,7 +479,7 @@ class QWGMultiDevices(DIO.CalInterface):
             qwg.stop()
 
         main_qwg = self.qwgs[0]
-        if main_qwg.dio_mode is not 'MASTER':
+        if main_qwg.dio_mode() is not 'MASTER':
             raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefore it is not possible the use it "
                              f"as base QWG for calibration of multiple QWGs.")
         main_qwg.dio_calibrate()
