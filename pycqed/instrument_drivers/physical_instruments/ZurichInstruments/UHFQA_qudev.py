@@ -74,5 +74,3 @@ class UHFQA_qudev(uhf.UHFQA_core):
 
         self.set('awgs_0_userregs_{}'.format(uhf.UHFQA_core.USER_REG_LOOP_CNT), loop_cnt)
         self.set('awgs_0_userregs_{}'.format(uhf.UHFQA_core.USER_REG_RO_MODE), ro_mode)
-        if self.wait_dly() > 0 and not self._awg_program_features['wait_dly']:
-            raise uhf.ziUHFQCSeqCError('Trying to use a delay of {} using an AWG program that does not use \'wait_dly\'.'.format(self.wait_dly()))
