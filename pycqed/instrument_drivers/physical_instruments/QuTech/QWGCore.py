@@ -501,6 +501,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0) -> None:
         self.dio_calibrate()    # FIXME: integrate
+        self.get_operation_complete()
 
     ##########################################################################
     # DAC calibration support

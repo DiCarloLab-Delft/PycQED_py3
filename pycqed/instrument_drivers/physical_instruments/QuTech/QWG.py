@@ -282,8 +282,8 @@ class QWG(QWGCore, Instrument):
             label='DIO input operation mode',
             get_cmd=self.get_dio_mode,
             set_cmd=self.set_dio_mode,
-            vals=vals.Enum('MASTER', 'SLAVE'),
-            val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve'},
+            vals=vals.Enum('MASTER', 'SLAVE', 'SE'),
+            val_mapping={'MASTER': 'MASter', 'SLAVE': 'SLAve', 'SE': 'SE'},
             docstring=_dio_mode_doc + '\nEffective immediately when sent')  # FIXME: no way, not a HandshakeParameter
 
         # FIXME: handle through SCPI status (once implemented on QWG)
@@ -482,11 +482,14 @@ class QWGMultiDevices(DIO.CalInterface):
         if main_qwg.dio_mode() is not 'MASTER':
             raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefore it is not possible the use it "
                              f"as base QWG for calibration of multiple QWGs.")
+
+        log.info(f"Calibrating DIO of QWG '{main_qwg.name}'")
         main_qwg.dio_calibrate()
         main_qwg.check_errors()
         active_index = main_qwg.dio_active_index()
 
         for qwg in self.qwgs[1:]:
+            log.info(f"Calibrating DIO of QWG '{qwg.name}'")
             qwg.dio_calibrate(active_index)
             qwg.check_errors()
 

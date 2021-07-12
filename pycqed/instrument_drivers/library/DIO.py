@@ -10,7 +10,8 @@ class CalInterface(ABC):
     @abstractmethod
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         """
-        output DIO calibration pattern
+        output DIO calibration pattern.
+        NB: should return after initiating output, and then continue to output data
 
         Args:
             dio_mode: the DIO mode for which calibration is requested
@@ -26,7 +27,8 @@ class CalInterface(ABC):
     @abstractmethod
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
         """
-        calibrate DIO protocol timing. Requires valid input signal on bits defined by dio_mask
+        calibrate DIO protocol timing. Requires valid input signal on bits defined by dio_mask.
+        NB: should not return until calibration has been performed
 
         Args:
             dio_mask: mask defining bits that are actually toggled (codeword, trigger, toggle). On certain architectures

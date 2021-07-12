@@ -209,6 +209,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # based on ElecPrj_CC:src/q1asm/qwg_staircase.q1asm
             # FIXME: tests 5 of 8 bits only
             cc_prog = """
+            # program: output_dio_calibration_data for mode 'awg8-mw-vsm'
             ### DIO protocol definition:
             # DIO           QWG             AWG8        note
             # ------------- --------------- ----------- ------------------
@@ -245,6 +246,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
 
             cc_prog = """
+            # program: output_dio_calibration_data for mode 'awg8-mw-direct-iq'
             ### DIO protocol definition:
             # DIO           QWG             AWG8        note
             # ------------- --------------- ----------- ------------------
@@ -258,6 +260,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # DIO[6:0]      CW_1            CW_1
             #
             # cw:
+            # FIXME: table below is for loopCnt=32, not 128 like in code below
             #           incr            mask
             # CW_1=1    0x0000 0001     0000 001F
             # CW_2=31   0x0000 0080     0000 0F80
@@ -293,6 +296,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # based on ZI_HDAWG8.py::_prepare_CC_dio_calibration_hdawg and examples/CC_examples/flux_calibration.vq1asm
             # FIXME: hardcoded slots, this is OpenQL output
             cc_prog = """
+            # program: output_dio_calibration_data for mode 'awg8-flux'
             mainLoop:
                         seq_out         0x00000000,20           # 00000000000000000000000000000000
                         seq_out         0x82498249,2            # 10000010010010011000001001001001
@@ -318,6 +322,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
         elif dio_mode == "uhfqa":  # FIXME: no official mode yet
             # Based on UHFQuantumController.py::_prepare_CC_dio_calibration_uhfqa and  and examples/CC_examples/uhfqc_calibration.vq1asm
             cc_prog = inspect.cleandoc("""
+            # program: output_dio_calibration_data for mode 'uhfqa'
             mainLoop:   seq_out         0x03FF0000,1        # TRIG=0x00010000, CW[8:0]=0x03FE0000
                         seq_out         0x00000000,10
                         jmp             @mainLoop
