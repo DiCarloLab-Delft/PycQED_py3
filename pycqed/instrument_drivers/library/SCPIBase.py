@@ -38,7 +38,7 @@ class SCPIBase:
             log.error(f"{self._name}: Found {err_cnt} SCPI errors:")
             for _ in range(err_cnt):
                 log.error(self.get_error())
-            raise RuntimeError("SCPI errors found")
+            # raise RuntimeError("SCPI errors found")
 
     ##########################################################################
     # Generic SCPI commands from IEEE 488.2 (IEC 625-2) standard

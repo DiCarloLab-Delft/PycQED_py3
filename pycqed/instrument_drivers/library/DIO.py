@@ -1,7 +1,9 @@
 import sys
+import logging
 from abc import ABC, abstractmethod
 from typing import Tuple,List
 
+log = logging.getLogger(__name__)
 
 class CalInterface(ABC):
     # Abstract base class to define interface for DIO calibration
@@ -11,7 +13,7 @@ class CalInterface(ABC):
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
         """
         output DIO calibration pattern.
-        NB: should return after initiating output, and then continue to output data
+        NB: should return after output has *actually* started, and then continue to output data
 
         Args:
             dio_mode: the DIO mode for which calibration is requested
@@ -59,6 +61,7 @@ def calibrate(sender: CalInterface = None,
     """
     # FIXME: allow list of senders or receivers
     if sender:
+        # log.info(f"outputting DIO calibration data on '{sender.name()}'")  # FIXME: .name attribute not guaranteed to be present
         dio_mask,expected_sequence = sender.output_dio_calibration_data(dio_mode=sender_dio_mode, port=sender_port)
     else:
         dio_mask = 0
@@ -66,9 +69,11 @@ def calibrate(sender: CalInterface = None,
 
     # FIXME: disable receiver connector outputs? And other receivers we're not aware of?
     if receiver:
+        # log.info(f"calibrating DIO protocol on '{receiver.name()}'")  # FIXME: .name attribute not guaranteed to be present
         receiver.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=receiver_port)
 
     if sender:
+        # log.info(f"stopping '{sender.name()}'")  # FIXME: .name attribute not guaranteed to be present
         sender.stop()  # FIXME: not in interface
 
 

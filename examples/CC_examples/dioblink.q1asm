@@ -1,0 +1,6 @@
+# program: 	dioblink.q1asm
+# author: 	Wouter Vlothuizen, Martin Woudstra
+
+loop:   seq_out		0,1
+		seq_out		0xFFFFFFFF,1
+		jmp			@loop

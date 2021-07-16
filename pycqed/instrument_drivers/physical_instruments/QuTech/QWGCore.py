@@ -407,11 +407,12 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     def set_dio_mode(self, mode:str):
         self._transport.write(f'DIO:MODE {mode}')
 
-    def get_dio_suitable_indexes(self):
-        """
-        Get DIO all suitable indexes. The array is ordered by most preferable index first
-        """
-        return self._int_to_array(self._ask('DIO:INDexes?'))
+    # FIXME: deprecated in QWG software version 1.6.0
+    # def get_dio_suitable_indexes(self):
+    #     """
+    #     Get DIO all suitable indexes. The array is ordered by most preferable index first
+    #     """
+    #     return self._int_to_array(self._ask('DIO:INDexes?'))
 
     def get_dio_calibrated_inputs(self) -> int:
         """
@@ -445,9 +446,9 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         info = f'- Calibrated:          {self.get_dio_calibrate()}\n' \
                f'- Mode:                {self.get_dio_mode()}\n' \
                f'- Selected index:      {self.get_dio_active_index()}\n' \
-               f'- Suitable indexes:    {self.get_dio_suitable_indexes()}\n' \
                f'- Calibrated DIO bits: {bin(self.get_dio_calibrated_inputs())}\n' \
                f'- DIO bit diff table:\n{self._dio_bit_diff_table()}'
+#               f'- Suitable indexes:    {self.get_dio_suitable_indexes()}\n' \
 
         if extended:
             info += f'- LVDS detected:       {self.get_dio_lvds()}\n' \

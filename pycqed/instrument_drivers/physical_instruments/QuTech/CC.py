@@ -13,6 +13,7 @@
 import logging
 import numpy as np
 import inspect
+import time
 from typing import Tuple,List
 
 from .CCCore import CCCore
@@ -244,45 +245,54 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
 
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
+            if 1: # FIXME: QWG only
+                cc_prog = """
+                # program:  dioblink.q1asm
+                # author:   Wouter Vlothuizen, Martin Woudstra
 
-            cc_prog = """
-            # program: output_dio_calibration_data for mode 'awg8-mw-direct-iq'
-            ### DIO protocol definition:
-            # DIO           QWG             AWG8        note
-            # ------------- --------------- ----------- ------------------
-            # DIO[31]       TRIG_2          TRIG
-            # DIO[30]       TOGGLE_DS_2     TOGGLE_DS   hardware generated
-            # DIO[29:23]    CW_4            CW_4
-            # DIO[22:16]    CW_3            CW_3
-            # DIO[15]       TRIG_1          unused
-            # DIO[14]       TOGGLE_DS_1     unused
-            # DIO[13:7]     CW_2            CW_2
-            # DIO[6:0]      CW_1            CW_1
-            #
-            # cw:
-            # FIXME: table below is for loopCnt=32, not 128 like in code below
-            #           incr            mask
-            # CW_1=1    0x0000 0001     0000 001F
-            # CW_2=31   0x0000 0080     0000 0F80
-            # CW_3=1    0x0001 0000     001F 0000
-            # CW_4=31   0x0080 0000     0F80 0000
-            # TRIG_1    0x0000 8000
-            # TRIG_2    0x8000 0000
-            # sum       0x8081 8081
+                loop:   seq_out     0,1
+                        seq_out     0xFFFFFFFF,1
+                        jmp         @loop
+                """
+            else:
+                cc_prog = """
+                # program: output_dio_calibration_data for mode 'awg8-mw-direct-iq'
+                ### DIO protocol definition:
+                # DIO           QWG             AWG8        note
+                # ------------- --------------- ----------- ------------------
+                # DIO[31]       TRIG_2          TRIG
+                # DIO[30]       TOGGLE_DS_2     TOGGLE_DS   hardware generated
+                # DIO[29:23]    CW_4            CW_4
+                # DIO[22:16]    CW_3            CW_3
+                # DIO[15]       TRIG_1          unused
+                # DIO[14]       TOGGLE_DS_1     unused
+                # DIO[13:7]     CW_2            CW_2
+                # DIO[6:0]      CW_1            CW_1
+                #
+                # cw:
+                # FIXME: table below is for loopCnt=32, not 128 like in code below
+                #           incr            mask
+                # CW_1=1    0x0000 0001     0000 001F
+                # CW_2=31   0x0000 0080     0000 0F80
+                # CW_3=1    0x0001 0000     001F 0000
+                # CW_4=31   0x0080 0000     0F80 0000
+                # TRIG_1    0x0000 8000
+                # TRIG_2    0x8000 0000
+                # sum       0x8081 8081
 
-            .DEF        cw          0x80008000         # see above
-            .DEF        incr        0x00810081
-            .DEF        duration    4                  # 20 ns periods
-            .DEF        loopCnt     128                #
+                .DEF        cw          0x80008000         # see above
+                .DEF        incr        0x00810081
+                .DEF        duration    4                  # 20 ns periods
+                .DEF        loopCnt     128                #
 
-            repeat:
-                    move        $cw,R0
-                    move        $loopCnt,R1                 # loop counter
-            inner:  seq_out     R0,$duration
-                    add         R0,$incr,R0
-                    loop        R1,@inner
-                    jmp         @repeat
-            """
+                repeat:
+                        move        $cw,R0
+                        move        $loopCnt,R1                 # loop counter
+                inner:  seq_out     R0,$duration
+                        add         R0,$incr,R0
+                        loop        R1,@inner
+                        jmp         @repeat
+                """
             sequence_length = 128
             staircase_sequence = range(0, sequence_length)
             expected_sequence = [(0, list(staircase_sequence)),
@@ -335,6 +345,9 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
         log.debug(f"uploading DIO calibration program for mode '{dio_mode}' to CC")
         self.assemble_and_start(cc_prog)
+        if 1:
+            # self.get_operation_complete() # wait for output to actually start. FIXME: extraneous?
+            time.sleep(0.5) # FIXME: currently no proper way to actually assure that CC is already running
 
         return dio_mask,expected_sequence
 

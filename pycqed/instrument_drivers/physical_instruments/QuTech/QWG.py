@@ -456,7 +456,7 @@ class QWGMultiDevices(DIO.CalInterface):
 
     @staticmethod
     def dio_calibration(cc, qwgs: List[QWG], verbose: bool = False):
-        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")
+        raise DeprecationWarning("dio_calibration() is deprecated, use instrument_drivers.library.DIO.calibrate")
 
     ##########################################################################
     # overrides for CalInterface interface

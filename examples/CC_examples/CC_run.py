@@ -25,7 +25,7 @@ log.info('connecting to CC')
 cc = CC('cc', IPTransport(ip))
 cc.init()
 
-if 1:
+if 0:
     cc.debug_marker_out(0, cc.UHFQA_TRIG)
     cc.debug_marker_out(1, cc.UHFQA_TRIG)
     #cc.debug_marker_out(8, cc.HDAWG_TRIG)
