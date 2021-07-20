@@ -195,6 +195,7 @@ class CCCore(SCPIBase):
     QWG_TRIG = 31
     QWG1_CW = range(0,11)
     QWG2_CW = range(16,27)
+    # FIXME: add full dual-QWG definitions
 
     # UHFQA DIO/marker bit definitions: CC output
     UHFQA_TOGGLE_DS = 31

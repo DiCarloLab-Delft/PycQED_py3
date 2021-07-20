@@ -380,6 +380,7 @@ class QWG(QWGCore, Instrument):
         :param bit_map:  array of ints, element determines the codeword input
         :return: none
         """
+        # FIXME: leave checking to QWG
         if len(bit_map) > self._dev_desc.numSelectCwInputs:
             raise ValueError(f'Cannot set bit map; Number of codeword bits inputs are too high; '
                              f'max: {self._dev_desc.numSelectCwInputs}, actual: {len(bit_map)}')
