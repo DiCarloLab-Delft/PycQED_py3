@@ -42,6 +42,8 @@ import multiprocessing
 # Imported for a type check
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
     import QuTech_AWG_Module
+# New untested QWG driver by Wouter, 20210629
+from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG
 
 log = logging.getLogger(__name__)
 
@@ -479,7 +481,7 @@ class CCLight_Transmon(Qubit):
         Checks if a QWG is used for microwave control.
         """
         AWG = self.instr_LutMan_MW.get_instr().AWG.get_instr()
-        return isinstance(AWG, QuTech_AWG_Module)
+        return isinstance(AWG, QWG)
 
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter

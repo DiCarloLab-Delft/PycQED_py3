@@ -245,13 +245,13 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
 
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
-            if 1: # FIXME: QWG only
+            if 0: # FIXME: QWG testing only
                 cc_prog = """
                 # program:  dioblink.q1asm
                 # author:   Wouter Vlothuizen, Martin Woudstra
 
-                loop:   seq_out     0,1
-                        seq_out     0xFFFFFFFF,1
+                loop:   seq_out     0xFF00AAAA,1
+                        seq_out     0x00FF5555,1
                         jmp         @loop
                 """
             else:

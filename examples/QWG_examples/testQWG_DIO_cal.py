@@ -1,6 +1,6 @@
 import logging
 
-if 1:
+if 0:
     root_formatter = logging.Formatter('{asctime}.{msecs:03.0f} {levelname:7s} {name:32.32s}  {message}',
                                        '%Y%m%d %H:%M:%S',
                                        '{')
@@ -43,8 +43,9 @@ cc.init()
 
 
 qwg_21 = QWG('qwg_21', IPTransport('192.168.0.179'))
-qwg_22 = QWG('qwg_22', IPTransport('192.168.0.178'))
-qwgs = [qwg_21, qwg_22]
+#qwg_22 = QWG('qwg_22', IPTransport('192.168.0.178'))
+qwg_8 = QWG('qwg_8', IPTransport('192.168.0.192'))
+qwgs = [qwg_21, qwg_8]
 #qwgs = [qwg_22, qwg_21] # reversed
 
 for qwg in qwgs:
@@ -65,9 +66,9 @@ else:
         DIO.calibrate(sender=cc,receiver=qwg,sender_dio_mode='awg8-mw-direct-iq')
 
 
-for qwg in qwgs:
-    print(f"QWG '{qwg.name}'' DIO calibration report:")
-    print(qwg.dio_calibration_report())
+# for qwg in qwgs:
+#     print(f"QWG '{qwg.name}'' DIO calibration report:")
+#     print(qwg.dio_calibration_report())
 
 if 0:
     for qwg in qwgs:
