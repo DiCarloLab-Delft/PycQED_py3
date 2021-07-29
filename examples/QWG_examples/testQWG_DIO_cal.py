@@ -1,6 +1,6 @@
 import logging
 
-if 0:
+if 1:
     root_formatter = logging.Formatter('{asctime}.{msecs:03.0f} {levelname:7s} {name:32.32s}  {message}',
                                        '%Y%m%d %H:%M:%S',
                                        '{')
@@ -36,11 +36,12 @@ from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-
-cc = CC('cc', IPTransport('192.168.0.241'))
-print(cc.get_identity())
-cc.init()
-
+if 0:
+    cc = CC('cc', IPTransport('192.168.0.241'))
+    print(cc.get_identity())
+    cc.init()
+else:
+    cc = None
 
 qwg_21 = QWG('qwg_21', IPTransport('192.168.0.179'))
 #qwg_22 = QWG('qwg_22', IPTransport('192.168.0.178'))
