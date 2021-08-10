@@ -1,7 +1,3 @@
-
-
-
-
 """
     File:       QWG.py
     Author:     Wouter Vlothuizen, TNO/QuTech,

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from pycqed.instrument_drivers.library.Transport import IPTransport
 import pycqed.instrument_drivers.library.DIO as DIO
 from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG,QWGMultiDevices
-#from pycqed.measurement.waveform_control_CC.waveform import Waveform
+from .waveform import Waveform
 
 
 # create waveforms
@@ -25,22 +25,15 @@ mu2 = 15e-9
 sigma2 = 5e-9
 dirAmpl2 = 1.0
 
-if 0: # functions disappeared
-    wvCos = Waveform.cos(fs, sampleCnt, f)
-    wvSin = Waveform.sin(fs, sampleCnt, f)
-    wvZero = Waveform.DC(fs, sampleCnt)
-    wvHi = Waveform.DC(fs, sampleCnt, 1.0)
-    wvLo = Waveform.DC(fs, sampleCnt, -1.0)
-    wvGauss = Waveform.gauss_pulse(fs, sampleCnt, mu, sigma)
-    wvDerivGauss = Waveform.derivGauss(fs, sampleCnt, mu, sigma, dirAmpl)
-    wvGauss2 = Waveform.gauss(fs, sampleCnt, mu2, sigma2)
-    wvDerivGauss2 = Waveform.derivGauss(fs, sampleCnt, mu2, sigma2, dirAmpl2)
-else:
-    wvZero = np.array(np.arange(0, 1, 1/sampleCnt))
-    wvGauss = 0.7 * np.array(np.arange(0, 1, 1/sampleCnt))
-    wvDerivGauss = 0.7 * np.array(np.arange(0, 1, 1/sampleCnt))
-    wvGauss2 = 0.7 * np.array(np.arange(0, 1, 1/sampleCnt))
-    wvDerivGauss2 = 0.7 * np.array(np.arange(0, 1, 1/sampleCnt))
+wvCos = Waveform.cos(fs, sampleCnt, f)
+wvSin = Waveform.sin(fs, sampleCnt, f)
+wvZero = Waveform.DC(fs, sampleCnt)
+wvHi = Waveform.DC(fs, sampleCnt, 1.0)
+wvLo = Waveform.DC(fs, sampleCnt, -1.0)
+wvGauss = Waveform.gauss(fs, sampleCnt, mu, sigma)
+wvDerivGauss = Waveform.derivGauss(fs, sampleCnt, mu, sigma, dirAmpl)
+wvGauss2 = Waveform.gauss(fs, sampleCnt, mu2, sigma2)
+wvDerivGauss2 = Waveform.derivGauss(fs, sampleCnt, mu2, sigma2, dirAmpl2)
 
 
 qwg1 = QWG('qwg_21', IPTransport('192.168.0.179'))
@@ -65,15 +58,14 @@ def run(continuous=True):
         qwg1.run_mode('CONt')
 
     else:  # codeword based
-        if 0:
-            qwg1.create_waveform_real('zero', wvZero)
-            # qwg1.create_waveform_real('hi', wvHi)
-            # qwg1.create_waveform_real('lo', wvLo)
-            qwg1.create_waveform_real('gauss', wvGauss)
-            qwg1.create_waveform_real('derivGauss', wvDerivGauss)
-            qwg1.create_waveform_real('gauss2', wvGauss2)
-            qwg1.create_waveform_real('derivGauss2', wvDerivGauss2)
-            qwg1.create_waveform_real('gaussNeg', wvGauss) # FIXME: -wvGauss
+        qwg1.create_waveform_real('zero', wvZero)
+        qwg1.create_waveform_real('hi', wvHi)
+        qwg1.create_waveform_real('lo', wvLo)
+        qwg1.create_waveform_real('gauss', wvGauss)
+        qwg1.create_waveform_real('derivGauss', wvDerivGauss)
+        qwg1.create_waveform_real('gauss2', wvGauss2)
+        qwg1.create_waveform_real('derivGauss2', wvDerivGauss2)
+        qwg1.create_waveform_real('gaussNeg', -wvGauss)
 
         # segment 0: idle
         qwg1.set('ch1_default_waveform', 'zero')
