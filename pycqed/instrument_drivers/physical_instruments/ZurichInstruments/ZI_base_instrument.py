@@ -243,7 +243,8 @@ class MockDAQServer():
     just entries in a 'dict') based on the device name that is used when
     connecting to a device. These nodes differ depending on the instrument
     type, which is determined by the number in the device name: dev2XXX are
-    UHFQA instruments and dev8XXX are HDAWG8 instruments.
+    UHFQA instruments, dev8XXX are HDAWG8 instruments, dev10XXX are PQSC
+    instruments.
     """
 
     def __init__(self, server, port, apilevel, verbose=False):
@@ -279,6 +280,8 @@ class MockDAQServer():
             self.devtype = 'UHFQA'
         elif self.device.lower().startswith('dev8'):
             self.devtype = 'HDAWG8'
+        elif self.device.lower().startswith('dev10'):
+            self.devtype = 'PQSC'
 
         # Add paths
         filename = os.path.join(os.path.dirname(os.path.abspath(
@@ -340,6 +343,9 @@ class MockDAQServer():
             self.nodes[f'/{self.device}/dios/0/drive'] = {'type': 'Integer', 'value': 0}
             for dio_nr in range(32):
                 self.nodes[f'/{self.device}/raw/dios/0/delays/{dio_nr}/value'] = {'type': 'Integer', 'value': 0}
+        elif self.devtype == 'PQSC':
+            self.nodes[f'/{self.device}/raw/error/json/errors'] = {
+                'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
 
     def listNodesJSON(self, path):
         pass
@@ -616,7 +622,8 @@ class ZI_base_instrument(Instrument):
                  port: int= 8004,
                  apilevel: int= 5,
                  num_codewords: int= 0,
-                 logfile:str = None,
+                 awg_module: bool=True,
+                 logfile: str = None,
                  **kw) -> None:
         """
         Input arguments:
@@ -626,6 +633,7 @@ class ZI_base_instrument(Instrument):
             server          (str) the host where the ziDataServer is running
             port            (int) the port to connect to for the ziDataServer (don't change)
             apilevel        (int) the API version level to use (don't change unless you know what you're doing)
+            awg_module      (bool) create an awgModule
             num_codewords   (int) the number of codeword-based waveforms to prepare
             logfile         (str) file name where all commands should be logged
         """
@@ -682,20 +690,24 @@ class ZI_base_instrument(Instrument):
             raise
 
         # Create modules
-        self._awgModule = self.daq.awgModule()
-        self._awgModule.set('awgModule/device', device)
-        self._awgModule.execute()
+        if awg_module:
+            self._awgModule = self.daq.awgModule()
+            self._awgModule.set('awgModule/device', device)
+            self._awgModule.execute()
 
-        # Will hold information about all configured waveforms
-        self._awg_waveforms = {}
+            # Will hold information about all configured waveforms
+            self._awg_waveforms = {}
 
-        # Asserted when AWG needs to be reconfigured
-        self._awg_needs_configuration = [False]*(self._num_channels()//2)
-        self._awg_program = [None]*(self._num_channels()//2)
+            # Asserted when AWG needs to be reconfigured
+            self._awg_needs_configuration = [False]*(self._num_channels()//2)
+            self._awg_program = [None]*(self._num_channels()//2)
 
-        # Create waveform parameters
-        self._num_codewords = 0
-        self._add_codeword_waveform_parameters(num_codewords)
+            # Create waveform parameters
+            self._num_codewords = 0
+            self._add_codeword_waveform_parameters(num_codewords)
+        else:
+            self._awgModule = None
+
         # Create other neat parameters
         self._add_extra_parameters()
         # A list of all subscribed paths
