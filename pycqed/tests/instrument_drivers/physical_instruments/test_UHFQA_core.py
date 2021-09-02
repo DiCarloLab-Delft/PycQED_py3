@@ -140,3 +140,6 @@ class Test_UHFQA_core(unittest.TestCase):
         assert self.uhf.qas_0_rotations_3() == (1-1j)
         self.uhf.reset_rotation_params()
         assert self.uhf.qas_0_rotations_3() == (1+1j)
+
+    def test_start(self):
+        self.uhf.start()
