@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import re
+import copy
 from datetime import datetime
 from functools import partial
 
@@ -1440,7 +1441,7 @@ class ZI_base_instrument(Instrument):
         found_errors = False
 
         # Combine errors_to_ignore with commandline
-        _errors_to_ignore = self._errors_to_ignore
+        _errors_to_ignore = copy.copy(self._errors_to_ignore)
         if errors_to_ignore is not None:
             _errors_to_ignore += errors_to_ignore
 
