@@ -799,6 +799,9 @@ class ZI_base_instrument(Instrument):
     def _num_channels(self):
         raise NotImplementedError('Virtual method with no implementation!')
 
+    def _get_waveform_table(self, awg_nr: int) -> list:
+        raise NotImplementedError('Virtual method with no implementation!')    
+
     def _add_extra_parameters(self) -> None:
         """
         Adds extra useful parameters to the instrument.
