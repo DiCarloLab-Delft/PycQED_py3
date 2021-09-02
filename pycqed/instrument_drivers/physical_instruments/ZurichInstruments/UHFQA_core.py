@@ -11,6 +11,7 @@ import numpy as np
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 from pycqed.utilities.general import check_keyboard_interrupt
 
+from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
 
 log = logging.getLogger(__name__)
@@ -187,6 +188,17 @@ class UHFQA_core(zibase.ZI_base_instrument):
                 'this allows normalized calibration when performing cross-talk suppressed readout. The parameter '
                 'is not actually used in this driver, but in some of the support classes that make use of the driver.',
                 parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'wait_dly',
+            set_cmd=self._set_wait_dly,
+            get_cmd=self._get_wait_dly,
+            unit='',
+            label='AWG cycle delay',
+            docstring='Configures a delay in AWG clocks cycles (4.44 ns) to be '
+            'applied between when the AWG starts playing the readout waveform, and when it triggers the '
+            'actual readout.',
+            vals=validators.Ints())
 
     ##########################################################################
     # 'public' overrides for ZI_base_instrument
@@ -643,3 +655,9 @@ class UHFQA_core(zibase.ZI_base_instrument):
             'waves': False,
             'cases': False,
             'diocws': False}
+
+    def _set_wait_dly(self, value) -> None:
+        self.set('awgs_0_userregs_{}'.format(UHFQA_core.USER_REG_WAIT_DLY), value)
+
+    def _get_wait_dly(self):
+        return self.get('awgs_0_userregs_{}'.format(UHFQA_core.USER_REG_WAIT_DLY))

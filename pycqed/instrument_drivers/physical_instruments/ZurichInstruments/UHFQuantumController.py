@@ -300,17 +300,6 @@ class UHFQC(uhf.UHFQA_core, DIO.CalInterface):
             vals=validators.Anything())
 
         self.add_parameter(
-            'wait_dly',
-            set_cmd=self._set_wait_dly,
-            get_cmd=self._get_wait_dly,
-            unit='',
-            label='AWG cycle delay',
-            docstring='Configures a delay in AWG clocks cycles (4.44 ns) to be '
-            'applied between when the AWG starts playing the readout waveform, and when it triggers the '
-            'actual readout.',
-            vals=validators.Ints())
-
-        self.add_parameter(
             'cases',
             set_cmd=self._set_cases,
             get_cmd=self._get_cases,
