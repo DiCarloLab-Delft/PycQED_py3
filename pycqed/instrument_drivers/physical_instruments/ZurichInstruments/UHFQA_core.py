@@ -47,6 +47,18 @@ class ziUHFQCDIOCalibrationError(Exception):
 ##########################################################################
 
 class UHFQA_core(zibase.ZI_base_instrument):
+    """
+    This is the base PycQED driver for the 1.8 Gsample/s UHFQA developed
+    by Zurich Instruments. The class implements functionality that os
+    by both the DCL and QuDev versions of the UHFQA driver.
+
+    Requirements:
+    Installation instructions for Zurich Instrument Libraries.
+    1. install ziPython 3.5/3.6 ucs4 19.05 for 64bit Windows from
+        http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
+    2. upload the latest firmware to the UHFQA using the LabOne GUI
+    """
+    
     # Define minimum required revisions
     MIN_FWREVISION = 63210
     MIN_FPGAREVISION = 63133
@@ -58,16 +70,6 @@ class UHFQA_core(zibase.ZI_base_instrument):
     USER_REG_AVG_CNT = 3
     USER_REG_ERR_CNT = 4
 
-    """
-    This is the base PycQED driver for the 1.8 Gsample/s UHFQA developed
-    by Zurich Instruments.
-
-    Requirements:
-    Installation instructions for Zurich Instrument Libraries.
-    1. install ziPython 3.5/3.6 ucs4 19.05 for 64bit Windows from
-        http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
-    2. upload the latest firmware to the UHFQA using the LabOne GUI
-    """
     def __init__(self,
                  name,
                  device:                  str,
