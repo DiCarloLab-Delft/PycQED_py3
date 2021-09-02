@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import re
+import copy
 from datetime import datetime
 from functools import partial
 
@@ -304,6 +305,8 @@ class MockDAQServer():
         self.nodes[f'/{self.device}/system/fwrevision'] = {'type': 'Integer', 'value': 99999}
         self.nodes[f'/{self.device}/system/fpgarevision'] = {'type': 'Integer', 'value': 99999}
         self.nodes[f'/{self.device}/system/slaverevision'] = {'type': 'Integer', 'value': 99999}
+        self.nodes[f'/{self.device}/raw/error/json/errors'] = {
+                'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
 
         if self.devtype == 'UHFQA':
             self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'QA\nAWG'}
@@ -319,8 +322,6 @@ class MockDAQServer():
             self.nodes[f'/{self.device}/dios/0/mode'] = {'type': 'Integer', 'value': 0}
         elif self.devtype == 'HDAWG8':
             self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'PC\nME'}
-            self.nodes[f'/{self.device}/raw/error/json/errors'] = {
-                'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
             for i in range(32):
                 self.nodes['/' + self.device +
                         '/raw/dios/0/delays/' + str(i) + '/value'] = {'type': 'Integer', 'value': 0}
@@ -797,6 +798,9 @@ class ZI_base_instrument(Instrument):
 
     def _num_channels(self):
         raise NotImplementedError('Virtual method with no implementation!')
+
+    def _get_waveform_table(self, awg_nr: int) -> list:
+        raise NotImplementedError('Virtual method with no implementation!')    
 
     def _add_extra_parameters(self) -> None:
         """
@@ -1425,11 +1429,60 @@ class ZI_base_instrument(Instrument):
             pass
         super().close()
 
-    def check_errors(self, errors_to_ignore=None) -> None:
-        raise NotImplementedError('Virtual method with no implementation!')
+    def check_errors(self, errors_to_ignore=None):
+        errors = json.loads(self.getv('raw/error/json/errors'))
 
-    def clear_errors(self) -> None:
-        raise NotImplementedError('Virtual method with no implementation!')
+        # If this is the first time we are called, log the detected errors, but don't raise
+        # any exceptions
+        if self._errors is None:
+            raise_exceptions = False
+            self._errors = {}
+        else:
+            raise_exceptions = True
+
+        # Asserted in case errors were found
+        found_errors = False
+
+        # Combine errors_to_ignore with commandline
+        _errors_to_ignore = copy.copy(self._errors_to_ignore)
+        if errors_to_ignore is not None:
+            _errors_to_ignore += errors_to_ignore
+
+        # Go through the errors and update our structure, raise exceptions if anything changed
+        for m in errors['messages']:
+            code     = m['code']
+            count    = m['count']
+            severity = m['severity']
+            message  = m['message']
+
+            if not raise_exceptions:
+                self._errors[code] = {
+                    'count'   : count,
+                    'severity': severity,
+                    'message' : message}
+                log.warning(f'{self.devname}: Code {code}: "{message}" ({severity})')
+            else:
+                # Check if there are new errors
+                if code not in self._errors or count > self._errors[code]['count']:
+                    if code in _errors_to_ignore:
+                        log.warning(f'{self.devname}: {message} ({code}/{severity})')
+                    else:
+                        log.error(f'{self.devname}: {message} ({code}/{severity})')
+                        found_errors = True
+
+                if code in self._errors:
+                    self._errors[code]['count'] = count
+                else:
+                    self._errors[code] = {
+                        'count'   : count,
+                        'severity': severity,
+                        'message' : message}
+
+        if found_errors:
+            log.error('Errors detected during run-time!')
+
+    def clear_errors(self):
+        self.seti('raw/error/clear', 1)
 
     def demote_error(self, code: str):
         """
@@ -1442,7 +1495,6 @@ class ZI_base_instrument(Instrument):
             is raised. The code is a string like "DIOCWCASE".
         """
         self._errors_to_ignore.append(code)
-
 
     def reset_waveforms_zeros(self):
         """
