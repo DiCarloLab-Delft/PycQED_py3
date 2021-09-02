@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import logging
 import re
 from datetime import datetime
+from functools import partial
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators
@@ -257,6 +258,7 @@ class MockDAQServer():
         self.devtype = None
         self.poll_nodes = []
         self.verbose = verbose
+        self.async_nodes = []
 
     def awgModule(self):
         return MockAwgModule(self)
@@ -391,6 +393,16 @@ class MockDAQServer():
 
         self.nodes[path]['value'] = value
 
+    def asyncSetInt(self, path, value):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path +
+                                 "' used with mocked server and device!")
+
+        if self.verbose:
+            print('asyncSetInt', path, value)
+
+        self.async_nodes.append(partial(self.setInt, path, value))
+
     def setDouble(self, path, value):
         if path not in self.nodes:
             raise ziRuntimeError("Unknown node '" + path +
@@ -398,6 +410,15 @@ class MockDAQServer():
         if self.verbose:
             print('setDouble', path, value)
         self.nodes[path]['value'] = value
+
+    def asyncSetDouble(self, path, value):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path +
+                                 "' used with mocked server and device!")
+        if self.verbose:
+            print('setDouble', path, value)
+
+        self.async_nodes.append(partial(self.setDouble, path, value))
 
     def setVector(self, path, value):
         if path not in self.nodes:
@@ -487,10 +508,11 @@ class MockDAQServer():
             self.poll_nodes.remove(path)
 
     def sync(self):
-        """The sync method does not need to do anything as there are no
-        device delays to deal with when using the mock server.
+        """The sync method does not need to do anything except goes through
+        the list of nodes set asynchronously and executes those.
         """
-        pass
+        for p in self.async_nodes:
+            p()
 
     def _load_parameter_file(self, filename: str):
         """
@@ -570,7 +592,7 @@ class MockAwgModule():
         if path == 'awgModule/device':
             value = [self._device]
         elif path == 'awgModule/index':
-            value[self._index]
+            value = [self._index]
         elif path == 'awgModule/compiler/statusstring':
             value = ['File successfully uploaded']
         else:
@@ -719,6 +741,9 @@ class ZI_base_instrument(Instrument):
         self._errors_to_ignore = []
         # Make initial error check
         self.check_errors()
+
+        # Default is not to use async mode
+        self._async_mode = False
 
         # Optionally setup log file
         if logfile is not None:
@@ -1254,21 +1279,30 @@ class ZI_base_instrument(Instrument):
 
     def setd(self, path, value) -> None:
         self._write_cmd_to_logfile(f'daq.setDouble("{path}", {value})')
-        self.daq.setDouble(self._get_full_path(path), value)
+        if self._async_mode:
+            self.daq.asyncSetDouble(self._get_full_path(path), value)
+        else:
+            self.daq.setDouble(self._get_full_path(path), value)
 
     def getd(self, path):
         return self.daq.getDouble(self._get_full_path(path))
 
     def seti(self, path, value) -> None:
         self._write_cmd_to_logfile(f'daq.setDouble("{path}", {value})')
-        self.daq.setInt(self._get_full_path(path), value)
+        if self._async_mode:
+            self.daq.asyncSetInt(self._get_full_path(path), value)
+        else:
+            self.daq.setInt(self._get_full_path(path), value)
 
     def geti(self, path):
         return self.daq.getInt(self._get_full_path(path))
 
     def sets(self, path, value) -> None:
         self._write_cmd_to_logfile(f'daq.setString("{path}", {value})')
-        self.daq.setString(self._get_full_path(path), value)
+        if self._async_mode:
+            self.daq.asyncSetString(self._get_full_path(path), value)
+        else:
+            self.daq.setString(self._get_full_path(path), value)
 
     def gets(self, path):
         return self.daq.getString(self._get_full_path(path))
@@ -1521,3 +1555,10 @@ class ZI_base_instrument(Instrument):
 
     def assure_ext_clock(self) -> None:
         raise NotImplementedError('Virtual method with no implementation!')
+
+    def asyncBegin(self):
+        self._async_mode = True
+
+    def asyncEnd(self):
+        self.daq.sync()
+        self._async_mode = False 

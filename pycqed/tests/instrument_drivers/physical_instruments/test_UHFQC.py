@@ -187,3 +187,15 @@ class Test_UHFQC(unittest.TestCase):
         Test_UHFQC.uhf.close()
         self.setup_class()
         self.assertEqual(Test_UHFQC.uhf.devname, 'dev2109')
+
+    def test_async(self):
+        self.uhf.awgs_0_userregs_0(0)
+        self.uhf.awgs_0_triggers_0_level(0.0)
+        self.uhf.asyncBegin()
+        self.uhf.awgs_0_userregs_0(100)
+        self.uhf.awgs_0_triggers_0_level(1.123)
+        assert self.uhf.awgs_0_userregs_0() == 0
+        assert self.uhf.awgs_0_triggers_0_level() == 0
+        self.uhf.asyncEnd()
+        assert self.uhf.awgs_0_userregs_0() == 100
+        assert self.uhf.awgs_0_triggers_0_level() == 1.123
