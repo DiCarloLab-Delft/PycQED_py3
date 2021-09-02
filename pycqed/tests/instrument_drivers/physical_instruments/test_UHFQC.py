@@ -120,6 +120,27 @@ class Test_UHFQC(unittest.TestCase):
     def test_print_overview(self):
         self.uhf.print_overview()
 
+    def test_minimum_holdoff(self):
+        # Test without averaging
+        self.uhf.qas_0_integration_length(128)
+        self.uhf.qas_0_result_averages(1)
+        self.uhf.qas_0_delay(0)
+        assert self.uhf.minimum_holdoff() == 800/1.8e9
+        self.uhf.qas_0_delay(896)
+        assert self.uhf.minimum_holdoff() == (896+16)/1.8e9
+        self.uhf.qas_0_integration_length(2048)
+        assert self.uhf.minimum_holdoff() == (2048)/1.8e9
+
+        # Test with averaging
+        self.uhf.qas_0_result_averages(16)
+        self.uhf.qas_0_delay(0)
+        self.uhf.qas_0_integration_length(128)
+        assert self.uhf.minimum_holdoff() == 2560/1.8e9
+        self.uhf.qas_0_delay(896)
+        assert self.uhf.minimum_holdoff() == 2560/1.8e9
+        self.uhf.qas_0_integration_length(4096)
+        assert self.uhf.minimum_holdoff() == 4096/1.8e9
+
     def test_reset_acquisition_params(self):
         self.uhf.awgs_0_userregs_0(100)
         self.uhf.awgs_0_userregs_15(153)
