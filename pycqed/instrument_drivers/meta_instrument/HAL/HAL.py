@@ -244,16 +244,17 @@ the HAL constructs a single object representing all instruments used, based on a
 
 FIXME: notes:
 - factory pattern
-- an instrument implements particular elements, e.g. tx.AWG, tx.filterIIR, tx.upconverter, rx.downconverter, rx.detector
+- an instrument implements particular elements, e.g. one or more of tx.AWG, tx.filterIIR, tx.upconverter, rx.downconverter, rx.detector
 - how to handle (e.g.) internal upconverter vs. external: attach instrument to root node, driver determines sub nodes.
   how to manage profiles then?
-- define allowed node structure: tree and leaf nodes, check JSON against this? Use JSON schema?
+    - define allowed node structure: tree and leaf nodes, check JSON against this? Use JSON schema?
 - terminology: 
     -   elements vs. nodes vs tree
         -   the actual variables live inside the elements, can persist through serialization
     -   locations (resources? targets?) stuff that you can control in real time? (Virtual) place where you can generate/measure signal
-        A waveform can be output on 'q0.flux'. But we can als set q0.flux.amplitude, maybe from the sequencer, or from sw.
+        A waveform can be output on 'q0.flux'. But we can also set q0.flux.amplitude, maybe from the sequencer, or from sw.
         What makes a node eligible to be a real-time target: the presence of an AWG at that point (or ACQ for measurement) (i.e. have certain parent class?)
+        NB: also see ZI nodes, that can partly be set from seqc
         
         Rephrase:
         a resource is something you can control. If it is a rt capable resource, it can be controlled in rt. The waveform 
@@ -274,7 +275,7 @@ FIXME: notes:
 - where to know about sampling rate
 - compare: https://qcodes.github.io/Qcodes/examples/Station.html
     -   uses YAML
-    -   also sets parameters, which we dislike
+    -   also sets parameters, which we dislike (separate parameters from structure)
     -   
     
 - element structure created
@@ -287,8 +288,12 @@ FIXME: notes:
     q*.rx.
     
     also:
-    .instrument
-    .group/channel
+    q*.instrument
+    q*.group/channel
+    
+    - what is the type of q*? Qubit? Type of choice?
+    - do we also have access to the calibration routines from Qubit object from these nodes? Or do we redesign these,
+        using some base class
     
 """
 
