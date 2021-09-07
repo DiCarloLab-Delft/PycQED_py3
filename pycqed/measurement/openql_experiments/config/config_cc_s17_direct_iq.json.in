@@ -245,7 +245,6 @@
         // instructions for S17 (FIXME: remove)
         "sf_cz_ne q10": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [1]
@@ -253,7 +252,6 @@
         },
         "sf_cz_ne q11": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [1]
@@ -261,7 +259,6 @@
         },
         "sf_cz_ne q14": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [1]
@@ -269,7 +266,6 @@
         },
         "sf_cz_ne q15": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [1]
@@ -277,7 +273,6 @@
         },
         "sf_cz_nw q11": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [4]
@@ -285,7 +280,6 @@
         },
         "sf_cz_nw q12": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [4]
@@ -293,7 +287,6 @@
         },
         "sf_cz_nw q14": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [4]
@@ -301,7 +294,6 @@
         },
         "sf_cz_nw q15": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [4]
@@ -309,7 +301,6 @@
         },
         "sf_cz_sw q8": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [3]
@@ -317,7 +308,6 @@
         },
         "sf_cz_sw q9": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [3]
@@ -325,7 +315,6 @@
         },
         "sf_cz_sw q11": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [3]
@@ -333,7 +322,6 @@
         },
         "sf_cz_sw q12": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [3]
@@ -341,7 +329,6 @@
         },
         "sf_cz_se q8": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [2]
@@ -349,7 +336,6 @@
         },
         "sf_cz_se q9": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [2]
@@ -357,7 +343,6 @@
         },
         "sf_cz_se q10": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [2]
@@ -365,7 +350,6 @@
         },
         "sf_cz_se q11": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [2]
@@ -373,7 +357,6 @@
         },
         "sf_park q11": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [5]
@@ -381,7 +364,6 @@
         },
         "sf_park q12": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [5]
@@ -389,7 +371,6 @@
         },
         "sf_park q14": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [5]
@@ -397,7 +378,6 @@
         },
         "sf_park q15": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [5]
@@ -405,7 +385,6 @@
         },
         "sf_park q13": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [5]
@@ -413,7 +392,6 @@
         },
         "sf_park q10": {
             "duration": 40,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [5]
