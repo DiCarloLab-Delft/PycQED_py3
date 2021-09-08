@@ -22,7 +22,8 @@ default_mw_lutmap = {
     11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90, "type" : "ge"},
     12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
-    14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"}
+    14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
+    30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"}
 }
 
 inspire_mw_lutmap = {
@@ -243,6 +244,20 @@ class Base_MW_LutMan(Base_LutMan):
         self.spec_func = wf.block_pulse
 
         self._add_channel_params()
+        # FIXME: Remove after the end of RUS experiment
+        self.add_parameter('w1', label='Weight 1 for RUS Experiment',
+                           vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        self.add_parameter('w2', label='Weight 2 for RUS Experiment',
+                           vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        self.add_parameter('bias', label='Bias for RUS Experiment',
+                           vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+
         self.add_parameter('cfg_sideband_mode',
                            vals=vals.Enum('real-time', 'static'),
                            initial_value='static',

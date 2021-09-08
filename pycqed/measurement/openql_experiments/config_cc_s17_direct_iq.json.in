@@ -139,7 +139,7 @@
                     "ref_control_mode": "uhfqa-9ch",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 0,
+                        "slot": 2,
                         "io_module": "CC-CONN-DIO"
                     }
                 },
@@ -151,7 +151,7 @@
                     "ref_control_mode": "uhfqa-9ch",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 1,
+                        "slot": 4,
                         "io_module": "CC-CONN-DIO"
                     }
                 },
@@ -163,7 +163,7 @@
                     "ref_control_mode": "uhfqa-9ch",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 2,
+                        "slot": 5,
                         "io_module": "CC-CONN-DIO"
                     }
                 },
@@ -182,7 +182,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 3,
+                        "slot": 0,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -199,7 +199,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 4,
+                        "slot": 1,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -216,7 +216,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 8,
+                        "slot": 6,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -233,7 +233,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 9,
+                        "slot": 7,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -250,7 +250,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 10,
+                        "slot": 8,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -264,7 +264,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 5,
+                        "slot": 3,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -277,7 +277,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 6,
+                        "slot": 9,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -290,7 +290,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 7,
+                        "slot": 10,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 }
@@ -306,7 +306,6 @@
         "x %0": ["rx180 %0"],
         "y %0": ["ry180 %0"],
         "roty90 %0": ["ry90 %0"],
-        "cnot %0 %1": ["ry90 %1", "cz %0 %1", "ry90 %1"],
 
         // To support other forms of writing the same gates
         "x180 %0": ["rx180 %0"],
@@ -559,10 +558,37 @@
         "cnot_park1 %0 %1 %2": ["ry90 %1", "cz %0 %1", "park_cz %2", "ry90 %1"],
         "cnot_park2 %0 %1 %2": ["ry90 %1", "cz_park %0 %1 %2", "ry90 %1"],
         "cz_park1 %0 %1 %2": ["cz %0 %1", "park_cz %2"],
-        "rxm180 %0": ["cw_27 %0"]
+        "rxm180 %0": ["cw_27 %0"],
+        "cz q12,q15": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
+        "cz q15,q12": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
 
-        // also possible
-//        "blabla q0 q1": ["foo q0", "foo q1", "foo q3"]
+        "measure_fb %0": ["measure %0", "_wait_uhfqa %0", "_dist_dsm %0", "_wait_dsm %0"],
+        "rx2theta %0": ["cw_27 %0"],
+        "rxm2theta %0": ["cw_28 %0"],
+        "rx2thetaalpha %0": ["cw_29 %0"],
+        "rphi180 %0": ["cw_27 %0"],
+        "rphi180beta %0": ["cw_28 %0"],
+        "rx180beta %0": ["cw_29 %0"],
+        "rphi180beta2 %0": ["cw_30 %0"],
+        "ry90beta %0": ["cw_28 %0"],
+        "rym90alpha %0": ["cw_29 %0"],
+		"ry90betapi %0": ["cw_30 %0"],
+		"rphi180alpha %0": ["cw_31 %0"],
+		"rx90alpha %0": ["cw_26 %0"],
+		"rx180alpha2 %0": ["cw_25 %0"],
+        "rphim2theta %0": ["cw_28 %0"],
+        "rY2theta %0": ["cw_29 %0"],
+        "rphi180pi2 %0": ["cw_31 %0"],
+        "rx2b %0": ["cw_09 %0"],
+		"rxw1 %0": ["cw_10 %0"],
+		"rxw2 %0": ["cw_11 %0"],
+        "ry2b %0": ["cw_12 %0"],
+        "ryw1 %0": ["cw_13 %0"],
+        "ryw2 %0": ["cw_14 %0"],
+        "rphim45 %0": ["cw_15 %0"],
+        "rphi45 %0":  ["cw_16 %0"],
+        "rphi135m90 %0": ["cw_17 %0"],
+        "rphi13590 %0": ["cw_18 %0"]
     },
 
 
@@ -580,6 +606,16 @@
 //                "ref_signal": "single-qubit-mw",
                 "signal": [],   // no signal, to prevent conflicts with other gates (NB: will output nothing because VSM stays off)
                 "static_codeword_override": [0]
+            }
+        },
+        "rx45": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x",
+            "cc": {
+                "ref_signal": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
+                "static_codeword_override": [13]
             }
         },
         "rx180": {
@@ -642,15 +678,234 @@
                 "static_codeword_override": [6]
             }
         },
-
-        "cz": {
+        // "cz": {
+        //     "duration": @FLUX_DURATION@,
+        //     "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+        //     "type": "flux",
+        //     "cc_light_instr": "cz",
+        //     "cc": {
+        //         "ref_signal": "two-qubit-flux",     // NB: reference, instead of defining "signal" here
+        //         "static_codeword_override": [1,1]   // FIXME
+        //     }
+        // },
+        "sf_cz_ne q10": {
             "duration": @FLUX_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "type": "flux",
-            "cc_light_instr": "cz",
+            "cc_light_instr": "sf_cz_ne",
             "cc": {
-                "ref_signal": "two-qubit-flux",     // NB: reference, instead of defining "signal" here
-                "static_codeword_override": [1,1]   // FIXME
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [1]
+            }
+        },
+        "sf_cz_ne q11": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_ne",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [1]
+            }
+        },
+        "sf_cz_ne q14": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_ne",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [1]
+            }
+        },
+        "sf_cz_ne q15": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_ne",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [1]
+            }
+        },
+        "sf_cz_nw q11": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_nw",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [4]
+            }
+        },
+        "sf_cz_nw q12": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_nw",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [4]
+            }
+        },
+        "sf_cz_nw q14": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_nw",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [4]
+            }
+        },
+        "sf_cz_nw q15": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_nw",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [4]
+            }
+        },
+        "sf_cz_sw q8": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_sw",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [3]
+            }
+        },
+        "sf_cz_sw q9": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_sw",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [3]
+            }
+        },
+        "sf_cz_sw q11": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_sw",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [3]
+            }
+        },
+        "sf_cz_sw q12": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_sw",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [3]
+            }
+        },
+        "sf_cz_se q8": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_se",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [2]
+            }
+        },
+        "sf_cz_se q9": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_se",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [2]
+            }
+        },
+        "sf_cz_se q10": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_se",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [2]
+            }
+        },
+        "sf_cz_se q11": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_se",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [2]
+            }
+        },
+        "sf_park q11": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_park",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [5]
+            }
+        },
+        "sf_park q12": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_park",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [5]
+            }
+        },
+        "sf_park q14": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_park",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [5]
+            }
+        },
+        "sf_park q15": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_park",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [5]
+            }
+        },
+        "sf_park q13": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_park",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [5]
+            }
+        },
+        "sf_park q10": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_park",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [5]
             }
         },
         // "flux-dance-1": {
@@ -2480,27 +2735,51 @@
                 "static_codeword_override": [2]
             }
         },
-        "sf_sp_park": {
-            "duration": @FLUX_DURATION@,
+        // cannot be any shorter according to Wouter
+        "if_1_break": {
+			"duration": 60,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 1
+				}
+			}
+		},
+		// cannot be any shorter according to Wouter
+		"if_0_break": {
+			"duration": 60,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 0
+				}
+			}
+		},
+		// the smallest value was empirically found to be 560 ns
+		"_wait_uhfqa": {
+            "duration": 560,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "type": "flux",
-            "cc_light_instr": "sf_sp_park",
             "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [5]
+                "signal": []
             }
         },
-        "sf_square": {
-            "duration": @FLUX_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "type": "flux",
-            "cc_light_instr": "sf_square",
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [6]
-            }
-        }
-    },  // end of "instructions"
+        // cannot be any shorter
+        "_dist_dsm": {
+			"duration": 20,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+			    "readout_mode": "feedback",
+				"signal": [
+					{	"type": "measure",
+						"operand_idx": 0,
+						"value": []
+					}
+                ]
+			}
+		}
+	}	// end of "instructions"
 
 
     // NB: the "topology" keyword must be present, but the contents are only interpreted by

@@ -5,7 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import logging
 import re
+import copy
 from datetime import datetime
+from functools import partial
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators
@@ -243,7 +245,8 @@ class MockDAQServer():
     just entries in a 'dict') based on the device name that is used when
     connecting to a device. These nodes differ depending on the instrument
     type, which is determined by the number in the device name: dev2XXX are
-    UHFQA instruments and dev8XXX are HDAWG8 instruments.
+    UHFQA instruments, dev8XXX are HDAWG8 instruments, dev10XXX are PQSC
+    instruments.
     """
 
     def __init__(self, server, port, apilevel, verbose=False):
@@ -256,6 +259,7 @@ class MockDAQServer():
         self.devtype = None
         self.poll_nodes = []
         self.verbose = verbose
+        self.async_nodes = []
 
     def awgModule(self):
         return MockAwgModule(self)
@@ -279,6 +283,8 @@ class MockDAQServer():
             self.devtype = 'UHFQA'
         elif self.device.lower().startswith('dev8'):
             self.devtype = 'HDAWG8'
+        elif self.device.lower().startswith('dev10'):
+            self.devtype = 'PQSC'
 
         # Add paths
         filename = os.path.join(os.path.dirname(os.path.abspath(
@@ -299,6 +305,8 @@ class MockDAQServer():
         self.nodes[f'/{self.device}/system/fwrevision'] = {'type': 'Integer', 'value': 99999}
         self.nodes[f'/{self.device}/system/fpgarevision'] = {'type': 'Integer', 'value': 99999}
         self.nodes[f'/{self.device}/system/slaverevision'] = {'type': 'Integer', 'value': 99999}
+        self.nodes[f'/{self.device}/raw/error/json/errors'] = {
+                'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
 
         if self.devtype == 'UHFQA':
             self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'QA\nAWG'}
@@ -314,8 +322,6 @@ class MockDAQServer():
             self.nodes[f'/{self.device}/dios/0/mode'] = {'type': 'Integer', 'value': 0}
         elif self.devtype == 'HDAWG8':
             self.nodes[f'/{self.device}/features/options'] = {'type': 'String', 'value': 'PC\nME'}
-            self.nodes[f'/{self.device}/raw/error/json/errors'] = {
-                'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
             for i in range(32):
                 self.nodes['/' + self.device +
                         '/raw/dios/0/delays/' + str(i) + '/value'] = {'type': 'Integer', 'value': 0}
@@ -340,6 +346,9 @@ class MockDAQServer():
             self.nodes[f'/{self.device}/dios/0/drive'] = {'type': 'Integer', 'value': 0}
             for dio_nr in range(32):
                 self.nodes[f'/{self.device}/raw/dios/0/delays/{dio_nr}/value'] = {'type': 'Integer', 'value': 0}
+        elif self.devtype == 'PQSC':
+            self.nodes[f'/{self.device}/raw/error/json/errors'] = {
+                'type': 'String', 'value': '{"sequence_nr" : 0, "new_errors" : 0, "first_timestamp" : 0, "timestamp" : 0, "timestamp_utc" : "2019-08-07 17 : 33 : 55", "messages" : []}'}
 
     def listNodesJSON(self, path):
         pass
@@ -385,6 +394,16 @@ class MockDAQServer():
 
         self.nodes[path]['value'] = value
 
+    def asyncSetInt(self, path, value):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path +
+                                 "' used with mocked server and device!")
+
+        if self.verbose:
+            print('asyncSetInt', path, value)
+
+        self.async_nodes.append(partial(self.setInt, path, value))
+
     def setDouble(self, path, value):
         if path not in self.nodes:
             raise ziRuntimeError("Unknown node '" + path +
@@ -392,6 +411,15 @@ class MockDAQServer():
         if self.verbose:
             print('setDouble', path, value)
         self.nodes[path]['value'] = value
+
+    def asyncSetDouble(self, path, value):
+        if path not in self.nodes:
+            raise ziRuntimeError("Unknown node '" + path +
+                                 "' used with mocked server and device!")
+        if self.verbose:
+            print('setDouble', path, value)
+
+        self.async_nodes.append(partial(self.setDouble, path, value))
 
     def setVector(self, path, value):
         if path not in self.nodes:
@@ -481,10 +509,11 @@ class MockDAQServer():
             self.poll_nodes.remove(path)
 
     def sync(self):
-        """The sync method does not need to do anything as there are no
-        device delays to deal with when using the mock server.
+        """The sync method does not need to do anything except goes through
+        the list of nodes set asynchronously and executes those.
         """
-        pass
+        for p in self.async_nodes:
+            p()
 
     def _load_parameter_file(self, filename: str):
         """
@@ -564,7 +593,7 @@ class MockAwgModule():
         if path == 'awgModule/device':
             value = [self._device]
         elif path == 'awgModule/index':
-            value[self._index]
+            value = [self._index]
         elif path == 'awgModule/compiler/statusstring':
             value = ['File successfully uploaded']
         else:
@@ -616,7 +645,8 @@ class ZI_base_instrument(Instrument):
                  port: int= 8004,
                  apilevel: int= 5,
                  num_codewords: int= 0,
-                 logfile:str = None,
+                 awg_module: bool=True,
+                 logfile: str = None,
                  **kw) -> None:
         """
         Input arguments:
@@ -626,6 +656,7 @@ class ZI_base_instrument(Instrument):
             server          (str) the host where the ziDataServer is running
             port            (int) the port to connect to for the ziDataServer (don't change)
             apilevel        (int) the API version level to use (don't change unless you know what you're doing)
+            awg_module      (bool) create an awgModule
             num_codewords   (int) the number of codeword-based waveforms to prepare
             logfile         (str) file name where all commands should be logged
         """
@@ -682,20 +713,24 @@ class ZI_base_instrument(Instrument):
             raise
 
         # Create modules
-        self._awgModule = self.daq.awgModule()
-        self._awgModule.set('awgModule/device', device)
-        self._awgModule.execute()
+        if awg_module:
+            self._awgModule = self.daq.awgModule()
+            self._awgModule.set('awgModule/device', device)
+            self._awgModule.execute()
 
-        # Will hold information about all configured waveforms
-        self._awg_waveforms = {}
+            # Will hold information about all configured waveforms
+            self._awg_waveforms = {}
 
-        # Asserted when AWG needs to be reconfigured
-        self._awg_needs_configuration = [False]*(self._num_channels()//2)
-        self._awg_program = [None]*(self._num_channels()//2)
+            # Asserted when AWG needs to be reconfigured
+            self._awg_needs_configuration = [False]*(self._num_channels()//2)
+            self._awg_program = [None]*(self._num_channels()//2)
 
-        # Create waveform parameters
-        self._num_codewords = 0
-        self._add_codeword_waveform_parameters(num_codewords)
+            # Create waveform parameters
+            self._num_codewords = 0
+            self._add_codeword_waveform_parameters(num_codewords)
+        else:
+            self._awgModule = None
+
         # Create other neat parameters
         self._add_extra_parameters()
         # A list of all subscribed paths
@@ -707,6 +742,9 @@ class ZI_base_instrument(Instrument):
         self._errors_to_ignore = []
         # Make initial error check
         self.check_errors()
+
+        # Default is not to use async mode
+        self._async_mode = False
 
         # Optionally setup log file
         if logfile is not None:
@@ -760,6 +798,9 @@ class ZI_base_instrument(Instrument):
 
     def _num_channels(self):
         raise NotImplementedError('Virtual method with no implementation!')
+
+    def _get_waveform_table(self, awg_nr: int) -> list:
+        raise NotImplementedError('Virtual method with no implementation!')    
 
     def _add_extra_parameters(self) -> None:
         """
@@ -1242,21 +1283,30 @@ class ZI_base_instrument(Instrument):
 
     def setd(self, path, value) -> None:
         self._write_cmd_to_logfile(f'daq.setDouble("{path}", {value})')
-        self.daq.setDouble(self._get_full_path(path), value)
+        if self._async_mode:
+            self.daq.asyncSetDouble(self._get_full_path(path), value)
+        else:
+            self.daq.setDouble(self._get_full_path(path), value)
 
     def getd(self, path):
         return self.daq.getDouble(self._get_full_path(path))
 
     def seti(self, path, value) -> None:
         self._write_cmd_to_logfile(f'daq.setDouble("{path}", {value})')
-        self.daq.setInt(self._get_full_path(path), value)
+        if self._async_mode:
+            self.daq.asyncSetInt(self._get_full_path(path), value)
+        else:
+            self.daq.setInt(self._get_full_path(path), value)
 
     def geti(self, path):
         return self.daq.getInt(self._get_full_path(path))
 
     def sets(self, path, value) -> None:
         self._write_cmd_to_logfile(f'daq.setString("{path}", {value})')
-        self.daq.setString(self._get_full_path(path), value)
+        if self._async_mode:
+            self.daq.asyncSetString(self._get_full_path(path), value)
+        else:
+            self.daq.setString(self._get_full_path(path), value)
 
     def gets(self, path):
         return self.daq.getString(self._get_full_path(path))
@@ -1379,11 +1429,60 @@ class ZI_base_instrument(Instrument):
             pass
         super().close()
 
-    def check_errors(self, errors_to_ignore=None) -> None:
-        raise NotImplementedError('Virtual method with no implementation!')
+    def check_errors(self, errors_to_ignore=None):
+        errors = json.loads(self.getv('raw/error/json/errors'))
 
-    def clear_errors(self) -> None:
-        raise NotImplementedError('Virtual method with no implementation!')
+        # If this is the first time we are called, log the detected errors, but don't raise
+        # any exceptions
+        if self._errors is None:
+            raise_exceptions = False
+            self._errors = {}
+        else:
+            raise_exceptions = True
+
+        # Asserted in case errors were found
+        found_errors = False
+
+        # Combine errors_to_ignore with commandline
+        _errors_to_ignore = copy.copy(self._errors_to_ignore)
+        if errors_to_ignore is not None:
+            _errors_to_ignore += errors_to_ignore
+
+        # Go through the errors and update our structure, raise exceptions if anything changed
+        for m in errors['messages']:
+            code     = m['code']
+            count    = m['count']
+            severity = m['severity']
+            message  = m['message']
+
+            if not raise_exceptions:
+                self._errors[code] = {
+                    'count'   : count,
+                    'severity': severity,
+                    'message' : message}
+                log.warning(f'{self.devname}: Code {code}: "{message}" ({severity})')
+            else:
+                # Check if there are new errors
+                if code not in self._errors or count > self._errors[code]['count']:
+                    if code in _errors_to_ignore:
+                        log.warning(f'{self.devname}: {message} ({code}/{severity})')
+                    else:
+                        log.error(f'{self.devname}: {message} ({code}/{severity})')
+                        found_errors = True
+
+                if code in self._errors:
+                    self._errors[code]['count'] = count
+                else:
+                    self._errors[code] = {
+                        'count'   : count,
+                        'severity': severity,
+                        'message' : message}
+
+        if found_errors:
+            log.error('Errors detected during run-time!')
+
+    def clear_errors(self):
+        self.seti('raw/error/clear', 1)
 
     def demote_error(self, code: str):
         """
@@ -1396,7 +1495,6 @@ class ZI_base_instrument(Instrument):
             is raised. The code is a string like "DIOCWCASE".
         """
         self._errors_to_ignore.append(code)
-
 
     def reset_waveforms_zeros(self):
         """
@@ -1509,3 +1607,10 @@ class ZI_base_instrument(Instrument):
 
     def assure_ext_clock(self) -> None:
         raise NotImplementedError('Virtual method with no implementation!')
+
+    def asyncBegin(self):
+        self._async_mode = True
+
+    def asyncEnd(self):
+        self.daq.sync()
+        self._async_mode = False 

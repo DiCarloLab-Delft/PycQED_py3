@@ -1,0 +1,2753 @@
+{
+    "CLOCKBASE": {
+        "Description": "Returns the internal clock frequency of the device.",
+        "Node": "CLOCKBASE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "EXECUTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "EXECUTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "EXECUTION/HOLDOFF": {
+        "Description": "[empty]",
+        "Node": "EXECUTION/HOLDOFF",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "EXECUTION/PROGRESS": {
+        "Description": "[empty]",
+        "Node": "EXECUTION/PROGRESS",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "EXECUTION/REPETITIONS": {
+        "Description": "[empty]",
+        "Node": "EXECUTION/REPETITIONS",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "FEATURES/CODE": {
+        "Description": "Node providing a mechanism to write feature codes.",
+        "Node": "FEATURES/CODE",
+        "Properties": "Read, Write",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "FEATURES/DEVTYPE": {
+        "Description": "Returns the device type.",
+        "Node": "FEATURES/DEVTYPE",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "FEATURES/OPTIONS": {
+        "Description": "Returns enabled options.",
+        "Node": "FEATURES/OPTIONS",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "FEATURES/SERIAL": {
+        "Description": "Device serial number.",
+        "Node": "FEATURES/SERIAL",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "STATS/CMDSTREAM/BANDWIDTH": {
+        "Description": "Command streaming bandwidth usage on the physical network connection between device and data server.",
+        "Node": "STATS/CMDSTREAM/BANDWIDTH",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Mbit/s"
+    },
+    "STATS/CMDSTREAM/BYTESRECEIVED": {
+        "Description": "Number of bytes received on the command stream from the device since session start.",
+        "Node": "STATS/CMDSTREAM/BYTESRECEIVED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "B"
+    },
+    "STATS/CMDSTREAM/BYTESSENT": {
+        "Description": "Number of bytes sent on the command stream from the device since session start.",
+        "Node": "STATS/CMDSTREAM/BYTESSENT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "B"
+    },
+    "STATS/CMDSTREAM/PACKETSLOST": {
+        "Description": "Number of command packets lost since device start. Command packets contain device settings that are sent to and received from the device.",
+        "Node": "STATS/CMDSTREAM/PACKETSLOST",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/CMDSTREAM/PACKETSRECEIVED": {
+        "Description": "Number of packets received on the command stream from the device since session start.",
+        "Node": "STATS/CMDSTREAM/PACKETSRECEIVED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/CMDSTREAM/PACKETSSENT": {
+        "Description": "Number of packets sent on the command stream to the device since session start.",
+        "Node": "STATS/CMDSTREAM/PACKETSSENT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/CMDSTREAM/PENDING": {
+        "Description": "Number of buffers ready for receiving command packets from the device.",
+        "Node": "STATS/CMDSTREAM/PENDING",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/CMDSTREAM/PROCESSING": {
+        "Description": "Number of buffers being processed for command packets. Small values indicate proper performance. For a TCP/IP interface, command packets are sent using the TCP protocol.",
+        "Node": "STATS/CMDSTREAM/PROCESSING",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/DATASTREAM/BANDWIDTH": {
+        "Description": "Data streaming bandwidth usage on the physical network connection between device and data server.",
+        "Node": "STATS/DATASTREAM/BANDWIDTH",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Mbit/s"
+    },
+    "STATS/DATASTREAM/BYTESRECEIVED": {
+        "Description": "Number of bytes received on the data stream from the device since session start.",
+        "Node": "STATS/DATASTREAM/BYTESRECEIVED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "B"
+    },
+    "STATS/DATASTREAM/PACKETSLOST": {
+        "Description": "Number of data packets lost since device start. Data packets contain measurement data.",
+        "Node": "STATS/DATASTREAM/PACKETSLOST",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/DATASTREAM/PACKETSRECEIVED": {
+        "Description": "Number of packets received on the data stream from the device since session start.",
+        "Node": "STATS/DATASTREAM/PACKETSRECEIVED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/DATASTREAM/PENDING": {
+        "Description": "Number of buffers ready for receiving data packets from the device.",
+        "Node": "STATS/DATASTREAM/PENDING",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/DATASTREAM/PROCESSING": {
+        "Description": "Number of buffers being processed for data packets. Small values indicate proper performance. For a TCP/IP interface, data packets are sent using the UDP protocol.",
+        "Node": "STATS/DATASTREAM/PROCESSING",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATS/PHYSICAL/FPGA/AUX": {
+        "Description": "Supply voltage of the FPGA.",
+        "Node": "STATS/PHYSICAL/FPGA/AUX",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "STATS/PHYSICAL/FPGA/CORE": {
+        "Description": "Core voltage of the FPGA.",
+        "Node": "STATS/PHYSICAL/FPGA/CORE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "STATS/PHYSICAL/FPGA/TEMP": {
+        "Description": "Internal temperature of the FPGA.",
+        "Node": "STATS/PHYSICAL/FPGA/TEMP",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "STATS/PHYSICAL/OVERTEMPERATURE": {
+        "Description": "This flag is set to 1 if the temperature of the FPGA exceeds 85\u00b0C. It will be reset to 0 after a restart of the device.",
+        "Node": "STATS/PHYSICAL/OVERTEMPERATURE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATUS/FIFOLEVEL": {
+        "Description": "USB FIFO level: Indicates the USB FIFO fill level inside the device. When 100%, data is lost",
+        "Node": "STATUS/FIFOLEVEL",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "STATUS/FLAGS/BINARY": {
+        "Description": "",
+        "Node": "STATUS/FLAGS/BINARY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATUS/FLAGS/PACKETLOSSTCP": {
+        "Description": "Flag indicating if tcp packages have been lost.",
+        "Node": "STATUS/FLAGS/PACKETLOSSTCP",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATUS/FLAGS/PACKETLOSSUDP": {
+        "Description": "Flag indicating if udp packages have been lost.",
+        "Node": "STATUS/FLAGS/PACKETLOSSUDP",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "STATUS/TIME": {
+        "Description": "The current timestamp.",
+        "Node": "STATUS/TIME",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/ACTIVEINTERFACE": {
+        "Description": "Currently active interface of the device.",
+        "Node": "SYSTEM/ACTIVEINTERFACE",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/BOARDREVISIONS/0": {
+        "Description": "Hardware revision of the FPGA base board",
+        "Node": "SYSTEM/BOARDREVISIONS/0",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/BOARDREVISIONS/1": {
+        "Description": "Hardware revision of the analog board",
+        "Node": "SYSTEM/BOARDREVISIONS/1",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/CLOCKS/REFERENCECLOCK/IN/FREQ": {
+        "Description": "[empty]",
+        "Node": "SYSTEM/CLOCKS/REFERENCECLOCK/IN/FREQ",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "SYSTEM/CLOCKS/REFERENCECLOCK/IN/SOURCE": {
+        "Description": "[empty]",
+        "Node": "SYSTEM/CLOCKS/REFERENCECLOCK/IN/SOURCE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/CLOCKS/REFERENCECLOCK/IN/STATUS": {
+        "Description": "[empty]",
+        "Node": "SYSTEM/CLOCKS/REFERENCECLOCK/IN/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/CLOCKS/REFERENCECLOCK/OUT/ENABLE": {
+        "Description": "[empty]",
+        "Node": "SYSTEM/CLOCKS/REFERENCECLOCK/OUT/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/CLOCKS/REFERENCECLOCK/OUT/FREQ": {
+        "Description": "[empty]",
+        "Node": "SYSTEM/CLOCKS/REFERENCECLOCK/OUT/FREQ",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "SYSTEM/FPGAREVISION": {
+        "Description": "HDL firmware revision",
+        "Node": "SYSTEM/FPGAREVISION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/FWLOGENABLE": {
+        "Description": "Enables logging to the fwlog node.",
+        "Node": "SYSTEM/FWLOGENABLE",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/FWREVISION": {
+        "Description": "Revision of the device internal controller software",
+        "Node": "SYSTEM/FWREVISION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/FX3REVISION": {
+        "Description": "USB firmware revision",
+        "Node": "SYSTEM/FX3REVISION",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/IDENTIFY": {
+        "Description": "Setting this node to 1 will cause the device to blink the power led for a few seconds.",
+        "Node": "SYSTEM/IDENTIFY",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/INTERFACESPEED": {
+        "Description": "Speed of the currently active interface (USB only).",
+        "Node": "SYSTEM/INTERFACESPEED",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/DEFAULTGATEWAY": {
+        "Description": "Default gateway configuration for the network connection.",
+        "Node": "SYSTEM/NICS/0/DEFAULTGATEWAY",
+        "Properties": "Read, Write",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/DEFAULTIP4": {
+        "Description": "IPv4 address of the device to use if static IP is enabled.",
+        "Node": "SYSTEM/NICS/0/DEFAULTIP4",
+        "Properties": "Read, Write",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/DEFAULTMASK": {
+        "Description": "IPv4 mask in case of static IP.",
+        "Node": "SYSTEM/NICS/0/DEFAULTMASK",
+        "Properties": "Read, Write",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/GATEWAY": {
+        "Description": "Current network gateway.",
+        "Node": "SYSTEM/NICS/0/GATEWAY",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/IP4": {
+        "Description": "Current IPv4 of the device.",
+        "Node": "SYSTEM/NICS/0/IP4",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/MAC": {
+        "Description": "Current MAC address of the device network interface.",
+        "Node": "SYSTEM/NICS/0/MAC",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/MASK": {
+        "Description": "Current network mask.",
+        "Node": "SYSTEM/NICS/0/MASK",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/SAVEIP": {
+        "Description": "If written, this action will program the defined static IP address to the device.",
+        "Node": "SYSTEM/NICS/0/SAVEIP",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/NICS/0/STATIC": {
+        "Description": "Enable this flag if the device is used in a network with fixed IP assignment without a DHCP server.",
+        "Node": "SYSTEM/NICS/0/STATIC",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/OWNER": {
+        "Description": "Returns the current owner of the device (IP).",
+        "Node": "SYSTEM/OWNER",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "SYSTEM/PORTTCP": {
+        "Description": "Returns the current TCP port used for communication to the dataserver.",
+        "Node": "SYSTEM/PORTTCP",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/PORTUDP": {
+        "Description": "Returns the current UDP port used for communication to the dataserver.",
+        "Node": "SYSTEM/PORTUDP",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/POWERCONFIGDATE": {
+        "Description": "Contains the date of power configuration (format is: (year << 16) | (month << 8) | day)",
+        "Node": "SYSTEM/POWERCONFIGDATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/PROPERTIES/MAXFREQ": {
+        "Description": "The maximum oscillator frequency that can be set.",
+        "Node": "SYSTEM/PROPERTIES/MAXFREQ",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "SYSTEM/PROPERTIES/MINFREQ": {
+        "Description": "The minimum oscillator frequency that can be set.",
+        "Node": "SYSTEM/PROPERTIES/MINFREQ",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "SYSTEM/PROPERTIES/NEGATIVEFREQ": {
+        "Description": "Indicates whether negative frequencies are supported.",
+        "Node": "SYSTEM/PROPERTIES/NEGATIVEFREQ",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/PROPERTIES/TIMEBASE": {
+        "Description": "Minimal time difference between two timestamps. Is equal to 1/(maximum sampling rate).",
+        "Node": "SYSTEM/PROPERTIES/TIMEBASE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "SYSTEM/SAVEPORTS": {
+        "Description": "Flag indicating that the TCP and UDP ports should be saved.",
+        "Node": "SYSTEM/SAVEPORTS",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/SHUTDOWN": {
+        "Description": "Sending a '1' to this node initiates a shutdown of the operating system on the MFLI device. It is recommended to trigger this shutdown before switching the device off with the hardware switch at the back side of the device.",
+        "Node": "SYSTEM/SHUTDOWN",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/STALL": {
+        "Description": "Indicates if the network connection is stalled.",
+        "Node": "SYSTEM/STALL",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "SYSTEM/UPDATE": {
+        "Description": "Requests update of the device firmware and bitstream from the dataserver.",
+        "Node": "SYSTEM/UPDATE",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "TRIGGERS/OUT/0/SOURCE": {
+        "Description": "",
+        "Node": "TRIGGERS/OUT/0/SOURCE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "TRIGGERS/OUT/1/SOURCE": {
+        "Description": "",
+        "Node": "TRIGGERS/OUT/1/SOURCE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/0/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/0/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/1/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/1/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/10/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/10/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/11/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/11/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/12/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/12/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/13/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/13/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/14/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/14/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/15/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/15/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/16/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/16/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/17/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/17/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/2/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/2/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/3/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/3/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/4/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/4/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/5/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/5/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/6/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/6/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/7/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/7/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/8/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/8/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/CONNECTION/ALIAS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/CONNECTION/ALIAS",
+        "Properties": "Read, Write, Setting",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/CONNECTION/DEVTYPE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/CONNECTION/DEVTYPE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/CONNECTION/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/CONNECTION/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/CONNECTION/PROTOCOLVERSION": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/CONNECTION/PROTOCOLVERSION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/CONNECTION/READY": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/CONNECTION/READY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/CONNECTION/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/CONNECTION/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/CONNECTION/SERIAL": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/CONNECTION/SERIAL",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/CONNECTION/STATUS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/CONNECTION/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/DOWNLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/DOWNLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/DOWNLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/DOWNLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/DOWNLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/DOWNLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/DOWNLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/DOWNLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/UPLINK/DIFFPAIRS": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/UPLINK/DIFFPAIRS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/UPLINK/ERROR/COUNT": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/UPLINK/ERROR/COUNT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/UPLINK/ERROR/RESET": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/UPLINK/ERROR/RESET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/UPLINK/LINKSPEED": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/UPLINK/LINKSPEED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/UPLINK/MONITOR/DATA": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/UPLINK/MONITOR/DATA",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "ZSYNCS/9/UPLINK/MONITOR/ENABLE": {
+        "Description": "[empty]",
+        "Node": "ZSYNCS/9/UPLINK/MONITOR/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    }
+}

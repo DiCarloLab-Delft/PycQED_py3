@@ -231,6 +231,8 @@ def QubitFreqFlux(flux, f_max, E_c,
     return calculated_frequency
 
 
+
+
 def CosFunc(t, amplitude, frequency, phase, offset):
     """
     parameters:
@@ -258,6 +260,12 @@ def CosFunc2(t, amplitude, frequency, phase, offset):
 def ExpDecayFunc(t, tau, amplitude, offset, n):
     return amplitude * np.exp(-(t / tau) ** n) + offset
 
+
+def ExpGaussDecayCos(t, Gexp, Gphi, amplitude, frequency, offset):
+    return amplitude*np.exp(-t*Gexp-(t*Gphi)**2)*np.cos(2*np.pi*t*frequency) + offset
+
+def ExpGaussDecay_only(t, Gexp, Gphi, amplitude, offset):
+    return amplitude*np.exp(-t*Gexp-(t*Gphi)**2) + offset
 
 def idle_error_rate_exp_decay(N, N1, N2, A, offset):
     """
@@ -1006,6 +1014,49 @@ def Cos_guess(model, data, t, **kwargs):
     params['frequency'].min = 0
 
     return params
+
+
+def ExpGaussDecayCos_guess(model, data, t, **kwargs):
+    # Find initial guess frequency from Fourier transform of the measured data
+    data_F = np.fft.fft(data)
+    dt = t[1]-t[0]
+    freqs = np.fft.fftfreq(len(t))/dt
+    freqs = np.fft.fftshift(freqs)
+    f_start = np.abs(freqs[np.abs(np.where(np.abs(data_F) == max(np.abs(data_F[1:])))[0][0])])*2
+
+    # Amplitude
+    Amp_start = (max(data)-min(data))/2
+
+    # Offset
+    offset_start = np.mean(data)
+
+    # Decay rates initial guesses
+    # Since exp(-Gexp*t) ~ -Gexp*t for small t, initial Gexp is estimated from the slope
+    # Gexp_start = (max(data)-offset_start)/t[-1]
+    Gexp_start = 1/(t[-1]/3)
+    Gphi_start = Gexp_start
+
+
+
+    params = model.make_params(Gexp = Gexp_start, Gphi = Gphi_start, amplitude=Amp_start,
+                               frequency=f_start/(2*np.pi),
+                               offset=offset_start)
+
+    # Make sure that decay rates Gexp  and Gphi are positive
+    params['Gexp'].min = 0
+    params['Gexp'].max = 1e14
+    params['Gphi'].min = 0
+    params['Gphi'].max = 1e14
+    params['amplitude'].max = 0
+    params['amplitude'].value = min(data)-offset_start
+    params['amplitude'].vary = False
+
+
+
+    return params
+
+
+
 
 
 def exp_damp_osc_guess(model, data, t):
