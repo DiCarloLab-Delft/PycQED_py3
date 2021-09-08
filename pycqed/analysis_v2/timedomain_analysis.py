@@ -1309,7 +1309,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict["xvals_cal"] = np.arange(365, 365 + len(cal_idx) * 25, 25)
         self.proc_data_dict["cal_labels"] = cal_labels
 
-        for ch_idx, type_str in zip(ch_idx_list, type_list):
+        cs_idx = [0,1]
+        for ch_idx, c_idx, type_str in zip(ch_idx_list, cs_idx, type_list):
             yvals = list(self.raw_data_dict["measured_values_ord_dict"].values())[
                 ch_idx
             ][0]
@@ -1322,8 +1323,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             if normalize_to_cal_points:
                 yvals = a_tools.normalize_data_v3(
                     yvals,
-                    cal_zero_points=cal_points_idxs[ch_idx][0],
-                    cal_one_points=cal_points_idxs[ch_idx][1],
+                    cal_zero_points=cal_points_idxs[c_idx][0],
+                    cal_one_points=cal_points_idxs[c_idx][1],
                 )
 
             yvals_osc = yvals[osc_idxs]

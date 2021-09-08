@@ -329,6 +329,45 @@ class AWG_multi_channel_amplitude(Soft_Sweep):
             self.AWG.set('ch{}_amp'.format(ch), val)
         time.sleep(self.delay)
 
+class mw_lutman_amp_sweep(Soft_Sweep):
+    """
+    """
+
+    def __init__(self,qubits,device):
+        super().__init__()
+        self.device = device
+        self.name = 'mw_lutman_amp_sweep'
+        self.qubits = qubits
+        self.parameter_name = 'mw_amp'
+        self.unit = 'a.u.'
+
+    def set_parameter(self, val):
+        for q in self.qubits:
+          qub  = self.device.find_instrument(q)
+          mw_lutman = qub.instr_LutMan_MW.get_instr()
+          mw_lutman.channel_amp(val)
+
+
+class motzoi_lutman_amp_sweep(Soft_Sweep):
+    """
+    """
+
+    def __init__(self,qubits,device):
+        super().__init__()
+        self.device = device
+        self.name = 'motzoi_lutman_amp_sweep'
+        self.qubits = qubits
+        self.parameter_name = 'motzoi_amp'
+        self.unit = 'a.u.'
+
+    def set_parameter(self, val):
+        for q in self.qubits:
+          qub = self.device.find_instrument(q)
+          mw_lutman = qub.instr_LutMan_MW.get_instr()
+          mw_lutman.mw_motzoi(val)
+          mw_lutman.load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=True)
+
 ###############################################################################
 ####################          Hardware Sweeps      ############################
 ###############################################################################
@@ -883,29 +922,33 @@ class joint_HDAWG_lutman_parameters(Soft_Sweep):
         self.AWG.start()
 
 
-class RO_mod_freq_parameter(Soft_Sweep):
+class RO_freq_sweep(Soft_Sweep):
     """
     Sweeps two parameteres toghether, assigning the same value
     name is defined by user
     label and units are grabbed from parameter_1
     """
 
-    def __init__(self, name, qubit, parameter):
+    def __init__(self, name, qubit, ro_lutman, idx, parameter):
         self.set_kw()
         self.name = name
         self.parameter_name = parameter.label
         self.unit = parameter.unit
         self.sweep_control = 'soft'
         self.qubit = qubit
+        self.ro_lm = ro_lutman
+        self.idx = idx
 
     def set_parameter(self, val):
-        # LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
-        old_lo_freq = self.qubit.ro_freq.get() - self.qubit.ro_freq_mod.get()
-
+        LO_freq = self.ro_lm.LO_freq()
+        IF_freq = val - LO_freq
         # Parameter 1 will be qubit.ro_freq()
         self.qubit.ro_freq.set(val)
         # Parameter 2 will be qubit.ro_freq_mod()
-        self.qubit.ro_freq_mod.set(val - old_lo_freq)
+        self.qubit.ro_freq_mod.set(IF_freq)
+
+        self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
+        self.ro_lm.load_waveforms_onto_AWG_lookuptable()
 
 
 class QWG_lutman_par_chunks(Soft_Sweep):
@@ -1194,20 +1237,52 @@ class multi_sweep_function(Soft_Sweep):
     '''
     cascades several sweep functions into a single joint sweep functions.
     '''
-    def __init__(self, sweep_functions: list, parameter_name=None,name=None,**kw):
+    def __init__(self, sweep_functions: list, sweep_point_ratios: list=None,
+                 parameter_name=None, name=None,**kw):
         self.set_kw()
         self.sweep_functions = sweep_functions
         self.sweep_control = 'soft'
         self.name = name or 'multi_sweep'
         self.unit = sweep_functions[0].unit
         self.parameter_name = parameter_name or 'multiple_parameters'
+        self.sweep_point_ratios = sweep_point_ratios
         for i, sweep_function in enumerate(sweep_functions):
             if self.unit.lower() != sweep_function.unit.lower():
                 raise ValueError('units of the sweepfunctions are not equal')
 
     def set_parameter(self, val):
-        for sweep_function in self.sweep_functions:
-            sweep_function.set_parameter(val)
+        if self.sweep_point_ratios is None:
+            for sweep_function in self.sweep_functions:
+                sweep_function.set_parameter(val)
+        else:
+            for i, sweep_function in enumerate(self.sweep_functions):
+                v = (val-1)*self.sweep_point_ratios[i]+1
+                sweep_function.set_parameter(v)
+
+class multi_sweep_function_ranges(Soft_Sweep):
+    '''
+    cascades several sweep functions into a single joint sweep functions.
+    '''
+    def __init__(self, sweep_functions: list, sweep_ranges: list, n_points: int,
+                 parameter_name=None, name=None,**kw):
+        self.set_kw()
+        self.sweep_functions = sweep_functions
+        self.sweep_control = 'soft'
+        self.name = name or 'multi_sweep'
+        self.unit = sweep_functions[0].unit
+        self.parameter_name = parameter_name or 'multiple_parameters'
+        self.sweep_ranges = sweep_ranges
+        self.n_points = n_points
+        for i, sweep_function in enumerate(sweep_functions):
+            if self.unit.lower() != sweep_function.unit.lower():
+                raise ValueError('units of the sweepfunctions are not equal')
+
+    def set_parameter(self, val):
+        Sweep_points = [ np.linspace(self.sweep_ranges[i][0], 
+                                     self.sweep_ranges[i][1],
+                                     self.n_points) for i in range(len(self.sweep_ranges)) ]
+        for i, sweep_function in enumerate(self.sweep_functions):
+            sweep_function.set_parameter(Sweep_points[i][val])
 
 
 class two_par_joint_sweep(Soft_Sweep):
@@ -1248,7 +1323,14 @@ class FLsweep(Soft_Sweep):
     """
     Special sweep function for AWG8 and QWG flux pulses.
     """
-    def __init__(self, lm, par, waveform_name, amp_for_generation = None, upload_waveforms_always: bool=True):
+    def __init__(self, 
+            lm, 
+            par, 
+            waveform_name: str, 
+            amp_for_generation: float = None, 
+            upload_waveforms_always: bool=True,
+            bypass_waveform_upload: bool=False
+        ):
         super().__init__()
         self.lm = lm
         self.par = par
@@ -1258,6 +1340,7 @@ class FLsweep(Soft_Sweep):
         self.name = par.name
         self.amp_for_generation = amp_for_generation
         self.upload_waveforms_always = upload_waveforms_always
+        self.bypass_waveform_upload = bypass_waveform_upload
 
         self.AWG = self.lm.AWG.get_instr()
         self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
@@ -1268,7 +1351,8 @@ class FLsweep(Soft_Sweep):
         old_par_val = self.par()
         self.par(val)
         updated_par_val = self.par()
-        if self.upload_waveforms_always or updated_par_val != old_par_val:
+        if self.upload_waveforms_always \
+                or (updated_par_val != old_par_val and not self.bypass_waveform_upload):
             if self.awg_model_QWG:
                 self.set_parameter_QWG(val)
             else:
@@ -1295,6 +1379,57 @@ class FLsweep(Soft_Sweep):
             force_load_sequencer_program=True)
         self.AWG.start()
         return
+
+class flux_t_middle_sweep(Soft_Sweep):
+
+    def __init__(self, 
+            fl_lm_tm: list, 
+            fl_lm_park: list,
+            which_gate: list,
+            t_pulse: list
+        ):
+        super().__init__()
+        self.name = 'time_middle'
+        self.parameter_name = 'time_middle'
+        self.unit = 's'
+        self.fl_lm_tm = fl_lm_tm
+        self.fl_lm_park = fl_lm_park
+        self.which_gate = which_gate
+        self.t_pulse = t_pulse
+
+    def set_parameter(self, val):
+        which_gate = self.which_gate
+        t_pulse = np.repeat(self.t_pulse, 2)
+        sampling_rate = self.fl_lm_tm[0].sampling_rate()
+        
+        # Calculate vcz times for each flux pulse
+        time_mid = val / sampling_rate
+        n_points  = [ np.ceil(tp / 2 * sampling_rate) for tp in t_pulse ]
+        time_sq  = [ n / sampling_rate for n in n_points ]
+        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate 
+        time_pad = np.abs(np.array(time_sq)-np.max(time_sq))
+
+        # set flux lutman parameters of CZ qubits
+        for i, fl_lm in enumerate(self.fl_lm_tm):
+            fl_lm.set('vcz_time_single_sq_{}'.format(which_gate[i]), time_sq[i])
+            fl_lm.set('vcz_time_middle_{}'.format(which_gate[i]), time_mid)
+            fl_lm.set('vcz_time_pad_{}'.format(which_gate[i]), time_pad[i])
+            fl_lm.set('vcz_amp_fine_{}'.format(which_gate[i]), .5)
+
+        # set flux lutman parameters of Park qubits
+        for fl_lm in self.fl_lm_park:
+            fl_lm.park_length(time_park)
+
+        Lutmans = self.fl_lm_tm + self.fl_lm_park
+        AWGs = np.unique([lm.AWG() for lm in Lutmans])
+        for AWG in AWGs:
+            Lutmans[0].find_instrument(AWG).stop()
+        for Lutman in Lutmans:
+            Lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        for AWG in AWGs:
+            Lutmans[0].find_instrument(AWG).stop()
+
+        return val
 
 
 class Nested_resonator_tracker(Soft_Sweep):

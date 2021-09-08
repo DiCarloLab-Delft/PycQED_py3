@@ -681,7 +681,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter,
                            vals=vals.Strings())
         self.add_parameter(
-            'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 16),
+            'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 20),
             parameter_class=ManualParameter, initial_value=0,
             docstring='The qubit number is used in the OpenQL compiler. ')
 
@@ -971,7 +971,7 @@ class CCLight_Transmon(Qubit):
           log.info('Warning: This qubit is using a fixed RO LO frequency.')
           LO = self.instr_LO_ro.get_instr()
           Lo_Lutman = self.instr_LutMan_RO.get_instr()
-          LO_freq = Lo_Lutman.LO_freq
+          LO_freq = Lo_Lutman.LO_freq()
           LO.frequency.set(LO_freq)
           mod_freq = self.ro_freq() - LO_freq
           self.ro_freq_mod(mod_freq)
@@ -1040,6 +1040,7 @@ class CCLight_Transmon(Qubit):
 
             idx = self.cfg_qubit_nr()
             # These parameters affect all resonators
+            ro_lm.set('resonator_combinations', [[idx]])
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
             ro_lm.set('mixer_alpha',
                       self.ro_pulse_mixer_alpha())
@@ -2239,7 +2240,15 @@ class CCLight_Transmon(Qubit):
         if amps is None:
             amps = np.linspace(.001, .5, 31)
 
-        nested_MC.set_sweep_function(self.ro_freq)
+        ro_lm = self.find_instrument(self.instr_LutMan_RO())
+        q_idx = self.cfg_qubit_nr()
+        swf1 = swf.RO_freq_sweep(name='RO frequency',
+                                 qubit=self,
+                                 ro_lutman=ro_lm, 
+                                 idx=q_idx, 
+                                 parameter=self.ro_freq)
+
+        nested_MC.set_sweep_function(swf1)
         nested_MC.set_sweep_points(freqs)
         nested_MC.set_sweep_function_2D(self.ro_pulse_amp)
         nested_MC.set_sweep_points_2D(amps)
@@ -2247,7 +2256,9 @@ class CCLight_Transmon(Qubit):
         d = det.Function_Detector(self.measure_ssro,
                                   result_keys=['SNR', 'F_a', 'F_d'],
                                   value_names=['SNR', 'F_a', 'F_d'],
-                                  value_units=['a.u.', 'a.u.', 'a.u.'])
+                                  value_units=['a.u.', 'a.u.', 'a.u.'],
+                                  msmt_kw={'prepare': False}
+                                  )
         nested_MC.set_detector_function(d)
         nested_MC.run(name='RO_coarse_tuneup', mode='2D')
 
@@ -2915,8 +2926,8 @@ class CCLight_Transmon(Qubit):
         else:
             spec_source = self.instr_spec_source.get_instr()
             spec_source.on()
-            if mode == 'pulsed_marked':
-                spec_source.pulsemod_state('On')
+            # if mode == 'pulsed_marked':
+            #     spec_source.pulsemod_state('On')
 
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
@@ -3621,6 +3632,8 @@ class CCLight_Transmon(Qubit):
                      prepare: bool = True, no_figs: bool = False,
                      post_select: bool = False,
                      post_select_threshold: float = None,
+                     nr_flux_dance:float=None,
+                     wait_time:float=None,
                      update: bool = True,
                      SNR_detector: bool = False,
                      shots_per_meas: int = 2**16,
@@ -3679,6 +3692,8 @@ class CCLight_Transmon(Qubit):
         # This snippet causes 0.08 s of overhead but is dangerous to bypass
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
+            nr_flux_dance=nr_flux_dance,
+            wait_time=wait_time, 
             initialize=post_select,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
@@ -4085,8 +4100,6 @@ class CCLight_Transmon(Qubit):
             raise ImplementationError(
                 "Change readout demodulation to SSB.")
 
-        saved_param = self.ro_pulse_amp()
-        #self.ro_pulse_amp(self.ro_pulse_amp_CW())
         self.prepare_for_timedomain()
 
         # off/on switching is achieved by turning the MW source on and
@@ -4114,8 +4127,6 @@ class CCLight_Transmon(Qubit):
                     label=self.msmt_suffix, close_fig=True)
                 # fit converts to Hz
                 f_res.append(a.fit_results.params['f0'].value*1e9)
-
-        self.ro_pulse_amp(saved_param)  # reload pulse amplitude
 
         if analyze:
             a = ma2.Dispersive_shift_Analysis()
@@ -4835,6 +4846,8 @@ class CCLight_Transmon(Qubit):
 
     def measure_T1(self, times=None, MC=None,
                    analyze=True, close_fig=True, update=True,
+                   nr_flux_dance:float=None,
+                   wait_time:float=None,
                    prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
@@ -4856,6 +4869,7 @@ class CCLight_Transmon(Qubit):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         p = sqo.T1(times, qubit_idx=self.cfg_qubit_nr(),
+                   nr_flux_dance=nr_flux_dance,wait_time=wait_time,
                    platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              parameter_name='Time',
@@ -5754,7 +5768,7 @@ class CCLight_Transmon(Qubit):
         # Settings that have to be changed....
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        self.ro_acq_weight_type('SSB')
+        self.ro_acq_weight_type('optimal IQ')
         self.ro_acq_digitized(False)
 
         if prepare_for_timedomain:
@@ -5907,8 +5921,52 @@ class CCLight_Transmon(Qubit):
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
         return a.fit_res.params['fidelity_per_Clifford'].value
 
+    def measure_ef_rabi_2D(self,
+                           amps: list = np.linspace(0, .8, 18),
+                           anharmonicity: list = np.arange(-275e6,-326e6,-5e6),
+                           recovery_pulse: bool = True,
+                           MC=None, label: str = '',
+                           analyze=True, close_fig=True,
+                           prepare_for_timedomain=True):
+        """
+        Measures a rabi oscillation of the ef/12 transition.
+
+        Modulation frequency of the "ef" pusles is controlled through the
+        `anharmonicity` parameter of the qubit object.
+        Hint: the expected pi-pulse amplitude of the ef/12 transition is ~1/2
+            the pi-pulse amplitude of the ge/01 transition.
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=amps)
+
+        p = sqo.ef_rabi_seq(
+            self.cfg_qubit_nr(),
+            amps=amps, recovery_pulse=recovery_pulse,
+            platf_cfg=self.cfg_openql_platform_fn())
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             parameter_name='Pulse amp',
+                             unit='dac',
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_sweep_function_2D(swf.anharmonicity_sweep(qubit=self,
+                                                         amps=amps))
+        MC.set_sweep_points_2D(anharmonicity)
+        MC.set_detector_function(d)
+        MC.run('ef_rabi_2D'+label+self.msmt_suffix, mode='2D')
+        if analyze:
+            a = ma.TwoD_Analysis()
+            return a
+
     def measure_ef_rabi(self,
-                        amps: list = np.linspace(-.8, .8, 18),
+                        amps: list = np.linspace(0, .8, 18),
                         recovery_pulse: bool = True,
                         MC=None, label: str = '',
                         analyze=True, close_fig=True,

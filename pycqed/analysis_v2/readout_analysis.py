@@ -619,7 +619,35 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             if iq_centers is not None:
                 dp = deepcopy(peak_marker_2D)
                 dp['ax_id'] = '2D_shots'
-                self.plot_dicts['2D_shots_marker'] = dp
+                self.plot_dicts['2D_shots_marker'] = dp 
+                self.plot_dicts['2D_shots_marker_line_0']={
+                    'plotfn': self.plot_line,
+                    'ax_id': '2D_shots',
+                    'xvals': [0, iq_centers[0][0]],
+                    'yvals': [0, iq_centers[1][0]],
+                    'xlabel': x_volt_label,
+                    'xunit': x_volt_unit,
+                    'ylabel': y_volt_label,
+                    'yunit': y_volt_unit,
+                    'marker': '',
+                    'aspect': 'equal',
+                    'linestyle': '--',
+                    'color': 'black'
+                }
+                self.plot_dicts['2D_shots_marker_line_1']={
+                    'plotfn': self.plot_line,
+                    'ax_id': '2D_shots',
+                    'xvals': [0, iq_centers[0][1]],
+                    'yvals': [0, iq_centers[1][1]],
+                    'xlabel': x_volt_label,
+                    'xunit': x_volt_unit,
+                    'ylabel': y_volt_label,
+                    'yunit': y_volt_unit,
+                    'marker': '',
+                    'aspect': 'equal',
+                    'linestyle': '--',
+                    'color': 'black'
+                }
 
         # The cumulative histograms
         #####################################

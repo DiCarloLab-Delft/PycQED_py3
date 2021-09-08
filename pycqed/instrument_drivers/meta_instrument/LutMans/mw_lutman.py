@@ -679,23 +679,30 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
         if self.cfg_sideband_mode() == 'static':
             AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
-            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), 0)
             AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), 0)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), 0)
             AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
 
         # In case of sideband modulation mode 'real-time', amplitudes have to be set
         # according to modulation matrix
         elif self.cfg_sideband_mode() == 'real-time':
-            if self.mixer_alpha()<=1:
-                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), self.mixer_alpha()*val)
-                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), -val)
-                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), self.mixer_alpha()*val)
-                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
-            else:
-                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
-                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), (-1/self.mixer_alpha())*val)
-                AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), val)
-                AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), (1/self.mixer_alpha())*val)
+            g0 = np.tan(np.radians(self.mixer_phi()))
+            g1 = self.mixer_alpha()*1/np.cos(np.radians(self.mixer_phi()))
+
+            if np.abs(val*g0) > 1.0 or np.abs(val*g1) > 1.0:
+                raise Exception('Resulting amplitude from mixer parameters '+\
+                                'exceed the maximum channel amplitude')
+                # print('Resulting amplitude from mixer parameters '+\
+                #       'exceed the maximum channel amplitude')
+                # if np.abs(val*g0):
+                #     g0 = 1/val
+                # if np.abs(val*g1):
+                #     g1 = 1/val
+
+            AWG.set('awgs_{}_outputs_0_gains_0'.format(awg_nr), val)
+            AWG.set('awgs_{}_outputs_1_gains_0'.format(awg_nr), 0)
+            AWG.set('awgs_{}_outputs_0_gains_1'.format(awg_nr), val*g0)
+            AWG.set('awgs_{}_outputs_1_gains_1'.format(awg_nr), val*g1)
         else:
             raise KeyError('Unexpected value for parameter sideband mode.')
 
@@ -709,8 +716,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         vals = []
         if self.cfg_sideband_mode() == 'static':
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
-            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
             assert vals[0]==vals[4]
             assert vals[1]==vals[2]==0
@@ -795,8 +802,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_I()-1), 90)
             self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_Q()-1), 0)
             # Create correct modulation modeI
-            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 3)
-            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 4)
+            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 6)
+            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 6)
         else:
             raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
 
@@ -869,13 +876,13 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     self._wave_dict[idx] = wf.mod_square_VSM(
                         amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
                         length=self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation(),
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
                         sampling_rate=self.sampling_rate())
                 elif 'sq_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square(
                         amp=self.sq_amp(), length=self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation(),  phase=0,
-                        motzoi=0, sampling_rate=self.sampling_rate())
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
             else:

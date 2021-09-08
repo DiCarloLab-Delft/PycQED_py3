@@ -122,7 +122,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
                  interface: str = '1GbE',
                  server: str = 'localhost',
                  port = 8004,
-                 num_codewords: int = 32,
+                 num_codewords: int = 64,
                  **kw) -> None:
         """
         Input arguments:
@@ -387,7 +387,7 @@ while (1) {
             self.sync()
 
         # Use 50 MHz DIO clocking
-        self.seti('raw/dios/0/extclk', 1)
+        self.seti('dios/0/mode', 2)
 
         # Configure the DIO interface and the waveforms
         for awg_nr in range(int(self._num_channels()//2)):

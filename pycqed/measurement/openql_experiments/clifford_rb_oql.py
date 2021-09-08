@@ -221,6 +221,11 @@ def randomized_benchmarking(
         Cl = SingleQubitClifford
         # at the end we will add calibration points only for the parking qubit
         number_of_qubits = 3
+    elif len(qubits) > 3 and simultaneous_single_qubit_RB:
+        qubit_map = {f"q{i}": qubits[i] for i in range(len(qubits))}
+        # arguments used to generate 2 single qubit sequences
+        number_of_qubits = len(qubits)
+        Cl = SingleQubitClifford
     else:
         raise NotImplementedError()
 
@@ -338,7 +343,7 @@ def randomized_benchmarking(
                                 k.prepz(qubit_idx)
 
                         # FIXME: Gate seqs is a hack for failing openql scheduling
-                        gate_seqs = [[], []]
+                        gate_seqs = [[] for q in qubits]
                         for gsi, q_idx in enumerate(qubits):
                             cl_seq = rb.randomized_benchmarking_sequence(
                                 n_cl,
@@ -463,6 +468,14 @@ def randomized_benchmarking(
                     f_state_cal_pts=f_state_cal_pts,
                     # we must measure all 3 qubits to avoid alignment issues
                     measured_qubits=list(qubit_map.values()),
+                )
+            elif number_of_qubits > 3:
+                if f_state_cal_pts:
+                    combinations = ["0"*number_of_qubits,
+                                    "1"*number_of_qubits, 
+                                    "2"*number_of_qubits]
+                p = oqh.add_multi_q_cal_points(
+                    p, qubits=qubits, combinations=combinations
                 )
 
     p = oqh.compile(p)
