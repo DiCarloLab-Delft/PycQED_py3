@@ -800,7 +800,7 @@ class ZI_base_instrument(Instrument):
         raise NotImplementedError('Virtual method with no implementation!')
 
     def _get_waveform_table(self, awg_nr: int) -> list:
-        raise NotImplementedError('Virtual method with no implementation!')    
+        return dict()    
 
     def _add_extra_parameters(self) -> None:
         """
