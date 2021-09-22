@@ -1538,7 +1538,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
                                 q2: int = None, q3: int = None,
                                 platf_cfg: str = None,
                                 disable_cz: bool = False,
-                                disabled_cz_duration: int = 60,
+                                disabled_cz_duration: int = 40,
                                 cz_repetitions: int = 1,
                                 angles=np.arange(0, 360, 20),
                                 wait_time_before_flux: int = 0,
@@ -1633,7 +1633,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
             for dummy_i in range(cz_repetitions):
                 if not disable_cz:
                     # Parallel flux pulses below
-                    if flux_codeword.split('-')[1] == 'dance':
+                    if 'dance' in flux_codeword:
                         k.gate(flux_codeword, [0])
                     else:
                         k.gate(flux_codeword, [q0, q1])
@@ -1657,7 +1657,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 else:
                     k.gate("wait", [], 0) #alignment workaround
                     # k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
-                    k.gate('wait', [q0,q1], 60)
+                    k.gate('wait', [q0,q1], disabled_cz_duration)
                     k.gate("wait", [], 0) #alignment workaround
 
                 k.gate("wait", [], 0)
@@ -2038,20 +2038,21 @@ def parity_check_flux_dance(
         qubits = Q_idxs_target + Q_idxs_control
         cal_states =  ['{:0{}b}'.format(i, len(qubits)) for i in range(2**len(qubits))]
 
+        # add calibration points for separately measured parking qubits,
+        # such that the first half of calibration states by case will have
+        # the parked qubits appended in state 0, and the second half in state 1
+        if Q_idxs_parking:
+            cal_states = [state + '0' if i < len(cal_states)/2 else state + '1' for i,state in enumerate(cal_states)]
+
         oqh.add_multi_q_cal_points(
             p, 
-            qubits=qubits, 
+            qubits=qubits if not Q_idxs_parking else qubits+Q_idxs_parking, 
             f_state_cal_pt_cw=31,
             combinations=cal_states, 
             return_comb=False, 
             nr_flux_dance=nr_flux_dance_before_cal_points,
             flux_cw_list=flux_cw_list if nr_flux_dance_before_cal_points else None
             )
-
-        # add calibration points for separately measured parking qubits
-        if Q_idxs_parking:
-            for qb in Q_idxs_parking:
-                oqh.add_single_qubit_cal_points(p, qubit_idx=qb)
 
     p = oqh.compile(p)
 
@@ -2124,14 +2125,14 @@ def parity_check_fidelity(
 
         for i,indx in enumerate(case):
             if indx == '1':
-                k.gate("ry180", [Q_idxs_data[i]])
+                k.gate("rx180", [Q_idxs_data[i]])
 
         for qb in Q_idxs_ancilla:
-            k.gate("rx90", [qb])
+            k.gate("rxm90", [qb])
 
         if Q_idxs_ramsey:
             for qb in Q_idxs_ramsey:
-                k.gate("rx90", [qb])
+                k.gate("rxm90", [qb])
 
         k.gate("wait", [], 0)  # alignment workaround
 
@@ -2150,14 +2151,14 @@ def parity_check_fidelity(
         # #################################################################
         for i,indx in enumerate(case):
             if indx == '1':
-                k.gate("ry180", [Q_idxs_data[i]])
+                k.gate("rxm180", [Q_idxs_data[i]])
 
         for q_idx in Q_idxs_ancilla:
             k.gate("cw_09", [q_idx])
 
         if Q_idxs_ramsey:
             for qb in Q_idxs_ramsey:
-                k.gate("rxm90", [qb])
+                k.gate("rx90", [qb])
 
         k.gate('wait', [], 0)
         # #################################################################

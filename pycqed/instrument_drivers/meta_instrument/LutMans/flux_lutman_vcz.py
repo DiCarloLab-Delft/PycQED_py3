@@ -291,7 +291,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         for this_cz in ["NE", "NW", "SW", "SE"]:
             self.add_parameter(
                 "cz_wf_generator_%s" % this_cz,
-                initial_value="vcz_dev_waveform",
+                initial_value="vcz_waveform",
                 # initial_value=None,
                 vals=vals.Strings(),
                 parameter_class=ManualParameter,

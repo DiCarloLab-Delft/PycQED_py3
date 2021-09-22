@@ -388,6 +388,13 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(min_value=0, max_value=1.6),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('mw_channel_range', 
+                           label='AWG channel range. WARNING: Check your hardware specific limits!',
+                           unit='V', 
+                           initial_value=.8,
+                           vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
+
         self.add_parameter('mw_ef_amp',
                            label='Pi-pulse amplitude ef-transition', unit='V',
                            initial_value=.4,
@@ -1218,6 +1225,7 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
         MW_LutMan.channel_amp(self.mw_channel_amp())
+        MW_LutMan.channel_range(self.mw_channel_range())
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
         MW_LutMan.spec_amp(self.spec_amp())
@@ -1267,8 +1275,6 @@ class CCLight_Transmon(Qubit):
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
                         self.mw_mixer_offs_DQ())
         else:
-            # MW_LutMan.mw_amp180(1) #why
-            MW_LutMan.channel_amp(self.mw_channel_amp())
             if self._using_QWG():
                 # case without VSM and with QWG
                 if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
@@ -1285,7 +1291,6 @@ class CCLight_Transmon(Qubit):
             else:
                 # case without VSM (and AWG8)
                 MW_LutMan.mw_amp180(1)
-                MW_LutMan.channel_amp(self.mw_channel_amp())
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 
@@ -1301,6 +1306,9 @@ class CCLight_Transmon(Qubit):
         else:
             warnings.warn('"cfg_prepare_mw_awg" set to False, '
                           'not preparing microwave pulses.')
+
+        # 5. upload commandtable for virtual-phase gates
+        MW_LutMan.upload_single_qubit_phase_corrections()
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
@@ -5566,15 +5574,17 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # append the calibration points, times are for location in plot
+        # allow flipping only with pi/2 or pi pulses
+        assert angle in ['90','180']
 
+        # append the calibration points, times are for location in plot
         nf = np.array(number_of_flips)
         dn = nf[1] - nf[0]
         nf = np.concatenate([nf,
-                             (nf[-1]+1*dn,
-                                 nf[-1]+2*dn,
-                              nf[-1]+3*dn,
-                              nf[-1]+4*dn)])
+                                (nf[-1]+1*dn,
+                                nf[-1]+2*dn,
+                                nf[-1]+3*dn,
+                                nf[-1]+4*dn) ])
 
         self.prepare_for_timedomain()
         p = sqo.flipping(number_of_flips=nf, equator=equator,
@@ -5594,32 +5604,31 @@ class CCLight_Transmon(Qubit):
                 options_dict={'scan_label': 'flipping'})
 
         if update:
-            chisqr_cos = a.fit_res['cos_fit'].chisqr
-            chisqr_line = a.fit_res['line_fit'].chisqr
+            # choose scale factor based on simple goodness-of-fit comparison
+            # not a very stable choice, to be improved
+            if a.fit_res['cos_fit'].chisqr < a.fit_res['line_fit'].chisqr:
+                scale_factor = a._get_scale_factor_cos()
+            else:
+                scale_factor = a._get_scale_factor_line()
 
-            scale_factor_cos = a._get_scale_factor_cos()
-            scale_factor_line = a._get_scale_factor_line()
-
-            # FIXME: hardcoded solution to imperfect correction selection
-            # if chisqr_cos < chisqr_line:
-            #     scale_factor = scale_factor_cos
-            # else:
-            #     scale_factor = scale_factor_line
-            scale_factor = scale_factor_line
-
-            if abs(scale_factor-1) < 2e-3:
-                print('Pulse amplitude accurate within 0.2%. Amplitude not updated.')
+            if abs(scale_factor-1) < 1e-3:
+                print('Pulse amplitude accurate within 0.1%. Amplitude not updated.')
                 return a
 
-            if self.cfg_with_vsm():
-                amp_old = self.mw_vsm_G_amp()
-                self.mw_vsm_G_amp(scale_factor*amp_old)
-            else:
-                amp_old = self.mw_channel_amp()
-                self.mw_channel_amp(scale_factor*amp_old)
+            if angle == '180':
+                if self.cfg_with_vsm():
+                    amp_old = self.mw_vsm_G_amp()
+                    self.mw_vsm_G_amp(scale_factor*amp_old)
+                else:
+                    amp_old = self.mw_channel_amp()
+                    self.mw_channel_amp(scale_factor*amp_old)
+            elif angle == '90':
+                amp_old = self.mw_amp90_scale()
+                self.mw_amp90_scale(scale_factor*amp_old)
 
-            print('Pulse amplitude changed from {:.3f} to {:.3f}'.format(
-                amp_old, scale_factor*amp_old))
+            print('Pulse amplitude for {}-pulse changed from {:.3f} to {:.3f}'.format(
+                angle, amp_old, scale_factor*amp_old))
+
         return a
 
     def flipping_GBT(self, nr_sequence: int = 2):

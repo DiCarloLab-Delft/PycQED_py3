@@ -17,13 +17,18 @@ from pycqed.analysis import fitting_models as fit_mods
 
 class Parity_Check_Analysis():
 
-    def __init__(self, label, ancilla_qubits, data_qubits, folder=None, timestamp=None, cases=None, plotting=False):
-        self.result = self.parity_check_analysis(label, ancilla_qubits, data_qubits, folder, timestamp, cases, plotting)
-        return self.result
+    def __init__(self, label, ancilla_qubits, data_qubits, parking_qubits=None, 
+                folder=None, timestamp=None, cases=None, plotting=False):
+        self.result = self.parity_check_analysis(label, ancilla_qubits, data_qubits, parking_qubits,
+                                                folder=folder, timestamp=timestamp, cases=cases, plotting=plotting)
+        return
 
-    def parity_check_analysis(self, label, ancilla_qubits, data_qubits, parking_qubits=None, folder=None, timestamp=None, cases=None, plotting=False):    
+    def parity_check_analysis(self, label, ancilla_qubits, data_qubits, 
+                                parking_qubits=None, folder=None, timestamp=None, cases=None, plotting=False):    
         res_dict = {}
         all_qubits = ancilla_qubits + data_qubits
+        if parking_qubits:
+            all_qubits += parking_qubits
         a = ma.MeasurementAnalysis(label=label, auto=False, close_file=False)
         res_dict['label'] = label
         a.get_naming_and_values()
@@ -36,7 +41,7 @@ class Parity_Check_Analysis():
         res_dict['cases'] = cases
 
         angles = np.arange(0, 341, 20)
-        n = len(all_qubits)
+        n = len(ancilla_qubits+data_qubits)
         cal_pts = ['{:0{}b}'.format(i, n) for i in range(2**n)]
         # dummy indices for calibration points to match x axis with angles
         cal_num = 2**n
@@ -54,15 +59,17 @@ class Parity_Check_Analysis():
             msmt = d[:-2**n]
             msmt = msmt.reshape(len(cases), len(angles))
             
-            cal_data = d[-2**n:]
-            raw_cal_data[i] = cal_data 
-            zero_levels = [cal_data[k] for k,cal_pt in enumerate(cal_pts) if int(cal_pt[i]) == 0]
-            one_levels = [cal_data[k] for k,cal_pt in enumerate(cal_pts) if int(cal_pt[i]) == 1]
-            normalized_cal_data[i] = (cal_data - np.mean(zero_levels)) / (np.mean(one_levels) - np.mean(zero_levels))
+            cal_ind = i - len(parking_qubits) if parking_qubits else i
 
-            normalized_data[i] = {}
+            cal_data = d[-2**n:]
+            raw_cal_data[cal_ind] = cal_data 
+            zero_levels = [cal_data[k] for k,cal_pt in enumerate(cal_pts) if int(cal_pt[cal_ind]) == 0]
+            one_levels = [cal_data[k] for k,cal_pt in enumerate(cal_pts) if int(cal_pt[cal_ind]) == 1]
+            normalized_cal_data[cal_ind] = (cal_data - np.mean(zero_levels)) / (np.mean(one_levels) - np.mean(zero_levels))
+
+            normalized_data[cal_ind] = {}
             for j, case in enumerate(cases): 
-                normalized_data[i][case] = (msmt[j] - np.mean(zero_levels)) / (np.mean(one_levels) - np.mean(zero_levels))
+                normalized_data[cal_ind][case] = (msmt[j] - np.mean(zero_levels)) / (np.mean(one_levels) - np.mean(zero_levels))
 
         res_dict['raw_cal_data'] = raw_cal_data
         res_dict['normalized_data']  = normalized_data
@@ -97,7 +104,7 @@ class Parity_Check_Analysis():
             if len(data_qubits) == 1:
                 ax_mf = [ax_mf]
 
-        for q, qubit in enumerate(all_qubits):
+        for q, qubit in enumerate(ancilla_qubits + data_qubits):
 
             if plotting:
                 with plt.rc_context(rc_params):
@@ -224,3 +231,10 @@ class Parity_Check_Analysis():
                 plt.close(fig)
 
         return res_dict
+
+
+class Parity_Check_Fidelity_Analysis():
+
+    def __init__(self):
+
+        return

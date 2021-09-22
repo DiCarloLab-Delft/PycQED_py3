@@ -84,9 +84,10 @@ Changelog:
 
 import time
 import logging
+import json
 import numpy as np
 import re
-from typing import Tuple,List
+from typing import Tuple, List, Union
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG_core as zicore
@@ -151,7 +152,9 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
             'clockbase',
             'system_clocks_referenceclock_source',
             'system_clocks_referenceclock_status',
-            'system_clocks_referenceclock_freq'}
+            'system_clocks_referenceclock_freq',
+            'cfg_sideband_mode',
+            'cfg_codeword_protocol'}
         for i in range(4):
             self._snapshot_whitelist.update({
                 'awgs_{}_enable'.format(i),
@@ -315,6 +318,33 @@ while (1) {
 }'''
             self._awg_needs_configuration[awg_nr] = True
 
+
+    def upload_commandtable(self, commandtable: Union[str, dict], awg_nr: int):
+        """
+        Uploads commandtable that is used to call phase increment instructions via DIO codewords,
+        needed for single qubit phase corrections.
+
+        commandtable (Union[str, dict]):
+            The json string to be uploaded as the commandtable. 
+            Will be converted to string if given as dict.
+        """
+        if isinstance(commandtable, dict):
+            commandtable = json.dumps(commandtable, sort_keys=True, indent=2)
+
+        # validate json (without schema)
+        try:
+            json.loads(commandtable)
+        except json.decoder.JSONDecodeError:
+            log.error(f"Invalid JSON in commandtable: {commandtable}")
+        else:
+            log.info("Commandtable has valid json format")
+            # upload commandtable
+            self.stop()
+            self.setv(f"/{self.devname}/awgs/{awg_nr}/commandtable/data", commandtable)
+            self.start()
+
+        return self.geti(f"/{self.devname}/awgs/{awg_nr}/commandtable/status")
+
     ##########################################################################
     # 'private' functions: application specific/codeword support
     ##########################################################################
@@ -361,15 +391,21 @@ while (1) {
             csvname_l = self.devname + '_' + wf_l
             csvname_r = self.devname + '_' + wf_r
 
+            # FIXME: Unfortunately, 'static' here also refers to configuration required for flux HDAWG8
             if self.cfg_sideband_mode() == 'static':
                 program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
                     dio_cw, csvname_l, csvname_r)
             elif self.cfg_sideband_mode() == 'real-time':
-                program += 'setWaveDIO({}, 1, 2, \"{}\", 1, 2, \"{}\");\n'.format(
-                    dio_cw, csvname_l, csvname_r)
+                # program += 'setWaveDIO({}, 1, 2, \"{}\", 1, 2, \"{}\");\n'.format(
+                    # dio_cw, csvname_l, csvname_r)
+                program += 'assignWaveIndex(1, 2, \"{}\", 1, 2, \"{}\", {});\n'.format(
+                    csvname_l, csvname_r, dio_cw)
             else:
                 raise Exception("Unknown modulation type: '{}'".format(self.cfg_sideband_mode()))
 
+        if self.cfg_sideband_mode() == 'real-time':
+            program += '// Initialize the phase of the oscillators\n'
+            program += 'executeTableEntry(1023);\n'
         return program
 
     def _configure_codeword_protocol(self):
@@ -499,9 +535,9 @@ while (1) {
         for awg_nr in range(int(self._num_channels()//2)):
             self.set('awgs_{}_enable'.format(awg_nr), 1)
 
-        # Disable all function generators
+         # Disable all function generators
         for param in [key for key in self.parameters.keys() if
-                      re.match(r'sines_\d+_enables_\d+', key)]:
+                re.match(r'sines_\d+_enables_\d+', key)]:
             self.set(param, 0)
 
         # Set amp or direct mode
@@ -510,11 +546,6 @@ while (1) {
             for ch in range(8):
                 self.set('sigouts_{}_direct'.format(ch), 0)
                 self.set('sigouts_{}_range'.format(ch), 5)
-        else:
-            # Switch all outputs into direct mode when not using flux pulses
-            for ch in range(8):
-                self.set('sigouts_{}_direct'.format(ch), 1)
-                self.set('sigouts_{}_range'.format(ch), .8)
 
         # Turn on all outputs
         for param in [key for key in self.parameters.keys() if re.match(r'sigouts_\d+_on', key)]:

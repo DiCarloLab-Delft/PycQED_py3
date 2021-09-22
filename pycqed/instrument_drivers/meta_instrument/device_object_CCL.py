@@ -1571,24 +1571,29 @@ class DeviceCCL(Instrument):
             cases = control_cases_to_measure 
 
         # for separate preparation of parking qubits in 1, used to study parking
-        Q_idxs_parking = []
-        for i,qb in enumerate(parking_qubits):
-            assert qb in self.qubits()
-            if qb in target_qubits + control_qubits:
-                log.warning(f"Parking qubit {qb} already given as control or target qubit!")
-            Q_idxs_parking += [self.find_instrument(qb).cfg_qubit_nr()]
+        if parking_qubits:
+            Q_idxs_parking = []
+            for i,qb in enumerate(parking_qubits):
+                assert qb in self.qubits()
+                if qb in target_qubits + control_qubits:
+                    log.warning(f"Parking qubit {qb} already given as control or target qubit!")
+                Q_idxs_parking += [self.find_instrument(qb).cfg_qubit_nr()]
 
-        # if refocusing:
+        # prepare list of all used qubits
+        all_qubits = target_qubits + control_qubits_by_case
+        if parking_qubits:
+            all_qubits += parking_qubits
+
         # check the lutman of the target, control and parking qubits for cw_27, 
         # which is needed for refocusing, case preparation, and preparation in 1 (respectively)
-        # and prepare if necessary
-        for qb in target_qubits + control_qubits_by_case + parking_qubits:
+        # and prepare if necessary       
+        for qb in all_qubits:
             mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
             xm180_dict = {"name": "rXm180", "theta": -180, "phi": 0, "type": "ge"}
             if mw_lutman.LutMap().get(27) != xm180_dict:
                 print(f"{mw_lutman.name} does not have refocusing pulse, overriding cw_27..")
                 mw_lutman.LutMap()[27] = xm180_dict
-                mw_lutman.load_waveform_onto_AWG_lookuptable(27)
+                mw_lutman.load_waveform_onto_AWG_lookuptable(27, regenerate_waveforms=True)
 
         for i,qb in enumerate(target_qubits):
             mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
@@ -1598,11 +1603,11 @@ class DeviceCCL(Instrument):
                 phases=np.arange(0,360,20)+phase_offsets[i] if phase_offsets else np.arange(0,360,20))
 
         if prepare_for_timedomain:
-            # Preserve readout (feedline/UHF) order in preparation!
+            # To preserve readout (feedline/UHF) order in preparation!
             qubits_by_feedline = [['D1','X1'],  
                                     ['D2','Z1','D3','D4','D5','D7','X2','X3','Z3'],
                                     ['D6','D8','D9','X4','Z2','Z4']]
-            all_qubits_sorted = sorted(target_qubits+control_qubits_by_case+parking_qubits, 
+            all_qubits_sorted = sorted(all_qubits, 
                                         key=lambda x: [i for i,qubits in enumerate(qubits_by_feedline) if x in qubits])
             log.info(f"Sorted preparation qubits: {all_qubits_sorted}")
             self.prepare_for_timedomain(qubits=all_qubits_sorted)
@@ -1622,7 +1627,7 @@ class DeviceCCL(Instrument):
             control_cases=cases,
             flux_cw_list=flux_cw_list,
             Q_idxs_ramsey=Q_idxs_ramsey if ramsey_qubits else None,
-            Q_idxs_parking=Q_idxs_parking,
+            Q_idxs_parking=Q_idxs_parking if parking_qubits else None,
             nr_flux_dance_before_cal_points=nr_flux_dance_before_cal_points,
             platf_cfg=self.cfg_openql_platform_fn(),
             angles=angles,
@@ -1660,25 +1665,24 @@ class DeviceCCL(Instrument):
 
 
     def measure_parity_check_fidelity(self,
-                ancilla_qubits: list,
-                data_qubits: list, # have to be given in readout (feedline) order
-                flux_dance_steps: List[int] = [1,2,3,4],
-                flux_codeword: str = 'flux-dance',
-                ramsey_qubits: list = None,
-                refocusing: bool = False,
-                MC=None,
-                phase_offsets: list = None,
-                result_logging_mode='raw',
-                cases_to_measure: list = None,
-                prepare_for_timedomain=True,
-                initialization_msmt: bool = False,
-                nr_shots_per_case: int = 2**13,
-                shots_per_meas: int = 2**16,
-                wait_time_before_flux_ns: int = 0,
-                wait_time_after_flux_ns: int = 0,
-                label_suffix="",
-                verbose=True,
-                disable_metadata=False,
+            target_qubits: list,
+            control_qubits: list, # have to be given in readout (feedline) order
+            flux_dance_steps: List[int] = [1,2,3,4],
+            flux_codeword: str = 'flux-dance',
+            ramsey_qubits: list = None,
+            refocusing: bool = False,
+            phase_offsets: list = None,
+            cases_to_measure: list = None,
+            result_logging_mode='raw',
+            prepare_for_timedomain = True,
+            initialization_msmt: bool = True,
+            nr_shots_per_case: int = 2**14,
+            shots_per_meas: int = 2**16,
+            wait_time_before_flux_ns: int = 0,
+            wait_time_after_flux_ns: int = 0,
+            label_suffix: str = "",
+            disable_metadata: bool = False,
+            MC = None,
             ):
         """
         Measures a parity check fidelity. In this experiment the conditional phase
@@ -1724,22 +1728,22 @@ class DeviceCCL(Instrument):
             MC = self.instr_MC.get_instr()
 
         Q_idxs_ancilla = [] 
-        for i,ancilla in enumerate(ancilla_qubits):
-            log.info(f"Parity {ancilla} - {data_qubits}")
+        for i,ancilla in enumerate(target_qubits):
+            log.info(f"Parity {ancilla} - {control_qubits}")
             assert ancilla in self.qubits()
-            assert all([Q in self.qubits() for Q in data_qubits])
+            assert all([Q in self.qubits() for Q in control_qubits])
             Q_idxs_ancilla += [self.find_instrument(ancilla).cfg_qubit_nr()]
         
         Q_idxs_ramsey = []
         if ramsey_qubits:
             for i,qb in enumerate(ramsey_qubits):
                 assert qb in self.qubits()
-                if qb in ancilla_qubits:
+                if qb in target_qubits:
                     log.warning(f"Ramsey qubit {qb} already given as ancilla qubit!")
                 Q_idxs_ramsey += [self.find_instrument(qb).cfg_qubit_nr()]
 
         Q_idxs_data = []   
-        Q_idxs_data += [self.find_instrument(Q).cfg_qubit_nr() for Q in data_qubits]  
+        Q_idxs_data += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits]  
         cases = ['{:0{}b}'.format(i, len(Q_idxs_data)) for i in range(2**len(Q_idxs_data))]
        
         if initialization_msmt:
@@ -1751,9 +1755,9 @@ class DeviceCCL(Instrument):
         self.ro_acq_digitized(False)
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=ancilla_qubits+data_qubits)
+            self.prepare_for_timedomain(qubits=target_qubits+control_qubits)
 
-        for i, qb in enumerate(ancilla_qubits): 
+        for i, qb in enumerate(target_qubits): 
             mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
             # load_phase_pulses already uploads all waveforms inside
             mw_lutman.load_phase_pulses_to_AWG_lookuptable(
@@ -1777,13 +1781,12 @@ class DeviceCCL(Instrument):
             wait_time_before_flux=wait_time_before_flux_ns,
             wait_time_after_flux=wait_time_after_flux_ns
             )
-
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
 
         d = self.get_int_logging_detector(
-            qubits=ancilla_qubits+data_qubits, 
+            qubits=target_qubits+control_qubits, 
             result_logging_mode=result_logging_mode
             )
         shots_per_meas = int(np.floor(np.min([shots_per_meas, nr_shots]) 
@@ -1799,7 +1802,7 @@ class DeviceCCL(Instrument):
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
 
-        label = f"Parity_check_fidelity_{ancilla_qubits}_{data_qubits}_{self.msmt_suffix}_{label_suffix}"
+        label = f"Parity_check_fidelity_{target_qubits}_{control_qubits}_{self.msmt_suffix}_{label_suffix}"
         MC.run(label, disable_snapshot_metadata=disable_metadata)
 
         MC.soft_avg(old_soft_avg)
@@ -5318,7 +5321,8 @@ class DeviceCCL(Instrument):
         compile_only: bool = False,
         pool=None,  # a multiprocessing.Pool()
         rb_tasks=None,  # used after called with `compile_only=True
-        label_name=None
+        label_name=None,
+        prepare_for_timedomain=True
     ):
         """
     Performs simultaneous single qubit RB on multiple qubits.
@@ -5353,7 +5357,8 @@ class DeviceCCL(Instrument):
         self.ro_acq_weight_type(ro_acq_weight_type)
         self.ro_acq_digitized(False)
 
-        self.prepare_for_timedomain(qubits=qubits)
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubits, bypass_flux=True)
         if MC is None:
             MC = self.instr_MC.get_instr()
         MC.soft_avg(1)

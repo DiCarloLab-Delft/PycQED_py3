@@ -139,7 +139,7 @@
                     "ref_control_mode": "uhfqa-9ch",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 2,
+                        "slot": 0,
                         "io_module": "CC-CONN-DIO"
                     }
                 },
@@ -151,7 +151,7 @@
                     "ref_control_mode": "uhfqa-9ch",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 4,
+                        "slot": 1,
                         "io_module": "CC-CONN-DIO"
                     }
                 },
@@ -163,7 +163,7 @@
                     "ref_control_mode": "uhfqa-9ch",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 5,
+                        "slot": 2,
                         "io_module": "CC-CONN-DIO"
                     }
                 },
@@ -182,7 +182,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 0,
+                        "slot": 3,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -199,7 +199,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 1,
+                        "slot": 4,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -216,7 +216,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 6,
+                        "slot": 8,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -233,7 +233,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 7,
+                        "slot": 9,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -250,7 +250,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 8,
+                        "slot": 10,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -264,7 +264,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 3,
+                        "slot": 5,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -277,7 +277,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 9,
+                        "slot": 6,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },
@@ -290,7 +290,7 @@
 //                    "ref_control_mode": "awg8-flux-vector-8",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 10,
+                        "slot": 7,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 }
@@ -357,7 +357,7 @@
         "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_cz_sw q9","sf_park q4", "barrier q9, q5, q4"],
         // Edge 1/25
         "cz q9, q4": ["barrier q9, q4, q5", "sf_cz_nw q4", "sf_cz_se q9","sf_park q5", "barrier q9, q4, q5"],
-        "cz q4, q9": ["barrier ", "sf_cz_nw q4", "sf_cz_se q9","sf_park q5", "barrier q9, q4, q5"],
+        "cz q4, q9": ["barrier q9, q4, q5", "sf_cz_nw q4", "sf_cz_se q9","sf_park q5", "barrier q9, q4, q5"],
         // Edge 5/29
         "cz q5, q10": ["barrier q5, q10, q4", "sf_cz_nw q10", "sf_cz_se q5","sf_park q4", "barrier q5, q10, q4"],
         "cz q10, q5": ["barrier q5, q10, q4", "sf_cz_nw q10", "sf_cz_se q5","sf_cz_sw q4", "barrier q5, q10, q4"],
@@ -418,9 +418,12 @@
         // Edge 21/45
         "cz q14, q0": ["barrier q14, q0", "sf_cz_ne q0", "sf_cz_sw q14", "barrier q14, q0"],
         "cz q0, q14": ["barrier q14, q0", "sf_cz_ne q0", "sf_cz_sw q14", "barrier q14, q0"],
+        // // Edge 22/46
+        "cz q6, q11": ["barrier q6, q11, q2", "sf_cz_nw q11", "sf_cz_se q6","sf_park q2", "barrier q6, q11, q2", "update_ph_nw q11", "update_ph_se q6", "barrier q6, q11, q2"],
+        "cz q11, q6": ["barrier q6, q11, q2", "sf_cz_nw q11", "sf_cz_se q6","sf_park q2", "barrier q6, q11, q2", "update_ph_nw q11", "update_ph_se q6", "barrier q6, q11, q2"],
         // Edge 22/46
-        "cz q6, q11": ["barrier q6, q11, q2", "sf_cz_nw q11", "sf_cz_se q6","sf_park q2", "barrier q6, q11, q2"],
-        "cz q11, q6": ["barrier q6, q11, q2", "sf_cz_nw q11", "sf_cz_se q6","sf_park q2", "barrier q6, q11, q2"],
+        // "cz q6, q11": ["barrier q6, q11, q2", "sf_cz_nw q11", "sf_cz_se q6","sf_park q2", "barrier q6, q11, q2","barrier q6, q11, q2"],
+        // "cz q11, q6": ["barrier q6, q11, q2", "sf_cz_nw q11", "sf_cz_se q6","sf_park q2", "barrier q6, q11, q2","barrier q6, q11, q2"],
         // Edge 23/47
         "cz q2, q11": ["barrier q2, q11, q6", "sf_cz_ne q11", "sf_cz_sw q2","sf_park q6", "barrier q2, q11, q6"],
         "cz q11, q2": ["barrier q2, q11, q6", "sf_cz_ne q11", "sf_cz_sw q2","sf_park q6", "barrier q2, q11, q6"],
@@ -906,6 +909,26 @@
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [5]
+            }
+        },
+        "update_ph_nw q11": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "update_ph_nw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [60]
+            }
+        },
+        "update_ph_se q6": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "update_ph_se",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [63]
             }
         },
         // "flux-dance-1": {
@@ -1875,6 +1898,18 @@
         //         "static_codeword_override": [4]
         //     }
         // },
+
+        "sf_square": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [6]
+            }
+        },
+        
         "sf_park": {
             "duration": @FLUX_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
@@ -2779,7 +2814,7 @@
                 ]
 			}
 		}
-	}	// end of "instructions"
+	},	// end of "instructions"
 
 
     // NB: the "topology" keyword must be present, but the contents are only interpreted by

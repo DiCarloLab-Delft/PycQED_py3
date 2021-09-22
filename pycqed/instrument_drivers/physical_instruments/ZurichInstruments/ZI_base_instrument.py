@@ -1322,7 +1322,7 @@ class ZI_base_instrument(Instrument):
         # Handle absolute path
         # print('DEBUG::setv {} {}'.format(path,value))
         if self.use_setVector:
-            self._write_cmd_to_logfile(f'daq.setVector("{path}", np.array({np.array2string(value, separator=",")}))')
+            # self._write_cmd_to_logfile(f'daq.setVector("{path}", np.array({np.array2string(value, separator=",")}))')
             self.daq.setVector(self._get_full_path(path), value)
         else:
             self._write_cmd_to_logfile(f'daq.vectorWrite("{path}", np.array({np.array2string(value, separator=",")}))')

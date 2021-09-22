@@ -1544,11 +1544,14 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
 
         cal_labels = ["00", "01", "10", "11"]
 
+        cs_idx = [0,1]
+
         if self.include_park:
             # add calibration points same as first qubit
             cal_points_idxs += [cal_points_idxs[0]]
             ch_idx_list.append(ch_idx_park)
             type_list.append("park")
+            cs_idx.append(2)
             cal_labels = ["000", "010", "101", "111"]
 
         osc_idxs = np.where(x_vals <= 360)[0]
@@ -1558,7 +1561,6 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict["xvals_cal"] = np.arange(365, 365 + len(cal_idx) * 25, 25)
         self.proc_data_dict["cal_labels"] = cal_labels
 
-        cs_idx = [0,1]
         for ch_idx, c_idx, type_str in zip(ch_idx_list, cs_idx, type_list):
             yvals = list(self.raw_data_dict["measured_values_ord_dict"].values())[
                 ch_idx
