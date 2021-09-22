@@ -1620,6 +1620,10 @@ def conditional_oscillation_seq(q0: int, q1: int,
                     # Parallel flux pulses below
 
                     k.gate(flux_codeword, [q0, q1])
+                    # k.gate('rx180',[8])
+                    # k.gate('i',[8])
+                    # k.gate('rx180',[8])
+                    k.gate("wait", [], 0)  # alignment workaround
 
                     # in case of parking and parallel cz
                     if flux_codeword_park == 'cz':
@@ -1674,14 +1678,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
             # #################################################################
             # Measurement
             # #################################################################
-            if case == 'excitation':
-                gate = 'rx180' 
-                # if single_q_gates_replace is None else single_q_gates_replace
-                k.gate("wait", [], 0) #alignment workaround
-                k.gate(gate, [q1])
-                # k.gate('i', [q0])
-                # k.gate("wait", [], 0)
-
             k.measure(q0)
             k.measure(q1)
             if q2 is not None:
@@ -1716,6 +1712,175 @@ def conditional_oscillation_seq(q0: int, q1: int,
 
     p.set_sweep_points(p.sweep_points)
     return p
+
+# def conditional_oscillation_seq(q0: int, q1: int,
+#                                 q2: int = None, q3: int = None,
+#                                 q_extra: list = None,
+#                                 platf_cfg: str = None,
+#                                 disable_cz: bool = False,
+#                                 disabled_cz_duration: int = 60,
+#                                 cz_repetitions: int = 1,
+#                                 angles=np.arange(0, 360, 20),
+#                                 wait_time_before_flux: int = 0,
+#                                 wait_time_after_flux: int = 0,
+#                                 add_cal_points: bool = True,
+#                                 cases: list = ('no_excitation', 'excitation'),
+#                                 flux_codeword: str = 'cz',
+#                                 flux_codeword_park: str = None,
+#                                 parked_qubit_seq: str = 'ground',
+#                                 disable_parallel_single_q_gates: bool = False):
+
+#     assert parked_qubit_seq in {"ground", "ramsey"}
+
+#     p = oqh.create_program("conditional_oscillation_seq", platf_cfg)
+
+#     # These angles correspond to special pi/2 pulses in the lutman
+#     for i, angle in enumerate(angles):
+#         for case in cases:
+
+#             k = oqh.create_kernel("{}_{}".format(case, angle), p)
+#             k.prepz(q0)
+#             k.prepz(q1)
+#             if q2 is not None:
+#                 k.prepz(q2)
+#             if q3 is not None:
+#                 k.prepz(q3)
+
+#             k.gate("wait", [], 0)  # alignment workaround
+
+#             # #################################################################
+#             # Single qubit ** parallel ** gates before flux pulses
+#             # #################################################################
+#             for qubit in q_extra:
+#                 k.gate("rx180",[qubit])
+
+#             control_qubits = [q1]
+#             if q3 is not None:
+#                 # In case of parallel cz
+#                 control_qubits.append(q3)
+
+#             ramsey_qubits = [q0]
+#             if q2 is not None and parked_qubit_seq == "ramsey":
+#                 # For parking and parallel cz
+#                 ramsey_qubits.append(q2)
+
+#             if case == "excitation":
+#                 # implicit identities otherwise
+#                 for q in control_qubits:
+#                     k.gate("rx180", [q])
+#                     if disable_parallel_single_q_gates:
+#                         k.gate("wait", [], 0)
+
+#             for q in ramsey_qubits:
+#                 k.gate("rx90", [q])
+#                 if disable_parallel_single_q_gates:
+#                     k.gate("wait", [], 0)
+
+#             k.gate("wait", [], 0)  # alignment workaround
+
+#             # #################################################################
+#             # Flux pulses
+#             # #################################################################
+
+#             k.gate('wait', [], wait_time_before_flux)
+
+#             for dummy_i in range(cz_repetitions):
+#                 if not disable_cz:
+#                     # Parallel flux pulses below
+
+#                     k.gate(flux_codeword, [15, 11])
+#                     k.gate('rx180',[8])
+#                     k.gate('i',[8])
+#                     k.gate('rx180',[8])
+#                     k.gate("wait", [], 0)  # alignment workaround
+
+#                     # in case of parking and parallel cz
+#                     if flux_codeword_park == 'cz':
+#                         k.gate(flux_codeword_park, [q2, q3])
+#                     elif flux_codeword_park == 'park':
+#                         k.gate(flux_codeword_park, [q2])
+#                         if q3 is not None:
+#                             raise ValueError("Expected q3 to be None")
+#                     elif flux_codeword_park is None:
+#                         pass
+#                     else:
+#                         raise ValueError(
+#                             'flux_codeword_park "{}" not allowed'.format(
+#                                 flux_codeword_park))
+#                 else:
+#                     k.gate("wait", [], 0) #alignment workaround
+#                     # k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
+#                     k.gate('wait', [q0,q1], 50)
+#                     k.gate("wait", [], 0) #alignment workaround
+
+#                 k.gate("wait", [], 0)
+
+#             k.gate('wait', [], wait_time_after_flux)
+
+#             # #################################################################
+#             # Single qubit ** parallel ** gates post flux pulses
+#             # #################################################################
+#             if case == "excitation":
+#                 for q in control_qubits:
+#                     k.gate("rx180", [q])
+#                     if disable_parallel_single_q_gates:
+#                         k.gate("wait", [], 0)
+
+#             # cw_idx corresponds to special hardcoded angles in the lutman
+#             # special because the cw phase pulses go in mult of 20 deg
+#             cw_idx = angle // 20 + 9
+#             phi_gate = None
+#             if angle == 90:
+#                 phi_gate = 'ry90'
+#             elif angle == 0:
+#                 phi_gate = 'rx90'
+#             else:
+#                 phi_gate = 'cw_{:02}'.format(cw_idx)
+
+#             for q in ramsey_qubits:
+#                 k.gate(phi_gate, [q])
+#                 if disable_parallel_single_q_gates:
+#                     k.gate("wait", [], 0)
+
+#             k.gate('wait', [], 0)
+
+#             # #################################################################
+#             # Measurement
+#             # #################################################################
+#             k.measure(q0)
+#             k.measure(q1)
+#             if q2 is not None:
+#                 k.measure(q2)
+#             if q3 is not None:
+#                 k.measure(q3)
+#             k.gate('wait', [], 0)
+#             p.add_kernel(k)
+
+#     if add_cal_points:
+#         if q2 is None:
+#             states = ["00", "01", "10", "11"]
+#         else:
+#             states = ["000", "010", "101", "111"]
+
+#         qubits = [q0, q1] if q2 is None else [q0, q1, q2]
+#         oqh.add_multi_q_cal_points(
+#             p, qubits=qubits, f_state_cal_pt_cw=31,
+#             combinations=states, return_comb=False)
+
+#     p = oqh.compile(p)
+
+#     # [2020-06-24] parallel cz not supported (yet)
+
+#     if add_cal_points:
+#         cal_pts_idx = [361, 362, 363, 364]
+#     else:
+#         cal_pts_idx = []
+
+#     p.sweep_points = np.concatenate(
+#         [np.repeat(angles, len(cases)), cal_pts_idx])
+
+#     p.set_sweep_points(p.sweep_points)
+#     return p
 
 
 def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,

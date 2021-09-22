@@ -1044,7 +1044,7 @@ class BaseDataAnalysis(object):
             legend_ncol = pdict.get('legend_ncol', 1)
             legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol, bbox_to_anchor=(1.35,0))
 
         if self.tight_fig:
             axs.figure.tight_layout()

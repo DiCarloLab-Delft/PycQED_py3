@@ -513,7 +513,6 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             }
 
 
-
 class EFRabiAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -579,7 +578,7 @@ class EFRabiAnalysis(Single_Qubit_TimeDomainAnalysis):
 
         msg = r'$\pi$-ef amp '
         msg += ': {:.4f}\n'.format(sf_cos)
-        
+
 
         self.raw_data_dict['scale_factor_msg'] = msg
         # TODO: save scale factor to file
@@ -640,8 +639,6 @@ class EFRabiAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'text_string': self.raw_data_dict['scale_factor_msg']}
 
 
-
-
 class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -697,10 +694,10 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
         self.proc_data_dict['data0_I_Q'] = np.mean(self.proc_data_dict['data_I_Q'][-4:-2])
         self.proc_data_dict['data0_Q_Q'] = np.mean(self.proc_data_dict['data_Q_Q'][-4:-2])
 
-        self.proc_data_dict['data_A_I'] = np.sqrt((self.proc_data_dict['data_I_I']-self.proc_data_dict['data0_I_I'])**2 + 
+        self.proc_data_dict['data_A_I'] = np.sqrt((self.proc_data_dict['data_I_I']-self.proc_data_dict['data0_I_I'])**2 +
                                               (self.proc_data_dict['data_Q_I']-self.proc_data_dict['data0_Q_I'])**2)
-        self.proc_data_dict['data_A_Q'] = np.sqrt((self.proc_data_dict['data_I_Q']-self.proc_data_dict['data0_I_Q'])**2 + 
-                                              (self.proc_data_dict['data_Q_Q']-self.proc_data_dict['data0_Q_Q'])**2)        
+        self.proc_data_dict['data_A_Q'] = np.sqrt((self.proc_data_dict['data_I_Q']-self.proc_data_dict['data0_I_Q'])**2 +
+                                              (self.proc_data_dict['data_Q_Q']-self.proc_data_dict['data0_Q_Q'])**2)
         self.proc_data_dict['data0_A_I'] = np.mean(self.proc_data_dict['data_A_I'][-4:-2])
         self.proc_data_dict['data1_A_I'] = np.mean(self.proc_data_dict['data_A_I'][-2:])
         self.proc_data_dict['dataA_I_avg'] = np.mean([self.proc_data_dict['data0_A_I'],
@@ -725,7 +722,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
-        
+
 
         phase_guess_fit = np.polyfit(self.proc_data_dict['plot_times_I'][:-4],
                                      self.proc_data_dict['phase'],1,
@@ -767,7 +764,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     #     msg = r'$\pi$-ef amp '
     #     msg += ': {:.4f}\n'.format(sf_cos)
-        
+
 
     #     self.raw_data_dict['scale_factor_msg'] = msg
     #     # TODO: save scale factor to file
@@ -888,11 +885,6 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
             #     'plotfn': self.plot_text,
             #     'box_props': 'fancy',
             #     'text_string': self.raw_data_dict['scale_factor_msg']}
-
-
-
-
-
 
 
 class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):

@@ -975,9 +975,9 @@ class DeviceCCL(Instrument):
 
         # self._prep_td_configure_VSM()
 
-    ########################################################
+    #######################################################
     # Measurement methods
-    ########################################################
+    #######################################################
 
     def measure_conditional_oscillation(
         self,
@@ -985,6 +985,7 @@ class DeviceCCL(Instrument):
         q1: str,
         q2: str = None,
         q3: str = None,
+        q_extra: list = [],
         flux_codeword="cz",
         flux_codeword_park=None,
         parked_qubit_seq=None,
@@ -1001,47 +1002,7 @@ class DeviceCCL(Instrument):
         verbose=True,
         disable_metadata=False,
         extract_only=False,
-    ):
-        """
-        Measures the "conventional cost function" for the CZ gate that
-        is a conditional oscillation. In this experiment the conditional phase
-        in the two-qubit Cphase gate is measured using Ramsey-lie sequence.
-        Specifically qubit q0 is prepared in the superposition, while q1 is in 0 or 1 state.
-        Next the flux pulse is applied. Finally pi/2 afterrotation around various axes
-        is applied to q0, and q1 is flipped back (if neccessary) to 0 state.
-        Plotting the probabilities of the zero state for each qubit as a function of
-        the afterrotation axis angle, and comparing case of q1 in 0 or 1 state, enables to
-        measure the conditional phase and estimale the leakage of the Cphase gate.
-
-        Refs:
-        Rol arXiv:1903.02492, Suppl. Sec. D
-
-        Args:
-            q0 (str):
-                target qubit name (i.e. the qubit in the superposition state)
-
-            q1 (str):
-                control qubit name (i.e. the qubit remaining in 0 or 1 state)
-            q2, q3 (str):
-                names of optional extra qubit to either park or apply a CZ to.
-            flux_codeword (str):
-                the gate to be applied to the qubit pair q0, q1
-            flux_codeword_park (str):
-                optionally park qubits q2 (and q3) with either a 'park' pulse
-                (single qubit operation on q2) or a 'cz' pulse on q2-q3.
-                NB: depending on the CC configurations the parking can be
-                implicit in the main `cz`
-            prepare_for_timedomain (bool):
-                should the insruments be reconfigured for time domain measurement
-            disable_cz (bool):
-                execute the experiment with no flux pulse applied
-            disabled_cz_duration_ns (int):
-                waiting time to emulate the flux pulse
-            wait_time_after_flux_ns (int):
-                additional waiting time (in ns) after the flux pulse, before
-                the final afterrotations
-
-        """
+        ):
         if MC is None:
             MC = self.instr_MC.get_instr()
         assert q0 in self.qubits()
@@ -1115,17 +1076,13 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))
 
         MC.run(
-            "conditional_oscillation_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}".format(
-                q0, q1, q2, q3, cz_repetitions,
+            "conditional_oscillation_{}_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}".format(
+                q0, q1, q_extra, q2, q3, cz_repetitions,
                 wait_time_before_flux_ns, wait_time_after_flux_ns,
                 self.msmt_suffix, label,
             ),
             disable_snapshot_metadata=disable_metadata,
         )
-
-        # [2020-06-24] parallel cz not supported (yet)
-        # should be implemented by just running the analysis twice with
-        # corresponding channels
 
         options_dict = {
             'ch_idx_osc': 0,
@@ -1140,6 +1097,124 @@ class DeviceCCL(Instrument):
             extract_only=extract_only)
 
         return a
+
+    # def measure_conditional_oscillation(
+    #     self,
+    #     q0: str,
+    #     q1: str,
+    #     q2: str = None,
+    #     q3: str = None,
+    #     q_extra: list = None,
+    #     flux_codeword="cz",
+    #     flux_codeword_park=None,
+    #     parked_qubit_seq=None,
+    #     downsample_swp_points=1,  # x2 and x3 available
+    #     prepare_for_timedomain=True,
+    #     MC=None,
+    #     disable_cz: bool = False,
+    #     disabled_cz_duration_ns: int = 60,
+    #     cz_repetitions: int = 1,
+    #     wait_time_before_flux_ns: int = 0,
+    #     wait_time_after_flux_ns: int = 0,
+    #     disable_parallel_single_q_gates: bool = False,
+    #     label="",
+    #     verbose=True,
+    #     disable_metadata=False,
+    #     extract_only=False,
+    # ):
+    #     if MC is None:
+    #         MC = self.instr_MC.get_instr()
+    #     assert q0 in self.qubits()
+    #     assert q1 in self.qubits()
+    #     q0idx = self.find_instrument(q0).cfg_qubit_nr()
+    #     q1idx = self.find_instrument(q1).cfg_qubit_nr()
+    #     list_qubits_used = [q0, q1]
+    #     if q2 is None:
+    #         q2idx = None
+    #     else:
+    #         q2idx = self.find_instrument(q2).cfg_qubit_nr()
+    #         list_qubits_used.append(q2)
+    #     if q3 is None:
+    #         q3idx = None
+    #     else:
+    #         q3idx = self.find_instrument(q3).cfg_qubit_nr()
+    #         list_qubits_used.append(q3)
+
+    #     if prepare_for_timedomain:
+    #         self.prepare_for_timedomain(qubits=list_qubits_used)
+    #         for q in list_qubits_used:  #only on the CZ qubits we add the ef pulses
+    #             mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+    #             lm = mw_lutman.LutMap()
+    #             # we hardcode the X on the ef transition to CW 31 here.
+    #             lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+    #             # load_phase_pulses will also upload other waveforms
+    #             mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+    #             mw_lutman.load_waveforms_onto_AWG_lookuptable(
+    #                 regenerate_waveforms=True)
+
+    #     # These are hardcoded angles in the mw_lutman for the AWG8
+    #     # only x2 and x3 downsample_swp_points available
+    #     angles = np.arange(0, 341, 20 * downsample_swp_points)
+
+    #     if parked_qubit_seq is None:
+    #         parked_qubit_seq = "ramsey" if q2 is not None else "ground"
+
+    #     p = mqo.conditional_oscillation_seq(
+    #         q0idx,
+    #         q1idx,
+    #         q2idx,
+    #         q3idx,
+    #         q_extra=q_extra,
+    #         platf_cfg=self.cfg_openql_platform_fn(),
+    #         disable_cz=disable_cz,
+    #         disabled_cz_duration=disabled_cz_duration_ns,
+    #         angles=angles,
+    #         wait_time_before_flux=wait_time_before_flux_ns,
+    #         wait_time_after_flux=wait_time_after_flux_ns,
+    #         flux_codeword=flux_codeword,
+    #         flux_codeword_park=flux_codeword_park,
+    #         cz_repetitions=cz_repetitions,
+    #         parked_qubit_seq=parked_qubit_seq,
+    #         disable_parallel_single_q_gates=disable_parallel_single_q_gates
+    #     )
+
+    #     s = swf.OpenQL_Sweep(
+    #         openql_program=p,
+    #         CCL=self.instr_CC.get_instr(),
+    #         parameter_name="Phase",
+    #         unit="deg",
+    #     )
+    #     MC.set_sweep_function(s)
+    #     MC.set_sweep_points(p.sweep_points)
+
+    #     measured_qubits = [q0,q1]
+    #     if q2 is not None:
+    #         measured_qubits.append(q2)
+    #     if q3 is not None:
+    #         measured_qubits.append(q3)
+
+    #     MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))
+
+    #     MC.run(
+    #         "conditional_oscillation_{}_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}".format(
+    #             q0, q1, q_extra, q2, q3, cz_repetitions,
+    #             wait_time_before_flux_ns, wait_time_after_flux_ns,
+    #             self.msmt_suffix, label,
+    #         ),
+    #         disable_snapshot_metadata=disable_metadata,
+    #     )
+
+    #     options_dict = {
+    #         'ch_idx_osc': 0,
+    #         'ch_idx_spec': 1
+    #     }
+
+    #     if q2 is not None:
+    #         options_dict['ch_idx_park'] = 2
+
+    #     a = ma2.Conditional_Oscillation_Analysis(
+    #         options_dict=options_dict,
+    #         extract_only=extract_only)
 
     def measure_two_qubit_grovers_repeated(
         self,

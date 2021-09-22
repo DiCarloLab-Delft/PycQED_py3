@@ -21,6 +21,7 @@ from pycqed.utilities.general import get_file_sha256_hash
 log = logging.getLogger(__name__)
 
 output_dir = join(dirname(__file__), 'output')
+visualize = False
 ql.set_option('output_dir', output_dir)
 ql.set_option('scheduler', 'ALAP')
 
@@ -100,6 +101,18 @@ def compile(p, quiet: bool = False, extra_openql_options: List[Tuple[str,str]] =
     """
     ql.initialize() # FIXME: reset options, may initialize more functionality in the future
     ql.set_option('output_dir', output_dir)
+
+    if visualize:
+        p.get_compiler().append_pass(
+            'ana.visualize.Circuit',
+            'visualize_circuit',
+            {
+                'output_prefix': output_dir + '/%N_circuit',
+                'config': join(dirname(__file__), "visualizer.json"),
+                'waveform_mapping': join(dirname(__file__), "waveform.json"),
+                'interactive': 'yes'
+            }
+        )
     if quiet:
         with suppress_stdout():
             p.compile()

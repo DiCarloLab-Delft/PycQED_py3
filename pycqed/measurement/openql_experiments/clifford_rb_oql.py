@@ -285,6 +285,12 @@ def randomized_benchmarking(
                             for qubit_idx in qubit_map.values():
                                 k.prepz(qubit_idx)
 
+                        # ADDED FOR LEAKAGE CHECKS
+                        # k.gate("wait", [], 0)
+                        # k.gate("rx180", [14])
+                        # k.gate("wait", [], 0)
+                        # REMOVE AFTER
+
                         for gates in cl_seq_decomposed_with_net:
                             for g, q in gates:
                                 if isinstance(q, str):  # single qubit gate
@@ -320,6 +326,12 @@ def randomized_benchmarking(
 
                         # FIXME: This hack is required to align multiplexed RO in openQL..
                         k.gate("wait", [], 0)
+
+                        # ADDED FOR LEAKAGE CHECKS
+                        # k.gate("rx180", [14])
+                        # k.gate("wait", [], 0)
+                        # REMOVE AFTER
+
                         for qubit_idx in qubit_map.values():
                             k.measure(qubit_idx)
                         k.gate("wait", [], 0)

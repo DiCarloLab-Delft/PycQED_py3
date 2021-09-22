@@ -115,7 +115,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
 
-    # k.prepz(qubit_idx)
+    k.prepz(qubit_idx)
     for i in range(nr_clocks):
         # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
         # control works. By repeating it the duration can be controlled.
@@ -564,8 +564,8 @@ def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
     p = oqh.compile(p)
     return p
 
-def spin_lock_simple(times, qubit_idx: int, platf_cfg: str, 
-                     mw_gate_duration: float = 40e-9, 
+def spin_lock_simple(times, qubit_idx: int, platf_cfg: str,
+                     mw_gate_duration: float = 40e-9,
                      tomo: bool = False):
     """
     Single qubit Echo sequence.
@@ -618,7 +618,7 @@ def spin_lock_simple(times, qubit_idx: int, platf_cfg: str,
     return p
 
 
-def rabi_frequency(times, qubit_idx: int, platf_cfg: str, 
+def rabi_frequency(times, qubit_idx: int, platf_cfg: str,
                     mw_gate_duration: float = 40e-9,
                     tomo: bool = False):
     """
