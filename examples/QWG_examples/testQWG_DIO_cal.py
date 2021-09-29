@@ -36,18 +36,31 @@ from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
-if 0:
+if 1:
     cc = CC('cc', IPTransport('192.168.0.241'))
     print(cc.get_identity())
     cc.init()
 else:
     cc = None
 
-qwg_21 = QWG('qwg_21', IPTransport('192.168.0.179'))
-#qwg_22 = QWG('qwg_22', IPTransport('192.168.0.178'))
-qwg_8 = QWG('qwg_8', IPTransport('192.168.0.192'))
-qwgs = [qwg_21, qwg_8]
-#qwgs = [qwg_22, qwg_21] # reversed
+if 0:
+    qwg_21 = QWG('qwg_21', IPTransport('192.168.0.179'))
+    #qwg_22 = QWG('qwg_22', IPTransport('192.168.0.178'))
+    qwg_8 = QWG('qwg_8', IPTransport('192.168.0.192'))
+    qwgs = [qwg_21, qwg_8]
+    #qwgs = [qwg_22, qwg_21] # reversed
+
+if 1: # 20210907, development setup Wouter, slot 0 and 1
+    qwg_9 = QWG('qwg_9', IPTransport('192.168.0.191'))      # slot 0
+    qwg_19 = QWG('qwg_19', IPTransport('192.168.0.181'))    # slot 1
+    qwgs = [qwg_19, qwg_9]
+if 0: # 20210907, development setup Wouter, slot 2 and 3
+    qwg_14 = QWG('qwg_14', IPTransport('192.168.0.186'))    # slot 2
+    qwg_10 = QWG('qwg_10', IPTransport('192.168.0.190'))    # slot 3
+    qwgs = [qwg_10, qwg_14]
+
+
+
 
 for qwg in qwgs:
     print(qwg.get_identity())
