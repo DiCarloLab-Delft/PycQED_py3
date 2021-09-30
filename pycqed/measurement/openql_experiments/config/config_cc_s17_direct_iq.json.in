@@ -1,5 +1,6 @@
 // File:    config_cc_s17_direct_iq.json.in
-// notes:   see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
+// notes:   requires OpenQL > 0.10.0
+//          see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
 // author: 	Wouter Vlothuizen e.a.
 
 {
@@ -7,6 +8,8 @@
 
 	"hardware_settings": {
         "qubit_number": 17,
+        "creg_number": 32,
+        "breg_number": 32,
 		"cycle_time" : 20,        // in [ns]
 
         "eqasm_backend_cc": {
@@ -185,41 +188,41 @@
 #include "common_gate_decomposition.json.in"
         ,
         // gate decompositions for S17
-        "cz q8,q10": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
-        "cz q10,q8": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
-        "cz q8,q11": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
-        "cz q11,q8": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
-        "cz q11,q14": ["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
-        "cz q14,q11": ["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
-        "cz q10,q14": ["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
-        "cz q14,q10": ["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
-        "cz q9,q11": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
-        "cz q11,q9": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
-        "cz q9,q12": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
-        "cz q12,q9": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
-        "cz q11,q15": ["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
-        "cz q15,q11": ["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
+//        "cz q8,q10": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
+//        "cz q10,q8": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
+//        "cz q8,q11": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
+//        "cz q11,q8": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
+//        "cz q11,q14": ["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
+//        "cz q14,q11": ["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
+//        "cz q10,q14": ["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
+//        "cz q14,q10": ["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
+//        "cz q9,q11": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
+//        "cz q11,q9": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
+//        "cz q9,q12": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
+//        "cz q12,q9": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
+//        "cz q11,q15": ["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
+//        "cz q15,q11": ["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
 
-        "cz q12,q15": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
-        "cz q15,q12": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
+//        "cz q12,q15": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
+//        "cz q15,q12": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
 
-        // gate decompositions for S17, using new CZ helpers FIXME: rename and remove originals after testing
-        "_cz q8,q10":   ["_cz_sw_ne_park q8,q10,q11"],
-        "_cz q10,q8":   ["_cz_sw_ne_park q8,q10,q11"],
-        "_cz q8,q11":   ["_cz_se_nw_park q8,q11,q10"],
-        "_cz q11,q8":   ["_cz_se_nw_park q8,q11,q10"],
-        "_cz q11,q14":  ["_cz_sw_ne_park q11,q14,q15"],
-        "_cz q14,q11":  ["_cz_sw_ne_park q11,q14,q15"],
-        "_cz q10,q14":  ["_cz_se_nw q10,q14"],
-        "_cz q14,q10":  ["_cz_se_nw q10,q14"],
-        "_cz q9,q11":   ["_cz_sw_ne_park q9,q11,q12"],
-        "_cz q11,q9":   ["_cz_sw_ne_park q9,q11,q12"],
-        "_cz q9,q12":   ["_cz_se_nw_park q9,q12,q11"],
-        "_cz q12,q9":   ["_cz_se_nw_park q9,q12,q11"],
-        "_cz q11,q15":  ["_cz_se_nw_park q11,q15,q14"],
-        "_cz q15,q11":  ["_cz_se_nw_park q11,q15,q14"],
-        "_cz q12,q15":  ["_cz_sw_ne q12,q15"],
-        "_cz q15,q12":  ["_cz_sw_ne q12,q15"],
+        // gate decompositions for S17, using new CZ helpers
+        "cz q8,q10":   ["_cz_sw_ne_park q8,q10,q11"],
+        "cz q10,q8":   ["_cz_sw_ne_park q8,q10,q11"],
+        "cz q8,q11":   ["_cz_se_nw_park q8,q11,q10"],
+        "cz q11,q8":   ["_cz_se_nw_park q8,q11,q10"],
+        "cz q11,q14":  ["_cz_sw_ne_park q11,q14,q15"],
+        "cz q14,q11":  ["_cz_sw_ne_park q11,q14,q15"],
+        "cz q10,q14":  ["_cz_se_nw q10,q14"],
+        "cz q14,q10":  ["_cz_se_nw q10,q14"],
+        "cz q9,q11":   ["_cz_sw_ne_park q9,q11,q12"],
+        "cz q11,q9":   ["_cz_sw_ne_park q9,q11,q12"],
+        "cz q9,q12":   ["_cz_se_nw_park q9,q12,q11"],
+        "cz q12,q9":   ["_cz_se_nw_park q9,q12,q11"],
+        "cz q11,q15":  ["_cz_se_nw_park q11,q15,q14"],
+        "cz q15,q11":  ["_cz_se_nw_park q11,q15,q14"],
+        "cz q12,q15":  ["_cz_sw_ne q12,q15"],
+        "cz q15,q12":  ["_cz_sw_ne q12,q15"],
 
         // RUS (FIXME: define instructions for these)
         "rx2theta %0":      ["cw_27 %0"],
@@ -240,163 +243,42 @@
 
 	"instructions": {
 #include "common_instructions.json.in"
-        ,
 
-        // instructions for S17 (FIXME: remove)
-        "sf_cz_ne q10": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [1]
-            }
-        },
-        "sf_cz_ne q11": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [1]
-            }
-        },
-        "sf_cz_ne q14": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [1]
-            }
-        },
-        "sf_cz_ne q15": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [1]
-            }
-        },
-        "sf_cz_nw q11": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [4]
-            }
-        },
-        "sf_cz_nw q12": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [4]
-            }
-        },
-        "sf_cz_nw q14": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [4]
-            }
-        },
-        "sf_cz_nw q15": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [4]
-            }
-        },
-        "sf_cz_sw q8": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [3]
-            }
-        },
-        "sf_cz_sw q9": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [3]
-            }
-        },
-        "sf_cz_sw q11": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [3]
-            }
-        },
-        "sf_cz_sw q12": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [3]
-            }
-        },
-        "sf_cz_se q8": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [2]
-            }
-        },
-        "sf_cz_se q9": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [2]
-            }
-        },
-        "sf_cz_se q10": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [2]
-            }
-        },
-        "sf_cz_se q11": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [2]
-            }
-        },
-        "sf_park q11": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [5]
-            }
-        },
-        "sf_park q12": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [5]
-            }
-        },
-        "sf_park q14": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [5]
-            }
-        },
-        "sf_park q15": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [5]
-            }
-        },
-        "sf_park q13": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [5]
-            }
-        },
-        "sf_park q10": {
-            "duration": 40,
-            "cc": {
-                "ref_signal": "single-qubit-flux",
-                "static_codeword_override": [5]
-            }
-        }
+//        ,
+
+        //****************************************************************
+        // decompositions, new style, require OpenQL > 0.10.0
+        // see https://openql.readthedocs.io/en/latest/gen/reference_configuration.html#instructions-section
+        // Should be compatible with API, and cQASM1.2
+        //****************************************************************
+
+
+        // was:         "measure_fb %0": ["measure %0", "_wait_uhfqa %0", "_dist_dsm %0", "_wait_dsm %0"],
+//        "measure_fb": {
+//            "prototype": ["U:qubit", "U:bit"],
+//            "duration_cycles": 100, // FIXME: note the *_cycles*, should match duration of "into", "duration" is also allowed
+//            "cc": { // FIXME: key is required
+//                "ref_signal": "single-qubit-mw",
+//                "static_codeword_override": [31]
+//            },
+//            "decomposition": {
+//                "into": "measure op(0),op(1); _wait_uhfqa op(0); _dist_dsm op(0); _wait_dsm op(0)"
+//            }
+//        }
+//,
+        // CZ decompositions
+//        "cz q8,q10": {
+//            "prototype": ["Z:qubit", "Z:qubit"],
+//            "duration": @FLUX_DURATION@,
+//            "cc": { // FIXME: key is required
+//                "ref_signal": "single-qubit-mw",
+//                "static_codeword_override": [31]
+//            },
+//            "decomposition": {
+//                "into": "_cz_sw_ne_park q8,q10,q11"
+//            }
+//        }
+
 
 	},	// instructions
 

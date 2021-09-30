@@ -3,7 +3,8 @@
     Author:             Wouter Vlothuizen, QuTech
     Purpose:            generate configuration file for Qutech Central Controller, using common file to prevent duplication
     Notes:
-    Usage:
+    Usage:              import generate_CC_cfg_modular as g
+                        g.generate_config_modular('config_cc_s17_direct_iq_openql_0_10.json')
     Bugs:
 
 """

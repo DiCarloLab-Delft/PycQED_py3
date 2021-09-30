@@ -171,12 +171,14 @@
 
         // additions for measurements using real time feedback
 		"_wait_uhfqa": {
+            "prototype": ["Z:qubit"],
             "duration": 720,
             "cc": {
                 "signal": []
             }
         },
         "_dist_dsm": {
+            "prototype": ["Z:qubit"],
 			"duration": 20,
 			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
 			"cc": {
@@ -190,6 +192,7 @@
 			}
 		},
         "_wait_dsm": {
+            "prototype": ["Z:qubit"],
             "duration": 280,
             "cc": {
                 "signal": []
@@ -197,6 +200,7 @@
         },
 
         // additions for pragma/break
+        // Require OpenQL < 0.10.1 (use cQASM afterwards)
         "if_1_break": {
 			"duration": 60,
 			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
