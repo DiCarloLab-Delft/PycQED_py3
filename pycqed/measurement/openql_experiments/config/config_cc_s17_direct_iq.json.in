@@ -187,24 +187,6 @@
     "gate_decomposition": {
 #include "common_gate_decomposition.json.in"
         ,
-        // gate decompositions for S17
-//        "cz q8,q10": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
-//        "cz q10,q8": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
-//        "cz q8,q11": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
-//        "cz q11,q8": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
-//        "cz q11,q14": ["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
-//        "cz q14,q11": ["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
-//        "cz q10,q14": ["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
-//        "cz q14,q10": ["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
-//        "cz q9,q11": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
-//        "cz q11,q9": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
-//        "cz q9,q12": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
-//        "cz q12,q9": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
-//        "cz q11,q15": ["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
-//        "cz q15,q11": ["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
-
-//        "cz q12,q15": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
-//        "cz q15,q12": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
 
         // gate decompositions for S17, using new CZ helpers
         "cz q8,q10":   ["_cz_sw_ne_park q8,q10,q11"],
