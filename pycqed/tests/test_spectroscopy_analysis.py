@@ -13,8 +13,7 @@ class Test_Qubit_spectroscopy_analysis(unittest.TestCase):
 
     def test_Qubit_spectroscopy_analysis_one_peak(self):
 
-        a = ma.Qubit_Spectroscopy_Analysis(timestamp='20170929_175516',
-                                           frequency_guess=None)
+        a = ma.Qubit_Spectroscopy_Analysis(timestamp='20170929_175516')
         self.assertAlmostEqual(a.fit_res.values['f0']/1e9, 6.11181, places=2)
         self.assertAlmostEqual(a.fit_res.values['kappa']/1e6, 0.32, places=1)
 

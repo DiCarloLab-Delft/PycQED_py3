@@ -15,7 +15,6 @@ from autodepgraph import AutoDepGraph_DAG
 import matplotlib.pyplot as plt
 from pycqed.analysis import fitting_models as fm
 
-
 class Mock_CCLight_Transmon(CCLight_Transmon):
 
     def __init__(self, name, **kw):
@@ -47,7 +46,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_slope', parameter_class=ManualParameter,
                            initial_value=0)
 
-        self.add_parameter('mock_phi_I', parameter_class=ManualParameter,
+        self.add_parameter('mock_phi_v', parameter_class=ManualParameter,
                            initial_value=0)
 
         self.add_parameter('mock_phi_0', parameter_class=ManualParameter,
@@ -76,7 +75,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_test_slope', parameter_class=ManualParameter,
                            initial_value=0)
 
-        self.add_parameter('mock_test_phi_I', parameter_class=ManualParameter,
+        self.add_parameter('mock_test_phi_v', parameter_class=ManualParameter,
                            initial_value=0)
 
         self.add_parameter('mock_test_phi_0', parameter_class=ManualParameter,
@@ -106,8 +105,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            unit='Hz', initial_value=self.mock_Ec(),
                            parameter_class=ManualParameter)
 
+
         # Qubit flux
-        self.add_parameter('mock_fl_dc_I_per_phi0', unit='A/Wb',
+        self.add_parameter('mock_fl_dc_V_per_phi0', unit='A/Wb',
                            initial_value={'FBL_Q1': 20e-3,
                                           'FBL_Q2': 2},
                            parameter_class=ManualParameter)
@@ -117,7 +117,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                            unit='-', parameter_class=ManualParameter,
                            initial_value=0.02)
 
-        self.add_parameter('mock_fl_dc_ch',
+        self.add_parameter('mock_cfg_dc_flux_ch',
                            label='most closely coupled fluxline',
                            unit='', initial_value='FBL_Q1',
                            parameter_class=ManualParameter)
@@ -185,6 +185,8 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         self.add_parameter('mock_T2_echo', label='Echo T2', unit='s',
                            initial_value=46.2892e-6,
                            parameter_class=ManualParameter)
+
+
 
     def find_spec_pow(self, freqs=None, powers=None, update=True):
         '''
@@ -270,6 +272,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         slope = 0
         f = freqs
 
+
         A_res = np.abs((slope * (f / 1.e9 - f0_res) / f0_res) *
                        fm.HangerFuncAmplitude(f, f0_res, Q, Qe, A, theta))
         A_test = np.abs((slope * (f / 1.e9 - f0_test) / f0_test) *
@@ -277,9 +280,9 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                                                Qe_test, A, theta))
 
         A_res = np.abs(A * (1. - Q / Qe * np.exp(1.j * theta) /
-                            (1. + 2.j * Q * (f / 1.e9 - f0_res) / f0_res)))
+                         (1. + 2.j * Q * (f / 1.e9 - f0_res) / f0_res)))
         A_test = np.abs(A * (1. - Q_test / Qe_test * np.exp(1.j * theta) /
-                             (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
+                          (1. + 2.j * Q_test * (f / 1.e9 - f0_test) / f0_test)))
 
         baseline = 0.40
         A_res -= A
@@ -331,7 +334,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
              wbase)
 
         f0 = self.calculate_mock_qubit_frequency()
-
+        
         peak_01 = A*(w/2.0)**2 / ((w/2.0)**2 + ((freqs - f0))**2)
         # 1-2 transition:
         if self.spec_amp() > self.mock_12_spec_amp() and self.spec_pow() >= -10:
@@ -385,7 +388,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                     if name != 'fakequbit':
                         qubit = device.find_instrument(name)
                         f0, response = qubit.calculate_mock_resonator_response(
-                            power, freqs)
+                                                power, freqs)
                         new_values += response
 
                 mocked_values = np.concatenate([mocked_values, new_values])
@@ -487,8 +490,6 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Assume flux is controlled by SPI rack
         fluxcurrent = self.instr_FluxCtrl.get_instr()
-        if fluxChan is None:
-            fluxChan = self.fl_dc_ch()
 
         s1 = swf.None_Sweep(name='Frequency', parameter_name='Frequency',
                             unit='Hz')
@@ -579,7 +580,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
                     if name != 'fakequbit':
                         qubit = device.find_instrument(name)
                         f0, response = qubit.calculate_mock_resonator_response(
-                            power, freqs)
+                                                power, freqs)
                         new_values += response
 
                 mocked_values = np.concatenate([mocked_values, new_values])
@@ -596,7 +597,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         mocked_values += np.random.normal(0,
                                           self.noise()/np.sqrt(self.ro_acq_averages()),
-                                          np.size(mocked_values))
+                                           np.size(mocked_values))
         mocked_values = np.abs(mocked_values)
 
         d = det.Mock_Detector(value_names=['Magnitude'], value_units=['V'],
@@ -754,18 +755,18 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             if double_fit:
                 b = ma.DoubleFrequency()
                 res = {
-                    'T2star1': b.tau1,
-                    'T2star2': b.tau2,
-                    'frequency1': b.f1,
-                    'frequency2': b.f2
-                }
+                       'T2star1': b.tau1,
+                       'T2star2': b.tau2,
+                       'frequency1': b.f1,
+                       'frequency2': b.f2
+                    }
                 return res
 
             else:
                 res = {
                     'T2star': a.T2_star['T2_star'],
-                    'frequency': a.qubit_frequency,
-                }
+                 'frequency': a.qubit_frequency,
+                    }
                 return res
 
     def measure_echo(self, times=None, MC=None, analyze=True, close_fig=True,
@@ -968,7 +969,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
     def calculate_mock_flux(self):
         """
         Calculates total flux through SQUID loop by a weighted sum of all
-        contributions from all FBLs, and subtracting the sweetspot flux.
+        contributions from all FBLs, and subtracting the sweetspot flux. 
         """
 
         fluxcurrent = self.instr_FluxCtrl.get_instr()
@@ -976,7 +977,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         for FBL in fluxcurrent.channel_map:
             current = fluxcurrent[FBL]()
 
-            flux += current/self.mock_fl_dc_I_per_phi0()[FBL]
+            flux += current/self.mock_fl_dc_V_per_phi0()[FBL]
 
         flux -= self.mock_sweetspot_phi_over_phi0()
 
@@ -1018,26 +1019,27 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         pow_shift = self.mock_pow_shift()
 
         h = 10**(power/20)*10e-3   # Lorentzian baseline [V]
-
+        
         Q = self.mock_Q()
         Qe = self.mock_Qe()
         theta = self.mock_theta()
         slope = self.mock_slope()
-        phi_I = self.mock_phi_I()
+        phi_v = self.mock_phi_v()
         phi_0 = self.mock_phi_0()
 
         Q_test = self.mock_test_Q()
         Qe_test = self.mock_test_Qe()
         theta_test = self.mock_test_theta()
         slope_test = self.mock_test_slope()
-        phi_I_test = self.mock_test_phi_I()
+        phi_v_test = self.mock_test_phi_v()
         phi_0_test = self.mock_test_phi_0()
+
 
         if power <= res_power:
             # Good signal
             f0 = self.calculate_mock_resonator_frequency(excited=excited)
             res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q, Qe, h,
-                                                      theta, phi_I, phi_0,
+                                                      theta, phi_v, phi_0,
                                                       slope=slope)
         elif (power > res_power) and (power < res_power + pow_shift):
             # Noisy regime -> width increases, peak decreases
@@ -1048,12 +1050,12 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             f0 = f0 - ((power - res_power)/pow_shift)*f_shift
 
             Q_decrease = (1+(power-res_power)/pow_shift*10)
-
-            Q_nonlinear = Q  # /Q_decrease
-            Qe_nonlinear = Qe  # /Q_decrease
+            
+            Q_nonlinear = Q#/Q_decrease
+            Qe_nonlinear = Qe#/Q_decrease
             res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q_nonlinear,
                                                       Qe_nonlinear, h,
-                                                      theta, phi_I, phi_0,
+                                                      theta, phi_v, phi_0,
                                                       slope=slope) - h
             res_qubit_dip = res_qubit_dip/Q_decrease
 
@@ -1071,7 +1073,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             # High power regime
             f0 = self.mock_freq_res_bare()
             res_qubit_dip = fm.hanger_func_complex_SI(freqs, f0, Q, Qe, h,
-                                                      theta, phi_I, phi_0,
+                                                      theta, phi_v, phi_0,
                                                       slope=slope)
 
         if self.mock_freq_test_res() is not None:
@@ -1079,7 +1081,7 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
             test_res_response = fm.hanger_func_complex_SI(freqs, f0_test_res,
                                                           Q_test, Qe_test, h,
                                                           theta_test,
-                                                          phi_I_test,
+                                                          phi_v_test,
                                                           phi_0_test,
                                                           slope=slope_test)
         else:
@@ -1094,10 +1096,10 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         """
         freq_qubit_12 = self.calculate_mock_qubit_frequency() + self.mock_Ec()
         freq_qubit = self.calculate_mock_qubit_frequency()
-        chi01 = self.mock_coupling01()**2 / (freq_qubit -
+        chi01 = self.mock_coupling01()**2 / (freq_qubit - 
                                              self.mock_freq_res_bare())
 
-        chi12 = self.mock_coupling12()**2 / (freq_qubit_12 -
+        chi12 = self.mock_coupling12()**2 / (freq_qubit_12 - 
                                              self.mock_freq_res_bare())
         if excited:
             chi = chi01 - chi12/2
@@ -1115,18 +1117,18 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         dag = AutoDepGraph_DAG('DAG')
         cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
         dag.add_node('Resonators Wide Search',
-                     calibrate_function=self.name + '.find_resonators')
+                          calibrate_function=self.name + '.find_resonators')
         dag.add_node('Zoom on resonators',
-                     calibrate_function=self.name + '.find_resonator_frequency_initial')
+                          calibrate_function=self.name + '.find_resonator_frequency_initial')
         dag.add_node('Resonators Power Scan',
-                     calibrate_function=self.name + '.find_test_resonators')
+                          calibrate_function=self.name + '.find_test_resonators')
         dag.add_node('Resonators Flux Sweep',
-                     calibrate_function=self.name + '.find_qubit_resonator_fluxline')
+                          calibrate_function=self.name + '.find_qubit_resonator_fluxline')
 
         dag.add_node(self.name + ' Resonator Frequency',
-                     calibrate_function=self.name + '.find_resonator_frequency')
+                          calibrate_function=self.name + '.find_resonator_frequency')
         dag.add_node(self.name + ' Resonator Power Scan',
-                     calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
+                          calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
 
         # Calibration of instruments and ro
         # dag.add_node(self.name + ' Calibrations',
@@ -1144,29 +1146,29 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
 
         # Qubits calibration
         dag.add_node(self.name + ' Frequency Coarse',
-                     calibrate_function=self.name + '.find_frequency',
-                     check_function=self.name + '.check_qubit_spectroscopy',
-                     tolerance=0.2e-3)
+                          calibrate_function=self.name + '.find_frequency',
+                          check_function=self.name + '.check_qubit_spectroscopy',
+                          tolerance=0.2e-3)
         dag.add_node(self.name + ' Frequency at Sweetspot',
-                     calibrate_function=self.name + '.find_frequency')
+                          calibrate_function=self.name + '.find_frequency')
         dag.add_node(self.name + ' Spectroscopy Power',
-                     calibrate_function=self.name + '.calibrate_spec_pow')
+                          calibrate_function=self.name + '.calibrate_spec_pow')
         dag.add_node(self.name + ' Sweetspot',
-                     calibrate_function=self.name + '.find_qubit_sweetspot')
+                          calibrate_function=self.name + '.find_qubit_sweetspot')
         dag.add_node(self.name + ' Rabi',
-                     calibrate_function=self.name + '.calibrate_mw_pulse_amplitude_coarse',
-                     check_function=self.name + '.check_rabi',
-                     tolerance=0.01)
+                          calibrate_function=self.name + '.calibrate_mw_pulse_amplitude_coarse',
+                          check_function=self.name + '.check_rabi',
+                          tolerance=0.01)
         dag.add_node(self.name + ' Frequency Fine',
-                     calibrate_function=self.name + '.calibrate_frequency_ramsey',
-                     check_function=self.name + '.check_ramsey',
-                     tolerance=0.1e-3)
+                          calibrate_function=self.name + '.calibrate_frequency_ramsey',
+                          check_function=self.name + '.check_ramsey',
+                          tolerance=0.1e-3)
 
         # Validate qubit calibration
         dag.add_node(self.name + ' ALLXY',
-                     calibrate_function=self.name + '.measure_allxy')
+                          calibrate_function=self.name + '.measure_allxy')
         dag.add_node(self.name + ' MOTZOI Calibration',
-                     calibrate_function=self.name + '.calibrate_motzoi')
+                          calibrate_function=self.name + '.calibrate_motzoi')
         # If all goes well, the qubit is fully 'calibrated' and can be controlled
 
         # Qubits measurements
@@ -1188,23 +1190,23 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         # VNA
         dag.add_edge('Zoom on resonators', 'Resonators Wide Search')
         dag.add_edge('Resonators Power Scan',
-                     'Zoom on resonators')
+                          'Zoom on resonators')
         dag.add_edge('Resonators Flux Sweep',
-                     'Zoom on resonators')
+                          'Zoom on resonators')
         dag.add_edge('Resonators Flux Sweep',
-                     'Resonators Power Scan')
+                          'Resonators Power Scan')
         # Resonators
         dag.add_edge(self.name + ' Resonator Frequency',
-                     'Resonators Power Scan')
+                          'Resonators Power Scan')
         dag.add_edge(self.name + ' Resonator Frequency',
-                     'Resonators Flux Sweep')
+                          'Resonators Flux Sweep')
         dag.add_edge(self.name + ' Resonator Power Scan',
-                     self.name + ' Resonator Frequency')
+                          self.name + ' Resonator Frequency')
         dag.add_edge(self.name + ' Frequency Coarse',
-                     self.name + ' Resonator Power Scan')
+                          self.name + ' Resonator Power Scan')
         # Qubit Calibrations
         dag.add_edge(self.name + ' Frequency Coarse',
-                     self.name + ' Resonator Frequency')
+                          self.name + ' Resonator Frequency')
         # dag.add_edge(self.name + ' Frequency Coarse',
         #                   self.name + ' Calibrations')
 
@@ -1223,60 +1225,60 @@ class Mock_CCLight_Transmon(CCLight_Transmon):
         dag.add_edge(self.name + ' Spectroscopy Power',
                      self.name + ' Frequency Coarse')
         dag.add_edge(self.name + ' Sweetspot',
-                     self.name + ' Frequency Coarse')
+                          self.name + ' Frequency Coarse')
         dag.add_edge(self.name + ' Sweetspot',
-                     self.name + ' Spectroscopy Power')
+                          self.name + ' Spectroscopy Power')
         dag.add_edge(self.name + ' Rabi',
-                     self.name + ' Frequency at Sweetspot')
+                          self.name + ' Frequency at Sweetspot')
         dag.add_edge(self.name + ' Frequency Fine',
-                     self.name + ' Frequency at Sweetspot')
+                          self.name + ' Frequency at Sweetspot')
         dag.add_edge(self.name + ' Frequency Fine',
-                     self.name + ' Rabi')
+                          self.name + ' Rabi')
 
         dag.add_edge(self.name + ' Frequency at Sweetspot',
-                     self.name + ' Sweetspot')
+                          self.name + ' Sweetspot')
 
         dag.add_edge(self.name + ' ALLXY',
-                     self.name + ' Rabi')
+                          self.name + ' Rabi')
         dag.add_edge(self.name + ' ALLXY',
-                     self.name + ' Frequency Fine')
+                          self.name + ' Frequency Fine')
         dag.add_edge(self.name + ' ALLXY',
-                     self.name + ' MOTZOI Calibration')
+                          self.name + ' MOTZOI Calibration')
 
         # Perform initial measurements to see if they make sense
         dag.add_edge(self.name + ' T1',
-                     self.name + ' ALLXY')
+                          self.name + ' ALLXY')
         dag.add_edge(self.name + ' T2_Echo',
-                     self.name + ' ALLXY')
+                          self.name + ' ALLXY')
         dag.add_edge(self.name + ' T2_Star',
-                     self.name + ' ALLXY')
+                          self.name + ' ALLXY')
 
         # Measure as function of frequency and time
         dag.add_edge(self.name + ' T1(frequency)',
-                     self.name + ' T1')
+                          self.name + ' T1')
         dag.add_edge(self.name + ' T1(time)',
-                     self.name + ' T1')
+                          self.name + ' T1')
 
         dag.add_edge(self.name + ' T2_Echo(frequency)',
-                     self.name + ' T2_Echo')
+                          self.name + ' T2_Echo')
         dag.add_edge(self.name + ' T2_Echo(time)',
-                     self.name + ' T2_Echo')
+                          self.name + ' T2_Echo')
 
         dag.add_edge(self.name + ' T2_Star(frequency)',
-                     self.name + ' T2_Star')
+                          self.name + ' T2_Star')
         dag.add_edge(self.name + ' T2_Star(time)',
-                     self.name + ' T2_Star')
+                          self.name + ' T2_Star')
 
         dag.add_edge(self.name + ' DAC Arc Polynomial',
-                     self.name + ' Frequency at Sweetspot')
+                          self.name + ' Frequency at Sweetspot')
 
         # Measurements of anharmonicity and avoided crossing
         dag.add_edge(self.name + ' f_12 estimate',
-                     self.name + ' Frequency at Sweetspot')
+                          self.name + ' Frequency at Sweetspot')
         dag.add_edge(self.name + ' Anharmonicity',
-                     self.name + ' f_12 estimate')
+                          self.name + ' f_12 estimate')
         dag.add_edge(self.name + ' Avoided Crossing',
-                     self.name + ' DAC Arc Polynomial')
+                          self.name + ' DAC Arc Polynomial')
 
         dag.cfg_plot_mode = 'svg'
         dag.update_monitor()

@@ -40,7 +40,7 @@ def mixer_carrier_cancellation(SH, source, MC,
                                init_stepsize: float=0.1,
                                x0=(0.0, 0.0),
                                label: str='Offset_calibration',
-                               ftarget=-110, maxiter=300):
+                               ftarget=-110):
     """
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is a generic version.
@@ -75,7 +75,7 @@ def mixer_carrier_cancellation(SH, source, MC,
     ad_func_pars = {'adaptive_function': cma.fmin,
                     'x0': x0,
                     'sigma0':1,
-                    'options': {'maxiter': maxiter,    # maximum function cals
+                    'options': {'maxiter': 300,    # maximum function cals
                                 # Scaling for individual sigma's
                                 'cma_stds': [init_stepsize]*2,
                                 'ftarget': ftarget
@@ -319,7 +319,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency.get()),
-        Navg=5, delay=0.0, prepare_for_each_point=False)
+        Navg=5, delay=0.0, prepare_each_point=False)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': [0.0, 0.0],

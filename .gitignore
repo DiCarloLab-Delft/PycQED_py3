@@ -139,7 +139,6 @@ data/*
 *.sdpa
 *.sol
 *.json
-*.csv
 *.dat
 .idea
 *experiments.db

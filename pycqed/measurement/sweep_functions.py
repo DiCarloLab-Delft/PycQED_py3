@@ -1142,7 +1142,7 @@ class two_par_joint_sweep(Soft_Sweep):
 
 class FLsweep(Soft_Sweep):
     """
-    Special sweep function for AWG8 and QWG flux pulses.
+    Special sweep function for AWG8 flux pulses.
     """
     def __init__(self, lm, par, waveform_name):
         super().__init__()
@@ -1154,44 +1154,57 @@ class FLsweep(Soft_Sweep):
         self.name = par.name
 
 
-        self.AWG = self.lm.AWG.get_instr()
-        self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
-
+        AWG = self.lm.AWG.get_instr()
+        awg_unit = self.lm.cfg_awg_channel()//2
+        self.AWG_ready_par = AWG.parameters['awgs_{}_ready'.format(awg_unit)]
 
     def set_parameter(self, val):
-        if self.awg_model_QWG:
-            self.set_parameter_QWG(val)
-        else:
-            self.set_parameter_HDAWG(val)
-
-    def set_parameter_HDAWG(self, val):
-
-
         self.par(val)
-        self.AWG.stop()
-        self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
-                                                   regenerate_waveforms=True)
-        self.AWG.start()
-        return
+        self.lm.load_waveform_realtime(self.waveform_name,
+                                       regenerate_waveforms=True)
+        return 
 
-    def set_parameter_QWG(self, val):
-        self.par(val)
-        self.AWG.stop()
+
+
+
+
+class FLsweep_QWG(Soft_Sweep):
+    """
+    Special sweep function for QWG flux pulses.
+    """
+    def __init__(self, lm, par, waveform_name, realtime_loading=True,
+                 other_waveform=None, **kw):
+        super().__init__(**kw)
+        self.lm = lm
+        self.par = par
+        self.waveform_name = waveform_name
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+        self.realtime_loading = realtime_loading
+        self.other_waveform = other_waveform
+
+    def prepare(self, **kw):
+        awg = self.lm.AWG.get_instr()
+        awg.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
-            self.waveform_name, regenerate_waveforms=True,
-            force_load_sequencer_program=True)
-        self.AWG.start()
+            self.waveform_name, regenerate_waveforms=True)
+        awg.start()
 
+    def set_parameter(self, val):
+        self.par(val)
+        awg = self.lm.AWG.get_instr()
+        awg.stop()
+        self.lm.load_waveform_onto_AWG_lookuptable(
+            self.waveform_name, regenerate_waveforms=True)
+        awg.start()
 
 
 class Nested_resonator_tracker(Soft_Sweep):
     """
-    Sets a parameter and performs a "find_resonator_frequency" measurement
-    after setting the parameter.
+    For resonator tr.
     """
-    def __init__(self, qubit, nested_MC, par,
-                 use_min=False, freqs=None, reload_sequence=False,
-                 cc=None, sequence_file=None, **kw):
+    def __init__(self, qubit, nested_MC, par, use_min = False, freqs=None, **kw):
         super().__init__(**kw)
         self.qubit = qubit
         self.freqs = freqs
@@ -1200,23 +1213,15 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
-        self.reload_marked_sequence = reload_sequence
-        self.sequence_file = sequence_file
-        self.cc = cc
         self.use_min = use_min
 
     def set_parameter(self, val):
         self.par(val)
-        self.qubit.find_resonator_frequency(
-            freqs=self.freqs,
-            MC=self.nested_MC, use_min=self.use_min)
+        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC,use_min = self.use_min)
         self.qubit._prep_ro_sources()
-        if self.reload_marked_sequence:
-            # reload the meaningfull sequence
-            self.cc.eqasm_program(self.sequence_file.filename)
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()
-        self.cc.start()
+
 
 
 
@@ -1233,8 +1238,6 @@ class tim_flux_latency_sweep(Soft_Sweep):
         self.dev.tim_flux_latency_1(val)
         self.dev.tim_flux_latency_2(val)
         self.dev.prepare_timing()
-
-        time.sleep(.5)
         return val
 
 class tim_ro_latency_sweep(Soft_Sweep):
@@ -1250,9 +1253,6 @@ class tim_ro_latency_sweep(Soft_Sweep):
         self.dev.tim_ro_latency_1(val)
         self.dev.tim_ro_latency_2(val)
         self.dev.prepare_timing()
-
-
-        time.sleep(.5)
         return val
 
 class tim_mw_latency_sweep(Soft_Sweep):
@@ -1266,10 +1266,5 @@ class tim_mw_latency_sweep(Soft_Sweep):
     def set_parameter(self, val):
         self.dev.tim_mw_latency_0(val)
         self.dev.tim_mw_latency_1(val)
-        self.dev.tim_mw_latency_2(val)
-        self.dev.tim_mw_latency_3(val)
-        self.dev.tim_mw_latency_4(val)
         self.dev.prepare_timing()
-
-        time.sleep(.5)
         return val

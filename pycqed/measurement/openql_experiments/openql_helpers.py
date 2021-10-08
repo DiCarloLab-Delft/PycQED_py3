@@ -9,7 +9,7 @@ from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
 from pycqed.utilities.general import is_more_rencent
 import openql.openql as ql
-from openql.openql import Program, Kernel, Platform, CReg, Operation
+from openql.openql import Program, Kernel, Platform
 
 
 output_dir = join(dirname(__file__), 'output')
@@ -17,7 +17,7 @@ ql.set_option('output_dir', output_dir)
 ql.set_option('scheduler', 'ALAP')
 
 
-def create_program(pname: str, platf_cfg: str, nregisters: int=32):
+def create_program(pname: str, platf_cfg: str, nregisters: int=0):
     """
     Wrapper around the constructor of openQL "Program" class.
 
@@ -55,7 +55,7 @@ def create_program(pname: str, platf_cfg: str, nregisters: int=32):
                 p.eqasm_compiler = m.group(1)
                 break
     if p.eqasm_compiler == '':
-        logging.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
+        logging.error("key 'eqasm_compiler' not found in file '{}'".format(platf_cfg))
 
     return p
 
@@ -65,16 +65,17 @@ def create_kernel(kname: str, program):
     Wrapper around constructor of openQL "Kernel" class.
     """
     kname = kname.translate ({ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
+    kname = 'k_'+kname # prefix with k_
 
     k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
     return k
 
 
-def compile(p, quiet: bool = True):
+def compile(p):
     """
     Wrapper around OpenQL Program.compile() method.
     """
-    if quiet:
+    if 1:  # FIXME: allow choice, check OpenQL 0.7.0 whether warnings can now be on
         with suppress_stdout():
             p.compile()
     else:  # show warnings

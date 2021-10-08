@@ -16,8 +16,6 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import awg_sweep_functions as awg_swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
-from pycqed.analysis_v2 import alignment_analysis as aa
-from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_5014
 from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_UHFQC
 from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_5014
@@ -68,7 +66,6 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.add_parameter('LutMan', parameter_class=InstrumentParameter)
         self.add_parameter('CBox', parameter_class=InstrumentParameter)
         self.add_parameter('MC', parameter_class=InstrumentParameter)
-        self.add_parameter('Magnet',parameter_class=InstrumentParameter)
 
         self.add_parameter('RF_RO_source',
                            parameter_class=InstrumentParameter)
@@ -452,7 +449,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         '''
         Calibrates mixer skewness at the frequency relevant for qubit driving.
 
-        Note: I don'tR like that you have to pass station here but I don't want
+        Note: I don't like that you have to pass station here but I don't want
         to introduce extra variables at this point, it should be available to
         you in the notebook (MAR).
         '''
@@ -1237,136 +1234,3 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         operation_dict['SpecPulse '+self.name] = self.get_spec_pars()[0]
         self.get_pulse_dict(operation_dict)
         return operation_dict
-
-
-
-
-    def calibrate_field_alignment_to_sample_plane(self, alignment_resonator,
-                    MC_outer_loop, aligment_freq_span = 12e6, Coil_X_field_span = 0.1e-3,
-                    field_perp_step_size = 1.0e-5, MC=None,detector_type=None):
-
-        # /* Script to align the magnetic field to a resonator*/
-
-        alignmente_resonator_name, alignment_resonator_freq = list(alignment_resonator.items())[0]
-
-        f_res_aligning = alignment_resonator_freq
-        minf = f_res_aligning-aligment_freq_span*0.9
-        maxf = f_res_aligning+aligment_freq_span*0.1+1e6
-        freqs = np.arange(minf,maxf,2e5)
-        if detector_type == None:
-            detector_type = 'Homodyne'
-        elif detector_type == 'VNA':
-            raise NotImplementedError()
-
-        if MC is None:
-            MC = self.MC.get_instr()
-
-        current_xfield = self.Magnet.get_instr().coil_x.field()
-        searching_points_xfield = np.arange(-Coil_X_field_span/2+current_xfield,
-                                 Coil_X_field_span/2+current_xfield+0.01e-6,
-                                 field_perp_step_size)
-
-        def measure_fres(minf,maxf,MC):
-            tmp_suffix = self.msmt_suffix
-            self.msmt_suffix = self.msmt_suffix + '_coarse'
-            f_res_aligning = self.find_resonator_frequency(update=False, use_min=True
-                                                          ,freqs = np.arange(minf,maxf,2e5))
-            self.msmt_suffix = tmp_suffix
-            fine_freq_span =7e6
-            minf = f_res_aligning-fine_freq_span/2
-            maxf = f_res_aligning+fine_freq_span/2
-
-            freq_list_res = fine_reso_freq_range(start_freq=minf,stop_freq=maxf,
-                                                 target_freq=f_res_aligning,precise_range=2e6)
-            tmp_suffix = self.msmt_suffix
-            self.msmt_suffix = self.msmt_suffix + '_fine'
-            f_res_aligning = self.find_resonator_frequency(freqs=freq_list_res,
-                                                update=False,use_min=False)
-            self.msmt_suffix = tmp_suffix
-            timestamp = a_tools.latest_data(contains=self.name,
-                                                   return_timestamp=True)[0]
-            params_dict = {'amp':'amp'}
-            numeric_params = ['amp']
-            data = a_tools.get_data_from_timestamp_list([timestamp],
-                                params_dict,
-                                numeric_params=numeric_params,
-                                filter_no_analysis=False)
-            return {'f_res':f_res_aligning}
-        d  = det.Function_Detector(get_function=measure_fres,
-                                   msmt_kw={'minf':minf,
-                                            'maxf':maxf,
-                                            'MC':MC},
-                                   value_units=['Hz'],
-                                   value_names=['f_res'],
-                                   result_keys=['f_res'])
-
-        MC_outer_loop.set_detector_function(d)
-        MC_outer_loop.set_sweep_function(pw.wrap_par_to_swf(
-                            self.Magnet.get_instr().coil_x.field,
-                            retrieve_value = True))
-        MC_outer_loop.set_sweep_points(searching_points_xfield)
-        MC_outer_loop.run('Alignment of '+self.msmt_suffix+' on resonator ' +alignmente_resonator_name)
-        timestamp = a_tools.latest_data(contains='Alignment',
-                                        return_timestamp=True)[0]
-        params_dict = {'f_res':'measured_values',
-                       'xfield':'sweep_points'}
-        numeric_params = ['f_res','xfield']
-        data = a_tools.get_data_from_timestamp_list([timestamp],
-                            params_dict,
-                            numeric_params=numeric_params,
-                            filter_no_analysis=False)
-
-
-        ind_fmax = np.argmax(data['f_res'][0,0])
-        xfields = data['xfield'][0]
-        opt_xfield = xfields[ind_fmax]
-        self.Magnet.get_instr().coil_x.field(opt_xfield)
-        aa.AlignmentAnalysis(timestamp)
-        return opt_xfield
-
-
-
-
-
-
-
-
-
-
-
-
-
-def fine_reso_freq_range(start_freq,stop_freq,target_freq=None,precise_range=5e6,verbose = False):
-    '''
-    Create a finer frequency range around the resonator based on the previous resonator position.
-    Please use start_freq < stop_freq.
-    start_freq and stop_freq are both in Hertz
-    '''
-    if (target_freq == None):
-        previous_timestamp = a_tools.latest_data(contains='Resonator_scan', return_timestamp=True)[0]
-        reso_dict = {'f_res_fit':'Fitted Params HM.f0.value'}
-        numeric_params = ['f_res_fit']
-        data = (a_tools.get_data_from_timestamp_list([previous_timestamp], reso_dict,
-                                        numeric_params=numeric_params, filter_no_analysis=False))
-        precise_range = precise_range
-        reso_freq = data['f_res_fit'][0]*1e9
-    else:
-        reso_freq = target_freq
-    if verbose:
-        print('Making a fine list around '+str(reso_freq/1e9)+' GHz')
-    if reso_freq == None:
-        freq_list_res = np.arange(start_freq,stop_freq,2e5) # Straight part fast, because reso = None
-    elif reso_freq < start_freq or reso_freq > stop_freq:
-        freq_list_res = np.arange(start_freq,stop_freq,2e5) # Straight part fast, because reso out of range
-    elif reso_freq <= start_freq + precise_range/2.:
-        freq_list_res = np.hstack([np.arange(start_freq,reso_freq+precise_range/2.,2.5e4), # Reso part precise
-              np.arange(reso_freq+precise_range/2.,stop_freq,2e5)]) # Straight part fast
-    elif reso_freq >= stop_freq - precise_range/2.:
-        freq_list_res = np.hstack([np.arange(start_freq,reso_freq-precise_range/2.,2e5), # Straight part fast
-              np.arange(reso_freq-precise_range/2.,stop_freq,2.5e4)]) # Reso part precise
-    else:
-        freq_list_res = np.hstack([np.arange(start_freq,reso_freq-precise_range/2.,2e5), # Straight part fast
-              np.arange(reso_freq-precise_range/2.,reso_freq+precise_range/2.,2.5e4), # Reso part precise
-              np.arange(reso_freq+precise_range/2.,stop_freq,2e5)]) # Straight part fast
-
-    return freq_list_res

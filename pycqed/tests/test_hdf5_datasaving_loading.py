@@ -9,12 +9,8 @@ from pycqed.measurement import measurement_control
 from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
     import DummyParHolder
 
-from pytest import approx
 from qcodes import station
 from pycqed.analysis import analysis_toolbox as a_tools
-
-
-datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
 
 
 class Test_HDF5(unittest.TestCase):
@@ -22,7 +18,7 @@ class Test_HDF5(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.station = station.Station()
-        self.datadir = datadir
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
         self.MC.station = self.station
@@ -129,8 +125,7 @@ class Test_HDF5(unittest.TestCase):
         h5d.read_dict_from_hdf5(new_dict, opened_hdf5_file)
         # objects are not identical but the string representation should be
         self.assertEqual(test_dict.keys(), new_dict.keys())
-        self.assertEqual(test_dict['list_of_ints'],
-                         new_dict['list_of_ints'])
+        self.assertEqual(test_dict['list_of_ints'], new_dict['list_of_ints'])
         self.assertEqual(test_dict['list_of_floats'],
                          new_dict['list_of_floats'])
         self.assertEqual(test_dict['weird_dict'], new_dict['weird_dict'])
@@ -210,39 +205,3 @@ class Test_HDF5(unittest.TestCase):
         self.assertEqual(self.mock_parabola_2.status(), True)
         self.assertEqual(self.mock_parabola_2.dict_like(),
                          {'a': {'b': [2, 3, 5]}})
-
-
-def test_wr_rd_hdf5_array():
-    datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
-    test_dict = {
-        'x': np.linspace(0, 1, 14),
-        'y': np.cos(np.linspace(0, 2*np.pi, 11))}
-    data_object = h5d.Data(name='test_object', datadir=datadir)
-    h5d.write_dict_to_hdf5(test_dict, data_object)
-    data_object.close()
-    filepath = data_object.filepath
-
-    new_dict = {}
-    opened_hdf5_file = h5py.File(filepath, 'r')
-    h5d.read_dict_from_hdf5(new_dict, opened_hdf5_file)
-
-    assert test_dict.keys() == new_dict.keys()
-    np.testing.assert_allclose(test_dict['x'], new_dict['x'])
-    np.testing.assert_allclose(test_dict['y'], new_dict['y'])
-
-
-def test_extract_pars_from_datafile():
-    param_spec = {'T1': ('Analysis/Fitted Params F|1>/tau', 'attr:value'),
-                  'uT1': ('Analysis/Fitted Params F|1>/tau', 'attr:stderr'),
-                  'data': ('Experimental Data/Data', 'dset'),
-                  'timestamp': ('MC settings/begintime', 'dset')}
-    fp = a_tools.get_datafilepath_from_timestamp('20190807_000109')
-    extract_pars_dict = h5d.extract_pars_from_datafile(fp, param_spec)
-    assert extract_pars_dict['T1'] == approx(3.385325226491e-05)
-    assert extract_pars_dict['uT1'] == approx(4.5737638947423746e-07)
-    assert extract_pars_dict['timestamp'].T[0] == approx(
-        [2.019e+03, 8.000e+00, 7.000e+00, 0.000e+00, 1.000e+00, 9.000e+00,
-         2.000e+00, 2.190e+02, 1.000e+00])
-
-    assert extract_pars_dict['data'][:, 0] == approx(
-        np.arange(0, 165.001e-6, 3.75e-6))

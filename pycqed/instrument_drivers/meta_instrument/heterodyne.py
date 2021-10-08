@@ -167,15 +167,20 @@ class HeterodyneInstrument(Instrument):
             self._UHFQC_awg_parameters_changed = False
 
         # this sets the result to integration and rotation outcome
-        self._acquisition_instr.qas_0_result_source(2)
+        self._acquisition_instr.quex_rl_source(2)
         # only one sample to average over
-        self._acquisition_instr.qas_0_result_length(1)
-        self._acquisition_instr.qas_0_result_averages(self.nr_averages())
-        self._acquisition_instr.qas_0_integration_length(
+        self._acquisition_instr.quex_rl_length(1)
+        self._acquisition_instr.quex_rl_avgcnt(
+            int(np.log2(self.nr_averages())))
+        self._acquisition_instr.quex_wint_length(
             int(self.RO_length()*1.8e9))
-        # The AWG program uses userregs/0 to define the number of
-        # iterations in the loop, but this is configured using the acquisition_initialize function
-        self._acquisition_instr.acquisition_initialize(samples=1, averages=self.nr_averages(), channels=[0, 1], mode='rl')
+        # Configure the result logger to not do any averaging
+        # The AWG program uses userregs/0 to define the number o
+        # iterations in the loop
+        self._acquisition_instr.awgs_0_userregs_0(
+            int(self.nr_averages()))
+        self._acquisition_instr.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
+        self._acquisition_instr.acquisition_initialize([0, 1], 'rl')
         self.scale_factor_UHFQC = 1/(1.8e9*self.RO_length() *
                                      int(self.nr_averages()))
 
@@ -557,15 +562,19 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         else:
             self._acquisition_instr.prepare_DSB_weight_and_rotation(
                 IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
-
         # this sets the result to integration and rotation outcome
-        self._acquisition_instr.qas_0_result_source(2)
-        self._acquisition_instr.qas_0_result_length(1)
-        self._acquisition_instr.qas_0_result_averages(self.nr_averages())
-        self._acquisition_instr.qas_0_integration_length(int(self.RO_length()*1.8e9))
+        self._acquisition_instr.quex_rl_source(2)
+        self._acquisition_instr.quex_rl_length(1)
+        self._acquisition_instr.quex_rl_avgcnt(
+             int(np.log2(self.nr_averages())))
+        self._acquisition_instr.quex_wint_length(int(self.RO_length()*1.8e9))
+        # The AWG program uses userregs/0 to define the number of
+        # iterations in the loop
+        self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
+        self._acquisition_instr.awgs_0_userregs_1(0) # 0 for rl, 1 for iavg
+        self._acquisition_instr.awgs_0_userregs_2(
+            int(self.acquisition_delay()*1.8e9/8))
         self._acquisition_instr.awgs_0_single(1)
-        self._acquisition_instr.wait_dly(int(self.acquisition_delay()*1.8e9/8))
-        self._acquisition_instr.acquisition_initialize(samples=1, averages=self.nr_averages(), channels=[0, 1], mode='rl')
 
     def probe_CBox(self):
         if self._awg_seq_parameters_changed:

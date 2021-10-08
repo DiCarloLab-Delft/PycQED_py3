@@ -21,7 +21,6 @@ import os.path
 import datetime
 import json
 import logging
-import PyQt5
 from qcodes.plots.pyqtgraph import QtPlot
 
 

@@ -1,5 +1,3 @@
-import time
-from collections import MutableMapping
 import os
 import sys
 import numpy as np
@@ -22,7 +20,6 @@ import operator
 import string
 from contextlib import ContextDecorator
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
-from IPython.core.ultratb import AutoFormattedTB
 
 
 try:
@@ -282,8 +279,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
 
     for parname, par in ins_group['parameters'].items():
         try:
-            if (hasattr(instrument.parameters[parname], 'set') and
-                    (par['value'] is not None)):
+            if hasattr(instrument.parameters[parname], 'set'):
                 instrument.set(parname, par['value'])
         except Exception as e:
             print('Could not set parameter: "{}" to "{}" '
@@ -623,7 +619,7 @@ def format_value_string(par_name: str, lmfit_par, end_char='', unit=None):
     val_string += ': {:.4f}$\pm${:.4f} {}{}'
 
     scale_factor, unit = SI_prefix_and_scale_factor(
-        lmfit_par.value, unit)
+            lmfit_par.value, unit)
     val = lmfit_par.value*scale_factor
     if lmfit_par.stderr is not None:
         stderr = lmfit_par.stderr*scale_factor
@@ -633,134 +629,3 @@ def format_value_string(par_name: str, lmfit_par, end_char='', unit=None):
     val_string = fmt.format(val_string, val, stderr,
                             unit, end_char)
     return val_string
-
-
-def ramp_values(start_val: float, end_val: float, ramp_rate: float,
-                update_interval: float, callable, verbose:bool=False):
-    """
-    Ramps a value by setting delayed steps.
-
-    Args:
-        start_val (float)
-            the current value
-        end_val (float)
-            the target of the ramp
-        ramp_rate (float)
-            rate of the ramp in units of [unit/s]
-        update_interval (float)
-            the interval between different updates in units of [s]
-        callable (float)
-            the callable used to execute the ramp
-    """
-    # Determine the points to ramp over
-
-    t0 = time.time()
-
-    stepsize = ramp_rate*update_interval
-    if not np.isinf(ramp_rate) and stepsize < abs(end_val-start_val):
-        if end_val < start_val:
-            stepsize *= -1
-        ramp_points = np.arange(start_val+stepsize,
-                                end_val+stepsize/10, stepsize)
-        if len(ramp_points) == 0:
-            ramp_points = [end_val]
-    else:
-        ramp_points = [end_val]
-
-    # The loop with delayed setting of the values
-    t0print = time.time()
-    for i, v in enumerate(ramp_points[:-1]):  # Exclude last point
-        if verbose:
-            print("Setting {:.2g}, \tdt: {:.2f}s\t{:.1f}%     ".format(
-                v, time.time()-t0print, i/len(ramp_points)*100), end='\r')
-        callable(v)
-        while (time.time() - t0) < update_interval:
-            check_keyboard_interrupt()
-        t0 = time.time()
-
-    # last point is set outside of loop to avoid unneeded delay
-    if verbose:
-        print("Setting {:.2g}, \tdt: {:.2f}s\t{:.1f}%     ".format(
-              ramp_points[-1], time.time()-t0print, 100))
-    callable(ramp_points[-1])
-
-
-def delete_keys_from_dict(dictionary: dict, keys: set):
-    """
-    Delete keys from dictionary recursively.
-
-    Args:
-        dictionary (dict)
-        keys (set)  a set of keys to strip from the dictionary.
-
-    Return:
-        modified_dict (dict) a new dictionary that does not included the
-        blacklisted keys.
-
-    function based on "https://stackoverflow.com/questions/3405715/
-    elegant-way-to-remove-fields-from-nested-dictionaries"
-    """
-    keys_set = set(keys)  # Just an optimization for the "if key in keys" lookup.
-
-    modified_dict = {}
-    for key, value in dictionary.items():
-        if key not in keys_set:
-            if isinstance(value, MutableMapping):
-                modified_dict[key] = delete_keys_from_dict(value, keys_set)
-            else:
-                modified_dict[key] = value
-    return modified_dict
-
-
-# Handy things to print the traceback of exceptions
-
-
-# initialize the formatter for making the tracebacks into strings
-# mode = 'Plain' # for printing like in the interactive python traceback
-# TODO: Not sure if this line needs to be run in the highest level
-# python file in order to get a full traceback
-itb = AutoFormattedTB(mode='Verbose', tb_offset=None)
-
-
-def print_exception():
-    """
-    Prints the output of get_formatted_exception()
-    """
-    # This should print the same output, not sure when nesting code
-    # itb()
-    print(get_formatted_exception())
-
-
-def get_formatted_exception():
-    """
-    Retunr the last exception in a beautiful rainbow with extra sugar
-    and a cherry on top
-    Extra sugar = it tries to detect all variables on the line that
-    triggered the exception and includes them in the traceback
-
-    Typical usecase: You set a for loop or sequential independent jobs
-    that will take a lot of time and if one fails you still want the
-    rest to run and when you come back you also want to know why did it
-    fail. Just doing a print(exception) is useless, same for a full
-    traceback.
-
-    Example:
-        for job in list_of_long_jobs:
-            try:
-                job()
-            except Exception:
-                log.error(get_formatted_exception())
-                print('Thank you Victor!')
-
-    Inspired from https://stackoverflow.com/questions/40110540/jupyter-magic-to-handle-notebook-exceptions
-    """
-    # Not sure if using sys.exc_info() is a good idea but it works
-    # Maybe using logging in a more fancy ways is an alternative
-    # See https://stackoverflow.com/questions/3702675/how-to-print-the-full-traceback-without-halting-the-program
-    # for more opinions
-    etype, evalue, tb = sys.exc_info()
-
-    stb = itb.structured_traceback(etype, evalue, tb)
-    sstb = itb.stb2text(stb)
-
-    return sstb

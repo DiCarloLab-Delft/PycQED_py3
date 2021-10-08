@@ -171,14 +171,24 @@ class FluxFrequency(ba.BaseDataAnalysis):
         # self.proc_data_dict['peaks'] = {}
         for k in ['amplitude_values', 'phase_values', 'distance_values']:
             self.proc_data_dict[k + '_smooth'] = {}
+            # peaklist_x = []
+            # peaklist_z = []
             for i, dac_value in enumerate(self.proc_data_dict['dac_values']):
-                peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(
-                    freqs[i], self.proc_data_dict[k][i], smoothing=smooth,
-                    perc=self.options_dict.get('peak_perc', 99),
-                    window_len=self.options_dict.get('smoothing_win_len',
-                                                     False),
-                    factor=self.options_dict.get('data_factor', 1))
+                peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(freqs[i],
+                                                                      self.proc_data_dict[k][i],
+                                                                      smoothing=smooth,
+                                                                      perc=self.options_dict.get(
+                                                                          'peak_perc', 99),
+                                                                      window_len=self.options_dict.get(
+                                                                          'smoothing_win_len',
+                                                                          False),
+                                                                      factor=self.options_dict.get('data_factor', 1))
+                # print(dac_value, peaks_x, peaks_z)
+                # peaklist_x.append(list(peaks_x))
+                # peaklist_z.append(peaks_z)
                 self.proc_data_dict[k + '_smooth'][i] = smoothed_z
+                # self.proc_data_dict['peaks'][k[:-7]] = np.array([peaklist_x, peaklist_z])
+                # Fixme: save peaks
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -440,7 +450,7 @@ class Susceptibility_to_Flux_Bias(sa.Basic2DInterpolatedAnalysis):
         linearly dependent on the flux parameter.
         The input dataset needs to be 2D, frequency (x-axis) vs flux parameter (y-axis).
 
-        The final result in units of Hz per unit-of-DC-flux-parameter is stored in
+        The final result in units of Hz per unit-of-DC-flux-parameter is stored in 
         self.proc_data_dict['susceptibility'].
 
         TODO: Add plotting to verify the extraction of susceptibility is correct
@@ -571,7 +581,7 @@ class DACarcPolyFit(ba.BaseDataAnalysis):
         dac_key (str):
             key pointing to the parameter that stores the current
             applied to the flux bias line
-
+        
         frequency_key (str):
             key pointing to the parameter that stores the fitted
             qubit frequency
@@ -658,7 +668,7 @@ class DAC_analysis(ma.TwoD_Analysis):
     the qubit frequency at each DAC value.
 
     Fits a 2nd degree polynomial through the extracted qubit frequencies with
-    the np.polyfit method.
+    the np.polyfit method. 
 
     This function can be called with the timestamp of the DAC arc as its only
     argument. It is heavily inspired by the VNA_DAC_Analysis in

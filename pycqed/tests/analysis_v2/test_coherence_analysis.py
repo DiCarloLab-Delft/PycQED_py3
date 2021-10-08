@@ -88,7 +88,6 @@ class Test_PSD_Analysis(unittest.TestCase):
         with open(os.path.join(self.datadir, 'coherence_table.json')) as f:
             self.testdata_table = np.array(json.load(f))
 
-    @unittest.expectedFailure
     def test_PSD_Analysis_gamma_intercept(self):
         a = ca.PSD_Analysis(self.testdata_table)
 
@@ -111,7 +110,6 @@ class Test_CoherenceAnalysis(unittest.TestCase):
             t_start='20181002_190542', t_stop='20181002_203700',
             options_dict={'tag_tstamp': False, 'save_figs': False})
 
-    @unittest.expectedFailure
     def test_CoherenceAnalysis_quantities(self):
         self.assertAlmostEqual(
             self.a.proc_data_dict['sqrtA_echo']*1e6,
@@ -163,7 +161,6 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
         self.assertAlmostEqual(a.fit_res['kappares2'],
                                452876320.52273417, places=-4)
 
-    @unittest.expectedFailure
     def test_CoherenceTimesAnalysis_old(self):
         a = ca.CoherenceTimesAnalysis_old(
             t_start='20181002_190542', t_stop='20181002_203700',

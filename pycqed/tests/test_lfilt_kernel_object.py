@@ -1,17 +1,17 @@
 import unittest
 import numpy as np
 import pycqed.instrument_drivers.meta_instrument.lfilt_kernel_object as lko
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
+import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 
 
 class Test_LinDistortionKernelObject(unittest.TestCase):
 
     @classmethod
-    def setUpClass(cls):
-        cls.k0 = lko.LinDistortionKernel('k0')
-        cls.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
-        cls.k0.instr_AWG(cls.AWG.name)
-        cls.k0.cfg_awg_channel(1)
+    def setUpClass(self):
+        self.k0 = lko.LinDistortionKernel('k0')
+        self.AWG = v8.VirtualAWG8('DummyAWG8')
+        self.k0.instr_AWG(self.AWG.name)
+        self.k0.cfg_awg_channel(1)
 
     def setUp(self):
         self.k0.cfg_sampling_rate(2.4e9)

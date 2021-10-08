@@ -13,7 +13,6 @@ import logging
 import scipy.interpolate
 import numpy as np
 
-logger = logging.getLogger(__name__)
 
 def martinis_flux_pulse(length: float,
                         theta_i: float, theta_f: float,
@@ -74,7 +73,7 @@ def martinis_flux_pulse(length: float,
     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
     theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
     if not np.array_equal(theta_wave, theta_wave_clipped):
-        logger.warning(
+        logging.warning(
             'Martinis flux wave form has been clipped to [{}, 180 deg]'
             .format(np.rad2deg(theta_i)))
 
