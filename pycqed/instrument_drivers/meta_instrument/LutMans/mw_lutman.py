@@ -695,24 +695,49 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                            initial_value=0.5)
 
     def _add_phase_correction_parameters(self):
+        # corrections for phases that the qubit can acquire during one of its CZ gates
         for gate in ['NW','NE','SW','SE']:
-            # self.add_parameter(
-            #     name="vcz_correct_q_phase_virtual_%s" % which_gate,
-            #     docstring="",
-            #     parameter_class=ManualParameter,
-            #     vals=vals.Bool(),
-            #     initial_value=False,
-            #     label="Correct single qubit phase via MW lutman oscillators.",
-            # )
             self.add_parameter(
-                name='vcz_virtual_q_ph_corr_%s' % gate,
+                name=f'vcz_virtual_q_ph_corr_{gate}',
                 parameter_class=ManualParameter, 
                 unit='deg', 
-                vals=vals.Numbers(0, 360),
+                vals=vals.Numbers(-360, 360),
                 initial_value=0.0,
                 docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
-                            "Will be applied via sine generator phases."
+                            "Will be applied as increment to sine generator phases via command table."
             )
+
+        # corrections for phases that the qubit can acquire during parking as spectator of a CZ gate.
+        # this can happen in general for each of its neighbouring qubits (below: 'direction'), 
+        # while it is doing a gate in each possible direction (below: 'gate')
+        # for direction in ['NW','NE','SW','SE']:
+        #     for gate in ['NW','NE','SW','SE']:
+        #         self.add_parameter(
+        #             name=f'vcz_virtual_q_ph_corr_spec_{direction}_gate_{gate}',
+        #             parameter_class=ManualParameter, 
+        #             unit='deg', 
+        #             vals=vals.Numbers(0, 360),
+        #             initial_value=0.0,
+        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, " 
+        #                       f"that is doing a gate in direction {gate}."
+        #                         "Will be applied as increment to sine generator phases via command table."
+        #         )
+
+        # corrections for phases that the qubit can acquire during parking as part of a flux-dance step
+        # there are 8 flux-dance steps for the S17 scheme.
+        # NOTE: this correction must not be the same as the above one for the case of a spectator 
+        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates 
+        # for step in np.arange(1,9):
+        #     self.add_parameter(
+        #         name=f'vcz_virtual_q_ph_corr_step_{step}',
+        #         parameter_class=ManualParameter, 
+        #         unit='deg', 
+        #         vals=vals.Numbers(0, 360),
+        #         initial_value=0.0,
+        #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
+        #                     "Will be applied as increment to sine generator phases via command table."
+        #     )
+
 
     def _set_channel_range(self, val):
         awg_nr = (self.channel_I()-1)//2
@@ -975,8 +1000,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         return self._wave_dict
 
     def apply_mixer_predistortion_corrections(self, wave_dict):
-            M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
-                                              self.mixer_phi())
+            M = wf.mixer_predistortion_matrix(self.mixer_alpha(), self.mixer_phi())
             for key, val in wave_dict.items():
                 wave_dict[key] = np.dot(M, val)
             return wave_dict
@@ -991,7 +1015,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # manual waveform index 1-to-1 mapping
         for ind in np.arange(0,60,1):
             commandtable_dict['table'] += [{"index": int(ind), 
-                                             "waveform": {"index": int(ind)} 
+                                            "waveform": {"index": int(ind)} 
                                             }]
 
         # add phase corrections to the end of the codeword space
@@ -999,25 +1023,23 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         for i,d in enumerate(['NW','NE','SW','SE']):
             phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
             commandtable_dict['table'] += [{"index": int(phase_corr_inds[i]), 
-                                             "phase0": {"value": float(phase), "increment": True}, 
-                                             "phase1": {"value": float(phase), "increment": True}
-                                              # "waveform": {"index": 0}
+                                            "phase0": {"value": float(phase), "increment": True}, 
+                                            "phase1": {"value": float(phase), "increment": True}
                                             }]
 
         # Note: Whenever using the command table, the phase offset between I and Q channels on 
         # the HDAWG for real-time modulation have to be set from an index on the table. Index
         # 1023 will be used as it is un-used for codeword triggering 
         commandtable_dict['table'] += [{"index": 1023, 
-                                             "phase0": {"value": 90.0, "increment": False}, 
-                                             "phase1": {"value":  0.0, "increment": False}
-                                              # "waveform": {"index": 0}
+                                        "phase0": {"value": 90.0, "increment": False}, 
+                                        "phase1": {"value":  0.0, "increment": False}
                                         }]
 
         # get internal awg sequencer number (indexed 0,1,2,3)
         awg_nr = (self.channel_I()-1) // 2
-        status = self.AWG.get_instr().upload_commandtable(commandtable_dict, awg_nr)
+        commandtable_returned, status = self.AWG.get_instr().upload_commandtable(commandtable_dict, awg_nr)
         
-        return commandtable_dict, status
+        return commandtable_returned, status
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 

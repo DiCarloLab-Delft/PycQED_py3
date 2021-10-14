@@ -182,6 +182,14 @@ class MeasurementControl(Instrument):
             vals=vals.Strings(),
         )
 
+        self.add_parameter(
+            "run_history",
+            vals=vals.Lists(),
+            docstring="History of experiments executed by MC.run(), saved as MC metadata.",
+            parameter_class=ManualParameter,
+            initial_value=[],
+        )
+
         # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
             self.create_plot_monitor()
@@ -316,6 +324,13 @@ class MeasurementControl(Instrument):
 
             return_dict = self.create_experiment_result_dict()
 
+        run_history_entry = {'measurement_name': self.measurement_name,
+                            'mode': self.mode,
+                            'begintime': time.strftime("%Y%m%d_%H%M%S", time.localtime(self.begintime)),
+                            'preparetime': time.strftime("%Y%m%d_%H%M%S", time.localtime(self.preparetime)),
+                            'endtime': time.strftime("%Y%m%d_%H%M%S", time.localtime(self.endtime)),
+                            }
+        self.run_history().append(run_history_entry)
         self.finish(result)
         return return_dict
 

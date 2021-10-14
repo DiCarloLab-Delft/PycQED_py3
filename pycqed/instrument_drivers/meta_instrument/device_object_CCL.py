@@ -61,6 +61,16 @@ except ImportError:
     czcf = None
 
 
+def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
+    acq_ch_map_IQ = {}
+    for acq_instr, ch_map in acq_ch_map.items():
+        acq_ch_map_IQ[acq_instr] = {}
+        for qubit, ch in ch_map.items():
+            acq_ch_map_IQ[acq_instr]["{} I".format(qubit)] = ch
+            acq_ch_map_IQ[acq_instr]["{} Q".format(qubit)] = ch + 1
+    return acq_ch_map_IQ
+
+
 class DeviceCCL(Instrument):
     """
     Device object for systems controlled using the
@@ -72,22 +82,37 @@ class DeviceCCL(Instrument):
 
         self.msmt_suffix = '_' + name
 
-        self.add_parameter('qubits',
-                           parameter_class=ManualParameter,
-                           initial_value=[],
-                           vals=vals.Lists(elt_validator=vals.Strings()))
-
-        self.add_parameter('qubit_edges',
-                           parameter_class=ManualParameter,
-                           docstring="Denotes edges that connect qubits. "
-                           "Used to define the device topology.",
-                           initial_value=[[]],
-                           vals=vals.Lists(elt_validator=vals.Lists()))
+        self.add_parameter(
+            'qubits',
+            parameter_class=ManualParameter,
+            initial_value=[],
+            vals=vals.Lists(elt_validator=vals.Strings())
+        )
 
         self.add_parameter(
-            'ro_lo_freq', unit='Hz',
-            docstring=('Frequency of the common LO for all RO pulses.'),
-            parameter_class=ManualParameter)
+            'qubit_edges',
+            parameter_class=ManualParameter,
+            docstring="Denotes edges that connect qubits. "
+                        "Used to define the device topology.",
+            initial_value=[[]],
+            vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
+        )
+
+        self.add_parameter(
+            'qubits_by_feedline',
+            parameter_class=ManualParameter,
+            docstring="Qubits divided by feedline."
+                        "Used to sort qubits for timedomain preparation.",
+            initial_value=[[]],
+            vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
+        )
+
+        self.add_parameter(
+            'ro_lo_freq',
+            unit='Hz',
+            docstring='Frequency of the common LO for all RO pulses.',
+            parameter_class=ManualParameter
+        )
 
         # actually, it should be possible to build the integration
         # weights obeying different settings for different
@@ -1005,28 +1030,28 @@ class DeviceCCL(Instrument):
     ########################################################
 
     def measure_conditional_oscillation(
-        self,
-        q0: str,
-        q1: str,
-        q2: str = None,
-        q3: str = None,
-        flux_codeword="cz",
-        flux_codeword_park=None,
-        parked_qubit_seq=None,
-        downsample_swp_points=1,  # x2 and x3 available
-        prepare_for_timedomain=True,
-        MC=None,
-        disable_cz: bool = False,
-        disabled_cz_duration_ns: int = 60,
-        cz_repetitions: int = 1,
-        wait_time_before_flux_ns: int = 0,
-        wait_time_after_flux_ns: int = 0,
-        disable_parallel_single_q_gates: bool = False,
-        label="",
-        verbose=True,
-        disable_metadata=False,
-        extract_only=False,
-    ):
+            self,
+            q0: str,
+            q1: str,
+            q2: str = None,
+            q3: str = None,
+            flux_codeword="cz",
+            flux_codeword_park=None,
+            parked_qubit_seq=None,
+            downsample_swp_points=1,  # x2 and x3 available
+            prepare_for_timedomain=True,
+            MC=None,
+            disable_cz: bool = False,
+            disabled_cz_duration_ns: int = 60,
+            cz_repetitions: int = 1,
+            wait_time_before_flux_ns: int = 0,
+            wait_time_after_flux_ns: int = 0,
+            disable_parallel_single_q_gates: bool = False,
+            label="",
+            verbose=True,
+            disable_metadata=False,
+            extract_only=False,
+            ):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
@@ -1166,27 +1191,28 @@ class DeviceCCL(Instrument):
 
         return a
 
+
     def measure_conditional_oscillation_multi(
-        self,
-        pairs: list, 
-        parked_qbs: list,
-        flux_codeword="cz",
-        phase_offsets:list = None,
-        parked_qubit_seq=None,
-        downsample_swp_points=1,  # x2 and x3 available
-        prepare_for_timedomain=True,
-        MC=None,
-        disable_cz: bool = False,
-        disabled_cz_duration_ns: int = 60,
-        cz_repetitions: int = 1,
-        wait_time_before_flux_ns: int = 0,
-        wait_time_after_flux_ns: int = 0,
-        disable_parallel_single_q_gates: bool = False,
-        label="",
-        verbose=True,
-        disable_metadata=False,
-        extract_only=False,
-    ):
+            self,
+            pairs: list, 
+            parked_qbs: list,
+            flux_codeword="cz",
+            phase_offsets:list = None,
+            parked_qubit_seq=None,
+            downsample_swp_points=1,  # x2 and x3 available
+            prepare_for_timedomain=True,
+            MC=None,
+            disable_cz: bool = False,
+            disabled_cz_duration_ns: int = 60,
+            cz_repetitions: int = 1,
+            wait_time_before_flux_ns: int = 0,
+            wait_time_after_flux_ns: int = 0,
+            disable_parallel_single_q_gates: bool = False,
+            label="",
+            verbose=True,
+            disable_metadata=False,
+            extract_only=False,
+            ):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
@@ -1265,9 +1291,9 @@ class DeviceCCL(Instrument):
             list_qubits_used += [pair[0], pair[1]]
             ramsey_qubits += [pair[0]]
 
-        print ( 'Q_idxs_target : {}'. format(Q_idxs_target))
-        print ( 'Q_idxs_control : {}'. format(Q_idxs_control))
-        print ( 'list_qubits_used : {}'. format(list_qubits_used))
+        print('Q_idxs_target : {}'.format(Q_idxs_target))
+        print('Q_idxs_control : {}'.format(Q_idxs_control))
+        print('list_qubits_used : {}'.format(list_qubits_used))
 
         if parked_qbs is not None:
             Q_idxs_parked = [self.find_instrument(Q).cfg_qubit_nr() for Q in parked_qbs]
@@ -1330,11 +1356,19 @@ class DeviceCCL(Instrument):
             ),
             disable_snapshot_metadata=disable_metadata,
         )
+
         if len(pairs) > 1:
-            qb_ro_order = np.sum([ list(self._acq_ch_map[key].keys()) for key in self._acq_ch_map.keys()])
+            # qb_ro_order = np.sum([ list(self._acq_ch_map[key].keys()) for key in self._acq_ch_map.keys()])
+            # qubits_by_feedline = [['D1','X1'],  
+            #                         ['D2','Z1','D3','D4','D5','D7','X2','X3','Z3'],
+            #                         ['D6','D8','D9','X4','Z2','Z4']]
+            # qb_ro_order = sorted(np.array(pairs).flatten().tolist(), 
+            #                     key=lambda x: [i for i,qubits in enumerate(qubits_by_feedline) if x in qubits])
+            qb_ro_order = [qb for qb_dict in self._acq_ch_map.values() for qb in qb_dict.keys()]
         else:
             # qb_ro_order = [ list(self._acq_ch_map[key].keys()) for key in self._acq_ch_map.keys()][0]
             qb_ro_order = [pairs[0][0], pairs[0][1]]
+        
         result_dict = {}
         for i, pair in enumerate(pairs):
             ch_osc = qb_ro_order.index(pair[0])
@@ -1366,7 +1400,8 @@ class DeviceCCL(Instrument):
         return result_dict
 
 
-    def measure_parity_check_flux_dance(self,
+    def measure_parity_check_flux_dance(
+            self,
             target_qubits: List[str],
             control_qubits: List[str],
             flux_dance_steps: List[int] = [1,2,3,4],
@@ -1664,7 +1699,8 @@ class DeviceCCL(Instrument):
         return a.result
 
 
-    def measure_parity_check_fidelity(self,
+    def measure_parity_check_fidelity(
+            self,
             target_qubits: list,
             control_qubits: list, # have to be given in readout (feedline) order
             flux_dance_steps: List[int] = [1,2,3,4],
@@ -1811,13 +1847,60 @@ class DeviceCCL(Instrument):
         return True
 
 
+    # def measure_phase_corrections(
+    #         self,
+    #         target_qubits: List[str],
+    #         control_qubits: List[str],
+    #         flux_codeword: str="cz",
+    #         measure_switched_target: bool=True,
+    #         update: bool = True,
+    #         prepare_for_timedomain=True,
+    #         disable_cz: bool = False,
+    #         disabled_cz_duration_ns: int = 60,
+    #         cz_repetitions: int = 1,
+    #         wait_time_before_flux_ns: int = 0,
+    #         wait_time_after_flux_ns: int = 0,
+    #         label="",
+    #         verbose=True,
+    #         extract_only=False,
+    #         ):
+    #     assert all(qb in self.qubits() for control_qubits + target_qubits)
+
+    #     for q_target, q_control in zip(target_qubits, control_qubits):
+    #         a = self.measure_conditional_oscillation(
+    #             q_target, 
+    #             q_control, 
+
+    #             prepare_for_timedomain=prepare_for_timedomain
+    #             extract_only=extract_only
+    #             )
+        
+    #     if measure_switched_target:
+    #         for q_target, q_control in zip(control_qubits, target_qubits):
+    #             a = self.measure_conditional_oscillation(
+    #                 q_target, 
+    #                 q_control, 
+
+    #                 prepare_for_timedomain=prepare_for_timedomain
+    #                 extract_only=extract_only
+    #                 )
+
+
+    #     for qb in target_qubits:
+    #         mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
+
+
+
+    #     return self
+
+
     def measure_two_qubit_grovers_repeated(
-        self,
-        qubits: list,
-        nr_of_grover_iterations=40,
-        prepare_for_timedomain=True,
-        MC=None,
-    ):
+            self,
+            qubits: list,
+            nr_of_grover_iterations=40,
+            prepare_for_timedomain=True,
+            MC=None,
+            ):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         if MC is None:
@@ -3958,7 +4041,6 @@ class DeviceCCL(Instrument):
     def measure_two_qubit_randomized_benchmarking(
         self,
         qubits,
-        MC,
         nr_cliffords=np.array(
             [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
         ),
@@ -3972,7 +4054,8 @@ class DeviceCCL(Instrument):
         sim_cz_qubits: list = None,
         compile_only: bool = False,
         pool=None,  # a multiprocessing.Pool()
-        rb_tasks=None  # used after called with `compile_only=True`
+        rb_tasks=None,  # used after called with `compile_only=True`
+        MC=None
     ):
         """
         Measures two qubit randomized benchmarking, including
@@ -4036,11 +4119,14 @@ class DeviceCCL(Instrument):
                 this method again and providing the `rb_tasks`.
                 See the interleaved RB for use case.
         """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
+        old_avg = self.ro_acq_averages()
         self.ro_acq_weight_type("optimal IQ")
         self.ro_acq_digitized(False)
 
@@ -4166,8 +4252,11 @@ class DeviceCCL(Instrument):
         ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
 
     def measure_interleaved_randomized_benchmarking_statistics(
-        self, RB_type: str = "CZ", nr_iRB_runs: int = 30, **iRB_kw
-    ):
+            self, 
+            RB_type: str = "CZ", 
+            nr_iRB_runs: int = 30, 
+            **iRB_kw
+        ):
         """
         This is an optimized way of measuring statistics of the iRB
         Main advantage: it recompiles the RB sequences for the next run in the
@@ -4219,22 +4308,23 @@ class DeviceCCL(Instrument):
             log.error("Not all iRB measurements were successful!")
 
     def measure_two_qubit_interleaved_randomized_benchmarking(
-        self,
-        qubits: list,
-        MC,
-        nr_cliffords=np.array(
-            [1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50., 70., 90., 120.]
-        ),
-        nr_seeds=100,
-        recompile: bool = "as needed",
-        flux_codeword="cz",
-        flux_allocated_duration_ns: int = None,
-        sim_cz_qubits: list = None,
-        measure_idle_flux: bool = True,
-        rb_tasks_start: list = None,
-        pool=None,
-        start_next_round_compilation: bool = False
-    ):
+            self,
+            qubits: list,
+            nr_cliffords=np.array(
+                [1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50., 70., 90., 120.]
+            ),
+            nr_seeds=100,
+            recompile: bool = "as needed",
+            flux_codeword="cz",
+            flux_allocated_duration_ns: int = None,
+            sim_cz_qubits: list = None,
+            measure_idle_flux: bool = True,
+            rb_tasks_start: list = None,
+            pool=None,
+            start_next_round_compilation: bool = False,
+            maxtasksperchild=None,
+            MC = None,
+        ):
         """
         Perform two qubit interleaved randomized benchmarking with an
         interleaved CZ gate, and optionally an interleaved idle identity with
@@ -4244,10 +4334,13 @@ class DeviceCCL(Instrument):
         compilation with measurement (beside the parallelization of the RB
         sequences which will always happen in parallel).
         """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
         def run_parallel_iRB(
-            recompile, pool, rb_tasks_start: list = None,
-            start_next_round_compilation: bool = False
-        ):
+                recompile, pool, rb_tasks_start: list = None,
+                start_next_round_compilation: bool = False
+            ):
             """
             We define the full parallel iRB procedure here as function such
             that we can control the flow of the parallel RB sequences
@@ -4290,6 +4383,7 @@ class DeviceCCL(Instrument):
                 compile_only=True,
                 pool=pool
             )
+
             # 4. Start the measurement and run the analysis for [None]
             self.measure_two_qubit_randomized_benchmarking(
                 qubits=qubits,
@@ -4401,11 +4495,12 @@ class DeviceCCL(Instrument):
             if pool is None:
                 # Using `with ...:` makes sure the other processes will be terminated
                 # `maxtasksperchild` avoid RAM issues
-                with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
-                    run_parallel_iRB(
-                        recompile=recompile,
-                        pool=pool,
-                        rb_tasks_start=rb_tasks_start)
+                if not maxtasksperchild:
+                    maxtasksperchild = cl_oql.maxtasksperchild
+                with multiprocessing.Pool(maxtasksperchild=maxtasksperchild) as pool:
+                    run_parallel_iRB(recompile=recompile,
+                                    pool=pool,
+                                    rb_tasks_start=rb_tasks_start)
             else:
                 # In this case the `pool` to execute the RB compilation tasks
                 # is provided, `rb_tasks_start` is expected to be as well
@@ -4628,22 +4723,22 @@ class DeviceCCL(Instrument):
             )
 
     def measure_single_qubit_randomized_benchmarking_parking(
-        self,
-        qubits: list,
-        nr_cliffords=2**np.arange(10),
-        nr_seeds: int = 100,
-        MC=None,
-        recompile: bool = 'as needed',
-        prepare_for_timedomain: bool = True,
-        cal_points: bool = True,
-        ro_acq_weight_type: str = "optimal IQ",
-        flux_codeword: str = "cz",
-        rb_on_parked_qubit_only: bool = False,
-        interleaving_cliffords: list = [None],
-        compile_only: bool = False,
-        pool=None,  # a multiprocessing.Pool()
-        rb_tasks=None  # used after called with `compile_only=True`
-    ):
+            self,
+            qubits: list,
+            nr_cliffords=2**np.arange(10),
+            nr_seeds: int = 100,
+            MC=None,
+            recompile: bool = 'as needed',
+            prepare_for_timedomain: bool = True,
+            cal_points: bool = True,
+            ro_acq_weight_type: str = "optimal IQ",
+            flux_codeword: str = "cz",
+            rb_on_parked_qubit_only: bool = False,
+            interleaving_cliffords: list = [None],
+            compile_only: bool = False,
+            pool=None,  # a multiprocessing.Pool()
+            rb_tasks=None  # used after called with `compile_only=True`
+        ):
         """
         [2020-07-06 Victor] This is a modified copy of the same method from CCL_Transmon.
         The modification is intended for measuring a single qubit RB on a qubit
@@ -4658,8 +4753,8 @@ class DeviceCCL(Instrument):
             - stores single shots using `ro_acq_weight_type` weights (int. logging)
             - uploads a pulse driving the ef/12 transition (should be calibr.)
             - performs RB both with and without an extra pi-pulse
-            - Includes calibration poitns for 0, 1, and 2 (g,e, and f)
-            - analysis extracts fidelity and leakage/seepage
+            - includes calibration points for 0, 1, and 2 states (g,e, and f)
+            - runs analysis which extracts fidelity and leakage/seepage
 
         Refs:
         Knill PRA 77, 012307 (2008)
@@ -4815,19 +4910,19 @@ class DeviceCCL(Instrument):
         return a_q2
 
     def measure_two_qubit_purity_benchmarking(
-        self,
-        qubits,
-        MC,
-        nr_cliffords=np.array(
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0]
-        ),
-        nr_seeds=100,
-        interleaving_cliffords=[None],
-        label="TwoQubit_purityB_{}seeds_{}_{}",
-        recompile: bool = "as needed",
-        cal_points: bool = True,
-        flux_codeword: str = "cz",
-    ):
+            self,
+            qubits,
+            MC,
+            nr_cliffords=np.array(
+                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0]
+            ),
+            nr_seeds=100,
+            interleaving_cliffords=[None],
+            label="TwoQubit_purityB_{}seeds_{}_{}",
+            recompile: bool = "as needed",
+            cal_points: bool = True,
+            flux_codeword: str = "cz",
+        ):
         """
         Measures two qubit purity (aka unitarity) benchmarking.
         It is a modified RB routine which measures the length of
@@ -5127,20 +5222,20 @@ class DeviceCCL(Instrument):
         ma2.CharacterBenchmarking_TwoQubit_Analysis(ch_idxs=ch_idxs)
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
-        self,
-        qubits,
-        MC=None,
-        nr_cliffords=2 ** np.arange(11),
-        nr_seeds=100,
-        interleaving_cliffords=[None],
-        label="TwoQubit_sim_RB_{}seeds_recompile={}_{}_{}",
-        recompile: bool = "as needed",
-        cal_points: bool = True,
-        ro_acq_weight_type: str = "optimal IQ",
-        compile_only: bool = False,
-        pool=None,  # a multiprocessing.Pool()
-        rb_tasks=None  # used after called with `compile_only=True`
-    ):
+            self,
+            qubits,
+            MC=None,
+            nr_cliffords=2 ** np.arange(11),
+            nr_seeds=100,
+            interleaving_cliffords=[None],
+            label="TwoQubit_sim_RB_{}seeds_recompile={}_{}_{}",
+            recompile: bool = "as needed",
+            cal_points: bool = True,
+            ro_acq_weight_type: str = "optimal IQ",
+            compile_only: bool = False,
+            pool=None,  # a multiprocessing.Pool()
+            rb_tasks=None  # used after called with `compile_only=True`
+        ):
         """
         Performs simultaneous single qubit RB on two qubits.
         The data of this experiment should be compared to the results of single
@@ -5310,22 +5405,22 @@ class DeviceCCL(Instrument):
         return a_q0, a_q1
 
     def measure_multi_qubit_simultaneous_randomized_benchmarking(
-        self,
-        qubits,
-        MC=None,
-        nr_cliffords=2 ** np.arange(11),
-        nr_seeds=100,
-        recompile: bool = "as needed",
-        cal_points: bool = True,
-        ro_acq_weight_type: str = "optimal IQ",
-        compile_only: bool = False,
-        pool=None,  # a multiprocessing.Pool()
-        rb_tasks=None,  # used after called with `compile_only=True
-        label_name=None,
-        prepare_for_timedomain=True
-    ):
+            self,
+            qubits,
+            MC=None,
+            nr_cliffords=2 ** np.arange(11),
+            nr_seeds=100,
+            recompile: bool = "as needed",
+            cal_points: bool = True,
+            ro_acq_weight_type: str = "optimal IQ",
+            compile_only: bool = False,
+            pool=None,  # a multiprocessing.Pool()
+            rb_tasks=None,  # used after called with `compile_only=True
+            label_name=None,
+            prepare_for_timedomain=True
+        ):
         """
-    Performs simultaneous single qubit RB on multiple qubits.
+        Performs simultaneous single qubit RB on multiple qubits.
         The data of this experiment should be compared to the results of single
         qubit RB to reveal differences due to crosstalk and residual coupling
 
@@ -6310,10 +6405,21 @@ class DeviceCCL(Instrument):
 
       return True 
 
-    def measure_multi_flipping(self,qubits: list=None, number_of_flips: int=None,
-                               equator=True, ax='x', angle='180', MC=None,
-                               prepare_for_timedomain=True, update=False,
-                               scale_factor_based_on_line:bool = False):
+    def measure_multi_flipping(self,
+            qubits: list=None, 
+            number_of_flips: int=None,
+            equator=True, 
+            ax='x', 
+            angle='180', 
+            MC=None,
+            prepare_for_timedomain=True,
+            update=False,
+            scale_factor_based_on_line: bool = False
+        ):
+        # allow flipping only with pi/2 or pi, and x or y pulses
+        assert angle in ['90','180']
+        assert ax.lower() in ['x', 'y']
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -6323,14 +6429,15 @@ class DeviceCCL(Instrument):
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits, bypass_flux=True)
 
+        if number_of_flips is None:
+            number_of_flips = 30
+        nf = np.arange(0,(number_of_flips+4)*2,2)
+
         qubits_idx = []
         for q in qubits:
             qub = self.find_instrument(q)
             qubits_idx.append(qub.cfg_qubit_nr())
-        if number_of_flips is None:
-            number_of_flips = 20
-        nf = np.arange(0,(number_of_flips+4)*2,2)
-
+        
         p = mqo.multi_qubit_flipping(number_of_flips = nf,qubits_idx=qubits_idx,
                                    platf_cfg=self.cfg_openql_platform_fn(),
                                    equator=equator,ax=ax, angle=angle)
@@ -6346,17 +6453,51 @@ class DeviceCCL(Instrument):
         label = 'Multi_flipping_'+'_'.join(qubits)
         MC.run(label)
 
-        a = ma2.Multi_Flipping_Analysis(qubits=qubits, label = label)
+        a = ma2.Multi_Flipping_Analysis(qubits=qubits, label=label)
+
         if update:
             for q in qubits:
+                # Same as in single-qubit flipping:
+                # Choose scale factor based on simple goodness-of-fit comparison,
+                # unless it is forced by `scale_factor_based_on_line`
+                # This method gives priority to the line fit: 
+                # the cos fit will only be chosen if its chi^2 relative to the 
+                # chi^2 of the line fit is at least 10% smaller
+                # cos_chisqr = a.proc_data_dict['quantities_of_interest'][q]['cos_fit'].chisqr
+                # line_chisqr = a.proc_data_dict['quantities_of_interest'][q]['line_fit'].chisqr
+
+                # if scale_factor_based_on_line:
+                #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
+                # elif (line_chisqr - cos_chisqr)/line_chisqr > 0.1:
+                #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['cos_fit']['sf']
+                # else:
+                #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
+
                 if scale_factor_based_on_line:
-                    scale_factor = a.proc_data_dict['quantities_of_interest']\
-                                                   [q]['line_fit']['sf']
-                else:                                                   
+                    scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
+                else:
+                    # choose scale factor preferred by analysis (currently based on BIC measure)                                                   
                     scale_factor = a.proc_data_dict['{}_scale_factor'.format(q)]
-                qub = self.find_instrument(q)
-                new_amp = qub.mw_channel_amp()* scale_factor
-                qub.mw_channel_amp(new_amp)
+                
+                if abs(scale_factor-1) < 1e-3:
+                    print(f'Qubit {q}: Pulse amplitude accurate within 0.1%. Amplitude not updated.')
+                    return a
+
+                qb = self.find_instrument(q)
+                if angle == '180':
+                    if qb.cfg_with_vsm():
+                        amp_old = qb.mw_vsm_G_amp()
+                        qb.mw_vsm_G_amp(scale_factor*amp_old)
+                    else:
+                        amp_old = qb.mw_channel_amp()
+                        qb.mw_channel_amp(scale_factor*amp_old)
+                elif angle == '90':
+                    amp_old = qb.mw_amp90_scale()
+                    qb.mw_amp90_scale(scale_factor*amp_old)
+
+                print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
+                    q, ax, angle, amp_old, scale_factor*amp_old))
+
 
     def measure_multi_motzoi(self,qubits: list = None, prepare_for_timedomain=True ,MC=None, 
                              amps=None,calibrate=True):
@@ -6528,12 +6669,3 @@ class DeviceCCL(Instrument):
         a = ma2.tqg.Two_qubit_gate_tomo_Analysis(label='Ramsey', n_pairs=len(qubit_ramsey))
         
         return a.qoi
-
-def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
-    acq_ch_map_IQ = {}
-    for acq_instr, ch_map in acq_ch_map.items():
-        acq_ch_map_IQ[acq_instr] = {}
-        for qubit, ch in ch_map.items():
-            acq_ch_map_IQ[acq_instr]["{} I".format(qubit)] = ch
-            acq_ch_map_IQ[acq_instr]["{} Q".format(qubit)] = ch + 1
-    return acq_ch_map_IQ

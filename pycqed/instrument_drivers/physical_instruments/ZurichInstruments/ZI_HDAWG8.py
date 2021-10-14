@@ -340,10 +340,10 @@ while (1) {
             log.info("Commandtable has valid json format")
             # upload commandtable
             self.stop()
-            self.setv(f"/{self.devname}/awgs/{awg_nr}/commandtable/data", commandtable)
+            self.setv(f"awgs/{awg_nr}/commandtable/data", commandtable)
             self.start()
 
-        return self.geti(f"/{self.devname}/awgs/{awg_nr}/commandtable/status")
+        return commandtable, self.geti(f"awgs/{awg_nr}/commandtable/status")
 
     ##########################################################################
     # 'private' functions: application specific/codeword support
@@ -392,16 +392,19 @@ while (1) {
             csvname_r = self.devname + '_' + wf_r
 
             # FIXME: Unfortunately, 'static' here also refers to configuration required for flux HDAWG8
-            if self.cfg_sideband_mode() == 'static':
+            if self.cfg_sideband_mode() == 'static' or self.cfg_codeword_protocol() == 'flux':
+                # program += 'assignWaveIndex(\"{}\", \"{}\", {});\n'.format(
+                #     csvname_l, csvname_r, dio_cw)
                 program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
                     dio_cw, csvname_l, csvname_r)
-            elif self.cfg_sideband_mode() == 'real-time':
+            elif self.cfg_sideband_mode() == 'real-time' and self.cfg_codeword_protocol() == 'novsm_microwave':
                 # program += 'setWaveDIO({}, 1, 2, \"{}\", 1, 2, \"{}\");\n'.format(
-                    # dio_cw, csvname_l, csvname_r)
+                #     dio_cw, csvname_l, csvname_r)
                 program += 'assignWaveIndex(1, 2, \"{}\", 1, 2, \"{}\", {});\n'.format(
                     csvname_l, csvname_r, dio_cw)
             else:
-                raise Exception("Unknown modulation type: '{}'".format(self.cfg_sideband_mode()))
+                raise Exception("Unknown modulation type '{}' and codeword protocol '{}'" \
+                                    .format(self.cfg_sideband_mode(), self.cfg_codeword_protocol()))
 
         if self.cfg_sideband_mode() == 'real-time':
             program += '// Initialize the phase of the oscillators\n'

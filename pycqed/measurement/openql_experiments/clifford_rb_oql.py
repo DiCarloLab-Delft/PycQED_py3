@@ -23,10 +23,10 @@ reload(rb)
 
 log = logging.getLogger(__name__)
 
-# We same here a global configuration of the number of maximum task a process
+# We define here a global configuration of the number of maximum tasks a process
 # (from `multiprocessing` package) of RB compilation task should execute before
-# being restarted, this is necessary do to memory leakage happening
-# likely do to code outside python
+# being restarted, this is necessary due to memory leakage happening
+# likely due to code outside python
 # Not sure what this number should be, it is a trade off between memory
 # consumption and the overhead of having to start a new python process
 maxtasksperchild = 4
@@ -94,12 +94,12 @@ def randomized_benchmarking(
     f_state_cal_pts: bool = True,
     sim_cz_qubits: list = None,
     recompile: bool = True,
-):
+    ):
     """
     Input pars:
         qubits:         list of ints specifying qubit indices.
                         based on the length this function detects if it should
-                        generate a single or two qubit RB sequence.
+                        generate a single or two or multi qubit RB sequence.
         platf_cfg:      filename of the platform config file
         nr_cliffords:   list nr_cliffords for which to generate RB seqs
         nr_seeds:       int  nr_seeds for which to generate RB seqs
@@ -117,8 +117,13 @@ def randomized_benchmarking(
                                 576  -> Size of the single qubit like class
                                     contained in the two qubit Cl group
                                 11520 -> Size of the complete two qubit Cl group
-                        FIXME: seems useless, because none of the callers set this, and rb.randomized_benchmarking_sequence trims it to the group size
-        flux_codeword:  FIXME: TBW
+                        FIXME: seems useless, because none of the callers set this, 
+                                and rb.randomized_benchmarking_sequence trims it to the group size
+        flux_codeword:  Flux codeword to apply for each two-qubit gate in the 
+                        Clifford decomposition. If it contains 'cz', codeword is applied
+                        to qubit indices given in `qubits`. Otherwise codeword is
+                        applied to qubit 0, which is needed for flux-dance type codeword
+                        that are decomposed in the CC config file.
         simultaneous_single_qubit_RB: perform single qubit RB on 2 qubits in parallel
         initialize:     if True initializes qubits to 0, disable for restless
                         tuning
@@ -234,9 +239,7 @@ def randomized_benchmarking(
         with open(platf_cfg) as json_file:
             loaded_json = json.load(json_file)
         try:
-            flux_allocated_duration_ns = loaded_json["instructions"]["sf_cz_se q0"][
-                "duration"
-            ]
+            flux_allocated_duration_ns = loaded_json["instructions"]["sf_cz_se q0"]["duration"]
         except KeyError:
             raise ValueError("Could not find flux duration. Specify manually!")
 
@@ -260,17 +263,17 @@ def randomized_benchmarking(
                     net_cl_seq = rb.calculate_net_clifford(cl_seq, Cl)
 
                     # decompose
-                    cl_seq_decomposed = []
-                    for cl in cl_seq:
+                    cl_seq_decomposed = [None] * len(cl_seq)
+                    for i,cl in enumerate(cl_seq):
                         # benchmarking only CZ (not as a member of CNOT group)
                         if cl == 104368:  # 104368 = 100_000 + CZ
-                            cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
+                            cl_seq_decomposed[i] = [("CZ", ["q0", "q1"])]
                         # benchmarking only idling identity, with duration of cz
                         # see below where wait-time is added
                         elif cl == 100_000:
-                            cl_seq_decomposed.append([("I", ["q0", "q1"])])
+                            cl_seq_decomposed[i] = [("I", ["q0", "q1"])]
                         else:
-                            cl_seq_decomposed.append(Cl(cl).gate_decomposition)
+                            cl_seq_decomposed[i] = Cl(cl).gate_decomposition
 
                     # generate OpenQL kernel for every net_clifford
                     for net_clifford in net_cliffords:
@@ -300,13 +303,16 @@ def randomized_benchmarking(
                                         k.gate("wait", [], 0)  # alignment
                                         k.gate("wait", [], flux_allocated_duration_ns)
                                         k.gate("wait", [], 0)
-                                    elif sim_cz_qubits is None:
+                                    elif not sim_cz_qubits:
                                         # OpenQL alignment is necessary to ensure
                                         # parking flux pulse is played in parallel
                                         k.gate("wait", [], 0)
-                                        k.gate(
-                                            flux_codeword, list(qubit_map.values())
-                                        )  # fix for QCC
+                                        if 'cz' in flux_codeword:
+                                            k.gate(flux_codeword, list(qubit_map.values()))
+                                        else:
+                                            # if explicit flux codeword is given (flux-dance type),
+                                            # it only takes qubit 0 as argument
+                                            k.gate(flux_codeword, [0])
                                         k.gate("wait", [], 0)
                                     else:
                                         # A simultaneous CZ is applied to characterize cz gates that
@@ -329,6 +335,7 @@ def randomized_benchmarking(
                             k.measure(qubit_idx)
                         k.gate("wait", [], 0)
                         p.add_kernel(k)
+
                 elif simultaneous_single_qubit_RB:  # FIXME: condition boils down to just 'else'
                     # ############ 2 qubits using SingleQubitClifford
                     for net_clifford in net_cliffords:
@@ -379,6 +386,7 @@ def randomized_benchmarking(
                             k.measure(qubit_idx)
                         k.gate("wait", [], 0)
                         p.add_kernel(k)
+
                 elif simultaneous_single_qubit_parking_RB:
                     for net_clifford in net_cliffords:
                         k = oqh.create_kernel(

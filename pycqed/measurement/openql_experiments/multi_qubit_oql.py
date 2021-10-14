@@ -1730,21 +1730,23 @@ def conditional_oscillation_seq(q0: int, q1: int,
     return p
 
 
-def conditional_oscillation_seq_multi(Q_idxs_target,
-                                Q_idxs_control,
-                                Q_idxs_parked,
-                                platf_cfg: str = None,
-                                disable_cz: bool = False,
-                                disabled_cz_duration: int = 60,
-                                cz_repetitions: int = 1,
-                                angles=np.arange(0, 360, 20),
-                                wait_time_before_flux: int = 0,
-                                wait_time_after_flux: int = 0,
-                                add_cal_points: bool = True,
-                                cases: list = ('no_excitation', 'excitation'),
-                                flux_codeword: str = 'cz',
-                                parked_qubit_seq: str = 'ground',
-                                disable_parallel_single_q_gates: bool = False):
+def conditional_oscillation_seq_multi(
+        Q_idxs_target,
+        Q_idxs_control,
+        Q_idxs_parked,
+        platf_cfg: str = None,
+        disable_cz: bool = False,
+        disabled_cz_duration: int = 60,
+        cz_repetitions: int = 1,
+        angles=np.arange(0, 360, 20),
+        wait_time_before_flux: int = 0,
+        wait_time_after_flux: int = 0,
+        add_cal_points: bool = True,
+        cases: list = ('no_excitation', 'excitation'),
+        flux_codeword: str = 'cz',
+        parked_qubit_seq: str = 'ground',
+        disable_parallel_single_q_gates: bool = False
+        ):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
