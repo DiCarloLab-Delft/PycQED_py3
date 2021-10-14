@@ -341,23 +341,45 @@
         "cl_23 %0": ["rx90 %0", "ry90 %0", "rxm90 %0"],
 
         // CC additions
-        "cz q8,q10": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
-        "cz q10,q8": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
-        "cz q8,q11": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
-        "cz q11,q8": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
-        "cz q11,q14": ["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
-        "cz q14,q11": ["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
-        "cz q10,q14": ["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
-        "cz q14,q10": ["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
-        "cz q9,q11": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
-        "cz q11,q9": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
-        "cz q9,q12": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
-        "cz q12,q9": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
-        "cz q11,q15": ["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
-        "cz q15,q11": ["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
+        // "cz q8,q10": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
+        // "cz q10,q8": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11"],
+        "cz q8,q10": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11", "phase_corr_sw q8", "phase_corr_ne q10", "barrier q8,q10,q11"],
+        "cz q10,q8": ["barrier q8,q10,q11", "sf_cz_sw q8", "sf_cz_ne q10", "sf_park q11", "barrier q8,q10,q11", "phase_corr_sw q8", "phase_corr_ne q10", "barrier q8,q10,q11"],
 
-        "cz q12,q15": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
-        "cz q15,q12": ["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
+        // "cz q8,q11": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
+        // "cz q11,q8": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11"],
+        "cz q8,q11": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11", "phase_corr_se q8", "phase_corr_nw q11", "barrier q8,q10,q11"],
+        "cz q11,q8": ["barrier q8,q10,q11", "sf_cz_se q8", "sf_cz_nw q11", "sf_park q10", "barrier q8,q10,q11", "phase_corr_se q8", "phase_corr_nw q11", "barrier q8,q10,q11"],
+
+        // "cz q11,q14":["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
+        // "cz q14,q11":["barrier q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "barrier q11,q14,q15"],
+        "cz q11,q14":["barrier q8,q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "rx180 q8", "barrier q8,q11,q14,q15", "phase_corr_sw q11", "phase_corr_ne q14", "phase_corr_park q15", "rx180 q8", "barrier q8,q11,q14,q15"],
+        "cz q14,q11":["barrier q8,q11,q14,q15", "sf_cz_sw q11", "sf_cz_ne q14", "sf_park q15", "rx180 q8", "barrier q8,q11,q14,q15", "phase_corr_sw q11", "phase_corr_ne q14", "phase_corr_park q15", "rx180 q8", "barrier q8,q11,q14,q15"],
+
+        // "cz q10,q14":["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
+        // "cz q14,q10":["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14"],
+        "cz q10,q14":["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14", "phase_corr_se q10", "phase_corr_nw q14", "barrier q10,q14"],
+        "cz q14,q10":["barrier q10,q14", "sf_cz_se q10", "sf_cz_nw q14", "barrier q10,q14", "phase_corr_se q10", "phase_corr_nw q14", "barrier q10,q14"],
+
+        // "cz q9,q11": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
+        // "cz q11,q9": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12"],
+        "cz q9,q11": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12", "phase_corr_sw q9", "phase_corr_ne q11", "barrier q9,q11,q12"],
+        "cz q11,q9": ["barrier q9,q11,q12", "sf_cz_sw q9", "sf_cz_ne q11", "sf_park q12", "barrier q9,q11,q12", "phase_corr_sw q9", "phase_corr_ne q11", "barrier q9,q11,q12"],
+
+        // "cz q9,q12": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
+        // "cz q12,q9": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12"],
+        "cz q9,q12": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12", "phase_corr_se q9", "phase_corr_nw q12", "barrier q9,q11,q12"],
+        "cz q12,q9": ["barrier q9,q11,q12", "sf_cz_se q9", "sf_cz_nw q12", "sf_park q11", "barrier q9,q11,q12", "phase_corr_se q9", "phase_corr_nw q12", "barrier q9,q11,q12"],
+
+        // "cz q11,q15":["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
+        // "cz q15,q11":["barrier q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "barrier q11,q14,q15"],
+        "cz q11,q15":["barrier q8,q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "rx180 q8", "barrier q8,q11,q14,q15", "phase_corr_se q11", "phase_corr_nw q15", "phase_corr_park q14", "rx180 q8", "barrier q8,q11,q14,q15"],
+        "cz q15,q11":["barrier q8,q11,q14,q15", "sf_cz_se q11", "sf_cz_nw q15", "sf_park q14", "rx180 q8", "barrier q8,q11,q14,q15", "phase_corr_se q11", "phase_corr_nw q15", "phase_corr_park q14", "rx180 q8", "barrier q8,q11,q14,q15"],
+
+        // "cz q12,q15":["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
+        // "cz q15,q12":["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15"],
+        "cz q12,q15":["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15", "phase_corr_sw q12", "phase_corr_ne q15", "barrier q12,q15"],
+        "cz q15,q12":["barrier q12,q15", "sf_cz_sw q12", "sf_cz_ne q15", "barrier q12,q15", "phase_corr_sw q12", "phase_corr_ne q15", "barrier q12,q15"],
 
         "measure_fb %0": ["measure %0", "_wait_uhfqa %0", "_dist_dsm %0", "_wait_dsm %0"],
         "rx2theta %0": ["cw_27 %0"],
@@ -387,9 +409,10 @@
         "rphi135m90 %0": ["cw_17 %0"],
         "rphi13590 %0": ["cw_18 %0"],
         "rmx180 %0": ["cw_29 %0"],
-        "rmy180 %0": ["cw_30 %0"]
+        "rmy180 %0": ["cw_30 %0"],
+        "rxm45 %0": ["cw_27 %0"],
+        "rx45 %0": ["cw_28 %0"]
     },
-
 
 
     // User defined instruction set.
@@ -418,6 +441,16 @@
             }
         },
         "rx180": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "x",
+            "cc": {
+                "ref_signal": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
+                "static_codeword_override": [1]
+            }
+        },
+        "rx180 q8": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "type": "mw",
@@ -475,6 +508,186 @@
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [6]
+            }
+        },
+        "phase_corr_nw q11": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_nw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [60]
+            }
+        },
+        "phase_corr_nw q12": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_nw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [60]
+            }
+        },
+        "phase_corr_nw q14": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_nw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [60]
+            }
+        },
+        "phase_corr_nw q15": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_nw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [60]
+            }
+        },
+        "phase_corr_ne q10": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_ne",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [61]
+            }
+        },
+        "phase_corr_ne q11": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_ne",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [61]
+            }
+        },
+        "phase_corr_ne q14": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_ne",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [61]
+            }
+        },
+        "phase_corr_ne q15": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_ne",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [61]
+            }
+        },
+        "phase_corr_sw q8": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_sw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [62]
+            }
+        },
+        "phase_corr_sw q9": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_sw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [62]
+            }
+        },
+        "phase_corr_sw q11": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_sw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [62]
+            }
+        },
+        "phase_corr_sw q12": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_sw",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [62]
+            }
+        },
+        "phase_corr_se q8": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_se",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [63]
+            }
+        },
+        "phase_corr_se q9": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_se",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [63]
+            }
+        },
+        "phase_corr_se q10": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_se",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [63]
+            }
+        },
+        "phase_corr_se q11": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_se",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [63]
+            }
+        },
+        "phase_corr_park q14": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_park",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [59]
+            }
+        },
+        "phase_corr_park q15": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "visual_type": "phase_corr_park",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [59]
             }
         },
         "sf_cz_ne q10": {
@@ -1236,7 +1449,7 @@
         },
         // i believe 300 is the minimum, should be checked with scope (see is fluxes arent dead)
         "_wait_dsm": {
-            "duration": 300,
+            "duration": 340, //used to be 300
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
             "visual_type": "x",
             "cc": {
@@ -1245,53 +1458,53 @@
         },
         // cannot be any shorter according to Wouter
         "if_1_break": {
-			"duration": 60,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"visual_type": "x",
-			"cc": {
-				"signal": [],
-				"pragma": {
-                    "break": 1
-				}
-			}
-		},
-		// cannot be any shorter according to Wouter
-		"if_0_break": {
-			"duration": 60,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"visual_type": "x",
-			"cc": {
-				"signal": [],
-				"pragma": {
-                    "break": 0
-				}
-			}
-		},
-		// the smallest value was empirically found to be 560 ns
-		"_wait_uhfqa": {
-            "duration": 560,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "visual_type": "x",
-            "cc": {
-                "signal": []
-            }
-        },
-        // cannot be any shorter
-        "_dist_dsm": {
-			"duration": 20,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"visual_type": "x",
-			"cc": {
-			    "readout_mode": "feedback",
-				"signal": [
-					{	"type": "measure",
-						"operand_idx": 0,
-						"value": []
-					}
-                ]
-			}
-		}
-	},	// end of "instructions"
+      			"duration": 80, //used to be 60
+      			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+      			"visual_type": "x",
+      			"cc": {
+      				"signal": [],
+      				"pragma": {
+                          "break": 1
+      				}
+      			}
+      		},
+      		// cannot be any shorter according to Wouter
+      		"if_0_break": {
+      			"duration": 80, //used to be 60
+      			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+      			"visual_type": "x",
+      			"cc": {
+      				"signal": [],
+      				"pragma": {
+                          "break": 0
+      				}
+      			}
+      		},
+    		// the smallest value was empirically found to be 560 ns
+    		"_wait_uhfqa": {
+                "duration": 800, // used to be 560
+                "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+                "visual_type": "x",
+                "cc": {
+                    "signal": []
+                }
+            },
+            // cannot be any shorter
+            "_dist_dsm": {
+    			"duration": 40, //used to be 20
+    			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+    			"visual_type": "x",
+    			"cc": {
+    			    "readout_mode": "feedback",
+    				"signal": [
+    					{	"type": "measure",
+    						"operand_idx": 0,
+    						"value": []
+    					}
+            ]
+          }
+       }
+    },	// end of "instructions"
 
 
     // NB: the "topology" keyword must be present, but the contents are only interpreted by
@@ -1305,4 +1518,3 @@
     "resources": {
     }
 }
-

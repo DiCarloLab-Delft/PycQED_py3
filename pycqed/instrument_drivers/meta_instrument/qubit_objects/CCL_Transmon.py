@@ -388,6 +388,13 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(min_value=0, max_value=1.6),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('mw_channel_range',
+                           label='AWG channel range. WARNING: Check your hardware specific limits!',
+                           unit='V',
+                           initial_value=.8,
+                           vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
+
         self.add_parameter('mw_ef_amp',
                            label='Pi-pulse amplitude ef-transition', unit='V',
                            initial_value=.4,
@@ -1217,6 +1224,7 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
         MW_LutMan.channel_amp(self.mw_channel_amp())
+        MW_LutMan.channel_range(self.mw_channel_range())
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
         MW_LutMan.spec_amp(self.spec_amp())
@@ -1300,6 +1308,9 @@ class CCLight_Transmon(Qubit):
         else:
             warnings.warn('"cfg_prepare_mw_awg" set to False, '
                           'not preparing microwave pulses.')
+
+        # 5. upload commandtable for virtual-phase gates
+        MW_LutMan.upload_single_qubit_phase_corrections()
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
@@ -5552,8 +5563,9 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # append the calibration points, times are for location in plot
+        assert angle in ['90','180']
 
+        # append the calibration points, times are for location in plot
         nf = np.array(number_of_flips)
         dn = nf[1] - nf[0]
         nf = np.concatenate([nf,

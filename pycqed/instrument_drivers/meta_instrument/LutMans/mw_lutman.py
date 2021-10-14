@@ -23,7 +23,12 @@ default_mw_lutmap = {
     12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
     14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
-    30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"}
+    30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
+    59 : {"name" : "phaseCorrPark", "type" : "phase"},
+    60 : {"name" : "phaseCorrNW"  , "type" : "phase"},
+    61 : {"name" : "phaseCorrNE"  , "type" : "phase"},
+    62 : {"name" : "phaseCorrSW"  , "type" : "phase"},
+    63 : {"name" : "phaseCorrSE"  , "type" : "phase"},
 }
 
 inspire_mw_lutmap = {
@@ -157,7 +162,7 @@ inspire_mw_lutmap = {
     127: {"name" : "rY354" , "theta" : -5.625   , "phi" : 90 , "type" : "ge"}
 }
 
-valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square'}
+valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square', 'phase'}
 
 # _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
 #            'rXm90',  'rYm90', 'rPhi90', 'spec']
@@ -664,6 +669,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         self._num_channels = 8
         super().__init__(name, **kw)
         self.sampling_rate(2.4e9)
+        self._add_phase_correction_parameters()
 
     def _add_channel_params(self):
         super()._add_channel_params()
@@ -673,6 +679,10 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             docstring=('using the channel amp as additional'
                        'parameter to allow rabi-type experiments without'
                        'wave reloading. Should not be using VSM'))
+        self.add_parameter(
+            'channel_range', unit='V', vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
+            set_cmd=self._set_channel_range, get_cmd=self._get_channel_range,
+            docstring=('defines the channel range for the AWG sequencer output'))
         # Setting variable to track channel amplitude since it cannot be directly extracted from
         # HDAWG while using real-time modulation (because of mixer amplitude imbalance corrections)
         self.channel_amp_value = 0
@@ -683,6 +693,53 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.5)
+
+    def _add_phase_correction_parameters(self):
+        for gate in ['NW','NE','SW','SE']:
+            self.add_parameter(
+                name='vcz_virtual_q_ph_corr_%s' % gate,
+                parameter_class=ManualParameter,
+                unit='deg',
+                vals=vals.Numbers(0, 360),
+                initial_value=0.0,
+                docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
+                            "Will be applied via sine generator phases."
+            )
+        self.add_parameter(
+            name='vcz_virtual_q_ph_corr_park',
+            parameter_class=ManualParameter,
+            unit='deg',
+            vals=vals.Numbers(0, 360),
+            initial_value=0.0,
+            docstring=f"Virtual phase correction for two-qubit gate in parking."
+                        "Will be applied via sine generator phases."
+        )
+
+    def _set_channel_range(self, val):
+        awg_nr = (self.channel_I()-1)//2
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+        AWG = self.AWG.get_instr()
+        if val == 0.8:
+            AWG.set('sigouts_{}_range'.format(self.channel_I()-1), .8)
+            AWG.set('sigouts_{}_direct'.format(self.channel_I()-1), 1)
+            AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), .8)
+            AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 1)
+        else:
+            AWG.set('sigouts_{}_direct'.format(self.channel_I()-1), 0)
+            AWG.set('sigouts_{}_range'.format(self.channel_I()-1), val)
+            AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 0)
+            AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), val)
+
+
+    def _get_channel_range(self):
+        awg_nr = (self.channel_I()-1)//2
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+
+        val = AWG.get('sigouts_{}_range'.format(self.channel_I()-1))
+        assert val == AWG.get('sigouts_{}_range'.format(self.channel_Q()-1))
+        return val
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -897,6 +954,14 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                         phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
+            elif waveform['type'] == 'phase':
+                # fill codewords that are used for phase correction instructions
+                # with a zero waveform
+                self._wave_dict[idx] = wf.block_pulse(
+                    amp=0,
+                    sampling_rate=self.sampling_rate(),
+                    length=self.mw_gauss_width()*4,
+                    )
             else:
                 raise ValueError
 
@@ -913,6 +978,51 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             for key, val in wave_dict.items():
                 wave_dict[key] = np.dot(M, val)
             return wave_dict
+
+    def upload_single_qubit_phase_corrections(self):
+        commandtable_dict = {
+            "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
+            "header": { "version": "0.2" },
+            "table": []
+            }
+
+        # manual waveform index 1-to-1 mapping
+        for ind in np.arange(0,60,1):
+            commandtable_dict['table'] += [{"index": int(ind),
+                                             "waveform": {"index": int(ind)}
+                                            }]
+
+        # add phase corrections to the end of the codeword space
+        phase_corr_inds = np.arange(60,64,1)
+        for i,d in enumerate(['NW','NE','SW','SE']):
+            phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
+            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i]),
+                                             "phase0": {"value": float(phase), "increment": True},
+                                             "phase1": {"value": float(phase), "increment": True}
+                                              # "waveform": {"index": 0}
+                                            }]
+        phase = self.parameters[f"vcz_virtual_q_ph_corr_park"]()
+        commandtable_dict['table'] += [{"index": int(59),
+                                         "phase0": {"value": float(phase), "increment": True},
+                                         "phase1": {"value": float(phase), "increment": True}
+                                          # "waveform": {"index": 0}
+                                        }]
+
+        # Note: Whenever using the command table, the phase offset between I and Q channels on
+        # the HDAWG for real-time modulation have to be set from an index on the table. Index
+        # 1023 will be used as it is un-used for codeword triggering
+        commandtable_dict['table'] += [{"index": 1023,
+                                             "phase0": {"value": 90.0, "increment": False},
+                                             "phase1": {"value":  0.0, "increment": False}
+                                              # "waveform": {"index": 0}
+                                        }]
+
+        # get internal awg sequencer number (indexed 0,1,2,3)
+        awg_nr = (self.channel_I()-1) // 2
+        status = self.AWG.get_instr().upload_commandtable(commandtable_dict, awg_nr)
+
+        return commandtable_dict, status
+
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 

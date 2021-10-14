@@ -1620,9 +1620,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
                     # Parallel flux pulses below
 
                     k.gate(flux_codeword, [q0, q1])
-                    # k.gate('rx180',[8])
-                    # k.gate('i',[8])
-                    # k.gate('rx180',[8])
                     k.gate("wait", [], 0)  # alignment workaround
 
                     # in case of parking and parallel cz
@@ -1789,9 +1786,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
 #                     # Parallel flux pulses below
 
 #                     k.gate(flux_codeword, [15, 11])
-#                     k.gate('rx180',[8])
-#                     k.gate('i',[8])
-#                     k.gate('rx180',[8])
 #                     k.gate("wait", [], 0)  # alignment workaround
 
 #                     # in case of parking and parallel cz
@@ -1841,6 +1835,9 @@ def conditional_oscillation_seq(q0: int, q1: int,
 #                 k.gate(phi_gate, [q])
 #                 if disable_parallel_single_q_gates:
 #                     k.gate("wait", [], 0)
+
+#             for qubit in q_extra:
+#                 k.gate("rx180",[qubit])
 
 #             k.gate('wait', [], 0)
 
