@@ -248,20 +248,6 @@ class Base_MW_LutMan(Base_LutMan):
         self.spec_func = wf.block_pulse
 
         self._add_channel_params()
-        # FIXME: Remove after the end of RUS experiment
-        self.add_parameter('w1', label='Weight 1 for RUS Experiment',
-                           vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0)
-        self.add_parameter('w2', label='Weight 2 for RUS Experiment',
-                           vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0)
-        self.add_parameter('bias', label='Bias for RUS Experiment',
-                           vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0)
-
         self.add_parameter('cfg_sideband_mode',
                            vals=vals.Enum('real-time', 'static'),
                            initial_value='static',
