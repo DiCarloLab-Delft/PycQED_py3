@@ -33,12 +33,12 @@ def license():
 setup(name='PycQED',
       version=get_version(),
       use_2to3=False,
-      author='Adriaan Rol',
-      author_email='adriaan.rol@gmail.com',
-      maintainer='Adriaan Rol',
-      maintainer_email='adriaan.rol@gmail.com',
+      author='DiCarlo Lab at QuTech',
+      author_email='secr-qutech@tudelft.nl',
+      maintainer='Miguel Serrao Moreira',
+      maintainer_email='miguel.moreira@tudelft.nl',
       description='Python based Circuit QED data acquisition framework '
-                  'developed by members of the DiCarlo-lab at '
+                  'developed by members of the DiCarlo Lab at '
                   'QuTech, Delft University of Technology',
       long_description=readme(),
       url='https://github.com/DiCarloLab-Delft/PycQED_py3',
@@ -48,8 +48,6 @@ setup(name='PycQED',
           'Programming Language :: Python :: 3 :: Only',
           'Programming Language :: Python :: 3.5',
           'Programming Language :: Python :: 3.6',
-          'Programming Language :: Python :: 3.7',
-          'Programming Language :: Python :: 3.8',
           'Topic :: Scientific/Engineering'
       ],
       license=license(),
