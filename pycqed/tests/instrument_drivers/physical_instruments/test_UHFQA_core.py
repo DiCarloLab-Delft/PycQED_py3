@@ -87,6 +87,27 @@ class Test_UHFQA_core(unittest.TestCase):
         f.seek(0)
         self.assertIn('User registers overview', f.read())
 
+    def test_minimum_holdoff(self):
+        # Test without averaging
+        self.uhf.qas_0_integration_length(128)
+        self.uhf.qas_0_result_averages(1)
+        self.uhf.qas_0_delay(0)
+        assert self.uhf.minimum_holdoff() == 800/1.8e9
+        self.uhf.qas_0_delay(896)
+        assert self.uhf.minimum_holdoff() == (896+16)/1.8e9
+        self.uhf.qas_0_integration_length(2048)
+        assert self.uhf.minimum_holdoff() == (2048)/1.8e9
+
+        # Test with averaging
+        self.uhf.qas_0_result_averages(16)
+        self.uhf.qas_0_delay(0)
+        self.uhf.qas_0_integration_length(128)
+        assert self.uhf.minimum_holdoff() == 2560/1.8e9
+        self.uhf.qas_0_delay(896)
+        assert self.uhf.minimum_holdoff() == 2560/1.8e9
+        self.uhf.qas_0_integration_length(4096)
+        assert self.uhf.minimum_holdoff() == 4096/1.8e9
+
     def test_crosstalk_matrix(self):
         mat = np.random.random((10, 10))
         self.uhf.upload_crosstalk_matrix(mat)
