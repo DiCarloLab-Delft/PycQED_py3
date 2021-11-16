@@ -264,7 +264,7 @@ class QWG(QWGCore, Instrument):
                     vals=vals.Arrays(min_value=-1, max_value=1),
                     get_cmd=_gen_get_func_2par(self._get_cw_waveform, ch, cw),
                     set_cmd=_gen_set_func_2par(self._set_cw_waveform, ch, cw),
-                    snapshot_exclude=True,
+#                    snapshot_exclude=True,
                     docstring=docst)
 
     ##########################################################################
