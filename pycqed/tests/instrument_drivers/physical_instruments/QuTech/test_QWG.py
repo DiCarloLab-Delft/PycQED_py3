@@ -17,27 +17,27 @@ class Test_QWG(unittest.TestCase):
         os.makedirs('test_output', exist_ok=True)
 
         transport = FileTransport(str(test_path))
-        qwg = QWGCore('qwg', transport)
+        qwgcore = QWGCore('qwg', transport)
 
-        qwg.init()
+        qwgcore.init()
 
-        qwg.delete_waveform_all()
-        qwg.new_waveform_real('test', 3)
+        qwgcore.delete_waveform_all()
+        qwgcore.new_waveform_real('test', 3)
         if 0:  # FIXME: disabled because it produces binary data that breaks reading golden file
-            qwg.send_waveform_data_real('test', [-0.1, 0, 0.1])
-        qwg.delete_waveform('test')
+            qwgcore.send_waveform_data_real('test', [-0.1, 0, 0.1])
+        qwgcore.delete_waveform('test')
         if 0:   # FIXME, see above
-            qwg.create_waveform_real('test', [-0.1, 0, 0.1])
-        qwg.sync_sideband_generators()
+            qwgcore.create_waveform_real('test', [-0.1, 0, 0.1])
+        qwgcore.sync_sideband_generators()
 
-        qwg.start()
-        qwg.stop()
+        qwgcore.start()
+        qwgcore.stop()
 
         transport.close()  # to allow access to file
 
         # check results
         test_output = test_path.read_bytes()
-        golden_path = Path(pq.__path__[0]) / 'tests/instrument_drivers/physical_instruments/QuTech/golden' / file_name
+        golden_path = Path(__file__).parent / 'golden' / file_name
         golden = golden_path.read_bytes()
         self.assertEqual(test_output, golden)
 
