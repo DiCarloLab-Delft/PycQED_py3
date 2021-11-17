@@ -853,10 +853,17 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
     return p
 
 
-def Chevron(qubit_idx: int, qubit_idx_spec: int, qubit_idx_parks: int,
-            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str,
-            target_qubit_sequence: str = 'ramsey', cc: str = 'CCL',
-            recover_q_spec: bool = False):
+def Chevron(
+        qubit_idx: int,
+        qubit_idx_spec: int,
+        qubit_idx_parks: int, # FIXME: incorrect type
+        buffer_time, buffer_time2,
+        flux_cw: int,
+        platf_cfg: str,
+        target_qubit_sequence: str = 'ramsey',
+        cc: str = 'CCL',
+        recover_q_spec: bool = False
+):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.

@@ -236,8 +236,7 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=triglev_cmd + '?',
                                set_cmd=triglev_cmd + ' {}',
                                vals=self.device_descriptor.mvals_trigger_level,
-                               get_parser=float,
-                               snapshot_exclude=True)
+                               get_parser=float) # FIXME: snapshot_exclude=True)
 
             # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
             self._params_exclude_snapshot.append(triglev_name)
@@ -481,8 +480,7 @@ class QuTech_AWG_Module(SCPI):
                 self.add_parameter(cw_param,
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
-                                   vals=vals.Strings(),
-                                   snapshot_exclude=True)
+                                   vals=vals.Strings()) # FIXME: snapshot_exclude=True)
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(cw_param)
 
@@ -491,15 +489,13 @@ class QuTech_AWG_Module(SCPI):
                            label='Waveform list size',
                            unit='#',
                            get_cmd='wlist:size?',
-                           get_parser=int,
-                           snapshot_exclude=True)
+                           get_parser=int) # FIXME: snapshot_exclude=True)
         # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         self._params_exclude_snapshot.append('WlistSize')
 
         self.add_parameter('Wlist',
                            label='Waveform list',
-                           get_cmd=self._getWlist,
-                           snapshot_exclude=True)
+                           get_cmd=self._getWlist) # FIXME: snapshot_exclude=True)
         # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         self._params_exclude_snapshot.append('Wlist')
 
@@ -565,7 +561,7 @@ class QuTech_AWG_Module(SCPI):
                         self._set_cw_waveform, ch, cw),
                     get_cmd=self._gen_ch_cw_get_func(
                         self._get_cw_waveform, ch, cw),
-                    snapshot_exclude=True,
+#                    snapshot_exclude=True,
                     docstring=docst)
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(parname)

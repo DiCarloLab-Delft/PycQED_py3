@@ -475,6 +475,8 @@ class DeviceCCL(Instrument):
                             MW_lm = self.find_instrument(q_obj.instr_LutMan_MW())
                             if AWG_name == MW_lm.AWG():
                                 extra_delay = q_obj.mw_fine_delay()
+                                # FIXME: the line below assumes AWG8_MW_LutMan, incompatible with AWG8_VSM_MW_LutMan (PR #658)
+                                #  move delay setting to lutman
                                 awg_chs     = MW_lm.channel_I(), MW_lm.channel_Q()
                                 log.debug("Setting `sigouts_{}_delay` to {:4g}"
                                           " in {}".format(awg_chs[0], lat_fine, AWG.name))
