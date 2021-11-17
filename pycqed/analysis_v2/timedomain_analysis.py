@@ -1,14 +1,19 @@
+from importlib import reload
 import lmfit
 import numpy as np
 from uncertainties import ufloat
 from scipy.stats import sem
 from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
+reload(fit_mods)
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from pycqed.utilities.general import format_value_string
 from copy import deepcopy
+
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 
 
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
@@ -890,7 +895,6 @@ class DecoherenceAnalysis(Single_Qubit_TimeDomainAnalysis):
 
 
 
-
 class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -912,6 +916,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
                             'value_names': 'value_names',
                             'value_units': 'value_units',
                             'measured_values': 'measured_values'}
+
         # This analysis makes a hardcoded assumption on the calibration points
         self.options_dict['cal_points'] = [list(range(-4, -2)),
                                            list(range(-2, 0))]
@@ -967,6 +972,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
         self.proc_data_dict['plot_data_A_Q'] = (self.proc_data_dict['data_A_Q'] - self.proc_data_dict['dataA_Q_avg'])/\
                                             self.proc_data_dict['dataA_Q_amp']*2
 
+        
         self.proc_data_dict['phase'] = np.unwrap(np.arctan2(self.proc_data_dict['plot_data_A_Q'][:-4],self.proc_data_dict['plot_data_A_I'][:-4]))
         self.proc_data_dict['amp'] = np.hstack([np.sqrt(self.proc_data_dict['plot_data_A_Q'][:-4]**2+self.proc_data_dict['plot_data_A_I'][:-4]**2),
                  np.abs(self.proc_data_dict['plot_data_A_Q'][-4:])])
@@ -980,47 +986,55 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
                                      self.proc_data_dict['phase'],1,
                                      w=self.proc_data_dict['amp'][:-4])
         freq_guess, phase_guess = phase_guess_fit
+        offset_Q_guess = 0.0
+        offset_I_guess = 0.0
+        # if max(self.proc_data_dict['amp'][:-4]) > 1.5:
+        freq_guess1 = np.fft.fft(1j*self.proc_data_dict['plot_data_A_Q'][:-4] + self.proc_data_dict['plot_data_A_I'][:-4])
+        freqaxis = np.fft.fftfreq(len(freq_guess1),self.proc_data_dict['plot_times_I'][1] - self.proc_data_dict['plot_times_I'][0])
+        freqaxis1 = freqaxis[1:] 
+        freq_guess = freqaxis1[np.argmax(np.abs(freq_guess1[1:]))]*2*np.pi
+        # import matplotlib.pyplot as plt 
+        # plt.plot(freqaxis[1:],np.abs(freq_guess1[1:]))
+        # plt.plot(freq_guess,np.max(np.abs(freq_guess1[1:])),'x',markersize=8)
+
+        phase_guess = self.proc_data_dict['phase'][0]-freq_guess*self.proc_data_dict['plot_times_I'][0]
+        offset_Q_guess = 0.5
+        offset_I_guess = 0.5
         t_index = np.argmin(abs(self.proc_data_dict['amp'][:-4]-np.exp(-1)))
         tau_guess = self.proc_data_dict['plot_times_I'][:-4][t_index]
         complex_guess = {}
-        complex_guess['amplitude'] = {'value':1,
+        complex_guess['amplitude'] = {'value':max(self.proc_data_dict['amp'][:-4]),
                     'min':0,
-                    'max':10,
+                    # 'max':10,
                     'vary':True}
-        complex_guess['offset'] = {'value':0,
+        complex_guess['offset_I'] = {'value':offset_I_guess,
                     'min':-10,
                     'max':10,
-                    'vary':False}
-        complex_guess['phase'] = {'value':phase_guess,
-                    'min':-np.pi,
-                    'max':np.pi,
+                    'vary':True}
+        complex_guess['offset_Q'] = {'value':offset_Q_guess,
+                    'min':-10,
+                    'max':10,
+                    'vary':True}
+        complex_guess['phase'] = {'value':np.remainder(phase_guess,4*np.pi),
+                    'min':-4*np.pi,
+                    'max':4*np.pi,
                     'vary':True}
         complex_guess['frequency'] = {'value':freq_guess/2/np.pi,
+                    'min':-50e6,
+                    'max':50e6,
                     'vary':True}
-        complex_guess['tau'] = {'value':tau_guess,
-                    'min':0,
+        complex_guess['tau'] = {'value': 1e-6,
+                    'min':1e-7,
                     'vary':True}
-
-
-        complex_data = np.add(self.proc_data_dict['plot_data_A_I'],
-                            1.j*self.proc_data_dict['plot_data_A_Q'])
+        # print(complex_guess)
+        complex_data = np.add(self.proc_data_dict['plot_data_A_I'][:-4],
+                            1.j*self.proc_data_dict['plot_data_A_Q'][:-4])
         self.fit_dicts['exp_fit'] = {'fit_fn': fit_mods.ExpDampOscFuncComplex,
                                       'guess_dict':complex_guess,
                                       'fit_yvals': {'data': complex_data},
-                                      'fit_xvals': {'t': self.proc_data_dict['plot_times_I']},
+                                      'fit_xvals': {'t': self.proc_data_dict['plot_times_I'][:-4]},
                                       'fitting_type':'minimize'}
 
-    # def analyze_fit_results(self):
-    #     sf_cos = self._get_ef_pi_amp()
-    #     self.proc_data_dict['ef_pi_amp'] = sf_cos
-
-    #     msg = r'$\pi$-ef amp '
-    #     msg += ': {:.4f}\n'.format(sf_cos)
-        
-
-    #     self.raw_data_dict['scale_factor_msg'] = msg
-    #     # TODO: save scale factor to file
-    #     return sf_cos
 
 
 
@@ -1035,9 +1049,10 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
             'yvals': self.proc_data_dict['plot_data_A_I'],
             'ylabel': 'Normalized data',
             'yunit': '',
-            'setlabel': '<x>',
+            'setlabel': '<x> Data',
             'title': (self.raw_data_dict['timestamp'] + ' ' +
                       self.raw_data_dict['measurementstring']),
+            'dpi': 200,
             'do_legend': True,
             'legend_pos': 'best'}
         self.plot_dicts['mainQ'] = {
@@ -1049,9 +1064,10 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
             'yvals': self.proc_data_dict['plot_data_A_Q'],
             'ylabel': 'Normalized data',
             'yunit': '',
-            'setlabel': '<y>',
+            'setlabel': '<y> Data',
             'title': (self.raw_data_dict['timestamp'] + ' ' +
                       self.raw_data_dict['measurementstring']),
+            'dpi': 200,
             'do_legend': True,
             'legend_pos': 'best'}
         self.plot_dicts['Phase'] = {
@@ -1062,9 +1078,10 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
             'yvals': self.proc_data_dict['phase'],
             'ylabel': 'Phase',
             'yunit': 'rad',
-            'setlabel': 'Phase',
+            'setlabel': 'Phase Data',
             'title': (self.raw_data_dict['timestamp'] + ' ' +
                       self.raw_data_dict['measurementstring']),
+            'dpi': 200,
             'do_legend': True,
             'legend_pos': 'best'}
 
@@ -1076,11 +1093,28 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
             'yvals': self.proc_data_dict['amp'],
             'ylabel': 'Coherence',
             'yunit': '',
-            'setlabel': 'coherence',
+            'setlabel': 'Coherence',
             'title': (self.raw_data_dict['timestamp'] + ' ' +
                       self.raw_data_dict['measurementstring']),
+            'dpi': 200,
             'do_legend': True,
             'legend_pos': 'best'}
+
+        self.plot_dicts['Parametric'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['plot_data_A_I'][:-4],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0],  # does not do anything yet
+            'yvals': self.proc_data_dict['plot_data_A_Q'][:-4],
+            'ylabel': self.raw_data_dict['xlabel'][0],
+            'yunit': '',
+            'setlabel': 'Data',
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.raw_data_dict['measurementstring']),
+            'dpi': 200,
+            'do_legend': True,
+            'legend_pos': 'best'}
+        
         if self.do_fitting:
 
             self.plot_dicts['exp_fit_real'] = {
@@ -1098,7 +1132,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'output_mod_fn':np.imag,
                 'fit_res': self.fit_dicts['exp_fit']['fit_res'],
                 'plot_init': self.options_dict['plot_init'],
-                'setlabel': 'exp fit real part',
+                'setlabel': 'exp fit imaginary part',
                 'do_legend': True,
                 'legend_pos': 'best'}
 
@@ -1108,7 +1142,7 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'output_mod_fn':np.abs,
                 'fit_res': self.fit_dicts['exp_fit']['fit_res'],
                 'plot_init': self.options_dict['plot_init'],
-                'setlabel': 'fit amp',
+                'setlabel': 'Fit amplitude',
                 'do_legend': True,
                 'legend_pos': 'best'}
 
@@ -1118,25 +1152,51 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'output_mod_fn':lambda a: np.unwrap(np.angle(a)),
                 'fit_res': self.fit_dicts['exp_fit']['fit_res'],
                 'plot_init': self.options_dict['plot_init'],
-                'setlabel': 'fit phase',
+                'setlabel': 'Fit phase',
                 'do_legend': True,
                 'legend_pos': 'best'}
-            # self.plot_dicts['pi_amp'] = {
-            #     'plotfn': self.plot_line,
-            #     'ax_id': 'main',
-            #     'xvals': [self.proc_data_dict['ef_pi_amp']],
-            #     # 'xlabel': self.raw_data_dict['xlabel'][0],
-            #     'xunit': self.raw_data_dict['xunit'],  # does not do anything yet
-            #     'yvals': [fit_mods.CosFunc(self.proc_data_dict['ef_pi_amp'],
-            #         **self.fit_dicts['cos_fit']['fit_res'].best_values)],
-            #     'marker':'o',
-            #     'line_kws':{'markersize':10}}
-            # self.plot_dicts['text_msg'] = {
-            #     'ax_id': 'main',
-            #     'ypos': 0.15,
-            #     'plotfn': self.plot_text,
-            #     'box_props': 'fancy',
-            #     'text_string': self.raw_data_dict['scale_factor_msg']}
+
+            self.plot_dicts['exp_fit_parametric'] = {
+                'ax_id': 'Parametric',
+                'plotfn': self.plot_fit,
+                'output_mod_fn':np.imag,
+                'output_mod_fn_x':np.real,
+                'fit_res': self.fit_dicts['exp_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'exp fit parametric',
+                'do_legend': True,
+                'legend_pos': 'best'}
+
+            fit_res_params = self.fit_dicts['exp_fit']['fit_res'].params
+            scale_frequency, unit_frequency = SI_prefix_and_scale_factor(fit_res_params['frequency'].value,'Hz')
+            plot_frequency = fit_res_params['frequency'].value*scale_frequency
+            scale_amplitude, unit_amplitude = SI_prefix_and_scale_factor(fit_res_params['amplitude'].value)
+            plot_amplitude = fit_res_params['amplitude'].value*scale_amplitude
+            scale_tau, unit_tau = SI_prefix_and_scale_factor(fit_res_params['tau'].value,'s')
+            plot_tau = fit_res_params['tau'].value*scale_tau
+            scale_offset_I, unit_offset_I = SI_prefix_and_scale_factor(fit_res_params['offset_I'].value)
+            plot_offset_I = fit_res_params['offset_I'].value*scale_offset_I
+            scale_offset_Q, unit_offset_Q = SI_prefix_and_scale_factor(fit_res_params['offset_Q'].value)
+            plot_offset_Q = fit_res_params['offset_Q'].value*scale_offset_Q
+            # scale_phase, label_phase = SI_prefix_and_scale_factor(fit_res_params['phase'].value, 'rad')
+            # print(SI_prefix_and_scale_factor(fit_res_params['frequency'].value,'Hz'))
+            self.plot_dicts['Parameters'] = {
+                'ax_id': 'main',
+                'ypos': .5,
+                'xpos': 1.04,
+                'plotfn': self.plot_text,
+                'dpi': 200,
+                'box_props': 'fancy',
+                'horizontalalignment': 'left',
+                # 'text_string': 'Chi = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].chisqr),
+                'text_string': 'Fit results' + '\n'
+                                + '$\mathrm{\chi}^2$ = %.3f'%(self.fit_dicts['exp_fit']['fit_res'].chisqr)  + '\n'
+                                + 'Detuning = %.2f '%(plot_frequency) + unit_frequency + '\n'
+                                + '$\mathrm{T}_2$ = %.2f '%(plot_tau) + unit_tau + '\n'
+                                + 'A = %.2f '%(plot_amplitude) + unit_amplitude + '\n'
+                                + 'Offset I = %.2f ' %(plot_offset_I) + unit_offset_I + '\n'
+                                + 'Offset Q = %.2f ' %(plot_offset_Q) + unit_offset_Q + '\n'}
+
 
 
 
@@ -1544,11 +1604,14 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
 
         cal_labels = ["00", "01", "10", "11"]
 
+        cs_idx = [0,1]
+
         if self.include_park:
             # add calibration points same as first qubit
             cal_points_idxs += [cal_points_idxs[0]]
             ch_idx_list.append(ch_idx_park)
             type_list.append("park")
+            cs_idx.append(2)
             cal_labels = ["000", "010", "101", "111"]
 
         osc_idxs = np.where(x_vals <= 360)[0]
@@ -1558,7 +1621,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict["xvals_cal"] = np.arange(365, 365 + len(cal_idx) * 25, 25)
         self.proc_data_dict["cal_labels"] = cal_labels
 
-        for ch_idx, type_str in zip(ch_idx_list, type_list):
+        for ch_idx, c_idx, type_str in zip(ch_idx_list, cs_idx, type_list):
             yvals = list(self.raw_data_dict["measured_values_ord_dict"].values())[
                 ch_idx
             ][0]
@@ -1571,8 +1634,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             if normalize_to_cal_points:
                 yvals = a_tools.normalize_data_v3(
                     yvals,
-                    cal_zero_points=cal_points_idxs[ch_idx][0],
-                    cal_one_points=cal_points_idxs[ch_idx][1],
+                    cal_zero_points=cal_points_idxs[c_idx][0],
+                    cal_one_points=cal_points_idxs[c_idx][1],
                 )
 
             yvals_osc = yvals[osc_idxs]

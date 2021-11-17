@@ -69,7 +69,6 @@ def calibrate(sender: CalInterface = None,
     if sender:
         sender.stop()  # FIXME: not in interface
 
-
 _control_modes = {
     # control mode definition, compatible with OpenQL CC backend JSON syntax
 

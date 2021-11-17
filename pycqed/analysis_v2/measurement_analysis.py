@@ -21,9 +21,11 @@ import pycqed.analysis_v2.syndrome_analysis as synda
 reload(sa)
 # only one of these two files should exist in the end
 import pycqed.analysis_v2.cryo_scope_analysis as csa
+# import pycqed.analysis_v2.cryo_scope_analysis_V2 as csa
 reload(csa)
 import pycqed.analysis_v2.cryo_spectrumanalyzer_analysis as csa
 reload(csa)
+# reload(csa_V2)
 import pycqed.analysis_v2.distortions_analysis as da
 
 import pycqed.analysis_v2.optimization_analysis as oa
@@ -43,6 +45,9 @@ reload(rba)
 
 import pycqed.analysis_v2.multiplexed_readout_analysis as mux
 reload(mux)
+
+import  pycqed.analysis_v2.parity_check_analysis as pca
+reload(pca)
 # import pycqed.analysis_v2.gate_set_tomography_analysis as gsa
 # reload(gsa)
 
@@ -50,6 +55,8 @@ reload(mux)
 # reload(fla)
 import pycqed.analysis_v2.multiplexed_readout_analysis as mra
 reload(mra)
+import pycqed.analysis_v2.Two_qubit_gate_analysis as tqg
+reload(tqg)
 
 import pycqed.analysis_v2.fluxing_analysis as fla
 reload(fla)
@@ -80,12 +87,18 @@ from pycqed.analysis_v2.multiplexed_readout_analysis import \
     Multiplexed_Readout_Analysis, Multiplexed_Transient_Analysis,\
     Multiplexed_Weights_Analysis
 
+from pycqed.analysis_v2.parity_check_analysis import Parity_Check_Analysis
+
 from pycqed.analysis_v2.syndrome_analysis import (
     Single_Qubit_RoundsToEvent_Analysis, One_Qubit_Paritycheck_Analysis)
 
 
 from pycqed.analysis_v2.cryo_scope_analysis import RamZFluxArc, \
     SlidingPulses_Analysis, Cryoscope_Analysis
+
+from pycqed.analysis_v2.cryo_scope_analysis_V2 import RamZFluxArc, \
+    SlidingPulses_Analysis, Cryoscope_Analysis
+
 from pycqed.analysis_v2.cryo_spectrumanalyzer_analysis import Cryospec_Analysis
 from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis
 
@@ -120,4 +133,18 @@ from pycqed.analysis_v2.fluxing_analysis import Chevron_Analysis,\
     Chevron_Alignment_Analysis
 
 from pycqed.analysis_v2.cryoscope_v2_analysis import Cryoscope_v2_Analysis
-from pycqed.analysis_v2.multi_allxy import Multi_AllXY_Analysis, plot_Multi_AllXY
+
+import pycqed.analysis_v2.multi_analysis as mana 
+reload(mana)
+
+## Hiresh fix this there is an error in flipping
+# from pycqed.analysis_v2.multi_analysis import (Multi_AllXY_Analysis, plot_Multi_AllXY,
+#     Multi_Rabi_Analysis, plot_Multi_Rabi, Multi_Ramsey_Analysis, plot_Multi_Ramsey,
+#     Multi_T1_Analysis, plot_Multi_T1, Multi_Echo_Analysis, plot_Multi_Echo,
+#     Multi_Flipping_Analysis,plot_Multi_Flipping, Multi_Motzoi_Analysis)
+
+from pycqed.analysis_v2.multi_analysis import (Multi_AllXY_Analysis, plot_Multi_AllXY,
+    Multi_Rabi_Analysis, plot_Multi_Rabi, Multi_Ramsey_Analysis, plot_Multi_Ramsey,
+    Multi_T1_Analysis, plot_Multi_T1, Multi_Echo_Analysis, plot_Multi_Echo,
+    Multi_Flipping_Analysis, Multi_Motzoi_Analysis)
+

@@ -19,6 +19,7 @@ matplotlib
 pandas
 PyQt5
 pyqtgraph
+# FIXME: breaks test_gst.py: pygsti==0.9.7.5
 pygsti==0.9.6
 pyvisa>=1.8
 numpy
@@ -30,5 +31,6 @@ networkx
 scikit-learn==0.23.1  # Tests started to fail on 2020-08-05 due to 0.23.2
 qutechopenql
 zhinst
+# FIXME: breaks test_gst.py: plotly
 plotly<3.8
 packaging

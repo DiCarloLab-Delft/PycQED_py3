@@ -96,73 +96,20 @@ class Test_UHFQC(unittest.TestCase):
         self.uhf.reset_waveforms_zeros()
         assert np.allclose(self.uhf.wave_ch1_cw003(), np.zeros(48))
 
-    def test_print_correlation_overview(self):
-        self.uhf.print_correlation_overview()
-
-    def test_print_deskew_overview(self):
-        self.uhf.print_deskew_overview()
-
-    def test_print_crosstalk_overview(self):
-        self.uhf.print_crosstalk_overview()
-
-    def test_print_integration_overview(self):
-        self.uhf.print_integration_overview()
-
-    def test_print_rotations_overview(self):
-        self.uhf.print_rotations_overview()
-
-    def test_print_thresholds_overview(self):
-        self.uhf.print_thresholds_overview()
-
-    def test_print_user_regs_overview(self):
-        self.uhf.print_user_regs_overview()
-
-    def test_print_overview(self):
-        self.uhf.print_overview()
-
-    def test_reset_acquisition_params(self):
-        self.uhf.awgs_0_userregs_0(100)
-        self.uhf.awgs_0_userregs_15(153)
-
-        self.uhf.reset_acquisition_params()
-        assert self.uhf.awgs_0_userregs_0() == 0
-        assert self.uhf.awgs_0_userregs_15() == 0
-
-    def test_crosstalk_matrix(self):
-        mat = np.random.random((10, 10))
-        self.uhf.upload_crosstalk_matrix(mat)
-        new_mat = self.uhf.download_crosstalk_matrix()
-        assert np.allclose(mat, new_mat)
-
-        self.uhf.reset_crosstalk_matrix()
-        reset_mat = self.uhf.download_crosstalk_matrix()
-        assert np.allclose(np.eye(10), reset_mat)
-
-    def test_reset_correlation_settings(self):
-        self.uhf.qas_0_correlations_5_enable(1)
-        self.uhf.qas_0_correlations_5_source(3)
-        self.uhf.qas_0_thresholds_5_correlation_enable(1)
-        self.uhf.qas_0_thresholds_5_correlation_source(3)
-
-        assert self.uhf.qas_0_correlations_5_enable() == 1
-        assert self.uhf.qas_0_correlations_5_source() == 3
-        assert self.uhf.qas_0_thresholds_5_correlation_enable() == 1
-        assert self.uhf.qas_0_thresholds_5_correlation_source() == 3
-
-        self.uhf.reset_correlation_params()
-
-        assert self.uhf.qas_0_correlations_5_enable() == 0
-        assert self.uhf.qas_0_correlations_5_source() == 0
-        assert self.uhf.qas_0_thresholds_5_correlation_enable() == 0
-        assert self.uhf.qas_0_thresholds_5_correlation_source() == 0
-
-    def test_reset_rotation_params(self):
-        self.uhf.qas_0_rotations_3(1-1j)
-        assert self.uhf.qas_0_rotations_3() == (1-1j)
-        self.uhf.reset_rotation_params
-
     def test_close_open(self):
         # Close the instrument, then reopen to make sure that we can reconnect
         Test_UHFQC.uhf.close()
         self.setup_class()
         self.assertEqual(Test_UHFQC.uhf.devname, 'dev2109')
+
+    def test_async(self):
+        self.uhf.awgs_0_userregs_0(0)
+        self.uhf.awgs_0_triggers_0_level(0.0)
+        self.uhf.asyncBegin()
+        self.uhf.awgs_0_userregs_0(100)
+        self.uhf.awgs_0_triggers_0_level(1.123)
+        assert self.uhf.awgs_0_userregs_0() == 0
+        assert self.uhf.awgs_0_triggers_0_level() == 0
+        self.uhf.asyncEnd()
+        assert self.uhf.awgs_0_userregs_0() == 100
+        assert self.uhf.awgs_0_triggers_0_level() == 1.123
