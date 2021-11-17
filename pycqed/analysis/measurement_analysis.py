@@ -668,7 +668,7 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
-    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
+    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-',
                                    log=False, ticks_around=True, label=None,
                                    **kw):
 
@@ -5645,10 +5645,10 @@ class AllXY_Analysis(TD_Analysis):
                 ax = axarray
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.measured_values[i],
+                                            marker='o-',
                                             fig=fig2, ax=ax,
                                             xlabel=self.xlabel,
-                                            ylabel=str(
-                                                self.value_names[i]),
+                                            ylabel=str(self.value_names[i]),
                                             save=False, label="Measurement")
         ax1.set_ylim(min(self.corr_data) - .1, max(self.corr_data) + .1)
         if self.flip_axis:
@@ -5657,6 +5657,7 @@ class AllXY_Analysis(TD_Analysis):
             ylabel = r'$F$ $|1 \rangle$'
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.corr_data,
+                                        marker='o-',
                                         fig=fig1, ax=ax1,
                                         xlabel='',
                                         ylabel=ylabel,

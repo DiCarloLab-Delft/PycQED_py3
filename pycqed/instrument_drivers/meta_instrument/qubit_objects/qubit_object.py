@@ -1002,7 +1002,7 @@ class Qubit(Instrument):
         return f_res
 
     def find_frequency(self, method='spectroscopy', spec_mode='pulsed_marked',
-                       steps=[1, 3, 10, 30, 100, 300, 1000],
+                       steps=[1, 3, 10, 30, 100],
                        artificial_periods=4,
                        freqs=None,
                        f_span=100e6,
@@ -1250,7 +1250,7 @@ class Qubit(Instrument):
         """
         cur_freq = self.freq_qubit()
         # Steps don't double to be more robust against aliasing
-        for n in steps:
+        for i,n in enumerate(steps):
             times = np.arange(self.mw_gauss_width()*4,
                               50*n*stepsize, n*stepsize)
             artificial_detuning = artificial_periods/times[-1]
@@ -1258,7 +1258,8 @@ class Qubit(Instrument):
                                 artificial_detuning=artificial_detuning,
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
-                                analyze=False)
+                                analyze=False,
+                                prepare_for_timedomain=True if 0 == i else False)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,

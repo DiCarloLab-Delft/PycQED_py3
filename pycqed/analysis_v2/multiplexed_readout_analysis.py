@@ -35,15 +35,19 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     using post-selection.
     """
 
-    def __init__(self, nr_qubits: int,
-                 t_start: str = None, t_stop: str = None,
-                 label: str = '',
-                 options_dict: dict = None, extract_only: bool = False,
-                 extract_combinations: bool = False,
-                 post_selection: bool = False,
-                 post_selec_thresholds: list = None,
-                 q_target=None,
-                 auto=True):
+    def __init__(self,
+                nr_qubits: int,
+                t_start: str = None, 
+                t_stop: str = None,
+                label: str = '',
+                options_dict: dict = None, 
+                extract_only: bool = False,
+                extract_combinations: bool = False,
+                post_selection: bool = False,
+                post_selec_thresholds: list = None,
+                q_target=None,
+                auto=True
+                ):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,

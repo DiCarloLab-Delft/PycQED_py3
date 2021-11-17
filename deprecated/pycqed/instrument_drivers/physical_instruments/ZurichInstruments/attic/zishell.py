@@ -1,6 +1,6 @@
 # N.B. !!!!!!!
-# This file should match the zishell_nh.py but was provided by Yves for 
-# debugging in may 2019. Note that this file is not used in the rest of PycQED. 
+# This file should match the zishell_nh.py but was provided by Yves for
+# debugging in may 2019. Note that this file is not used in the rest of PycQED.
 
 
 #!/usr/bin/ipython
@@ -406,7 +406,7 @@ class ziShellDevice:
         if not self.daq:
             raise(ziShellDAQError())
 
-        self.daq.setDebugLevel(0)
+        self.daq.setDebugLevel(3)
         self.connected = False
 
         if self.device and self.interface:

@@ -242,17 +242,30 @@ def generate_config(filename: str,
 
     for CW in range(32):
         for q in qubits:
-            cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
-                "duration": mw_pulse_duration,
-                "latency": mw_latency,
-                "qubits": [q],
-                "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-                "disable_optimization": False,
-                "type": "mw",
-                "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "cw_{:02}".format(CW),
-                "cc_light_codeword": CW,
-                "cc_light_opcode": 8+CW}
+            if CW == 10:
+                cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
+                    "duration": 1000,
+                    "latency": mw_latency,
+                    "qubits": [q],
+                    "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                    "disable_optimization": False,
+                    "type": "mw",
+                    "cc_light_instr_type": "single_qubit_gate",
+                    "cc_light_instr": "cw_{:02}".format(CW),
+                    "cc_light_codeword": CW,
+                    "cc_light_opcode": 8+CW}
+            else:
+                cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
+                    "duration": mw_pulse_duration,
+                    "latency": mw_latency,
+                    "qubits": [q],
+                    "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                    "disable_optimization": False,
+                    "type": "mw",
+                    "cc_light_instr_type": "single_qubit_gate",
+                    "cc_light_instr": "cw_{:02}".format(CW),
+                    "cc_light_codeword": CW,
+                    "cc_light_opcode": 8+CW}
 
     for q in qubits:
         cfg["instructions"]["compensate {}".format(q)] = {

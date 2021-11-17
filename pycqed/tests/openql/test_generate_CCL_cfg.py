@@ -38,21 +38,23 @@ class Test_configuration_files(unittest.TestCase):
                 sequence_type='echo', net_gate='pi', feedback=True,
                 platf_cfg=test_config_fn)
 
-    # def test_generate_qi_config(self):
-    #     test_config_fn = os.path.join(curdir, 'test_gen_qi_cfg.json')
-    #     rot_dict = generate_config_qi(filename=test_config_fn,
-    #                                    mw_pulse_duration=20, ro_duration=300,
-    #                                    init_duration=200000)
-    #     # If this compiles we conclude that the generated config is valid
-    #     # A single qubit sequence
-    #     sqo.AllXY(qubit_idx=0, platf_cfg=test_config_fn)
-    #     # A sequence containing two-qubit gates
-    #     mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
-    #                               platf_cfg=test_config_fn)
-    #
-    #     # conditional sequence does not work because of bad config
-    #     # # A sequence containing controlled operations
-    #     # sqo.RTE(qubit_idx=0,
-    #     #         sequence_type='echo', net_gate='pi', feedback=True,
-    #     #         platf_cfg=test_config_fn)
-    #     print(rot_dict)
+    @unittest.skip(
+        "fails on OpenQL 0.10.0, 'RuntimeError: Usage error: in gate description for 'c0rot_0_120.6 q0': instruction name is not a valid identifier', and CClight isn't supported anyway on this version")
+    def test_generate_qi_config(self):
+        test_config_fn = os.path.join(curdir, 'test_gen_qi_cfg.json')
+        rot_dict = generate_config_qi(filename=test_config_fn,
+                                       mw_pulse_duration=20, ro_duration=300,
+                                       init_duration=200000)
+        # If this compiles we conclude that the generated config is valid
+        # A single qubit sequence
+        sqo.AllXY(qubit_idx=0, platf_cfg=test_config_fn)
+        # A sequence containing two-qubit gates
+        mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
+                                  platf_cfg=test_config_fn)
+
+        # conditional sequence does not work because of bad config
+        # # A sequence containing controlled operations
+        # sqo.RTE(qubit_idx=0,
+        #         sequence_type='echo', net_gate='pi', feedback=True,
+        #         platf_cfg=test_config_fn)
+        print(rot_dict)

@@ -61,7 +61,6 @@ def calibrate(sender: CalInterface,
     receiver.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=receiver_port)
     sender.stop()  # FIXME: not in interface
 
-
 _control_modes = {
     # control mode definition, compatible with OpenQL CC backend JSON syntax
 

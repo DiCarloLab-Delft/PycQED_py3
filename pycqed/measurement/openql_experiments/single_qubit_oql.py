@@ -280,7 +280,15 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
     return p
 
 
-def T1(times, qubit_idx: int, platf_cfg: str):
+def T1(
+        qubit_idx: int,
+        platf_cfg: str, 
+        times: list, 
+        nr_cz_instead_of_idle_time: list=None,
+        qb_cz_idx: int=None, 
+        nr_flux_dance: float=None, 
+        wait_time_after_flux_dance: float=0
+        ):
     """
     Single qubit T1 sequence.
     Writes output files to the directory specified in openql.
@@ -300,9 +308,28 @@ def T1(times, qubit_idx: int, platf_cfg: str):
     for i, time in enumerate(times[:-4]):
         k = oqh.create_kernel('T1_{}'.format(i), p)
         k.prepz(qubit_idx)
-        wait_nanoseconds = int(round(time/1e-9))
+
+        if nr_flux_dance:
+            for _ in range(int(nr_flux_dance)):
+                for step in [1,2,3,4]:
+                    # if refocusing:
+                    #     k.gate(f'flux-dance-{step}-refocus', [0])
+                    # else:
+                    k.gate(f'flux-dance-{step}', [0])
+                k.gate("wait", [], 0)  # alignment 
+            k.gate("wait", [], wait_time_after_flux_dance)
+
         k.gate('rx180', [qubit_idx])
-        k.gate("wait", [qubit_idx], wait_nanoseconds)
+
+        if nr_cz_instead_of_idle_time is not None:
+            for n in range(nr_cz_instead_of_idle_time[i]):
+                k.gate("cz", [qubit_idx, qb_cz_idx])
+            k.gate("wait", [], 0)  # alignment 
+            k.gate("wait", [], wait_time_after_flux_dance)
+        else:
+            wait_nanoseconds = int(round(time/1e-9))
+            k.gate("wait", [qubit_idx], wait_nanoseconds)
+        
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -809,7 +836,7 @@ def single_elt_on(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str):
+def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_flux_dance:float=None,wait_time:float=None):
     """
     Performs an 'off_on' sequence on the qubit specified.
         off: (RO) - prepz -      - RO
@@ -833,6 +860,17 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str):
         k.prepz(qubit_idx)
         if initialize:
             k.measure(qubit_idx)
+
+        if nr_flux_dance:
+            for i in range(int(nr_flux_dance)):
+                for step in [1,2,3,4]:
+                    # if refocusing:
+                    #     k.gate(f'flux-dance-{step}-refocus', [0])
+                    # else:
+                    k.gate(f'flux-dance-{step}', [0])
+                k.gate("wait", [], 0)  # alignment 
+            k.gate("wait", [], wait_time)
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -841,6 +879,17 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str):
         k.prepz(qubit_idx)
         if initialize:
             k.measure(qubit_idx)
+
+        if nr_flux_dance:
+            for i in range(int(nr_flux_dance)):
+                for step in [1,2,3,4]:
+                    # if refocusing:
+                    #     k.gate(f'flux-dance-{step}-refocus', [0])
+                    # else:
+                    k.gate(f'flux-dance-{step}', [0])
+                k.gate("wait", [], 0)  # alignment 
+            k.gate("wait", [], wait_time) 
+
         k.gate('rx180', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
