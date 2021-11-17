@@ -1,0 +1,11 @@
+*RST
+*CLS
+STATus:PRESet
+wlist:waveform:delete all
+wlist:waveform:new "test",3,real
+wlist:waveform:delete "test"
+QUTEch:OUTPut:SYNCsideband
+awgcontrol:run:immediate
+*OPC?
+awgcontrol:stop:immediate
+*OPC?
