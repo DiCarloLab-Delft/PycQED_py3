@@ -19,7 +19,8 @@ matplotlib
 pandas
 PyQt5
 pyqtgraph
-pygsti==0.9.7.5
+# FIXME: breaks test_gst.py: pygsti==0.9.7.5
+pygsti==0.9.6
 pyvisa>=1.8
 numpy
 Cython
