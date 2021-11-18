@@ -1,15 +1,12 @@
 import time
 import numpy as np
-#from pycqed.analysis import measurement_analysis as MA
-#from pycqed.analysis import ramiro_analysis as RA
-#from pycqed.analysis import fitting_models as fit_mods
 import scipy as scipy
 try:
     import qutip as qt
 except ImportError as e:
     import logging
     logging.warning('Could not import qutip, tomo code will not work')
-import itertools
+
 from pycqed.analysis_v2 import pytomo as csdp_tomo
 
 comp_projectors = [qt.ket2dm(qt.tensor(qt.basis(2,0), qt.basis(2,0))),
