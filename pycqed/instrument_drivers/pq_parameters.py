@@ -3,6 +3,7 @@ from qcodes.utils.validators import Validator, Strings
 
 import numpy as np
 
+
 class NP_NANs(Validator):
     is_numeric = True
 
@@ -10,16 +11,14 @@ class NP_NANs(Validator):
         self._valid_values = [np.nan]
 
     def __repr__(self):
-        return '<nan>'
+        return "<nan>"
 
-    def validate(self, value, context=''):
+    def validate(self, value, context=""):
         try:
             if not np.isnan(value):
-                raise ValueError('{} is not nan; {}'.format(
-                    repr(value), context))
-        except:
-            raise ValueError('{} is not nan; {}'.format(
-                repr(value), context))
+                raise ValueError("{} is not nan; {}".format(repr(value), context))
+        except Exception:
+            raise ValueError("{} is not nan; {}".format(repr(value), context))
 
 
 class InstrumentParameter(ManualParameter):
@@ -36,6 +35,7 @@ class InstrumentParameter(ManualParameter):
 
         **kwargs: Passed to Parameter parent class
     """
+
     def get_instr(self):
         """
         Returns the instance of the instrument with the name equal to the
@@ -59,7 +59,7 @@ class InstrumentParameter(ManualParameter):
         elif isinstance(vals, Validator):
             self.vals = vals
         else:
-            raise TypeError('vals must be a Validator')
+            raise TypeError("vals must be a Validator")
 
 
 class ConfigParameter(ManualParameter):
@@ -85,15 +85,15 @@ class ConfigParameter(ManualParameter):
         super().__init__(name=name, **kwargs)
         self._instrument = instrument
         # if the instrument does not have _config_changed attribute creates it
-        if not hasattr(self._instrument, '_config_changed'):
+        if not hasattr(self._instrument, "_config_changed"):
             self._instrument._config_changed = True
-        self._meta_attrs.extend(['instrument', 'initial_value'])
+        self._meta_attrs.extend(["instrument", "initial_value"])
 
         if initial_value is not None:
             self.validate(initial_value)
-            self._save_val(initial_value)
+            self.cache.set(initial_value)
 
-    def set(self, value):
+    def set_raw(self, value):
         """
         Validate and saves value.
         If the value is different from the latest value it sets the
@@ -103,8 +103,8 @@ class ConfigParameter(ManualParameter):
         self.validate(value)
         if value != self.get_latest():
             self._instrument._config_changed = True
-        self._save_val(value)
+        self.cache.set(value)
 
-    def get(self):
+    def get_raw(self):
         """ Return latest value"""
         return self.get_latest()

@@ -32,7 +32,7 @@ def generate_config(filename: str,
     documentation under "configuration_specification".
     """
 
-    qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
+    qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6']
     lut_map = ['i {}', 'rx180 {}', 'ry180 {}', 'rx90 {}', 'ry90 {}',
                'rxm90 {}', 'rym90 {}', 'rphi90 {}', 'spec {}', 'rx12 {}',
                'square {}']
@@ -126,6 +126,7 @@ def generate_config(filename: str,
         },
 
         "gate_decomposition": {
+            "measz %0": ["measure %0"],
             "x %0": ["rx180 %0"],
             "y %0": ["ry180 %0"],
             "roty90 %0": ["ry90 %0"],
@@ -241,17 +242,30 @@ def generate_config(filename: str,
 
     for CW in range(32):
         for q in qubits:
-            cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
-                "duration": mw_pulse_duration,
-                "latency": mw_latency,
-                "qubits": [q],
-                "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-                "disable_optimization": False,
-                "type": "mw",
-                "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "cw_{:02}".format(CW),
-                "cc_light_codeword": CW,
-                "cc_light_opcode": 8+CW}
+            if CW == 10:
+                cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
+                    "duration": 1000,
+                    "latency": mw_latency,
+                    "qubits": [q],
+                    "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                    "disable_optimization": False,
+                    "type": "mw",
+                    "cc_light_instr_type": "single_qubit_gate",
+                    "cc_light_instr": "cw_{:02}".format(CW),
+                    "cc_light_codeword": CW,
+                    "cc_light_opcode": 8+CW}
+            else:
+                cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
+                    "duration": mw_pulse_duration,
+                    "latency": mw_latency,
+                    "qubits": [q],
+                    "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                    "disable_optimization": False,
+                    "type": "mw",
+                    "cc_light_instr_type": "single_qubit_gate",
+                    "cc_light_instr": "cw_{:02}".format(CW),
+                    "cc_light_codeword": CW,
+                    "cc_light_opcode": 8+CW}
 
     for q in qubits:
         cfg["instructions"]["compensate {}".format(q)] = {

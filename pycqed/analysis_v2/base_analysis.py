@@ -23,6 +23,7 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
+from collections.abc import Iterable
 
 import importlib
 importlib.reload(a_tools)
@@ -48,6 +49,8 @@ class BaseDataAnalysis(object):
         if self.do_fitting:
             self.run_fitting() # fitting to models
         self.prepare_plots()   # specify default plots
+        if self.save_qois:
+            self.save_quantities_of_interest()
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
 
@@ -65,7 +68,8 @@ class BaseDataAnalysis(object):
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
-                 extract_only: bool = False, do_fitting: bool = False):
+                 extract_only: bool = False, do_fitting: bool = False,
+                 save_qois: bool = True):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -135,6 +139,7 @@ class BaseDataAnalysis(object):
                                     of parameters will be extracted and used in analysis
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
+        :param save_qois: Should the save save_quantities_of_interest method be executed?
         '''
         # todo: what exactly does this flag do? May 2018 (Adriaan/Rene)
         self.single_timestamp = False
@@ -225,6 +230,10 @@ class BaseDataAnalysis(object):
 
         if type(self.auto_keys) is str:
             self.auto_keys = [self.auto_keys]
+        ####################################################
+        # Save quantities of interest switch               #
+        ####################################################
+        self.save_qois = save_qois
 
     def run_analysis(self):
         """
@@ -239,16 +248,20 @@ class BaseDataAnalysis(object):
             self.run_fitting()  # fitting to models
             self.save_fit_results()
             self.analyze_fit_results()  # analyzing the results of the fits
-        self.save_quantities_of_interest()
+        if self.save_qois:
+            self.save_quantities_of_interest()
 
         if not self.extract_only:
-            self.prepare_plots()  # specify default plots
-            self.plot(key_list='auto')  # make the plots
+            self.run_post_extract()
 
-            if self.options_dict.get('save_figs', False):
-                self.save_figures(
-                    close_figs=self.options_dict.get('close_figs', True),
-                    tag_tstamp=self.options_dict.get('tag_tstamp', True))
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto')  # make the plots
+
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
     def get_timestamps(self):
         """
@@ -399,10 +412,13 @@ class BaseDataAnalysis(object):
         """
         pass
 
-    def save_figures(self, savedir: str = None,
-                     tag_tstamp: bool = True,
-                     fmt: str = 'png', key_list: list = 'auto',
-                     close_figs: bool = True):
+    def save_figures(
+        self,
+        savedir: str = None,
+        tag_tstamp: bool = True,
+        fmt: str = 'png', key_list: list = 'auto',
+        close_figs: bool = True
+    ):
         """
         Save figures self.figs attribute.
 
@@ -457,9 +473,11 @@ class BaseDataAnalysis(object):
             if close_figs:
                 plt.close(self.figs[key])
 
-    def save_data(self, savedir: str = None, savebase: str = None,
-                  tag_tstamp: bool = True,
-                  fmt: str = 'json', key_list='auto'):
+    def save_data(
+        self, savedir: str = None, savebase: str = None,
+        tag_tstamp: bool = True,
+        fmt: str = 'json', key_list='auto'
+    ):
         '''
         Saves the data from self.raw_data_dict to file.
 
@@ -568,9 +586,9 @@ class BaseDataAnalysis(object):
                 if fitting_type == 'model' and fit_dict.get('fit_guess', True):
                     fit_guess_fn = model.guess
 
-            if guess_pars is None: # if you pass on guess_pars, immediately go to the fitting
-                if fit_guess_fn is not None: # Run the guess funtions here
-                    if fitting_type is 'minimize':
+            if guess_pars is None:  # if you pass on guess_pars, immediately go to the fitting
+                if fit_guess_fn is not None:  # Run the guess funtions here
+                    if fitting_type == 'minimize':
                         guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
                         params = lmfit.Parameters()
                         for gd_key, val in guess_pars.items():
@@ -580,7 +598,7 @@ class BaseDataAnalysis(object):
 
                     # a fit function should return lmfit parameter objects
                     # but can also work by returning a dictionary of guesses
-                    elif fitting_type is 'model':
+                    elif fitting_type == 'model':
                         guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
                         if not isinstance(guess_pars, lmfit.Parameters):
                             for gd_key, val in list(guess_pars.items()):
@@ -591,32 +609,32 @@ class BaseDataAnalysis(object):
                         # additionally this can be used to overwrite values
                         # from the guess functions.
                         if guess_dict is not None:
-                             for gd_key, val in guess_dict.items():
-                                 for attr, attr_val in val.items():
-                                     # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
-                                     setattr(guess_pars[gd_key], attr, attr_val)
+                            for gd_key, val in guess_dict.items():
+                                for attr, attr_val in val.items():
+                                    # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
+                                    setattr(guess_pars[gd_key], attr, attr_val)
                 elif guess_dict is not None:
-                    if fitting_type is 'minimize':
+                    if fitting_type == 'minimize':
                         params = lmfit.Parameters()
                         for gd_key, val in list(guess_dict.items()):
                             params.add(gd_key)
                             for attr, attr_val in val.items():
                                 setattr(params[gd_key], attr, attr_val)
 
-                    elif fitting_type is 'model':
+                    elif fitting_type == 'model':
                         for gd_key, val in list(guess_dict.items()):
                             model.set_param_hint(gd_key, **val)
                         guess_pars = model.make_params()
             else:
-                if fitting_type is 'minimize':
+                if fitting_type == 'minimize':
                     raise NotImplementedError(
                         'Conversion from guess_pars to params with lmfit.Parameters() needs to be implemented')
                     # TODO: write a method that converts the type model.make_params() to a lmfit.Parameters() object
-            if fitting_type is 'model':  # Perform the fitting
+            if fitting_type == 'model':  # Perform the fitting
                 fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
                                                 params=guess_pars)
                 self.fit_res[key] = fit_dict['fit_res']
-            elif fitting_type is 'minimize':  # Perform the fitting
+            elif fitting_type == 'minimize':  # Perform the fitting
 
                 fit_dict['fit_res'] = lmfit.minimize(fcn=_complex_residual_function,
                                                      params=params,
@@ -643,7 +661,7 @@ class BaseDataAnalysis(object):
         if hasattr(self, 'fit_res') and self.fit_res is not None:
             # Find the file to save to
             fn = self.options_dict.get('analysis_result_file', False)
-            if fn == False:
+            if not fn:
                 fn = a_tools.measurement_filename(
                     a_tools.get_folder(self.timestamps[0]))
 
@@ -705,25 +723,29 @@ class BaseDataAnalysis(object):
             if self.verbose:
                 print('Saving quantities of interest to %s' % fn)
 
-            qoi = 'quantities_of_interest'
+            qoi_name = 'quantities_of_interest'
             # Save data to file
             with h5py.File(fn, 'a') as data_file:
-                try:
-                    analysis_group = data_file.create_group('Analysis')
-                except ValueError:
-                    # If the analysis group already exists, re-use it
-                    # (as not to overwrite previous/other fits)
-                    analysis_group = data_file['Analysis']
-                try:
+                a_key = 'Analysis'
+                if a_key not in data_file.keys():
+                    analysis_group = data_file.create_group(a_key)
+                else:
+                    analysis_group = data_file[a_key]
 
-                    qoi_group = analysis_group.create_group(qoi)
-                except ValueError:
-                    # Delete the old group and create a new group (overwrite).
-                    del analysis_group[qoi]
-                    qoi_group = analysis_group.create_group(qoi)
+                # [2020-07-11 Victor] some analysis can be called several
+                # times on the same datafile, e.g. single qubit RB,
+                # in that case the `qois_group` should not be overwritten!
+                # level = 0 => Overwrites the entire qois_group
+                # level = 1 => Overwrites only the entries in the `qois_group`
+                # present in the `qois_dict`
+                overwrite_qois = getattr(self, "overwrite_qois", True)
+                group_overwrite_level = 0 if overwrite_qois else 1
 
-                write_dict_to_hdf5(self.proc_data_dict['quantities_of_interest'],
-                                   entry_point=qoi_group)
+                qois_dict = {qoi_name: self.proc_data_dict['quantities_of_interest']}
+                write_dict_to_hdf5(
+                    qois_dict,
+                    entry_point=analysis_group,
+                    group_overwrite_level=group_overwrite_level)
 
     @staticmethod
     def _convert_dict_rec(obj):
@@ -749,10 +771,11 @@ class BaseDataAnalysis(object):
         for param_name in model.params:
             dic['params'][param_name] = {}
             param = model.params[param_name]
+            dic['params'][param_name]['value'] = getattr(param, 'value')
             for k in param.__dict__:
                 if not k.startswith('_') and k not in ['from_internal', ]:
                     dic['params'][param_name][k] = getattr(param, k)
-            dic['params'][param_name]['value'] = getattr(param, 'value')
+            
 
         return dic
 
@@ -929,6 +952,8 @@ class BaseDataAnalysis(object):
 
         # if a y or xerr is specified, used the errorbar-function
         plot_linekws = pdict.get('line_kws', {})
+        legend_kws = pdict.get('legend_kws', {})
+
         xerr = pdict.get('xerr', None)
         yerr = pdict.get('yerr', None)
         if xerr is not None or yerr is not None:
@@ -939,6 +964,7 @@ class BaseDataAnalysis(object):
                 plot_linekws['xerr'] = plot_linekws.get('xerr', xerr)
 
         pdict['line_kws'] = plot_linekws
+        pdict['legend_kws'] = legend_kws
 
         axs.set_aspect(pdict.get('aspect', 'auto'))
         pfunc = getattr(axs, pdict.get('func', 'plot'))
@@ -993,10 +1019,12 @@ class BaseDataAnalysis(object):
         else:
             if pdict.get('color', False):
                 plot_linekws['color'] = pdict.get('color')
-
+            # "setlabel": "NONE" allows to disable the label
             p_out = pfunc(plot_xvals, plot_yvals,
-                          linestyle=plot_linestyle, marker=plot_marker,
-                          label='%s%s' % (dataset_desc, dataset_label),
+                          linestyle=plot_linestyle,
+                          marker=plot_marker,
+                          label=(None if dataset_label == "NONE"
+                            else '%s%s' % (dataset_desc, dataset_label)),
                           **plot_linekws)
 
         if plot_xrange is None:
@@ -1020,7 +1048,7 @@ class BaseDataAnalysis(object):
             legend_ncol = pdict.get('legend_ncol', 1)
             legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol,**legend_kws)
 
         if self.tight_fig:
             axs.figure.tight_layout()
@@ -1334,6 +1362,11 @@ class BaseDataAnalysis(object):
         """
         Plots an lmfit fit result object using the plot_line function.
         """
+        if "ax_row" in pdict.keys() and "ax_col" in pdict.keys():
+            # This covers the case of being able to plot fits on
+            # specific subplot
+            axs = axs[pdict["ax_row"]][pdict["ax_col"]]
+
         if pdict['fit_res'] == {}:
             # This is an implicit way of indicating a failed fit.
             # We can probably do better by for example plotting the initial
@@ -1347,7 +1380,6 @@ class BaseDataAnalysis(object):
         plot_linestyle_init = pdict.get('init_linestyle', '--')
         plot_numpoints = pdict.get('num_points', 1000)
 
-
         if hasattr(pdict['fit_res'], 'model'):
             model = pdict['fit_res'].model
             if not (isinstance(model, lmfit.model.Model) or
@@ -1355,7 +1387,6 @@ class BaseDataAnalysis(object):
                 raise TypeError(
                     'The passed item in "fit_res" needs to be'
                     ' a fitting model, but is {}'.format(type(model)))
-
 
             if len(model.independent_vars) == 1:
                 independent_var = model.independent_vars[0]
@@ -1396,7 +1427,7 @@ class BaseDataAnalysis(object):
                 pdict['xvals'] = output_mod_fn_x(output)
 
         if plot_normed:
-            pdict['yvals'] = pdict['yvals']/pdict['yvals'][0]
+            pdict['yvals'] = pdict['yvals'] / pdict['yvals'][0]
 
         self.plot_line(pdict, axs)
 
@@ -1407,7 +1438,7 @@ class BaseDataAnalysis(object):
                 # The initial guess
                 pdict_init['yvals'] = model.eval(
                     **pdict_init['fit_res'].init_values,
-                    #This is probably a bug .init_values should be .init_params
+                    # This is probably a bug .init_values should be .init_params
                     # not changing as I cannot test it right now.
                     **{independent_var: pdict_init['xvals']})
             else:
@@ -1459,7 +1490,7 @@ class BaseDataAnalysis(object):
 
         axs.vlines(x, ymin, ymax, colors,
                    linestyles=linestyles, label=label, **pdict['line_kws'])
-        axs.legend()
+        # axs.legend()
 
     def plot_matplot_ax_method(self, pdict, axs):
         """

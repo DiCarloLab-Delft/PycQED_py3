@@ -22,6 +22,7 @@ class Test_ZI_HDAWG8(unittest.TestCase):
     def test_instantiation(self):
         self.assertEqual(Test_ZI_HDAWG8.hd.devname, 'dev8026')
 
+    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')
     def test_dynamic_waveform_upload(self):
         Test_ZI_HDAWG8.hd.system_clocks_referenceclock_source(1)
         Test_ZI_HDAWG8.hd.cfg_codeword_protocol('microwave')

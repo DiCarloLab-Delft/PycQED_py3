@@ -16,6 +16,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
 
+
 class Qubit(Instrument):
 
     """
@@ -315,8 +316,8 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
-    def find_resonators(self, start_freq=6.9e9, stop_freq=7.9e9, VNA_power=-40,
-                        bandwidth=200, timeout=200, f_step=250e3, with_VNA=None,
+    def find_resonators(self, start_freq=6.8e9, stop_freq=8e9, VNA_power=-40,
+                        bandwidth=200, timeout=200, f_step=1e6, with_VNA=None,
                         verbose=True):
         """
         Performs a wide range scan to find all resonator dips. Will use VNA if
@@ -342,10 +343,6 @@ class Qubit(Instrument):
         if with_VNA:
             raise NotImplementedError
         else:
-            self.ro_pulse_amp(0.08)
-            self.ro_pulse_amp_CW(0.06)
-            self.ro_acq_averages(2**10)
-            self.ro_soft_avg(1)
             freqs = np.arange(start_freq, stop_freq + f_step, f_step)
             self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
             result = ma2.sa.Initial_Resonator_Scan_Analysis()
@@ -430,8 +427,8 @@ class Qubit(Instrument):
 
         return True
 
-    def find_resonator_frequency_initial(self, start_freq=6.9e9, stop_freq=7.9e9,
-                                         npts=50001, use_min=False, MC=None,
+    def find_resonator_frequency_initial(self, start_freq=6.9e9, stop_freq=8.1e9,
+                                         npts=50001, use_min=True, MC=None,
                                          update=True, with_VNA=None,
                                          resonators=None, look_for_missing=True):
         """
@@ -561,7 +558,7 @@ class Qubit(Instrument):
         #                         res.freq = a.fit_results.params['f0'].value*1e9
         # return True
 
-    def measure_individual_resonators(self, with_VNA=False, use_min=False):
+    def measure_individual_resonators(self, with_VNA=False, use_min=True):
         """
         Specifically designed for use in automation, not recommended to use by
         hand!
@@ -580,8 +577,6 @@ class Qubit(Instrument):
             else:
                 old_avger=self.ro_acq_averages()
                 self.ro_acq_averages(2**14)
-                self.ro_pulse_amp(0.08)
-                self.ro_pulse_amp_CW(0.06)
                 freqs = np.arange(freq - 5e6, freq + 5e6, 50e3)
                 label = '_{:.3f}_{}'.format(str_freq, unit)
                 name = 'Resonator_scan' + self.msmt_suffix + label
@@ -654,10 +649,10 @@ class Qubit(Instrument):
             label = '_resonator_{}'.format(res.identifier)
             if res.type == 'test_resonator':
                 powers = np.linspace(-20, 0.1, 3)
-                f_step = 25e3
+                f_step = 100e3
             else:
-                powers = np.arange(-40, 0.1, 10)
-                f_step = 25e3
+                powers = np.arange(-60, 0.1, 5)
+                f_step = 100e3
 
             if with_VNA:
                 VNA = self.instr_VNA.get_instr()
@@ -985,10 +980,6 @@ class Qubit(Instrument):
             warnings.warn("Deprecation warning: rename f_res to freq_res")
             freq_res_par = self.f_res
             freq_RO_par = self.f_RO
-
-        old_avg = self.ro_acq_averages()
-        self.ro_acq_averages(2**14)
-
         if freqs is None:
             f_center = freq_res_par()
             if f_center is None:
@@ -998,8 +989,6 @@ class Qubit(Instrument):
             freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
         self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
         a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-
-        self.ro_acq_averages(old_avg)
 
         if use_min:
             f_res = a.min_frequency
@@ -1013,7 +1002,7 @@ class Qubit(Instrument):
         return f_res
 
     def find_frequency(self, method='spectroscopy', spec_mode='pulsed_marked',
-                       steps=[1, 3, 10, 30, 100, 300, 1000],
+                       steps=[1, 3, 10, 30, 100],
                        artificial_periods=4,
                        freqs=None,
                        f_span=100e6,
@@ -1116,7 +1105,7 @@ class Qubit(Instrument):
                 close_fig=close_fig)
         return analysis_spec.fitted_freq
 
-    def calibrate_spec_pow(self, freqs=None, start_power=-35, power_step = 5,
+    def calibrate_spec_pow(self, freqs=None, start_power=-55, power_step = 5,
                            threshold=0.5, verbose=True):
         """
         Finds the optimal spectroscopy power for qubit spectroscopy (not pulsed)
@@ -1259,11 +1248,9 @@ class Qubit(Instrument):
             stepsize (float):
                 smalles stepsize in ns for which to run ramsey experiments.
         """
-
-        self.ro_acq_averages(2**10)
         cur_freq = self.freq_qubit()
         # Steps don't double to be more robust against aliasing
-        for n in steps:
+        for i,n in enumerate(steps):
             times = np.arange(self.mw_gauss_width()*4,
                               50*n*stepsize, n*stepsize)
             artificial_detuning = artificial_periods/times[-1]
@@ -1271,7 +1258,8 @@ class Qubit(Instrument):
                                 artificial_detuning=artificial_detuning,
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
-                                analyze=False)
+                                analyze=False,
+                                prepare_for_timedomain=True if 0 == i else False)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,

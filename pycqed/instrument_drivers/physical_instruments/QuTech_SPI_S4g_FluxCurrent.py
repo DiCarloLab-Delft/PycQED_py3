@@ -90,13 +90,16 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
         self.current_sources[mod_id].set_current(dac, value)
 
     def print_overview(self):
-        msg = '{0:16}{1:4}\t{2:4}\t   {3:.4} \n'.format(
-            'Name', 'Module', 'Channel', 'I')
-        for ch_name, ch_map in self.channel_map.items():
+        msg = '{0:8}\t{1:4}\t{2:4}\t{3:<8}\n'.format(
+                    'Name', 'Module', 'Channel', '   Current')
+
+        # print overview sorted by channel names
+        for ch_name, ch_map in sorted(self.channel_map.items()):
             I = self.get(ch_name)
             scale_fac, unit = SI_prefix_and_scale_factor(I, 'A')
-            msg += '{0:16}{1:4}\t{2:4}\t{3:.4} {4:4}\n'.format(
-                ch_name, ch_map[0], ch_map[1], scale_fac*I, unit)
+            msg += '{0:8}\t{1:4}\t{2:4}\t{3:>8.2f} {4:4}\n'.format(
+                       ch_name, ch_map[0], ch_map[1], scale_fac*I, unit)
+        
         print(msg)
 
     def set_dacs_zero(self):

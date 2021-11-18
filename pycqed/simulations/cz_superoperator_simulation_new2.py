@@ -1,6 +1,6 @@
+import adaptive
 from pycqed.measurement import measurement_control as mc
 
-import adaptive
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
 
@@ -176,7 +176,7 @@ def compute_propagator(arglist):
     fluxlutman_static = arglist['fluxlutman_static']
     sim_control_CZ = arglist['sim_control_CZ']
     which_gate = sim_control_CZ.which_gate()
-    gates_num = sim_control_CZ.gates_num()  # repeat the same gate this number of times
+    gates_num = int(sim_control_CZ.gates_num())  # repeat the same gate this number of times
     gates_interval = sim_control_CZ.gates_interval()  # idle time between repeated gates
 
     q_J2 = fluxlutman.get('q_J2_{}'.format(which_gate))
@@ -208,7 +208,7 @@ def compute_propagator(arglist):
             sampling_rate=fluxlutman.sampling_rate())    # return in terms of theta
         epsilon = wfl.theta_to_eps(thetawave, q_J2)
         amp = fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02', which_gate=which_gate)
-                 # transform detuning frequency to (positive) amplitude
+        # transform detuning frequency to (positive) amplitude
     else:
         amp = get_f_pulse_double_sided(fluxlutman,theta_i, which_gate=which_gate)
 
@@ -227,7 +227,7 @@ def compute_propagator(arglist):
     amp_interp=interp1d(tlist_temp,amp_temp)
     amp=amp_interp(tlist_new)
 
-    if czd_double_sided and sim_control_CZ.waiting_at_sweetspot()!=0:
+    if czd_double_sided and sim_control_CZ.waiting_at_sweetspot() > 0:
         tlist_new, amp = czf.add_waiting_at_sweetspot(tlist_new,amp, sim_control_CZ.waiting_at_sweetspot())
 
     # Apply voltage scaling
@@ -254,17 +254,17 @@ def compute_propagator(arglist):
     intervals_list = np.zeros(np.size(tlist_new)) + sim_step_new
 
     # We add the single qubit rotations at the end of the pulse
-    if sim_control_CZ.Z_rotations_length() != 0:
+    if sim_control_CZ.Z_rotations_length() > sim_step_new:
         actual_Z_rotations_length = np.arange(0, sim_control_CZ.Z_rotations_length(), sim_step_new)[-1] + sim_step_new
-        intervals_list = np.append(intervals_list,[actual_Z_rotations_length/2,actual_Z_rotations_length/2])
-        amp_Z_rotation=[0,0]
+        intervals_list = np.append(intervals_list, [sim_step_new, actual_Z_rotations_length - sim_step_new])
+        amp_Z_rotation = [0, 0]
         if sim_control_CZ.sigma_q0() != 0:
             amp_Z_rotation = czf.shift_due_to_fluxbias_q0(fluxlutman=fluxlutman,amp_final=amp_Z_rotation,fluxbias_q0=fluxbias_q0,sim_control_CZ=sim_control_CZ, which_gate=which_gate)
 
     # We add the idle time at the end of the pulse (even if it's not at the end. It doesn't matter)
-    if sim_control_CZ.total_idle_time() != 0:
-        actual_total_idle_time = np.arange(0,sim_control_CZ.total_idle_time(),sim_step_new)[-1]+sim_step_new
-        intervals_list = np.append(intervals_list,[actual_total_idle_time/2,actual_total_idle_time/2])
+    if sim_control_CZ.total_idle_time() > sim_step_new:
+        actual_total_idle_time = np.arange(0, sim_control_CZ.total_idle_time(), sim_step_new)[-1] + sim_step_new
+        intervals_list = np.append(intervals_list, [sim_step_new, actual_total_idle_time - sim_step_new])
         amp_idle_time = [0, 0]
         # idle time is single-sided so we save the czd_double_sided value, set it to False
         # and later restore it to the original value
@@ -278,10 +278,10 @@ def compute_propagator(arglist):
 
     # We concatenate amp and f_pulse with the values they take during the Zrotations and idle_x
     # It comes after the previous line because of details of the function czf.shift_due_to_fluxbias_q0
-    if sim_control_CZ.Z_rotations_length() != 0:
-        amp_final=np.concatenate((amp_final,amp_Z_rotation))
-    if sim_control_CZ.total_idle_time() != 0:
-        amp_final=np.concatenate((amp_final,amp_idle_time))
+    if sim_control_CZ.Z_rotations_length() > sim_step_new:
+        amp_final = np.concatenate((amp_final, amp_Z_rotation))
+    if sim_control_CZ.total_idle_time() > sim_step_new:
+        amp_final = np.concatenate((amp_final, amp_idle_time))
 
     # czf.plot(x_plot_vec=[np.arange(0,np.size(intervals_list))],y_plot_vec=[amp_final],
     #                          title='Pulse with (possibly) single qubit rotations and idle time',
@@ -300,25 +300,34 @@ def compute_propagator(arglist):
     #         amp_final = np.append(amp_final, amp_append)
 
     if gates_num > 1:
-        # This is intended to make the simulation faster by skipping
-        # all the amp = 0 steps, verified to encrease sim speed
-        # 4.7s/data point -> 4.0s/data point
-        # Errors in simulation outcomes are < 1e-10
+        if gates_interval > 0:
+            # This is intended to make the simulation faster by skipping
+            # all the amp = 0 steps, verified to encrease sim speed
+            # 4.7s/data point -> 4.0s/data point
+            # Errors in simulation outcomes are < 1e-10
+            actual_gates_interval = np.arange(0, gates_interval, sim_step_new)[-1] + sim_step_new
 
-        actual_gates_interval = np.arange(0, gates_interval, sim_step_new)[-1] + sim_step_new
-
-        # We add an extra small step to ensure the amp signal goes to
-        # zero first
-        interval_append = np.concatenate(([sim_step_new, actual_gates_interval - sim_step_new], intervals_list))
-        amp_append = np.concatenate(([0, 0], amp_final))
+            # We add an extra small step to ensure the amp signal goes to
+            # zero first
+            interval_append = np.concatenate(([sim_step_new, actual_gates_interval - sim_step_new], intervals_list))
+            amp_append = np.concatenate(([0, 0], amp_final))
+        else:
+            interval_append = intervals_list
+            amp_append = amp_final
 
         # Append arbitrary number of same gate
         for gate in range(gates_num - 1):
             amp_final = np.append(amp_final, amp_append)
             intervals_list = np.append(intervals_list, interval_append)
 
-    t_final = np.sum(intervals_list)        # actual overall gate length
+    # print('l_3={}\nl_2={}\ntheta_f={}'.format(fluxlutman.cz_lambda_3(), fluxlutman.cz_lambda_2(). fluxlutman.cz_theta_f_))
+    # print('np.array={}'.format(intervals_list))
+    # print('np.array={}'.format(amp_final))
+    # np.savez('l3={}'.format(fluxlutman.get('cz_lambda_3_{}'.format(which_gate))), x=intervals_list, y=amp_final)
+    # plt.plot(np.cumsum(intervals_list), amp_final)
+    # plt.show()
 
+    t_final = np.sum(intervals_list)        # actual overall gate length
 
     # Obtain jump operators for Lindblad equation
     c_ops = czf.return_jump_operators(sim_control_CZ=sim_control_CZ, amp_final=amp_final, fluxlutman=fluxlutman, which_gate=which_gate)
@@ -487,8 +496,26 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             t_final_vec = []
             for input_arglist in input_to_parallelize:
                 result_list = compute_propagator(input_arglist)
-                U_final_vec.append(result_list[0])
-                t_final_vec.append(result_list[1])
+                if self.sim_control_CZ.double_cz_pi_pulses() != '':
+                    # Experimenting with single qubit ideal pi pulses
+                    if self.sim_control_CZ.double_cz_pi_pulses() == 'with_pi_pulses':
+                        pi_single_qubit = qtp.Qobj([[0, 1, 0],
+                                                    [1, 0, 0],
+                                                    [0, 0, 1]])
+                        # pi_pulse = qtp.tensor(pi_single_qubit, qtp.qeye(n_levels_q0))
+                        pi_op = qtp.tensor(pi_single_qubit, pi_single_qubit)
+                        # pi_super_op = qtp.to_super(pi_op)
+                        U_final = result_list[0]
+                        U_final = pi_op * U_final * pi_op * U_final
+                    elif self.sim_control_CZ.double_cz_pi_pulses() == 'no_pi_pulses':
+                        U_final = result_list[0]
+                        U_final = U_final * U_final
+                    t_final = 2 * result_list[1]
+                else:
+                    U_final = result_list[0]
+                    t_final = result_list[1]
+                U_final_vec.append(U_final)
+                t_final_vec.append(t_final)
 
             t_final = t_final_vec[0]  # equal for all entries, we need it to compute phases in the rotating frame
             # needed to compute phases in the rotating frame, not used anymore
@@ -504,7 +531,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             U_superop_average = sum(U_final_vec)              # computing resulting average propagator
             # print(czf.verify_CPTP(U_superop_average))
 
-            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average,t_final=t_final,fluxlutman=self.fluxlutman, fluxlutman_static=self.fluxlutman_static, which_gate=self.sim_control_CZ.which_gate())
+            qoi = czf.simulate_quantities_of_interest_superoperator_new(U=U_superop_average, t_final=t_final, fluxlutman=self.fluxlutman, fluxlutman_static=self.fluxlutman_static, which_gate=self.sim_control_CZ.which_gate())
 
             # if we look only for the minimum avgatefid_pc in the heat maps,
             # then we optimize the search via higher-order cost function

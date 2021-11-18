@@ -1,10 +1,11 @@
 from .base_lutman import Base_LutMan, get_redundant_codewords, get_wf_idx_from_name
 import numpy as np
-from collections import Iterable, OrderedDict
+from collections.abc import Iterable
+from collections import OrderedDict
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
-
+import time
 
 default_mw_lutmap = {
     0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
@@ -18,10 +19,149 @@ default_mw_lutmap = {
     8  : {"name" : "spec"  , "type"  : "spec"}  ,
     9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0 , "type" : "ef"},
     10 : {"name" : "square", "type"  : "square"},
-
+    11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90, "type" : "ge"},
+    12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
+    13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
+    14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
+    30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
+    60 : {"name" : "phaseCorrNW" , "type" : "phase"},
+    61 : {"name" : "phaseCorrNE" , "type" : "phase"},
+    62 : {"name" : "phaseCorrSW" , "type" : "phase"},
+    63 : {"name" : "phaseCorrSE" , "type" : "phase"},
 }
 
-valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square'}
+inspire_mw_lutmap = {
+    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0  , "type" : "ge"}, # I for CW compatibility
+    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0  , "type" : "ge"}, # rX180 for CW compatibility
+    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90 , "type" : "ge"}, # rY180 for CW compatibility
+    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0  , "type" : "ge"}, # rX90 for CW compatibility
+    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90 , "type" : "ge"}, # rY90 for CW compatibility
+    5  : {"name" : "rX270" , "theta" : 270      , "phi" : 0  , "type" : "ge"}, # rXm90 for CW compatibility
+    6  : {"name" : "rY270" , "theta" : 270      , "phi" : 90 , "type" : "ge"}, # rYm90 for CW compatibility
+    7  : {"name" : "rX5"   , "theta" : 5.625    , "phi" : 0  , "type" : "ge"},
+    8  : {"name" : "rX11"  , "theta" : 11.25    , "phi" : 0  , "type" : "ge"},
+    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0  , "type" : "ef"}, # rX12 for CW compatibility
+    10 : {"name" : "rX16"  , "theta" : 16.875   , "phi" : 0  , "type" : "ge"},
+    11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90 , "type" : "ge"}, # rY45 for CW compatibility
+    12 : {"name" : "rY315" , "theta" : -45      , "phi" : 90 , "type" : "ge"}, # rYm45 for CW compatibility
+    13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0  , "type" : "ge"}, # rX45 for CW compatibility
+    14 : {"name" : "rX315" , "theta" : -45      , "phi" : 0  , "type" : "ge"}, # rXm45 for CW compatibility
+    15 : {"name" : "rX22"  , "theta" : 22.5     , "phi" : 0  , "type" : "ge"},
+    16 : {"name" : "rX28"  , "theta" : 28.125   , "phi" : 0  , "type" : "ge"},
+    17 : {"name" : "rX33"  , "theta" : 33.75    , "phi" : 0  , "type" : "ge"},
+    18 : {"name" : "rX39"  , "theta" : 39.375   , "phi" : 0  , "type" : "ge"},
+    19 : {"name" : "rX50"  , "theta" : 50.625   , "phi" : 0  , "type" : "ge"},
+    20 : {"name" : "rX56"  , "theta" : 56.25    , "phi" : 0  , "type" : "ge"},
+    21 : {"name" : "rX61"  , "theta" : 61.875   , "phi" : 0  , "type" : "ge"},
+    22 : {"name" : "rX67"  , "theta" : 67.5     , "phi" : 0  , "type" : "ge"},
+    23 : {"name" : "rX73"  , "theta" : 73.125   , "phi" : 0  , "type" : "ge"},
+    24 : {"name" : "rX78"  , "theta" : 78.75    , "phi" : 0  , "type" : "ge"},
+    25 : {"name" : "rX84"  , "theta" : 84.375   , "phi" : 0  , "type" : "ge"},
+    26 : {"name" : "rX95"  , "theta" : 95.625   , "phi" : 0  , "type" : "ge"},
+    27 : {"name" : "rX101" , "theta" : 101.25   , "phi" : 0  , "type" : "ge"},
+    28 : {"name" : "rX106" , "theta" : 106.875  , "phi" : 0  , "type" : "ge"},
+    29 : {"name" : "rX112" , "theta" : 112.5    , "phi" : 0  , "type" : "ge"},
+    30 : {"name" : "rX118" , "theta" : 118.125  , "phi" : 0  , "type" : "ge"},
+    31 : {"name" : "rX123" , "theta" : 123.75   , "phi" : 0  , "type" : "ge"},
+    32 : {"name" : "rX129" , "theta" : 129.375  , "phi" : 0  , "type" : "ge"},
+    33 : {"name" : "rX135" , "theta" : 135      , "phi" : 0  , "type" : "ge"},
+    34 : {"name" : "rX140" , "theta" : 140.625  , "phi" : 0  , "type" : "ge"},
+    35 : {"name" : "rX146" , "theta" : 146.25   , "phi" : 0  , "type" : "ge"},
+    36 : {"name" : "rX151" , "theta" : 151.875  , "phi" : 0  , "type" : "ge"},
+    37 : {"name" : "rX157" , "theta" : 157.5    , "phi" : 0  , "type" : "ge"},
+    38 : {"name" : "rX163" , "theta" : 163.125  , "phi" : 0  , "type" : "ge"},
+    39 : {"name" : "rX168" , "theta" : 168.75   , "phi" : 0  , "type" : "ge"},
+    40 : {"name" : "rX174" , "theta" : 174.375  , "phi" : 0  , "type" : "ge"},
+    41 : {"name" : "rX185" , "theta" : -174.375 , "phi" : 0  , "type" : "ge"},
+    42 : {"name" : "rX191" , "theta" : -168.75  , "phi" : 0  , "type" : "ge"},
+    43 : {"name" : "rX196" , "theta" : -163.125 , "phi" : 0  , "type" : "ge"},
+    44 : {"name" : "rX202" , "theta" : -157.5   , "phi" : 0  , "type" : "ge"},
+    45 : {"name" : "rX208" , "theta" : -151.875 , "phi" : 0  , "type" : "ge"},
+    46 : {"name" : "rX213" , "theta" : -146.25  , "phi" : 0  , "type" : "ge"},
+    47 : {"name" : "rX219" , "theta" : -140.625 , "phi" : 0  , "type" : "ge"},
+    48 : {"name" : "rX225" , "theta" : -135     , "phi" : 0  , "type" : "ge"},
+    49 : {"name" : "rX230" , "theta" : -129.375 , "phi" : 0  , "type" : "ge"},
+    50 : {"name" : "rX236" , "theta" : -123.75  , "phi" : 0  , "type" : "ge"},
+    51 : {"name" : "rX241" , "theta" : -118.125 , "phi" : 0  , "type" : "ge"},
+    52 : {"name" : "rX247" , "theta" : -112.5   , "phi" : 0  , "type" : "ge"},
+    53 : {"name" : "rX253" , "theta" : -106.875 , "phi" : 0  , "type" : "ge"},
+    54 : {"name" : "rX258" , "theta" : -101.25  , "phi" : 0  , "type" : "ge"},
+    55 : {"name" : "rX264" , "theta" : -95.625  , "phi" : 0  , "type" : "ge"},
+    56 : {"name" : "rX275" , "theta" : -84.375  , "phi" : 0  , "type" : "ge"},
+    57 : {"name" : "rX281" , "theta" : -78.75   , "phi" : 0  , "type" : "ge"},
+    58 : {"name" : "rX286" , "theta" : -73.125  , "phi" : 0  , "type" : "ge"},
+    59 : {"name" : "rX292" , "theta" : -67.5    , "phi" : 0  , "type" : "ge"},
+    60 : {"name" : "rX298" , "theta" : -61.875  , "phi" : 0  , "type" : "ge"},
+    61 : {"name" : "rX303" , "theta" : -56.25   , "phi" : 0  , "type" : "ge"},
+    62 : {"name" : "rX309" , "theta" : -50.625  , "phi" : 0  , "type" : "ge"},
+    63 : {"name" : "rX320" , "theta" : -39.375  , "phi" : 0  , "type" : "ge"},
+    64 : {"name" : "rX326" , "theta" : -33.75   , "phi" : 0  , "type" : "ge"},
+    65 : {"name" : "rX331" , "theta" : -28.125  , "phi" : 0  , "type" : "ge"},
+    66 : {"name" : "rX337" , "theta" : -22.5    , "phi" : 0  , "type" : "ge"},
+    67 : {"name" : "rX343" , "theta" : -16.875  , "phi" : 0  , "type" : "ge"},
+    68 : {"name" : "rX348" , "theta" : -11.25   , "phi" : 0  , "type" : "ge"},
+    69 : {"name" : "rX354" , "theta" : -5.625   , "phi" : 0  , "type" : "ge"},
+    70 : {"name" : "rY5"   , "theta" : 5.625    , "phi" : 90 , "type" : "ge"},
+    71 : {"name" : "rY11"  , "theta" : 11.25    , "phi" : 90 , "type" : "ge"},
+    72 : {"name" : "rY16"  , "theta" : 16.875   , "phi" : 90 , "type" : "ge"},
+    73 : {"name" : "rY22"  , "theta" : 22.5     , "phi" : 90 , "type" : "ge"},
+    74 : {"name" : "rY28"  , "theta" : 28.125   , "phi" : 90 , "type" : "ge"},
+    75 : {"name" : "rY33"  , "theta" : 33.75    , "phi" : 90 , "type" : "ge"},
+    76 : {"name" : "rY39"  , "theta" : 39.375   , "phi" : 90 , "type" : "ge"},
+    77 : {"name" : "rY50"  , "theta" : 50.625   , "phi" : 90 , "type" : "ge"},
+    78 : {"name" : "rY56"  , "theta" : 56.25    , "phi" : 90 , "type" : "ge"},
+    79 : {"name" : "rY61"  , "theta" : 61.875   , "phi" : 90 , "type" : "ge"},
+    80 : {"name" : "rY67"  , "theta" : 67.5     , "phi" : 90 , "type" : "ge"},
+    81 : {"name" : "rY73"  , "theta" : 73.125   , "phi" : 90 , "type" : "ge"},
+    82 : {"name" : "rY78"  , "theta" : 78.75    , "phi" : 90 , "type" : "ge"},
+    83 : {"name" : "rY84"  , "theta" : 84.375   , "phi" : 90 , "type" : "ge"},
+    84 : {"name" : "rY95"  , "theta" : 95.625   , "phi" : 90 , "type" : "ge"},
+    85 : {"name" : "rY101" , "theta" : 101.25   , "phi" : 90 , "type" : "ge"},
+    86 : {"name" : "rY106" , "theta" : 106.875  , "phi" : 90 , "type" : "ge"},
+    87 : {"name" : "rY112" , "theta" : 112.5    , "phi" : 90 , "type" : "ge"},
+    88 : {"name" : "rY118" , "theta" : 118.125  , "phi" : 90 , "type" : "ge"},
+    89 : {"name" : "rY123" , "theta" : 123.75   , "phi" : 90 , "type" : "ge"},
+    90 : {"name" : "rY129" , "theta" : 129.375  , "phi" : 90 , "type" : "ge"},
+    91 : {"name" : "rY135" , "theta" : 135      , "phi" : 90 , "type" : "ge"},
+    92 : {"name" : "rY140" , "theta" : 140.625  , "phi" : 90 , "type" : "ge"},
+    93 : {"name" : "rY146" , "theta" : 146.25   , "phi" : 90 , "type" : "ge"},
+    94 : {"name" : "rY151" , "theta" : 151.875  , "phi" : 90 , "type" : "ge"},
+    95 : {"name" : "rY157" , "theta" : 157.5    , "phi" : 90 , "type" : "ge"},
+    96 : {"name" : "rY163" , "theta" : 163.125  , "phi" : 90 , "type" : "ge"},
+    97 : {"name" : "rY168" , "theta" : 168.75   , "phi" : 90 , "type" : "ge"},
+    98 : {"name" : "rY174" , "theta" : 174.375  , "phi" : 90 , "type" : "ge"},
+    99 : {"name" : "rY185" , "theta" : -174.375 , "phi" : 90 , "type" : "ge"},
+    100: {"name" : "rY191" , "theta" : -168.75  , "phi" : 90 , "type" : "ge"},
+    101: {"name" : "rY196" , "theta" : -163.125 , "phi" : 90 , "type" : "ge"},
+    102: {"name" : "rY202" , "theta" : -157.5   , "phi" : 90 , "type" : "ge"},
+    103: {"name" : "rY208" , "theta" : -151.875 , "phi" : 90 , "type" : "ge"},
+    104: {"name" : "rY213" , "theta" : -146.25  , "phi" : 90 , "type" : "ge"},
+    105: {"name" : "rY219" , "theta" : -140.625 , "phi" : 90 , "type" : "ge"},
+    106: {"name" : "rY225" , "theta" : -135     , "phi" : 90 , "type" : "ge"},
+    107: {"name" : "rY230" , "theta" : -129.375 , "phi" : 90 , "type" : "ge"},
+    108: {"name" : "rY236" , "theta" : -123.75  , "phi" : 90 , "type" : "ge"},
+    109: {"name" : "rY241" , "theta" : -118.125 , "phi" : 90 , "type" : "ge"},
+    110: {"name" : "rY247" , "theta" : -112.5   , "phi" : 90 , "type" : "ge"},
+    111: {"name" : "rY253" , "theta" : -106.875 , "phi" : 90 , "type" : "ge"},
+    112: {"name" : "rY258" , "theta" : -101.25  , "phi" : 90 , "type" : "ge"},
+    113: {"name" : "rY264" , "theta" : -95.625  , "phi" : 90 , "type" : "ge"},
+    114: {"name" : "rY275" , "theta" : -84.375  , "phi" : 90 , "type" : "ge"},
+    115: {"name" : "rY281" , "theta" : -78.75   , "phi" : 90 , "type" : "ge"},
+    116: {"name" : "rY286" , "theta" : -73.125  , "phi" : 90 , "type" : "ge"},
+    117: {"name" : "rY292" , "theta" : -67.5    , "phi" : 90 , "type" : "ge"},
+    118: {"name" : "rY298" , "theta" : -61.875  , "phi" : 90 , "type" : "ge"},
+    119: {"name" : "rY303" , "theta" : -56.25   , "phi" : 90 , "type" : "ge"},
+    120: {"name" : "rY309" , "theta" : -50.625  , "phi" : 90 , "type" : "ge"},
+    121: {"name" : "rY320" , "theta" : -39.375  , "phi" : 90 , "type" : "ge"},
+    122: {"name" : "rY326" , "theta" : -33.75   , "phi" : 90 , "type" : "ge"},
+    123: {"name" : "rY331" , "theta" : -28.125  , "phi" : 90 , "type" : "ge"},
+    124: {"name" : "rY337" , "theta" : -22.5    , "phi" : 90 , "type" : "ge"},
+    125: {"name" : "rY343" , "theta" : -16.875  , "phi" : 90 , "type" : "ge"},
+    126: {"name" : "rY348" , "theta" : -11.25   , "phi" : 90 , "type" : "ge"},
+    127: {"name" : "rY354" , "theta" : -5.625   , "phi" : 90 , "type" : "ge"}
+}
+
+valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square', 'phase'}
 
 # _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
 #            'rXm90',  'rYm90', 'rPhi90', 'spec']
@@ -87,6 +227,10 @@ class Base_MW_LutMan(Base_LutMan):
         """Set the default lutmap for standard microwave drive pulses."""
         self.LutMap(default_mw_lutmap.copy())
 
+    def set_inspire_lutmap(self):
+        """Set the default lutmap for expanded microwave drive pulses."""
+        self.LutMap(inspire_mw_lutmap.copy())
+
     def codeword_idx_to_parnames(self, cw_idx: int):
         """Convert a codeword_idx to a list of par names for the waveform."""
         # the possible channels way of doing this is to make it work both for
@@ -110,7 +254,7 @@ class Base_MW_LutMan(Base_LutMan):
                            parameter_class=ManualParameter)
         self.add_parameter('mw_amp180', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
-                           initial_value=0.1)
+                           initial_value=1.0)
         self.add_parameter('mw_amp90_scale',
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
@@ -135,6 +279,14 @@ class Base_MW_LutMan(Base_LutMan):
                            vals=vals.Numbers(), unit='frac',
                            parameter_class=ManualParameter,
                            initial_value=1)
+        # parameters related to timings
+        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 1e-6),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        # square pulse duratio for larger pulses
+        self.add_parameter('sq_pulse_duration', unit='s', vals=vals.Numbers(0, 1e-6),
+                           parameter_class=ManualParameter,
+                           initial_value=40e-9)
 
         self.add_parameter(
             'mw_modulation', vals=vals.Numbers(), unit='Hz',
@@ -188,15 +340,21 @@ class Base_MW_LutMan(Base_LutMan):
         # lutmap is expected to obey lutmap mw schema
         for idx, waveform in self.LutMap().items():
             if waveform['type'] == 'ge':
-                amp = theta_to_amp(theta=waveform['theta'],
-                                   amp180=self.mw_amp180())
+                if waveform['theta'] == 90:
+                    amp = self.mw_amp180()*self.mw_amp90_scale()
+                elif waveform['theta'] == -90:
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
+                else:
+                    amp = theta_to_amp(theta=waveform['theta'],
+                                       amp180=self.mw_amp180())
                 self._wave_dict[idx] = self.wf_func(
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
                     f_modulation=f_modulation,
                     sampling_rate=self.sampling_rate(),
-                    motzoi=self.mw_motzoi())
+                    motzoi=self.mw_motzoi(),
+                    delay=self.pulse_delay())
             elif waveform['type'] == 'ef':
                 amp = theta_to_amp(theta=waveform['theta'],
                                    amp180=self.mw_ef_amp180())
@@ -206,7 +364,8 @@ class Base_MW_LutMan(Base_LutMan):
                     sigma_length=self.mw_gauss_width(),
                     f_modulation=self.mw_ef_modulation(),
                     sampling_rate=self.sampling_rate(),
-                    motzoi=0)
+                    motzoi=0,
+                    delay=self.pulse_delay())
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
                     **waveform["drag_pars"])
@@ -225,17 +384,21 @@ class Base_MW_LutMan(Base_LutMan):
                 # Apperently the VSM LutMan has both parameters, so make sure
                 # we detect on the one only available in the VSM. Otherwise, we
                 # won't get the needed four waveforms.
+                if 'duration' in waveform.keys():
+                    sq_pulse_duration = waveform['duration']
+                else:
+                    sq_pulse_duration = self.sq_pulse_duration()
                 if 'sq_G_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square_VSM(
                         amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
-                        length=self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation(),
+                        length=sq_pulse_duration,#self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
                         sampling_rate=self.sampling_rate())
                 elif 'sq_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square(
-                        amp=self.sq_amp(), length=self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation(),  phase=0,
-                        motzoi=0, sampling_rate=self.sampling_rate())
+                        amp=self.sq_amp(), length=sq_pulse_duration,
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
             else:
@@ -243,7 +406,7 @@ class Base_MW_LutMan(Base_LutMan):
 
         # Add predistortions + test
         if (self.mixer_apply_predistortion_matrix()
-                and apply_predistortion_matrix):
+                and apply_predistortion_matrix and self.cfg_sideband_mode != 'real-time'):
             self._wave_dict = self.apply_mixer_predistortion_corrections(
                 self._wave_dict)
         return self._wave_dict
@@ -284,6 +447,39 @@ class Base_MW_LutMan(Base_LutMan):
         for i, (phase) in enumerate(phases):
             lm[i+9] = {"name": "rPhi90",    "theta": 90,
                        "phi": phase, "type": "ge"}
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+    def load_x_pulses_to_AWG_lookuptable(self,
+                                             phases=np.arange(0, 360, 20)):
+        """
+        Loads rPhi90 pulses onto the AWG lookuptable.
+        """
+
+        if (len(phases) > 18):
+            raise ValueError('max 18 amplitude values can be provided')
+        lm = self.LutMap()
+        for i, (phase) in enumerate(phases):
+            lm[i+9] = {"name": "rPhi90",    "theta": phase,
+                       "phi": 0, "type": "ge"}
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+    def load_square_waves_to_AWG_lookuptable(self):
+        """
+        Loads square pulses onto the AWG lookuptable.
+        """
+
+        self.set_default_lutmap()
+        lm = self.LutMap()
+        lm[10] = {"name": "square",
+                    "type": "square",
+                    "duration": 1e-6}
+        lm[11] = {"name": "cw_11",
+                    "type": "square"}
+        for i in range(12,21):
+            div = i-12
+            lm[i] = {"name": "cw_{}".format(i),
+                        "type": "square",
+                        "duration": 40e-9*(i-11)/10}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
@@ -458,6 +654,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         self._num_channels = 8
         super().__init__(name, **kw)
         self.sampling_rate(2.4e9)
+        self._add_phase_correction_parameters()
 
     def _add_channel_params(self):
         super()._add_channel_params()
@@ -467,7 +664,14 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             docstring=('using the channel amp as additional'
                        'parameter to allow rabi-type experiments without'
                        'wave reloading. Should not be using VSM'))
+        self.add_parameter(
+            'channel_range', unit='V', vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
+            set_cmd=self._set_channel_range, get_cmd=self._get_channel_range,
+            docstring=('defines the channel range for the AWG sequencer output'))
 
+        # Setting variable to track channel amplitude since it cannot be directly extracted from
+        # HDAWG while using real-time modulation (because of mixer amplitude imbalance corrections)
+        self.channel_amp_value = 0
 
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
@@ -476,22 +680,135 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0.5)
 
+    def _add_phase_correction_parameters(self):
+        # corrections for phases that the qubit can acquire during one of its CZ gates
+        for gate in ['NW','NE','SW','SE']:
+            self.add_parameter(
+                name=f'vcz_virtual_q_ph_corr_{gate}',
+                parameter_class=ManualParameter, 
+                unit='deg', 
+                vals=vals.Numbers(-360, 360),
+                initial_value=0.0,
+                docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
+                            "Will be applied as increment to sine generator phases via command table."
+            )
+
+        # corrections for phases that the qubit can acquire during parking as spectator of a CZ gate.
+        # this can happen in general for each of its neighbouring qubits (below: 'direction'), 
+        # while it is doing a gate in each possible direction (below: 'gate')
+        # for direction in ['NW','NE','SW','SE']:
+        #     for gate in ['NW','NE','SW','SE']:
+        #         self.add_parameter(
+        #             name=f'vcz_virtual_q_ph_corr_spec_{direction}_gate_{gate}',
+        #             parameter_class=ManualParameter, 
+        #             unit='deg', 
+        #             vals=vals.Numbers(0, 360),
+        #             initial_value=0.0,
+        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, " 
+        #                       f"that is doing a gate in direction {gate}."
+        #                         "Will be applied as increment to sine generator phases via command table."
+        #         )
+
+        # corrections for phases that the qubit can acquire during parking as part of a flux-dance step
+        # there are 8 flux-dance steps for the S17 scheme.
+        # NOTE: this correction must not be the same as the above one for the case of a spectator 
+        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates 
+        # for step in np.arange(1,9):
+        #     self.add_parameter(
+        #         name=f'vcz_virtual_q_ph_corr_step_{step}',
+        #         parameter_class=ManualParameter, 
+        #         unit='deg', 
+        #         vals=vals.Numbers(0, 360),
+        #         initial_value=0.0,
+        #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
+        #                     "Will be applied as increment to sine generator phases via command table."
+        #     )
+
+
+    def _set_channel_range(self, val):
+        awg_nr = (self.channel_I()-1)//2
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+        AWG = self.AWG.get_instr()
+        if val == 0.8:
+            AWG.set('sigouts_{}_range'.format(self.channel_I()-1), .8)
+            AWG.set('sigouts_{}_direct'.format(self.channel_I()-1), 1)
+            AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), .8)
+            AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 1)
+        else:
+            AWG.set('sigouts_{}_direct'.format(self.channel_I()-1), 0)
+            AWG.set('sigouts_{}_range'.format(self.channel_I()-1), val)
+            AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 0)
+            AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), val)
+                
+
+    def _get_channel_range(self):
+        awg_nr = (self.channel_I()-1)//2
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+
+        val = AWG.get('sigouts_{}_range'.format(self.channel_I()-1))
+        assert val == AWG.get('sigouts_{}_range'.format(self.channel_Q()-1))
+        return val
+
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
-        for awg_ch in [self.channel_I(), self.channel_Q()]:
-            awg_nr = (awg_ch-1)//2
-            ch_pair = (awg_ch-1) % 2
-            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair), val)
+        awg_nr = (self.channel_I()-1)//2
+        # Enforce assumption that channel I preceeds channel Q and share AWG
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+        self.channel_amp_value = val
+
+        if self.cfg_sideband_mode() == 'static':
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), 0)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), 0)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
+
+        # In case of sideband modulation mode 'real-time', amplitudes have to be set
+        # according to modulation matrix
+        elif self.cfg_sideband_mode() == 'real-time':
+            g0 = np.tan(np.radians(self.mixer_phi()))
+            g1 = self.mixer_alpha()*1/np.cos(np.radians(self.mixer_phi()))
+
+            if np.abs(val*g0) > 1.0 or np.abs(val*g1) > 1.0:
+                raise Exception('Resulting amplitude from mixer parameters '+\
+                                'exceed the maximum channel amplitude')
+                # print('Resulting amplitude from mixer parameters '+\
+                #       'exceed the maximum channel amplitude')
+                # if np.abs(val*g0):
+                #     g0 = 1/val
+                # if np.abs(val*g1):
+                #     g1 = 1/val
+
+            AWG.set('awgs_{}_outputs_0_gains_0'.format(awg_nr), val)
+            AWG.set('awgs_{}_outputs_1_gains_0'.format(awg_nr), 0)
+            AWG.set('awgs_{}_outputs_0_gains_1'.format(awg_nr), val*g0)
+            AWG.set('awgs_{}_outputs_1_gains_1'.format(awg_nr), val*g1)
+        else:
+            raise KeyError('Unexpected value for parameter sideband mode.')
 
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
+        awg_nr = (self.channel_I()-1)//2
+        # Enforce assumption that channel I precedes channel Q and share AWG
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+
         vals = []
-        for awg_ch in [self.channel_I(), self.channel_Q()]:
-            awg_nr = (awg_ch-1)//2
-            ch_pair = (awg_ch-1) % 2
-            vals.append(
-                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair)))
-        assert vals[0] == vals[1]
+        if self.cfg_sideband_mode() == 'static':
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
+            assert vals[0]==vals[4]
+            assert vals[1]==vals[2]==0
+
+        # In case of sideband modulation mode 'real-time', amplitudes have to be set
+        # according to modulation matrix
+        elif self.cfg_sideband_mode() == 'real-time':
+            vals.append(self.channel_amp_value)
+
         return vals[0]
 
     def load_waveform_onto_AWG_lookuptable(
@@ -539,12 +856,176 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 awgs = [self.channel_GI()//2, self.channel_DI()//2]
             else:
                 awgs = [self.channel_I()//2]
+                # Enforce assumption that channel I precedes channel Q
+                assert self.channel_I() < self.channel_Q()
+                assert (self.channel_I())//2 < (self.channel_Q())//2
 
             self.AWG.get_instr().upload_codeword_program(awgs=awgs)
+
+        # This ensures that settings other than the sequencer program are updated
+        # for different sideband modulation modes
+        if self.cfg_sideband_mode() == 'static':
+            self.AWG.get_instr().cfg_sideband_mode('static')
+            # Turn off modulation modes
+            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 0)
+            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 0)
+
+        elif self.cfg_sideband_mode() == 'real-time':
+            if (self.channel_I()-1)//2 != (self.channel_Q()-1)//2:
+                raise KeyError('In real-time sideband mode, channel I/Q should share same awg nr.')
+            self.AWG.get_instr().cfg_sideband_mode('real-time')
+
+            # Set same oscillator for I/Q pair and same harmonic
+            self.AWG.get_instr().set('sines_{}_oscselect'.format(self.channel_I()-1), (self.channel_I()-1)//2)
+            self.AWG.get_instr().set('sines_{}_oscselect'.format(self.channel_Q()-1), (self.channel_I()-1)//2)
+            self.AWG.get_instr().set('sines_{}_harmonic'.format(self.channel_I()-1), 1)
+            self.AWG.get_instr().set('sines_{}_harmonic'.format(self.channel_Q()-1), 1)
+            # Create respective cossine/sin signals for modulation through phase-shift
+            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_I()-1), 90)
+            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_Q()-1), 0)
+            # Create correct modulation modeI
+            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 6)
+            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 6)
+        else:
+            raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
 
         super().load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
+
+    def generate_standard_waveforms(
+            self, apply_predistortion_matrix: bool=True):
+        self._wave_dict = OrderedDict()
+
+        if self.cfg_sideband_mode() == 'static':
+            f_modulation = self.mw_modulation()
+        elif self.cfg_sideband_mode() == 'real-time':
+            f_modulation = 0
+            if ((self.channel_I()-1)//2 != (self.channel_Q()-1)//2):
+                raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
+
+            self.AWG.get_instr().set('oscs_{}_freq'.format((self.channel_I()-1)//2),
+                                     self.mw_modulation())
+        else:
+            raise KeyError('Unexpected argument for cfg_sideband_mode')
+
+        # lutmap is expected to obey lutmap mw schema
+        for idx, waveform in self.LutMap().items():
+            if waveform['type'] == 'ge':
+                if waveform['theta'] == 90:
+                    amp = self.mw_amp180()*self.mw_amp90_scale()
+                elif waveform['theta'] == -90:
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
+                else:
+                    amp = theta_to_amp(theta=waveform['theta'],
+                                       amp180=self.mw_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=f_modulation,
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=self.mw_motzoi(),
+                    delay=self.pulse_delay())
+            elif waveform['type'] == 'ef':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_ef_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=self.mw_ef_modulation(),
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=0,
+                    delay=self.pulse_delay())
+            elif waveform['type'] == 'raw-drag':
+                self._wave_dict[idx] = self.wf_func(
+                    **waveform["drag_pars"])
+            elif waveform['type'] == 'spec':
+                self._wave_dict[idx] = self.spec_func(
+                    amp=self.spec_amp(),
+                    length=self.spec_length(),
+                    sampling_rate=self.sampling_rate(),
+                    delay=0,
+                    phase=0)
+            elif waveform['type'] == 'square':
+                # Using a slightly different construction as above
+                # as the call signatures of these functions is different.
+                # Apperently the VSM LutMan has both parameters, so make sure
+                # we detect on the one only available in the VSM. Otherwise, we
+                # won't get the needed four waveforms.
+                if 'sq_G_amp' in self.parameters:
+                    self._wave_dict[idx] = wf.mod_square_VSM(
+                        amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
+                        length=self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        sampling_rate=self.sampling_rate())
+                elif 'sq_amp' in self.parameters:
+                    self._wave_dict[idx] = wf.mod_square(
+                        amp=self.sq_amp(), length=self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
+                else:
+                    raise KeyError('Expected parameter "sq_amp" to exist')
+            elif waveform['type'] == 'phase':
+                # fill codewords that are used for phase correction instructions
+                # with a zero waveform
+                self._wave_dict[idx] = wf.block_pulse(
+                    amp=0, 
+                    sampling_rate=self.sampling_rate(),
+                    length=self.mw_gauss_width()*4,
+                    )
+            else:
+                raise ValueError
+
+        # Add predistortions + test
+        if (self.mixer_apply_predistortion_matrix() and apply_predistortion_matrix and
+          self.cfg_sideband_mode() == 'static'):
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
+        return self._wave_dict
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+            M = wf.mixer_predistortion_matrix(self.mixer_alpha(), self.mixer_phi())
+            for key, val in wave_dict.items():
+                wave_dict[key] = np.dot(M, val)
+            return wave_dict
+
+    def upload_single_qubit_phase_corrections(self):
+        commandtable_dict = {
+            "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
+            "header": { "version": "0.2" },
+            "table": []
+            }
+
+        # manual waveform index 1-to-1 mapping
+        for ind in np.arange(0,60,1):
+            commandtable_dict['table'] += [{"index": int(ind), 
+                                            "waveform": {"index": int(ind)} 
+                                            }]
+
+        # add phase corrections to the end of the codeword space
+        phase_corr_inds = np.arange(60,64,1)
+        for i,d in enumerate(['NW','NE','SW','SE']):
+            phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
+            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i]), 
+                                            "phase0": {"value": float(phase), "increment": True}, 
+                                            "phase1": {"value": float(phase), "increment": True}
+                                            }]
+
+        # Note: Whenever using the command table, the phase offset between I and Q channels on 
+        # the HDAWG for real-time modulation have to be set from an index on the table. Index
+        # 1023 will be used as it is un-used for codeword triggering 
+        commandtable_dict['table'] += [{"index": 1023, 
+                                        "phase0": {"value": 90.0, "increment": False}, 
+                                        "phase1": {"value":  0.0, "increment": False}
+                                        }]
+
+        # get internal awg sequencer number (indexed 0,1,2,3)
+        awg_nr = (self.channel_I()-1) // 2
+        commandtable_returned, status = self.AWG.get_instr().upload_commandtable(commandtable_dict, awg_nr)
+        
+        return commandtable_returned, status
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 

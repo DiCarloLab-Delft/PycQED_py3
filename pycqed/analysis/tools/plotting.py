@@ -1,6 +1,7 @@
 '''
-Currently empty should contain the plotting tools portion of the
-analysis toolbox
+Contain the plotting tools portion of the analysis toolbox
+Note: There is an equivalent file for analysis v2, include your new code there,
+unless it is only inteded for analysis v1
 '''
 import lmfit
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ from matplotlib import cm
 import numpy as np
 import matplotlib.colors as col
 import hsluv
-import logging
+from scipy.interpolate import interp1d
 from matplotlib.patches import Rectangle, ConnectionPatch
 
 golden_mean = (np.sqrt(5)-1.0)/2.0    # Aesthetic ratio
@@ -18,7 +19,7 @@ double_col_figsize = (6.9, golden_mean*6.9)
 thesis_col_figsize = (12.2/2.54, golden_mean*12.2/2.54)
 
 
-def set_xlabel(axis, label, unit=None, **kw):
+def set_xlabel(axis, label, unit=None, latexify_ticks=False, **kw):
     """
     Add a unit aware x-label to an axis object.
 
@@ -33,18 +34,19 @@ def set_xlabel(axis, label, unit=None, **kw):
         xticks = axis.get_xticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(xticks)), unit=unit)
+        tick_str = '{:.4g}' if not latexify_ticks else r'${:.4g}$'
         formatter = matplotlib.ticker.FuncFormatter(
-            lambda x, pos: '{:.4g}'.format(x*scale_factor))
+            lambda x, pos: tick_str.format(x * scale_factor))
 
         axis.xaxis.set_major_formatter(formatter)
 
-        axis.set_xlabel(label+' ({})'.format(unit), **kw)
+        axis.set_xlabel(label + ' ({})'.format(unit), **kw)
     else:
         axis.set_xlabel(label, **kw)
     return axis
 
 
-def set_ylabel(axis, label, unit=None, **kw):
+def set_ylabel(axis, label, unit=None, latexify_ticks=False, **kw):
     """
     Add a unit aware y-label to an axis object.
 
@@ -59,12 +61,13 @@ def set_ylabel(axis, label, unit=None, **kw):
         yticks = axis.get_yticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(yticks)), unit=unit)
+        tick_str = '{:.6g}' if not latexify_ticks else r'${:.6g}$'
         formatter = matplotlib.ticker.FuncFormatter(
-            lambda x, pos: '{:.6g}'.format(x*scale_factor))
+            lambda x, pos: tick_str.format(x * scale_factor))
 
         axis.yaxis.set_major_formatter(formatter)
 
-        axis.set_ylabel(label+' ({})'.format(unit), **kw)
+        axis.set_ylabel(label + ' ({})'.format(unit), **kw)
     else:
         axis.set_ylabel(label, **kw)
     return axis
@@ -122,7 +125,7 @@ def SI_prefix_and_scale_factor(val, unit=None):
                 if plt.rcParams['text.usetex'] and prefix == 'μ':
                     prefix = r'$\mu$'
 
-            return 10 ** -prefix_power,  prefix + unit
+            return 10 ** -prefix_power, prefix + unit
         except (KeyError, TypeError):
             pass
 
@@ -488,6 +491,9 @@ def set_axeslabel_color(ax, color):
 
 
 # generate custom colormaps
+# Inpired from
+# https://stackoverflow.com/questions/23712207/cyclic-colormap-without-visual-distortions-for-use-in-phase-angle-plots
+
 def make_segmented_cmap():
     white = '#ffffff'
     black = '#000000'
@@ -498,26 +504,97 @@ def make_segmented_cmap():
     return anglemap
 
 
-def make_anglemap(N=256, use_hpl=True):
-    h = np.ones(N)  # hue
-    h[:N//2] = 11.6  # red
-    h[N//2:] = 258.6  # blue
+def make_anglemap_colorlist(N=256, use_hpl=True):
+    hue = np.ones(N)  # hue
+    hue[:N // 2] = 11.6  # red
+    hue[N // 2:] = 258.6  # blue
     s = 100  # saturation
-    l = np.linspace(0, 100, N//2)  # luminosity
-    l = np.hstack((l, l[::-1]))
+    lum = np.linspace(0, 100, N // 2)  # luminosity
+    lum = np.hstack((lum, lum[::-1]))
 
     colorlist = np.zeros((N, 3))
     for ii in range(N):
         if use_hpl:
-            colorlist[ii, :] = hsluv.hpluv_to_rgb((h[ii], s, l[ii]))
+            colorlist[ii, :] = hsluv.hpluv_to_rgb((hue[ii], s, lum[ii]))
         else:
-            colorlist[ii, :] = hsluv.hsluv_to_rgb((h[ii], s, l[ii]))
+            colorlist[ii, :] = hsluv.hsluv_to_rgb((hue[ii], s, lum[ii]))
     colorlist[colorlist > 1] = 1  # correct numeric errors
     colorlist[colorlist < 0] = 0
+    return colorlist
+
+
+def make_anglemap(N=256, use_hpl=True):
+    colorlist = make_anglemap_colorlist(N=N, use_hpl=use_hpl)
     return col.ListedColormap(colorlist)
 
 
 hsluv_anglemap = make_anglemap(use_hpl=False)
+
+
+def circ_interp(x, y_deg, kind='linear'):
+        phases = np.deg2rad(y_deg)
+        newdata_cos = np.cos(phases)
+        newdata_sin = np.sin(phases)
+
+        ip_cos = interp1d(x, newdata_cos, kind=kind)
+        ip_sin = interp1d(x, newdata_sin, kind=kind)
+
+        return lambda interp_at: np.rad2deg(np.arctan2(ip_sin(interp_at), ip_cos(interp_at))) % 360
+
+
+def make_anglemap45_colorlist(N=256, use_hpl=True):
+    col_space = 'hpluv' if use_hpl else 'hsluv'
+    colspace_to_rgb = getattr(hsluv, col_space + '_to_rgb')
+    rgb_to_colspace = getattr(hsluv, 'rgb_to_' + col_space)
+
+    black = [0., 0., 0.]
+    blue = [0.34, 0.86, 0.70]
+    violet = [0.34, 0.34, 0.86]
+    magenta = [0.86, 0.34, 0.86]
+    pink = [1.00, 0.90, 0.92]
+    red = [0.86, 0.34, 0.34]
+    yellow = [0.86, 0.86, 0.34]
+    green = [0.34, 0.86, 0.34]
+
+    rgb_list = [
+        black,
+        blue,
+        violet,
+        magenta,
+        pink,
+        red,
+        yellow,
+        green,
+        black
+    ]
+
+    col_pos = np.linspace(0, 1, 9)
+
+    [hsl_hue, hsl_sat, hsl_lum] = np.array([rgb_to_colspace(np.array(rgb_col)) for rgb_col in rgb_list]).T
+
+    f_circ_interp = circ_interp(col_pos, hsl_hue)
+    f_hsl_sat = interp1d(col_pos, hsl_sat, kind='linear')
+    f_hsl_lum = interp1d(col_pos, hsl_lum, kind='linear')
+
+    pnts = np.linspace(0, 1, N)
+    new_col = [
+        f_circ_interp(pnts),
+        np.clip(f_hsl_sat(pnts), a_min=0, a_max=100),
+        np.clip(f_hsl_lum(pnts), a_min=0, a_max=100)
+    ]
+
+    new_col = np.array([colspace_to_rgb(np.array(rgb_col)) for rgb_col in np.array(new_col).T])
+    new_col[new_col < 0] = 0
+    new_col[new_col > 1] = 1
+    return new_col
+
+
+def make_anglemap45(N=256, use_hpl=True):
+    colorlist = make_anglemap45_colorlist(N=N, use_hpl=use_hpl)
+    return col.ListedColormap(colorlist)
+
+
+hsluv_anglemap45 = make_anglemap45(use_hpl=False)
 
 
 def plot_fit(xvals, fit_res, ax, **plot_kws):

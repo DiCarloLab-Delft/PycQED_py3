@@ -112,13 +112,13 @@ def single_channel_block(amp, length, sampling_rate=2e8, delay=0):
         sampling_rate in Hz
         empty delay in s
     '''
-    nr_samples = int(np.round((length+delay)*sampling_rate))
-    delay_samples = int(np.round(delay*sampling_rate))
+    nr_samples = int(np.round((length + delay) * sampling_rate))
+    delay_samples = int(np.round(delay * sampling_rate))
     pulse_samples = nr_samples - delay_samples
 
     block = amp * np.ones(int(pulse_samples))
     Zeros = np.zeros(int(delay_samples))
-    pulse = np.array(list(Zeros)+list(block))
+    pulse = np.array(list(Zeros) + list(block))
     return pulse
 
 

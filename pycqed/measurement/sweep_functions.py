@@ -1,12 +1,13 @@
+# FIXME: commented out CBox stuff for PR #620
 import logging
 import time
-import os
+#import os
 import numpy as np
-from pycqed.utilities.general import setInDict
-from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
-from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
-from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
-import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
+#from pycqed.utilities.general import setInDict
+# from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
+#from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
+#import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
+from pycqed.analysis_v2.tools import contours2d as c2d
 
 
 class Sweep_function(object):
@@ -50,6 +51,7 @@ class Soft_Sweep(Sweep_function):
 
 ##############################################################################
 
+
 class Elapsed_Time_Sweep(Soft_Sweep):
     """
     A sweep function to do a measurement periodically.
@@ -66,7 +68,6 @@ class Elapsed_Time_Sweep(Soft_Sweep):
         self.unit = 's'
         self.as_fast_as_possible = as_fast_as_possible
         self.time_first_set = None
-
 
     def set_parameter(self, val):
         if self.time_first_set is None:
@@ -85,6 +86,7 @@ class Elapsed_Time_Sweep(Soft_Sweep):
             pass  # wait
         elapsed_time = time.time() - self.time_first_set
         return elapsed_time
+
 
 class Heterodyne_Frequency_Sweep(Soft_Sweep):
     """
@@ -172,6 +174,7 @@ class None_Sweep(Soft_Sweep):
         '''
         pass
 
+
 class None_Sweep_With_Parameter_Returned(Soft_Sweep):
 
     def __init__(self, sweep_control='soft', sweep_points=None,
@@ -203,60 +206,60 @@ class None_Sweep_idx(None_Sweep):
         self.num_calls += 1
 
 
-class QX_Sweep(Soft_Sweep):
+# class QX_Sweep(Soft_Sweep):
+#
+#     """
+#     QX Input Test
+#     """
+#
+#     def __init__(self, qxc, sweep_control='soft', sweep_points=None, **kw):
+#         super(QX_Sweep, self).__init__()
+#         self.sweep_control = sweep_control
+#         self.name = 'QX_Sweep'
+#         self.parameter_name = 'Error Rate'
+#         self.unit = 'P'
+#         self.sweep_points = sweep_points
+#         self.__qxc = qxc
+#         self.__qxc.create_qubits(2)
+#         self.__cnt = 0
+#
+#     def set_parameter(self, val):
+#         circuit_name = ("circuit%i" % self.__cnt)
+#         self.__qxc.create_circuit(circuit_name, [
+#                                   "prepz q0", "h q0", "x q0", "z q0", "y q0", "y q0", "z q0", "x q0", "h q0", "measure q0"])
+#         self.__cnt = self.__cnt+1
+#         # pass
 
-    """
-    QX Input Test
-    """
 
-    def __init__(self, qxc, sweep_control='soft', sweep_points=None, **kw):
-        super(QX_Sweep, self).__init__()
-        self.sweep_control = sweep_control
-        self.name = 'QX_Sweep'
-        self.parameter_name = 'Error Rate'
-        self.unit = 'P'
-        self.sweep_points = sweep_points
-        self.__qxc = qxc
-        self.__qxc.create_qubits(2)
-        self.__cnt = 0
-
-    def set_parameter(self, val):
-        circuit_name = ("circuit%i" % self.__cnt)
-        self.__qxc.create_circuit(circuit_name, [
-                                  "prepz q0", "h q0", "x q0", "z q0", "y q0", "y q0", "z q0", "x q0", "h q0", "measure q0"])
-        self.__cnt = self.__cnt+1
-        # pass
-
-
-class QX_RB_Sweep(Soft_Sweep):
-
-    """
-       QX Randomized Benchmarking Test
-    """
-
-    def __init__(self, qxc, filename, num_circuits, sweep_control='soft',
-                 sweep_points=None, **kw):
-        super(QX_RB_Sweep, self).__init__()
-        self.sweep_control = sweep_control
-        self.name = 'QX_RB_Sweep'
-        self.parameter_name = 'N_Clifford'
-        self.unit = 'P'
-        self.sweep_points = sweep_points
-        self.__qxc = qxc
-        self.__qxc.create_qubits(2)
-        self.__cnt = 0
-        self.filename = filename
-        self.num_circuits = num_circuits
-        qasm = ql.qasm_loader(filename)
-        qasm.load_circuits()
-        self.circuits = qasm.get_circuits()
-        for c in self.circuits:
-            self.__qxc.create_circuit(c[0], c[1])
-
-    def set_parameter(self, val):
-        if not (self.__cnt < self.num_circuits):
-            raise AssertionError()
-        self.__cnt = self.__cnt+1
+# class QX_RB_Sweep(Soft_Sweep):
+#
+#     """
+#        QX Randomized Benchmarking Test
+#     """
+#
+#     def __init__(self, qxc, filename, num_circuits, sweep_control='soft',
+#                  sweep_points=None, **kw):
+#         super(QX_RB_Sweep, self).__init__()
+#         self.sweep_control = sweep_control
+#         self.name = 'QX_RB_Sweep'
+#         self.parameter_name = 'N_Clifford'
+#         self.unit = 'P'
+#         self.sweep_points = sweep_points
+#         self.__qxc = qxc
+#         self.__qxc.create_qubits(2)
+#         self.__cnt = 0
+#         self.filename = filename
+#         self.num_circuits = num_circuits
+#         qasm = ql.qasm_loader(filename)
+#         qasm.load_circuits()
+#         self.circuits = qasm.get_circuits()
+#         for c in self.circuits:
+#             self.__qxc.create_circuit(c[0], c[1])
+#
+#     def set_parameter(self, val):
+#         if not (self.__cnt < self.num_circuits):
+#             raise AssertionError()
+#         self.__cnt = self.__cnt+1
 
 
 class Delayed_None_Sweep(Soft_Sweep):
@@ -326,6 +329,45 @@ class AWG_multi_channel_amplitude(Soft_Sweep):
             self.AWG.set('ch{}_amp'.format(ch), val)
         time.sleep(self.delay)
 
+class mw_lutman_amp_sweep(Soft_Sweep):
+    """
+    """
+
+    def __init__(self,qubits,device):
+        super().__init__()
+        self.device = device
+        self.name = 'mw_lutman_amp_sweep'
+        self.qubits = qubits
+        self.parameter_name = 'mw_amp'
+        self.unit = 'a.u.'
+
+    def set_parameter(self, val):
+        for q in self.qubits:
+          qub  = self.device.find_instrument(q)
+          mw_lutman = qub.instr_LutMan_MW.get_instr()
+          mw_lutman.channel_amp(val)
+
+
+class motzoi_lutman_amp_sweep(Soft_Sweep):
+    """
+    """
+
+    def __init__(self,qubits,device):
+        super().__init__()
+        self.device = device
+        self.name = 'motzoi_lutman_amp_sweep'
+        self.qubits = qubits
+        self.parameter_name = 'motzoi_amp'
+        self.unit = 'a.u.'
+
+    def set_parameter(self, val):
+        for q in self.qubits:
+          qub = self.device.find_instrument(q)
+          mw_lutman = qub.instr_LutMan_MW.get_instr()
+          mw_lutman.mw_motzoi(val)
+          mw_lutman.load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=True)
+
 ###############################################################################
 ####################          Hardware Sweeps      ############################
 ###############################################################################
@@ -344,25 +386,25 @@ class Hard_Sweep(Sweep_function):
         pass
 
 
-class QASM_Sweep(Hard_Sweep):
-
-    def __init__(self, filename, CBox, op_dict,
-                 parameter_name='Points', unit='a.u.', upload=True):
-        super().__init__()
-        self.name = 'QASM_Sweep'
-        self.filename = filename
-        self.upload = upload
-        self.CBox = CBox
-        self.op_dict = op_dict
-        self.parameter_name = parameter_name
-        self.unit = unit
-        logging.warning('QASM_Sweep is deprecated, use QASM_Sweep_v2')
-
-    def prepare(self, **kw):
-        self.CBox.trigger_source('internal')
-        if self.upload:
-            qumis_file = qta.qasm_to_asm(self.filename, self.op_dict)
-            self.CBox.load_instructions(qumis_file.name)
+# class QASM_Sweep(Hard_Sweep):
+#
+#     def __init__(self, filename, CBox, op_dict,
+#                  parameter_name='Points', unit='a.u.', upload=True):
+#         super().__init__()
+#         self.name = 'QASM_Sweep'
+#         self.filename = filename
+#         self.upload = upload
+#         self.CBox = CBox
+#         self.op_dict = op_dict
+#         self.parameter_name = parameter_name
+#         self.unit = unit
+#         logging.warning('QASM_Sweep is deprecated, use QASM_Sweep_v2')
+#
+#     def prepare(self, **kw):
+#         self.CBox.trigger_source('internal')
+#         if self.upload:
+#             qumis_file = qta.qasm_to_asm(self.filename, self.op_dict)
+#             self.CBox.load_instructions(qumis_file.name)
 
 
 class OpenQL_Sweep(Hard_Sweep):
@@ -401,260 +443,285 @@ class OpenQL_File_Sweep(Hard_Sweep):
             self.CCL.eqasm_program(self.filename)
 
 
-class QASM_Sweep_v2(Hard_Sweep):
+# class QASM_Sweep_v2(Hard_Sweep):
+#     """
+#     Sweep function for a QASM file, using the XFu compiler to generate QuMis
+#     """
+#
+#     def __init__(self, qasm_fn: str, config: dict, CBox,
+#                  parameter_name: str ='Points', unit: str='a.u.',
+#                  upload: bool=True, verbosity_level: int=0,
+#                  disable_compile_and_upload: bool=False):
+#         super().__init__()
+#         self.name = 'QASM_Sweep_v2'
+#
+#         self.qasm_fn = qasm_fn
+#         self.config = config
+#         self.CBox = CBox
+#         self.upload = upload
+#
+#         self.parameter_name = parameter_name
+#         self.unit = unit
+#         self.verbosity_level = verbosity_level
+#         self.disable_compile_and_upload = disable_compile_and_upload
+#
+#     def prepare(self, **kw):
+#         if not self.disable_compile_and_upload:
+#             self.compile_and_upload(self.qasm_fn, self.config)
+#
+#     def compile_and_upload(self, qasm_fn, config):
+#         if self.upload:
+#             self.CBox.trigger_source('internal')
+#         qasm_folder, fn = os.path.split(qasm_fn)
+#         base_fn = fn.split('.')[0]
+#         qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
+#         self.compiler = qcx.QASM_QuMIS_Compiler(
+#             verbosity_level=self.verbosity_level)
+#         self.compiler.compile(qasm_fn, qumis_fn=qumis_fn,
+#                               config=config)
+#         if self.upload:
+#             self.CBox.load_instructions(qumis_fn)
+#         return self.compiler
+
+
+# class QASM_config_sweep(QASM_Sweep_v2):
+#     """
+#     Sweep function for a QASM file, using the XFu compiler to generate QuMis
+#     """
+#
+#     def __init__(self, qasm_fn: str, config: dict,
+#                  config_par_map: list, CBox,
+#                  parameter_name: str =None, unit: str='a.u.',
+#                  par_scale_factor=1, set_parser=None,
+#                  upload: bool=True, verbosity_level: int=0):
+#         self.name = 'QASM_config_sweep'
+#         self.sweep_control = 'soft'
+#         self.qasm_fn = qasm_fn
+#         self.config = config
+#         self.CBox = CBox
+#         self.set_parser = set_parser
+#         self.upload = upload
+#         self.config_par_map = config_par_map
+#         self.par_scale_factor = par_scale_factor
+#
+#         if parameter_name is None:
+#             self.parameter_name = self.config_par_map[-1]
+#         else:
+#             self.parameter_name = parameter_name
+#         self.unit = unit
+#         self.verbosity_level = verbosity_level
+#
+#     def set_parameter(self, val):
+#         val *= self.par_scale_factor
+#         if self.set_parser is not None:
+#             val = self.set_parser(val)
+#         setInDict(self.config, self.config_par_map, val)
+#         self.compile_and_upload(self.qasm_fn, self.config)
+#
+#     def prepare(self, **kw):
+#         pass
+
+
+# class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
+#
+#     def __init__(self, qasm_fn: str, config: dict,
+#                  CBox, QWG_flux_lutmans,
+#                  parameter_name: str ='Points', unit: str='a.u.',
+#                  upload: bool=True, verbosity_level: int=1,
+#                  disable_compile_and_upload: bool = False,
+#                  identical_pulses: bool=True):
+#         super(QWG_flux_QASM_Sweep, self).__init__()
+#         self.name = 'QWG_flux_QASM_Sweep'
+#
+#         self.qasm_fn = qasm_fn
+#         self.config = config
+#         self.CBox = CBox
+#         self.QWG_flux_lutmans = QWG_flux_lutmans
+#         self.upload = upload
+#
+#         self.parameter_name = parameter_name
+#         self.unit = unit
+#         self.verbosity_level = verbosity_level
+#         self.disable_compile_and_upload = disable_compile_and_upload
+#         self.identical_pulses = identical_pulses
+#
+#     def prepare(self, **kw):
+#         if not self.disable_compile_and_upload:
+#             # assume this corresponds 1 to 1 with the QWG_trigger
+#             compiler = self.compile_and_upload(self.qasm_fn, self.config)
+#             if self.identical_pulses:
+#                 pts = 1
+#             else:
+#                 pts = len(self.sweep_points)
+#             for i in range(pts):
+#                 self.time_tuples, end_time_ns = qch.get_timetuples_since_event(
+#                     start_label='qwg_trigger_{}'.format(i),
+#                     target_labels=['square', 'dummy_CZ', 'CZ'],
+#                     timing_grid=compiler.timing_grid, end_label='ro',
+#                     convert_clk_to_ns=True)
+#                 if len(self.time_tuples) == 0 and self.verbosity_level > 0:
+#                     logging.warning('No time tuples found')
+#
+#                 t0 = time.time()
+#                 for fl_lm in self.QWG_flux_lutmans:
+#                     self.comp_fp = fl_lm.generate_composite_flux_pulse(
+#                         time_tuples=self.time_tuples,
+#                         end_time_ns=end_time_ns)
+#                     if self.upload:
+#                         fl_lm.load_custom_pulse_onto_AWG_lookuptable(
+#                             waveform=self.comp_fp,
+#                             pulse_name='custom_{}_{}'.format(i, fl_lm.name),
+#                             distort=True, append_compensation=True,
+#                             codeword=i)
+#                 t1 = time.time()
+#                 if self.verbosity_level > 0:
+#                     print('Uploading custom flux pulses took {:.2f}s'.format(
+#                           t1-t0))
+
+
+# class Multi_QASM_Sweep(QASM_Sweep_v2):
+#     '''
+#     Sweep function that combines multiple QASM sweeps into one sweep.
+#     '''
+#
+#     def __init__(self, exp_per_file: int, hard_repetitions: int,
+#                  soft_repetitions: int, qasm_list, config: dict, detector,
+#                  CBox, parameter_name: str='Points', unit: str='a.u.',
+#                  upload: bool=True, verbosity_level: int=0):
+#         '''
+#         Args:
+#             exp_num_list (array of ints):
+#                     Number of experiments included in each of the given QASM
+#                     files. This is needed to correctly set the detector points
+#                     for each QASM Sweep.
+#             hard_repetitions (int):
+#                     Number of hard averages for a single QASM file.
+#             soft_repetitions (int):
+#                     Number of soft averages over the whole sweep, i.e. how many
+#                     times is the whole list of QASM files repeated.
+#             qasm_list (array of strings):
+#                     List of names of the QASM files to be included in the sweep.
+#             config (dict):
+#                     QASM config used for compilation.
+#             detector (obj):
+#                     An instance of the detector object that is used for the
+#                     measurement.
+#     '''
+#         super().__init__(qasm_fn=None, config=config, CBox=CBox,
+#                          parameter_name=parameter_name, unit=unit,
+#                          upload=upload, verbosity_level=verbosity_level)
+#         self.name = 'Multi_QASM_Sweep'
+#         self.detector = detector
+#         self.hard_repetitions = hard_repetitions
+#         self.soft_repetitions = soft_repetitions
+#         self._cur_file_idx = 0
+#         self.exp_per_file = exp_per_file
+#
+#         # Set up hard repetitions
+#         self.detector.nr_shots = self.hard_repetitions * self.exp_per_file
+#
+#         # Set up soft repetitions
+#         self.qasm_list = list(qasm_list) * soft_repetitions
+#
+#         # This is a hybrid sweep. Sweep control needs to be soft
+#         self.sweep_control = 'soft'
+#
+#     def prepare(self):
+#         pass
+#
+#     def set_parameter(self, val):
+#         self.compile_and_upload(self.qasm_list[self._cur_file_idx],
+#                                 self.config)
+#         self._cur_file_idx += 1
+
+
+# class QuMis_Sweep(Hard_Sweep):
+#
+#     def __init__(self, filename, CBox,
+#                  parameter_name='Points', unit='a.u.', upload=True):
+#         super().__init__()
+#         self.name = 'QuMis_Sweep'
+#         self.filename = filename
+#         self.upload = upload
+#         self.CBox = CBox
+#         self.parameter_name = parameter_name
+#         self.unit = unit
+#
+#     def prepare(self, **kw):
+#         if self.upload:
+#             self.CBox.trigger_source('internal')
+#             self.CBox.load_instructions(self.filename)
+
+#=======
+
+class anharmonicity_sweep(Soft_Sweep):
     """
-    Sweep function for a QASM file, using the XFu compiler to generate QuMis
+    Sweeps a LutMan parameter and uploads the waveforms to AWG (in real-time if
+    supported)
     """
 
-    def __init__(self, qasm_fn: str, config: dict, CBox,
-                 parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True, verbosity_level: int=0,
-                 disable_compile_and_upload: bool=False):
-        super().__init__()
-        self.name = 'QASM_Sweep_v2'
-
-        self.qasm_fn = qasm_fn
-        self.config = config
-        self.CBox = CBox
-        self.upload = upload
-
-        self.parameter_name = parameter_name
-        self.unit = unit
-        self.verbosity_level = verbosity_level
-        self.disable_compile_and_upload = disable_compile_and_upload
-
-    def prepare(self, **kw):
-        if not self.disable_compile_and_upload:
-            self.compile_and_upload(self.qasm_fn, self.config)
-
-    def compile_and_upload(self, qasm_fn, config):
-        if self.upload:
-            self.CBox.trigger_source('internal')
-        qasm_folder, fn = os.path.split(qasm_fn)
-        base_fn = fn.split('.')[0]
-        qumis_fn = os.path.join(qasm_folder, base_fn + ".qumis")
-        self.compiler = qcx.QASM_QuMIS_Compiler(
-            verbosity_level=self.verbosity_level)
-        self.compiler.compile(qasm_fn, qumis_fn=qumis_fn,
-                              config=config)
-        if self.upload:
-            self.CBox.load_instructions(qumis_fn)
-        return self.compiler
-
-
-class QASM_config_sweep(QASM_Sweep_v2):
-    """
-    Sweep function for a QASM file, using the XFu compiler to generate QuMis
-    """
-
-    def __init__(self, qasm_fn: str, config: dict,
-                 config_par_map: list, CBox,
-                 parameter_name: str =None, unit: str='a.u.',
-                 par_scale_factor=1, set_parser=None,
-                 upload: bool=True, verbosity_level: int=0):
-        self.name = 'QASM_config_sweep'
+    def __init__(self, qubit, amps):
+        self.set_kw()
+        self.name = qubit.anharmonicity.name
+        self.parameter_name = qubit.anharmonicity.label
+        self.unit = qubit.anharmonicity.unit
         self.sweep_control = 'soft'
-        self.qasm_fn = qasm_fn
-        self.config = config
-        self.CBox = CBox
-        self.set_parser = set_parser
-        self.upload = upload
-        self.config_par_map = config_par_map
-        self.par_scale_factor = par_scale_factor
-
-        if parameter_name is None:
-            self.parameter_name = self.config_par_map[-1]
-        else:
-            self.parameter_name = parameter_name
-        self.unit = unit
-        self.verbosity_level = verbosity_level
+        self.qubit = qubit
+        self.amps = amps
 
     def set_parameter(self, val):
-        val *= self.par_scale_factor
-        if self.set_parser is not None:
-            val = self.set_parser(val)
-        setInDict(self.config, self.config_par_map, val)
-        self.compile_and_upload(self.qasm_fn, self.config)
-
-    def prepare(self, **kw):
-        pass
+        self.qubit.anharmonicity.set(val)
+        # _prep_mw_pulses will upload anharmonicity val to LutMan
+        self.qubit._prep_mw_pulses()
+        # and we regenerate the waveform with that new modulation
+        mw_lutman = self.qubit.instr_LutMan_MW.get_instr()
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=self.amps)
 
 
-class QWG_flux_QASM_Sweep(QASM_Sweep_v2):
-
-    def __init__(self, qasm_fn: str, config: dict,
-                 CBox, QWG_flux_lutmans,
-                 parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True, verbosity_level: int=1,
-                 disable_compile_and_upload: bool = False,
-                 identical_pulses: bool=True):
-        super(QWG_flux_QASM_Sweep, self).__init__()
-        self.name = 'QWG_flux_QASM_Sweep'
-
-        self.qasm_fn = qasm_fn
-        self.config = config
-        self.CBox = CBox
-        self.QWG_flux_lutmans = QWG_flux_lutmans
-        self.upload = upload
-
-        self.parameter_name = parameter_name
-        self.unit = unit
-        self.verbosity_level = verbosity_level
-        self.disable_compile_and_upload = disable_compile_and_upload
-        self.identical_pulses = identical_pulses
-
-    def prepare(self, **kw):
-        if not self.disable_compile_and_upload:
-            # assume this corresponds 1 to 1 with the QWG_trigger
-            compiler = self.compile_and_upload(self.qasm_fn, self.config)
-            if self.identical_pulses:
-                pts = 1
-            else:
-                pts = len(self.sweep_points)
-            for i in range(pts):
-                self.time_tuples, end_time_ns = qch.get_timetuples_since_event(
-                    start_label='qwg_trigger_{}'.format(i),
-                    target_labels=['square', 'dummy_CZ', 'CZ'],
-                    timing_grid=compiler.timing_grid, end_label='ro',
-                    convert_clk_to_ns=True)
-                if len(self.time_tuples) == 0 and self.verbosity_level > 0:
-                    logging.warning('No time tuples found')
-
-                t0 = time.time()
-                for fl_lm in self.QWG_flux_lutmans:
-                    self.comp_fp = fl_lm.generate_composite_flux_pulse(
-                        time_tuples=self.time_tuples,
-                        end_time_ns=end_time_ns)
-                    if self.upload:
-                        fl_lm.load_custom_pulse_onto_AWG_lookuptable(
-                            waveform=self.comp_fp,
-                            pulse_name='custom_{}_{}'.format(i, fl_lm.name),
-                            distort=True, append_compensation=True,
-                            codeword=i)
-                t1 = time.time()
-                if self.verbosity_level > 0:
-                    print('Uploading custom flux pulses took {:.2f}s'.format(
-                          t1-t0))
-
-
-class Multi_QASM_Sweep(QASM_Sweep_v2):
-    '''
-    Sweep function that combines multiple QASM sweeps into one sweep.
-    '''
-
-    def __init__(self, exp_per_file: int, hard_repetitions: int,
-                 soft_repetitions: int, qasm_list, config: dict, detector,
-                 CBox, parameter_name: str='Points', unit: str='a.u.',
-                 upload: bool=True, verbosity_level: int=0):
-        '''
-        Args:
-            exp_num_list (array of ints):
-                    Number of experiments included in each of the given QASM
-                    files. This is needed to correctly set the detector points
-                    for each QASM Sweep.
-            hard_repetitions (int):
-                    Number of hard averages for a single QASM file.
-            soft_repetitions (int):
-                    Number of soft averages over the whole sweep, i.e. how many
-                    times is the whole list of QASM files repeated.
-            qasm_list (array of strings):
-                    List of names of the QASM files to be included in the sweep.
-            config (dict):
-                    QASM config used for compilation.
-            detector (obj):
-                    An instance of the detector object that is used for the
-                    measurement.
-    '''
-        super().__init__(qasm_fn=None, config=config, CBox=CBox,
-                         parameter_name=parameter_name, unit=unit,
-                         upload=upload, verbosity_level=verbosity_level)
-        self.name = 'Multi_QASM_Sweep'
-        self.detector = detector
-        self.hard_repetitions = hard_repetitions
-        self.soft_repetitions = soft_repetitions
-        self._cur_file_idx = 0
-        self.exp_per_file = exp_per_file
-
-        # Set up hard repetitions
-        self.detector.nr_shots = self.hard_repetitions * self.exp_per_file
-
-        # Set up soft repetitions
-        self.qasm_list = list(qasm_list) * soft_repetitions
-
-        # This is a hybrid sweep. Sweep control needs to be soft
-        self.sweep_control = 'soft'
-
-    def prepare(self):
-        pass
-
-    def set_parameter(self, val):
-        self.compile_and_upload(self.qasm_list[self._cur_file_idx],
-                                self.config)
-        self._cur_file_idx += 1
-
-
-class QuMis_Sweep(Hard_Sweep):
-
-    def __init__(self, filename, CBox,
-                 parameter_name='Points', unit='a.u.', upload=True):
-        super().__init__()
-        self.name = 'QuMis_Sweep'
-        self.filename = filename
-        self.upload = upload
-        self.CBox = CBox
-        self.parameter_name = parameter_name
-        self.unit = unit
-
-    def prepare(self, **kw):
-        if self.upload:
-            self.CBox.trigger_source('internal')
-            self.CBox.load_instructions(self.filename)
-
-
-class QX_Hard_Sweep(Hard_Sweep):
-
-    def __init__(self, qxc, filename):  # , num_circuits):
-        super().__init__()
-        self.name = 'QX_Hard_Sweep'
-        self.filename = filename
-        self.__qxc = qxc
-        # self.num_circuits = num_circuits
-        qasm = ql.qasm_loader(filename, qxc.get_nr_qubits())
-        qasm.load_circuits()
-        self.circuits = qasm.get_circuits()
-
-    def get_circuits_names(self):
-        ids = []
-        for c in self.circuits:
-            ids.append(c[0])
-        return ids
-
-    def prepare(self, **kw):
-        # self.CBox.trigger_source('internal')
-        print("QX_Hard_Sweep.prepare() called...")
-        # self.__qxc.create_qubits(2)
-        # for c in self.circuits:
-        #     self.__qxc.create_circuit(c[0], c[1])
-
-
-class QX_RB_Hard_Sweep(Hard_Sweep):
-
-    def __init__(self, qxc, qubits=2):
-        super().__init__()
-        self.name = 'QX_RB_Hard_Sweep'
-        self.qubits = qubits
-        self.__qxc = qxc
-        self.__qxc.create_qubits(2)
-        # qasm = ql.qasm_loader(filename)
-        # qasm.load_circuits()
-        # self.circuits = qasm.get_circuits()
-        # print(self.circuits[0])
-
-    def prepare(self, **kw):
-        # self.CBox.trigger_source('internal')
-        print("QX_Hard_Sweep.prepare() called...")
-        # for c in self.circuits:
-        # self.__qxc.create_circuit(c[0],c[1])
+# class QX_Hard_Sweep(Hard_Sweep):
+#
+#     def __init__(self, qxc, filename):  # , num_circuits):
+#         super().__init__()
+#         self.name = 'QX_Hard_Sweep'
+#         self.filename = filename
+#         self.__qxc = qxc
+#         # self.num_circuits = num_circuits
+#         qasm = ql.qasm_loader(filename, qxc.get_nr_qubits())
+#         qasm.load_circuits()
+#         self.circuits = qasm.get_circuits()
+#
+#     def get_circuits_names(self):
+#         ids = []
+#         for c in self.circuits:
+#             ids.append(c[0])
+#         return ids
+#
+#     def prepare(self, **kw):
+#         # self.CBox.trigger_source('internal')
+#         print("QX_Hard_Sweep.prepare() called...")
+#         # self.__qxc.create_qubits(2)
+#         # for c in self.circuits:
+#         #     self.__qxc.create_circuit(c[0], c[1])
+#
+#
+# class QX_RB_Hard_Sweep(Hard_Sweep):
+#
+#     def __init__(self, qxc, qubits=2):
+#         super().__init__()
+#         self.name = 'QX_RB_Hard_Sweep'
+#         self.qubits = qubits
+#         self.__qxc = qxc
+#         self.__qxc.create_qubits(2)
+#         # qasm = ql.qasm_loader(filename)
+#         # qasm.load_circuits()
+#         # self.circuits = qasm.get_circuits()
+#         # print(self.circuits[0])
+#
+#     def prepare(self, **kw):
+#         # self.CBox.trigger_source('internal')
+#         print("QX_Hard_Sweep.prepare() called...")
+#         # for c in self.circuits:
+#         # self.__qxc.create_circuit(c[0],c[1])
 
 
 # NOTE: AWG_sweeps are located in AWG_sweep_functions
@@ -805,6 +872,86 @@ class lutman_par(Soft_Sweep):
             regenerate_waveforms=True)
 
 
+class anharmonicity_sweep(Soft_Sweep):
+    """
+    Sweeps a LutMan parameter and uploads the waveforms to AWG (in real-time if
+    supported)
+    """
+
+    def __init__(self, qubit, amps):
+        self.set_kw()
+        self.name = qubit.anharmonicity.name
+        self.parameter_name = qubit.anharmonicity.label
+        self.unit = qubit.anharmonicity.unit
+        self.sweep_control = 'soft'
+        self.qubit = qubit
+        self.amps = amps
+
+    def set_parameter(self, val):
+        self.qubit.anharmonicity.set(val)
+        # _prep_mw_pulses will upload anharmonicity val to LutMan
+        self.qubit._prep_mw_pulses()
+        # and we regenerate the waveform with that new modulation
+        mw_lutman = self.qubit.instr_LutMan_MW.get_instr()
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=self.amps)
+
+
+class joint_HDAWG_lutman_parameters(Soft_Sweep):
+    """
+    Sweeps two parameteres toghether, assigning the same value
+    name is defined by user
+    label and units are grabbed from parameter_1
+    """
+
+    def __init__(self, name, parameter_1, parameter_2,
+                 AWG, lutman):
+        self.set_kw()
+        self.name = name
+        self.parameter_name = parameter_1.label
+        self.unit = parameter_1.unit
+        self.lm = lutman
+        self.AWG = AWG
+        self.sweep_control = 'soft'
+        self.parameter_1 = parameter_1
+        self.parameter_2 = parameter_2
+
+    def set_parameter(self, val):
+        self.parameter_1.set(val)
+        self.parameter_2.set(-val)
+        self.AWG.stop()
+        self.lm.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.AWG.start()
+
+
+class RO_freq_sweep(Soft_Sweep):
+    """
+    Sweeps two parameteres toghether, assigning the same value
+    name is defined by user
+    label and units are grabbed from parameter_1
+    """
+
+    def __init__(self, name, qubit, ro_lutman, idx, parameter):
+        self.set_kw()
+        self.name = name
+        self.parameter_name = parameter.label
+        self.unit = parameter.unit
+        self.sweep_control = 'soft'
+        self.qubit = qubit
+        self.ro_lm = ro_lutman
+        self.idx = idx
+
+    def set_parameter(self, val):
+        LO_freq = self.ro_lm.LO_freq()
+        IF_freq = val - LO_freq
+        # Parameter 1 will be qubit.ro_freq()
+        self.qubit.ro_freq.set(val)
+        # Parameter 2 will be qubit.ro_freq_mod()
+        self.qubit.ro_freq_mod.set(IF_freq)
+
+        self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
+        self.ro_lm.load_waveforms_onto_AWG_lookuptable()
+
+
 class QWG_lutman_par_chunks(Soft_Sweep):
     '''
     Sweep function that divides sweep points into chunks. Every chunk is
@@ -928,6 +1075,7 @@ class lutman_par_dB_attenuation_QWG(Soft_Sweep):
         self.LutMan.QWG.get_instr().start()
         self.LutMan.QWG.get_instr().getOperationComplete()
 
+
 class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, run=False, single=True,**kw):
@@ -960,9 +1108,8 @@ class par_dB_attenuation_UHFQC_AWG_direct(Soft_Sweep):
         self.UHFQC = UHFQC
 
     def set_parameter(self, val):
-        UHFQC.awgs_0_outputs_1_amplitude(10**(val/20))
+        UHFQC.awgs_0_outputs_1_amplitude(10**(val/20))  # FIXME: broken code
         UHFQC.awgs_0_outputs_0_amplitude(10**(val/20))
-
 
 
 class lutman_par_UHFQC_dig_trig(Soft_Sweep):
@@ -1068,6 +1215,7 @@ class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
+
 class UHFQC_pulse_dB_attenuation(Soft_Sweep):
 
     def __init__(self, UHFQC, IF, dig_trigger=True,**kw):
@@ -1080,30 +1228,62 @@ class UHFQC_pulse_dB_attenuation(Soft_Sweep):
         self.dig_trigger = dig_trigger
         self.IF = IF
 
-
     def set_parameter(self, val):
         self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.IF,RO_amp=10**(val/20),RO_pulse_length=2e-6,acquisition_delay=200e-9,dig_trigger=self.dig_trigger)
         time.sleep(1)
         #print('refreshed UHFQC')
 
+
 class multi_sweep_function(Soft_Sweep):
     '''
     cascades several sweep functions into a single joint sweep functions.
     '''
-    def __init__(self, sweep_functions: list, parameter_name=None,name=None,**kw):
+    def __init__(self, sweep_functions: list, sweep_point_ratios: list=None,
+                 parameter_name=None, name=None,**kw):
         self.set_kw()
         self.sweep_functions = sweep_functions
         self.sweep_control = 'soft'
         self.name = name or 'multi_sweep'
         self.unit = sweep_functions[0].unit
         self.parameter_name = parameter_name or 'multiple_parameters'
+        self.sweep_point_ratios = sweep_point_ratios
         for i, sweep_function in enumerate(sweep_functions):
             if self.unit.lower() != sweep_function.unit.lower():
                 raise ValueError('units of the sweepfunctions are not equal')
 
     def set_parameter(self, val):
-        for sweep_function in self.sweep_functions:
-            sweep_function.set_parameter(val)
+        if self.sweep_point_ratios is None:
+            for sweep_function in self.sweep_functions:
+                sweep_function.set_parameter(val)
+        else:
+            for i, sweep_function in enumerate(self.sweep_functions):
+                v = (val-1)*self.sweep_point_ratios[i]+1
+                sweep_function.set_parameter(v)
+
+class multi_sweep_function_ranges(Soft_Sweep):
+    '''
+    cascades several sweep functions into a single joint sweep functions.
+    '''
+    def __init__(self, sweep_functions: list, sweep_ranges: list, n_points: int,
+                 parameter_name=None, name=None,**kw):
+        self.set_kw()
+        self.sweep_functions = sweep_functions
+        self.sweep_control = 'soft'
+        self.name = name or 'multi_sweep'
+        self.unit = sweep_functions[0].unit
+        self.parameter_name = parameter_name or 'multiple_parameters'
+        self.sweep_ranges = sweep_ranges
+        self.n_points = n_points
+        for i, sweep_function in enumerate(sweep_functions):
+            if self.unit.lower() != sweep_function.unit.lower():
+                raise ValueError('units of the sweepfunctions are not equal')
+
+    def set_parameter(self, val):
+        Sweep_points = [ np.linspace(self.sweep_ranges[i][0], 
+                                     self.sweep_ranges[i][1],
+                                     self.n_points) for i in range(len(self.sweep_ranges)) ]
+        for i, sweep_function in enumerate(self.sweep_functions):
+            sweep_function.set_parameter(Sweep_points[i][val])
 
 
 class two_par_joint_sweep(Soft_Sweep):
@@ -1144,7 +1324,14 @@ class FLsweep(Soft_Sweep):
     """
     Special sweep function for AWG8 and QWG flux pulses.
     """
-    def __init__(self, lm, par, waveform_name):
+    def __init__(self, 
+            lm, 
+            par, 
+            waveform_name: str, 
+            amp_for_generation: float = None, 
+            upload_waveforms_always: bool=True,
+            bypass_waveform_upload: bool=False
+        ):
         super().__init__()
         self.lm = lm
         self.par = par
@@ -1152,36 +1339,98 @@ class FLsweep(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
-
+        self.amp_for_generation = amp_for_generation
+        self.upload_waveforms_always = upload_waveforms_always
+        self.bypass_waveform_upload = bypass_waveform_upload
 
         self.AWG = self.lm.AWG.get_instr()
         self.awg_model_QWG = self.AWG.IDN()['model'] == 'QWG'
 
-
     def set_parameter(self, val):
-        if self.awg_model_QWG:
-            self.set_parameter_QWG(val)
-        else:
-            self.set_parameter_HDAWG(val)
+        # Just in case there is some resolution or number precision differences
+        # when setting the value
+        old_par_val = self.par()
+        self.par(val)
+        updated_par_val = self.par()
+        if self.upload_waveforms_always \
+                or (updated_par_val != old_par_val and not self.bypass_waveform_upload):
+            if self.awg_model_QWG:
+                self.set_parameter_QWG(val)
+            else:
+                self.set_parameter_HDAWG(val)
 
     def set_parameter_HDAWG(self, val):
-
-
         self.par(val)
+        if self.amp_for_generation:
+            old_val_amp = self.lm.cfg_awg_channel_amplitude()
+            self.lm.cfg_awg_channel_amplitude(self.amp_for_generation)
         self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
                                                    regenerate_waveforms=True)
+        if self.amp_for_generation:
+            self.lm.cfg_awg_channel_amplitude(abs(old_val_amp))
+
         self.AWG.start()
         return
 
     def set_parameter_QWG(self, val):
-        self.par(val)
         self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True,
             force_load_sequencer_program=True)
         self.AWG.start()
+        return
 
+class flux_t_middle_sweep(Soft_Sweep):
+
+    def __init__(self, 
+            fl_lm_tm: list, 
+            fl_lm_park: list,
+            which_gate: list,
+            t_pulse: list
+        ):
+        super().__init__()
+        self.name = 'time_middle'
+        self.parameter_name = 'time_middle'
+        self.unit = 's'
+        self.fl_lm_tm = fl_lm_tm
+        self.fl_lm_park = fl_lm_park
+        self.which_gate = which_gate
+        self.t_pulse = t_pulse
+
+    def set_parameter(self, val):
+        which_gate = self.which_gate
+        t_pulse = np.repeat(self.t_pulse, 2)
+        sampling_rate = self.fl_lm_tm[0].sampling_rate()
+        
+        # Calculate vcz times for each flux pulse
+        time_mid = val / sampling_rate
+        n_points  = [ np.ceil(tp / 2 * sampling_rate) for tp in t_pulse ]
+        time_sq  = [ n / sampling_rate for n in n_points ]
+        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate 
+        time_pad = np.abs(np.array(time_sq)-np.max(time_sq))
+
+        # set flux lutman parameters of CZ qubits
+        for i, fl_lm in enumerate(self.fl_lm_tm):
+            fl_lm.set('vcz_time_single_sq_{}'.format(which_gate[i]), time_sq[i])
+            fl_lm.set('vcz_time_middle_{}'.format(which_gate[i]), time_mid)
+            fl_lm.set('vcz_time_pad_{}'.format(which_gate[i]), time_pad[i])
+            fl_lm.set('vcz_amp_fine_{}'.format(which_gate[i]), .5)
+
+        # set flux lutman parameters of Park qubits
+        for fl_lm in self.fl_lm_park:
+            fl_lm.park_length(time_park)
+
+        Lutmans = self.fl_lm_tm + self.fl_lm_park
+        AWGs = np.unique([lm.AWG() for lm in Lutmans])
+        for AWG in AWGs:
+            Lutmans[0].find_instrument(AWG).stop()
+        for Lutman in Lutmans:
+            Lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        for AWG in AWGs:
+            Lutmans[0].find_instrument(AWG).stop()
+
+        return val
 
 
 class Nested_resonator_tracker(Soft_Sweep):
@@ -1213,15 +1462,68 @@ class Nested_resonator_tracker(Soft_Sweep):
         self.qubit._prep_ro_sources()
         if self.reload_marked_sequence:
             # reload the meaningfull sequence
+            self.cc.stop()
             self.cc.eqasm_program(self.sequence_file.filename)
+            self.cc.start()
         spec_source = self.qubit.instr_spec_source.get_instr()
         spec_source.on()
         self.cc.start()
 
+class Nested_spec_source_pow(Soft_Sweep):
+    """
+    Sets a parameter and performs a "find_resonator_frequency" measurement
+    after setting the parameter.
+    """
+    def __init__(self, qubit, nested_MC, par, reload_sequence=False,
+                 cc=None, sequence_file=None, **kw):
+        super().__init__(**kw)
+        self.qubit = qubit
+        self.par = par
+        self.nested_MC = nested_MC
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+        self.reload_marked_sequence = reload_sequence
+        self.sequence_file = sequence_file
+        self.cc = cc
 
+    def set_parameter(self, val):
+        spec_source = self.qubit.instr_spec_source.get_instr()
+        spec_source.power.set(val)
+        if self.reload_marked_sequence:
+            # reload the meaningfull sequence
+            self.cc.eqasm_program(self.sequence_file.filename)
+        spec_source.on()
+        self.cc.start()
+
+class Nested_amp_ro(Soft_Sweep):
+    """
+    Sets a parameter and performs a "find_resonator_frequency" measurement
+    after setting the parameter.
+    """
+    def __init__(self, qubit, nested_MC, par, reload_sequence=False,
+                 cc=None, sequence_file=None, **kw):
+        super().__init__(**kw)
+        self.qubit = qubit
+        self.par = par
+        self.nested_MC = nested_MC
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+        self.reload_marked_sequence = reload_sequence
+        self.sequence_file = sequence_file
+        self.cc = cc
+
+    def set_parameter(self, val):
+        self.par(val)
+        self.qubit._prep_ro_pulse(CW=True)
+        if self.reload_marked_sequence:
+            # reload the meaningfull sequence
+            self.cc.eqasm_program(self.sequence_file.filename)
+        self.cc.start()
 
 class tim_flux_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'Flux latency'
@@ -1237,8 +1539,9 @@ class tim_flux_latency_sweep(Soft_Sweep):
         time.sleep(.5)
         return val
 
+
 class tim_ro_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'RO latency'
@@ -1250,13 +1553,12 @@ class tim_ro_latency_sweep(Soft_Sweep):
         self.dev.tim_ro_latency_1(val)
         self.dev.tim_ro_latency_2(val)
         self.dev.prepare_timing()
-
-
         time.sleep(.5)
         return val
 
+
 class tim_mw_latency_sweep(Soft_Sweep):
-    def __init__(self,device):
+    def __init__(self, device):
         super().__init__()
         self.dev = device
         self.name = 'MW latency'
@@ -1272,4 +1574,41 @@ class tim_mw_latency_sweep(Soft_Sweep):
         self.dev.prepare_timing()
 
         time.sleep(.5)
+        return val
+
+
+class tim_mw_latency_sweep_1D(Soft_Sweep):
+    def __init__(self, device):
+        super().__init__()
+        self.dev = device
+        self.name = 'MW latency'
+        self.parameter_name = 'MW latency'
+        self.unit = 's'
+
+    def set_parameter(self, val):
+        self.dev.tim_mw_latency_0(val)
+        self.dev.tim_mw_latency_1(val)
+        self.dev.prepare_timing()
+        return val
+
+
+class SweepAlong2DContour(Soft_Sweep):
+    """
+    Performs a sweep along a 2D contour by setting two parameters at the same
+    time
+    """
+    def __init__(self, par_A, par_B, contour_pnts, interp_kw: dict = {}):
+        super().__init__()
+        self.par_A = par_A
+        self.par_B = par_B
+        self.name = 'Contour sweep'
+        self.parameter_name = 'Contour sweep'
+        self.unit = 'a.u.'
+        self.interpolator = c2d.interp_2D_contour(contour_pnts, **interp_kw)
+
+    def set_parameter(self, val):
+        val_par_A, val_par_B = self.interpolator(val)
+        self.par_A(val_par_A)
+        self.par_B(val_par_B)
+
         return val

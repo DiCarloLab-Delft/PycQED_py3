@@ -22,7 +22,7 @@ class InstrumentMonitor(Instrument):
         """
         Initializes the plotting window
         """
-        super().__init__(name=name, server_name=None)
+        super().__init__(name=name)
         self.station = station
         self.add_parameter('update_interval',
                            unit='s',

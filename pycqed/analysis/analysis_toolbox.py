@@ -1,31 +1,29 @@
-# some convenience tools
-#
-import numpy as np
-import logging
 import os
 import time
 import datetime
 import warnings
+import h5py
+import logging
+
+import pandas as pd
+import colorsys as colors
+# FIXME: was commented out, breaks code below
+#import qutip as qp
+#import qutip.metrics as qpmetrics
+
 from copy import deepcopy
 from collections import OrderedDict as od
-from matplotlib import colors
-import pandas as pd
-from pycqed.utilities.get_default_datadir import get_default_datadir
-from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import h5py
+from scipy.interpolate import griddata
 from scipy.signal import argrelextrema
 from scipy import optimize
-# to allow backwards compatibility with old a_tools code
-from .tools.data_manipulation import *
-from .tools.plotting import *
-import colorsys as colors
-from matplotlib import cm
+
+from pycqed.utilities.get_default_datadir import get_default_datadir
 from pycqed.analysis import composite_analysis as RA
+from .tools.plotting import *
 
-# import qutip as qp
-# import qutip.metrics as qpmetrics
-
+from matplotlib import colors
+from matplotlib import cm
 from matplotlib.colors import LogNorm
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabel,
                                             data_to_table_png,
@@ -216,7 +214,7 @@ def get_datafilepath_from_timestamp(timestamp):
 
     daydir = os.listdir(os.path.join(datadir, daystamp))
 
-    # Loooking for the folder starting with the right timestamp
+    # Looking for the folder starting with the right timestamp
     measdir_names = [item for item in daydir if item.startswith(tstamp)]
 
     if len(measdir_names) > 1:
@@ -226,7 +224,7 @@ def get_datafilepath_from_timestamp(timestamp):
     measdir_name = measdir_names[0]
     # Naming follows a standard convention
     data_fp = os.path.join(datadir, daystamp, measdir_name,
-                           measdir_name+'.hdf5')
+                           measdir_name + '.hdf5')
     return data_fp
 
 
@@ -626,11 +624,11 @@ def get_data_from_timestamp_list(timestamps,
                     remove_timestamps.append(timestamp)
                     do_analysis = True
                 ana.finish()
-            except KeyError as e: 
+            except KeyError as e:
 
                 logging.warning('KeyError "%s" when processing timestamp %s' %
                                 (e, timestamp))
-                logging.warning(e) 
+                logging.warning(e)
 
             except Exception as e:
                 logging.warning('Error "%s" when processing timestamp %s' %
@@ -1796,7 +1794,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
                show=False, normalize=False, log=False,
                transpose=False, add_colorbar=True,
                xlabel='', ylabel='', zlabel='',
-               x_unit='', y_unit='', z_unit='',  **kw):
+               x_unit='', y_unit='', z_unit='', **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
@@ -1812,21 +1810,22 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
             combination of letters x, y, z for scaling of the according axis.
             Remember to set the labels correctly.
     """
-    if ax == None:
+    if ax is None:
         fig, ax = plt.subplots()
 
-    norm = None
-    try:
-        if log is True or 'z' in log:
-            norm = LogNorm()
+    norm = kw.get('norm', None)
+    if norm is None:
+        try:
+            if log is True or 'z' in log:
+                norm = LogNorm()
 
-        if 'y' in log:
-            y = np.log10(y)
+            if 'y' in log:
+                y = np.log10(y)
 
-        if 'x' in log:
-            x = np.log10(x)
-    except TypeError:  # log is not iterable
-        pass
+            if 'x' in log:
+                x = np.log10(x)
+        except TypeError:  # log is not iterable
+            pass
 
     # calculate coordinates for corners of color blocks
     # x coordinates
@@ -1886,6 +1885,8 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
     x_unit = kw.get('x_unit', x_unit)
     y_unit = kw.get('y_unit', y_unit)
     z_unit = kw.get('z_unit', z_unit)
+    cbarticks = kw.get('cbarticks', None)
+    cbarextend = kw.get('cbarextend', 'neither')
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
@@ -1920,7 +1921,8 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
         if cax is None:
             ax_divider = make_axes_locatable(ax)
             cax = ax_divider.append_axes('right', size='5%', pad='2%')
-        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
+        cbar = plt.colorbar(colormap, cax=cax, orientation='vertical',
+            ticks=cbarticks, extend=cbarextend)
         if zlabel is not None:
             set_cbarlabel(cbar, zlabel, unit=z_unit)
         return fig, ax, colormap, cbar
