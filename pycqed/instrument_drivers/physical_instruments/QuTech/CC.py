@@ -302,7 +302,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
                         seq_out         0x8B6D8B6D,2            # 10001011011011011000101101101101
                         seq_out         0x8DB68DB6,2            # 10001101101101101000110110110110
                         seq_out         0x8FFF8FFF,2            # 10001111111111111000111111111111
-                            jmp             @mainLoop               # loop indefinitely
+                        jmp             @mainLoop               # loop indefinitely
             """
 
             sequence_length = 8
