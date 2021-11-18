@@ -1,10 +1,10 @@
 import numpy as np
 from pycqed.measurement import awg_sweep_functions as awg_swf
-from pycqed.measurement import detector_functions as det
+#from pycqed.measurement import detector_functions as det
 from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.analysis import measurement_analysis as ma
 import qcodes as qc
-from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
+#from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
 import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 station = qc.station
 

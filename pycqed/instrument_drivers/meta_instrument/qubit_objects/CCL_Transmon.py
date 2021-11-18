@@ -2,7 +2,7 @@
 import time
 import logging
 import numpy as np
-from autodepgraph import AutoDepGraph_DAG
+#from autodepgraph import AutoDepGraph_DAG
 import warnings
 
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
@@ -14,8 +14,8 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.utilities.general import gen_sweep_pts
-from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
-    mk_optimize_res_loss_func
+# from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
+#     mk_optimize_res_loss_func
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
     mk_minimization_loss_func, mk_minimization_goal_func
 

@@ -16,7 +16,7 @@ from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
+# from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 # from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
@@ -481,9 +481,9 @@ class Test_Instantiate(unittest.TestCase):
                              MC=None, heterodyne_instr=None, cw_source=None)
         QDT.close()
 
-    def test_instantiate_TekTransmon(self):
-        TT = Tektronix_driven_transmon('TT')
-        TT.close()
+    # def test_instantiate_TekTransmon(self):
+    #     TT = Tektronix_driven_transmon('TT')
+    #     TT.close()
 
     # FIXME: disabled for PR #620
     # def test_instantiate_CBoxv3_transmon(self):
