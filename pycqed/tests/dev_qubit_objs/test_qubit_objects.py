@@ -14,10 +14,7 @@ import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
-
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
-# from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
-# from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
@@ -480,16 +477,3 @@ class Test_Instantiate(unittest.TestCase):
         QDT = QuDev_transmon('QuDev_transmon',
                              MC=None, heterodyne_instr=None, cw_source=None)
         QDT.close()
-
-    # def test_instantiate_TekTransmon(self):
-    #     TT = Tektronix_driven_transmon('TT')
-    #     TT.close()
-
-    # FIXME: disabled for PR #620
-    # def test_instantiate_CBoxv3_transmon(self):
-    #     CT = CBox_v3_driven_transmon('CT')
-    #     CT.close()
-    #
-    # def test_instantiate_QWG_transmon(self):
-    #     QT = QWG_driven_transmon('QT')
-    #     QT.close()

@@ -1,4 +1,5 @@
 # FIXME: split-off QWG/UHFQA/etc sweeps into separate files
+# FIXME: deprecate unused sweep functions
 
 import logging
 import time
