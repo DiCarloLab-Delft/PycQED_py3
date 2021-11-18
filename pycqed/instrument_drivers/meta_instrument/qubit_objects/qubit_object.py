@@ -5,9 +5,9 @@ import warnings
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
-from pycqed.measurement import detector_functions as det
 from qcodes.instrument.parameter import ManualParameter
 
+from pycqed.measurement import detector_functions as det
 from pycqed.utilities.general import gen_sweep_pts
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
@@ -23,6 +23,10 @@ class Qubit(Instrument):
     Abstract base class for the qubit object.
     Contains a template for all methods a qubit (should) has.
     N.B. This is not intended to be initialized.
+    FIXME: this is no longer an ABC, since some methods have an implementation here.
+     Additionally, some methods in CCLight_Transmon have parameter packs that are
+     different from those specified here, so things have become a bit messy.
+     Note that QuDev_transmon also inherits Qubit.
 
     Specific types of qubits should inherit from this class, different
     hardware configurations can inherit from those to further specify
@@ -813,7 +817,7 @@ class Qubit(Instrument):
         if resonators is None:
             try:
                 device = self.instr_device.get_instr()
-            except AttributeuxError:
+            except AttributeError:
                 logging.warning('Could not find device resonators: '
                                 'No device found for {}.'.format(self.name))
                 return False
