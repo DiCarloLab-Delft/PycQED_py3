@@ -26,17 +26,14 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import tomography as tomo
 from pycqed.analysis_v2 import measurement_analysis as ma2
-from pycqed.utilities.general import check_keyboard_interrupt, print_exception
-
-from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
-    QuTech_AWG_Module,
-)
-#from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
-from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
-from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
 
 from pycqed.utilities import learner1D_minimizer as l1dm
+from pycqed.utilities.general import check_keyboard_interrupt, print_exception
+
+from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
+
+
 
 log = logging.getLogger(__name__)
 

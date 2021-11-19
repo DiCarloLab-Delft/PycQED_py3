@@ -1,17 +1,10 @@
-# import numpy as np
-# import time
 import logging as log
 from typing import List, Union
 
-# from pycqed.measurement import detector_functions as det
-# from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import optimization as opt
 
 from qcodes.instrument.parameter import ManualParameter
-# from pycqed.analysis.analysis_toolbox import normalize_TD_data
-# from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
-# from pycqed.analysis_v2 import measurement_analysis as ma2
-# from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
+
 
 counter_param = ManualParameter('counter', unit='#')
 counter_param(0)

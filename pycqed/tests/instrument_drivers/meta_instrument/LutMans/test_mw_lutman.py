@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-import pytest
+
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 import pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module as qwg
 
@@ -44,7 +44,6 @@ class Test_MW_LutMan(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
         self.AWG8_VSM_MW_LutMan.set_default_lutmap()
 
-        self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
         self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
         self.QWG_MW_LutMan.AWG(self.QWG.name)
         self.QWG_MW_LutMan.channel_I(1)
