@@ -147,20 +147,6 @@ class Test_MW_LutMan(unittest.TestCase):
         # Does not check the full lutmap
         dict_contained_in(expected_dict, self.AWG8_MW_LutMan.LutMap())
 
-    def test_lut_mapping_CBox(self):
-        self.CBox_MW_LutMan.set_default_lutmap()
-        expected_dict = {'I': 0,
-                         'rX180': 1,
-                         'rY180': 2,
-                         'rX90': 3,
-                         'rY90': 4,
-                         'rXm90': 5,
-                         'rYm90': 6,
-                         'rPhi90': 7}
-
-        self.assertDictEqual.__self__.maxDiff = None
-        self.assertDictEqual(expected_dict, self.CBox_MW_LutMan.LutMap())
-
     def test_lut_mapping_AWG8_VSM(self):
         self.AWG8_VSM_MW_LutMan.set_default_lutmap()
         expected_dict = {
