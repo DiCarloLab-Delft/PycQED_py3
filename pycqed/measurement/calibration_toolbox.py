@@ -7,7 +7,7 @@ from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement import detector_functions as det
 #from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement import mc_parameter_wrapper as pw
-from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
+#from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 from pycqed.measurement.optimization import nelder_mead
 #from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sqqs
 
@@ -635,76 +635,76 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
 #         return phase_min_lst[0], ampl_min_lst[0]
 
 
-def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
-                                      acquisition_marker_channel,
-                                      LutMan,
-                                      MC,
-                                      SH_ref_level: float=-40,
-                                      verbose: bool=True):
-    '''
-    Input args
-        UHFQC:  UHFQC acquisition instrument
-        SH:     Signal Hound
-        source: MW-source connected to the mixer
-        LutMan: Used for changing the pars and loading the pulses
-        AWG:    Used for supplying triggers to the CBox
-        MC:
-        awg_nrs: The awgs used in the CBox to which the pulses are uploaded.
-                 (list to allow setting a copy on e.g. awg_nr = 1)
-
-
-    Calibrates the mixer skewnness
-    The UHFQC, in this case a fixed sequence is played in the tektronix
-    to ensure the UHFQC is continously triggered and the parameters are
-    reloaded between each measured point.
-
-    If calibrate_both_sidebands is True the optimization runs two calibrations,
-    first it tries to minimize the power in the spurious sideband by varying
-    the phase and amplitude skewness. After that it flips the phase 180 degrees
-    and repeates the same experiment for the desired sideband. Both should
-    give the same result.
-
-    For a description on how to translate these coefficients to a rotation
-    matrix see the notes in docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
-
-    If calibrate_both_sidebands is False it will only minimize the signal in
-    the spurious sideband. and return those values.
-
-    '''
-    # Loads a train of pulses to the AWG to trigger the UHFQC continuously
-    AWG.stop()
-    st_seqs.generate_and_upload_marker_sequence(
-        5e-9, 1.0e-6, RF_mod=False,
-        acq_marker_channels=acquisition_marker_channel)
-    AWG.run()
-
-    #  Ensure that the block is 4 periods of the modulation freq
-    #  Ensure that the block is 4 periods of the modulation freq
-    LutMan.M_block_length.set(960e-9)  # in ns
-    LutMan.M_ampCW.set(0.4)
-    LutMan.render_wave('M_ModBlock', time_unit='ns')
-    # divide instead of multiply by 1e-9 because of rounding errors
-    S1 = swf.UHFQC_Lutman_par_with_reload(
-        LutMan, LutMan.mixer_alpha, ['M_ModBlock'], run=True, single=False)
-    S2 = swf.UHFQC_Lutman_par_with_reload(
-        LutMan, LutMan.mixer_phi, ['M_ModBlock'], run=True, single=False)
-    SH.ref_lvl(SH_ref_level)
-    detector = det.Signal_Hound_fixed_frequency(
-        SH, frequency=(source.frequency.get() -
-                       LutMan.M_modulation()),
-        Navg=5, delay=0.0, prepare_each_point=False)
-
-    ad_func_pars = {'adaptive_function': nelder_mead,
-                    'x0': [1.0, 0.0],
-                    'initial_step': [.15, 10],
-                    'no_improv_break': 15,
-                    'minimize': True,
-                    'maxiter': 500}
-    MC.set_sweep_functions([S1, S2])
-    MC.set_detector_function(detector)  # sets test_detector
-    MC.set_adaptive_function_parameters(ad_func_pars)
-    MC.run(name='Spurious_sideband', mode='adaptive')
-    a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
-    alpha = a.optimization_result[0][0]
-    phi = a.optimization_result[0][1]
-    return phi, alpha
+# def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
+#                                       acquisition_marker_channel,
+#                                       LutMan,
+#                                       MC,
+#                                       SH_ref_level: float=-40,
+#                                       verbose: bool=True):
+#     '''
+#     Input args
+#         UHFQC:  UHFQC acquisition instrument
+#         SH:     Signal Hound
+#         source: MW-source connected to the mixer
+#         LutMan: Used for changing the pars and loading the pulses
+#         AWG:    Used for supplying triggers to the CBox
+#         MC:
+#         awg_nrs: The awgs used in the CBox to which the pulses are uploaded.
+#                  (list to allow setting a copy on e.g. awg_nr = 1)
+#
+#
+#     Calibrates the mixer skewnness
+#     The UHFQC, in this case a fixed sequence is played in the tektronix
+#     to ensure the UHFQC is continously triggered and the parameters are
+#     reloaded between each measured point.
+#
+#     If calibrate_both_sidebands is True the optimization runs two calibrations,
+#     first it tries to minimize the power in the spurious sideband by varying
+#     the phase and amplitude skewness. After that it flips the phase 180 degrees
+#     and repeates the same experiment for the desired sideband. Both should
+#     give the same result.
+#
+#     For a description on how to translate these coefficients to a rotation
+#     matrix see the notes in docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
+#
+#     If calibrate_both_sidebands is False it will only minimize the signal in
+#     the spurious sideband. and return those values.
+#
+#     '''
+#     # Loads a train of pulses to the AWG to trigger the UHFQC continuously
+#     AWG.stop()
+#     st_seqs.generate_and_upload_marker_sequence(
+#         5e-9, 1.0e-6, RF_mod=False,
+#         acq_marker_channels=acquisition_marker_channel)
+#     AWG.run()
+#
+#     #  Ensure that the block is 4 periods of the modulation freq
+#     #  Ensure that the block is 4 periods of the modulation freq
+#     LutMan.M_block_length.set(960e-9)  # in ns
+#     LutMan.M_ampCW.set(0.4)
+#     LutMan.render_wave('M_ModBlock', time_unit='ns')
+#     # divide instead of multiply by 1e-9 because of rounding errors
+#     S1 = swf.UHFQC_Lutman_par_with_reload(
+#         LutMan, LutMan.mixer_alpha, ['M_ModBlock'], run=True, single=False)
+#     S2 = swf.UHFQC_Lutman_par_with_reload(
+#         LutMan, LutMan.mixer_phi, ['M_ModBlock'], run=True, single=False)
+#     SH.ref_lvl(SH_ref_level)
+#     detector = det.Signal_Hound_fixed_frequency(
+#         SH, frequency=(source.frequency.get() -
+#                        LutMan.M_modulation()),
+#         Navg=5, delay=0.0, prepare_each_point=False)
+#
+#     ad_func_pars = {'adaptive_function': nelder_mead,
+#                     'x0': [1.0, 0.0],
+#                     'initial_step': [.15, 10],
+#                     'no_improv_break': 15,
+#                     'minimize': True,
+#                     'maxiter': 500}
+#     MC.set_sweep_functions([S1, S2])
+#     MC.set_detector_function(detector)  # sets test_detector
+#     MC.set_adaptive_function_parameters(ad_func_pars)
+#     MC.run(name='Spurious_sideband', mode='adaptive')
+#     a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
+#     alpha = a.optimization_result[0][0]
+#     phi = a.optimization_result[0][1]
+#     return phi, alpha

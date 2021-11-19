@@ -316,7 +316,7 @@ class Chevron_Alignment_Analysis(sa.Basic2DInterpolatedAnalysis):
         fit_from: str = "",
         fit_threshold: float = None,
         sq_pulse_duration: float = None,
-        peak_is_inverted: bool = True,
+        peak_is_inverted: bool = False,
     ):
         self.fit_from = fit_from
         self.fit_threshold = fit_threshold
@@ -731,6 +731,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         t_start: str = None,
         t_stop: str = None,
         label: str = "",
+        for_multi_CZ : bool = False,
+        pair = {},
         data_file_path: str = None,
         close_figs: bool = True,
         options_dict: dict = None,
@@ -759,7 +761,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         target_cond_phase: float = 180.0,
         single_q_phase_offset: bool = False,
         calc_L1_from_missing_frac: bool = True,
-        calc_L1_from_offset_diff: bool = False,
+        # calc_L1_from_offset_diff: bool = False,
         hull_clustering_thr=0.1,
         hull_phase_thr=5,
         hull_L1_thr=5,
@@ -776,7 +778,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         self.plt_optimal_values = plt_optimal_values
         self.plt_optimal_values_max = plt_optimal_values_max
         self.plt_clusters = plt_clusters
-
+        self.for_multi_CZ = for_multi_CZ
+        self.pair = pair 
         # Optimals are interpolated
         # Manually set to false if the default analysis flow is changed
         # e.g. in get_guesses_from_cz_sim in flux_lutman
@@ -807,7 +810,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         # Handy calculation for comparing experiment and simulations
         # but using the same analysis code
         self.calc_L1_from_missing_frac = calc_L1_from_missing_frac
-        self.calc_L1_from_offset_diff = calc_L1_from_offset_diff
+        # self.calc_L1_from_offset_diff = calc_L1_from_offset_diff
         # Compare to any other dataset that has the same shape for
         # 'measured_values'
         self.comparison_timestamp = comparison_timestamp
@@ -834,6 +837,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             "cost function",
             "Cost function",
             "Cost function value",
+            "cost function val",
         }
         L1_names = {"L1", "Leakage", "half missing fraction"}
         ms_names = {
@@ -851,16 +855,18 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             "cond phase",
             "cond. phase",
             "conditional phase",
+            "delta phi",
+            "phi diff"
         }
-        offset_diff_names = {
-            "offset difference",
-            "offset diff",
-            "offset diff.",
-            "Offset difference",
-            "Offset diff",
-            "Offset diff.",
-        }
-        phase_q0_names = {"Q0 phase", "phase q0"}
+        # offset_diff_names = {
+        #     "offset difference",
+        #     "offset diff",
+        #     "offset diff.",
+        #     "Offset difference",
+        #     "Offset diff",
+        #     "Offset diff.",
+        # }
+        # phase_q0_names = {"Q0 phase", "phase q0"}
 
         # also account for possible underscores instead of a spaces between words
         allNames = [
@@ -868,8 +874,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             L1_names,
             ms_names,
             cond_phase_names,
-            offset_diff_names,
-            phase_q0_names,
+            # offset_diff_names,
+            # phase_q0_names,
         ]
         allNames = [
             names.union({name.replace(" ", "_") for name in names})
@@ -886,8 +892,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
             self.L1_names,
             self.ms_names,
             self.cond_phase_names,
-            self.offset_diff_names,
-            self.phase_q0_names,
+            # self.offset_diff_names,
+            # self.phase_q0_names,
         ] = allNames
 
         super().__init__(
@@ -918,14 +924,30 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         )
         a.get_naming_and_values()
 
+        
+        params_names = ['relative_sq_amp','fine_amp']
         for idx, lab in enumerate(["x", "y"]):
-            self.raw_data_dict[lab] = a.sweep_points[idx]
-            self.raw_data_dict["{}label".format(lab)] = a.parameter_names[idx]
-            self.raw_data_dict["{}unit".format(lab)] = a.parameter_units[idx]
+            if self.for_multi_CZ:
+                self.raw_data_dict[lab] = (a.sweep_points[idx]-1)*(self.pair['sweep_ratio'][idx])+1
+                names=[' '.join(nam.split('_')[:-1]) for nam in a.value_names \
+                if nam.split('_')[-1] == f"{self.pair['pair_name']}"]
+                idxx = int(len(a.value_names)/3)
+                vls=[a.measured_values[self.pair['pair_num']+(i*idxx)] for i in range(len(names))]
+                unts=[a.value_units[self.pair['pair_num']+(i*idxx)] for i in range(len(names)) ]
+                self.raw_data_dict["measured_values"] = vls
+                self.raw_data_dict["value_names"] = names
+                self.raw_data_dict["value_units"] = unts
+                print(names)
+                print(unts)
 
-        self.raw_data_dict["measured_values"] = a.measured_values
-        self.raw_data_dict["value_names"] = a.value_names
-        self.raw_data_dict["value_units"] = a.value_units
+            else: 
+                self.raw_data_dict[lab] = a.sweep_points[idx]
+                self.raw_data_dict["measured_values"] = a.measured_values
+                self.raw_data_dict["value_names"] = a.value_names
+                self.raw_data_dict["value_units"] = a.value_units
+            # self.raw_data_dict["{}label".format(lab)] = a.parameter_names[idx]
+            self.raw_data_dict["{}label".format(lab)] = params_names[idx]
+            self.raw_data_dict["{}unit".format(lab)] = a.parameter_units[idx]
         self.raw_data_dict["measurementstring"] = a.measurementstring
         self.raw_data_dict["folder"] = a.folder
         a.finish()
@@ -1328,7 +1350,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         vln_set = set(self.proc_data_dict["value_names"])
         for names, do_calc in [
             (self.ms_names, self.calc_L1_from_missing_frac),
-            (self.offset_diff_names, self.calc_L1_from_offset_diff),
+            # (self.offset_diff_names, self.calc_L1_from_offset_diff),
         ]:
             found_name = len(vln_set.intersection(names)) > 0
             if do_calc and found_name:
@@ -1361,8 +1383,8 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
                 self.L1_names,
                 self.ms_names,
                 self.cond_phase_names,
-                self.offset_diff_names,
-                self.phase_q0_names,
+                # self.offset_diff_names,
+                # self.phase_q0_names,
             ]:
                 inters_this = names.intersection(self.proc_data_dict["value_names"])
                 inters_comp = names.intersection(
@@ -1765,7 +1787,7 @@ class Conditional_Oscillation_Heatmap_Analysis(ba.BaseDataAnalysis):
         optimal_measured_values=None,
         optimal_start: int = 0,
         optimal_end: int = np.inf,
-        sig_digits: int = 4,
+        sig_digits: int = 8,
         opt_are_interp=None,
     ):
         if not optimal_pars_values:

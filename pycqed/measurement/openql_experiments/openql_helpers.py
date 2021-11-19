@@ -93,7 +93,7 @@ def compile(p, quiet: bool = False, extra_openql_options: List[Tuple[str,str]] =
     """
     Wrapper around OpenQL Program.compile() method.
     """
-    ql.initialize() # FIXME: reset options, may initialize more functionality in the future
+    # ql.initialize() # FIXME: reset options, may initialize more functionality in the future
     ql.set_option('output_dir', output_dir)
     if quiet:
         with suppress_stdout():
@@ -249,10 +249,13 @@ def add_two_q_cal_points(p, q0: int, q1: int,
 
 
 def add_multi_q_cal_points(
-    p, qubits: list,
-    combinations: list = ["00", "01", "10", "11"],
+    p: Program, 
+    qubits: List[int],
+    combinations: List[str] = ["00", "01", "10", "11"],
     reps_per_cal_pnt: int = 1,
     f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+    nr_flux_dance: int = None,
+    flux_cw_list: List[str] = None, 
     return_comb=False
 ):
     """
@@ -281,20 +284,41 @@ def add_multi_q_cal_points(
         "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
     }
 
-    for i, comb in enumerate(combinations):
+    for i, comb in enumerate(comb_repetead):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
 
+        # NOTE: for debugging purposes of the effect of fluxing on readout, 
+        #       prepend flux dance before calibration points
         for q_state, q in zip(comb, qubits):
             k.prepz(q)
+        k.gate("wait", [], 0)  # alignment 
+
+        if nr_flux_dance and flux_cw_list:
+            for i in range(int(nr_flux_dance)):
+                for flux_cw in flux_cw_list:
+                    k.gate(flux_cw, [0])
+                k.gate("wait", [], 0)
+            # k.gate("wait", [], 20) # prevent overlap of flux with mw gates
+
+        for q_state, q in zip(comb, qubits):
             for gate in state_to_gates[q_state]:
                 k.gate(gate, [q])
-        k.gate("wait", [], 0)  # alignment
+        k.gate("wait", [], 0)  # alignment 
+        # k.gate("wait", [], 20)  # alignment 
+
+
+        # for q_state, q in zip(comb, qubits):
+        #     k.prepz(q)
+        #     for gate in state_to_gates[q_state]:
+        #         k.gate(gate, [q])
+        # k.gate("wait", [], 0)  # alignment
 
         for q in qubits:
             k.measure(q)
         k.gate('wait', [], 0)  # alignment
         kernel_list.append(k)
         p.add_kernel(k)
+    
     if return_comb:
         return comb_repetead
     else:

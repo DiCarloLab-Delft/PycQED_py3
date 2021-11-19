@@ -55,7 +55,7 @@ If you use this software in any of your publications we would appreciate it if y
 ## Overview of the main modules
 Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things.
 Also take a look at [this recent (March 2020) presentation](docs/200330_Introduction_to_PycQED_v2.pdf) and [this previous presentation](docs/160714_qcodes_meetup.pdf), where the relation to QCoDeS and the core concepts in the package are explained.
-Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Adriaan) on the shoulder or create an issue to discuss it.
+Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Miguel) on the shoulder or create an issue to discuss it.
 
 ### Folder Structure
 + [docs](docs/)

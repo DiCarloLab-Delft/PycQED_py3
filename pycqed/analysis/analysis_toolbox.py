@@ -3,6 +3,7 @@ import time
 import datetime
 import warnings
 import h5py
+import logging
 
 import pandas as pd
 import colorsys as colors

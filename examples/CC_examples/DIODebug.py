@@ -97,7 +97,7 @@ if 1:   # HDAWG
 
         for i,d in enumerate(data):
             if d & 0x80000000 and d != prev_d:
-                print('0x{:08X}: {} {} {} {}'.format(d,
+                print('{}\t0x{:08X}: {} {} {} {}'.format(i, d,
                                                      d >> shift3 & mask3,
                                                      d >> shift2 & mask2,
                                                      d >> shift1 & mask1,
@@ -110,12 +110,18 @@ if 1:   # HDAWG
 
     if 0:
         # FIXME: looking at single awg
-        ts, cws = get_awg_dio_data(instr._dev, 0)
-        ZI_tools.print_timing_diagram_simple(cws, dio_lines, 64)
+        dio_lines = range(7, -1, -1)
+        awg = 1 # 0..3
+        ts, cws = instr._get_awg_dio_data(awg)
+        if 0:
+            ZI_tools.print_timing_diagram_simple(cws, dio_lines, 64)
+        else:
+            for i,t in enumerate(ts):
+                print('[{}] {}:\t0x{:08X}'.format(i, t, cws[i]))
 
 
 
-    if 1:  # get list of nodes
+    if 0:  # get list of nodes
         #nodes = instr.daq.listNodes('/' + dev + '/', 7)
         nodes = instr.daq.listNodes('/', 7)
         with open("nodes.txt", "w") as file:
@@ -126,7 +132,7 @@ if 1:   # HDAWG
         log.info(f"AWG{awg} DIO delay is set to {instr.getd(f'awgs/{awg}/dio/delay/value')}")
 
     # show some relevant DIO variables
-    if 1:
+    if 0:
         for awg in [0, 1, 2, 3]:
             print_var('awgs_{}_dio_error_timing'.format(awg))
             print_var('awgs_{}_dio_state'.format(awg))

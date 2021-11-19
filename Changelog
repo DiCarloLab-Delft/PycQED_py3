@@ -9,14 +9,19 @@ Legend:
 . Generic bullet
 
 
-v0.3 - Work In Progress
+v0.3 - 20211119
 # redesigned DIO timing calibration interface (PR #621):
     . DIO modes now defined in instrument_drivers/library/DIO.py instead of individual instrument drivers
     . usage: see examples/CC_examples/CC_demo_mux.py "DIO.calibrate"
 # support for Central Controller software v0.2.2 (older versions not supported)
     . requires OpenQL > 0.8.1.dev4
-# removed support for deprecated hardware (PR #620)
-. FIXME: many more changes, please document
+# removed support for deprecated hardware (PRs #620 and #646)
++ added support for real-time modulation of waveforms for microwave control
++ added support for mixer skewness calibration with real-time modulation
++ added support for virtual-Z gates
++ added multiple methods for parity check calibration and assessment
++ added multiple methods for parallel qubit calibration
+. many more undocumented changes
 
 v0.2 - 20191213
 . second public release
