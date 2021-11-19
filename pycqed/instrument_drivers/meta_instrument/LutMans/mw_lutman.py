@@ -373,16 +373,17 @@ class Base_MW_LutMan(Base_LutMan):
                 self._wave_dict)
         return self._wave_dict
 
+    # FIXME: seems to be overridden in all derived classes: remove
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool=False):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        # FIXME: type mismatch with function parameter, misleading name
+        # FIXME: type mismatch with function parameter, misleading name (also in Base_LutMan): called wave_id elsewhere
         if isinstance(waveform_name, int):
             cw_idx = waveform_name
         else:
-            raise DeprecationWarning
+            raise DeprecationWarning # FIXME: breaks contract of Base_LutMan
 
         waveforms = self._wave_dict[cw_idx]
         codewords = self.codeword_idx_to_parnames(cw_idx)
@@ -428,6 +429,7 @@ class Base_MW_LutMan(Base_LutMan):
     # FIXME: the load_* functions provide an undesired backdoor, also see issue #626
     ##########################################################################
 
+    # FIXME: remove, let user use LutMap parameter
     def set_inspire_lutmap(self):
         """Set the default lutmap for expanded microwave drive pulses."""
         self.LutMap(inspire_mw_lutmap.copy())
@@ -702,7 +704,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
             force_load_sequencer_program (bool): if True forces a new compilation
-                and upload of the program on the sequencer.
+                and upload of the program on the sequencer. FIXME: parameter pack incompatible with base class
         """
         # Uploading the codeword program (again) is needed to link the new
         # waveforms in case the user has changed the codeword mode.

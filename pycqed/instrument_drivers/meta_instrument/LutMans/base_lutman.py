@@ -42,6 +42,12 @@ class Base_LutMan(Instrument):
             ),
             vals=vals.Strings(),
         )
+
+        # FIXME: allowing direct access requires that user maintains consistence
+        #  between LutMap and _wave_dict (and instrument), see all the handling
+        #  (e.g. *lutman.load_*) in CCL_Transmon/device_object_CCL/sweep_functions,
+        #  and issue #626
+        #  Also, some verification when setting would be nice
         self.add_parameter(
             "LutMap",
             docstring=(
@@ -52,6 +58,7 @@ class Base_LutMan(Instrument):
             vals=vals.Dict(),
             parameter_class=ManualParameter,
         )
+
         self.add_parameter(
             "sampling_rate",
             unit="Hz",
@@ -139,7 +146,7 @@ class Base_LutMan(Instrument):
         self, wave_id, show=True, time_units="lut_index", reload_pulses=True
     ):
         """
-        Render a waveform.
+        Render a waveform to a figure.
 
         Args:
             wave_id: can be either the "name" of a waveform or
@@ -150,6 +157,7 @@ class Base_LutMan(Instrument):
 
         if reload_pulses:
             self.generate_standard_waveforms()
+
         fig, ax = plt.subplots(1, 1)
         if time_units == "lut_index":
             x = np.arange(len(self._wave_dict[wave_id][0]))

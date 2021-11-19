@@ -38,11 +38,12 @@ class Base_RO_LutMan(Base_LutMan):
 
     def __init__(self, name, num_res=2, feedline_number: int=0,
                  feedline_map='S7', **kw):
-        if num_res > 10:
+        if num_res > 10:  # FIXME: this is UHFQA limit
             raise ValueError('At most 10 resonators can be read out.')
         self._num_res = num_res
         self._feedline_number = feedline_number
 
+        # FIXME: we should not be aware of topology here
         if feedline_map == 'S5':
             if self._feedline_number == 0:
                 self._resonator_codeword_bit_mapping = [0, 2, 3, 4]
@@ -67,7 +68,6 @@ class Base_RO_LutMan(Base_LutMan):
             elif self._feedline_number == 2:
                 self._resonator_codeword_bit_mapping = [4, 5, 9, 10, 14, 16]
             else:
-                # FIXME: copy/paste error
                 raise NotImplementedError(
                     'Hardcoded for feedline 0, 1 and 2 of Surface-17')
         else:
