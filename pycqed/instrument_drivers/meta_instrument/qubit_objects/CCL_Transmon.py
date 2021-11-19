@@ -1366,7 +1366,7 @@ class CCLight_Transmon(Qubit):
                           'not preparing microwave pulses.')
 
         # 5. upload commandtable for virtual-phase gates
-        MW_LutMan.upload_single_qubit_phase_corrections()
+        MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
 
     def _prep_td_configure_VSM(self):
         # Configure VSM

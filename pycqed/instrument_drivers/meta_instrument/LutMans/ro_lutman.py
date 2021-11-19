@@ -1,9 +1,11 @@
+import numpy as np
+
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
+
 from pycqed.measurement.waveform_control_CC import waveform as wf
+
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
-import numpy as np
-import copy as copy
 
 
 def create_pulse(shape: str,
@@ -80,19 +82,9 @@ class Base_RO_LutMan(Base_LutMan):
         self._pulse_type = 'M_simple'
         super().__init__(name, **kw)
 
-    def _set_resonator_combinations(self, value):
-        self._resonator_combinations = value
-        self.set_default_lutmap()
-
-    def _get_resonator_combinations(self):
-        return self._resonator_combinations
-
-    def _set_pulse_type(self, value):
-        self._pulse_type = value
-        self.set_default_lutmap()
-
-    def _get_pulse_type(self):
-        return self._pulse_type
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
 
     def _add_waveform_parameters(self):
         # mixer corrections are done globally, can be specified per resonator
@@ -351,6 +343,24 @@ class Base_RO_LutMan(Base_LutMan):
 
         return self._wave_dict
 
+    ##########################################################################
+    # Private functions
+    ##########################################################################
+
+    def _set_resonator_combinations(self, value):
+        self._resonator_combinations = value
+        self.set_default_lutmap()
+
+    def _get_resonator_combinations(self):
+        return self._resonator_combinations
+
+    def _set_pulse_type(self, value):
+        self._pulse_type = value
+        self.set_default_lutmap()
+
+    def _get_pulse_type(self):
+        return self._pulse_type
+
 
 class UHFQC_RO_LutMan(Base_RO_LutMan):
 
@@ -383,37 +393,9 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=None)
 
-    def load_single_pulse_sequence_onto_UHFQC(self, pulse_name,
-                                              regenerate_waveforms=True):
-        '''
-        Load a single pulse to the lookuptable, it uses the lut_mapping to
-            determine which lookuptable to load to.
-        '''
-        wf_idx = get_wf_idx_from_name(pulse_name, self.LutMap())
-        if not wf_idx:
-            raise KeyError(
-                'Waveform named "{}" does not exist in the LutMap! Make sure that "pulse_type" "resonator_combinations" is set correctly.')
-
-        self._mode = 'single_pulse'
-        self._single_pulse_name = pulse_name
-        self.load_waveforms_onto_AWG_lookuptable(
-            regenerate_waveforms=regenerate_waveforms)
-
-    def load_DIO_triggered_sequence_onto_UHFQC(self,
-                                               regenerate_waveforms=True,
-                                               timeout=5):
-        '''
-        Load a single pulse to the lookuptable.
-        '''
-        self._mode = 'DIO_triggered'
-        self.timeout(timeout)
-        self.load_waveforms_onto_AWG_lookuptable(
-            regenerate_waveforms=regenerate_waveforms)
-
-    def set_mixer_offsets(self):
-        UHFQC = self.AWG.get_instr()
-        UHFQC.sigouts_0_offset(self.mixer_offs_I())
-        UHFQC.sigouts_1_offset(self.mixer_offs_Q())
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
 
     def load_waveform_onto_AWG_lookuptable(
             self, wave_id: str, regenerate_waveforms: bool=False):
@@ -484,6 +466,43 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         super().load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
+
+    ##########################################################################
+    # Functions
+    # FIXME: these provide an undesired backdoor
+    ##########################################################################
+
+    def set_mixer_offsets(self):
+        UHFQC = self.AWG.get_instr()
+        UHFQC.sigouts_0_offset(self.mixer_offs_I())
+        UHFQC.sigouts_1_offset(self.mixer_offs_Q())
+
+    def load_single_pulse_sequence_onto_UHFQC(self, pulse_name,
+                                              regenerate_waveforms=True):
+        '''
+        Load a single pulse to the lookuptable, it uses the lut_mapping to
+            determine which lookuptable to load to.
+        '''
+        wf_idx = get_wf_idx_from_name(pulse_name, self.LutMap())
+        if not wf_idx:
+            raise KeyError(
+                'Waveform named "{}" does not exist in the LutMap! Make sure that "pulse_type" "resonator_combinations" is set correctly.')
+
+        self._mode = 'single_pulse'
+        self._single_pulse_name = pulse_name
+        self.load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=regenerate_waveforms)
+
+    def load_DIO_triggered_sequence_onto_UHFQC(self,
+                                               regenerate_waveforms=True,
+                                               timeout=5):
+        '''
+        Load a single pulse to the lookuptable.
+        '''
+        self._mode = 'DIO_triggered'
+        self.timeout(timeout)
+        self.load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=regenerate_waveforms)
 
 
 def add_waves_different_length(a, b):
