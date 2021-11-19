@@ -317,6 +317,7 @@ class Base_MW_LutMan(Base_LutMan):
                     sampling_rate=self.sampling_rate(),
                     motzoi=self.mw_motzoi(),
                     delay=self.pulse_delay())
+
             elif waveform['type'] == 'ef':
                 amp = theta_to_amp(theta=waveform['theta'],
                                    amp180=self.mw_ef_amp180())
@@ -328,6 +329,7 @@ class Base_MW_LutMan(Base_LutMan):
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
                     delay=self.pulse_delay())
+
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
                     **waveform["drag_pars"])
@@ -416,6 +418,10 @@ class Base_MW_LutMan(Base_LutMan):
             parameter_class=ManualParameter, initial_value=True)
 
     def _add_channel_params(self):
+        """
+        add parameters that define connectivity of logical channels to
+        hardware channel numbers of the instrument involved (i.e. self.AWG)
+        """
         self.add_parameter('channel_I',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(1, self._num_channels))
@@ -510,6 +516,7 @@ class Base_MW_LutMan(Base_LutMan):
             mod_freqs = [mod_freqs]*len(amps)
 
         # 2. Generate a LutMap for the ef-pulses
+        # FIXME: hardcoded indices must match OpenQL definitions
         lm = self.LutMap()
         for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
             lm[i+9] = {"name": "", "type": "raw-drag",
@@ -527,7 +534,7 @@ class Base_MW_LutMan(Base_LutMan):
     # Private functions
     ##########################################################################
 
-    def codeword_idx_to_parnames(self, cw_idx: int):
+    def _codeword_idx_to_parnames(self, cw_idx: int):
         """Convert a codeword_idx to a list of par names for the waveform."""
         # the possible channels way of doing this is to make it work both for
         # VSM style lutmans and no VSM style lutmans.
@@ -763,6 +770,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
     def generate_standard_waveforms(
             self, apply_predistortion_matrix: bool=True):
+        # FIXME: looks very similar to overridden function in Base_MW_LutMan
         self._wave_dict = OrderedDict()
 
         if self.cfg_sideband_mode() == 'static':
@@ -795,6 +803,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     sampling_rate=self.sampling_rate(),
                     motzoi=self.mw_motzoi(),
                     delay=self.pulse_delay())
+
             elif waveform['type'] == 'ef':
                 amp = theta_to_amp(theta=waveform['theta'],
                                    amp180=self.mw_ef_amp180())
@@ -806,9 +815,11 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
                     delay=self.pulse_delay())
+
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
                     **waveform["drag_pars"])
+
             elif waveform['type'] == 'spec':
                 self._wave_dict[idx] = self.spec_func(
                     amp=self.spec_amp(),
@@ -816,6 +827,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     sampling_rate=self.sampling_rate(),
                     delay=0,
                     phase=0)
+
             elif waveform['type'] == 'square':
                 # Using a slightly different construction as above
                 # as the call signatures of these functions is different.
@@ -835,6 +847,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                         phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
+
             elif waveform['type'] == 'phase':
                 # fill codewords that are used for phase correction instructions
                 # with a zero waveform
@@ -1239,6 +1252,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         ########################################
         # STD waveforms
         ########################################
+        # FIXME: this creates _wave_dict, independent of LutMap
         self._wave_dict['I'] = self.wf_func(
             amp=0, sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
@@ -1278,7 +1292,6 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
-
         self._wave_dict['rPhi180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,

@@ -128,6 +128,7 @@ class Base_LutMan(Instrument):
             regenerate_waveforms (bool): if True calls
                 generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
+            FIXME: inefficient if multiple LutMans (qubits) per instrument are updated
         """
         AWG = self.AWG.get_instr()
 
@@ -239,6 +240,8 @@ class Base_LutMan(Instrument):
         return int(time * self.sampling_rate())
 
 
+# FIXME: this is specific for very early versions of the QWG that only supported a single codeword triggering all 4
+#  channels. Should be removed.
 def get_redundant_codewords(codeword: int, bit_width: int = 4, bit_shift: int = 0):
     """
     Takes in a desired codeword and generates the redundant codewords.

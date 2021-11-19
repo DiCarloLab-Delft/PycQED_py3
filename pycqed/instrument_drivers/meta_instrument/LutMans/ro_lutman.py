@@ -472,6 +472,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
     # FIXME: these provide an undesired backdoor
     ##########################################################################
 
+    # FIXME: move to UHFQC driver?
     def set_mixer_offsets(self):
         UHFQC = self.AWG.get_instr()
         UHFQC.sigouts_0_offset(self.mixer_offs_I())
