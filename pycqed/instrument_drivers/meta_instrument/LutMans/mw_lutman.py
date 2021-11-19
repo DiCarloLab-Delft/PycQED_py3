@@ -165,13 +165,6 @@ inspire_mw_lutmap = {
 
 valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square', 'phase'}
 
-# _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-#            'rXm90',  'rYm90', 'rPhi90', 'spec']
-# # use remaining codewords to set pi/2 gates for various angles
-# for i in range(18):
-#     angle = i * 20
-#     _def_lm.append('r{}_90'.format(angle))
-
 
 def mw_lutmap_is_valid(lutmap: dict) -> bool:
     """
@@ -432,7 +425,7 @@ class Base_MW_LutMan(Base_LutMan):
 
     ##########################################################################
     # Functions
-    # FIXME: the load_* functions provide an undesired backdoor
+    # FIXME: the load_* functions provide an undesired backdoor, also see issue #626
     ##########################################################################
 
     def set_inspire_lutmap(self):
