@@ -1,11 +1,6 @@
 import copy
 import numpy as np
 import logging
-# import collections
-# from skopt import Optimizer
-# from adaptive.utils import cache_latest
-# from adaptive.notebook_integration import ensure_holoviews
-# from adaptive.learner.base_learner import BaseLearner
 
 log = logging.getLogger(__name__)
 

@@ -1,12 +1,9 @@
-
 import unittest
 import pytest
 import numpy as np
 import os
+
 import pycqed as pq
-#import time
-#import openql
-#import warnings
 import pycqed.analysis.analysis_toolbox as a_tools
 
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
@@ -19,13 +16,9 @@ from qcodes import station
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 
-#from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
 from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
 import pycqed.instrument_drivers.meta_instrument.device_object_CCL as do
 
-#from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
-#from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
-#from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan

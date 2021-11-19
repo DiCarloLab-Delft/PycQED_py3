@@ -1,20 +1,15 @@
 # FIXME: code has errors according to PyCharm
-import os
-import time
-from imp import reload
 from matplotlib import pyplot as plt
 import numpy as np
-#from pycqed.analysis import measurement_analysis as MA
-#from pycqed.analysis import ramiro_analysis as RA
 from pycqed.analysis import fitting_models as fit_mods
-import lmfit
 import scipy as scipy
 try:
 	import qutip as qt
 except ImportError as e:
 	import logging
 	logging.warning('Could not import qutip, tomo code will not work')
-import itertools
+
+
 #Written By MALAY SINGH and RAMA SAGASTIZABAL
 #To prepare relevant inputs for tomography_V2
 class TomoPrep():

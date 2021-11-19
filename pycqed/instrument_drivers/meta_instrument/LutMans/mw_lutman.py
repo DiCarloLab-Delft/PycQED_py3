@@ -525,47 +525,6 @@ class Base_MW_LutMan(Base_LutMan):
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
 
-class CBox_MW_LutMan(Base_MW_LutMan):
-    _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-               'rXm90',  'rYm90', 'rPhi90', 'spec']
-    # use remaining codewords to set pi/2 gates for various angles
-    for i in range(18):
-        angle = i * 20
-        _def_lm.append('r{}_90'.format(angle))
-
-    def __init__(self, name, **kw):
-        super().__init__(name, **kw)
-
-    def _add_channel_params(self):
-        # CBox channels come in pairs defined in the AWG nr
-        self.add_parameter('awg_nr', parameter_class=ManualParameter,
-                           initial_value=0, vals=vals.Numbers(0, 2))
-
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
-        if regenerate_waveforms:
-            self.generate_standard_waveforms()
-        I_wave, Q_wave = self._wave_dict[waveform_name]
-        codeword = self.LutMap()[waveform_name]
-
-        self.AWG.get_instr().set_awg_lookuptable(self.awg_nr(),
-                                                 codeword, 0, I_wave)
-        self.AWG.get_instr().set_awg_lookuptable(self.awg_nr(),
-                                                 codeword, 1, Q_wave)
-
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = OrderedDict()
-        for cw_idx, cw_key in enumerate(def_lm):
-            max_cw_cbox = 8
-            if cw_idx < max_cw_cbox:
-                LutMap[cw_key] = cw_idx
-        self.LutMap(LutMap)
-
-
 class QWG_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
