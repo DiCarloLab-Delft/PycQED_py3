@@ -126,7 +126,7 @@ class Qubit(Instrument):
         return {'driver': str(self.__class__), 'name': self.name}
 
     ##########################################################################
-    # Abstract functions
+    # Abstract functions: add_*_parameters
     ##########################################################################
 
     def add_instrument_ref_parameters(self):
@@ -149,6 +149,11 @@ class Qubit(Instrument):
 
     def add_generic_qubit_parameters(self):
         pass
+
+    ##########################################################################
+    # Abstract functions
+    # FIXME: do these make a lot of sense: CCLight_Transmon does not seem to care too much
+    ##########################################################################
 
     def measure_T1(self, times=None, MC=None,
                    close_fig: bool=True, update: bool=True,
@@ -386,9 +391,6 @@ class Qubit(Instrument):
         self.add_config_parameters()
         self.add_generic_qubit_parameters()
 
-    def _get_operations(self):
-        return self._operations
-
     def add_operation(self, operation_name):
         self._operations[operation_name] = {}
 
@@ -468,9 +470,74 @@ class Qubit(Instrument):
                     self.get(parameter_name)
         return operation_dict
 
+    def _get_operations(self):
+        return self._operations
+
     ##########################################################################
     # Normal functions: resonators
     ##########################################################################
+
+    def measure_individual_resonators(self, with_VNA=False, use_min=True):
+        """
+        Specifically designed for use in automation, not recommended to use by
+        hand!
+        Finds which peaks were wrongly assigend as a resonator in the resonator
+        wide search
+        """
+        device = self.instr_device.get_instr()
+        found_resonators = device.found_resonators
+
+        new_resonators = []
+        for i, res in enumerate(found_resonators):
+            freq = res.freq
+            str_freq, unit = plt_tools.SI_val_to_msg_str(freq, 'Hz', float)
+            if with_VNA:
+                raise NotImplementedError
+            else:
+                old_avger=self.ro_acq_averages()
+                self.ro_acq_averages(2**14)
+                freqs = np.arange(freq - 5e6, freq + 5e6, 50e3)
+                label = '_{:.3f}_{}'.format(str_freq, unit)
+                name = 'Resonator_scan' + self.msmt_suffix + label
+                self.measure_heterodyne_spectroscopy(freqs=freqs,
+                                                     analyze=False,
+                                                     label=label)
+
+            a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
+            self.ro_acq_averages(old_avger)
+
+            dip = np.amin(a.data_y)
+            offset = a.fit_results.params['A'].value
+
+            if ((np.abs(dip/offset) > 0.7) or getattr(a.fit_results.params['f0'],'stderr', None) is None):
+
+                print('Removed candidate {} ({:.3f} {}): Not a resonator'
+                      .format(res.identifier, str_freq, unit))
+
+            else:
+                if use_min:
+                    f_res = a.min_frequency
+                else:
+                    f_res = a.fit_results.params['f0'].value*1e9
+
+                # Check if not a duplicate
+                if i > 0:
+                    prev_freq = found_resonators[i-1].freq
+                    if np.abs(prev_freq - f_res) < 10e6:
+                        print('Removed candidate: {} ({:.3f} {}): Duplicate'
+                              .format(res.identifier, str_freq, unit))
+                    else:
+                        found_resonators[i].freq = f_res
+                        print("Added resonator {} ({:.3f} {})"
+                              .format(res.identifier, str_freq, unit))
+                        new_resonators.append(res)
+
+                else:
+                    found_resonators[i].freq = f_res
+                    print("Added resonator {} ({:.3f} {})"
+                          .format(res.identifier, str_freq, unit))
+                    new_resonators.append(res)
+        return new_resonators
 
     def find_resonators(self, start_freq=6.8e9, stop_freq=8e9, VNA_power=-40,
                         bandwidth=200, timeout=200, f_step=1e6, with_VNA=None,
@@ -713,68 +780,6 @@ class Qubit(Instrument):
         #                     else:
         #                         res.freq = a.fit_results.params['f0'].value*1e9
         # return True
-
-    def measure_individual_resonators(self, with_VNA=False, use_min=True):
-        """
-        Specifically designed for use in automation, not recommended to use by
-        hand!
-        Finds which peaks were wrongly assigend as a resonator in the resonator
-        wide search
-        """
-        device = self.instr_device.get_instr()
-        found_resonators = device.found_resonators
-
-        new_resonators = []
-        for i, res in enumerate(found_resonators):
-            freq = res.freq
-            str_freq, unit = plt_tools.SI_val_to_msg_str(freq, 'Hz', float)
-            if with_VNA:
-                raise NotImplementedError
-            else:
-                old_avger=self.ro_acq_averages()
-                self.ro_acq_averages(2**14)
-                freqs = np.arange(freq - 5e6, freq + 5e6, 50e3)
-                label = '_{:.3f}_{}'.format(str_freq, unit)
-                name = 'Resonator_scan' + self.msmt_suffix + label
-                self.measure_heterodyne_spectroscopy(freqs=freqs,
-                                                     analyze=False,
-                                                     label=label)
-
-            a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
-            self.ro_acq_averages(old_avger)
-
-            dip = np.amin(a.data_y)
-            offset = a.fit_results.params['A'].value
-
-            if ((np.abs(dip/offset) > 0.7) or getattr(a.fit_results.params['f0'],'stderr', None) is None):
-
-                print('Removed candidate {} ({:.3f} {}): Not a resonator'
-                      .format(res.identifier, str_freq, unit))
-
-            else:
-                if use_min:
-                    f_res = a.min_frequency
-                else:
-                    f_res = a.fit_results.params['f0'].value*1e9
-
-                # Check if not a duplicate
-                if i > 0:
-                    prev_freq = found_resonators[i-1].freq
-                    if np.abs(prev_freq - f_res) < 10e6:
-                        print('Removed candidate: {} ({:.3f} {}): Duplicate'
-                              .format(res.identifier, str_freq, unit))
-                    else:
-                        found_resonators[i].freq = f_res
-                        print("Added resonator {} ({:.3f} {})"
-                              .format(res.identifier, str_freq, unit))
-                        new_resonators.append(res)
-
-                else:
-                    found_resonators[i].freq = f_res
-                    print("Added resonator {} ({:.3f} {})"
-                          .format(res.identifier, str_freq, unit))
-                    new_resonators.append(res)
-        return new_resonators
 
     def find_test_resonators(self, with_VNA=None, resonators=None):
         """
@@ -1306,7 +1311,6 @@ class Qubit(Instrument):
         self.spec_pow(power-power_step)
         return True
 
-
     def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         motzois = gen_sweep_pts(center=0, span=1, num=31)
 
@@ -1332,7 +1336,6 @@ class Qubit(Instrument):
                 print('Setting motzoi to {:.3f}'.format(opt_motzoi))
             self.motzoi(opt_motzoi)
         return opt_motzoi
-
 
     # FIXME: overridden in unused class Transmon
     def calibrate_frequency_ramsey(self,
@@ -1648,8 +1651,6 @@ class Qubit(Instrument):
         MC.set_detector_function(qubit_freq_det)
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.run('Tune_to_freq', mode='adaptive')
-
-
 
 class Transmon(Qubit):
 

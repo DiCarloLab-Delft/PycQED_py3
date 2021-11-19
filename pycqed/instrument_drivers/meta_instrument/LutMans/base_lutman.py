@@ -1,10 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
+
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.instrument.parameter import InstrumentRefParameter
 from qcodes.utils import validators as vals
+
 from pycqed.analysis.fit_toolbox.functions import PSD
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
@@ -24,25 +26,22 @@ class Base_LutMan(Instrument):
         - Methods to render waves.
 
     The Base LutMan does not provide a set of FIXME: comment ends
-
-
     """
 
     def __init__(self, name, **kw):
         logging.info(__name__ + " : Initializing instrument")
         super().__init__(name, **kw)
+
         # FIXME: rename to instr_AWG to be consistent with other instr refs
         self.add_parameter(
             "AWG",
             parameter_class=InstrumentRefParameter,
             docstring=(
                 "Name of the AWG instrument used, note that this can also be "
-                "a UHFQC or a CBox as these also contain AWG's"
+                "a UHFQC as it also contain AWGs"
             ),
             vals=vals.Strings(),
         )
-        self._add_cfg_parameters()
-        self._add_waveform_parameters()
         self.add_parameter(
             "LutMap",
             docstring=(
@@ -61,6 +60,9 @@ class Base_LutMan(Instrument):
             parameter_class=ManualParameter,
         )
 
+        self._add_cfg_parameters()
+        self._add_waveform_parameters()
+
         # Used to determine bounds in plotting.
         # overwrite in child classes if used.
         self._voltage_min = None
@@ -70,18 +72,9 @@ class Base_LutMan(Instrument):
         self._wave_dict = {}
         self.set_default_lutmap()
 
-    def time_to_sample(self, time):
-        """
-        Takes a time in seconds and returns the corresponding sample
-        """
-        return int(time * self.sampling_rate())
-
-    def set_default_lutmap(self):
-        """
-        Sets the "LutMap" parameter to
-
-        """
-        raise NotImplementedError()
+    ##########################################################################
+    # Abstract functions
+    ##########################################################################
 
     def _add_waveform_parameters(self):
         """
@@ -91,6 +84,13 @@ class Base_LutMan(Instrument):
 
     def _add_cfg_parameters(self):
         pass
+
+    def set_default_lutmap(self):
+        """
+        Sets the "LutMap" parameter to
+
+        """
+        raise NotImplementedError()
 
     def generate_standard_waveforms(self):
         """
@@ -106,6 +106,10 @@ class Base_LutMan(Instrument):
         Loads a specific waveform to the AWG
         """
         raise NotImplementedError()
+
+    ##########################################################################
+    # Overridden functions
+    ##########################################################################
 
     def load_waveforms_onto_AWG_lookuptable(
         self, regenerate_waveforms: bool = True, stop_start: bool = True
@@ -187,9 +191,16 @@ class Base_LutMan(Instrument):
             plt.show()
         return fig, ax
 
+    ##########################################################################
+    # Functions
+    ##########################################################################
+
     def render_wave_PSD(
         self, wave_id, show=True, reload_pulses=True, f_bounds=None, y_bounds=None
     ):
+        """
+        Create a Power Spectral Density plot
+        """
         if wave_id not in self.LutMap().keys():
             wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
         if reload_pulses:
@@ -212,6 +223,12 @@ class Base_LutMan(Instrument):
         if show:
             plt.show()
         return fig, ax
+
+    def time_to_sample(self, time):
+        """
+        Takes a time in seconds and returns the corresponding sample
+        """
+        return int(time * self.sampling_rate())
 
 
 def get_redundant_codewords(codeword: int, bit_width: int = 4, bit_shift: int = 0):

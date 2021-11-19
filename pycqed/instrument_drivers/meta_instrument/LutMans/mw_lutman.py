@@ -1,11 +1,13 @@
 from .base_lutman import Base_LutMan, get_redundant_codewords, get_wf_idx_from_name
+
 import numpy as np
 from collections.abc import Iterable
 from collections import OrderedDict
+
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
+
 from pycqed.measurement.waveform_control_CC import waveform as wf
-import time
 
 default_mw_lutmap = {
     0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
@@ -223,24 +225,13 @@ class Base_MW_LutMan(Base_LutMan):
 
     """
 
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
+
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
         self.LutMap(default_mw_lutmap.copy())
-
-    def set_inspire_lutmap(self):
-        """Set the default lutmap for expanded microwave drive pulses."""
-        self.LutMap(inspire_mw_lutmap.copy())
-
-    def codeword_idx_to_parnames(self, cw_idx: int):
-        """Convert a codeword_idx to a list of par names for the waveform."""
-        # the possible channels way of doing this is to make it work both for
-        # VSM style lutmans and no VSM style lutmans.
-        possible_channels = ('channel_GI', 'channel_GQ',
-                             'channel_DI', 'channel_DQ',
-                             'channel_I', 'channel_Q')
-        codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
-                     for ch in possible_channels if hasattr(self, ch)]
-        return codewords
 
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
@@ -248,6 +239,8 @@ class Base_MW_LutMan(Base_LutMan):
         self.spec_func = wf.block_pulse
 
         self._add_channel_params()
+        self._add_mixer_corr_pars()
+
         self.add_parameter('cfg_sideband_mode',
                            vals=vals.Enum('real-time', 'static'),
                            initial_value='static',
@@ -294,8 +287,6 @@ class Base_MW_LutMan(Base_LutMan):
                        ' that when using an AWG with build in modulation this'
                        ' should be set to 0.'),
             parameter_class=ManualParameter, initial_value=50.0e6)
-        self._add_mixer_corr_pars()
-
         self.add_parameter('mw_ef_modulation', vals=vals.Numbers(), unit='Hz',
                            docstring=('Modulation frequency for driving pulses to the '
                                       'second excited-state.'),
@@ -305,28 +296,6 @@ class Base_MW_LutMan(Base_LutMan):
                                'Pulse amplitude for pulsing the ef/12 transition'),
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter, initial_value=.2)
-
-    def _add_mixer_corr_pars(self):
-        self.add_parameter('mixer_alpha', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
-        self.add_parameter(
-            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
-                'If True applies a mixer correction using mixer_phi and '
-                'mixer_alpha to all microwave pulses using.'),
-            parameter_class=ManualParameter, initial_value=True)
-
-    def _add_channel_params(self):
-        self.add_parameter('channel_I',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-
-        self.add_parameter('channel_Q',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
 
     def generate_standard_waveforms(
             self, apply_predistortion_matrix: bool=True):
@@ -411,13 +380,6 @@ class Base_MW_LutMan(Base_LutMan):
                 self._wave_dict)
         return self._wave_dict
 
-    def apply_mixer_predistortion_corrections(self, wave_dict):
-        M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
-                                          self.mixer_phi())
-        for key, val in wave_dict.items():
-            wave_dict[key] = np.dot(M, val)
-        return wave_dict
-
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool=False):
         if regenerate_waveforms:
@@ -434,6 +396,22 @@ class Base_MW_LutMan(Base_LutMan):
 
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
+
+    ##########################################################################
+    # Functions
+    # FIXME: the load_* functions provide an undesired backdoor
+    ##########################################################################
+
+    def set_inspire_lutmap(self):
+        """Set the default lutmap for expanded microwave drive pulses."""
+        self.LutMap(inspire_mw_lutmap.copy())
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+        M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
+                                          self.mixer_phi())
+        for key, val in wave_dict.items():
+            wave_dict[key] = np.dot(M, val)
+        return wave_dict
 
     def load_phase_pulses_to_AWG_lookuptable(self,
                                              phases=np.arange(0, 360, 20)):
@@ -523,6 +501,47 @@ class Base_MW_LutMan(Base_LutMan):
 
         # 3. generate and upload waveforms
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+    ##########################################################################
+    # Private functions
+    ##########################################################################
+
+    def codeword_idx_to_parnames(self, cw_idx: int):
+        """Convert a codeword_idx to a list of par names for the waveform."""
+        # the possible channels way of doing this is to make it work both for
+        # VSM style lutmans and no VSM style lutmans.
+        possible_channels = ('channel_GI', 'channel_GQ',
+                             'channel_DI', 'channel_DQ',
+                             'channel_I', 'channel_Q')
+        codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
+                     for ch in possible_channels if hasattr(self, ch)]
+        return codewords
+
+    ##########################################################################
+    # Private functions, sometimes overridden
+    ##########################################################################
+
+    def _add_mixer_corr_pars(self):
+        self.add_parameter('mixer_alpha', vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=1.0)
+        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
+                'If True applies a mixer correction using mixer_phi and '
+                'mixer_alpha to all microwave pulses using.'),
+            parameter_class=ManualParameter, initial_value=True)
+
+    def _add_channel_params(self):
+        self.add_parameter('channel_I',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
+
+        self.add_parameter('channel_Q',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
 
 
 class CBox_MW_LutMan(Base_MW_LutMan):
@@ -747,6 +766,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         assert awg_nr == (self.channel_Q()-1)//2
         assert self.channel_I() < self.channel_Q()
 
+        AWG = self.AWG.get_instr()  # FIXME: this line was missing, so the code below couldn't execute and is probably untested
         val = AWG.get('sigouts_{}_range'.format(self.channel_I()-1))
         assert val == AWG.get('sigouts_{}_range'.format(self.channel_Q()-1))
         return val
