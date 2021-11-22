@@ -96,12 +96,6 @@ class TestMultiQubitFluxLutMan:
     @classmethod
     def teardown_class(self):
         self.AWG.close_all()
-        # for inststr in list(self.AWG._all_instruments):
-        #     try:
-        #         inst = self.AWG.find_instrument(inststr)
-        #         inst.close()
-        #     except KeyError:
-        #         pass
 
     def test_amp_to_dac_val_conversions(self):
         self.fluxlutman.cfg_awg_channel(1)
