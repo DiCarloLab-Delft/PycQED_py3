@@ -9,7 +9,7 @@
         "i": {
             "duration": @MW_DURATION@,
             "cc": {
-                "signal": [],   // no signal, to prevent conflicts with other gates (NB: will output nothing because VSM stays off)
+                "signal": [],   // no signal
                 "static_codeword_override": [0]
             }
         },
@@ -20,7 +20,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "ge", "parameters": {"theta": 180, "phi": 0}}
+                        "value": { "type": "ge", "theta": 180, "phi": 0 }
                     }
                 ],
                 "static_codeword_override": [1]
@@ -33,7 +33,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "ge", "parameters": {"theta": 180, "phi": 90}}}
+                        "value": { "type": "ge", "theta": 180, "phi": 90 }
                 ],
                 "static_codeword_override": [2]
             }
@@ -45,7 +45,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "ge", "parameters": {"theta": 90, "phi": 0}}
+                        "value": { "type": "ge", "theta": 90, "phi": 0 }
                     }
                 ],
                 "static_codeword_override": [3]
@@ -58,7 +58,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "ge", "parameters": {"theta": 90, "phi": 90}}
+                        "value": { "type": "ge", "theta": 90, "phi": 90 }
                     }
                 ],
                 "static_codeword_override": [4]
@@ -71,7 +71,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "ge", "parameters": {"theta": -90, "phi": 0}}
+                        "value": { "type": "ge", "theta": -90, "phi": 0 }
                     }
                 ],
                 "static_codeword_override": [5]
@@ -84,7 +84,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "ge", "parameters": {"theta": -90, "phi": 90}}
+                        "value": { "type": "ge", "theta": -90, "phi": 90 }
                     }
                 ],
                 "static_codeword_override": [6]
@@ -98,7 +98,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "spec", "parameters": {} }
+                        "value": { "type": "spec"}
                     }
                 ],
                 "static_codeword_override": [8]
@@ -111,7 +111,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "ef", "parameters": {"theta": 180, "phi": 0}}
+                        "value": { "type": "ef", "theta": 180, "phi": 0 }
                     }
                 ],
                 "static_codeword_override": [9]
@@ -124,7 +124,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "square", "parameters": {} }
+                        "value": { "type": "square"}
                     }
                 ],
                 "static_codeword_override": [10]
@@ -137,7 +137,7 @@
                     {
                         "type": "mw",
                         "operand_idx": 0,
-                        "value": {"func": "ge", "parameters": {"theta": 45, "phi": 0}}
+                        "value": { "type": "ge", "theta": 45, "phi": 0 }
                     }
                 ],
                 "static_codeword_override": [13]
@@ -168,60 +168,6 @@
             }
         },
 
-
-        // additions for measurements using real time feedback
-		"_wait_uhfqa": {
-            "prototype": ["Z:qubit"],
-            "duration": 720,
-            "cc": {
-                "signal": []
-            }
-        },
-        "_dist_dsm": {
-            "prototype": ["Z:qubit"],
-			"duration": 20,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"cc": {
-			    "readout_mode": "feedback",
-				"signal": [
-					{	"type": "measure",
-						"operand_idx": 0,
-						"value": []
-					}
-                ]
-			}
-		},
-        "_wait_dsm": {
-            "prototype": ["Z:qubit"],
-            "duration": 280,
-            "cc": {
-                "signal": []
-            }
-        },
-
-        // additions for pragma/break
-        // Require OpenQL < 0.10.1 (use cQASM afterwards)
-        "if_1_break": {
-			"duration": 60,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"cc": {
-				"signal": [],
-				"pragma": {
-                    "break": 1
-				}
-			}
-		},
-		"if_0_break": {
-			"duration": 60,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-			"cc": {
-				"signal": [],
-				"pragma": {
-                    "break": 0
-				}
-			}
-		},
-
         // helpers for CZ gate decomposition, flux_lutman compatible
         "_cz_sw_ne_park": {
             "duration": @FLUX_DURATION@,
@@ -230,17 +176,17 @@
                     {
                         "type": "flux",
                         "operand_idx": 0,
-                        "value": { "func": "cz", "parameters": { "which": "SW" } }
+                        "value": { "type": "cz",  "which": "SW" }
                     },
                     {
                         "type": "flux",
                         "operand_idx": 1,
-                        "value": { "func": "idle_z", "parameters": { "which": "NE" } }
+                        "value": { "type": "idle_z",  "which": "NE" }
                     },
                     {
                         "type": "flux",
                         "operand_idx": 2,
-                        "value": { "func": "park", "parameters": {} }
+                        "value": { "type": "park" }
                     }
                 ],
                 "static_codeword_override": [3,1,5]
@@ -253,12 +199,12 @@
                     {
                         "type": "flux",
                         "operand_idx": 0,
-                        "value": { "func": "cz", "parameters": { "which": "SW" } }
+                        "value": { "type": "cz",  "which": "SW" }
                     },
                     {
                         "type": "flux",
                         "operand_idx": 1,
-                        "value": { "func": "idle_z", "parameters": { "which": "NE" } }
+                        "value": { "type": "idle_z",  "which": "NE" }
                     }
                 ],
                 "static_codeword_override": [3,1]
@@ -271,17 +217,17 @@
                     {
                         "type": "flux",
                         "operand_idx": 0,
-                        "value": { "func": "cz", "parameters": { "which": "SE" } }
+                        "value": { "type": "cz",  "which": "SE" }
                     },
                     {
                         "type": "flux",
                         "operand_idx": 1,
-                        "value": { "func": "idle_z", "parameters": { "which": "NW" } }
+                        "value": { "type": "idle_z",  "which": "NW" }
                     },
                     {
                         "type": "flux",
                         "operand_idx": 2,
-                        "value": { "func": "park", "parameters": {} }
+                        "value": { "type": "park" }
                     }
                 ],
                 "static_codeword_override": [2,4,5]
@@ -294,12 +240,12 @@
                     {
                         "type": "flux",
                         "operand_idx": 0,
-                        "value": { "func": "cz", "parameters": { "which": "SE" } }
+                        "value": { "type": "cz",  "which": "SE" }
                     },
                     {
                         "type": "flux",
                         "operand_idx": 1,
-                        "value": { "func": "idle_z", "parameters": { "which": "NW" } }
+                        "value": { "type": "idle_z",  "which": "NW" }
                     }
                 ],
                 "static_codeword_override": [2,4]
@@ -599,5 +545,59 @@
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [6]
             }
-        }
+        },
+
+        // additions for measurements using real time feedback
+		"_wait_uhfqa": {
+            "prototype": ["Z:qubit"],
+            "duration": 720,
+            "cc": {
+                "signal": []
+            }
+        },
+        "_dist_dsm": {
+            "prototype": ["Z:qubit"],
+			"duration": 20,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+			    "readout_mode": "feedback",
+				"signal": [
+					{	"type": "measure",
+						"operand_idx": 0,
+						"value": []
+					}
+                ]
+			}
+		},
+        "_wait_dsm": {
+            "prototype": ["Z:qubit"],
+            "duration": 280,
+            "cc": {
+                "signal": []
+            }
+        },
+
+        // additions for pragma/break
+        // Require OpenQL < 0.10.1 (use cQASM afterwards)
+        "if_1_break": {
+			"duration": 60,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 1
+				}
+			}
+		},
+		"if_0_break": {
+			"duration": 60,
+			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 0
+				}
+			}
+		}
+
 //	},	// end of "instructions"
