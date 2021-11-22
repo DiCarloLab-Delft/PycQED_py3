@@ -589,6 +589,7 @@
         //**************************************************************************************************************
 
         "measure": {
+            "prototype": ["M:qubit"],
             "duration": @RO_DURATION@,
             "cc": {
                 "signal": [
@@ -607,6 +608,7 @@
 
         // helpers for CZ gate decomposition, flux_lutman compatible
         "_cz_sw_ne_park": {
+            "prototype": ["Z:qubit", "Z:qubit", "Z:qubit"], // FIXME: add to _cz_**
             "duration": @FLUX_DURATION@,
             "cc": {
                 "signal": [
@@ -759,14 +761,14 @@
 
         // additions for measurements using real time feedback
 		"_wait_uhfqa": {
-            "prototype": ["Z:qubit"],
+            "prototype": ["U:qubit"],
             "duration": 720,
             "cc": {
                 "signal": []
             }
         },
         "_dist_dsm": {
-            "prototype": ["Z:qubit"],
+            "prototype": ["U:qubit"],
 			"duration": 20,
 			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
 			"cc": {
@@ -780,7 +782,7 @@
 			}
 		},
         "_wait_dsm": {
-            "prototype": ["Z:qubit"],
+            "prototype": ["U:qubit"],
             "duration": 280,
             "cc": {
                 "signal": []
