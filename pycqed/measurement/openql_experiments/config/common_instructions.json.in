@@ -5,7 +5,21 @@
 
 //{
 //	"instructions": {
+        //**************************************************************************************************************
+        // microwave
+        //**************************************************************************************************************
+
+        // based on PyqQED_py3 'generate_CCL_cfg.py':
+        "prepz": {
+            "duration": @INIT_DURATION@,
+            "cc": {
+                "signal": [],    // NB: no signal
+                "static_codeword_override": [0]
+            }
+        },
+
         // based on PyqQED_py3 'mw_lutman.py' (matches default_mw_lutmap) and 'generate_CCL_cfg.py':
+        // normal gates
         "i": {
             "duration": @MW_DURATION@,
             "cc": {
@@ -91,6 +105,8 @@
             }
         },
         // FIXME: missing codeword 7
+
+        // spectroscopy gate
         "spec": {
             "duration": @MW_DURATION@,
             "cc": {
@@ -104,6 +120,8 @@
                 "static_codeword_override": [8]
             }
         },
+
+        // 2nd excited state
         "rx12": {
             "duration": @MW_DURATION@,
             "cc": {
@@ -117,6 +135,8 @@
                 "static_codeword_override": [9]
             }
         },
+
+
         "square": {
             "duration": @MW_DURATION@,
             "cc": {
@@ -130,6 +150,8 @@
                 "static_codeword_override": [10]
             }
         },
+
+        // normal gate
         "rx45": {
             "duration": @MW_DURATION@,
             "cc": {
@@ -146,114 +168,197 @@
 
 
 
-        // based on PyqQED_py3 'generate_CCL_cfg.py':
-        "prepz": {
-            "duration": @INIT_DURATION@,
-            "cc": {
-                "signal": [],    // NB: no signal
-                "static_codeword_override": [0]
-            }
-        },
-
-        "measure": {
-            "duration": @RO_DURATION@,
-            "cc": {
-                "signal": [
-                    {   "type": "measure",
-                        "operand_idx": 0,
-                        "value": ["dummy"]          // Future extension: specify output and weight, and generate code word
-                    }
-                ],
-                "static_codeword_override": [0]   // FIXME
-            }
-        },
-
-        // helpers for CZ gate decomposition, flux_lutman compatible
-        "_cz_sw_ne_park": {
-            "duration": @FLUX_DURATION@,
+        // RUS: replaces former gate decompositions
+        // FIXME: replace signal/value/type with sensible info
+        // FIXME: check codewords, fix conflicts
+        "rx2theta": {
+            "duration": @MW_DURATION@,
             "cc": {
                 "signal": [
                     {
-                        "type": "flux",
+                        "type": "mw",
                         "operand_idx": 0,
-                        "value": { "type": "cz",  "which": "SW" }
-                    },
-                    {
-                        "type": "flux",
-                        "operand_idx": 1,
-                        "value": { "type": "idle_z",  "which": "NE" }
-                    },
-                    {
-                        "type": "flux",
-                        "operand_idx": 2,
-                        "value": { "type": "park" }
+                        "value": { "type": "cw_27"}
                     }
                 ],
-                "static_codeword_override": [3,1,5]
+                "static_codeword_override": [27]
             }
         },
-        "_cz_sw_ne": {
-            "duration": @FLUX_DURATION@,
+        "rxm2theta": {
+            "duration": @MW_DURATION@,
             "cc": {
                 "signal": [
                     {
-                        "type": "flux",
+                        "type": "mw",
                         "operand_idx": 0,
-                        "value": { "type": "cz",  "which": "SW" }
-                    },
-                    {
-                        "type": "flux",
-                        "operand_idx": 1,
-                        "value": { "type": "idle_z",  "which": "NE" }
+                        "value": { "type": "cw_28"}
                     }
                 ],
-                "static_codeword_override": [3,1]
+                "static_codeword_override": [28]
             }
         },
-        "_cz_se_nw_park": {
-            "duration": @FLUX_DURATION@,
+        "rx2thetaalpha": {
+            "duration": @MW_DURATION@,
             "cc": {
                 "signal": [
                     {
-                        "type": "flux",
+                        "type": "mw",
                         "operand_idx": 0,
-                        "value": { "type": "cz",  "which": "SE" }
-                    },
-                    {
-                        "type": "flux",
-                        "operand_idx": 1,
-                        "value": { "type": "idle_z",  "which": "NW" }
-                    },
-                    {
-                        "type": "flux",
-                        "operand_idx": 2,
-                        "value": { "type": "park" }
+                        "value": { "type": "cw_29"}
                     }
                 ],
-                "static_codeword_override": [2,4,5]
+                "static_codeword_override": [29]
             }
         },
-        "_cz_se_nw": {
-            "duration": @FLUX_DURATION@,
+        "rphi180": {
+            "duration": @MW_DURATION@,
             "cc": {
                 "signal": [
                     {
-                        "type": "flux",
+                        "type": "mw",
                         "operand_idx": 0,
-                        "value": { "type": "cz",  "which": "SE" }
-                    },
-                    {
-                        "type": "flux",
-                        "operand_idx": 1,
-                        "value": { "type": "idle_z",  "which": "NW" }
+                        "value": { "type": "cw_27"}
                     }
                 ],
-                "static_codeword_override": [2,4]
+                "static_codeword_override": [27]
+            }
+        },
+        "rphi180beta": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_28"}
+                    }
+                ],
+                "static_codeword_override": [28]
+            }
+        },
+        "rx180beta": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_29"}
+                    }
+                ],
+                "static_codeword_override": [29]
+            }
+        },
+        "rphi180beta2": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_30"}
+                    }
+                ],
+                "static_codeword_override": [30]
+            }
+        },
+        "ry90beta": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_28"}
+                    }
+                ],
+                "static_codeword_override": [28]
+            }
+        },
+        "rym90alpha": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_29"}
+                    }
+                ],
+                "static_codeword_override": [29]
+            }
+        },
+        "ry90betapi": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_30"}
+                    }
+                ],
+                "static_codeword_override": [30]
+            }
+        },
+        "rphi180alpha": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_31"}
+                    }
+                ],
+                "static_codeword_override": [31]
+            }
+        },
+        "rx90alpha": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_26"}
+                    }
+                ],
+                "static_codeword_override": [26]
+            }
+        },
+        "rx180alpha2": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_25"}
+                    }
+                ],
+                "static_codeword_override": [25]
+            }
+        },
+        "rphim2theta": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_28"}
+                    }
+                ],
+                "static_codeword_override": [28]
             }
         },
 
         // cw_00 .. cw_31
-        // FIXME: remove? Partly used in some gate decompositions
+        // FIXME: remove
+        // FIXME: codewords overlap with RUS above, which originally used gate decomposition
+        // FIXME: remove? Used by multi_qubit_oql.py and single_qubit_oql.py (echo/rabi_frequency/...)
+        // ef_rabi_seq() uses codeword range [9, 26]
         "cw_00": {
             "duration": @MW_DURATION@,
             "cc": {
@@ -476,6 +581,111 @@
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [31]
+            }
+        },
+
+        //**************************************************************************************************************
+        // measure
+        //**************************************************************************************************************
+
+        "measure": {
+            "duration": @RO_DURATION@,
+            "cc": {
+                "signal": [
+                    {   "type": "measure",
+                        "operand_idx": 0,
+                        "value": ["dummy"]          // Future extension: specify output and weight, and generate code word
+                    }
+                ],
+                "static_codeword_override": [0]   // FIXME
+            }
+        },
+
+        //**************************************************************************************************************
+        // flux
+        //**************************************************************************************************************
+
+        // helpers for CZ gate decomposition, flux_lutman compatible
+        "_cz_sw_ne_park": {
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SW" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NE" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 2,
+                        "value": { "type": "park" }
+                    }
+                ],
+                "static_codeword_override": [3,1,5]
+            }
+        },
+        "_cz_sw_ne": {
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SW" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NE" }
+                    }
+                ],
+                "static_codeword_override": [3,1]
+            }
+        },
+        "_cz_se_nw_park": {
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SE" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NW" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 2,
+                        "value": { "type": "park" }
+                    }
+                ],
+                "static_codeword_override": [2,4,5]
+            }
+        },
+        "_cz_se_nw": {
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SE" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NW" }
+                    }
+                ],
+                "static_codeword_override": [2,4]
             }
         },
 

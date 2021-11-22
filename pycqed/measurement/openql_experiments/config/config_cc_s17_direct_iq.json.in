@@ -204,23 +204,8 @@
         "cz q11,q15":  ["_cz_se_nw_park q11,q15,q14"],
         "cz q15,q11":  ["_cz_se_nw_park q11,q15,q14"],
         "cz q12,q15":  ["_cz_sw_ne q12,q15"],
-        "cz q15,q12":  ["_cz_sw_ne q12,q15"],
+        "cz q15,q12":  ["_cz_sw_ne q12,q15"]
 
-        // RUS (FIXME: define instructions for these)
-        "rx2theta %0":      ["cw_27 %0"],
-        "rxm2theta %0":     ["cw_28 %0"],
-        "rx2thetaalpha %0": ["cw_29 %0"],
-        "rphi180 %0":       ["cw_27 %0"],
-        "rphi180beta %0":   ["cw_28 %0"],
-        "rx180beta %0":     ["cw_29 %0"],
-        "rphi180beta2 %0":  ["cw_30 %0"],
-        "ry90beta %0":      ["cw_28 %0"],
-        "rym90alpha %0":    ["cw_29 %0"],
-		"ry90betapi %0":    ["cw_30 %0"],
-		"rphi180alpha %0":  ["cw_31 %0"],
-		"rx90alpha %0":     ["cw_26 %0"],
-		"rx180alpha2 %0":   ["cw_25 %0"],
-        "rphim2theta %0":   ["cw_28 %0"]
     },  // gate_decomposition
 
 	"instructions": {
