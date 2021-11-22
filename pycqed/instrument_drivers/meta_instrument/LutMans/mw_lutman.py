@@ -454,6 +454,7 @@ class Base_MW_LutMan(Base_LutMan):
                        "phi": phase, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
+    # FIXME: function is almost identical to load_phase_pulses_to_AWG_lookuptable, except for phi vs. theta
     def load_x_pulses_to_AWG_lookuptable(self,
                                              phases=np.arange(0, 360, 20)):
         """

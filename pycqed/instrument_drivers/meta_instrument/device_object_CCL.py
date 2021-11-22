@@ -550,7 +550,7 @@ class DeviceCCL(Instrument):
             for q in list_qubits_used:  # only on the CZ qubits we add the ef pulses
                 mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
                 lm = mw_lutman.LutMap()
-                # we hardcode the X on the ef transition to CW 31 here.
+                # FIXME: we hardcode the X on the ef transition to CW 31 here.
                 lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
                 # load_phase_pulses will also upload other waveforms
                 mw_lutman.load_phase_pulses_to_AWG_lookuptable()
@@ -740,7 +740,7 @@ class DeviceCCL(Instrument):
             mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
 
             lm = mw_lutman.LutMap()
-            # we hardcode the X on the ef transition to CW 31 here.
+            # FIXME: we hardcode the X on the ef transition to CW 31 here.
             lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
             # load_phase_pulses will also upload other waveforms
             if phase_offsets == None:
@@ -751,7 +751,7 @@ class DeviceCCL(Instrument):
             mw_lutman.load_waveforms_onto_AWG_lookuptable(
                 regenerate_waveforms=True)
 
-        # These are hardcoded angles in the mw_lutman for the AWG8
+        # FIXME: These are hardcoded angles in the mw_lutman for the AWG8
         # only x2 and x3 downsample_swp_points available
         angles = np.arange(0, 341, 20 * downsample_swp_points)
 
