@@ -15,7 +15,6 @@ import re
 import inspect
 
 
-
 def generate_config_modular(
         out_filename: str,
         mw_pulse_duration: int = 20,
@@ -45,7 +44,14 @@ def generate_config_modular(
         flux_mw_buffer=0,
     """
 
-    input = Path(in_filename).read_text()
+    # interpret relative path as relative to this directory
+    if Path(in_filename).is_absolute():
+        in_path = Path(in_filename)
+    else:
+        in_path = Path(__file__).parent / in_filename
+
+    # read input
+    input = in_path.read_text()
 
     # handle include directives
     cfg = ''
@@ -55,7 +61,7 @@ def generate_config_modular(
         if m == None:
             cfg = cfg + line + '\n'
         else:
-            incl_path = Path(in_filename).parent / m.group(1)
+            incl_path = in_path.parent / m.group(1)
             print(f"including file '{incl_path}")
             include = incl_path.read_text()
             cfg = cfg + f"//--- start of include file '{incl_path}' ---\n"
