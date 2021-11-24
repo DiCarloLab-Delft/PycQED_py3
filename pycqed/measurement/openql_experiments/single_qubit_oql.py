@@ -1103,7 +1103,7 @@ def Ram_Z(qubit_name,
 
 
 def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
-                          flux_cw: str = 'fl_cw_02',
+                          flux_cw: str = 'fl_cw_02', # FIXME: unused
                           cal_points: bool = True,
                           mw_gate: str = "rx90"):
     """
@@ -1138,7 +1138,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
 
 
 def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
-                         # flux_cw: str = 'fl_cw_02',
+                         # flux_cw: str = 'fl_cw_02', # FIXME: unused
                          cal_points: bool = True):
     """
     A Ramsey sequence with varying waiting times `times`in between.

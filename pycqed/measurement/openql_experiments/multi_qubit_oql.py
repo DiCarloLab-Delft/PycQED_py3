@@ -1,9 +1,10 @@
 from typing import List
 import numpy as np
-import openql.openql as ql
+#import openql.openql as ql
+
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
 from pycqed.utilities.general import int2base, suppress_stdout
-from os.path import join
+#from os.path import join
 from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _def_lm_flux
 
 def single_flux_pulse_seq(qubit_indices: tuple,
@@ -26,6 +27,7 @@ def single_flux_pulse_seq(qubit_indices: tuple,
     return p
 
 
+# FIXME: not really used
 def flux_staircase_seq(platf_cfg: str):
 
     p = oqh.create_program("flux_staircase_seq", platf_cfg)
@@ -593,7 +595,7 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
     return p
 
 def FluxTimingCalibration(qubit_idxs: list, platf_cfg: str,
-                          flux_cw: str = 'fl_cw_02',
+                          flux_cw: str = 'fl_cw_02', # FIXME: unused
                           cal_points: bool = True):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
@@ -624,7 +626,7 @@ def FluxTimingCalibration(qubit_idxs: list, platf_cfg: str,
 
 def Cryoscope(
     qubit_idxs: list,
-    flux_cw: str = 'fl_cw_06',
+    flux_cw: str = 'fl_cw_06', # FIXME: effectively unused
     twoq_pair=[2, 0],
     platf_cfg: str = '',
     cc: str = 'CC',
@@ -646,6 +648,7 @@ def Cryoscope(
 
     p = oqh.create_program("Cryoscope", platf_cfg)
 
+    # FIXME: the variables created here are effectively unused
     if cc.upper() == 'CCL':
         flux_target = twoq_pair
     elif cc.upper() == 'QCC' or cc.upper() =='CC':
@@ -723,6 +726,7 @@ def Cryoscope(
     return p
 
 
+# FIXME: not really used
 def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
@@ -1158,6 +1162,7 @@ def two_qubit_tomo_bell_by_waiting(bell_state, q0, q1,
     return p
 
 
+# FIXME: not really used
 def two_qubit_DJ(q0, q1, platf_cfg):
     '''
     Two qubit Deutsch-Josza.
@@ -2184,6 +2189,7 @@ def parity_check_fidelity(
     return p
 
 
+# FIXME: not really used
 def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
                                  precompiled_flux: bool=True,
                                  second_CZ_delay: int=0,
@@ -2333,10 +2339,7 @@ def grovers_two_qubits_repeated(qubits, platf_cfg: str,
     return p
 
 
-
-
-
-
+# FIXME: not really used
 def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
                        precompiled_flux: bool=True,
                        cal_points: bool=True, second_CZ_delay: int=260,
@@ -2682,6 +2685,7 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
     return p
 
 
+# FIXME: not really used
 def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
     """
     VQE tomography for two qubits.
