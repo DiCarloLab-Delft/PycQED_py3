@@ -486,7 +486,7 @@ def randomized_benchmarking(
                     p, qubits=qubits, combinations=combinations
                 )
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     # p = oqh.compile(p, extra_openql_options=[('backend_cc_verbose', 'no')])
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
@@ -633,7 +633,7 @@ def character_benchmarking(
                 combinations = ["00", "01", "10", "11"]
             p = oqh.add_multi_q_cal_points(p, qubits=qubits, combinations=combinations)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
     os.rename(recompile_dict["tmp_file"], recompile_dict["file"])

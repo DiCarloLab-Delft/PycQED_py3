@@ -37,15 +37,9 @@ def openql_program_from_pygsti_expList(expList, program_name: str,
                 gatestring=gatestring, qubits=qubits,
                 kernel_name=kernel_name, program=p)
             p.add_kernel(k)
-        p = oqh.compile(p)
+        oqh.compile(p)
 
     p.sweep_points = np.arange(len(expList), dtype=float) + start_idx
-    # FIXME: remove try-except, when we depend hardly on >=openql-0.6
-    try:
-        p.set_sweep_points(p.sweep_points)
-    except TypeError:
-        # openql-0.5 compatibility
-        p.set_sweep_points(p.sweep_points, len(p.sweep_points))
 
     return p
 

@@ -17,7 +17,7 @@ def CW_tone(qubit_idx: int, platf_cfg: str):
         k.gate('square', [qubit_idx])
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -36,7 +36,7 @@ def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
     k.gate('spec', [qubit_idx])
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -61,7 +61,7 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
         k.measure(qi)
     k.gate('wait', qubit_idx, 0)
     p.add_kernel(k)
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -88,7 +88,7 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -132,7 +132,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -159,7 +159,7 @@ def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -224,7 +224,7 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
             k.measure(qubit_idx)
         p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -256,7 +256,8 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
              ['ry90', 'ry90']]
 
     # this should be implicit
-    p.set_sweep_points(np.arange(len(allXY), dtype=float))
+    if 0: # FIXME: p.set_sweep_points has been replaced by p.sweep_points, since that was missing here they are probably not necessary for this function
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
 
     for i, xy in enumerate(allXY):
         if double_points:
@@ -271,7 +272,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
             k.measure(qubit_idx)
             p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -331,7 +332,7 @@ def T1(
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -375,7 +376,7 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
     # attribute get's added to program to help finding the output files
     p.sweep_points = sweep_points
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -408,7 +409,7 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -444,7 +445,7 @@ def complex_Ramsey(times, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -488,7 +489,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
@@ -536,7 +537,7 @@ def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -583,7 +584,7 @@ def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 def spin_lock_simple(times, qubit_idx: int, platf_cfg: str, 
@@ -636,7 +637,7 @@ def spin_lock_simple(times, qubit_idx: int, platf_cfg: str,
 
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx, f_state_cal_pts=tomo)
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -696,7 +697,7 @@ def rabi_frequency(times, qubit_idx: int, platf_cfg: str,
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx, f_state_cal_pts=tomo)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -722,7 +723,7 @@ def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
         square_us_cycles = np.floor(time/1e-6).astype(int)
-        square_ns_cycles = np.round((time%1e-6)/mw_gate_duration).astype(int)
+        square_ns_cycles = np.round((time%1e-6)/mw_gate_duration).astype(int) # FIXME: unresolved
         wait_nanoseconds = 1
         # print("square_us_cycles", square_us_cycles)
         # print("square_us_cycles", square_ns_cycles)
@@ -744,7 +745,7 @@ def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 def idle_error_rate_seq(nr_of_idle_gates,
@@ -806,9 +807,8 @@ def idle_error_rate_seq(nr_of_idle_gates,
             p.add_kernel(k)
         sweep_points.append(N)
 
-    p.set_sweep_points(sweep_points)
     p.sweep_points = sweep_points
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -822,7 +822,7 @@ def single_elt_on(qubit_idx: int, platf_cfg: str):
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -887,7 +887,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
     if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
         raise ValueError()
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -923,7 +923,7 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
 
     return p
 
@@ -985,7 +985,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -1048,7 +1048,7 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
                 k.measure(qubit_idx)
             p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -1079,7 +1079,7 @@ def motzoi_XY(qubit_idx: int, platf_cfg: str,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -1133,7 +1133,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
 
     if cal_points:
         oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -1168,7 +1168,7 @@ def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
 
     if cal_points:
         oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -1206,7 +1206,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
 
         p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -1268,7 +1268,7 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 
@@ -1310,7 +1310,7 @@ def ef_rabi_seq(q0: int,
     if add_cal_points:
         p = oqh.add_single_qubit_cal_points(p, qubit_idx=q0)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
 
     if add_cal_points:
         cal_pts_idx = [amps[-1] + .1, amps[-1] + .15,
@@ -1319,7 +1319,6 @@ def ef_rabi_seq(q0: int,
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([amps, cal_pts_idx])
-    p.set_sweep_points(p.sweep_points)
     return p
 
 
@@ -1344,7 +1343,8 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
 
     p = oqh.create_program('Depletion', platf_cfg)
 
-    p.set_sweep_points(np.arange(len(allXY), dtype=float))
+    if 0: # FIXME: p.set_sweep_points has been replaced by p.sweep_points, since that was missing here they are probably not necessary for this function
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
 
     if double_points:
         js=2
@@ -1368,7 +1368,7 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
             k.measure(qubit_idx)
             p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p
 
 def TEST_RTE(qubit_idx: int, platf_cfg: str,
@@ -1402,5 +1402,5 @@ def TEST_RTE(qubit_idx: int, platf_cfg: str,
 
     p.add_kernel(k)
 
-    p = oqh.compile(p)
+    oqh.compile(p)
     return p

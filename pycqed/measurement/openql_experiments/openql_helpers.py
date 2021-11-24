@@ -6,8 +6,8 @@ from os.path import join, dirname, isfile
 import json
 from typing import List, Tuple
 
-import openql.openql as ql
-from openql.openql import Program, Kernel, Platform
+import openql as ql
+from openql import Program, Kernel, Platform
 
 from pycqed.utilities.general import suppress_stdout
 from pycqed.utilities.general import is_more_recent
@@ -20,9 +20,29 @@ ql.set_option('output_dir', output_dir)
 ql.set_option('scheduler', 'ALAP')
 
 
-def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
+class OqlProgram:
+    def __init__(self):
+        self.name = ""
+        self.platform = Platform
+        self.program = Program
+        self.nqubits = 0
+        self.nregisters = 0
+        self.output_dir = ""
+        self.eqasm_compiler = ""
+        self.filename = ""
+        self.sweep_points = None
+
+    def add_kernel(self, k: Kernel):
+        self.program.add_kernel(k)
+
+
+def create_program(
+        pname: str,
+        platf_cfg: str,
+        nregisters: int = 32
+) -> OqlProgram:
     """
-    Wrapper around the constructor of openQL "Program" class.
+    Wrapper to create OpenQL Platform and Program.
 
     Args:
         pname       (str) : Name of the program
@@ -42,18 +62,18 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
     if 1: # FIXME: workaround for OpenQL 0.8.1.dev4 re-setting option
         ql.set_option('output_dir', output_dir)
 
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    nqubits = platf.get_qubit_number()
-    p = Program(pname,
-                platf,
-                nqubits,
-                nregisters)
-
-    # add information to the Program object (FIXME: better create new type, seems to duplicate qubit_count and creg_count)
-    p.platf = platf
+    p = OqlProgram()
+    p.name = pname
+    p.platform = Platform('OpenQL_Platform', platf_cfg)
+    p.nqubits = p.platform.get_qubit_number()
+    p.nregisters = nregisters  # NB: not available via platform
+    p.program = Program(
+        pname,
+        p.platform,
+        p.nqubits,
+        p.nregisters
+    )
     p.output_dir = output_dir
-    p.nqubits = platf.get_qubit_number()
-    p.nregisters = nregisters
 
     # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
     p.eqasm_compiler = ''
@@ -78,18 +98,25 @@ def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
     return p
 
 
-def create_kernel(kname: str, program):
+def create_kernel(
+        kname: str,
+        program: OqlProgram
+) -> Kernel:
     """
     Wrapper around constructor of openQL "Kernel" class.
     """
     kname = kname.translate(
         {ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
 
-    k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
+    k = Kernel(kname, program.platform, program.nqubits, program.nregisters)
     return k
 
 
-def compile(p, quiet: bool = False, extra_openql_options: List[Tuple[str,str]] = None):
+def compile(
+        p: OqlProgram,
+        quiet: bool = False,
+        extra_openql_options: List[Tuple[str,str]] = None
+) -> None:
     """
     Wrapper around OpenQL Program.compile() method.
     """
@@ -97,15 +124,15 @@ def compile(p, quiet: bool = False, extra_openql_options: List[Tuple[str,str]] =
     ql.set_option('output_dir', output_dir)
     if quiet:
         with suppress_stdout():
-            p.compile()
+            p.program.compile()
     else:  # show warnings
         ql.set_option('log_level', 'LOG_ERROR')
         if extra_openql_options is not None:
             for opt, val in extra_openql_options:
                 ql.set_option(opt, val)
-        p.compile()
+        p.program.compile()
 
-    return p  # FIXME: returned unchanged, kept for compatibility for now  (PR #638)
+    return p  # FIXME: returned unchanged, kept for compatibility for now (PR #638), but we say we return None
 
 
 def is_compatible_openql_version_cc() -> bool:
@@ -118,10 +145,14 @@ def is_compatible_openql_version_cc() -> bool:
 # Calibration points
 #############################################################################
 
+# FIXME: move to class OqlProgram
 
-def add_single_qubit_cal_points(p, qubit_idx,
-                                f_state_cal_pts: bool = False,
-                                measured_qubits=None):
+def add_single_qubit_cal_points(
+        p: OqlProgram,
+        qubit_idx: int,
+        f_state_cal_pts: bool = False,
+        measured_qubits=None
+):
     """
     Adds single qubit calibration points to an OpenQL program
 
@@ -168,14 +199,18 @@ def add_single_qubit_cal_points(p, qubit_idx,
     return p
 
 
-def add_two_q_cal_points(p, q0: int, q1: int,
-                         reps_per_cal_pt: int = 1,
-                         f_state_cal_pts: bool = False,
-                         f_state_cal_pt_cw: int = 31,
-                         measured_qubits=None,
-                         interleaved_measured_qubits=None,
-                         interleaved_delay=None,
-                         nr_of_interleaves=1):
+def add_two_q_cal_points(
+        p: OqlProgram,
+        q0: int,
+        q1: int,
+        reps_per_cal_pt: int = 1,
+        f_state_cal_pts: bool = False,
+#        f_state_cal_pt_cw: int = 31,
+        measured_qubits=None,
+        interleaved_measured_qubits=None,
+        interleaved_delay=None,
+        nr_of_interleaves=1
+):
     """
     Returns a list of kernels containing calibration points for two qubits
 
@@ -249,14 +284,14 @@ def add_two_q_cal_points(p, q0: int, q1: int,
 
 
 def add_multi_q_cal_points(
-    p: Program, 
-    qubits: List[int],
-    combinations: List[str] = ["00", "01", "10", "11"],
-    reps_per_cal_pnt: int = 1,
-    f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
-    nr_flux_dance: int = None,
-    flux_cw_list: List[str] = None, 
-    return_comb=False
+        p: OqlProgram,
+        qubits: List[int],
+        combinations: List[str] = ["00", "01", "10", "11"],
+        reps_per_cal_pnt: int = 1,
+        f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+        nr_flux_dance: int = None,
+        flux_cw_list: List[str] = None, 
+        return_comb=False
 ):
     """
     Add a list of kernels containing calibration points in the program `p`
@@ -274,9 +309,9 @@ def add_multi_q_cal_points(
         p
     """
     kernel_list = []  # Not sure if this is needed
-    comb_repetead = []
+    comb_repeated = []
     for state in combinations:
-        comb_repetead += [state] * reps_per_cal_pnt
+        comb_repeated += [state] * reps_per_cal_pnt
 
     state_to_gates = {
         "0": ["i"],
@@ -284,7 +319,7 @@ def add_multi_q_cal_points(
         "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
     }
 
-    for i, comb in enumerate(comb_repetead):
+    for i, comb in enumerate(comb_repeated):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
 
         # NOTE: for debugging purposes of the effect of fluxing on readout, 
@@ -320,20 +355,24 @@ def add_multi_q_cal_points(
         p.add_kernel(k)
     
     if return_comb:
-        return comb_repetead
+        return comb_repeated
     else:
         return p
 
 
-def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
-                         q2 = None,
-                         reps_per_cal_pt: int =1,
-                         f_state_cal_pts: bool=False,
-                         f_state_cal_pt_cw: int = 31,
-                         measured_qubits=None,
-                         interleaved_measured_qubits=None,
-                         interleaved_delay=None,
-                         nr_of_interleaves=1):
+def add_two_q_cal_points_special_cond_osc(
+        p: OqlProgram,
+        q0: int,
+        q1: int,
+        q2 = None,
+        reps_per_cal_pt: int =1,
+        f_state_cal_pts: bool=False,
+#        f_state_cal_pt_cw: int = 31,
+        measured_qubits=None,
+        interleaved_measured_qubits=None,
+        interleaved_delay=None,
+        nr_of_interleaves=1
+):
     """
     Returns a list of kernels containing calibration points for two qubits
 
@@ -428,10 +467,10 @@ def clocks_to_s(time, clock_cycle=20e-9):
 
 
 def check_recompilation_needed_hash_based(
-    program_fn: str,
-    platf_cfg: str,
-    clifford_rb_oql: str,
-    recompile: bool = True,
+        program_fn: str,
+        platf_cfg: str,
+        clifford_rb_oql: str,
+        recompile: bool = True,
 ):
     """
     Similar functionality to the deprecated `check_recompilation_needed` but
@@ -524,8 +563,11 @@ def check_recompilation_needed_hash_based(
     return res_dict
 
 
-def check_recompilation_needed(program_fn: str, platf_cfg: str,
-                               recompile=True):
+def check_recompilation_needed(
+        program_fn: str,
+        platf_cfg: str,
+        recompile=True
+) -> bool:
     """
     determines if compilation of a file is needed based on it's timestamp
     and an optional recompile option
@@ -556,7 +598,7 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
     elif recompile is False:
         if isfile(program_fn):
             if is_more_recent(platf_cfg, program_fn):
-                log.warnings("File {}\n is more recent"
+                log.warning("File {}\n is more recent"
                     "than program, use `recompile='as needed'` if you"
                     " don't know what this means!".format(platf_cfg))
             return False
@@ -567,7 +609,11 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
             'recompile should be True, False or "as needed"')
 
 
-def load_range_of_oql_programs(programs, counter_param, CC):
+def load_range_of_oql_programs(
+        programs,
+        counter_param,
+        CC
+) -> None:
     """
     This is a helper function for running an experiment that is spread over
     multiple OpenQL programs such as RB.
@@ -578,8 +624,10 @@ def load_range_of_oql_programs(programs, counter_param, CC):
 
 
 def load_range_of_oql_programs_from_filenames(
-    programs_filenames: list, counter_param, CC
-):
+        programs_filenames: list,
+        counter_param,
+        CC
+) -> None:
     """
     This is a helper function for running an experiment that is spread over
     multiple OpenQL programs such as RB.
@@ -595,8 +643,12 @@ def load_range_of_oql_programs_from_filenames(
     CC.eqasm_program(fn)
 
 
-def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
-                                                detector):
+def load_range_of_oql_programs_varying_nr_shots(
+        programs,
+        counter_param,
+        CC,
+        detector
+) -> None:
     """
     This is a helper function for running an experiment that is spread over
     multiple OpenQL programs of varying length such as GST.
