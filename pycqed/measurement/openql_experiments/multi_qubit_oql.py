@@ -11,7 +11,7 @@ def single_flux_pulse_seq(qubit_indices: tuple,
 
     p = oqh.create_program("single_flux_pulse_seq", platf_cfg)
 
-    k = oqh.create_kernel("main", p)
+    k = p.create_kernel("main")
     for idx in qubit_indices:
         k.prepz(idx)  # to ensure enough separation in timing
         k.prepz(idx)  # to ensure enough separation in timing
@@ -22,7 +22,7 @@ def single_flux_pulse_seq(qubit_indices: tuple,
     k.gate('fl_cw_02', [qubit_indices[0], qubit_indices[1]])
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -31,7 +31,7 @@ def flux_staircase_seq(platf_cfg: str):
 
     p = oqh.create_program("flux_staircase_seq", platf_cfg)
 
-    k = oqh.create_kernel("main", p)
+    k = p.create_kernel("main")
     for i in range(1):
         k.prepz(i)  # to ensure enough separation in timing
     for i in range(1):
@@ -43,7 +43,7 @@ def flux_staircase_seq(platf_cfg: str):
         k.gate("wait", [0, 1, 2, 3], 200)  # because scheduling is wrong.
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -78,7 +78,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
     p = oqh.create_program("multi_qubit_off_on", platf_cfg)
 
     for i, comb in enumerate(combinations):
-        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+        k = p.create_kernel('Prep_{}'.format(comb))
 
         # 1. Prepare qubits in 0
         for q in qubits:
@@ -118,7 +118,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
         k.gate('wait', qubits, 0)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
 
     return p
 
@@ -136,7 +136,7 @@ def single_qubit_off_on(qubits: list,
     p = oqh.create_program("single_qubit_off_on", platf_cfg)
 
     for i, comb in enumerate(combinations):
-        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+        k = p.create_kernel('Prep_{}'.format(comb))
 
         # 1. Prepare qubits in 0
         for q in qubits:
@@ -165,7 +165,7 @@ def single_qubit_off_on(qubits: list,
         k.gate('wait', qubits, 0)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
 
     return p
 
@@ -207,7 +207,7 @@ def targeted_off_on(qubits: list,
     p = oqh.create_program("Targeted_off_on", platf_cfg)
 
     for i, comb in enumerate(combinations):
-        k = oqh.create_kernel('Prep_{}'.format(comb), p)
+        k = p.create_kernel('Prep_{}'.format(comb))
 
         # 1. Prepare qubits in 0
         for q in qubits:
@@ -228,7 +228,7 @@ def targeted_off_on(qubits: list,
         k.gate('wait', qubits, 0)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
 
     return p
 
@@ -259,7 +259,7 @@ def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
 
     for i, angle in enumerate(angles[:-4]):
         cw_idx = angle//20 + 9
-        k = oqh.create_kernel("Ramsey_azi_"+str(angle), p)
+        k = p.create_kernel("Ramsey_azi_"+str(angle))
         for qubit in qubits:
             k.prepz(qubit)
         if len(qubits)>1 and target_qubit_excited:
@@ -287,9 +287,9 @@ def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p, qubit_idx=qubits[-1], measured_qubits=qubits)
+    p.add_single_qubit_cal_points(qubit_idx=qubits[-1], measured_qubits=qubits)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -331,7 +331,7 @@ def echo_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
 
     for i, angle in enumerate(angles[:-4]):
         cw_idx = angle//20 + 9
-        k = oqh.create_kernel('echo_azi_{}'.format(angle), p)
+        k = p.create_kernel('echo_azi_{}'.format(angle))
         for qubit in qubits:
             k.prepz(qubit)
         k.gate('rx90', [qubits[-1]])
@@ -365,9 +365,9 @@ def echo_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p, qubit_idx=qubits[-1], measured_qubits=qubits)
+    p.add_single_qubit_cal_points(qubit_idx=qubits[-1], measured_qubits=qubits)
 
-    oqh.compile(p)
+    p.compile()
 
     return p
 
@@ -384,9 +384,9 @@ def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
     '''
     p = oqh.create_program('two_qubit_off_on', platf_cfg)
 
-    oqh.add_two_q_cal_points(p,  q0=q0, q1=q1)
+    p.add_two_q_cal_points(q0=q0, q1=q1)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -416,7 +416,7 @@ def two_qubit_tomo_cardinal(q0: int, q1: int, cardinal: int,  platf_cfg: str):
         for p_q0 in tomo_list_q0:
             i += 1
             kernel_name = '{}_{}_{}'.format(i, p_q0, p_q1)
-            k = oqh.create_kernel(kernel_name, p)
+            k = p.create_kernel(kernel_name)
             k.prepz(q0)
             k.prepz(q1)
             k.gate(prep_pulse_q0, [q0])
@@ -429,9 +429,9 @@ def two_qubit_tomo_cardinal(q0: int, q1: int, cardinal: int,  platf_cfg: str):
     # every calibration point is repeated 7 times. This is copied from the
     # script for Tektronix driven qubits. I do not know if this repetition
     # is important or even necessary here.
-    oqh.add_two_q_cal_points(p, q0=q1, q1=q0, reps_per_cal_pt=7)
+    p.add_two_q_cal_points(q0=q1, q1=q0, reps_per_cal_pt=7)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -480,7 +480,7 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
     for pulse_comb_q0, pulse_comb_q1 in zip(pulse_combinations_q0,
                                             pulse_combinations_q1):
         i += 1
-        k = oqh.create_kernel('AllXY_{}'.format(i), p)
+        k = p.create_kernel('AllXY_{}'.format(i))
         k.prepz(q0)
         k.prepz(q1)
         # N.B. The identity gates are there to ensure proper timing
@@ -532,7 +532,7 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
         k.measure(q1)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -565,7 +565,7 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
 
     for i, time in enumerate(times[:-2]):
 
-        k = oqh.create_kernel("residual_coupling_seq_{}".format(i), p)
+        k = p.create_kernel("residual_coupling_seq_{}".format(i))
         k.prepz(q0)
         for q_s in q_spectator_idx:
             k.prepz(q_s)
@@ -587,12 +587,11 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_multi_q_cal_points(
-            p,
+    p.add_multi_q_cal_points(
             qubits=all_qubits,
             combinations=['0'*n_qubits,'1'*n_qubits])
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -605,7 +604,7 @@ def FluxTimingCalibration(qubit_idxs: list, platf_cfg: str,
     p = oqh.create_program('FluxTimingCalibration', platf_cfg)
 
     # don't use last 4 points if calibration points are used
-    k = oqh.create_kernel('pi_flux_pi', p)
+    k = p.create_kernel('pi_flux_pi')
 
     k.prepz(qubit_idxs[0])
     for q_idx in qubit_idxs:
@@ -622,8 +621,8 @@ def FluxTimingCalibration(qubit_idxs: list, platf_cfg: str,
     p.add_kernel(k)
 
     if cal_points:
-        oqh.add_single_qubit_cal_points(p, qubit_idx=qubit_idx) # FIXME: error
-    oqh.compile(p)
+        p.add_single_qubit_cal_points(qubit_idx=qubit_idx) # FIXME: unresolved
+    p.compile()
     return p
 
 
@@ -660,7 +659,7 @@ def Cryoscope(
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
 
-    k = oqh.create_kernel("RamZ_X", p)
+    k = p.create_kernel("RamZ_X")
     k.prepz(qubit_idxs[0])
     k.gate("wait", [], 0)  # alignment workaround
     for q_idx in qubit_idxs:
@@ -676,7 +675,7 @@ def Cryoscope(
         k.measure(q_idx)
     p.add_kernel(k)
 
-    k = oqh.create_kernel("RamZ_Y", p)
+    k = p.create_kernel("RamZ_Y")
     k.prepz(qubit_idxs[0])
     k.gate("wait", [], 0)  # alignment workaround
     for q_idx in qubit_idxs:
@@ -693,7 +692,7 @@ def Cryoscope(
     p.add_kernel(k)
 
     if double_projections:
-        k = oqh.create_kernel("RamZ_mX", p)
+        k = p.create_kernel("RamZ_mX")
         k.prepz(qubit_idxs[0])
         k.gate("wait", [], 0)  # alignment workaround
         for q_idx in qubit_idxs:
@@ -709,7 +708,7 @@ def Cryoscope(
             k.measure(q_idx)
         p.add_kernel(k)
 
-        k = oqh.create_kernel("RamZ_mY", p)
+        k = p.create_kernel("RamZ_mY")
         k.prepz(qubit_idxs[0])
         k.gate("wait", [], 0)  # alignment workaround
         for q_idx in qubit_idxs:
@@ -725,7 +724,7 @@ def Cryoscope(
             k.measure(q_idx)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -743,7 +742,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
 
         t_nanoseconds = int(round(t/1e-9))
 
-        k = oqh.create_kernel("RamZ_X_{}".format(i_t), p)
+        k = p.create_kernel("RamZ_X_{}".format(i_t))
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate("wait", [], 0) #alignment workaround
@@ -755,7 +754,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-        k = oqh.create_kernel("RamZ_Y_{}".format(i_t), p)
+        k = p.create_kernel("RamZ_Y_{}".format(i_t))
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate("wait", [], 0) #alignment workaround
@@ -767,7 +766,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -790,7 +789,7 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
     p = oqh.create_program('OpenQL_Platform', platf_cfg)
     wait_time = wait_time/1e-9
 
-    k = oqh.create_kernel("fluxed_ramsey_1", p)
+    k = p.create_kernel("fluxed_ramsey_1")
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate("wait", [], 0) #alignment workaround
@@ -801,7 +800,7 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    k = oqh.create_kernel("fluxed_ramsey_2", p)
+    k = p.create_kernel("fluxed_ramsey_2")
     k.prepz(qubit_idx)
     k.gate("wait", [], 0) #alignment workaround
     k.gate('rx90', qubit_idx)
@@ -815,7 +814,7 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
     # adding the calibration points
     # add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
 
     return p
 
@@ -842,7 +841,7 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
     buffer_nanoseconds = int(round(buffer_time/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time/1e-9))
 
-    k = oqh.create_kernel("Chevron_hack", p)
+    k = p.create_kernel("Chevron_hack")
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx_spec])
     k.gate('rx180', [qubit_idx])
@@ -856,7 +855,7 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
     k.measure(qubit_idx_spec)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -910,7 +909,7 @@ def Chevron(
         flux_cw = 2
     flux_cw_name = _def_lm_flux[flux_cw]['name'].lower()
 
-    k = oqh.create_kernel("Chevron", p)
+    k = p.create_kernel("Chevron")
     k.prepz(qubit_idx)
     k.prepz(qubit_idx_spec)
     if (qubit_idx_parks is not None):
@@ -965,7 +964,7 @@ def Chevron(
 
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -1002,7 +1001,7 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
     p = oqh.create_program("two_qubit_ramsey", platf_cfg)
 
     for i, time in enumerate(times):
-        k = oqh.create_kernel("two_qubit_ramsey_{}".format(i), p)
+        k = p.create_kernel("two_qubit_ramsey_{}".format(i))
         k.prepz(qubit_idx)
 
         if target_qubit_sequence == 'ramsey':
@@ -1027,8 +1026,8 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_two_q_cal_points(p, qubit_idx, qubit_idx_spec, reps_per_cal_pt=2)
-    oqh.compile(p)
+    p.add_two_q_cal_points(qubit_idx, qubit_idx_spec, reps_per_cal_pt=2)
+    p.compile()
     return p
 
 
@@ -1068,8 +1067,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
     p = oqh.create_program("two_qubit_tomo_bell_{}_{}".format(q1, q0), platf_cfg)
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
-            k = oqh.create_kernel(
-                "BellTomo_{}{}_{}{}".format(q1, p_q1, q0, p_q0), p)
+            k = p.create_kernel("BellTomo_{}{}_{}{}".format(q1, p_q1, q0, p_q0))
             # next experiment
             k.prepz(q0)  # to ensure enough separation in timing
             k.prepz(q1)  # to ensure enough separation in timing
@@ -1098,8 +1096,8 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             # k.gate("wait", [2, 0], 0)
             p.add_kernel(k)
     # 7 repetitions is because of assumptions in tomo analysis
-    oqh.add_two_q_cal_points(p, q0=q0, q1=q1, reps_per_cal_pt=7)
-    oqh.compile(p)
+    p.add_two_q_cal_points(q0=q0, q1=q1, reps_per_cal_pt=7)
+    p.compile()
     return p
 
 
@@ -1136,8 +1134,8 @@ def two_qubit_tomo_bell_by_waiting(bell_state, q0, q1,
     p = oqh.create_program("two_qubit_tomo_bell_by_waiting", platf_cfg)
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
-            k = oqh.create_kernel("BellTomo_{}{}_{}{}".format(
-                q1, p_q1, q0, p_q0), p)
+            k = p.create_kernel("BellTomo_{}{}_{}{}".format(
+                q1, p_q1, q0, p_q0))
             # next experiment
             k.prepz(q0)  # to ensure enough separation in timing
             k.prepz(q1)  # to ensure enough separation in timing
@@ -1160,8 +1158,8 @@ def two_qubit_tomo_bell_by_waiting(bell_state, q0, q1,
             k.gate("wait", [2, 0], 0)
             p.add_kernel(k)
     # 7 repetitions is because of assumptions in tomo analysis
-    oqh.add_two_q_cal_points(p, q0=q0, q1=q1, reps_per_cal_pt=7)
-    oqh.compile(p)
+    p.add_two_q_cal_points(q0=q0, q1=q1, reps_per_cal_pt=7)
+    p.compile()
     return p
 
 
@@ -1178,7 +1176,7 @@ def two_qubit_DJ(q0, q1, platf_cfg):
 
     # experiments
     # 1
-    k = oqh.create_kernel("DJ1", p)
+    k = p.create_kernel("DJ1")
     k.prepz(q0)  # to ensure enough separation in timing
     k.prepz(q1)  # to ensure enough separation in timing
     # prerotations
@@ -1193,7 +1191,7 @@ def two_qubit_DJ(q0, q1, platf_cfg):
     p.add_kernel(k)
 
     # 2
-    k = oqh.create_kernel("DJ2", p)
+    k = p.create_kernel("DJ2")
     k.prepz(q0)  # to ensure enough separation in timing
     k.prepz(q1)  # to ensure enough separation in timing
     # prerotations
@@ -1210,7 +1208,7 @@ def two_qubit_DJ(q0, q1, platf_cfg):
     p.add_kernel(k)
 
     # 3
-    k = oqh.create_kernel("DJ3", p)
+    k = p.create_kernel("DJ3")
     k.prepz(q0)  # to ensure enough separation in timing
     k.prepz(q1)  # to ensure enough separation in timing
     # prerotations
@@ -1241,7 +1239,7 @@ def two_qubit_DJ(q0, q1, platf_cfg):
     p.add_kernel(k)
 
     # 4
-    k = oqh.create_kernel("DJ4", p)
+    k = p.create_kernel("DJ4")
     k.prepz(q0)  # to ensure enough separation in timing
     k.prepz(q1)  # to ensure enough separation in timing
     # prerotations
@@ -1269,8 +1267,8 @@ def two_qubit_DJ(q0, q1, platf_cfg):
     p.add_kernel(k)
 
     # 7 repetitions is because of assumptions in tomo analysis
-    oqh.add_two_q_cal_points(p, q0=q0, q1=q1, reps_per_cal_pt=7)
-    oqh.compile(p)
+    p.add_two_q_cal_points(q0=q0, q1=q1, reps_per_cal_pt=7)
+    p.compile()
     return p
 
 
@@ -1304,8 +1302,7 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
     p = oqh.create_program("single_qubit_repeated_parity_check", platf_cfg)
 
     for k, initial_state in enumerate(initial_states):
-        k = oqh.create_kernel(
-            'repeated_parity_check_{}'.format(k), p)
+        k = p.create_kernel('repeated_parity_check_{}'.format(k))
         k.prepz(qD)
         k.prepz(qA)
         if initialization_msmt:
@@ -1346,7 +1343,7 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
         k.gate('wait', [qA, qD], 0)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 def two_qubit_parity_check(qD0: int, qD1: int, qA: int, 
@@ -1404,8 +1401,8 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
             for initial_state in initial_states:
-                k = oqh.create_kernel(
-                    'repeated_parity_check_'+initial_state[0]+initial_state[1]+'_tomo0_'+p_q0+'_tomo1_'+p_q1,p)
+                k = p.create_kernel(
+                    'repeated_parity_check_'+initial_state[0]+initial_state[1]+'_tomo0_'+p_q0+'_tomo1_'+p_q1)
                 k.prepz(qD0)
                 k.prepz(qD1)
                 k.prepz(qA)
@@ -1535,17 +1532,24 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
         if echo_during_ancilla_mmt:
             interleaved_delay=ro_time
         if tomo_after:
-            oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=7, measured_qubits=[qD0, qD1],
-                                     interleaved_measured_qubits=[qA],
-                                     interleaved_delay=interleaved_delay,
-                                     nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes))
+            p.add_two_q_cal_points(
+                q0=qD0, q1=qD1,
+                reps_per_cal_pt=7,
+                measured_qubits=[qD0, qD1],
+                interleaved_measured_qubits=[qA],
+                interleaved_delay=interleaved_delay,
+                nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes))
 
         else:
-            oqh.add_two_q_cal_points(p, q0=qD0, q1=qD1, reps_per_cal_pt=7, measured_qubits=[qD0, qD1, qA],
-                         interleaved_measured_qubits=[qA],
-                         interleaved_delay=interleaved_delay, nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes)-1)
+            p.add_two_q_cal_points(
+                q0=qD0, q1=qD1,
+                reps_per_cal_pt=7,
+                measured_qubits=[qD0, qD1, qA],
+                interleaved_measured_qubits=[qA],
+                interleaved_delay=interleaved_delay,
+                nr_of_interleaves=initialization_msmt+number_of_repetitions*len(parity_axes)-1)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -1601,7 +1605,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
     for i, angle in enumerate(angles):
         for case in cases:
 
-            k = oqh.create_kernel("{}_{}".format(case, angle), p)
+            k = p.create_kernel("{}_{}".format(case, angle))
             k.prepz(q0)
             k.prepz(q1)
             if q2 is not None:
@@ -1725,13 +1729,12 @@ def conditional_oscillation_seq(q0: int, q1: int,
             states = ["000", "010", "101", "111"]
 
         qubits = [q0, q1] if q2 is None else [q0, q1, q2]
-        oqh.add_multi_q_cal_points(
-                p,
+        p.add_multi_q_cal_points(
                 qubits=qubits,
                 f_state_cal_pt_cw=31,
                 combinations=states)
 
-    oqh.compile(p)
+    p.compile()
 
     # [2020-06-24] parallel cz not supported (yet)
 
@@ -1798,7 +1801,7 @@ def conditional_oscillation_seq_multi(
     for i, angle in enumerate(angles):
         for case in cases:
 
-            k = oqh.create_kernel("{}_{}".format(case, angle), p)
+            k = p.create_kernel("{}_{}".format(case, angle))
             
             for q0 in Q_idxs_target:
                 k.prepz(q0)
@@ -1899,13 +1902,12 @@ def conditional_oscillation_seq_multi(
         states = ["0"*n+"0"*n, "0"*n+"1"*n, "1"*n+"0"*n, "1"*n+"1"*n]
 
         qubits = Q_idxs_target+Q_idxs_control
-        oqh.add_multi_q_cal_points(
-                p,
+        p.add_multi_q_cal_points(
                 qubits=qubits,
                 f_state_cal_pt_cw=31,
                 combinations=states)
 
-    oqh.compile(p)
+    p.compile()
 
     if add_cal_points:
         cal_pts_idx = [361, 362, 363, 364]
@@ -1967,7 +1969,7 @@ def parity_check_flux_dance(
     for case in control_cases:
         
         for i, angle in enumerate(angles):
-            k = oqh.create_kernel("{}_{}".format(case, angle), p)
+            k = p.create_kernel("{}_{}".format(case, angle))
             
             for q0 in Q_idxs_target:
                 k.prepz(q0)
@@ -2062,16 +2064,15 @@ def parity_check_flux_dance(
         if Q_idxs_parking:
             cal_states = [state + '0' if i < len(cal_states)/2 else state + '1' for i,state in enumerate(cal_states)]
 
-        oqh.add_multi_q_cal_points(
-            p, 
-            qubits=qubits if not Q_idxs_parking else qubits+Q_idxs_parking, 
+        p.add_multi_q_cal_points(
+            qubits=qubits if not Q_idxs_parking else qubits+Q_idxs_parking,
             f_state_cal_pt_cw=31,
             combinations=cal_states,
             nr_flux_dance=nr_flux_dance_before_cal_points,
             flux_cw_list=flux_cw_list if nr_flux_dance_before_cal_points else None
             )
 
-    oqh.compile(p)
+    p.compile()
 
     if add_cal_points:
         cal_pts_idx = np.arange(len(control_cases),len(cal_states)+len(control_cases))
@@ -2128,7 +2129,7 @@ def parity_check_fidelity(
     p = oqh.create_program("parity_check_fidelity", platf_cfg)
     
     for case in control_cases:
-        k = oqh.create_kernel("{}".format(case), p)
+        k = p.create_kernel("{}".format(case))
         
         for qb in Q_idxs_ancilla + Q_idxs_data:
             k.prepz(qb)
@@ -2186,7 +2187,7 @@ def parity_check_fidelity(
 
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
 
     return p
 
@@ -2233,7 +2234,7 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
 
     for G0 in ['ry90', 'rym90']:
         for G1 in ['ry90', 'rym90']:
-            k = oqh.create_kernel('Gr{}_{}'.format(G0, G1),  p)
+            k = p.create_kernel('Gr{}_{}'.format(G0, G1))
             k.prepz(q0)
             k.prepz(q1)
             k.gate(G0, [q0])
@@ -2265,8 +2266,8 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
             p.add_kernel(k)
 
     if cal_points:
-        oqh.add_two_q_cal_points(p, q0=q0, q1=q1)
-    oqh.compile(p)
+        p.add_two_q_cal_points(q0=q0, q1=q1)
+    p.compile()
     return p
 
 
@@ -2295,7 +2296,7 @@ def grovers_two_qubits_repeated(qubits, platf_cfg: str,
     G1 = {"phi": 90, "theta": 90}
     for i in range(nr_of_grover_iterations):
         # k = p.new_kernel('Grover_iteration_{}'.format(i))
-        k = oqh.create_kernel('Grover_iteration_{}'.format(i), p)
+        k = p.create_kernel('Grover_iteration_{}'.format(i))
         k.prepz(q0)
         k.prepz(q1)
         # k.prepz()
@@ -2336,7 +2337,7 @@ def grovers_two_qubits_repeated(qubits, platf_cfg: str,
         k.measure(q0)
         k.measure(q1)
         p.add_kernel(k)
-    oqh.compile(p)
+    p.compile()
     # p.compile()
     return p
 
@@ -2357,8 +2358,7 @@ def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
         raise NotImplementedError('Currently only precompiled flux pulses '
                                   'are supported.')
 
-    p = oqh.create_program("grovers_tomography",
-                           platf_cfg)
+    p = oqh.create_program("grovers_tomography", platf_cfg)
 
     tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
 
@@ -2379,8 +2379,8 @@ def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
 
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
-            k = oqh.create_kernel('Gr{}_{}_tomo_{}_{}'.format(
-                G0, G1, p_q0, p_q1), p)
+            k = p.create_kernel('Gr{}_{}_tomo_{}_{}'.format(
+                G0, G1, p_q0, p_q1))
             k.prepz(q0)
             k.prepz(q1)
 
@@ -2419,8 +2419,8 @@ def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
             k.gate('wait', [2, 0], 0)
             p.add_kernel(k)
 
-    oqh.add_two_q_cal_points(p, q0=q0, q1=q1, reps_per_cal_pt=7)
-    oqh.compile(p)
+    p.add_two_q_cal_points(q0=q0, q1=q1, reps_per_cal_pt=7)
+    p.compile()
     return p
 
 
@@ -2436,7 +2436,7 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str,
     tomo_list = ['rxm90', 'rym90', 'i']
 
     for p_pulse in tomo_list:
-        k = oqh.create_kernel("{}".format(p_pulse), p)
+        k = p.create_kernel("{}".format(p_pulse))
         k.prepz(q0)
         k.prepz(q1)
 
@@ -2464,14 +2464,14 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str,
 
     if cal_points:
         # FIXME: replace with standard add cal points function
-        k = oqh.create_kernel("Cal 00", p)
+        k = p.create_kernel("Cal 00")
         k.prepz(q0)
         k.prepz(q1)
         k.measure(q0)
         k.measure(q1)
         k.gate('wait', [2, 0], 0)
         p.add_kernel(k)
-        k = oqh.create_kernel("Cal 11", p)
+        k = p.create_kernel("Cal 11")
         k.prepz(q0)
         k.prepz(q1)
         k.gate("rx180", [q0])
@@ -2481,7 +2481,7 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str,
         k.gate('wait', [2, 0], 0)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -2606,7 +2606,7 @@ def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
     if flux_cw is None:
         flux_cw = 2
 
-    k = oqh.create_kernel("Chevron", p)
+    k = p.create_kernel("Chevron")
     k.prepz(qubit_idx)
     k.gate('rx180', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
@@ -2619,7 +2619,7 @@ def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
     k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -2661,8 +2661,8 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
         SP1 = cardinal_gates[idx_p1]
         t_q0 = gates[1]
         t_q1 = gates[0]
-        k = oqh.create_kernel(
-            'PT_{}_tomo_{}_{}'.format(cardinal, idx_g0, idx_g1), p)
+        k = p.create_kernel(
+            'PT_{}_tomo_{}_{}'.format(cardinal, idx_g0, idx_g1))
 
         k.prepz(q0)
         k.prepz(q1)
@@ -2682,8 +2682,8 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
         k.gate("wait", [], 0) #alignment workaround
         p.add_kernel(k)
 
-    oqh.add_two_q_cal_points(p, q0=q0, q1=q1, reps_per_cal_pt=2)
-    oqh.compile(p)
+    p.add_two_q_cal_points(q0=q0, q1=q1, reps_per_cal_pt=2)
+    p.compile()
     return p
 
 
@@ -2707,7 +2707,7 @@ def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
         for p_q0 in tomo_list_q0:
             i += 1
             kernel_name = '{}_{}_{}'.format(i, p_q0, p_q1)
-            k = oqh.create_kernel(kernel_name, p)
+            k = p.create_kernel(kernel_name)
             k.prepz(q0)
             k.prepz(q1)
             k.gate('ry180', [q0])  # Y180 gate without compilation
@@ -2725,8 +2725,8 @@ def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
     # every calibration point is repeated 7 times. This is copied from the
     # script for Tektronix driven qubits. I do not know if this repetition
     # is important or even necessary here.
-    oqh.add_two_q_cal_points(p, q0=q1, q1=q0, reps_per_cal_pt=7)
-    oqh.compile(p)
+    p.add_two_q_cal_points(q0=q1, q1=q0, reps_per_cal_pt=7)
+    p.compile()
     return p
 
 
@@ -2761,7 +2761,7 @@ def sliding_flux_pulses_seq(
     """
 
     p = oqh.create_program("sliding_flux_pulses_seq", platf_cfg)
-    k = oqh.create_kernel("sliding_flux_pulses_seq", p)
+    k = p.create_kernel("sliding_flux_pulses_seq")
     q0 = qubits[-1]
     q1 = qubits[-2]
 
@@ -2801,8 +2801,8 @@ def sliding_flux_pulses_seq(
     p.add_kernel(k)
 
     if add_cal_points:
-        oqh.add_two_q_cal_points(p, q0=q0, q1=q1)
-    oqh.compile(p)
+        p.add_two_q_cal_points(q0=q0, q1=q1)
+    p.compile()
 
     if add_cal_points:
         cal_pts_idx = [361, 362, 363, 364]
@@ -2840,7 +2840,7 @@ def two_qubit_state_tomography(qubit_idxs,
 
     for basis in bases_comb:
         for pre_rot in measurement_pre_rotations: # tomographic pre-rotation
-            k = oqh.create_kernel('TFD_{}-basis_{}'.format(basis, pre_rot), p)
+            k = p.create_kernel('TFD_{}-basis_{}'.format(basis, pre_rot))
             for q_idx in qubit_idxs:
                 k.prepz(q_idx)
 
@@ -2926,7 +2926,7 @@ def two_qubit_state_tomography(qubit_idxs,
             p.add_kernel(k)
 
     for cal_pt in calibration_points:
-        k = oqh.create_kernel('Cal_{}'.format(cal_pt), p)
+        k = p.create_kernel('Cal_{}'.format(cal_pt))
         for q_idx in qubit_idxs:
             k.prepz(q_idx)
         k.gate('wait', [], 0)
@@ -2939,7 +2939,7 @@ def two_qubit_state_tomography(qubit_idxs,
             k.measure(q_idx)
         k.gate('wait', [], 0)
         p.add_kernel(k)
-    oqh.compile(p)
+    p.compile()
     p.combinations = combinations
     return p
 
@@ -2978,7 +2978,7 @@ def multi_qubit_Depletion(qubits: list, platf_cfg: str,
 
     for i, pulse_comb in enumerate(pulse_combinations):
         for j in range(2): #double points
-            k = oqh.create_kernel('Depletion_{}_{}'.format(j, i), p)
+            k = p.create_kernel('Depletion_{}_{}'.format(j, i))
             for qubit in qubits:
                 k.prepz(qubit)
                 k.measure(qubit)
@@ -2987,7 +2987,7 @@ def multi_qubit_Depletion(qubits: list, platf_cfg: str,
             for qubit in qubits:
                 k.gate("wait", [qubit], wait_nanoseconds)
 
-            if sequence_type == 'simultaneous': # FIXME: error
+            if sequence_type == 'simultaneous': # FIXME: unresolved
                 for qubit in qubits:
                     k.gate(pulse_comb[0], [qubit])
                     k.gate(pulse_comb[1], [qubit])
@@ -2995,7 +2995,7 @@ def multi_qubit_Depletion(qubits: list, platf_cfg: str,
 
             p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -3032,7 +3032,7 @@ def two_qubit_Depletion(q0: int, q1: int, platf_cfg: str,
     for pulse_comb_q0, pulse_comb_q1 in zip(pulse_combinations_q0,
                                             pulse_combinations_q1):
         i += 1
-        k = oqh.create_kernel('AllXY_{}'.format(i), p)
+        k = p.create_kernel('AllXY_{}'.format(i))
         k.prepz(q0)
         k.prepz(q1)
         k.measure(q0)
@@ -3090,7 +3090,7 @@ def two_qubit_Depletion(q0: int, q1: int, platf_cfg: str,
         k.measure(q1)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -3104,7 +3104,7 @@ def Two_qubit_RTE(QX: int , QZ: int, platf_cfg: str,
     p = oqh.create_program('RTE', platf_cfg)
 
     for state in start_states:
-        k = oqh.create_kernel('RTE start state {}'.format(state), p)
+        k = p.create_kernel('RTE start state {}'.format(state))
         k.prepz(QX)
         k.prepz(QZ)
         if state == '1':
@@ -3155,7 +3155,7 @@ def Two_qubit_RTE(QX: int , QZ: int, platf_cfg: str,
 
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -3168,7 +3168,7 @@ def Two_qubit_RTE_pipelined(QX:int, QZ:int, QZ_d:int, platf_cfg: str,
     p = oqh.create_program('RTE_pipelined', platf_cfg)
 
     for state in start_states:
-      k = oqh.create_kernel('RTE pip start state {}'.format(state), p)
+      k = p.create_kernel('RTE pip start state {}'.format(state))
       k.prepz(QX)
       k.prepz(QZ)
       if state == '1':
@@ -3213,7 +3213,7 @@ def Two_qubit_RTE_pipelined(QX:int, QZ:int, QZ_d:int, platf_cfg: str,
 
       p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -3233,7 +3233,7 @@ def Ramsey_cross(wait_time: int,
 
     for i, angle in enumerate(angles[:-4]):
         cw_idx = angle//20 + 9
-        k = oqh.create_kernel("Ramsey_azi_"+str(angle), p)
+        k = p.create_kernel("Ramsey_azi_"+str(angle))
 
         k.prepz(q_rams)
         k.prepz(q_meas)
@@ -3270,9 +3270,9 @@ def Ramsey_cross(wait_time: int,
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p, qubit_idx=q_rams)
+    p.add_single_qubit_cal_points(qubit_idx=q_rams)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -3283,7 +3283,7 @@ def TEST_RTE(QX:int , QZ:int, platf_cfg: str,
     """
     p = oqh.create_program('Multi_RTE', platf_cfg)
 
-    k = oqh.create_kernel('Multi_RTE', p)
+    k = p.create_kernel('Multi_RTE')
     k.prepz(QX)
     k.prepz(QZ)
     ######################
@@ -3323,7 +3323,7 @@ def TEST_RTE(QX:int , QZ:int, platf_cfg: str,
 
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -3361,7 +3361,7 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
+            k = p.create_kernel("AllXY_{}_{}".format(i, j))
             for qubit in qubits_idx:
               k.prepz(qubit)
               k.gate(xy[0], [qubit])
@@ -3369,20 +3369,20 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
               k.measure(qubit)
             p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
 # FIXME: indentation is wrong in functions below
 def multi_qubit_rabi(qubits_idx: list,platf_cfg: str = None):
   p = oqh.create_program("Multi_qubit_rabi", platf_cfg)
-  k = oqh.create_kernel("rabi", p)
+  k = p.create_kernel("rabi")
   for qubit in qubits_idx:
       k.prepz(qubit)
       k.gate('rx180', [qubit])
       k.measure(qubit)
   p.add_kernel(k)
-  oqh.compile(p)
+  p.compile()
   return p
 
 def multi_qubit_ramsey(times,qubits_idx: list, platf_cfg: str):
@@ -3391,7 +3391,7 @@ def multi_qubit_ramsey(times,qubits_idx: list, platf_cfg: str):
   p = oqh.create_program('Multi_qubit_Ramsey',platf_cfg)
 
   for i in range(points-4):
-    k = oqh.create_kernel('Ramsey{}'.format(i),p)
+    k = p.create_kernel('Ramsey{}'.format(i))
     for q, qubit in enumerate(qubits_idx):
       k.prepz(qubit)
       wait_nanoseconds = int(round(times[q][i]/1e-9))
@@ -3401,8 +3401,8 @@ def multi_qubit_ramsey(times,qubits_idx: list, platf_cfg: str):
       k.measure(qubit)
     p.add_kernel(k)
 
-  oqh.add_multi_q_cal_points(p,qubits=qubits_idx,combinations=['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits])
-  oqh.compile(p)
+  p.add_multi_q_cal_points(qubits=qubits_idx,combinations=['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits])
+  p.compile()
   return p
 
 
@@ -3413,7 +3413,7 @@ def multi_qubit_T1(times,qubits_idx: list, platf_cfg: str):
   p = oqh.create_program('Multi_qubit_T1_',platf_cfg)
 
   for i in range(points-4):
-    k = oqh.create_kernel('T1_{}'.format(i),p)
+    k = p.create_kernel('T1_{}'.format(i))
     for q, qubit in enumerate(qubits_idx):
       k.prepz(qubit)
       wait_nanoseconds = int(round(times[q][i]/1e-9))
@@ -3422,8 +3422,8 @@ def multi_qubit_T1(times,qubits_idx: list, platf_cfg: str):
       k.measure(qubit)
     p.add_kernel(k)
 
-  oqh.add_multi_q_cal_points(p,qubits=qubits_idx,combinations=['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits])
-  oqh.compile(p)
+  p.add_multi_q_cal_points(qubits=qubits_idx,combinations=['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits])
+  p.compile()
   return p  
 
 
@@ -3434,7 +3434,7 @@ def multi_qubit_Echo(times,qubits_idx: list, platf_cfg: str):
   p = oqh.create_program('multi_qubit_echo_',platf_cfg)
 
   for i in range(points-4):
-    k = oqh.create_kernel('echo_{}'.format(i),p)
+    k = p.create_kernel('echo_{}'.format(i))
     for q, qubit in enumerate(qubits_idx):
       k.prepz(qubit)
       wait_nanoseconds = int(round(times[q][i]/1e-9/2))
@@ -3452,8 +3452,8 @@ def multi_qubit_Echo(times,qubits_idx: list, platf_cfg: str):
       k.measure(qubit)
     p.add_kernel(k)
 
-  oqh.add_multi_q_cal_points(p,qubits=qubits_idx,combinations=['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits])
-  oqh.compile(p)
+  p.add_multi_q_cal_points(qubits=qubits_idx,combinations=['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits])
+  p.compile()
   return p 
 
 
@@ -3470,7 +3470,7 @@ def multi_qubit_flipping(number_of_flips,qubits_idx: list, platf_cfg: str,
   p = oqh.create_program('multi_qubit_flipping_',platf_cfg)
 
   for i, n in enumerate(nf):
-    k = oqh.create_kernel('echo_{}'.format(i),p)
+    k = p.create_kernel('echo_{}'.format(i))
     for q, qubit in enumerate(qubits_idx):
       k.prepz(qubit)
       if equator:
@@ -3493,16 +3493,16 @@ def multi_qubit_flipping(number_of_flips,qubits_idx: list, platf_cfg: str,
     p.add_kernel(k)
 
   combinations = ['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits]
-  oqh.add_multi_q_cal_points(p, qubits=qubits_idx, combinations=combinations)
+  p.add_multi_q_cal_points(qubits=qubits_idx, combinations=combinations)
 
-  oqh.compile(p)
+  p.compile()
   return p  
 
 
 def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
   p = oqh.create_program("Multi_qubit_Motzoi", platf_cfg)
 
-  k = oqh.create_kernel("yX", p)
+  k = p.create_kernel("yX")
   for qubit in qubits_idx:
       k.prepz(qubit)
       k.gate('ry90', [qubit])
@@ -3510,7 +3510,7 @@ def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
       k.measure(qubit)
   p.add_kernel(k)
 
-  k = oqh.create_kernel("xY", p)
+  k = p.create_kernel("xY")
   for qubit in qubits_idx:
       k.prepz(qubit)
       k.gate('rx90', [qubit])
@@ -3518,7 +3518,7 @@ def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
       k.measure(qubit)
   p.add_kernel(k)
 
-  oqh.compile(p)
+  p.compile()
   return p
 
 
@@ -3571,7 +3571,7 @@ def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
 #                                qubits=[qR, qC],
 #                                combinations=['00', '10', '20', '01'])
 
-#     oqh.compile(p)
+#     p.compile()
 #     return p
 
 
@@ -3591,7 +3591,7 @@ def Ramsey_tomo(qR: list,
 
     for i in range(2):
         for basis, gate in zip(Tomo_bases, Tomo_gates):
-            k = oqh.create_kernel('Tomo_{}_off_{}'.format(basis, i), p)
+            k = p.create_kernel('Tomo_{}_off_{}'.format(basis, i))
             for qr, qc in zip(qR, qC):
                 k.prepz(qr)
                 k.prepz(qc)
@@ -3621,7 +3621,7 @@ def Ramsey_tomo(qR: list,
 
             p.add_kernel(k)
 
-            k = oqh.create_kernel('Tomo_{}_on_{}'.format(basis, i), p)
+            k = p.create_kernel('Tomo_{}_on_{}'.format(basis, i))
             for qr, qc in zip(qR, qC):
                 k.prepz(qr)
                 k.prepz(qc)
@@ -3649,13 +3649,12 @@ def Ramsey_tomo(qR: list,
 
             p.add_kernel(k)
 
-    oqh.add_multi_q_cal_points(
-        p,
+    p.add_multi_q_cal_points(
         qubits=qR+qC,
         combinations=['0'*len(qR)+'0'*len(qC),
                      '1'*len(qR)+'0'*len(qC),
                      '2'*len(qR)+'0'*len(qC),
                      '0'*len(qR)+'1'*len(qC)])
 
-    oqh.compile(p)
+    p.compile()
     return p

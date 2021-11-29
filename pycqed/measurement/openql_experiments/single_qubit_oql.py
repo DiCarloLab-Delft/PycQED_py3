@@ -12,12 +12,12 @@ def CW_tone(qubit_idx: int, platf_cfg: str):
     """
     p = oqh.create_program('CW_tone', platf_cfg)
 
-    k = oqh.create_kernel("Main", p)
+    k = p.create_kernel("Main")
     for i in range(40):
         k.gate('square', [qubit_idx])
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -31,12 +31,12 @@ def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
     """
     p = oqh.create_program('vsm_timing_cal_sequence', platf_cfg)
 
-    k = oqh.create_kernel("Main", p)
+    k = p.create_kernel("Main")
     k.prepz(qubit_idx)  # to ensure enough separation in timing
     k.gate('spec', [qubit_idx])
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -53,7 +53,7 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     """
     p = oqh.create_program('CW_RO_sequence', platf_cfg=platf_cfg)
 
-    k = oqh.create_kernel("main", p)
+    k = p.create_kernel("main")
     if not hasattr(qubit_idx, "__iter__"):
         qubit_idx = [qubit_idx]
     k.gate('wait', qubit_idx, 0)
@@ -61,7 +61,7 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
         k.measure(qi)
     k.gate('wait', qubit_idx, 0)
     p.add_kernel(k)
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -77,7 +77,7 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
 
     """
     p = oqh.create_program("pulsed_spec_seq", platf_cfg)
-    k = oqh.create_kernel("main", p)
+    k = p.create_kernel("main")
 
     nr_clocks = int(spec_pulse_length/20e-9)
 
@@ -88,7 +88,7 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -102,7 +102,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     FIXME: comment outdated
     """
     p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
-    k = oqh.create_kernel("main", p)
+    k = p.create_kernel("main")
 
     nr_clocks = int(spec_pulse_length/20e-9)
     print('Adding {} [ns] to spec seq'.format(wait_time_ns))
@@ -132,7 +132,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -145,7 +145,7 @@ def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
 
     """
     p = oqh.create_program("pulsed_spec_seq_v2", platf_cfg)
-    k = oqh.create_kernel("main", p)
+    k = p.create_kernel("main")
 
     nr_clocks = int(spec_pulse_length/20e-9)
 
@@ -159,7 +159,7 @@ def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -192,7 +192,7 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
     p = oqh.create_program("flipping", platf_cfg)
 
     for i, n in enumerate(number_of_flips):
-        k = oqh.create_kernel('flipping_{}'.format(i), p)
+        k = p.create_kernel('flipping_{}'.format(i))
         k.prepz(qubit_idx)
         if cal_points and (i == (len(number_of_flips)-4) or
                            i == (len(number_of_flips)-3)):
@@ -224,7 +224,7 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
             k.measure(qubit_idx)
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -265,14 +265,14 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
         else:
             js = 1
         for j in range(js):
-            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
+            k = p.create_kernel("AllXY_{}_{}".format(i, j))
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
             k.measure(qubit_idx)
             p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -302,7 +302,7 @@ def T1(
     p = oqh.create_program('T1', platf_cfg)
 
     for i, time in enumerate(times[:-4]):
-        k = oqh.create_kernel('T1_{}'.format(i), p)
+        k = p.create_kernel('T1_{}'.format(i))
         k.prepz(qubit_idx)
 
         if nr_flux_dance:
@@ -330,9 +330,9 @@ def T1(
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -355,7 +355,7 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
 
     for i, time in enumerate(times):
         for j in range(2):
-            k = oqh.create_kernel("T1_2nd_exc_{}_{}".format(i, j), p)
+            k = p.create_kernel("T1_2nd_exc_{}_{}".format(i, j))
             k.prepz(qubit_idx)
             wait_nanoseconds = int(round(time/1e-9))
             k.gate('rx180', [qubit_idx])
@@ -367,7 +367,7 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
             p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx,
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx,
                                     f_state_cal_pts=True)
 
     dt = times[1] - times[0]
@@ -376,7 +376,7 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
     # attribute get's added to program to help finding the output files
     p.sweep_points = sweep_points
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -397,7 +397,7 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     p = oqh.create_program("Ramsey", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
-        k = oqh.create_kernel("Ramsey_{}".format(i), p)
+        k = p.create_kernel("Ramsey_{}".format(i))
         k.prepz(qubit_idx)
         wait_nanoseconds = int(round(time/1e-9))
         k.gate('rx90', [qubit_idx])
@@ -407,9 +407,9 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -433,7 +433,7 @@ def complex_Ramsey(times, qubit_idx: int, platf_cfg: str):
     timeloop = times[:-4][::2]
     for i, time in enumerate(timeloop):
         for rot in prerotations:
-            k = oqh.create_kernel("Ramsey_" + rot + "_{}".format(i), p)
+            k = p.create_kernel("Ramsey_" + rot + "_{}".format(i))
             k.prepz(qubit_idx)
             wait_nanoseconds = int(round(time/1e-9))
             k.gate('rx90', [qubit_idx])
@@ -443,9 +443,9 @@ def complex_Ramsey(times, qubit_idx: int, platf_cfg: str):
             p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -467,7 +467,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
 
     for i, time in enumerate(times[:-4]):
 
-        k = oqh.create_kernel("echo_{}".format(i), p)
+        k = p.create_kernel("echo_{}".format(i))
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
         wait_nanoseconds = int(round(time/1e-9/2))
@@ -487,9 +487,9 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
@@ -510,7 +510,7 @@ def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
 
     for i, time in enumerate(times[:-4]):
 
-        k = oqh.create_kernel("CPMG_{}".format(i), p)
+        k = p.create_kernel("CPMG_{}".format(i))
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
 
@@ -535,9 +535,9 @@ def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
 
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -559,7 +559,7 @@ def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
 
     for i, order in enumerate(orders[:-4]):
 
-        k = oqh.create_kernel("CPMG_SO_{}".format(i), p)
+        k = p.create_kernel("CPMG_SO_{}".format(i))
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
 
@@ -582,9 +582,9 @@ def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 def spin_lock_simple(times, qubit_idx: int, platf_cfg: str, 
@@ -617,7 +617,7 @@ def spin_lock_simple(times, qubit_idx: int, platf_cfg: str,
 
     for i, time in enumerate(timeloop):
         for tomo_gate in tomo_gates:
-            k = oqh.create_kernel("spin_lock_simple" + "_tomo_" + tomo_gate + "_{}".format(i), p)
+            k = p.create_kernel("spin_lock_simple" + "_tomo_" + tomo_gate + "_{}".format(i))
             k.prepz(qubit_idx)
             # nr_clocks = int(time/20e-9/2)
             square_us_cycles = np.floor(time/1e-6).astype(int)
@@ -636,8 +636,8 @@ def spin_lock_simple(times, qubit_idx: int, platf_cfg: str,
             p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx, f_state_cal_pts=tomo)
-    oqh.compile(p)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx, f_state_cal_pts=tomo)
+    p.compile()
     return p
 
 
@@ -671,7 +671,7 @@ def rabi_frequency(times, qubit_idx: int, platf_cfg: str,
 
     for i, time in enumerate(timeloop):
         for tomo_gate in tomo_gates:
-            k = oqh.create_kernel("rabi_frequency"+ "_tomo_" + tomo_gate + "{}".format(i), p)
+            k = p.create_kernel("rabi_frequency"+ "_tomo_" + tomo_gate + "{}".format(i))
             k.prepz(qubit_idx)
             # nr_clocks = int(time/20e-9/2)
             square_us_cycles = np.floor((time+1e-10)/1e-6).astype(int)
@@ -695,9 +695,9 @@ def rabi_frequency(times, qubit_idx: int, platf_cfg: str,
             p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx, f_state_cal_pts=tomo)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx, f_state_cal_pts=tomo)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -719,7 +719,7 @@ def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
 
     for i, time in enumerate(times[:-4]):
 
-        k = oqh.create_kernel("spin_lock_echo{}".format(i), p)
+        k = p.create_kernel("spin_lock_echo{}".format(i))
         k.prepz(qubit_idx)
         # nr_clocks = int(time/20e-9/2)
         square_us_cycles = np.floor(time/1e-6).astype(int)
@@ -743,9 +743,9 @@ def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
         p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 def idle_error_rate_seq(nr_of_idle_gates,
@@ -780,7 +780,7 @@ def idle_error_rate_seq(nr_of_idle_gates,
         for state in states:
             if state not in allowed_states:
                 raise ValueError('State must be in {}'.format(allowed_states))
-            k = oqh.create_kernel("idle_prep{}_N{}".format(state, N), p)
+            k = p.create_kernel("idle_prep{}_N{}".format(state, N))
             # 1. Preparing in the right basis
             k.prepz(qubit_idx)
             if post_select:
@@ -808,21 +808,21 @@ def idle_error_rate_seq(nr_of_idle_gates,
         sweep_points.append(N)
 
     p.sweep_points = sweep_points
-    oqh.compile(p)
+    p.compile()
     return p
 
 
 def single_elt_on(qubit_idx: int, platf_cfg: str):
     p = oqh.create_program('single_elt_on', platf_cfg)
 
-    k = oqh.create_kernel('main', p)
+    k = p.create_kernel('main')
 
     k.prepz(qubit_idx)
     k.x(qubit_idx)
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -846,7 +846,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
 
     # # Off
     if 'off' in pulse_comb.lower():
-        k = oqh.create_kernel("off", p)
+        k = p.create_kernel("off")
         k.prepz(qubit_idx)
         if initialize:
             k.measure(qubit_idx)
@@ -865,7 +865,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
         p.add_kernel(k)
 
     if 'on' in pulse_comb.lower():
-        k = oqh.create_kernel("on", p)
+        k = p.create_kernel("on")
         k.prepz(qubit_idx)
         if initialize:
             k.measure(qubit_idx)
@@ -887,7 +887,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
     if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
         raise ValueError()
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -906,7 +906,7 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     """
     p = oqh.create_program('butterfly', platf_cfg)
 
-    k = oqh.create_kernel('0', p)
+    k = p.create_kernel('0')
     k.prepz(qubit_idx)
     if initialize:
         k.measure(qubit_idx)
@@ -914,7 +914,7 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    k = oqh.create_kernel('1', p)
+    k = p.create_kernel('1')
     k.prepz(qubit_idx)
     if initialize:
         k.measure(qubit_idx)
@@ -923,7 +923,7 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
 
     return p
 
@@ -946,7 +946,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
     """
     p = oqh.create_program('RTE', platf_cfg)
 
-    k = oqh.create_kernel('RTE', p)
+    k = p.create_kernel('RTE')
     if sequence_type == 'echo':
         k.gate('rx90', [qubit_idx])
         k.gate('i', [qubit_idx])
@@ -985,7 +985,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -1024,7 +1024,7 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
     i = 0
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
-            k = oqh.create_kernel('RB_{}Cl_s{}_{}'.format(n_cl, seed, j), p)
+            k = p.create_kernel('RB_{}Cl_s{}_{}'.format(n_cl, seed, j))
 
             if not restless:
                 k.prepz(qubit_idx)
@@ -1048,7 +1048,7 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
                 k.measure(qubit_idx)
             p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -1065,21 +1065,21 @@ def motzoi_XY(qubit_idx: int, platf_cfg: str,
     '''
     p = oqh.create_program(program_name, platf_cfg)
 
-    k = oqh.create_kernel("yX", p)
+    k = p.create_kernel("yX")
     k.prepz(qubit_idx)
     k.gate('ry90', [qubit_idx])
     k.gate('rx180', [qubit_idx])
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    k = oqh.create_kernel("xY", p)
+    k = p.create_kernel("xY")
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     k.gate('ry180', [qubit_idx])
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -1116,7 +1116,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         times = times[:-4]
     for i_t, t in enumerate(times):
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi_flux_pi_{}'.format(i_t), p)
+        k = p.create_kernel('pi_flux_pi_{}'.format(i_t))
         k.prepz(qubit_idx)
         k.gate(mw_gate, [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -1132,8 +1132,8 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         p.add_kernel(k)
 
     if cal_points:
-        oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
-    oqh.compile(p)
+        p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
+    p.compile()
     return p
 
 
@@ -1151,7 +1151,7 @@ def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
         times = times[:-4]
     for i_t, t in enumerate(times):
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel('pi_times_pi_{}'.format(i_t), p)
+        k = p.create_kernel('pi_times_pi_{}'.format(i_t))
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
@@ -1167,8 +1167,8 @@ def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
         p.add_kernel(k)
 
     if cal_points:
-        oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
-    oqh.compile(p)
+        p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
+    p.compile()
     return p
 
 
@@ -1186,7 +1186,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
     for i_t, t in enumerate(times):
 
         t_nanoseconds = int(round(t/1e-9))
-        k = oqh.create_kernel("pi-flux-pi_{}".format(i_t), p)
+        k = p.create_kernel("pi-flux-pi_{}".format(i_t))
         k.prepz(q0)
         k.prepz(q1)
 
@@ -1206,7 +1206,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
 
         p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -1231,7 +1231,7 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
     """
     p = oqh.create_program("FastFeedbackControl", platf_cfg)
 
-    k = oqh.create_kernel("FastFdbkCtrl_nofb", p)
+    k = p.create_kernel("FastFdbkCtrl_nofb")
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     # k.gate('rx180', [qubit_idx])
@@ -1243,7 +1243,7 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
 
     p.add_kernel(k)
 
-    k = oqh.create_kernel("FastFdbkCtrl_fb0", p)
+    k = p.create_kernel("FastFdbkCtrl_fb0")
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     # k.gate('rx180', [qubit_idx])
@@ -1254,7 +1254,7 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    k = oqh.create_kernel("FastFdbkCtrl_fb1", p)
+    k = p.create_kernel("FastFdbkCtrl_fb1")
     k.prepz(qubit_idx)
     k.gate('rx90', [qubit_idx])
     # k.gate('rx180', [qubit_idx])
@@ -1266,9 +1266,9 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
     p.add_kernel(k)
 
     # adding the calibration points
-    oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -1299,7 +1299,7 @@ def ef_rabi_seq(q0: int,
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = oqh.create_kernel("ef_A{}_{}".format(int(abs(1000*amp)),i), p)
+        k = p.create_kernel("ef_A{}_{}".format(int(abs(1000*amp)),i))
         k.prepz(q0)
         k.gate('rx180', [q0])
         k.gate('cw_{:02}'.format(cw_idx), [q0])
@@ -1308,9 +1308,9 @@ def ef_rabi_seq(q0: int,
         k.measure(q0)
         p.add_kernel(k)
     if add_cal_points:
-        oqh.add_single_qubit_cal_points(p, qubit_idx=q0)
+        p.add_single_qubit_cal_points(qubit_idx=q0)
 
-    oqh.compile(p)
+    p.compile()
 
     if add_cal_points:
         cal_pts_idx = [amps[-1] + .1, amps[-1] + .15,
@@ -1353,7 +1353,7 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
 
     for i, xy in enumerate(allXY):
         for j in range(js):
-            k = oqh.create_kernel('Depletion_{}_{}'.format(i, j), p)
+            k = p.create_kernel('Depletion_{}_{}'.format(i, j))
             # Prepare qubit
             k.prepz(qubit_idx)
             # Initial measurement
@@ -1368,7 +1368,7 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
             k.measure(qubit_idx)
             p.add_kernel(k)
 
-    oqh.compile(p)
+    p.compile()
     return p
 
 def TEST_RTE(qubit_idx: int, platf_cfg: str,
@@ -1378,7 +1378,7 @@ def TEST_RTE(qubit_idx: int, platf_cfg: str,
     """
     p = oqh.create_program('RTE', platf_cfg)
 
-    k = oqh.create_kernel('RTE', p)
+    k = p.create_kernel('RTE')
     k.prepz(qubit_idx)
     ######################
     # Parity check
@@ -1401,6 +1401,5 @@ def TEST_RTE(qubit_idx: int, platf_cfg: str,
         k.measure(qubit_idx)
 
     p.add_kernel(k)
-
-    oqh.compile(p)
+    p.compile()
     return p

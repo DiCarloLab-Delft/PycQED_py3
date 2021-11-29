@@ -283,11 +283,10 @@ def randomized_benchmarking(
                         cl_seq_decomposed_with_net = cl_seq_decomposed + [
                             recovery_clifford.gate_decomposition
                         ]
-                        k = oqh.create_kernel(
+                        k = p.create_kernel(
                             "RB_{}Cl_s{}_net{}_inter{}".format(
                                 int(n_cl), seed, net_clifford, interleaving_cl
                             ),
-                            p,
                         )
                         if initialize:
                             for qubit_idx in qubit_map.values():
@@ -339,11 +338,10 @@ def randomized_benchmarking(
                 elif simultaneous_single_qubit_RB:  # FIXME: condition boils down to just 'else'
                     # ############ 2 qubits using SingleQubitClifford
                     for net_clifford in net_cliffords:
-                        k = oqh.create_kernel(
+                        k = p.create_kernel(
                             "RB_{}Cl_s{}_net{}_inter{}".format(
                                 int(n_cl), seed, net_clifford, interleaving_cl
-                            ),
-                            p,
+                            )
                         )
                         if initialize:
                             for qubit_idx in qubit_map.values():
@@ -389,11 +387,10 @@ def randomized_benchmarking(
 
                 elif simultaneous_single_qubit_parking_RB:
                     for net_clifford in net_cliffords:
-                        k = oqh.create_kernel(
+                        k = p.create_kernel(
                             "RB_{}Cl_s{}_net{}_inter{}".format(
                                 int(n_cl), seed, net_clifford, interleaving_cl
-                            ),
-                            p,
+                            )
                         )
                         if initialize:
                             for qubit_idx in qubit_map.values():
@@ -458,20 +455,17 @@ def randomized_benchmarking(
 
         if cal_points:
             if number_of_qubits == 1:
-                oqh.add_single_qubit_cal_points(
-                    p, qubit_idx=qubits[0], f_state_cal_pts=f_state_cal_pts
+                p.add_single_qubit_cal_points(
+                    qubit_idx=qubits[0], f_state_cal_pts=f_state_cal_pts
                 )
             elif number_of_qubits == 2:
                 if f_state_cal_pts:
                     combinations = ["00", "01", "10", "11", "02", "20", "22"]
                 else:
                     combinations = ["00", "01", "10", "11"]
-                oqh.add_multi_q_cal_points(
-                    p, qubits=qubits, combinations=combinations
-                )
+                p.add_multi_q_cal_points(qubits=qubits, combinations=combinations)
             elif number_of_qubits == 3:
-                oqh.add_single_qubit_cal_points(
-                    p,
+                p.add_single_qubit_cal_points(
                     qubit_idx=qubit_map["q2"],
                     f_state_cal_pts=f_state_cal_pts,
                     # we must measure all 3 qubits to avoid alignment issues
@@ -482,12 +476,11 @@ def randomized_benchmarking(
                     combinations = ["0"*number_of_qubits,
                                     "1"*number_of_qubits, 
                                     "2"*number_of_qubits]
-                oqh.add_multi_q_cal_points(
-                    p, qubits=qubits, combinations=combinations
-                )
+                p.add_multi_q_cal_points(qubits=qubits, combinations=combinations)
 
-    oqh.compile(p)
-    # p = oqh.compile(p, extra_openql_options=[('backend_cc_verbose', 'no')])
+    p.compile()
+    # p.compile(p, extra_openql_options=[('backend_cc_verbose', 'no')])
+
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
     os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
@@ -598,11 +591,10 @@ def character_benchmarking(
                         combined_cl0.gate_decomposition
                     ] + cl_seq_decomposed
 
-                    k = oqh.create_kernel(
+                    k = p.create_kernel(
                         "CharBench_P{}_{}Cl_s{}_inter{}".format(
                             pauli, int(n_cl), seed, interleaving_cl
-                        ),
-                        p,
+                        )
                     )
 
                     for qubit_idx in qubit_map.values():
@@ -631,9 +623,10 @@ def character_benchmarking(
                 combinations = ["00", "01", "10", "11", "02", "20", "22"]
             else:
                 combinations = ["00", "01", "10", "11"]
-            oqh.add_multi_q_cal_points(p, qubits=qubits, combinations=combinations)
+            p.add_multi_q_cal_points(qubits=qubits, combinations=combinations)
 
-    oqh.compile(p)
+    p.compile()
+
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
     os.rename(recompile_dict["tmp_file"], recompile_dict["file"])

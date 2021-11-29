@@ -33,23 +33,23 @@ def openql_program_from_pygsti_expList(expList, program_name: str,
 
         for i, gatestring in enumerate(expList):
             kernel_name = 'G {} {}'.format(i, gatestring)
-            k = openql_kernel_from_gatestring(
+            k = _openql_kernel_from_gatestring(
                 gatestring=gatestring, qubits=qubits,
                 kernel_name=kernel_name, program=p)
             p.add_kernel(k)
-        oqh.compile(p)
+        p.compile()
 
     p.sweep_points = np.arange(len(expList), dtype=float) + start_idx
 
     return p
 
 
-def openql_kernel_from_gatestring(gatestring, qubits: list,
-                                  kernel_name: str, program):
+def _openql_kernel_from_gatestring(gatestring, qubits: list,
+                                   kernel_name: str, program):
     """
     Generates an openQL kernel for a pygsti gatestring.
     """
-    k = oqh.create_kernel(kernel_name, program)
+    k = program.create_kernel(kernel_name)
     for q in qubits:
         k.prepz(q)
 
