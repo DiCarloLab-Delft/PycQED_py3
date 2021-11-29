@@ -114,6 +114,16 @@ class OqlProgram:
 
     #############################################################################
     # Calibration points
+    #
+    # FIXME: while changing these from separate functions to class methods, it
+    #  was found that most functions returned the program that was provided as a
+    #  parameter (which makes no sense), and that the return parameter was mostly
+    #  ignored (which makes no difference). The function documentation was
+    #  inconsistent with the actual code, probably as a result of earlier
+    #  refactoring.
+    #  Function 'add_multi_q_cal_points' would return different types dependent
+    #  on a boolean parameter 'return_comb', but no cases were found where this
+    #  parameter was set to True, so this behaviour was removed
     #############################################################################
 
     def add_single_qubit_cal_points(
@@ -121,7 +131,7 @@ class OqlProgram:
             qubit_idx: int,
             f_state_cal_pts: bool = False,
             measured_qubits=None
-    ):
+    ) -> None:
         """
         Adds single qubit calibration points to an OpenQL program
 
@@ -129,7 +139,6 @@ class OqlProgram:
         :param f_state_cal_pts:
         :param measured_qubits: selects which qubits to perform readout on. If measured_qubits == None, it will default
         to measuring the qubit for which there are cal points.
-        :return:
         """
 
         if measured_qubits == None:
@@ -164,7 +173,6 @@ class OqlProgram:
                     k.measure(measured_qubit)
                 k.gate('wait', measured_qubits, 0)
                 self.add_kernel(k)
-        return self  # FIXME
 
 
     def add_two_q_cal_points(
@@ -178,9 +186,9 @@ class OqlProgram:
             interleaved_measured_qubits=None,
             interleaved_delay=None,
             nr_of_interleaves=1
-    ):
+    ) -> None:
         """
-        Returns a list of kernels containing calibration points for two qubits FIXME: incorrect
+        Adds two qubit calibration points to an OpenQL program
 
         :param q0: index of first qubit
         :param q1: index of scond qubit
@@ -190,7 +198,6 @@ class OqlProgram:
         :param interleaved_measured_qubits:
         :param interleaved_delay:
         :param nr_of_interleaves:
-        :return: FIXME: incorrect: kernel_list : list containing kernels for the calibration points
         """
 
         kernel_list = [] # FIXME: not really used (anymore?)
@@ -247,8 +254,6 @@ class OqlProgram:
             kernel_list.append(k)
             self.add_kernel(k)
 
-        return self # FIXME
-
 
     def add_multi_q_cal_points(
             self,
@@ -257,9 +262,8 @@ class OqlProgram:
             reps_per_cal_pnt: int = 1,
             f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
             nr_flux_dance: int = None,
-            flux_cw_list: List[str] = None,
-            return_comb=False
-    ):
+            flux_cw_list: List[str] = None
+    ) -> None:
         """
         Add a list of kernels containing calibration points in the program `p`
 
@@ -272,8 +276,6 @@ class OqlProgram:
         :param f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
         :param nr_flux_dance:
         :param flux_cw_list:
-        :param return_comb:
-        :return:
         """
 
         kernel_list = [] # FIXME: not really used (anymore?)
@@ -321,11 +323,6 @@ class OqlProgram:
             kernel_list.append(k)
             self.add_kernel(k)
 
-        if return_comb:
-            return comb_repeated
-        else:
-            return self # FIXME: dfferent return types
-
 
     def add_two_q_cal_points_special_cond_osc(
             self,
@@ -339,7 +336,7 @@ class OqlProgram:
             interleaved_measured_qubits=None,
             interleaved_delay=None,
             nr_of_interleaves=1
-    ):
+    ) -> None:
         """
 
         :param q0:
@@ -417,8 +414,6 @@ class OqlProgram:
             kernel_list.append(k)
             self.add_kernel(k)
 
-        return self  # FIXME
-
 
 ##########################################################################
 # compatibility functions (to be deprecated)
@@ -431,11 +426,13 @@ def create_program(
 ) -> OqlProgram:
     return OqlProgram(name, platf_cfg, nregisters)
 
+
 def create_kernel(
         kname: str,
         program: OqlProgram
 ) -> Kernel:
     return program.create_kernel(kname)
+
 
 def compile(
         p: OqlProgram,
@@ -444,13 +441,14 @@ def compile(
 ) -> None:
     return p.compile(quiet, extra_openql_options)
 
+
 def add_single_qubit_cal_points(
         p: OqlProgram,
         qubit_idx: int,
         f_state_cal_pts: bool = False,
         measured_qubits=None
-):
-    return p.add_single_qubit_cal_points(qubit_idx, f_state_cal_pts, measured_qubits)
+) -> None:
+    p.add_single_qubit_cal_points(qubit_idx, f_state_cal_pts, measured_qubits)
 
 
 def add_two_q_cal_points(
@@ -464,8 +462,8 @@ def add_two_q_cal_points(
         interleaved_measured_qubits=None,
         interleaved_delay=None,
         nr_of_interleaves=1
-):
-    return p.add_two_q_cal_points(q0, q1, reps_per_cal_pt, f_state_cal_pts, measured_qubits, interleaved_measured_qubits, interleaved_delay, nr_of_interleaves)
+) -> None:
+    p.add_two_q_cal_points(q0, q1, reps_per_cal_pt, f_state_cal_pts, measured_qubits, interleaved_measured_qubits, interleaved_delay, nr_of_interleaves)
 
 
 def add_multi_q_cal_points(
@@ -475,10 +473,9 @@ def add_multi_q_cal_points(
         reps_per_cal_pnt: int = 1,
         f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
         nr_flux_dance: int = None,
-        flux_cw_list: List[str] = None, 
-        return_comb=False
-):
-    return p.add_multi_q_cal_points(qubits, combinations, reps_per_cal_pnt, f_state_cal_pt_cw, nr_flux_dance, flux_cw_list, return_comb)
+        flux_cw_list: List[str] = None
+) -> None:
+    p.add_multi_q_cal_points(qubits, combinations, reps_per_cal_pnt, f_state_cal_pt_cw, nr_flux_dance, flux_cw_list)
 
 
 def add_two_q_cal_points_special_cond_osc(
@@ -493,7 +490,7 @@ def add_two_q_cal_points_special_cond_osc(
         interleaved_measured_qubits=None,
         interleaved_delay=None,
         nr_of_interleaves=1
-):
+) -> None:
     p.add_two_q_cal_points_special_cond_osc(q0, q1, q2, reps_per_cal_pt, f_state_cal_pts, measured_qubits, interleaved_measured_qubits, interleaved_delay, nr_of_interleaves)
 
 

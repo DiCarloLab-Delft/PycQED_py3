@@ -1308,7 +1308,7 @@ def ef_rabi_seq(q0: int,
         k.measure(q0)
         p.add_kernel(k)
     if add_cal_points:
-        p = oqh.add_single_qubit_cal_points(p, qubit_idx=q0)
+        oqh.add_single_qubit_cal_points(p, qubit_idx=q0)
 
     oqh.compile(p)
 

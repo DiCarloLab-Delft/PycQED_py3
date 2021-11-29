@@ -458,7 +458,7 @@ def randomized_benchmarking(
 
         if cal_points:
             if number_of_qubits == 1:
-                p = oqh.add_single_qubit_cal_points(
+                oqh.add_single_qubit_cal_points(
                     p, qubit_idx=qubits[0], f_state_cal_pts=f_state_cal_pts
                 )
             elif number_of_qubits == 2:
@@ -466,11 +466,11 @@ def randomized_benchmarking(
                     combinations = ["00", "01", "10", "11", "02", "20", "22"]
                 else:
                     combinations = ["00", "01", "10", "11"]
-                p = oqh.add_multi_q_cal_points(
+                oqh.add_multi_q_cal_points(
                     p, qubits=qubits, combinations=combinations
                 )
             elif number_of_qubits == 3:
-                p = oqh.add_single_qubit_cal_points(
+                oqh.add_single_qubit_cal_points(
                     p,
                     qubit_idx=qubit_map["q2"],
                     f_state_cal_pts=f_state_cal_pts,
@@ -482,7 +482,7 @@ def randomized_benchmarking(
                     combinations = ["0"*number_of_qubits,
                                     "1"*number_of_qubits, 
                                     "2"*number_of_qubits]
-                p = oqh.add_multi_q_cal_points(
+                oqh.add_multi_q_cal_points(
                     p, qubits=qubits, combinations=combinations
                 )
 
@@ -631,7 +631,7 @@ def character_benchmarking(
                 combinations = ["00", "01", "10", "11", "02", "20", "22"]
             else:
                 combinations = ["00", "01", "10", "11"]
-            p = oqh.add_multi_q_cal_points(p, qubits=qubits, combinations=combinations)
+            oqh.add_multi_q_cal_points(p, qubits=qubits, combinations=combinations)
 
     oqh.compile(p)
     # Just before returning we rename the hashes file as an indication of the
