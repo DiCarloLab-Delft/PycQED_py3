@@ -24,7 +24,7 @@ def single_flux_pulse_seq(qubit_indices: tuple, platf_cfg: str):
 
 
 # FIXME: not really used
-def flux_staircase_seq(platf_cfg: str):
+def flux_staircase_seq(platf_cfg: str) -> OqlProgram:
     p = OqlProgram("flux_staircase_seq", platf_cfg)
 
     k = p.create_kernel("main")
@@ -49,7 +49,8 @@ def multi_qubit_off_on(
         second_excited_state: bool,
         platf_cfg: str,
         nr_flux_dance: int = None,
-        wait_time: float = None):
+        wait_time: float = None
+) -> OqlProgram:
     """
     Performs an 'off_on' sequence on the qubits specified.
         off: (RO) - prepz -      -     - RO
@@ -128,7 +129,8 @@ def single_qubit_off_on(
         qubits: list,
         qtarget,
         initialize: bool,
-        platf_cfg: str):
+        platf_cfg: str
+) -> OqlProgram:
     n_qubits = len(qubits)
     comb_0 = '0' * n_qubits
     comb_1 = comb_0[:qubits.index(qtarget)] + '1' + comb_0[qubits.index(qtarget) + 1:]
@@ -176,7 +178,8 @@ def targeted_off_on(
         qubits: list,
         q_target: int,
         pulse_comb: str,
-        platf_cfg: str):
+        platf_cfg: str
+) -> OqlProgram:
     """
     Performs an 'off_on' sequence on the qubits specified.
         off: prepz -      - RO
@@ -243,7 +246,8 @@ def Ramsey_msmt_induced_dephasing(
         platf_cfg: str,
         target_qubit_excited: bool = False,
         wait_time=0,
-        extra_echo=False):
+        extra_echo=False
+) -> OqlProgram:
     """
     Ramsey sequence that varies azimuthal phase instead of time. Works for
     a single qubit or multiple qubits. The coherence of the LSQ is measured,
@@ -308,7 +312,8 @@ def echo_msmt_induced_dephasing(
         platf_cfg: str,
         wait_time: float = 0,
         target_qubit_excited: bool = False,
-        extra_echo: bool = False):
+        extra_echo: bool = False
+) -> OqlProgram:
     """
     Ramsey sequence that varies azimuthal phase instead of time. Works for
     a single qubit or multiple qubits. The coherence of the LSQ is measured,
@@ -385,7 +390,7 @@ def echo_msmt_induced_dephasing(
     return p
 
 
-def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
+def two_qubit_off_on(q0: int, q1: int, platf_cfg: str) -> OqlProgram:
     '''
     off_on sequence on two qubits.
 
@@ -403,7 +408,7 @@ def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
     return p
 
 
-def two_qubit_tomo_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str):
+def two_qubit_tomo_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str) -> OqlProgram:
     '''
     Cardinal tomography for two qubits.
     Args:
@@ -454,7 +459,8 @@ def two_qubit_AllXY(
         platf_cfg: str,
         sequence_type='sequential',
         replace_q1_pulses_with: str = None,
-        repetitions: int = 1):
+        repetitions: int = 1
+) -> OqlProgram:
     """
     AllXY sequence on two qubits.
     Has the option of replacing pulses on q1 with pi pulses
@@ -557,7 +563,8 @@ def residual_coupling_sequence(
         q0: int,
         q_spectator_idx: list,
         spectator_state: str,
-        platf_cfg: str):
+        platf_cfg: str
+) -> OqlProgram:
     """
     Sequence to measure the residual (ZZ) interaction between two qubits.
     Procedure is described in M18TR.
@@ -619,7 +626,8 @@ def FluxTimingCalibration(
         qubit_idxs: list,
         platf_cfg: str,
         flux_cw: str = 'fl_cw_02',  # FIXME: unused
-        cal_points: bool = True):
+        cal_points: bool = True
+) -> OqlProgram:
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
@@ -654,7 +662,8 @@ def Cryoscope(
         twoq_pair=[2, 0],
         platf_cfg: str = '',
         cc: str = 'CC',
-        double_projections: bool = True):
+        double_projections: bool = True
+) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -750,7 +759,7 @@ def Cryoscope(
 
 
 # FIXME: not really used
-def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
+def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str) -> OqlProgram:
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     Generates 2xlen(times) measurements (t1-x, t1-y, t2-x, t2-y. etc)
@@ -794,7 +803,8 @@ def fluxed_ramsey(
         qubit_idx: int,
         wait_time: float,
         flux_cw: str = 'fl_cw_02',
-        platf_cfg: str = ''):
+        platf_cfg: str = ''
+) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -849,7 +859,8 @@ def Chevron_hack(
         qubit_idx_spec,
         buffer_time,
         buffer_time2,
-        platf_cfg: str):
+        platf_cfg: str
+) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -895,7 +906,8 @@ def Chevron(
         platf_cfg: str,
         target_qubit_sequence: str = 'ramsey',
         cc: str = 'CCL',
-        recover_q_spec: bool = False):
+        recover_q_spec: bool = False
+) -> OqlProgram:
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -999,7 +1011,8 @@ def two_qubit_ramsey(
         qubit_idx: int,
         qubit_idx_spec: int,
         platf_cfg: str,
-        target_qubit_sequence: str = 'excited'):
+        target_qubit_sequence: str = 'excited'
+) -> OqlProgram:
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -1067,7 +1080,8 @@ def two_qubit_tomo_bell(
         q1,
         platf_cfg,
         wait_after_flux: float = None,
-        flux_codeword: str = 'cz'):
+        flux_codeword: str = 'cz'
+) -> OqlProgram:
     '''
     Two qubit bell state tomography.
 
@@ -1140,7 +1154,8 @@ def two_qubit_tomo_bell_by_waiting(
         q0,
         q1,
         platf_cfg,
-        wait_time: int = 20):
+        wait_time: int = 20
+) -> OqlProgram:
     '''
     Two qubit (bell) state tomography. There are no flux pulses applied,
     only waiting time. It is supposed to take advantage of residual ZZ to
@@ -1202,7 +1217,7 @@ def two_qubit_tomo_bell_by_waiting(
 
 
 # FIXME: not really used
-def two_qubit_DJ(q0, q1, platf_cfg):
+def two_qubit_DJ(q0, q1, platf_cfg) -> OqlProgram:
     '''
     Two qubit Deutsch-Josza.
 
@@ -1318,7 +1333,8 @@ def single_qubit_parity_check(
         initialization_msmt: bool = False,
         initial_states=['0', '1'],
         flux_codeword: str = 'cz',
-        parity_axis='Z'):
+        parity_axis='Z'
+) -> OqlProgram:
     """
     Implements a circuit for repeated parity checks.
 
@@ -1404,7 +1420,8 @@ def two_qubit_parity_check(
         echo_during_ancilla_mmt: bool = False,
         idling_time: float = 40e-9,
         idling_time_echo: float = 20e-9,
-        idling_rounds: int = 0):
+        idling_rounds: int = 0
+) -> OqlProgram:
     """
     Implements a circuit for repeated parity checks on two qubits.
 
@@ -1612,7 +1629,8 @@ def conditional_oscillation_seq(
         flux_codeword: str = 'cz',
         flux_codeword_park: str = None,
         parked_qubit_seq: str = 'ground',
-        disable_parallel_single_q_gates: bool = False):
+        disable_parallel_single_q_gates: bool = False
+) -> OqlProgram:
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -1809,7 +1827,7 @@ def conditional_oscillation_seq_multi(
         flux_codeword: str = 'cz',
         parked_qubit_seq: str = 'ground',
         # disable_parallel_single_q_gates: bool = False
-):
+) -> OqlProgram:
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -1977,7 +1995,7 @@ def parity_check_flux_dance(
         wait_time_before_flux: int = 0,
         wait_time_after_flux: int = 0,
         add_cal_points: bool = True
-):
+) -> OqlProgram:
     '''
     TODO: this is currently X parity check, add parameter for X/Z type
     Sequence used to calibrate flux pulses for CZ gates.
@@ -2140,7 +2158,7 @@ def parity_check_fidelity(
         initialization_msmt: bool = False,
         wait_time_before_flux: int = 0,
         wait_time_after_flux: int = 0
-):
+) -> OqlProgram:
     '''
     TODO: this is currently X parity check, add parameter for X/Z type
     Sequence used to calibrate flux pulses for CZ gates.
@@ -2245,7 +2263,8 @@ def grovers_two_qubit_all_inputs(
         second_CZ_delay: int = 0,
         CZ_duration: int = 260,
         add_echo_pulses: bool = False,
-        cal_points: bool = True):
+        cal_points: bool = True
+) -> OqlProgram:
     """
     Writes the QASM sequence for Grover's algorithm on two qubits.
     Sequence:
@@ -2321,7 +2340,8 @@ def grovers_two_qubit_all_inputs(
 def grovers_two_qubits_repeated(
         qubits,
         platf_cfg: str,
-        nr_of_grover_iterations: int):
+        nr_of_grover_iterations: int
+) -> OqlProgram:
     """
     Writes the QASM sequence for Grover's algorithm on two qubits.
     Sequence:
@@ -2398,7 +2418,8 @@ def grovers_tomography(
         # cal_points: bool = True,
         second_CZ_delay: int = 260,
         CZ_duration: int = 260,
-        add_echo_pulses: bool = False):
+        add_echo_pulses: bool = False
+) -> OqlProgram:
     """
     Tomography sequence for Grover's algorithm.
 
@@ -2480,7 +2501,8 @@ def CZ_poisoned_purity_seq(
         q0, q1,
         platf_cfg: str,
         nr_of_repeated_gates: int,
-        cal_points: bool = True):
+        cal_points: bool = True
+) -> OqlProgram:
     """
     Creates the |00> + |11> Bell state and does a partial tomography in
     order to determine the purity of both qubits.
@@ -2545,7 +2567,8 @@ def Chevron_first_manifold(
         buffer_time,
         buffer_time2,
         flux_cw: int,
-        platf_cfg: str):
+        platf_cfg: str
+) -> OqlProgram:
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -2594,7 +2617,7 @@ def partial_tomography_cardinal(
         # second_CZ_delay: int = 260,
         # CZ_duration: int = 260,
         # add_echo_pulses: bool = False
-):
+) -> OqlProgram:
     """
     Tomography sequence for Grover's algorithm.
 
@@ -2654,7 +2677,7 @@ def partial_tomography_cardinal(
 
 
 # FIXME: not really used
-def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
+def two_qubit_VQE(q0: int, q1: int, platf_cfg: str) -> OqlProgram:
     """
     VQE tomography for two qubits.
     Args:
@@ -2705,7 +2728,8 @@ def sliding_flux_pulses_seq(
         flux_codeword_a: str = 'fl_cw_01',
         flux_codeword_b: str = 'fl_cw_01',
         ramsey_axis: str = 'x',
-        add_cal_points: bool = True):
+        add_cal_points: bool = True
+) -> OqlProgram:
     """
     Experiment to measure effect flux pulses on each other.
 
@@ -2789,7 +2813,8 @@ def two_qubit_state_tomography(
         product_state,
         platf_cfg,
         wait_after_flux: float = None,
-        flux_codeword: str = 'cz'):
+        flux_codeword: str = 'cz'
+) -> OqlProgram:
     p = OqlProgram("state_tomography_2Q_{}_{}_{}".format(product_state, qubit_idxs[0], qubit_idxs[1]), platf_cfg)
 
     q0 = qubit_idxs[0]
@@ -2916,7 +2941,7 @@ def two_qubit_state_tomography(
     return p
 
 
-def multi_qubit_Depletion(qubits: list, platf_cfg: str, time: float):
+def multi_qubit_Depletion(qubits: list, platf_cfg: str, time: float) -> OqlProgram:
     """
 
     Performs a measurement pulse and wait time followed by a simultaneous ALLXY on the
@@ -2975,7 +3000,8 @@ def two_qubit_Depletion(
         platf_cfg: str,
         time: float,
         sequence_type='sequential',
-        double_points: bool = False):
+        double_points: bool = False
+) -> OqlProgram:
     """
 
     """
@@ -3076,7 +3102,8 @@ def Two_qubit_RTE(
         start_states: list = ['0'],
         ramsey_time_1: int = 120,
         ramsey_time_2: int = 120,
-        echo: bool = False):
+        echo: bool = False
+) -> OqlProgram:
     """
 
     """
@@ -3146,7 +3173,8 @@ def Two_qubit_RTE_pipelined(
         measurements: int,
         start_states: list = ['0'],
         ramsey_time: int = 120,
-        echo: bool = False):
+        echo: bool = False
+) -> OqlProgram:
     """
 
     """
@@ -3209,7 +3237,8 @@ def Ramsey_cross(
         q_meas: int,
         echo: bool,
         platf_cfg: str,
-        initial_state: str = '0'):
+        initial_state: str = '0'
+) -> OqlProgram:
     """
     q_target is ramseyed
     q_spec is measured
@@ -3261,7 +3290,7 @@ def Ramsey_cross(
     return p
 
 
-def TEST_RTE(QX: int, QZ: int, platf_cfg: str, measurements: int):
+def TEST_RTE(QX: int, QZ: int, platf_cfg: str, measurements: int) -> OqlProgram:
     """
 
     """
@@ -3311,7 +3340,7 @@ def TEST_RTE(QX: int, QZ: int, platf_cfg: str, measurements: int):
     return p
 
 
-def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = True):
+def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = True) -> OqlProgram:
     """
     Used for AllXY measurement and calibration for multiple qubits simultaneously.
     args:
@@ -3358,7 +3387,7 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
 
 
 # FIXME: indentation is wrong in functions below
-def multi_qubit_rabi(qubits_idx: list, platf_cfg: str = None):
+def multi_qubit_rabi(qubits_idx: list, platf_cfg: str = None) -> OqlProgram:
     p = OqlProgram("Multi_qubit_rabi", platf_cfg)
     k = p.create_kernel("rabi")
     for qubit in qubits_idx:
@@ -3370,7 +3399,7 @@ def multi_qubit_rabi(qubits_idx: list, platf_cfg: str = None):
     return p
 
 
-def multi_qubit_ramsey(times, qubits_idx: list, platf_cfg: str):
+def multi_qubit_ramsey(times, qubits_idx: list, platf_cfg: str) -> OqlProgram:
     n_qubits = len(qubits_idx)
     points = len(times[0])
     p = OqlProgram('Multi_qubit_Ramsey', platf_cfg)
@@ -3392,7 +3421,7 @@ def multi_qubit_ramsey(times, qubits_idx: list, platf_cfg: str):
     return p
 
 
-def multi_qubit_T1(times, qubits_idx: list, platf_cfg: str):
+def multi_qubit_T1(times, qubits_idx: list, platf_cfg: str) -> OqlProgram:
     n_qubits = len(qubits_idx)
     points = len(times[0])
 
@@ -3414,7 +3443,7 @@ def multi_qubit_T1(times, qubits_idx: list, platf_cfg: str):
     return p
 
 
-def multi_qubit_Echo(times, qubits_idx: list, platf_cfg: str):
+def multi_qubit_Echo(times, qubits_idx: list, platf_cfg: str) -> OqlProgram:
     n_qubits = len(qubits_idx)
     points = len(times[0])
 
@@ -3452,7 +3481,9 @@ def multi_qubit_flipping(
         equator: bool = False,
         cal_points: bool = True,
         ax: str = 'x',
-        angle: str = '180'):
+        angle: str = '180'
+) -> OqlProgram:
+
     n_qubits = len(qubits_idx)
     if cal_points:
         nf = number_of_flips[:-4]
@@ -3491,7 +3522,7 @@ def multi_qubit_flipping(
     return p
 
 
-def multi_qubit_motzoi(qubits_idx: list, platf_cfg: str = None):
+def multi_qubit_motzoi(qubits_idx: list, platf_cfg: str = None) -> OqlProgram:
     p = OqlProgram("Multi_qubit_Motzoi", platf_cfg)
 
     k = p.create_kernel("yX")
@@ -3572,7 +3603,8 @@ def Ramsey_tomo(
         qC: list,
         exc_specs: list,
         platf_cfg: str,
-        flux_codeword: str = 'cz'):
+        flux_codeword: str = 'cz'
+) -> OqlProgram:
     """
     Performs single qubit tomography on a qubit in the equator.
     """

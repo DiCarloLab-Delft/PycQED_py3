@@ -5,7 +5,7 @@ from pycqed.measurement.randomized_benchmarking import \
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
 
-def CW_tone(qubit_idx: int, platf_cfg: str):
+def CW_tone(qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Sequence to generate an "always on" pulse or "ContinuousWave" (CW) tone.
     This is a sequence that goes a bit against the paradigm of openql.
@@ -21,7 +21,7 @@ def CW_tone(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
+def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     A sequence for calibrating the VSM timing delay.
 
@@ -40,7 +40,7 @@ def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
+def CW_RO_sequence(qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     A sequence that performs readout back to back without initialization.
     The separation of the readout triggers is done by specifying the duration
@@ -68,7 +68,8 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
 def pulsed_spec_seq(
         qubit_idx: int, 
         spec_pulse_length: float,
-        platf_cfg: str):
+        platf_cfg: str
+) -> OqlProgram:
     """
     Sequence for pulsed spectroscopy.
 
@@ -101,7 +102,8 @@ def pulsed_spec_seq_marked(
         trigger_idx: int, 
         trigger_idx_2: int = None,
         wait_time_ns: int = 0, 
-        cc: str = 'CCL'):
+        cc: str = 'CCL'
+) -> OqlProgram:
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and uses the zeroth
@@ -147,7 +149,8 @@ def pulsed_spec_seq_v2(
         qubit_idx: int,
         spec_pulse_length: float,
         platf_cfg: str, 
-        trigger_idx: int):
+        trigger_idx: int
+) -> OqlProgram:
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and usus the zeroth
@@ -180,7 +183,8 @@ def flipping(
         equator: bool = False, 
         cal_points: bool = True,
         ax: str = 'x', 
-        angle: str = '180'):
+        angle: str = '180'
+) -> OqlProgram:
     """
     Generates a flipping sequence that performs multiple pi-pulses
     Basic sequence:
@@ -243,7 +247,7 @@ def flipping(
     return p
 
 
-def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
+def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True) -> OqlProgram:
     """
     Single qubit AllXY sequence.
     Writes output files to the directory specified in openql.
@@ -299,7 +303,7 @@ def T1(
         qb_cz_idx: int = None,
         nr_flux_dance: float = None,
         wait_time_after_flux_dance: float = 0
-):
+) -> OqlProgram:
     """
     Single qubit T1 sequence.
     Writes output files to the directory specified in openql.
@@ -351,7 +355,7 @@ def T1(
     return p
 
 
-def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
+def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit T1 sequence for the second excited states.
     Writes output files to the directory specified in openql.
@@ -395,7 +399,7 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
-def Ramsey(times, qubit_idx: int, platf_cfg: str):
+def Ramsey(times, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -428,7 +432,7 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
-def complex_Ramsey(times, qubit_idx: int, platf_cfg: str):
+def complex_Ramsey(times, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -464,7 +468,7 @@ def complex_Ramsey(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
-def echo(times, qubit_idx: int, platf_cfg: str):
+def echo(times, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit Echo sequence.
     Writes output files to the directory specified in openql.
@@ -508,7 +512,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
-def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
+def CPMG(times, order: int, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit CPMG sequence.
     Writes output files to the directory specified in openql.
@@ -555,7 +559,7 @@ def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
     return p
 
 
-def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
+def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit CPMG sequence.
     Writes output files to the directory specified in openql.
@@ -607,7 +611,8 @@ def spin_lock_simple(
         qubit_idx: int, 
         platf_cfg: str,
         mw_gate_duration: float = 40e-9,
-        tomo: bool = False):
+        tomo: bool = False
+) -> OqlProgram:
     """
     Single qubit Echo sequence.
     Writes output files to the directory specified in openql.
@@ -664,7 +669,8 @@ def rabi_frequency(
         qubit_idx: int, 
         platf_cfg: str,
         mw_gate_duration: float = 40e-9,
-        tomo: bool = False):
+        tomo: bool = False
+) -> OqlProgram:
     """
     Rabi Sequence consisting out of sequence of square pulses
     Writes output files to the directory specified in openql.
@@ -722,7 +728,7 @@ def rabi_frequency(
     return p
 
 
-def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
+def spin_lock_echo(times, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit Echo sequence.
     Writes output files to the directory specified in openql.
@@ -777,7 +783,8 @@ def idle_error_rate_seq(
         echo: bool,
         qubit_idx: int,
         platf_cfg: str,
-        post_select=True):
+        post_select=True
+) -> OqlProgram:
     """
     Sequence to perform the idle_error_rate_sequence.
     Virtually identical to a T1 experiment (Z-basis)
@@ -836,7 +843,7 @@ def idle_error_rate_seq(
     return p
 
 
-def single_elt_on(qubit_idx: int, platf_cfg: str):
+def single_elt_on(qubit_idx: int, platf_cfg: str) -> OqlProgram:
     p = OqlProgram('single_elt_on', platf_cfg)
 
     k = p.create_kernel('main')
@@ -856,7 +863,8 @@ def off_on(
         initialize: bool,
         platf_cfg: str,
         nr_flux_dance: float = None,
-        wait_time: float = None):
+        wait_time: float = None
+) -> OqlProgram:
     """
     Performs an 'off_on' sequence on the qubit specified.
         off: (RO) - prepz -      - RO
@@ -921,7 +929,7 @@ def off_on(
     return p
 
 
-def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
+def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:
     """
     Performs a 'butterfly' sequence on the qubit specified.
         0:  prepz (RO) -      - RO - RO
@@ -963,7 +971,8 @@ def RTE(
         sequence_type: str,
         platf_cfg: str,
         net_gate: str,
-        feedback=False):
+        feedback=False
+) -> OqlProgram:
     """
     Creates a sequence for the rounds to event (RTE) experiment
 
@@ -1032,7 +1041,8 @@ def randomized_benchmarking(
         restless: bool = False,
         program_name: str = 'randomized_benchmarking',
         cal_points: bool = True,
-        double_curves: bool = False):
+        double_curves: bool = False
+) -> OqlProgram:
     '''
     Input pars:
         qubit_idx:      int specifying the target qubit (starting at 0)
@@ -1093,7 +1103,8 @@ def randomized_benchmarking(
 def motzoi_XY(
         qubit_idx: int,
         platf_cfg: str,
-        program_name: str = 'motzoi_XY'):
+        program_name: str = 'motzoi_XY'
+) -> OqlProgram:
     '''
     Sequence used for calibrating the motzoi parameter.
     Consists of yX and xY
@@ -1149,7 +1160,8 @@ def FluxTimingCalibration(
         platf_cfg: str,
         flux_cw: str = 'fl_cw_02',  # FIXME: unused
         cal_points: bool = True,
-        mw_gate: str = "rx90"):
+        mw_gate: str = "rx90"
+) -> OqlProgram:
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
@@ -1186,7 +1198,8 @@ def TimingCalibration_1D(
         times,
         platf_cfg: str,
         # flux_cw: str = 'fl_cw_02', # FIXME: unused
-        cal_points: bool = True):
+        cal_points: bool = True
+) -> OqlProgram:
     """
     A Ramsey sequence with varying waiting times `times`in between.
     It calibrates the timing between spec and measurement pulse.
@@ -1219,7 +1232,7 @@ def TimingCalibration_1D(
     return p
 
 
-def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
+def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str) -> OqlProgram:
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
 
@@ -1257,7 +1270,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
     return p
 
 
-def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
+def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit sequence to test fast feedback control (fast conditional
     execution).
@@ -1324,7 +1337,8 @@ def ef_rabi_seq(
         amps: list,
         platf_cfg: str,
         recovery_pulse: bool = True,
-        add_cal_points: bool = True):
+        add_cal_points: bool = True
+) -> OqlProgram:
     """
     Sequence used to calibrate pulses for 2nd excited state (ef/12 transition)
 
@@ -1370,7 +1384,7 @@ def ef_rabi_seq(
     return p
 
 
-def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
+def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool) -> OqlProgram:
     """
     Input pars:
         times:          the list of waiting times for each ALLXY element
@@ -1423,7 +1437,7 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
 def TEST_RTE(
         qubit_idx: int,
         platf_cfg: str,
-        measurements: int):
+        measurements: int) -> OqlProgram:
     """
 
     """
