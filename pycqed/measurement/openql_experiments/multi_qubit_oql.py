@@ -1,7 +1,7 @@
 from typing import List
 import numpy as np
 
-import pycqed.measurement.openql_experiments.openql_helpers as oqh
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 from pycqed.utilities.general import int2base, suppress_stdout
 from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _def_lm_flux
 
@@ -9,7 +9,7 @@ from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_l
 def single_flux_pulse_seq(qubit_indices: tuple,
                           platf_cfg: str):
 
-    p = oqh.create_program("single_flux_pulse_seq", platf_cfg)
+    p = OqlProgram("single_flux_pulse_seq", platf_cfg)
 
     k = p.create_kernel("main")
     for idx in qubit_indices:
@@ -29,7 +29,7 @@ def single_flux_pulse_seq(qubit_indices: tuple,
 # FIXME: not really used
 def flux_staircase_seq(platf_cfg: str):
 
-    p = oqh.create_program("flux_staircase_seq", platf_cfg)
+    p = OqlProgram("flux_staircase_seq", platf_cfg)
 
     k = p.create_kernel("main")
     for i in range(1):
@@ -75,7 +75,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
     combinations = [int2base(i, base=base, fixed_length=len(qubits)) for
                     i in range(base**len(qubits))]
 
-    p = oqh.create_program("multi_qubit_off_on", platf_cfg)
+    p = OqlProgram("multi_qubit_off_on", platf_cfg)
 
     for i, comb in enumerate(combinations):
         k = p.create_kernel('Prep_{}'.format(comb))
@@ -133,7 +133,7 @@ def single_qubit_off_on(qubits: list,
 
     combinations = [comb_0, comb_1]
 
-    p = oqh.create_program("single_qubit_off_on", platf_cfg)
+    p = OqlProgram("single_qubit_off_on", platf_cfg)
 
     for i, comb in enumerate(combinations):
         k = p.create_kernel('Prep_{}'.format(comb))
@@ -204,7 +204,7 @@ def targeted_off_on(qubits: list,
             raise ValueError()
         combinations[i] = ''.join(comb)
 
-    p = oqh.create_program("Targeted_off_on", platf_cfg)
+    p = OqlProgram("Targeted_off_on", platf_cfg)
 
     for i, comb in enumerate(combinations):
         k = p.create_kernel('Prep_{}'.format(comb))
@@ -255,7 +255,7 @@ def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
 
     """
 
-    p = oqh.create_program("Ramsey_msmt_induced_dephasing", platf_cfg)
+    p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)
 
     for i, angle in enumerate(angles[:-4]):
         cw_idx = angle//20 + 9
@@ -327,7 +327,7 @@ def echo_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
 
 
     """
-    p = oqh.create_program('echo_msmt_induced_dephasing', platf_cfg)
+    p = OqlProgram('echo_msmt_induced_dephasing', platf_cfg)
 
     for i, angle in enumerate(angles[:-4]):
         cw_idx = angle//20 + 9
@@ -382,7 +382,7 @@ def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
         q0, q1      (int) : target qubits for the sequence
         platf_cfg: str
     '''
-    p = oqh.create_program('two_qubit_off_on', platf_cfg)
+    p = OqlProgram('two_qubit_off_on', platf_cfg)
 
     p.add_two_q_cal_points(q0=q0, q1=q1)
 
@@ -408,7 +408,7 @@ def two_qubit_tomo_cardinal(q0: int, q1: int, cardinal: int,  platf_cfg: str):
     prep_pulse_q0 = tomo_list_q0[prep_index_q0]
     prep_pulse_q1 = tomo_list_q1[prep_index_q1]
 
-    p = oqh.create_program('two_qubit_tomo_cardinal', platf_cfg)
+    p = OqlProgram('two_qubit_tomo_cardinal', platf_cfg)
 
     # Tomography pulses
     i = 0
@@ -454,7 +454,7 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
 
         double_points (bool) : if True measures each point in the AllXY twice
     """
-    p = oqh.create_program('two_qubit_AllXY', platf_cfg)
+    p = OqlProgram('two_qubit_AllXY', platf_cfg)
 
     pulse_combinations = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
                           ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -557,7 +557,7 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
 
     """
 
-    p = oqh.create_program("residual_coupling_sequence", platf_cfg)
+    p = OqlProgram("residual_coupling_sequence", platf_cfg)
     all_qubits = [q0]+q_spectator_idx
     n_qubits = len(all_qubits)
 
@@ -601,7 +601,7 @@ def FluxTimingCalibration(qubit_idxs: list, platf_cfg: str,
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
-    p = oqh.create_program('FluxTimingCalibration', platf_cfg)
+    p = OqlProgram('FluxTimingCalibration', platf_cfg)
 
     # don't use last 4 points if calibration points are used
     k = p.create_kernel('pi_flux_pi')
@@ -648,7 +648,7 @@ def Cryoscope(
 
     """
 
-    p = oqh.create_program("Cryoscope", platf_cfg)
+    p = OqlProgram("Cryoscope", platf_cfg)
 
     # FIXME: the variables created here are effectively unused
     if cc.upper() == 'CCL':
@@ -734,7 +734,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     Generates 2xlen(times) measurements (t1-x, t1-y, t2-x, t2-y. etc)
     """
-    p = oqh.create_program("CryoscopeGoogle", platf_cfg)
+    p = OqlProgram("CryoscopeGoogle", platf_cfg)
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
 
@@ -786,7 +786,7 @@ def fluxed_ramsey(qubit_idx: int, wait_time: float,
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program('OpenQL_Platform', platf_cfg)
+    p = OqlProgram('OpenQL_Platform', platf_cfg)
     wait_time = wait_time/1e-9
 
     k = p.create_kernel("fluxed_ramsey_1")
@@ -836,7 +836,7 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("Chevron_hack", platf_cfg)
+    p = OqlProgram("Chevron_hack", platf_cfg)
 
     buffer_nanoseconds = int(round(buffer_time/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time/1e-9))
@@ -901,7 +901,7 @@ def Chevron(
         qspec ----------------RO- (target_qubit_sequence='ground')
 
     """
-    p = oqh.create_program("Chevron", platf_cfg)
+    p = OqlProgram("Chevron", platf_cfg)
 
     buffer_nanoseconds = int(round(buffer_time / 1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2 / 1e-9))
@@ -998,7 +998,7 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
         qspec ---------------RO- (target_qubit_sequence='ground')
 
     """
-    p = oqh.create_program("two_qubit_ramsey", platf_cfg)
+    p = OqlProgram("two_qubit_ramsey", platf_cfg)
 
     for i, time in enumerate(times):
         k = p.create_kernel("two_qubit_ramsey_{}".format(i))
@@ -1064,7 +1064,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
     # # FIXME: needs to be added
     # print('Warning: not using compensation pulses.')
 
-    p = oqh.create_program("two_qubit_tomo_bell_{}_{}".format(q1, q0), platf_cfg)
+    p = OqlProgram("two_qubit_tomo_bell_{}_{}".format(q1, q0), platf_cfg)
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
             k = p.create_kernel("BellTomo_{}{}_{}{}".format(q1, p_q1, q0, p_q0))
@@ -1131,7 +1131,7 @@ def two_qubit_tomo_bell_by_waiting(bell_state, q0, q1,
     # Recovery pulse is the same for all Bell states
     after_pulse_q1 = 'rym90'
 
-    p = oqh.create_program("two_qubit_tomo_bell_by_waiting", platf_cfg)
+    p = OqlProgram("two_qubit_tomo_bell_by_waiting", platf_cfg)
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
             k = p.create_kernel("BellTomo_{}{}_{}{}".format(
@@ -1172,7 +1172,7 @@ def two_qubit_DJ(q0, q1, platf_cfg):
         q0, q1          (str): names of the target qubits
     '''
 
-    p = oqh.create_program("two_qubit_DJ", platf_cfg)
+    p = OqlProgram("two_qubit_DJ", platf_cfg)
 
     # experiments
     # 1
@@ -1299,7 +1299,7 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
         initialization_msmt : whether to start with an initial measurement
                     to prepare the starting state.
     """
-    p = oqh.create_program("single_qubit_repeated_parity_check", platf_cfg)
+    p = OqlProgram("single_qubit_repeated_parity_check", platf_cfg)
 
     for k, initial_state in enumerate(initial_states):
         k = p.create_kernel('repeated_parity_check_{}'.format(k))
@@ -1391,7 +1391,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                     to prepare the starting state.
     """
 
-    p = oqh.create_program("two_qubit_parity_check", platf_cfg)
+    p = OqlProgram("two_qubit_parity_check", platf_cfg)
     data_qubits=[qD0,qD1]
     if tomo:
         tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
@@ -1599,7 +1599,7 @@ def conditional_oscillation_seq(q0: int, q1: int,
     '''
     assert parked_qubit_seq in {"ground", "ramsey"}
 
-    p = oqh.create_program("conditional_oscillation_seq", platf_cfg)
+    p = OqlProgram("conditional_oscillation_seq", platf_cfg)
 
     # These angles correspond to special pi/2 pulses in the lutman
     for i, angle in enumerate(angles):
@@ -1795,7 +1795,7 @@ def conditional_oscillation_seq_multi(
         wait_time_after_flux   (int): wait time in ns after triggering all flux
             pulses
     '''
-    p = oqh.create_program("conditional_oscillation_seq_multi", platf_cfg)
+    p = OqlProgram("conditional_oscillation_seq_multi", platf_cfg)
 
     # These angles correspond to special pi/2 pulses in the lutman
     for i, angle in enumerate(angles):
@@ -1964,7 +1964,7 @@ def parity_check_flux_dance(
         wait_time_after_flux   (int): wait time in ns after triggering all flux
             pulses
     '''
-    p = oqh.create_program("parity_check_flux_dance", platf_cfg)
+    p = OqlProgram("parity_check_flux_dance", platf_cfg)
 
     for case in control_cases:
         
@@ -2126,7 +2126,7 @@ def parity_check_fidelity(
         wait_time_after_flux   (int): wait time in ns after triggering all flux
             pulses
     '''
-    p = oqh.create_program("parity_check_fidelity", platf_cfg)
+    p = OqlProgram("parity_check_fidelity", platf_cfg)
     
     for case in control_cases:
         k = p.create_kernel("{}".format(case))
@@ -2230,7 +2230,7 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
         raise NotImplementedError('Currently only precompiled flux pulses '
                                   'are supported.')
 
-    p = oqh.create_program("grovers_two_qubit_all_inputs", platf_cfg)
+    p = OqlProgram("grovers_two_qubit_all_inputs", platf_cfg)
 
     for G0 in ['ry90', 'rym90']:
         for G1 in ['ry90', 'rym90']:
@@ -2288,7 +2288,7 @@ def grovers_two_qubits_repeated(qubits, platf_cfg: str,
     qubits: list of int
         List of the qubits (indices) to which the sequence is applied.
     """
-    p = oqh.create_program("grovers_two_qubits_repeated", platf_cfg)
+    p = OqlProgram("grovers_two_qubits_repeated", platf_cfg)
     q0 = qubits[-1]
     q1 = qubits[-2]
 
@@ -2358,7 +2358,7 @@ def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
         raise NotImplementedError('Currently only precompiled flux pulses '
                                   'are supported.')
 
-    p = oqh.create_program("grovers_tomography", platf_cfg)
+    p = OqlProgram("grovers_tomography", platf_cfg)
 
     tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
 
@@ -2432,7 +2432,7 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str,
     Creates the |00> + |11> Bell state and does a partial tomography in
     order to determine the purity of both qubits.
     """
-    p = oqh.create_program("CZ_poisoned_purity_seq",
+    p = OqlProgram("CZ_poisoned_purity_seq",
                            platf_cfg)
     tomo_list = ['rxm90', 'rym90', 'i']
 
@@ -2600,7 +2600,7 @@ def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("Chevron_first_manifold", platf_cfg)
+    p = OqlProgram("Chevron_first_manifold", platf_cfg)
 
     buffer_nanoseconds = int(round(buffer_time/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
@@ -2639,7 +2639,7 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
         raise NotImplementedError('Currently only precompiled flux pulses '
                                   'are supported.')
 
-    p = oqh.create_program("partial_tomography_cardinal",
+    p = OqlProgram("partial_tomography_cardinal",
                            platf_cfg)
 
     cardinal_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
@@ -2700,7 +2700,7 @@ def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
     tomo_list_q0 = tomo_pulses
     tomo_list_q1 = tomo_pulses
 
-    p = oqh.create_program("two_qubit_VQE", platf_cfg)
+    p = OqlProgram("two_qubit_VQE", platf_cfg)
 
     # Tomography pulses
     i = 0
@@ -2762,7 +2762,7 @@ def sliding_flux_pulses_seq(
         add_cal_points : if True adds calibration points at the end
     """
 
-    p = oqh.create_program("sliding_flux_pulses_seq", platf_cfg)
+    p = OqlProgram("sliding_flux_pulses_seq", platf_cfg)
     k = p.create_kernel("sliding_flux_pulses_seq")
     q0 = qubits[-1]
     q1 = qubits[-2]
@@ -2821,7 +2821,7 @@ def two_qubit_state_tomography(qubit_idxs,
                                wait_after_flux: float=None,
                                flux_codeword: str='cz'):
 
-    p = oqh.create_program("state_tomography_2Q_{}_{}_{}".format(product_state,qubit_idxs[0], qubit_idxs[1]), platf_cfg)
+    p = OqlProgram("state_tomography_2Q_{}_{}_{}".format(product_state,qubit_idxs[0], qubit_idxs[1]), platf_cfg)
 
     q0 = qubit_idxs[0]
     q1 = qubit_idxs[1]
@@ -2964,7 +2964,7 @@ def multi_qubit_Depletion(qubits: list, platf_cfg: str,
         time   : wait time (s) after readout pulse.
     """
 
-    p = oqh.create_program('multi_qubit_Depletion', platf_cfg)
+    p = OqlProgram('multi_qubit_Depletion', platf_cfg)
 
     pulse_combinations = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
                           ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -3008,7 +3008,7 @@ def two_qubit_Depletion(q0: int, q1: int, platf_cfg: str,
     """
 
     """
-    p = oqh.create_program('two_qubit_Depletion', platf_cfg)
+    p = OqlProgram('two_qubit_Depletion', platf_cfg)
 
     pulse_combinations = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
                           ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -3103,7 +3103,7 @@ def Two_qubit_RTE(QX: int , QZ: int, platf_cfg: str,
     """
 
     """
-    p = oqh.create_program('RTE', platf_cfg)
+    p = OqlProgram('RTE', platf_cfg)
 
     for state in start_states:
         k = p.create_kernel('RTE start state {}'.format(state))
@@ -3167,7 +3167,7 @@ def Two_qubit_RTE_pipelined(QX:int, QZ:int, QZ_d:int, platf_cfg: str,
     """
 
     """
-    p = oqh.create_program('RTE_pipelined', platf_cfg)
+    p = OqlProgram('RTE_pipelined', platf_cfg)
 
     for state in start_states:
       k = p.create_kernel('RTE pip start state {}'.format(state))
@@ -3231,7 +3231,7 @@ def Ramsey_cross(wait_time: int,
     q_spec is measured
 
     """
-    p = oqh.create_program("Ramsey_msmt_induced_dephasing", platf_cfg)
+    p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)
 
     for i, angle in enumerate(angles[:-4]):
         cw_idx = angle//20 + 9
@@ -3283,7 +3283,7 @@ def TEST_RTE(QX:int , QZ:int, platf_cfg: str,
     """
 
     """
-    p = oqh.create_program('Multi_RTE', platf_cfg)
+    p = OqlProgram('Multi_RTE', platf_cfg)
 
     k = p.create_kernel('Multi_RTE')
     k.prepz(QX)
@@ -3342,7 +3342,7 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
 
     """
 
-    p = oqh.create_program("Multi_qubit_AllXY", platf_cfg)
+    p = OqlProgram("Multi_qubit_AllXY", platf_cfg)
 
     allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
              ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -3377,7 +3377,7 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
 
 # FIXME: indentation is wrong in functions below
 def multi_qubit_rabi(qubits_idx: list,platf_cfg: str = None):
-  p = oqh.create_program("Multi_qubit_rabi", platf_cfg)
+  p = OqlProgram("Multi_qubit_rabi", platf_cfg)
   k = p.create_kernel("rabi")
   for qubit in qubits_idx:
       k.prepz(qubit)
@@ -3390,7 +3390,7 @@ def multi_qubit_rabi(qubits_idx: list,platf_cfg: str = None):
 def multi_qubit_ramsey(times,qubits_idx: list, platf_cfg: str):
   n_qubits = len(qubits_idx)
   points = len(times[0])
-  p = oqh.create_program('Multi_qubit_Ramsey',platf_cfg)
+  p = OqlProgram('Multi_qubit_Ramsey',platf_cfg)
 
   for i in range(points-4):
     k = p.create_kernel('Ramsey{}'.format(i))
@@ -3412,7 +3412,7 @@ def multi_qubit_T1(times,qubits_idx: list, platf_cfg: str):
   n_qubits = len(qubits_idx)
   points = len(times[0])
 
-  p = oqh.create_program('Multi_qubit_T1_',platf_cfg)
+  p = OqlProgram('Multi_qubit_T1_',platf_cfg)
 
   for i in range(points-4):
     k = p.create_kernel('T1_{}'.format(i))
@@ -3433,7 +3433,7 @@ def multi_qubit_Echo(times,qubits_idx: list, platf_cfg: str):
   n_qubits = len(qubits_idx) 
   points = len(times[0])
 
-  p = oqh.create_program('multi_qubit_echo_',platf_cfg)
+  p = OqlProgram('multi_qubit_echo_',platf_cfg)
 
   for i in range(points-4):
     k = p.create_kernel('echo_{}'.format(i))
@@ -3469,7 +3469,7 @@ def multi_qubit_flipping(number_of_flips,qubits_idx: list, platf_cfg: str,
     nf = number_of_flips
 
 
-  p = oqh.create_program('multi_qubit_flipping_',platf_cfg)
+  p = OqlProgram('multi_qubit_flipping_',platf_cfg)
 
   for i, n in enumerate(nf):
     k = p.create_kernel('echo_{}'.format(i))
@@ -3502,7 +3502,7 @@ def multi_qubit_flipping(number_of_flips,qubits_idx: list, platf_cfg: str,
 
 
 def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
-  p = oqh.create_program("Multi_qubit_Motzoi", platf_cfg)
+  p = OqlProgram("Multi_qubit_Motzoi", platf_cfg)
 
   k = p.create_kernel("yX")
   for qubit in qubits_idx:
@@ -3532,7 +3532,7 @@ def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
 #     Performs single qubit tomography on a qubit in the equator.
 #     """
     
-#     p = oqh.create_program('single_qubit_tomo', platf_cfg)
+#     p = OqlProgram('single_qubit_tomo', platf_cfg)
     
 #     Tomo_bases = ['Z', 'X', 'Y']
 #     Tomo_gates = ['I', 'rym90', 'rx90']
@@ -3586,7 +3586,7 @@ def Ramsey_tomo(qR: list,
     Performs single qubit tomography on a qubit in the equator.
     """
     
-    p = oqh.create_program('single_qubit_tomo', platf_cfg)
+    p = OqlProgram('single_qubit_tomo', platf_cfg)
     
     Tomo_bases = ['Z', 'X', 'Y']
     Tomo_gates = ['I', 'rym90', 'rx90']

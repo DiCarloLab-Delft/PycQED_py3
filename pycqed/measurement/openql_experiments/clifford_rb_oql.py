@@ -1,23 +1,20 @@
-"""
-This file reads in a pygsti dataset file and converts it to a valid
-OpenQL sequence. FIXME: copy/paste error
-"""
-
 import os
+import json
+import time
+import inspect
+import logging
 import numpy as np
+from importlib import reload
+
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import (
     SingleQubitClifford,
     TwoQubitClifford,
     common_cliffords,
 )
-import json
-import time
 from pycqed.utilities.general import check_keyboard_interrupt
-import inspect
-from importlib import reload
-import logging
 
 reload(rb)
 
@@ -190,7 +187,7 @@ def randomized_benchmarking(
                 program_name='Interleaved_RB_s{}_int{}_ncl{}_{}'.format(i))
 
     """
-    p = oqh.create_program(program_name, platf_cfg)
+    p = OqlProgram(program_name, platf_cfg)
 
     this_file = inspect.getfile(inspect.currentframe())
 
@@ -201,7 +198,6 @@ def randomized_benchmarking(
         clifford_rb_oql=this_file,
         recompile=recompile,
     )
-
     if not recompile_dict["recompile"]:
         os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
         return p
@@ -526,7 +522,7 @@ def character_benchmarking(
 
     assert len(qubits) == 2
 
-    p = oqh.create_program(program_name, platf_cfg)
+    p = OqlProgram(program_name, platf_cfg)
 
     this_file = inspect.getfile(inspect.currentframe())
 

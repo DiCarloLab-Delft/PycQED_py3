@@ -27,7 +27,7 @@ class OqlProgram:
         """
         create OpenQL Program (and Platform)
 
-        :param name: Name of the program
+        :param name: name of the program
         :param platf_cfg: location of the platform configuration used to construct the OpenQL Platform used.
         :param nregisters: the number of classical registers required in the program.
         """
@@ -99,32 +99,32 @@ class OqlProgram:
         """
         Wrapper around OpenQL Program.compile() method.
         """
-        ql.set_option('output_dir', self.output_dir)
+#        ql.set_option('output_dir', self.output_dir)
         if quiet:
             with suppress_stdout():
                 self.program.compile()
         else:  # show warnings
-            ql.set_option('log_level', 'LOG_ERROR')
+            ql.set_option('log_level', 'LOG_ERROR')  # FIXME: should be LOG_WARNING
             if extra_openql_options is not None:
                 for opt, val in extra_openql_options:
                     ql.set_option(opt, val)
             self.program.compile()
 
-        return self  # FIXME: returned unchanged, kept for compatibility for now (PR #638), but we say we return None
-
     #############################################################################
     # Calibration points
-    #
-    # FIXME: while changing these from separate functions to class methods, it
-    #  was found that most functions returned the program that was provided as a
-    #  parameter (which makes no sense), and that the return parameter was mostly
-    #  ignored (which makes no difference). The function documentation was
-    #  inconsistent with the actual code, probably as a result of earlier
-    #  refactoring.
-    #  Function 'add_multi_q_cal_points' would return different types dependent
-    #  on a boolean parameter 'return_comb', but no cases were found where this
-    #  parameter was set to True, so this behaviour was removed
     #############################################################################
+
+    """
+    FIXME: while changing these from separate functions to class methods, it
+     was found that most functions returned the program (that was provided as a
+     parameter, which makes no sense), and that the return parameter was mostly
+     ignored (which makes no difference). The function documentation was
+     inconsistent with the actual code in this respect, probably as a result of
+     earlier refactoring.
+     Function 'add_multi_q_cal_points' would return different types dependent
+     on a boolean parameter 'return_comb', but no cases were found where this
+     parameter was set to True, so this behaviour was removed
+    """
 
     def add_single_qubit_cal_points(
             self,
@@ -412,7 +412,11 @@ class OqlProgram:
 
 ##########################################################################
 # compatibility functions
-# FIXME: these are to be deprecated, but note that many scripts use these
+# FIXME: these are to be deprecated, but note that many scripts use these.
+#  In many functions we return the program object for legacy
+#  compatibility, although we specify a return type of " -> None" for
+#  those that use PyCharm or an other tool aware of type inconsistencies
+#  (which is highly recommended)
 ##########################################################################
 
 def create_program(
@@ -435,7 +439,8 @@ def compile(
         quiet: bool = False,
         extra_openql_options: List[Tuple[str,str]] = None
 ) -> None:
-    return p.compile(quiet, extra_openql_options)
+    p.compile(quiet, extra_openql_options)
+    return p # legacy compatibility
 
 
 def add_single_qubit_cal_points(
@@ -445,6 +450,7 @@ def add_single_qubit_cal_points(
         measured_qubits=None
 ) -> None:
     p.add_single_qubit_cal_points(qubit_idx, f_state_cal_pts, measured_qubits)
+    return p # legacy compatibility
 
 
 def add_two_q_cal_points(
@@ -460,6 +466,7 @@ def add_two_q_cal_points(
         nr_of_interleaves=1
 ) -> None:
     p.add_two_q_cal_points(q0, q1, reps_per_cal_pt, f_state_cal_pts, measured_qubits, interleaved_measured_qubits, interleaved_delay, nr_of_interleaves)
+    return p # legacy compatibility
 
 
 def add_multi_q_cal_points(
@@ -472,6 +479,7 @@ def add_multi_q_cal_points(
         flux_cw_list: List[str] = None
 ) -> None:
     p.add_multi_q_cal_points(qubits, combinations, reps_per_cal_pnt, f_state_cal_pt_cw, nr_flux_dance, flux_cw_list)
+    return p # legacy compatibility
 
 
 def add_two_q_cal_points_special_cond_osc(
@@ -488,6 +496,7 @@ def add_two_q_cal_points_special_cond_osc(
         nr_of_interleaves=1
 ) -> None:
     p.add_two_q_cal_points_special_cond_osc(q0, q1, q2, reps_per_cal_pt, f_state_cal_pts, measured_qubits, interleaved_measured_qubits, interleaved_delay, nr_of_interleaves)
+    return p # legacy compatibility
 
 
 #############################################################################
@@ -508,7 +517,8 @@ def clocks_to_s(time, clock_cycle=20e-9):
     return time * clock_cycle
 
 
-# FIXME: manage recompilation in this file, not at caller
+# NB: used in clifford_rb_oql.py to skip both generation of RB sequences, and OpenQL compilation if
+# contents of platf_cfg or clifford_rb_oql (i.e. the Python file that generates the RB sequence) have changed
 def check_recompilation_needed_hash_based(
         program_fn: str,
         platf_cfg: str,

@@ -2,7 +2,7 @@ import numpy as np
 from pycqed.measurement.randomized_benchmarking import \
     randomized_benchmarking as rb
 
-import pycqed.measurement.openql_experiments.openql_helpers as oqh
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
 
 def CW_tone(qubit_idx: int, platf_cfg: str):
@@ -10,7 +10,7 @@ def CW_tone(qubit_idx: int, platf_cfg: str):
     Sequence to generate an "always on" pulse or "ContinuousWave" (CW) tone.
     This is a sequence that goes a bit against the paradigm of openql.
     """
-    p = oqh.create_program('CW_tone', platf_cfg)
+    p = OqlProgram('CW_tone', platf_cfg)
 
     k = p.create_kernel("Main")
     for i in range(40):
@@ -29,7 +29,7 @@ def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
     This can be used as a reference.
 
     """
-    p = oqh.create_program('vsm_timing_cal_sequence', platf_cfg)
+    p = OqlProgram('vsm_timing_cal_sequence', platf_cfg)
 
     k = p.create_kernel("Main")
     k.prepz(qubit_idx)  # to ensure enough separation in timing
@@ -51,7 +51,7 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
             int or a list of integers.
         platf_cfg (str)     :
     """
-    p = oqh.create_program('CW_RO_sequence', platf_cfg=platf_cfg)
+    p = OqlProgram('CW_RO_sequence', platf_cfg=platf_cfg)
 
     k = p.create_kernel("main")
     if not hasattr(qubit_idx, "__iter__"):
@@ -76,7 +76,7 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     this is not the case the spec_pulse_length will be rounded.
 
     """
-    p = oqh.create_program("pulsed_spec_seq", platf_cfg)
+    p = OqlProgram("pulsed_spec_seq", platf_cfg)
     k = p.create_kernel("main")
 
     nr_clocks = int(spec_pulse_length/20e-9)
@@ -101,7 +101,7 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     wave output on the AWG (currently hardcoded, should be improved)
     FIXME: comment outdated
     """
-    p = oqh.create_program("pulsed_spec_seq_marked", platf_cfg)
+    p = OqlProgram("pulsed_spec_seq_marked", platf_cfg)
     k = p.create_kernel("main")
 
     nr_clocks = int(spec_pulse_length/20e-9)
@@ -144,7 +144,7 @@ def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
     wave output on the AWG (currently hardcoded, should be improved)
 
     """
-    p = oqh.create_program("pulsed_spec_seq_v2", platf_cfg)
+    p = OqlProgram("pulsed_spec_seq_v2", platf_cfg)
     k = p.create_kernel("main")
 
     nr_clocks = int(spec_pulse_length/20e-9)
@@ -189,7 +189,7 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
     Returns:
         p:              OpenQL Program object
     """
-    p = oqh.create_program("flipping", platf_cfg)
+    p = OqlProgram("flipping", platf_cfg)
 
     for i, n in enumerate(number_of_flips):
         k = p.create_kernel('flipping_{}'.format(i))
@@ -244,7 +244,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
 
 
     """
-    p = oqh.create_program("AllXY", platf_cfg)
+    p = OqlProgram("AllXY", platf_cfg)
 
     allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
              ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -299,7 +299,7 @@ def T1(
 
 
     """
-    p = oqh.create_program('T1', platf_cfg)
+    p = OqlProgram('T1', platf_cfg)
 
     for i, time in enumerate(times[:-4]):
         k = p.create_kernel('T1_{}'.format(i))
@@ -351,7 +351,7 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
 
 
     """
-    p = oqh.create_program("T1_2nd_exc", platf_cfg)
+    p = OqlProgram("T1_2nd_exc", platf_cfg)
 
     for i, time in enumerate(times):
         for j in range(2):
@@ -394,7 +394,7 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("Ramsey", platf_cfg)
+    p = OqlProgram("Ramsey", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
         k = p.create_kernel("Ramsey_{}".format(i))
@@ -427,7 +427,7 @@ def complex_Ramsey(times, qubit_idx: int, platf_cfg: str):
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("complex_Ramsey", platf_cfg)
+    p = OqlProgram("complex_Ramsey", platf_cfg)
 
     prerotations = ['rx90','rym90']
     timeloop = times[:-4][::2]
@@ -463,7 +463,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("echo", platf_cfg)
+    p = OqlProgram("echo", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
 
@@ -506,7 +506,7 @@ def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("CPMG", platf_cfg)
+    p = OqlProgram("CPMG", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
 
@@ -555,7 +555,7 @@ def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("CPMG_SO", platf_cfg)
+    p = OqlProgram("CPMG_SO", platf_cfg)
 
     for i, order in enumerate(orders[:-4]):
 
@@ -603,7 +603,7 @@ def spin_lock_simple(times, qubit_idx: int, platf_cfg: str,
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("spin_lock_simple", platf_cfg)
+    p = OqlProgram("spin_lock_simple", platf_cfg)
     # Poor mans tomography:
     if tomo:
         tomo_gates = ['I','rX180','rX12']
@@ -657,7 +657,7 @@ def rabi_frequency(times, qubit_idx: int, platf_cfg: str,
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("rabi_frequency", platf_cfg)
+    p = OqlProgram("rabi_frequency", platf_cfg)
 
     if tomo:
         tomo_gates = ['I','rX180','rX12']
@@ -715,7 +715,7 @@ def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("spin_lock_echo", platf_cfg)
+    p = OqlProgram("spin_lock_echo", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
 
@@ -773,7 +773,7 @@ def idle_error_rate_seq(nr_of_idle_gates,
     """
     allowed_states = ['0', '1', '+']
 
-    p = oqh.create_program("idle_error_rate", platf_cfg)
+    p = OqlProgram("idle_error_rate", platf_cfg)
 
     sweep_points = []
     for N in nr_of_idle_gates:
@@ -813,7 +813,7 @@ def idle_error_rate_seq(nr_of_idle_gates,
 
 
 def single_elt_on(qubit_idx: int, platf_cfg: str):
-    p = oqh.create_program('single_elt_on', platf_cfg)
+    p = OqlProgram('single_elt_on', platf_cfg)
 
     k = p.create_kernel('main')
 
@@ -842,7 +842,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
     Pulses can be optionally enabled by putting 'off', respectively 'on' in
     the pulse_comb string.
     """
-    p = oqh.create_program('off_on', platf_cfg)
+    p = OqlProgram('off_on', platf_cfg)
 
     # # Off
     if 'off' in pulse_comb.lower():
@@ -904,7 +904,7 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
         platf_cfg (str)  : openql config used for setup.
 
     """
-    p = oqh.create_program('butterfly', platf_cfg)
+    p = OqlProgram('butterfly', platf_cfg)
 
     k = p.create_kernel('0')
     k.prepz(qubit_idx)
@@ -944,7 +944,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
     N.B. there is some hardcoded stuff in here (such as rest times).
     It should be better documented what this is and what it does.
     """
-    p = oqh.create_program('RTE', platf_cfg)
+    p = OqlProgram('RTE', platf_cfg)
 
     k = p.create_kernel('RTE')
     if sequence_type == 'echo':
@@ -1019,7 +1019,7 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
     benchmarking.
     '''
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
-    p = oqh.create_program(program_name, platf_cfg)
+    p = OqlProgram(program_name, platf_cfg)
 
     i = 0
     for seed in range(nr_seeds):
@@ -1063,7 +1063,7 @@ def motzoi_XY(qubit_idx: int, platf_cfg: str,
     to be more easily compatible with standard detector functions and sweep pts
 
     '''
-    p = oqh.create_program(program_name, platf_cfg)
+    p = OqlProgram(program_name, platf_cfg)
 
     k = p.create_kernel("yX")
     k.prepz(qubit_idx)
@@ -1109,7 +1109,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
-    p = oqh.create_program('FluxTimingCalibration', platf_cfg)
+    p = OqlProgram('FluxTimingCalibration', platf_cfg)
 
     # don't use last 4 points if calibration points are used
     if cal_points:
@@ -1144,7 +1144,7 @@ def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
     A Ramsey sequence with varying waiting times `times`in between.
     It calibrates the timing between spec and measurement pulse.
     """
-    p = oqh.create_program('TimingCalibration1D', platf_cfg)
+    p = OqlProgram('TimingCalibration1D', platf_cfg)
 
     # don't use last 4 points if calibration points are used
     if cal_points:
@@ -1179,7 +1179,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
     N.B. this function is not consistent with "FluxTimingCalibration".
     This should be fixed
     """
-    p = oqh.create_program("FluxTimingCalibration_2q", platf_cfg)
+    p = OqlProgram("FluxTimingCalibration_2q", platf_cfg)
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
 
@@ -1229,7 +1229,7 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
 
 
     """
-    p = oqh.create_program("FastFeedbackControl", platf_cfg)
+    p = OqlProgram("FastFeedbackControl", platf_cfg)
 
     k = p.create_kernel("FastFdbkCtrl_nofb")
     k.prepz(qubit_idx)
@@ -1293,7 +1293,7 @@ def ef_rabi_seq(q0: int,
     if len(amps) > 18:
         raise ValueError('Only 18 free codewords available for amp pulses')
 
-    p = oqh.create_program("ef_rabi_seq", platf_cfg)
+    p = OqlProgram("ef_rabi_seq", platf_cfg)
     # These angles correspond to special pi/2 pulses in the lutman
     for i, amp in enumerate(amps):
         # cw_idx corresponds to special hardcoded pulses in the lutman
@@ -1341,7 +1341,7 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
              ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
              ['ry90', 'ry90']]
 
-    p = oqh.create_program('Depletion', platf_cfg)
+    p = OqlProgram('Depletion', platf_cfg)
 
     if 0: # FIXME: p.set_sweep_points has been replaced by p.sweep_points, since that was missing here they are probably not necessary for this function
         p.set_sweep_points(np.arange(len(allXY), dtype=float))
@@ -1376,7 +1376,7 @@ def TEST_RTE(qubit_idx: int, platf_cfg: str,
     """
 
     """
-    p = oqh.create_program('RTE', platf_cfg)
+    p = OqlProgram('RTE', platf_cfg)
 
     k = p.create_kernel('RTE')
     k.prepz(qubit_idx)
