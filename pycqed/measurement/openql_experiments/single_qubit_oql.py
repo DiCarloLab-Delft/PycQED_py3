@@ -56,10 +56,10 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     k = p.create_kernel("main")
     if not hasattr(qubit_idx, "__iter__"):
         qubit_idx = [qubit_idx]
-    k.gate('wait', qubit_idx, 0)
+    k.barrier(qubit_idx)
     for qi in qubit_idx:
         k.measure(qi)
-    k.gate('wait', qubit_idx, 0)
+    k.barrier(qubit_idx)
     p.add_kernel(k)
     p.compile()
     return p
@@ -122,12 +122,12 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
         k.gate(spec_instr, [trigger_idx])
         if trigger_idx_2 is not None:
             k.gate(spec_instr, [trigger_idx_2])
-            k.wait([trigger_idx, trigger_idx_2], 0)
+            k.barrier([trigger_idx, trigger_idx_2])
 
     if trigger_idx != qubit_idx:
-        k.wait([trigger_idx, qubit_idx], 0)
+        k.barrier([trigger_idx, qubit_idx])
         if trigger_idx_2 is not None:
-            k.wait([trigger_idx_2], 0)
+            k.barier([trigger_idx_2])
     k.wait([qubit_idx], wait_time_ns)
     k.measure(qubit_idx)
     p.add_kernel(k)
@@ -154,7 +154,7 @@ def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
         # control works. By repeating it the duration can be controlled.
         k.gate('spec', [trigger_idx])
     if trigger_idx != qubit_idx:
-        k.wait([trigger_idx, qubit_idx], 0)
+        k.barrier([trigger_idx, qubit_idx])
 
     k.measure(qubit_idx)
     p.add_kernel(k)
@@ -312,7 +312,7 @@ def T1(
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-                k.gate("wait", [], 0)  # alignment 
+                k.barrier([])  # alignment 
             k.gate("wait", [], wait_time_after_flux_dance)
 
         k.gate('rx180', [qubit_idx])
@@ -320,7 +320,7 @@ def T1(
         if nr_cz_instead_of_idle_time is not None:
             for n in range(nr_cz_instead_of_idle_time[i]):
                 k.gate("cz", [qubit_idx, qb_cz_idx])
-            k.gate("wait", [], 0)  # alignment 
+            k.barrier([])  # alignment 
             k.gate("wait", [], wait_time_after_flux_dance)
         else:
             wait_nanoseconds = int(round(time/1e-9))
@@ -858,7 +858,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-                k.gate("wait", [], 0)  # alignment 
+                k.barrier([])  # alignment 
             k.gate("wait", [], wait_time)
 
         k.measure(qubit_idx)
@@ -877,7 +877,7 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-                k.gate("wait", [], 0)  # alignment 
+                k.barrier([])  # alignment 
             k.gate("wait", [], wait_time) 
 
         k.gate('rx180', [qubit_idx])
@@ -1120,7 +1120,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
         k.prepz(qubit_idx)
         k.gate(mw_gate, [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-        k.gate("wait", [], 0)  # alignment workaround
+        k.barrier([])  # alignment workaround
         # k.gate(flux_cw, [2, 0])
         k.gate('sf_square', [qubit_idx])
         if t_nanoseconds > 10:
@@ -1155,7 +1155,7 @@ def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
-        k.gate("wait", [], 0)  # alignment workaround
+        k.barrier([])  # alignment workaround
         # k.gate(flux_cw, [2, 0])
         # k.gate('sf_square', [qubit_idx])
         if t_nanoseconds > 10:

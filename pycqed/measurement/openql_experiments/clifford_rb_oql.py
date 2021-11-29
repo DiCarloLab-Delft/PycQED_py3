@@ -299,40 +299,40 @@ def randomized_benchmarking(
                                 elif isinstance(q, list):  # 2 qubit gate
                                     if g == "I":
                                         # interleaving an idling with the length of the CZ
-                                        k.gate("wait", [], 0)  # alignment
+                                        k.barrier([])  # alignment
                                         k.gate("wait", [], flux_allocated_duration_ns)
-                                        k.gate("wait", [], 0)
+                                        k.barrier([])
                                     elif not sim_cz_qubits:
                                         # OpenQL alignment is necessary to ensure
                                         # parking flux pulse is played in parallel
-                                        k.gate("wait", [], 0)
+                                        k.barrier([])
                                         if 'cz' in flux_codeword:
                                             k.gate(flux_codeword, list(qubit_map.values()))
                                         else:
                                             # if explicit flux codeword is given (flux-dance type),
                                             # it only takes qubit 0 as argument
                                             k.gate(flux_codeword, [0])
-                                        k.gate("wait", [], 0)
+                                        k.barrier([])
                                     else:
                                         # A simultaneous CZ is applied to characterize cz gates that
                                         # have been calibrated to be used in parallel.
 
                                         # OpenQL alignment is necessary to ensure
                                         # parking flux pulse is played in parallel
-                                        k.gate("wait", [], 0)
+                                        k.barrier([])
                                         k.gate(
                                             flux_codeword, list(qubit_map.values())
                                         )  # fix for QCC
                                         k.gate(
                                             flux_codeword, sim_cz_qubits
                                         )  # fix for QCC
-                                        k.gate("wait", [], 0)
+                                        k.barrier([])
 
                         # FIXME: This hack is required to align multiplexed RO in openQL..
-                        k.gate("wait", [], 0)
+                        k.barrier([])
                         for qubit_idx in qubit_map.values():
                             k.measure(qubit_idx)
-                        k.gate("wait", [], 0)
+                        k.barrier([])
                         p.add_kernel(k)
 
                 elif simultaneous_single_qubit_RB:  # FIXME: condition boils down to just 'else'
@@ -379,10 +379,10 @@ def randomized_benchmarking(
                                 except IndexError:
                                     pass
                         # end of #157 HACK
-                        k.gate("wait", [], 0)
+                        k.barrier([])
                         for qubit_idx in qubit_map.values():
                             k.measure(qubit_idx)
-                        k.gate("wait", [], 0)
+                        k.barrier([])
                         p.add_kernel(k)
 
                 elif simultaneous_single_qubit_parking_RB:
@@ -395,7 +395,7 @@ def randomized_benchmarking(
                         if initialize:
                             for qubit_idx in qubit_map.values():
                                 k.prepz(qubit_idx)
-                        k.gate("wait", [], 0)
+                        k.barrier([])
 
                         rb_qubits = (
                             ["q2"] if rb_on_parked_qubit_only else ["q0", "q1", "q2"]
@@ -438,19 +438,17 @@ def randomized_benchmarking(
                                 elif isinstance(qubit_or_qubits, list):
                                     # interleaving the CZ with parking
                                     # and ensure alignment
-                                    k.gate(
-                                        "wait", [], 0
-                                    )  # alignment, avoid flux overlap with mw gates
+                                    k.barrier([])  # alignment, avoid flux overlap with mw gates
                                     k.gate(
                                         flux_codeword,
                                         [qubit_map[qubit] for qubit in qubit_or_qubits],
                                     )
-                                    k.gate("wait", [], 0)
+                                    k.barrier([])
 
-                        k.gate("wait", [], 0)  # align RO
+                        k.barrier([])  # align RO
                         for qubit_idx in qubit_map.values():
                             k.measure(qubit_idx)  # measure parking qubit only
-                        k.gate("wait", [], 0)
+                        k.barrier([])
                         p.add_kernel(k)
 
         if cal_points:
@@ -609,9 +607,9 @@ def character_benchmarking(
 
                                 # This is a hack because we cannot
                                 # properly trigger CZ gates.
-                                k.gate("wait", [], 0)
+                                k.barrier([])
                                 k.gate(flux_codeword, [2, 0])
-                                k.gate("wait", [], 0)
+                                k.barrier([])
 
                     for qubit_idx in qubit_map.values():
                         k.measure(qubit_idx)

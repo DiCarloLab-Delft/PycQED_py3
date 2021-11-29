@@ -278,7 +278,6 @@ class OqlProgram:
         :param flux_cw_list:
         """
 
-        kernel_list = [] # FIXME: not really used (anymore?)
         comb_repeated = []
         for state in combinations:
             comb_repeated += [state] * reps_per_cal_pnt
@@ -320,7 +319,6 @@ class OqlProgram:
             for q in qubits:
                 k.measure(q)
             k.gate('wait', [], 0)  # alignment
-            kernel_list.append(k)
             self.add_kernel(k)
 
 
@@ -348,10 +346,8 @@ class OqlProgram:
         :param interleaved_measured_qubits:
         :param interleaved_delay:
         :param nr_of_interleaves:
-        :return: kernel_list     : list containing kernels for the calibration points FIXME: incorrect
         """
 
-        kernel_list = [] # FIXME: not really used (anymore?)
         combinations = (["00"] * reps_per_cal_pt +
                         ["01"] * reps_per_cal_pt +
                         ["10"] * reps_per_cal_pt +
@@ -411,12 +407,12 @@ class OqlProgram:
             for q in measured_qubits:
                 k.measure(q)
             k.gate('wait', measured_qubits, 0)
-            kernel_list.append(k)
             self.add_kernel(k)
 
 
 ##########################################################################
-# compatibility functions (to be deprecated)
+# compatibility functions
+# FIXME: these are to be deprecated, but note that many scripts use these
 ##########################################################################
 
 def create_program(
