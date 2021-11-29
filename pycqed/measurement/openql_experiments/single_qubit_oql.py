@@ -65,8 +65,10 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
-                    platf_cfg: str):
+def pulsed_spec_seq(
+        qubit_idx: int, 
+        spec_pulse_length: float,
+        platf_cfg: str):
     """
     Sequence for pulsed spectroscopy.
 
@@ -92,9 +94,14 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     return p
 
 
-def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
-                           platf_cfg: str, trigger_idx: int, trigger_idx_2: int = None,
-                           wait_time_ns: int = 0, cc: str = 'CCL'):
+def pulsed_spec_seq_marked(
+        qubit_idx: int, 
+        spec_pulse_length: float,
+        platf_cfg: str, 
+        trigger_idx: int, 
+        trigger_idx_2: int = None,
+        wait_time_ns: int = 0, 
+        cc: str = 'CCL'):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and uses the zeroth
@@ -136,8 +143,11 @@ def pulsed_spec_seq_marked(qubit_idx: int, spec_pulse_length: float,
     return p
 
 
-def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
-                       platf_cfg: str, trigger_idx: int):
+def pulsed_spec_seq_v2(
+        qubit_idx: int,
+        spec_pulse_length: float,
+        platf_cfg: str, 
+        trigger_idx: int):
     """
     Sequence for pulsed spectroscopy, similar to old version. Difference is that
     this one triggers the 0th trigger port of the CCLight and usus the zeroth
@@ -163,9 +173,14 @@ def pulsed_spec_seq_v2(qubit_idx: int, spec_pulse_length: float,
     return p
 
 
-def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
-             equator: bool = False, cal_points: bool = True,
-             ax: str = 'x', angle: str = '180'):
+def flipping(
+        qubit_idx: int, 
+        number_of_flips, 
+        platf_cfg: str,
+        equator: bool = False, 
+        cal_points: bool = True,
+        ax: str = 'x', 
+        angle: str = '180'):
     """
     Generates a flipping sequence that performs multiple pi-pulses
     Basic sequence:
@@ -240,7 +255,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
         double_points:  if true repeats every element twice
                         intended for evaluating the noise at larger time scales
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
 
     """
@@ -278,13 +293,13 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
 
 def T1(
         qubit_idx: int,
-        platf_cfg: str, 
-        times: list, 
-        nr_cz_instead_of_idle_time: list=None,
-        qb_cz_idx: int=None, 
-        nr_flux_dance: float=None, 
-        wait_time_after_flux_dance: float=0
-        ):
+        platf_cfg: str,
+        times: list,
+        nr_cz_instead_of_idle_time: list = None,
+        qb_cz_idx: int = None,
+        nr_flux_dance: float = None,
+        wait_time_after_flux_dance: float = 0
+):
     """
     Single qubit T1 sequence.
     Writes output files to the directory specified in openql.
@@ -295,7 +310,7 @@ def T1(
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
 
     """
@@ -347,7 +362,7 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
 
     """
@@ -391,7 +406,7 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
     """
     p = OqlProgram("Ramsey", platf_cfg)
@@ -424,7 +439,7 @@ def complex_Ramsey(times, qubit_idx: int, platf_cfg: str):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
     """
     p = OqlProgram("complex_Ramsey", platf_cfg)
@@ -460,7 +475,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
     """
     p = OqlProgram("echo", platf_cfg)
@@ -492,6 +507,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     p.compile()
     return p
 
+
 def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
     """
     Single qubit CPMG sequence.
@@ -503,7 +519,7 @@ def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
     """
     p = OqlProgram("CPMG", platf_cfg)
@@ -532,8 +548,6 @@ def CPMG(times, order: int, qubit_idx: int, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-
-
     # adding the calibration points
     p.add_single_qubit_cal_points(qubit_idx=qubit_idx)
 
@@ -552,7 +566,7 @@ def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
     """
     p = OqlProgram("CPMG_SO", platf_cfg)
@@ -587,9 +601,13 @@ def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str):
     p.compile()
     return p
 
-def spin_lock_simple(times, qubit_idx: int, platf_cfg: str, 
-                     mw_gate_duration: float = 40e-9, 
-                     tomo: bool = False):
+
+def spin_lock_simple(
+        times, 
+        qubit_idx: int, 
+        platf_cfg: str,
+        mw_gate_duration: float = 40e-9,
+        tomo: bool = False):
     """
     Single qubit Echo sequence.
     Writes output files to the directory specified in openql.
@@ -600,7 +618,7 @@ def spin_lock_simple(times, qubit_idx: int, platf_cfg: str,
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
     """
     p = OqlProgram("spin_lock_simple", platf_cfg)
@@ -641,11 +659,14 @@ def spin_lock_simple(times, qubit_idx: int, platf_cfg: str,
     return p
 
 
-def rabi_frequency(times, qubit_idx: int, platf_cfg: str, 
-                    mw_gate_duration: float = 40e-9,
-                    tomo: bool = False):
+def rabi_frequency(
+        times, 
+        qubit_idx: int, 
+        platf_cfg: str,
+        mw_gate_duration: float = 40e-9,
+        tomo: bool = False):
     """
-    Rabi Sequence consising out of sequence of square pulses
+    Rabi Sequence consisting out of sequence of square pulses
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
 
@@ -654,7 +675,7 @@ def rabi_frequency(times, qubit_idx: int, platf_cfg: str,
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
     """
     p = OqlProgram("rabi_frequency", platf_cfg)
@@ -712,7 +733,7 @@ def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
     """
     p = OqlProgram("spin_lock_echo", platf_cfg)
@@ -748,12 +769,15 @@ def spin_lock_echo(times, qubit_idx: int, platf_cfg: str):
     p.compile()
     return p
 
-def idle_error_rate_seq(nr_of_idle_gates,
-                        states: list,
-                        gate_duration_ns: int,
-                        echo: bool,
-                        qubit_idx: int, platf_cfg: str,
-                        post_select=True):
+
+def idle_error_rate_seq(
+        nr_of_idle_gates,
+        states: list,
+        gate_duration_ns: int,
+        echo: bool,
+        qubit_idx: int,
+        platf_cfg: str,
+        post_select=True):
     """
     Sequence to perform the idle_error_rate_sequence.
     Virtually identical to a T1 experiment (Z-basis)
@@ -767,7 +791,7 @@ def idle_error_rate_seq(nr_of_idle_gates,
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
 
     """
@@ -826,7 +850,13 @@ def single_elt_on(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_flux_dance:float=None,wait_time:float=None):
+def off_on(
+        qubit_idx: int,
+        pulse_comb: str,
+        initialize: bool,
+        platf_cfg: str,
+        nr_flux_dance: float = None,
+        wait_time: float = None):
     """
     Performs an 'off_on' sequence on the qubit specified.
         off: (RO) - prepz -      - RO
@@ -928,8 +958,12 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     return p
 
 
-def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
-        net_gate: str, feedback=False):
+def RTE(
+        qubit_idx: int,
+        sequence_type: str,
+        platf_cfg: str,
+        net_gate: str,
+        feedback=False):
     """
     Creates a sequence for the rounds to event (RTE) experiment
 
@@ -989,12 +1023,16 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
     return p
 
 
-def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
-                            nr_cliffords, nr_seeds: int,
-                            net_clifford: int = 0, restless: bool = False,
-                            program_name: str = 'randomized_benchmarking',
-                            cal_points: bool = True,
-                            double_curves: bool = False):
+def randomized_benchmarking(
+        qubit_idx: int,
+        platf_cfg: str,
+        nr_cliffords,
+        nr_seeds: int,
+        net_clifford: int = 0,
+        restless: bool = False,
+        program_name: str = 'randomized_benchmarking',
+        cal_points: bool = True,
+        double_curves: bool = False):
     '''
     Input pars:
         qubit_idx:      int specifying the target qubit (starting at 0)
@@ -1052,8 +1090,10 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
     return p
 
 
-def motzoi_XY(qubit_idx: int, platf_cfg: str,
-              program_name: str = 'motzoi_XY'):
+def motzoi_XY(
+        qubit_idx: int,
+        platf_cfg: str,
+        program_name: str = 'motzoi_XY'):
     '''
     Sequence used for calibrating the motzoi parameter.
     Consists of yX and xY
@@ -1083,6 +1123,7 @@ def motzoi_XY(qubit_idx: int, platf_cfg: str,
     return p
 
 
+# FIXME: never implemented?
 def Ram_Z(qubit_name,
           wait_before=150e-9, wait_between=200e-9, clock_cycle=1e-9):
     '''
@@ -1102,10 +1143,13 @@ def Ram_Z(qubit_name,
     pass
 
 
-def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
-                          flux_cw: str = 'fl_cw_02', # FIXME: unused
-                          cal_points: bool = True,
-                          mw_gate: str = "rx90"):
+def FluxTimingCalibration(
+        qubit_idx: int,
+        times,
+        platf_cfg: str,
+        flux_cw: str = 'fl_cw_02',  # FIXME: unused
+        cal_points: bool = True,
+        mw_gate: str = "rx90"):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
@@ -1137,9 +1181,12 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
     return p
 
 
-def TimingCalibration_1D(qubit_idx: int, times, platf_cfg: str,
-                         # flux_cw: str = 'fl_cw_02', # FIXME: unused
-                         cal_points: bool = True):
+def TimingCalibration_1D(
+        qubit_idx: int,
+        times,
+        platf_cfg: str,
+        # flux_cw: str = 'fl_cw_02', # FIXME: unused
+        cal_points: bool = True):
     """
     A Ramsey sequence with varying waiting times `times`in between.
     It calibrates the timing between spec and measurement pulse.
@@ -1225,7 +1272,7 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
 
 
     """
@@ -1272,11 +1319,12 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
     return p
 
 
-def ef_rabi_seq(q0: int,
-                amps: list,
-                platf_cfg: str,
-                recovery_pulse: bool = True,
-                add_cal_points: bool = True):
+def ef_rabi_seq(
+        q0: int,
+        amps: list,
+        platf_cfg: str,
+        recovery_pulse: bool = True,
+        add_cal_points: bool = True):
     """
     Sequence used to calibrate pulses for 2nd excited state (ef/12 transition)
 
@@ -1329,7 +1377,7 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
-        p:              OpenQL Program object containing
+        p:              OpenQL Program object
     """
 
     allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
@@ -1371,8 +1419,11 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool):
     p.compile()
     return p
 
-def TEST_RTE(qubit_idx: int, platf_cfg: str,
-             measurements:int):
+
+def TEST_RTE(
+        qubit_idx: int,
+        platf_cfg: str,
+        measurements: int):
     """
 
     """

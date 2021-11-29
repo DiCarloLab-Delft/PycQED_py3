@@ -91,7 +91,7 @@ def randomized_benchmarking(
     f_state_cal_pts: bool = True,
     sim_cz_qubits: list = None,
     recompile: bool = True,
-    ):
+    ) -> OqlProgram:
     """
     Input pars:
         qubits:         list of ints specifying qubit indices.
@@ -492,7 +492,7 @@ def character_benchmarking(
     f_state_cal_pts: bool = True,
     flux_codeword="cz",
     recompile: bool = True,
-):
+) -> OqlProgram:
     """
     Create OpenQL program to perform two-qubit character benchmarking.
 

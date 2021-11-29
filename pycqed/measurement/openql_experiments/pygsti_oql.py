@@ -32,7 +32,8 @@ def _openql_program_from_pygsti_expList(
         qubits: list,
         platf_cfg: str,
         start_idx: int=0,
-        recompile=True) -> OqlProgram:
+        recompile=True
+) -> OqlProgram:
 
     p = OqlProgram(program_name, platf_cfg)
 
@@ -55,7 +56,8 @@ def _openql_kernel_from_gatestring(
         gatestring,
         qubits: list,
         kernel_name: str,
-        program) -> Kernel:
+        program
+) -> Kernel:
     """
     Generates an openQL kernel for a pygsti gatestring.
     """
@@ -251,7 +253,7 @@ def two_qubit_gst(
 
 
 # FIXME: arguments replaced by hardcoded qubits
-def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
+def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str):
     """
     Generates the QISA and QASM programs for poor_mans_GST, this is 2Q GST
     without the repetitions of any gate.
