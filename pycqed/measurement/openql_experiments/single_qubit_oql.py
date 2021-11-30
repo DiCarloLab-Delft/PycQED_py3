@@ -1270,6 +1270,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str) -> Oql
     return p
 
 
+# FIXME: CC-Light specific
 def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str) -> OqlProgram:
     """
     Single qubit sequence to test fast feedback control (fast conditional
