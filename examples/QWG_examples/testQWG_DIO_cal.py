@@ -50,11 +50,11 @@ if 0:
     qwgs = [qwg_21, qwg_8]
     #qwgs = [qwg_22, qwg_21] # reversed
 
-if 1: # 20210907, development setup Wouter, slot 0 and 1
+if 0: # 20210907, development setup Wouter, slot 0 and 1
     qwg_9 = QWG('qwg_9', IPTransport('192.168.0.191'))      # slot 0
     qwg_19 = QWG('qwg_19', IPTransport('192.168.0.181'))    # slot 1
     qwgs = [qwg_19, qwg_9]
-if 0: # 20210907, development setup Wouter, slot 2 and 3
+if 1: # 20210907, development setup Wouter, slot 2 and 3
     qwg_14 = QWG('qwg_14', IPTransport('192.168.0.186'))    # slot 2
     qwg_10 = QWG('qwg_10', IPTransport('192.168.0.190'))    # slot 3
     qwgs = [qwg_10, qwg_14]
