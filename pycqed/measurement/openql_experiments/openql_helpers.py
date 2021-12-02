@@ -1,13 +1,14 @@
 import re
 import logging
 import json
+import pathlib
+import inspect
 import numpy as np
 from os import remove
 from os.path import join, dirname, isfile
 from typing import List, Tuple
 
 import openql as ql
-from openql import Program, Kernel, Platform
 
 from pycqed.utilities.general import suppress_stdout
 from pycqed.utilities.general import is_more_recent
@@ -22,34 +23,48 @@ class OqlProgram:
             self,
             name: str,
             platf_cfg: str,
-            nregisters: int = 32
+            nregisters: int = 32,
+            output_dir: str = join(dirname(__file__), 'output')
     ):
         """
         create OpenQL Program (and Platform)
 
-        :param name: name of the program
-        :param platf_cfg: location of the platform configuration used to construct the OpenQL Platform used.
-        :param nregisters: the number of classical registers required in the program.
+        Args:
+            name:
+                name of the program
+
+            platf_cfg:
+                path of the platform configuration file used by OpenQL
+
+            nregisters:
+                the number of classical registers required in the program
+
+            output_dir:
+                the output director for files generated
         """
 
-        output_dir = join(dirname(__file__), 'output')
+
+        # setup OpenQL
         ql.initialize()  # reset options, may initialize more functionality in the future
         ql.set_option('output_dir', output_dir)
         ql.set_option('scheduler', 'ALAP')
 
+        # store some parameters
         self.name = name
         self.nregisters = nregisters  # NB: not available via platform
-        self.platform = Platform('OpenQL_Platform', platf_cfg)
+        self.output_dir = output_dir
+        self.filename = ""
+        self.sweep_points = None
+
+        # create Platform and Program
+        self.platform = ql.Platform('OpenQL_Platform', platf_cfg)
         self.nqubits = self.platform.get_qubit_number()
-        self.program = Program(
+        self.program = ql.Program(
             name,
             self.platform,
             self.nqubits,
             self.nregisters
         )
-        self.output_dir = output_dir
-        self.filename = ""
-        self.sweep_points = None
 
         # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
         self.eqasm_compiler = ''
@@ -69,25 +84,25 @@ class OqlProgram:
         else:
             ext = '.qisa'  # CC-light, QCC
 
-        # add filename to help finding the output files. NB: file is created by calling compile()
+        # add filename to help finding the output files. NB: the actual file is created by calling compile()
         self.filename = join(self.output_dir, self.name + ext)
 
 
-    def add_kernel(self, k: Kernel) -> None:
+    def add_kernel(self, k: ql.Kernel) -> None:
         self.program.add_kernel(k)
 
 
     def create_kernel(
             self,
             kname: str
-    ) -> Kernel:
+    ) -> ql.Kernel:
         """
         Wrapper around constructor of openQL "Kernel" class.
         """
         kname = kname.translate(
             {ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
 
-        k = Kernel(kname, self.platform, self.nqubits, self.nregisters)
+        k = ql.Kernel(kname, self.platform, self.nqubits, self.nregisters)
         return k
 
 
@@ -99,7 +114,7 @@ class OqlProgram:
         """
         Wrapper around OpenQL Program.compile() method.
         """
-#        ql.set_option('output_dir', self.output_dir)
+
         if quiet:
             with suppress_stdout():
                 self.program.compile()
@@ -110,12 +125,67 @@ class OqlProgram:
                     ql.set_option(opt, val)
             self.program.compile()
 
+
+    def compile_cqasm(
+            self,
+            src: str,
+            extra_openql_options: List[Tuple[str, str]] = None
+    ) -> None:
+        """
+
+        Args:
+            src:
+            quiet:
+            extra_openql_options:
+
+        """
+
+        # save src to file (as needed by pass 'io.cqasm.Read')
+        src_filename = self.output_dir+"/"+self.name+".cq"
+        pathlib.Path(src_filename).write_text(inspect.cleandoc(src))
+
+        c = self.platform.get_compiler()
+        # FIXME: since we modify c below, we can call compile_cqasm only once
+
+        # insert decomposer for legacy decompositions
+        # see https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
+        c.prefix_pass(
+            'dec.Instructions',
+            'legacy',  # sets predicate key to use legacy decompositions (FIXME: TBC)
+            {
+                'output_prefix': f'{self.output_dir}/%N.%P',
+                'debug': 'yes'
+            }
+        )
+
+        # insert cQASM reader (as very first step)
+        c.prefix_pass(
+            'io.cqasm.Read',
+            'reader',
+            {
+                'cqasm_file': src_filename,
+                'output_prefix': f'{self.output_dir}/%N.%P',
+                'debug': 'yes'
+            }
+        )
+
+        if 0:
+            c.print_strategy()
+
+        # set options
+        ql.set_option('log_level', 'LOG_WARNING')
+        if extra_openql_options is not None:
+            for opt, val in extra_openql_options:
+                ql.set_option(opt, val)
+
+        c.compile_with_frontend(self.platform)
+
     #############################################################################
     # Calibration points
     #############################################################################
 
     """
-    FIXME: while changing these from separate functions to class methods, it
+    FIXME: while refactoring these from separate functions to class methods, it
      was found that most functions returned the program (that was provided as a
      parameter, which makes no sense), and that the return parameter was mostly
      ignored (which makes no difference). The function documentation was
@@ -135,10 +205,19 @@ class OqlProgram:
         """
         Adds single qubit calibration points to an OpenQL program
 
-        :param qubit_idx:
-        :param f_state_cal_pts:
-        :param measured_qubits: selects which qubits to perform readout on. If measured_qubits == None, it will default
-        to measuring the qubit for which there are cal points.
+        Args:
+            qubit_idx:
+                index of qubit
+
+            f_state_cal_pts:
+                if True, add calibration points for the 2nd exc. state
+
+            measured_qubits:
+                selects which qubits to perform readout on. If measured_qubits == None, it will default
+                to measuring the qubit for which there are cal points.
+
+        Returns:
+
         """
 
         if measured_qubits == None:
@@ -190,14 +269,27 @@ class OqlProgram:
         """
         Adds two qubit calibration points to an OpenQL program
 
-        :param q0: index of first qubit
-        :param q1: index of scond qubit
-        :param reps_per_cal_pt: number of times to repeat each cal point
-        :param f_state_cal_pts: if True, add calibration points for the 2nd exc. state
-        :param measured_qubits: selects which qubits to perform readout on if measured_qubits == None, it will default to measuring the qubits for which there are cal points.
-        :param interleaved_measured_qubits:
-        :param interleaved_delay:
-        :param nr_of_interleaves:
+        Args:
+            q0:
+                index of first qubit
+
+            q1:
+                index of second qubit
+
+            reps_per_cal_pt:
+                number of times to repeat each cal point
+
+            f_state_cal_pts:
+                if True, add calibration points for the 2nd exc. state
+
+            measured_qubits:
+                selects which qubits to perform readout on. If measured_qubits == None, it will default
+                to measuring the qubit for which there are cal points
+
+            interleaved_measured_qubits:
+            interleaved_delay:
+            nr_of_interleaves:
+
         """
 
         kernel_list = [] # FIXME: not really used (anymore?)
@@ -265,17 +357,25 @@ class OqlProgram:
             flux_cw_list: List[str] = None
     ) -> None:
         """
-        Add a list of kernels containing calibration points in the program `p`
 
-        :param qubits: list of int
-        :param combinations: list with the target multi-qubit state
+        Args:
+            qubits:
+                list of qubit indices
+
+            combinations:
+                list with the target multi-qubit state
                 e.g. ["00", "01", "10", "11"] or
                 ["00", "01", "10", "11", "02", "20", "22"] or
                 ["000", "010", "101", "111"]
-        :param reps_per_cal_pnt: number of times to repeat each cal point
-        :param f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
-        :param nr_flux_dance:
-        :param flux_cw_list:
+
+            reps_per_cal_pnt:
+                number of times to repeat each cal point
+
+            f_state_cal_pt_cw:
+                the cw_idx for the pulse to the ef transition.
+
+            nr_flux_dance:
+            flux_cw_list:
         """
 
         comb_repeated = []
@@ -337,15 +437,26 @@ class OqlProgram:
     ) -> None:
         """
 
-        :param q0:
-        :param q1:
-        :param q2:
-        :param reps_per_cal_pt: number of times to repeat each cal point
-        :param f_state_cal_pts: if True, add calibration points for the 2nd exc. state
-        :param measured_qubits: selects which qubits to perform readout on. If measured_qubits == None, it will default to measuring the qubits for which there are cal points.
-        :param interleaved_measured_qubits:
-        :param interleaved_delay:
-        :param nr_of_interleaves:
+        Args:
+            q0:
+            q1:
+            q2:
+            reps_per_cal_pt:
+                number of times to repeat each cal point
+
+            f_state_cal_pts:
+                 if True, add calibration points for the 2nd exc. state
+
+            measured_qubits:
+                selects which qubits to perform readout on. If measured_qubits == None, it will default
+                to measuring the qubit for which there are cal points.
+
+            interleaved_measured_qubits:
+            interleaved_delay:
+            nr_of_interleaves:
+
+        Returns:
+
         """
 
         combinations = (["00"] * reps_per_cal_pt +
@@ -430,7 +541,7 @@ def create_program(
 def create_kernel(
         kname: str,
         program: OqlProgram
-) -> Kernel:
+) -> ql.Kernel:
     return program.create_kernel(kname)
 
 
@@ -516,6 +627,10 @@ def clocks_to_s(time, clock_cycle=20e-9):
     """
     return time * clock_cycle
 
+
+#############################################################################
+# Recompilation helpers
+#############################################################################
 
 # NB: used in clifford_rb_oql.py to skip both generation of RB sequences, and OpenQL compilation if
 # contents of platf_cfg or clifford_rb_oql (i.e. the Python file that generates the RB sequence) have changed
@@ -661,6 +776,9 @@ def check_recompilation_needed(
         raise NotImplementedError(
             'recompile should be True, False or "as needed"')
 
+#############################################################################
+# Multiple program loading helpers
+#############################################################################
 
 def load_range_of_oql_programs(
         programs,
