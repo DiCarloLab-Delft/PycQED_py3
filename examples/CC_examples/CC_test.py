@@ -1,3 +1,5 @@
+# Test program for some CC functionality
+
 from pycqed.instrument_drivers.library.Transport import IPTransport
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
@@ -39,7 +41,6 @@ cc.assemble_and_start(prog)
 
 cc.start()
 cc.stop()
-
 
 ##################################################
 # CC.py functions
