@@ -235,7 +235,7 @@ def randomized_benchmarking(
         with open(platf_cfg) as json_file:
             loaded_json = json.load(json_file)
         try:
-            flux_allocated_duration_ns = loaded_json["instructions"]["sf_cz_se q0"]["duration"]
+            flux_allocated_duration_ns = loaded_json["instructions"]["sf_cz_se q0"]["duration"]  # FIXME: not generic
         except KeyError:
             raise ValueError("Could not find flux duration. Specify manually!")
 

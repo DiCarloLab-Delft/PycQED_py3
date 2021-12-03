@@ -7,7 +7,7 @@ import pathlib
 
 import pycqed.measurement.openql_experiments.generate_CC_cfg_modular as gen
 import pycqed.measurement.openql_experiments.cqasm.special_cq as spcq
-from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
+from pycqed.measurement.openql_experiments.openql_helpers import OqlCfg
 
 
 curdir = os.path.dirname(os.path.realpath(__file__))
@@ -17,7 +17,8 @@ platf_cfg = output_dir + '/config_cc_s17_direct_iq_openql_0_10.json' # FIXME: na
 
 class Test_cQASM(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         gen.generate_config_modular(platf_cfg)
 
     def test_nested_rus_angle_0(self):
@@ -26,12 +27,10 @@ class Test_cQASM(unittest.TestCase):
         data_idx = 11
         angle = 0
 
-        src = spcq.nested_rus(
+        p = spcq.nested_rus(
+            OqlCfg('nested_rus_angle_0', platf_cfg, output_dir),
             ancilla1_idx,
             ancilla2_idx,
             data_idx,
-            angle,
+            angle
         )
-
-        p = OqlProgram('nested_rus_angle_0', platf_cfg, output_dir=output_dir)
-        p.compile_cqasm(src)

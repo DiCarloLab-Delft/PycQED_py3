@@ -34,3 +34,4 @@ zhinst
 # FIXME: breaks test_gst.py: plotly
 plotly<3.8
 packaging
+deprecated

@@ -7,6 +7,7 @@ import numpy as np
 from os import remove
 from os.path import join, dirname, isfile
 from typing import List, Tuple
+from deprecated import deprecated
 
 import openql as ql
 
@@ -16,6 +17,38 @@ from pycqed.utilities.general import get_file_sha256_hash
 
 
 log = logging.getLogger(__name__)
+
+"""
+FIXME:
+concept should support:
+- programs with 'runtime' parameters
+- retrieval of return (measurement) data
+- running a set of programs
+- make-like 'update only if needed'
+- multiple HW-platforms
+- other compilers than OpenQL
+
+"""
+
+class OqlCfg:
+    def __init__(
+            self,
+            name: str,
+            platf_cfg: str,
+            output_dir: str = join(dirname(__file__), 'output')
+    ):
+        """
+        container for configuration parameters of OqlProgram
+
+        Args:
+            name:
+            platf_cfg:
+            nregisters:
+            output_dir:
+        """
+        self.name = name
+        self.platf_cfg = platf_cfg
+        self.output_dir = output_dir
 
 
 class OqlProgram:
@@ -40,7 +73,8 @@ class OqlProgram:
                 the number of classical registers required in the program
 
             output_dir:
-                the output director for files generated
+                the output directory for files generated
+                FIXME: for the legacy *_oql.py, there is no practical way to change the default, so all results of pytest end up in the default directory
         """
 
 
@@ -64,7 +98,7 @@ class OqlProgram:
             self.platform,
             self.nqubits,
             self.nregisters
-        )
+        )  # NB: unused if we use compile_cqasm()
 
         # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
         self.eqasm_compiler = ''
@@ -80,12 +114,9 @@ class OqlProgram:
         # determine extension of generated file
         # if self.eqasm_compiler == 'eqasm_backend_cc':
         if 1:  # FIXME: workaround for OpenQL 0.8.1.dev4 resetting values
-            ext = '.vq1asm'  # CC
+            self._ext = '.vq1asm'  # CC
         else:
-            ext = '.qisa'  # CC-light, QCC
-
-        # add filename to help finding the output files. NB: the actual file is created by calling compile()
-        self.filename = join(self.output_dir, self.name + ext)
+            self._ext = '.qisa'  # CC-light, QCC
 
 
     def add_kernel(self, k: ql.Kernel) -> None:
@@ -125,6 +156,9 @@ class OqlProgram:
                     ql.set_option(opt, val)
             self.program.compile()
 
+        # add filename to help finding the output files
+        self.filename = join(self.output_dir, self.name + self._ext)
+
 
     def compile_cqasm(
             self,
@@ -132,6 +166,10 @@ class OqlProgram:
             extra_openql_options: List[Tuple[str, str]] = None
     ) -> None:
         """
+        Compile a string with cQasm source code.
+
+        Note that, contrary to the behaviour of compile(), the program runs just once by default, since looping can be
+        easily done in cQasm if it is desired.
 
         Args:
             src:
@@ -146,6 +184,7 @@ class OqlProgram:
 
         c = self.platform.get_compiler()
         # FIXME: since we modify c below, we can call compile_cqasm only once
+        #  use Compiler.clear_passes() ?
 
         # insert decomposer for legacy decompositions
         # see https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
@@ -170,15 +209,20 @@ class OqlProgram:
         )
 
         if 0:
-            c.print_strategy()
+            c.print_strategy() # FIXME: or logdebug(c.dump_strategy())
 
         # set options
         ql.set_option('log_level', 'LOG_WARNING')
+        ql.set_option('backend_cc_run_once', 'yes')  # if you want to loop, write a cqasm loop
         if extra_openql_options is not None:
             for opt, val in extra_openql_options:
                 ql.set_option(opt, val)
 
         c.compile_with_frontend(self.platform)
+
+        # add filename to help finding the output files
+        # FIXME: the actual name is determined by 'pragma @ql.name' in the source, and not by self.name
+        self.filename = join(self.output_dir, self.name + self._ext)
 
     #############################################################################
     # Calibration points
@@ -523,13 +567,14 @@ class OqlProgram:
 
 ##########################################################################
 # compatibility functions
-# FIXME: these are to be deprecated, but note that many scripts use these.
+# FIXME: these are deprecated, but note that many scripts use these.
 #  In many functions we return the program object for legacy
 #  compatibility, although we specify a return type of " -> None" for
 #  those that use PyCharm or an other tool aware of type inconsistencies
 #  (which is highly recommended)
 ##########################################################################
 
+@deprecated(version='0.4', reason="use class OqlProgram")
 def create_program(
         name: str,
         platf_cfg: str,
@@ -538,6 +583,7 @@ def create_program(
     return OqlProgram(name, platf_cfg, nregisters)
 
 
+@deprecated(version='0.4', reason="use class OqlProgram")
 def create_kernel(
         kname: str,
         program: OqlProgram
@@ -545,6 +591,7 @@ def create_kernel(
     return program.create_kernel(kname)
 
 
+@deprecated(version='0.4', reason="use class OqlProgram")
 def compile(
         p: OqlProgram,
         quiet: bool = False,
@@ -554,6 +601,7 @@ def compile(
     return p # legacy compatibility
 
 
+@deprecated(version='0.4', reason="use class OqlProgram")
 def add_single_qubit_cal_points(
         p: OqlProgram,
         qubit_idx: int,
@@ -564,6 +612,7 @@ def add_single_qubit_cal_points(
     return p # legacy compatibility
 
 
+@deprecated(version='0.4', reason="use class OqlProgram")
 def add_two_q_cal_points(
         p: OqlProgram,
         q0: int,
@@ -580,6 +629,7 @@ def add_two_q_cal_points(
     return p # legacy compatibility
 
 
+@deprecated(version='0.4', reason="use class OqlProgram")
 def add_multi_q_cal_points(
         p: OqlProgram,
         qubits: List[int],
@@ -593,6 +643,7 @@ def add_multi_q_cal_points(
     return p # legacy compatibility
 
 
+@deprecated(version='0.4', reason="use class OqlProgram")
 def add_two_q_cal_points_special_cond_osc(
         p: OqlProgram,
         q0: int,
@@ -731,6 +782,7 @@ def check_recompilation_needed_hash_based(
     return res_dict
 
 
+@deprecated(reason="Use `check_recompilation_needed_hash_based`!")
 def check_recompilation_needed(
         program_fn: str,
         platf_cfg: str,
@@ -752,8 +804,6 @@ def check_recompilation_needed(
             Use carefully, only if you know what you are doing!
             Use 'as needed' to stay safe!
     """
-    log.error("Deprecated! Use `check_recompilation_needed_hash_based`!")
-
     if recompile is True:
         return True  # compilation is enforced
     elif recompile == 'as needed':
