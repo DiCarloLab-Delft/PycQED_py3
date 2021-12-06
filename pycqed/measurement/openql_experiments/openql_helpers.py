@@ -83,7 +83,7 @@ class OqlProgram:
         ql.set_option('output_dir', output_dir)
         ql.set_option('scheduler', 'ALAP')
 
-        # store some parameters
+        # store/initialize some parameters
         self.name = name
         self.nregisters = nregisters  # NB: not available via platform
         self.output_dir = output_dir
@@ -101,22 +101,21 @@ class OqlProgram:
         )  # NB: unused if we use compile_cqasm()
 
         # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
-        self.eqasm_compiler = ''
+        eqasm_compiler = ''
         with open(platf_cfg) as f:
             for line in f:
                 if 'eqasm_compiler' in line:
                     m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
-                    self.eqasm_compiler = m.group(1)
+                    eqasm_compiler = m.group(1)
                     break
-        if self.eqasm_compiler == '':
-            logging.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
+        if eqasm_compiler == '':
+            log.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
 
         # determine extension of generated file
-        # if self.eqasm_compiler == 'eqasm_backend_cc':
-        if 1:  # FIXME: workaround for OpenQL 0.8.1.dev4 resetting values
-            self._ext = '.vq1asm'  # CC
-        else:
+        if eqasm_compiler == 'cc_light_compiler':
             self._ext = '.qisa'  # CC-light, QCC
+        else:
+            self._ext = '.vq1asm'  # CC
 
 
     def add_kernel(self, k: ql.Kernel) -> None:
@@ -140,7 +139,7 @@ class OqlProgram:
     def compile(
             self,
             quiet: bool = False,
-            extra_openql_options: List[Tuple[str, str]] = None
+            extra_openql_options: List[Tuple[str, str]] = None  # FIXME: change into pass options like compile_cqasm
     ) -> None:
         """
         Wrapper around OpenQL Program.compile() method.
@@ -156,26 +155,31 @@ class OqlProgram:
                     ql.set_option(opt, val)
             self.program.compile()
 
-        # add filename to help finding the output files
+        # save name of file that OpenQL generates to allow uploading
         self.filename = join(self.output_dir, self.name + self._ext)
 
 
     def compile_cqasm(
             self,
             src: str,
-            extra_openql_options: List[Tuple[str, str]] = None
+            extra_pass_options: List[Tuple[str, str]] = None
     ) -> None:
         """
         Compile a string with cQasm source code.
 
         Note that, contrary to the behaviour of compile(), the program runs just once by default, since looping can be
-        easily done in cQasm if it is desired.
+        easily and more subtly performed in cQasm if desired.
 
         Args:
             src:
-            quiet:
-            extra_openql_options:
+                the cQasm source code string
 
+            extra_pass_options:
+                extra pass options for OpenQL. These consist of a tuple 'path, value' where path is structured as
+                "<passName>.<passOption>" and value is the option value, see
+                https://openql.readthedocs.io/en/latest/reference/python.html#openql.Compiler.set_option
+
+                See https://openql.readthedocs.io/en/latest/gen/reference_passes.html for passes and their options
         """
 
         # save src to file (as needed by pass 'io.cqasm.Read')
@@ -208,20 +212,25 @@ class OqlProgram:
             }
         )
 
-        if 0:
-            c.print_strategy() # FIXME: or logdebug(c.dump_strategy())
-
-        # set options
+        # set global options (see https://openql.readthedocs.io/en/latest/gen/reference_options.html)
         ql.set_option('log_level', 'LOG_WARNING')
-        ql.set_option('backend_cc_run_once', 'yes')  # if you want to loop, write a cqasm loop
-        if extra_openql_options is not None:
-            for opt, val in extra_openql_options:
-                ql.set_option(opt, val)
+
+        # set compiler pass options
+        # NB: pass options are preferred over their compatibility counterparts whenever available
+        c.set_option('VQ1Asm.run_once', 'yes')  # if you want to loop, write a cqasm loop
+
+        # finally, set user pass options
+        if extra_pass_options is not None:
+            for opt, val in extra_pass_options:
+                c.set_option(opt, val)
+
+        log.debug("\n" + c.dump_strategy())  # NB: have a look at the output to determine passes and their names
 
         c.compile_with_frontend(self.platform)
 
-        # add filename to help finding the output files
-        # FIXME: the actual name is determined by 'pragma @ql.name' in the source, and not by self.name
+        # save name of file that OpenQL generates to allow uploading
+        # NB: the actual name is determined by 'pragma @ql.name' in the source, not by self.name,
+        # so users must maintain consistency
         self.filename = join(self.output_dir, self.name + self._ext)
 
     #############################################################################
