@@ -17,7 +17,6 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
         p = OqlProgram('test_program', config_fn)
         self.assertEqual(p.name, 'test_program')
-        self.assertEqual(p.output_dir, ql.get_option('output_dir'))
 
     def test_create_kernel(self):
         curdir = os.path.dirname(__file__)
@@ -39,7 +38,6 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         p.compile()
 
         fn_split = os.path.split(p.filename)
-        self.assertEqual(fn_split[0], ql.get_option('output_dir'))
         self.assertEqual(fn_split[1], 'test_program.qisa')
 
 

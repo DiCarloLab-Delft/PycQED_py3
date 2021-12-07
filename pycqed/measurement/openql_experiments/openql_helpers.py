@@ -80,11 +80,13 @@ class OqlProgram:
 
         # setup OpenQL
         ql.initialize()  # reset options, may initialize more functionality in the future
-        ql.set_option('output_dir', output_dir)
-        ql.set_option('scheduler', 'ALAP')
+
+        # set OpenQL log level before anything else
+        ql.set_option('log_level', 'LOG_WARNING')
 
         # store/initialize some parameters
         self.name = name
+        self._platf_cfg = platf_cfg
         self.nregisters = nregisters  # NB: not available via platform
         self.output_dir = output_dir
         self.filename = ""
@@ -99,23 +101,6 @@ class OqlProgram:
             self.nqubits,
             self.nregisters
         )  # NB: unused if we use compile_cqasm()
-
-        # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
-        eqasm_compiler = ''
-        with open(platf_cfg) as f:
-            for line in f:
-                if 'eqasm_compiler' in line:
-                    m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
-                    eqasm_compiler = m.group(1)
-                    break
-        if eqasm_compiler == '':
-            log.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
-
-        # determine extension of generated file
-        if eqasm_compiler == 'cc_light_compiler':
-            self._ext = '.qisa'  # CC-light, QCC
-        else:
-            self._ext = '.vq1asm'  # CC
 
 
     def add_kernel(self, k: ql.Kernel) -> None:
@@ -139,21 +124,29 @@ class OqlProgram:
     def compile(
             self,
             quiet: bool = False,
-            extra_openql_options: List[Tuple[str, str]] = None  # FIXME: change into pass options like compile_cqasm
+            extra_pass_options: List[Tuple[str, str]] = None
     ) -> None:
         """
-        Wrapper around OpenQL Program.compile() method.
+        Compile an OpenQL Program created using the legacy Program/Kernel API.
+
+        Args:
+            quiet:
+                suppress all output (not recommended, because warnings are hidden)
+
+            extra_pass_options:
+                extra pass options for OpenQL. These consist of a tuple 'path, value' where path is structured as
+                "<passName>.<passOption>" and value is the option value, see
+                https://openql.readthedocs.io/en/latest/reference/python.html#openql.Compiler.set_option
+
+                See https://openql.readthedocs.io/en/latest/gen/reference_passes.html for passes and their options
         """
 
         if quiet:
             with suppress_stdout():
                 self.program.compile()
         else:  # show warnings
-            ql.set_option('log_level', 'LOG_ERROR')  # FIXME: should be LOG_WARNING
-            if extra_openql_options is not None:
-                for opt, val in extra_openql_options:
-                    ql.set_option(opt, val)
-            self.program.compile()
+            c = self._configure_compiler("", extra_pass_options)
+            c.compile(self.program)
 
         # save name of file that OpenQL generates to allow uploading
         self.filename = join(self.output_dir, self.name + self._ext)
@@ -186,46 +179,7 @@ class OqlProgram:
         src_filename = self.output_dir+"/"+self.name+".cq"
         pathlib.Path(src_filename).write_text(inspect.cleandoc(src))
 
-        c = self.platform.get_compiler()
-        # FIXME: since we modify c below, we can call compile_cqasm only once
-        #  use Compiler.clear_passes() ?
-
-        # insert decomposer for legacy decompositions
-        # see https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
-        c.prefix_pass(
-            'dec.Instructions',
-            'legacy',  # sets predicate key to use legacy decompositions (FIXME: TBC)
-            {
-                'output_prefix': f'{self.output_dir}/%N.%P',
-                'debug': 'yes'
-            }
-        )
-
-        # insert cQASM reader (as very first step)
-        c.prefix_pass(
-            'io.cqasm.Read',
-            'reader',
-            {
-                'cqasm_file': src_filename,
-                'output_prefix': f'{self.output_dir}/%N.%P',
-                'debug': 'yes'
-            }
-        )
-
-        # set global options (see https://openql.readthedocs.io/en/latest/gen/reference_options.html)
-        ql.set_option('log_level', 'LOG_WARNING')
-
-        # set compiler pass options
-        # NB: pass options are preferred over their compatibility counterparts whenever available
-        c.set_option('VQ1Asm.run_once', 'yes')  # if you want to loop, write a cqasm loop
-
-        # finally, set user pass options
-        if extra_pass_options is not None:
-            for opt, val in extra_pass_options:
-                c.set_option(opt, val)
-
-        log.debug("\n" + c.dump_strategy())  # NB: have a look at the output to determine passes and their names
-
+        c = self._configure_compiler(src_filename, extra_pass_options)
         c.compile_with_frontend(self.platform)
 
         # save name of file that OpenQL generates to allow uploading
@@ -572,6 +526,119 @@ class OqlProgram:
                 k.measure(q)
             k.gate('wait', measured_qubits, 0)
             self.add_kernel(k)
+
+    #############################################################################
+    # Private functions
+    #############################################################################
+
+    def _configure_compiler(
+            self,
+            cqasm_src_filename: str,
+            extra_pass_options: List[Tuple[str, str]] = None
+    ) -> ql.Compiler:
+        # NB: for alternative ways to configure the compiler, see
+        # https://openql.readthedocs.io/en/latest/gen/reference_configuration.html#compiler-configuration
+
+        c = self.platform.get_compiler()
+
+        # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
+        eqasm_compiler = ''
+        with open(self._platf_cfg) as f:
+            for line in f:
+                if 'eqasm_compiler' in line:
+                    m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
+                    eqasm_compiler = m.group(1)
+                    break
+        if eqasm_compiler == '':
+            log.error(f"key 'eqasm_compiler' not found in file '{self._platf_cfg}'")
+
+        # determine architecture and extension of generated file
+        if eqasm_compiler == 'cc_light_compiler':
+            # NB: OpenQL no longer has a backend for CC-light, but many test cases still refer to CC-light
+            self._arch = 'CCL'
+            self._ext = '.qisa'  # CC-light, QCC
+        else:
+            self._arch = 'CC'
+            self._ext = '.vq1asm'  # CC
+
+
+        # remove default pass list (this also removes support for most *global* options as defined in
+        # https://openql.readthedocs.io/en/latest/gen/reference_options.html, except for 'log_level')
+        # NB: this defeats automatic backend selection by OpenQL based on key "eqasm_compiler"
+        c.clear_passes()
+
+        # add the passes we need
+        if cqasm_src_filename != "":  # if we are compiling cQasm source code
+            # cQASM reader as very first step
+            c.append_pass(
+                'io.cqasm.Read',
+                'reader',
+                {
+                    'cqasm_file': cqasm_src_filename
+                }
+            )
+
+            # decomposer for legacy decompositions (those defined in the "gate_decomposition" section)
+            # see https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
+            c.append_pass(
+                'dec.Instructions',
+                # NB: don't change the name 'legacy', see:
+                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
+                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#predicate-key
+                'legacy',
+            )
+
+        # report the initial qasm
+        c.append_pass(
+            'io.cqasm.Report',
+            'initial',
+            {
+                'output_suffix': '.cq',
+                'with_timing': 'no'
+            }
+        )
+
+        # schedule
+        c.append_pass(
+            'sch.ListSchedule',
+            'scheduler',
+            {
+                'resource_constraints': 'yes'
+            }
+        )
+
+        # report scheduled qasm
+        c.append_pass(
+            'io.cqasm.Report',
+            'scheduled',
+            {
+                'output_suffix': '.cq',
+            }
+        )
+
+        if self._arch == 'CC':
+            # generate code using CC backend
+            # NB: OpenQL >= 0.10 no longer has a CC-light backend
+            c.append_pass(
+                'arch.cc.gen.VQ1Asm',
+                'cc_backend'
+            )
+
+        # set compiler pass options
+        c.set_option('*.output_prefix', f'{self.output_dir}/%N.%P')
+        if self._arch == 'CC':
+            c.set_option('cc_backend.output_prefix', f'{self.output_dir}/%N')
+        c.set_option('scheduler.scheduler_target', 'alap')
+        if cqasm_src_filename != "":
+            c.set_option('cc_backend.run_once', 'yes')  # if you want to loop, write a cqasm loop
+
+        # finally, set user pass options
+        if extra_pass_options is not None:
+            for opt, val in extra_pass_options:
+                c.set_option(opt, val)
+
+        log.debug("\n" + c.dump_strategy())
+        return c
 
 
 ##########################################################################
