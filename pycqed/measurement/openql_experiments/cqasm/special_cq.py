@@ -134,6 +134,6 @@ def nested_rus(
         measure_fb qData
     """
 
-    p = OqlProgram(oql_cfg.name, oql_cfg.platf_cfg, output_dir=oql_cfg.output_dir)  # NB: name must be identical to name set by "pragma @ql.name" above
+    p = OqlProgram(oql_cfg.name, oql_cfg.platf_cfg)  # NB: name must be identical to name set by "pragma @ql.name" above
     p.compile_cqasm(src)
     return p

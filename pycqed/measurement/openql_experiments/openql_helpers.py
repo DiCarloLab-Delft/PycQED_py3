@@ -52,12 +52,16 @@ class OqlCfg:
 
 
 class OqlProgram:
+    # we use a class global variable 'output_dir' to replace the former OpenQL option of the same name. Since that is a
+    # global OpenQL option, it no longer has direct effect now we no longer use the OpenQL generated list of passes (see
+    # self._configure_compiler). Additionally, OpenQL options are reset upon ql.initialize, so the value does not persist.
+    output_dir = join(dirname(__file__), 'output')
+
     def __init__(
             self,
             name: str,
             platf_cfg: str,
-            nregisters: int = 32,
-            output_dir: str = join(dirname(__file__), 'output')
+            nregisters: int = 32
     ):
         """
         create OpenQL Program (and Platform)
@@ -71,10 +75,6 @@ class OqlProgram:
 
             nregisters:
                 the number of classical registers required in the program
-
-            output_dir:
-                the output directory for files generated
-                FIXME: for the legacy *_oql.py, there is no practical way to change the default, so all results of pytest end up in the default directory
         """
 
 
@@ -88,7 +88,6 @@ class OqlProgram:
         self.name = name
         self._platf_cfg = platf_cfg
         self.nregisters = nregisters  # NB: not available via platform
-        self.output_dir = output_dir
         self.filename = ""
         self.sweep_points = None
 
@@ -148,9 +147,6 @@ class OqlProgram:
             c = self._configure_compiler("", extra_pass_options)
             c.compile(self.program)
 
-        # save name of file that OpenQL generates to allow uploading
-        self.filename = join(self.output_dir, self.name + self._ext)
-
 
     def compile_cqasm(
             self,
@@ -176,16 +172,11 @@ class OqlProgram:
         """
 
         # save src to file (as needed by pass 'io.cqasm.Read')
-        src_filename = self.output_dir+"/"+self.name+".cq"
+        src_filename = OqlProgram.output_dir+"/"+self.name+".cq"
         pathlib.Path(src_filename).write_text(inspect.cleandoc(src))
 
         c = self._configure_compiler(src_filename, extra_pass_options)
         c.compile_with_frontend(self.platform)
-
-        # save name of file that OpenQL generates to allow uploading
-        # NB: the actual name is determined by 'pragma @ql.name' in the source, not by self.name,
-        # so users must maintain consistency
-        self.filename = join(self.output_dir, self.name + self._ext)
 
     #############################################################################
     # Calibration points
@@ -561,6 +552,11 @@ class OqlProgram:
             self._arch = 'CC'
             self._ext = '.vq1asm'  # CC
 
+        # save name of file that OpenQL generates to allow uploading
+        # NB: for cQasm, the actual name is determined by 'pragma @ql.name' in the source, not by self.name,
+        # so users must maintain consistency
+        self.filename = join(OqlProgram.output_dir, self.name + self._ext)
+
 
         # remove default pass list (this also removes support for most *global* options as defined in
         # https://openql.readthedocs.io/en/latest/gen/reference_options.html, except for 'log_level')
@@ -625,9 +621,9 @@ class OqlProgram:
             )
 
         # set compiler pass options
-        c.set_option('*.output_prefix', f'{self.output_dir}/%N.%P')
+        c.set_option('*.output_prefix', f'{OqlProgram.output_dir}/%N.%P')
         if self._arch == 'CC':
-            c.set_option('cc_backend.output_prefix', f'{self.output_dir}/%N')
+            c.set_option('cc_backend.output_prefix', f'{OqlProgram.output_dir}/%N')
         c.set_option('scheduler.scheduler_target', 'alap')
         if cqasm_src_filename != "":
             c.set_option('cc_backend.run_once', 'yes')  # if you want to loop, write a cqasm loop

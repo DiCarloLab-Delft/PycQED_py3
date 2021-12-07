@@ -7,15 +7,14 @@ import numpy as np
 if 1:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     from pycqed.measurement.openql_experiments import openql_helpers as oqh
-    from openql import openql as ql
+    from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
+
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
         def setUp(self):
             curdir = os.path.dirname(__file__)
             self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-
-            output_dir = os.path.join(curdir, 'test_output')
-            ql.set_option('output_dir', output_dir)
+            OqlProgram.output_dir = os.path.join(curdir, 'test_output')
 
         def test_CW_tone(self):
             p = sqo.CW_tone(qubit_idx=1,
@@ -160,8 +159,7 @@ if 1:
             def setUp(self):
                 curdir = os.path.dirname(__file__)
                 self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-                output_dir = os.path.join(curdir, 'test_output_cc')
-                ql.set_option('output_dir', output_dir)
+                OqlProgram.output_dir = os.path.join(curdir, 'test_output_cc')
 
             def test_RTE(self):
                 pytest.skip("test_RTE() uses conditional gates, which are not implemented yet")

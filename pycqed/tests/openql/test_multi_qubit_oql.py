@@ -5,14 +5,14 @@ import numpy as np
 
 from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
-from openql import openql as ql
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
+
 
 class Test_multi_qubit_oql(unittest.TestCase):
     def setUp(self):
         curdir = os.path.dirname(__file__)
         self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-        output_dir = os.path.join(curdir, 'test_output')
-        ql.set_option('output_dir', output_dir)
+        OqlProgram.output_dir = os.path.join(curdir, 'test_output')
 
     def test_single_flux_pulse_seq(self):
         # N.B. edge 0,2 is still illegal...
@@ -222,8 +222,7 @@ if oqh.is_compatible_openql_version_cc():
         def setUp(self):
             curdir = os.path.dirname(__file__)
             self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-            output_dir = os.path.join(curdir, 'test_output_cc')
-            ql.set_option('output_dir', output_dir)
+            OqlProgram.output_dir = os.path.join(curdir, 'test_output_cc')
 
         def test_multi_qubit_off_on(self):
             pytest.skip("test_multi_qubit_off_on() gives signalconflict (FIXME)")

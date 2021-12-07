@@ -1,18 +1,17 @@
 import os
 import json
 import unittest
-from openql import openql as ql
+
 from pycqed.measurement.openql_experiments import clifford_rb_oql as rb_oql
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
 
 class Test_cliff_rb_oql(unittest.TestCase):
     def setUp(self):
         curdir = os.path.dirname(__file__)
         self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-
-        output_dir = os.path.join(curdir, 'test_output')
-        ql.set_option('output_dir', output_dir)
+        OqlProgram.output_dir = os.path.join(curdir, 'test_output')
 
     def test_single_qubit_rb_seq(self):
         p = rb_oql.randomized_benchmarking([0], platf_cfg=self.config_fn,
@@ -24,6 +23,7 @@ class Test_cliff_rb_oql(unittest.TestCase):
             # Remove the hashes file to make sure the next test runs correctly
             os.remove(hashes_fn)
 
+    @unittest.skip('OpenQL 0.10 no longer generates required .qisa file')
     def test_rb_recompilation_needed_hash_based(self):
         """
         [2020-07-22 Victor]
@@ -72,9 +72,7 @@ class Test_char_rb_oql(unittest.TestCase):
     def setUp(self):
         curdir = os.path.dirname(__file__)
         self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-
-        output_dir = os.path.join(curdir, 'test_output')
-        ql.set_option('output_dir', output_dir)
+        OqlProgram.output_dir = os.path.join(curdir, 'test_output')
 
     def test_two_qubit_character_rb(self):
         p = rb_oql.character_benchmarking(
@@ -104,15 +102,13 @@ if oqh.is_compatible_openql_version_cc():
         def setUp(self):
             curdir = os.path.dirname(__file__)
             self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-            output_dir = os.path.join(curdir, 'test_output_cc')
-            ql.set_option('output_dir', output_dir)
+            OqlProgram.output_dir = os.path.join(curdir, 'test_output_cc')
 
     class Test_char_rb_oql_CC(Test_char_rb_oql):
         def setUp(self):
             curdir = os.path.dirname(__file__)
             self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-            output_dir = os.path.join(curdir, 'test_output_cc')
-            ql.set_option('output_dir', output_dir)
+            OqlProgram.output_dir = os.path.join(curdir, 'test_output_cc')
 
         # FIXME: test for timetravel in CC backend. Takes a lot of time, and fails with current rb_oql
         # def test_two_qubit_rb_seq_timetravel(self):

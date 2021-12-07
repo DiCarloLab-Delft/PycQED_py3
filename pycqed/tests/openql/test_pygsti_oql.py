@@ -1,19 +1,18 @@
 import os
 import unittest
-import pytest
-from openql import openql as ql
+
 from pycqed.measurement.openql_experiments.pygsti_oql import \
     poor_mans_2q_gst, single_qubit_gst, two_qubit_gst
-from pycqed.measurement.openql_experiments import openql_helpers as oqh
+import pycqed.measurement.openql_experiments.openql_helpers as oqh
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
+
 
 # pytestmark = pytest.mark.skip
 class Test_pygsti_oql(unittest.TestCase):
     def setUp(self):
         curdir = os.path.dirname(__file__)
         self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-
-        output_dir = os.path.join(curdir, 'test_output')
-        ql.set_option('output_dir', output_dir)
+        OqlProgram.output_dir = os.path.join(curdir, 'test_output')
 
     def test_poor_mans_2q_gst(self):
         p = poor_mans_2q_gst(q0=0, q1=2, platf_cfg=self.config_fn)
@@ -40,8 +39,7 @@ if oqh.is_compatible_openql_version_cc():
         def setUp(self):
             curdir = os.path.dirname(__file__)
             self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-            output_dir = os.path.join(curdir, 'test_output_cc')
-            ql.set_option('output_dir', output_dir)
+            OqlProgram.output_dir = os.path.join(curdir, 'test_output_cc')
 else:
     class Test_pygsti_oql_CC_incompatible_openql_version(unittest.TestCase):
             @unittest.skip('OpenQL version does not support CC')
