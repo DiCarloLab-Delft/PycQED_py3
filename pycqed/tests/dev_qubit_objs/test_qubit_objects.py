@@ -19,21 +19,17 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon impo
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 
-from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.library.Transport import DummyTransport
 
 from qcodes import station
 
-from openql import openql as ql
-
 
 Dummy_VSM_not_fixed = False
 
 @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # too many problems
 class Test_CCL(unittest.TestCase):
-
     @classmethod
     def setUpClass(self):
         self.station = station.Station()
@@ -46,7 +42,7 @@ class Test_CCL(unittest.TestCase):
         self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
                                device='dev2109', interface='1GbE')
 
-        self.CCL = dummy_CCL('CCL')
+        self.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
         # self.VSM = Dummy_Duplexer('VSM')
         self.VSM = Dummy_QuTechVSMModule('VSM')
 
@@ -82,14 +78,15 @@ class Test_CCL(unittest.TestCase):
 
         self.CCL_qubit.instr_acquisition(self.UHFQC.name)
         self.CCL_qubit.instr_VSM(self.VSM.name)
-        self.CCL_qubit.instr_CC(self.CCL.name)
+#        self.CCL_qubit.instr_CC(self.CCL.name)
+        self.CCL_qubit.instr_CC(self.CC.name)
         self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
         self.CCL_qubit.instr_MC(self.MC.name)
 
         self.CCL_qubit.instr_SH(self.SH.name)
 
         config_fn = os.path.join(
-            pq.__path__[0], 'tests', 'openql', 'test_cfg_CCL.json')
+            pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
         self.CCL_qubit.cfg_openql_platform_fn(config_fn)
 
         # Setting some "random" initial parameters
@@ -448,28 +445,6 @@ class Test_CCL(unittest.TestCase):
                 inst.close()
             except KeyError:
                 pass
-
-
-##########################################################################
-# repeat same tests for Qutech Central Controller
-# NB: we just hijack the parent class to run the same tests
-# NB: requires OpenQL with CC backend support
-##########################################################################
-
-if ql.get_version() > '0.8.0':  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
-    class Test_CC(Test_CCL):
-        def setUp(self):
-            self.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
-            self.CCL_qubit.instr_CC(self.CC.name)
-
-            config_fn = os.path.join(
-                pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
-            self.CCL_qubit.cfg_openql_platform_fn(config_fn)
-else:
-    class Test_CC_incompatible_openql_version(unittest.TestCase):
-        @unittest.skip('OpenQL version does not support CC')
-        def test_fail(self):
-            pass
 
 
 class Test_Instantiate(unittest.TestCase):

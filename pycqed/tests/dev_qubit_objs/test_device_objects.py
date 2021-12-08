@@ -1,13 +1,19 @@
 import unittest
 import pytest
+from pytest import approx
 import numpy as np
 import os
 
 import pycqed as pq
-from pytest import approx
 
 import pycqed.analysis.analysis_toolbox as a_tools
 from pycqed.measurement import measurement_control
+from pycqed.measurement.detector_functions import (
+    Multi_Detector_UHF,
+    UHFQC_input_average_detector,
+    UHFQC_integrated_average_detector,
+    UHFQC_integration_logging_det,
+)
 
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
@@ -15,8 +21,6 @@ import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
-from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
-from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.library.Transport import DummyTransport
 
@@ -28,26 +32,11 @@ import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as c
 from qcodes import station
 
 
-from pycqed.measurement.detector_functions import (
-    Multi_Detector_UHF,
-    UHFQC_input_average_detector,
-    UHFQC_integrated_average_detector,
-    UHFQC_integration_logging_det,
-)
-
-try:
-    import openql
-
-    openql_import_fail = False
-except:
-    openql_import_fail = True
-
-
 class Test_Device_obj(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         """
-        This sets up a mock setup using a CCL to control multiple qubits
+        This sets up a mock setup using a CC to control multiple qubits
         """
         self.station = station.Station()
 
@@ -67,8 +56,6 @@ class Test_Device_obj(unittest.TestCase):
             name="UHFQC_2", server="emulator", device="dev2111", interface="1GbE"
         )
 
-        self.CCL = dummy_CCL('CCL')
-        self.QCC = dummy_QCC('QCC')
         self.CC = CC('CC', DummyTransport())
         self.VSM = Dummy_QuTechVSMModule('VSM')
         self.MC = measurement_control.MeasurementControl(
@@ -157,12 +144,12 @@ class Test_Device_obj(unittest.TestCase):
                 q.instr_LutMan_RO(self.ro_lutman_2.name)
 
             q.instr_VSM(self.VSM.name)
-            q.instr_CC(self.CCL.name)
+            q.instr_CC(self.CC.name)
             q.instr_MC(self.MC.name)
 
             q.instr_SH(self.SH.name)
 
-            config_fn = os.path.join(pq.__path__[0], "tests", "test_cfg_CCL.json")
+            config_fn = os.path.join(pq.__path__[0], "tests", "test_cfg_cc.json")
             q.cfg_openql_platform_fn(config_fn)
 
             # Setting some "random" initial parameters
@@ -184,7 +171,7 @@ class Test_Device_obj(unittest.TestCase):
         # Set up the device object and set required params
         self.device = do.DeviceCCL("device")
         self.device.qubits([q.name for q in qubits])
-        self.device.instr_CC(self.CCL.name)
+        self.device.instr_CC(self.CC.name)
 
         self.device.instr_AWG_mw_0(self.AWG_mw_0.name)
         self.device.instr_AWG_mw_1(self.AWG_mw_1.name)
@@ -222,6 +209,7 @@ class Test_Device_obj(unittest.TestCase):
 
         self.device.dio_map(self.dio_map_CCL)
 
+    @unittest.skip("CCL/QCC is removed")
     def test_get_dio_map(self):
         self.device.instr_CC(self.CCL.name)
         # 2020-03-20
@@ -251,6 +239,7 @@ class Test_Device_obj(unittest.TestCase):
 
         assert dio_map == expected_dio_map
 
+    @unittest.skip("CCL is removed")
     def test_prepare_timing_CCL(self):
         self.device.instr_CC(self.CCL.name)
         self.device.dio_map(self.dio_map_CCL)
@@ -276,6 +265,7 @@ class Test_Device_obj(unittest.TestCase):
         assert self.CCL.dio4_out_delay() == 3
         assert self.CCL.dio5_out_delay() == 2
 
+    @unittest.skip("QCC is removed")
     def test_prepare_timing_QCC(self):
         self.device.instr_CC(self.QCC.name)
         self.device.dio_map(self.dio_map_QCC)
@@ -296,6 +286,7 @@ class Test_Device_obj(unittest.TestCase):
         assert self.QCC.dio6_out_delay() == 0
         assert self.QCC.dio7_out_delay() == 7
 
+    @unittest.skip("QCC is removed")
     def test_prepare_timing_QCC_fine(self):
         self.device.instr_CC(self.QCC.name)
         self.device.dio_map(self.dio_map_QCC)

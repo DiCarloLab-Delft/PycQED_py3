@@ -14,13 +14,13 @@ class Test_openql_compiler_helpers(unittest.TestCase):
 
     def test_create_program(self):
         curdir = os.path.dirname(__file__)
-        config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
+        config_fn = os.path.join(curdir, 'test_cfg_cc.json')
         p = OqlProgram('test_program', config_fn)
         self.assertEqual(p.name, 'test_program')
 
     def test_create_kernel(self):
         curdir = os.path.dirname(__file__)
-        config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
+        config_fn = os.path.join(curdir, 'test_cfg_cc.json')
         p = OqlProgram('test_program', config_fn)
         k = p.create_kernel('my_kernel')
         self.assertEqual(k.name, 'my_kernel')
@@ -31,7 +31,7 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         Only tests the compile helper by compiling an empty file.
         """
         curdir = os.path.dirname(__file__)
-        config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
+        config_fn = os.path.join(curdir, 'test_cfg_cc.json')
         p = OqlProgram('test_program', config_fn)
         k = p.create_kernel('test_kernel')
         p.add_kernel(k)
