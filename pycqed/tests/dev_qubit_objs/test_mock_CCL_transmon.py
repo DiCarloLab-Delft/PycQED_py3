@@ -19,8 +19,8 @@ import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG
 from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
 import pycqed.instrument_drivers.meta_instrument.device_object_CCL as do
 
-from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.library.Transport import DummyTransport
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 import pycqed.instrument_drivers.virtual_instruments.virtual_SPI_S4g_FluxCurrent as flx
@@ -31,94 +31,94 @@ Dummy_VSM_not_fixed = False
 class Test_Mock_CCL(unittest.TestCase):
 
     @classmethod
-    def setUpClass(self):
-        self.station = station.Station()
-        self.CCL_qubit = ct.Mock_CCLight_Transmon('CCL_qubit')
+    def setUpClass(cls):
+        cls.station = station.Station()
+        cls.CCL_qubit = ct.Mock_CCLight_Transmon('CCL_qubit')
 
-        self.fluxcurrent = flx.virtual_SPI_S4g_FluxCurrent(
+        cls.fluxcurrent = flx.virtual_SPI_S4g_FluxCurrent(
                 'fluxcurrent',
                 channel_map={
                     'FBL_Q1': (0, 0),
                     'FBL_Q2': (0, 1),
                 })
-        self.fluxcurrent.FBL_Q1(0)
-        self.fluxcurrent.FBL_Q2(0)
-        self.station.add_component(self.fluxcurrent)
+        cls.fluxcurrent.FBL_Q1(0)
+        cls.fluxcurrent.FBL_Q2(0)
+        cls.station.add_component(cls.fluxcurrent)
 
-        self.MW1 = vmw.VirtualMWsource('MW1')
-        self.MW2 = vmw.VirtualMWsource('MW2')
-        self.MW3 = vmw.VirtualMWsource('MW3')
-        self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
-        self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
-                               device='dev2109', interface='1GbE')
+        cls.MW1 = vmw.VirtualMWsource('MW1')
+        cls.MW2 = vmw.VirtualMWsource('MW2')
+        cls.MW3 = vmw.VirtualMWsource('MW3')
+        cls.SH = sh.virtual_SignalHound_USB_SA124B('SH')
+        cls.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
+                              device='dev2109', interface='1GbE')
 
-        self.CC = CC('CC', DummyTransport())
+        cls.CC = CC('CC', DummyTransport())
         # self.VSM = Dummy_Duplexer('VSM')
-        self.VSM = Dummy_QuTechVSMModule('VSM')
+        cls.VSM = Dummy_QuTechVSMModule('VSM')
 
-        self.MC = measurement_control.MeasurementControl(
+        cls.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
-        self.MC.station = self.station
-        self.station.add_component(self.MC)
+        cls.MC.station = cls.station
+        cls.station.add_component(cls.MC)
 
         # Required to set it to the testing datadir
         test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
-        self.MC.datadir(test_datadir)
-        a_tools.datadir = self.MC.datadir()
+        cls.MC.datadir(test_datadir)
+        a_tools.datadir = cls.MC.datadir()
 
-        self.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
-        self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
-        self.AWG8_VSM_MW_LutMan.AWG(self.AWG.name)
-        self.AWG8_VSM_MW_LutMan.channel_GI(1)
-        self.AWG8_VSM_MW_LutMan.channel_GQ(2)
-        self.AWG8_VSM_MW_LutMan.channel_DI(3)
-        self.AWG8_VSM_MW_LutMan.channel_DQ(4)
-        self.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
-        self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
+        cls.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
+        cls.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
+        cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
+        cls.AWG8_VSM_MW_LutMan.channel_GI(1)
+        cls.AWG8_VSM_MW_LutMan.channel_GQ(2)
+        cls.AWG8_VSM_MW_LutMan.channel_DI(3)
+        cls.AWG8_VSM_MW_LutMan.channel_DQ(4)
+        cls.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
+        cls.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
 
-        self.ro_lutman = UHFQC_RO_LutMan(
+        cls.ro_lutman = UHFQC_RO_LutMan(
             'RO_lutman', num_res=5, feedline_number=0)
-        self.ro_lutman.AWG(self.UHFQC.name)
+        cls.ro_lutman.AWG(cls.UHFQC.name)
 
         # Assign instruments
-        self.CCL_qubit.instr_LutMan_MW(self.AWG8_VSM_MW_LutMan.name)
-        self.CCL_qubit.instr_LO_ro(self.MW1.name)
-        self.CCL_qubit.instr_LO_mw(self.MW2.name)
-        self.CCL_qubit.instr_spec_source(self.MW3.name)
+        cls.CCL_qubit.instr_LutMan_MW(cls.AWG8_VSM_MW_LutMan.name)
+        cls.CCL_qubit.instr_LO_ro(cls.MW1.name)
+        cls.CCL_qubit.instr_LO_mw(cls.MW2.name)
+        cls.CCL_qubit.instr_spec_source(cls.MW3.name)
 
-        self.CCL_qubit.instr_acquisition(self.UHFQC.name)
-        self.CCL_qubit.instr_VSM(self.VSM.name)
-        self.CCL_qubit.instr_CC(self.CC.name)
-        self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
-        self.CCL_qubit.instr_MC(self.MC.name)
-        self.CCL_qubit.instr_FluxCtrl(self.fluxcurrent.name)
-        self.CCL_qubit.instr_SH(self.SH.name)
+        cls.CCL_qubit.instr_acquisition(cls.UHFQC.name)
+        cls.CCL_qubit.instr_VSM(cls.VSM.name)
+        cls.CCL_qubit.instr_CC(cls.CC.name)
+        cls.CCL_qubit.instr_LutMan_RO(cls.ro_lutman.name)
+        cls.CCL_qubit.instr_MC(cls.MC.name)
+        cls.CCL_qubit.instr_FluxCtrl(cls.fluxcurrent.name)
+        cls.CCL_qubit.instr_SH(cls.SH.name)
 
         config_fn = os.path.join(
             pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
-        self.CCL_qubit.cfg_openql_platform_fn(config_fn)
+        cls.CCL_qubit.cfg_openql_platform_fn(config_fn)
 
         # Setting some "random" initial parameters
-        self.CCL_qubit.ro_freq(5.43e9)
-        self.CCL_qubit.ro_freq_mod(200e6)
+        cls.CCL_qubit.ro_freq(5.43e9)
+        cls.CCL_qubit.ro_freq_mod(200e6)
 
-        self.CCL_qubit.freq_qubit(4.56e9)
-        self.CCL_qubit.freq_max(4.62e9)
+        cls.CCL_qubit.freq_qubit(4.56e9)
+        cls.CCL_qubit.freq_max(4.62e9)
 
-        self.CCL_qubit.mw_freq_mod(-100e6)
-        self.CCL_qubit.mw_awg_ch(1)
-        self.CCL_qubit.cfg_qubit_nr(0)
+        cls.CCL_qubit.mw_freq_mod(-100e6)
+        cls.CCL_qubit.mw_awg_ch(1)
+        cls.CCL_qubit.cfg_qubit_nr(0)
 
         if 0: # FIXME: fails
-            self.CCL_qubit.mw_vsm_delay(15)
+            cls.CCL_qubit.mw_vsm_delay(15)
 
-        self.CCL_qubit.mw_mixer_offs_GI(.1)
-        self.CCL_qubit.mw_mixer_offs_GQ(.2)
-        self.CCL_qubit.mw_mixer_offs_DI(.3)
-        self.CCL_qubit.mw_mixer_offs_DQ(.4)
+        cls.CCL_qubit.mw_mixer_offs_GI(.1)
+        cls.CCL_qubit.mw_mixer_offs_GQ(.2)
+        cls.CCL_qubit.mw_mixer_offs_DI(.3)
+        cls.CCL_qubit.mw_mixer_offs_DQ(.4)
         # self.CCL_qubit.ro_acq_averages(32768)
-        self.device = do.DeviceCCL(name='device')
-        self.CCL_qubit.instr_device(self.device.name)
+        cls.device = do.DeviceCCL(name='device')
+        cls.CCL_qubit.instr_device(cls.device.name)
 
     ###########################################################
     # Test find resonator frequency
@@ -262,7 +262,6 @@ class Test_Mock_CCL(unittest.TestCase):
     ###########################################################
     #@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as non-important)') # error: "AttributeError: 'str' object has no attribute 'decode'"
     def test_ramsey(self):
-
         self.CCL_qubit.mock_Ec(250e6)
         self.CCL_qubit.mock_Ej1(8e9)
         self.CCL_qubit.mock_Ej2(8e9)
@@ -324,7 +323,6 @@ class Test_Mock_CCL(unittest.TestCase):
     ###########################################################
     #@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as non-important)') # error: "AttributeError: 'str' object has no attribute 'decode'"
     def test_echo(self):
-
         self.CCL_qubit.mock_Ec(250e6)
         self.CCL_qubit.mock_Ej1(8e9)
         self.CCL_qubit.mock_Ej2(8e9)

@@ -10,7 +10,7 @@ qcodes
 adaptive>=0.10.0
 cma
 scikit-optimize>=0.5.2
-h5py>=2.6
+h5py>=2.6, <3.0  # 3.0 breaks measurement_analysis.py
 hsluv
 IPython>=4.0
 ipywidgets>=4.1
