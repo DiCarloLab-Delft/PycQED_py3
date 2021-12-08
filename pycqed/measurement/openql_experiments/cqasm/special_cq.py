@@ -38,7 +38,7 @@ def nested_rus(
         OpenQL test case test_cc.py::test_nested_rus_angle_0
     """
 
-    name = 'nested_rus_angle_{angle}'
+    name = f'nested_rus_angle_{angle}'
     angle_gate = 'cw_{:02}'.format(int(angle) // 20 + 9)    # FIXME: replace cw_* by meaningful name
 
     src = f"""
