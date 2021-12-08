@@ -634,7 +634,7 @@ class QWG_lutman_par_chunks(Soft_Sweep):
             else:
                 scaleFac = 1
 
-            # Load onto QWG
+            # Load onto QWG: FIXME: should be performed by LutMan, we shouldn't mess with its internals
             QWG.createWaveformReal(
                 pulseName,
                 self.LutMan._wave_dict[self.flux_pulse_type]/scaleFac)
@@ -1015,7 +1015,7 @@ class FLsweep(Soft_Sweep):
         self.AWG.stop()
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True,
-            force_load_sequencer_program=True)
+            force_load_sequencer_program=True) # FIXME: parameter only exists for AWG8_MW_LutMan (and shouldn't)
         self.AWG.start()
         return
 

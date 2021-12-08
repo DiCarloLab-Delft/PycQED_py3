@@ -1,10 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
+
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.instrument.parameter import InstrumentRefParameter
 from qcodes.utils import validators as vals
+
 from pycqed.analysis.fit_toolbox.functions import PSD
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
@@ -24,25 +26,28 @@ class Base_LutMan(Instrument):
         - Methods to render waves.
 
     The Base LutMan does not provide a set of FIXME: comment ends
-
-
     """
 
     def __init__(self, name, **kw):
         logging.info(__name__ + " : Initializing instrument")
         super().__init__(name, **kw)
+
         # FIXME: rename to instr_AWG to be consistent with other instr refs
         self.add_parameter(
             "AWG",
             parameter_class=InstrumentRefParameter,
             docstring=(
                 "Name of the AWG instrument used, note that this can also be "
-                "a UHFQC or a CBox as these also contain AWG's"
+                "a UHFQC as it also contain AWGs"
             ),
             vals=vals.Strings(),
         )
-        self._add_cfg_parameters()
-        self._add_waveform_parameters()
+
+        # FIXME: allowing direct access requires that user maintains consistence
+        #  between LutMap and _wave_dict (and instrument), see all the handling
+        #  (e.g. *lutman.load_*) in CCL_Transmon/device_object_CCL/sweep_functions,
+        #  and issue #626
+        #  Also, some verification when setting would be nice
         self.add_parameter(
             "LutMap",
             docstring=(
@@ -53,6 +58,7 @@ class Base_LutMan(Instrument):
             vals=vals.Dict(),
             parameter_class=ManualParameter,
         )
+
         self.add_parameter(
             "sampling_rate",
             unit="Hz",
@@ -60,6 +66,9 @@ class Base_LutMan(Instrument):
             initial_value=1e9,
             parameter_class=ManualParameter,
         )
+
+        self._add_cfg_parameters()
+        self._add_waveform_parameters()
 
         # Used to determine bounds in plotting.
         # overwrite in child classes if used.
@@ -70,18 +79,9 @@ class Base_LutMan(Instrument):
         self._wave_dict = {}
         self.set_default_lutmap()
 
-    def time_to_sample(self, time):
-        """
-        Takes a time in seconds and returns the corresponding sample
-        """
-        return int(time * self.sampling_rate())
-
-    def set_default_lutmap(self):
-        """
-        Sets the "LutMap" parameter to
-
-        """
-        raise NotImplementedError()
+    ##########################################################################
+    # Abstract functions
+    ##########################################################################
 
     def _add_waveform_parameters(self):
         """
@@ -91,6 +91,13 @@ class Base_LutMan(Instrument):
 
     def _add_cfg_parameters(self):
         pass
+
+    def set_default_lutmap(self):
+        """
+        Sets the "LutMap" parameter to
+
+        """
+        raise NotImplementedError()
 
     def generate_standard_waveforms(self):
         """
@@ -107,6 +114,10 @@ class Base_LutMan(Instrument):
         """
         raise NotImplementedError()
 
+    ##########################################################################
+    # Overridden functions
+    ##########################################################################
+
     def load_waveforms_onto_AWG_lookuptable(
         self, regenerate_waveforms: bool = True, stop_start: bool = True
     ):
@@ -117,6 +128,7 @@ class Base_LutMan(Instrument):
             regenerate_waveforms (bool): if True calls
                 generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
+            FIXME: inefficient if multiple LutMans (qubits) per instrument are updated
         """
         AWG = self.AWG.get_instr()
 
@@ -135,7 +147,7 @@ class Base_LutMan(Instrument):
         self, wave_id, show=True, time_units="lut_index", reload_pulses=True
     ):
         """
-        Render a waveform.
+        Render a waveform to a figure.
 
         Args:
             wave_id: can be either the "name" of a waveform or
@@ -146,6 +158,7 @@ class Base_LutMan(Instrument):
 
         if reload_pulses:
             self.generate_standard_waveforms()
+
         fig, ax = plt.subplots(1, 1)
         if time_units == "lut_index":
             x = np.arange(len(self._wave_dict[wave_id][0]))
@@ -187,9 +200,16 @@ class Base_LutMan(Instrument):
             plt.show()
         return fig, ax
 
+    ##########################################################################
+    # Functions
+    ##########################################################################
+
     def render_wave_PSD(
         self, wave_id, show=True, reload_pulses=True, f_bounds=None, y_bounds=None
     ):
+        """
+        Create a Power Spectral Density plot
+        """
         if wave_id not in self.LutMap().keys():
             wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
         if reload_pulses:
@@ -213,7 +233,15 @@ class Base_LutMan(Instrument):
             plt.show()
         return fig, ax
 
+    def time_to_sample(self, time):
+        """
+        Takes a time in seconds and returns the corresponding sample
+        """
+        return int(time * self.sampling_rate())
 
+
+# FIXME: this is specific for very early versions of the QWG that only supported a single codeword triggering all 4
+#  channels. Should be removed.
 def get_redundant_codewords(codeword: int, bit_width: int = 4, bit_shift: int = 0):
     """
     Takes in a desired codeword and generates the redundant codewords.
