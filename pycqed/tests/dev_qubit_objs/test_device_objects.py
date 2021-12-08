@@ -179,22 +179,24 @@ class Test_Device_obj(unittest.TestCase):
 
         cls.device.ro_lo_freq(6e9)
 
-        # Fixed by design
-        cls.dio_map_CCL = {"ro_0": 1, "ro_1": 2, "flux_0": 3, "mw_0": 4, "mw_1": 5}
-        # Fixed by design
-        cls.dio_map_QCC = {
-            "ro_0": 1,
-            "ro_1": 2,
-            "ro_2": 3,
-            "mw_0": 4,
-            "mw_1": 5,
-            "flux_0": 6,
-            "flux_1": 7,
-            "flux_2": 8,
-            "mw_2": 9,
-            "mw_3": 10,
-            "mw_4": 11,
-        }
+        if 0:  # FIXME: CCL/QCC deprecated
+            # Fixed by design
+            cls.dio_map_CCL = {"ro_0": 1, "ro_1": 2, "flux_0": 3, "mw_0": 4, "mw_1": 5}
+            # Fixed by design
+            cls.dio_map_QCC = {
+                "ro_0": 1,
+                "ro_1": 2,
+                "ro_2": 3,
+                "mw_0": 4,
+                "mw_1": 5,
+                "flux_0": 6,
+                "flux_1": 7,
+                "flux_2": 8,
+                "mw_2": 9,
+                "mw_3": 10,
+                "mw_4": 11,
+            }
+
         # Modular, arbitrary example here
         cls.dio_map_CC = {
             "ro_0": 0,
@@ -207,7 +209,7 @@ class Test_Device_obj(unittest.TestCase):
             "flux_2": 8,
         }
 
-        cls.device.dio_map(cls.dio_map_CCL)
+        cls.device.dio_map(cls.dio_map_CC)
 
     @unittest.skip("CCL/QCC is removed")
     def test_get_dio_map(self):
@@ -317,7 +319,6 @@ class Test_Device_obj(unittest.TestCase):
         assert self.AWG_mw_1.sigouts_7_delay() == approx(0)
         assert self.AWG_mw_1.sigouts_7_delay() == approx(0)
 
-    @unittest.skip("FIXME: PR #658: test broken by commit bd19f56: AttributeError: 'mw_lutman' object and its delegates have no attribute 'channel_I'")
     def test_prepare_timing_CC(self):
         self.device.instr_CC(self.CC.name)
         self.device.dio_map(self.dio_map_CC)
