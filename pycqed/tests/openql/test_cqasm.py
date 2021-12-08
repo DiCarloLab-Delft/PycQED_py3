@@ -27,7 +27,7 @@ class Test_cQASM(unittest.TestCase):
         gen.generate_config_modular(platf_cfg_path)
         OqlProgram.output_dir = str(output_path)
 
-    if oqh.is_compatible_openql_version_cc():
+    if oqh.is_compatible_openql_version_cc():  # we require unreleased version not yet avaialble for CI
         def test_nested_rus_angle_0(self):
             ancilla1_idx = 10
             ancilla2_idx = 8
