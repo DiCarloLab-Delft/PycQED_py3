@@ -11,7 +11,7 @@ import pathlib
 
 import pycqed.measurement.openql_experiments.generate_CC_cfg_modular as gen
 import pycqed.measurement.openql_experiments.cqasm.special_cq as spcq
-from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram, OqlCfg
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
 
 this_path = pathlib.Path(__file__).parent
@@ -33,7 +33,7 @@ class Test_cQASM(unittest.TestCase):
         angle = 0
 
         p = spcq.nested_rus(
-            OqlCfg('nested_rus_angle_0', str(platf_cfg_path)),
+            str(platf_cfg_path),
             ancilla1_idx,
             ancilla2_idx,
             data_idx,

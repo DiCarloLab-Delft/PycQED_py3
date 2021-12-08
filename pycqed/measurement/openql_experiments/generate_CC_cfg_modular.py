@@ -90,4 +90,6 @@ def generate_config_modular(
 
     cfg = hdr + '\n\n' + cfg
 
+    folder = Path(out_filename).parent
+    folder.mkdir(parents=True, exist_ok=True)
     Path(out_filename).write_text(cfg)

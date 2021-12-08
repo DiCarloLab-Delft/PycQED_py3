@@ -30,27 +30,6 @@ concept should support:
 
 """
 
-class OqlCfg:
-    def __init__(
-            self,
-            name: str,
-            platf_cfg: str,
-            output_dir: str = join(dirname(__file__), 'output')
-    ):
-        """
-        container for configuration parameters of OqlProgram
-
-        Args:
-            name:
-            platf_cfg:
-            nregisters:
-            output_dir:
-        """
-        self.name = name
-        self.platf_cfg = platf_cfg
-        self.output_dir = output_dir
-
-
 class OqlProgram:
     # we use a class global variable 'output_dir' to replace the former OpenQL option of the same name. Since that is a
     # global OpenQL option, it no longer has direct effect now we no longer use the OpenQL generated list of passes (see
