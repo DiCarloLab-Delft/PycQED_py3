@@ -1,6 +1,5 @@
 import os
 import unittest
-import pytest
 import numpy as np
 
 from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo

@@ -107,7 +107,7 @@ if oqh.is_compatible_openql_version_cc():
                     [5, 8], ['0', '1', '+', '-'], gate_duration_ns=20,
                     echo=False, qubit_idx=0, platf_cfg=self.config_fn)
 
-        @unittest.skip("test_RTE() uses old style conditional gates, which are not implemented")
+        @unittest.skip("test_RTE() uses old style conditional gates, which are no longer implemented")
         def test_RTE(self):
             p = sqo.RTE(qubit_idx=0,
                         sequence_type='echo', net_gate='pi', feedback=True,
@@ -137,7 +137,7 @@ if oqh.is_compatible_openql_version_cc():
                                              times=np.arange(0, 80e-9, 20e-9))
             self.assertEqual(p.name, 'FluxTimingCalibration_2q')
 
-        @unittest.skip("test_fast_feedback_control() uses old style conditional gates, which are not implemented")
+        @unittest.skip("test_fast_feedback_control() uses old style conditional gates, which are no longer implemented")
         def test_fast_feedback_control(self):
             p = sqo.FastFeedbackControl(latency=200e-9,
                                         qubit_idx=0, platf_cfg=self.config_fn)
