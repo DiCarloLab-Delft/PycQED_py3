@@ -1,11 +1,13 @@
 from .base_lutman import Base_LutMan, get_redundant_codewords, get_wf_idx_from_name
+
 import numpy as np
 from collections.abc import Iterable
 from collections import OrderedDict
+
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
+
 from pycqed.measurement.waveform_control_CC import waveform as wf
-import time
 
 default_mw_lutmap = {
     0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
@@ -163,13 +165,6 @@ inspire_mw_lutmap = {
 
 valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square', 'phase'}
 
-# _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-#            'rXm90',  'rYm90', 'rPhi90', 'spec']
-# # use remaining codewords to set pi/2 gates for various angles
-# for i in range(18):
-#     angle = i * 20
-#     _def_lm.append('r{}_90'.format(angle))
-
 
 def mw_lutmap_is_valid(lutmap: dict) -> bool:
     """
@@ -223,24 +218,13 @@ class Base_MW_LutMan(Base_LutMan):
 
     """
 
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
+
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
         self.LutMap(default_mw_lutmap.copy())
-
-    def set_inspire_lutmap(self):
-        """Set the default lutmap for expanded microwave drive pulses."""
-        self.LutMap(inspire_mw_lutmap.copy())
-
-    def codeword_idx_to_parnames(self, cw_idx: int):
-        """Convert a codeword_idx to a list of par names for the waveform."""
-        # the possible channels way of doing this is to make it work both for
-        # VSM style lutmans and no VSM style lutmans.
-        possible_channels = ('channel_GI', 'channel_GQ',
-                             'channel_DI', 'channel_DQ',
-                             'channel_I', 'channel_Q')
-        codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
-                     for ch in possible_channels if hasattr(self, ch)]
-        return codewords
 
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
@@ -248,6 +232,8 @@ class Base_MW_LutMan(Base_LutMan):
         self.spec_func = wf.block_pulse
 
         self._add_channel_params()
+        self._add_mixer_corr_pars()
+
         self.add_parameter('cfg_sideband_mode',
                            vals=vals.Enum('real-time', 'static'),
                            initial_value='static',
@@ -294,8 +280,6 @@ class Base_MW_LutMan(Base_LutMan):
                        ' that when using an AWG with build in modulation this'
                        ' should be set to 0.'),
             parameter_class=ManualParameter, initial_value=50.0e6)
-        self._add_mixer_corr_pars()
-
         self.add_parameter('mw_ef_modulation', vals=vals.Numbers(), unit='Hz',
                            docstring=('Modulation frequency for driving pulses to the '
                                       'second excited-state.'),
@@ -305,28 +289,6 @@ class Base_MW_LutMan(Base_LutMan):
                                'Pulse amplitude for pulsing the ef/12 transition'),
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter, initial_value=.2)
-
-    def _add_mixer_corr_pars(self):
-        self.add_parameter('mixer_alpha', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
-        self.add_parameter(
-            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
-                'If True applies a mixer correction using mixer_phi and '
-                'mixer_alpha to all microwave pulses using.'),
-            parameter_class=ManualParameter, initial_value=True)
-
-    def _add_channel_params(self):
-        self.add_parameter('channel_I',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-
-        self.add_parameter('channel_Q',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
 
     def generate_standard_waveforms(
             self, apply_predistortion_matrix: bool=True):
@@ -355,6 +317,7 @@ class Base_MW_LutMan(Base_LutMan):
                     sampling_rate=self.sampling_rate(),
                     motzoi=self.mw_motzoi(),
                     delay=self.pulse_delay())
+
             elif waveform['type'] == 'ef':
                 amp = theta_to_amp(theta=waveform['theta'],
                                    amp180=self.mw_ef_amp180())
@@ -366,6 +329,7 @@ class Base_MW_LutMan(Base_LutMan):
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
                     delay=self.pulse_delay())
+
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
                     **waveform["drag_pars"])
@@ -411,6 +375,28 @@ class Base_MW_LutMan(Base_LutMan):
                 self._wave_dict)
         return self._wave_dict
 
+    # FIXME: seems to be overridden in all derived classes: remove
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
+                                           regenerate_waveforms: bool=False):
+        if regenerate_waveforms:
+            self.generate_standard_waveforms()
+
+        # FIXME: type mismatch with function parameter, misleading name (also in Base_LutMan): called wave_id elsewhere
+        if isinstance(waveform_name, int):
+            cw_idx = waveform_name
+        else:
+            raise DeprecationWarning # FIXME: breaks contract of Base_LutMan
+
+        waveforms = self._wave_dict[cw_idx]
+        codewords = self.codeword_idx_to_parnames(cw_idx)
+
+        for waveform, cw in zip(waveforms, codewords):
+            self.AWG.get_instr().set(cw, waveform)
+
+    ##########################################################################
+    # Base_MW_LutMan functions (ma be overridden in subclass)
+    ##########################################################################
+
     def apply_mixer_predistortion_corrections(self, wave_dict):
         M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
                                           self.mixer_phi())
@@ -418,22 +404,41 @@ class Base_MW_LutMan(Base_LutMan):
             wave_dict[key] = np.dot(M, val)
         return wave_dict
 
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
-        if regenerate_waveforms:
-            self.generate_standard_waveforms()
+    def _add_mixer_corr_pars(self):
+        self.add_parameter('mixer_alpha', vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=1.0)
+        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
+                'If True applies a mixer correction using mixer_phi and '
+                'mixer_alpha to all microwave pulses using.'),
+            parameter_class=ManualParameter, initial_value=True)
 
-        # FIXME: type mismatch with function parameter, misleading name
-        if isinstance(waveform_name, int):
-            cw_idx = waveform_name
-        else:
-            raise DeprecationWarning
+    def _add_channel_params(self):
+        """
+        add parameters that define connectivity of logical channels to
+        hardware channel numbers of the instrument involved (i.e. self.AWG)
+        """
+        self.add_parameter('channel_I',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
 
-        waveforms = self._wave_dict[cw_idx]
-        codewords = self.codeword_idx_to_parnames(cw_idx)
+        self.add_parameter('channel_Q',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
 
-        for waveform, cw in zip(waveforms, codewords):
-            self.AWG.get_instr().set(cw, waveform)
+    ##########################################################################
+    # Functions
+    # FIXME: the load_* functions provide an undesired backdoor, also see issue #626
+    ##########################################################################
+
+    # FIXME: remove, let user use LutMap parameter
+    def set_inspire_lutmap(self):
+        """Set the default lutmap for expanded microwave drive pulses."""
+        self.LutMap(inspire_mw_lutmap.copy())
 
     def load_phase_pulses_to_AWG_lookuptable(self,
                                              phases=np.arange(0, 360, 20)):
@@ -449,6 +454,7 @@ class Base_MW_LutMan(Base_LutMan):
                        "phi": phase, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
+    # FIXME: function is almost identical to load_phase_pulses_to_AWG_lookuptable, except for phi vs. theta
     def load_x_pulses_to_AWG_lookuptable(self,
                                              phases=np.arange(0, 360, 20)):
         """
@@ -511,6 +517,7 @@ class Base_MW_LutMan(Base_LutMan):
             mod_freqs = [mod_freqs]*len(amps)
 
         # 2. Generate a LutMap for the ef-pulses
+        # FIXME: hardcoded indices must match OpenQL definitions
         lm = self.LutMap()
         for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
             lm[i+9] = {"name": "", "type": "raw-drag",
@@ -524,12 +531,31 @@ class Base_MW_LutMan(Base_LutMan):
         # 3. generate and upload waveforms
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
+    ##########################################################################
+    # Private functions
+    ##########################################################################
+
+    def _codeword_idx_to_parnames(self, cw_idx: int):
+        """Convert a codeword_idx to a list of par names for the waveform."""
+        # the possible channels way of doing this is to make it work both for
+        # VSM style lutmans and no VSM style lutmans.
+        possible_channels = ('channel_GI', 'channel_GQ',
+                             'channel_DI', 'channel_DQ',
+                             'channel_I', 'channel_Q')
+        codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
+                     for ch in possible_channels if hasattr(self, ch)]
+        return codewords
+
 
 class QWG_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
         self._num_channels = 4
         super().__init__(name, **kw)
+
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
 
     def _add_channel_params(self):
         super()._add_channel_params()
@@ -557,18 +583,6 @@ class QWG_MW_LutMan(Base_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0.5)
 
-    def _set_channel_amp(self, val):
-        AWG = self.AWG.get_instr()
-        AWG.set('ch{}_amp'.format(self.channel_I()), val)
-        AWG.set('ch{}_amp'.format(self.channel_Q()), val)
-
-    def _get_channel_amp(self):
-        AWG = self.AWG.get_instr()
-        val_I = AWG.get('ch{}_amp'.format(self.channel_I()))
-        val_Q = AWG.get('ch{}_amp'.format(self.channel_Q()))
-        assert val_Q == val_I
-        return val_I
-
     def load_waveform_onto_AWG_lookuptable(
             self, wave_id: str, regenerate_waveforms: bool=False):
         """
@@ -593,6 +607,10 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         self.AWG.get_instr().set(wf_name_I, wf_I)
         self.AWG.get_instr().set(wf_name_Q, wf_Q)
 
+    ##########################################################################
+    # Base_MW_LutMan overrides
+    ##########################################################################
+
     def apply_mixer_predistortion_corrections(self, wave_dict):
         M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
                                           self.mixer_phi())
@@ -606,6 +624,22 @@ class QWG_MW_LutMan(Base_MW_LutMan):
 
         return wave_dict
 
+    ##########################################################################
+    # Private functions
+    ##########################################################################
+
+    def _set_channel_amp(self, val):
+        AWG = self.AWG.get_instr()
+        AWG.set('ch{}_amp'.format(self.channel_I()), val)
+        AWG.set('ch{}_amp'.format(self.channel_Q()), val)
+
+    def _get_channel_amp(self):
+        AWG = self.AWG.get_instr()
+        val_I = AWG.get('ch{}_amp'.format(self.channel_I()))
+        val_Q = AWG.get('ch{}_amp'.format(self.channel_Q()))
+        assert val_Q == val_I
+        return val_I
+
 
 class AWG8_MW_LutMan(Base_MW_LutMan):
 
@@ -614,6 +648,10 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         super().__init__(name, **kw)
         self.sampling_rate(2.4e9)
         self._add_phase_correction_parameters()
+
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
 
     def _add_channel_params(self):
         super()._add_channel_params()
@@ -638,6 +676,241 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.5)
+
+    def load_waveform_onto_AWG_lookuptable(
+        self, wave_id: str, regenerate_waveforms: bool=False):
+        """
+        Load a waveform into the AWG.
+
+        Args:
+            wave_id: can be either the "name" of a waveform or
+                the integer key in self._wave_dict.
+            regenerate_waveforms (bool) : if True regenerates all waveforms
+        """
+        if regenerate_waveforms:
+            self.generate_standard_waveforms()
+
+        if wave_id not in self.LutMap().keys():
+            wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
+
+        wf_I, wf_Q = self._wave_dict[wave_id]
+
+        wf_name_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(), wave_id)
+        wf_name_Q = 'wave_ch{}_cw{:03}'.format(self.channel_Q(), wave_id)
+
+        self.AWG.get_instr().set(wf_name_I, wf_I)
+        self.AWG.get_instr().set(wf_name_Q, wf_Q)
+
+    def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool=True, stop_start: bool = True,
+            force_load_sequencer_program: bool=False):
+        """
+        Loads all waveforms specified in the LutMap to an AWG.
+
+        Args:
+            regenerate_waveforms (bool): if True calls
+                generate_standard_waveforms before uploading.
+            stop_start           (bool): if True stops and starts the AWG.
+            force_load_sequencer_program (bool): if True forces a new compilation
+                and upload of the program on the sequencer. FIXME: parameter pack incompatible with base class
+        """
+        # Uploading the codeword program (again) is needed to link the new
+        # waveforms in case the user has changed the codeword mode.
+        if force_load_sequencer_program:
+            # This ensures only the channels that are relevant get reconfigured
+            if 'channel_GI' in self.parameters:
+                awgs = [self.channel_GI()//2, self.channel_DI()//2]
+            else:
+                awgs = [self.channel_I()//2]
+                # Enforce assumption that channel I precedes channel Q
+                assert self.channel_I() < self.channel_Q()
+                assert (self.channel_I())//2 < (self.channel_Q())//2
+
+            self.AWG.get_instr().upload_codeword_program(awgs=awgs)
+
+        # This ensures that settings other than the sequencer program are updated
+        # for different sideband modulation modes
+        if self.cfg_sideband_mode() == 'static':
+            self.AWG.get_instr().cfg_sideband_mode('static')
+            # Turn off modulation modes
+            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 0)
+            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 0)
+
+        elif self.cfg_sideband_mode() == 'real-time':
+            if (self.channel_I()-1)//2 != (self.channel_Q()-1)//2:
+                raise KeyError('In real-time sideband mode, channel I/Q should share same awg nr.')
+            self.AWG.get_instr().cfg_sideband_mode('real-time')
+
+            # Set same oscillator for I/Q pair and same harmonic
+            self.AWG.get_instr().set('sines_{}_oscselect'.format(self.channel_I()-1), (self.channel_I()-1)//2)
+            self.AWG.get_instr().set('sines_{}_oscselect'.format(self.channel_Q()-1), (self.channel_I()-1)//2)
+            self.AWG.get_instr().set('sines_{}_harmonic'.format(self.channel_I()-1), 1)
+            self.AWG.get_instr().set('sines_{}_harmonic'.format(self.channel_Q()-1), 1)
+            # Create respective cossine/sin signals for modulation through phase-shift
+            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_I()-1), 90)
+            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_Q()-1), 0)
+            # Create correct modulation modeI
+            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 6)
+            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 6)
+        else:
+            raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
+
+        super().load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=regenerate_waveforms,
+            stop_start=stop_start)
+
+    ##########################################################################
+    # Base_MW_LutMan overrides
+    ##########################################################################
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+            M = wf.mixer_predistortion_matrix(self.mixer_alpha(), self.mixer_phi())
+            for key, val in wave_dict.items():
+                wave_dict[key] = np.dot(M, val)
+            return wave_dict
+
+    def generate_standard_waveforms(
+            self, apply_predistortion_matrix: bool=True):
+        # FIXME: looks very similar to overridden function in Base_MW_LutMan
+        self._wave_dict = OrderedDict()
+
+        if self.cfg_sideband_mode() == 'static':
+            f_modulation = self.mw_modulation()
+        elif self.cfg_sideband_mode() == 'real-time':
+            f_modulation = 0
+            if ((self.channel_I()-1)//2 != (self.channel_Q()-1)//2):
+                raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
+
+            self.AWG.get_instr().set('oscs_{}_freq'.format((self.channel_I()-1)//2),
+                                     self.mw_modulation())
+        else:
+            raise KeyError('Unexpected argument for cfg_sideband_mode')
+
+        # lutmap is expected to obey lutmap mw schema
+        for idx, waveform in self.LutMap().items():
+            if waveform['type'] == 'ge':
+                if waveform['theta'] == 90:
+                    amp = self.mw_amp180()*self.mw_amp90_scale()
+                elif waveform['theta'] == -90:
+                    amp = - self.mw_amp180() * self.mw_amp90_scale()
+                else:
+                    amp = theta_to_amp(theta=waveform['theta'],
+                                       amp180=self.mw_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=f_modulation,
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=self.mw_motzoi(),
+                    delay=self.pulse_delay())
+
+            elif waveform['type'] == 'ef':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_ef_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=self.mw_ef_modulation(),
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=0,
+                    delay=self.pulse_delay())
+
+            elif waveform['type'] == 'raw-drag':
+                self._wave_dict[idx] = self.wf_func(
+                    **waveform["drag_pars"])
+
+            elif waveform['type'] == 'spec':
+                self._wave_dict[idx] = self.spec_func(
+                    amp=self.spec_amp(),
+                    length=self.spec_length(),
+                    sampling_rate=self.sampling_rate(),
+                    delay=0,
+                    phase=0)
+
+            elif waveform['type'] == 'square':
+                # Using a slightly different construction as above
+                # as the call signatures of these functions is different.
+                # Apperently the VSM LutMan has both parameters, so make sure
+                # we detect on the one only available in the VSM. Otherwise, we
+                # won't get the needed four waveforms.
+                if 'sq_G_amp' in self.parameters:
+                    self._wave_dict[idx] = wf.mod_square_VSM(
+                        amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
+                        length=self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        sampling_rate=self.sampling_rate())
+                elif 'sq_amp' in self.parameters:
+                    self._wave_dict[idx] = wf.mod_square(
+                        amp=self.sq_amp(), length=self.mw_gauss_width()*4,
+                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
+                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
+                else:
+                    raise KeyError('Expected parameter "sq_amp" to exist')
+
+            elif waveform['type'] == 'phase':
+                # fill codewords that are used for phase correction instructions
+                # with a zero waveform
+                self._wave_dict[idx] = wf.block_pulse(
+                    amp=0,
+                    sampling_rate=self.sampling_rate(),
+                    length=self.mw_gauss_width()*4,
+                    )
+            else:
+                raise ValueError
+
+        # Add predistortions + test
+        if (self.mixer_apply_predistortion_matrix() and apply_predistortion_matrix and
+          self.cfg_sideband_mode() == 'static'):
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
+        return self._wave_dict
+
+    ##########################################################################
+    # Functions
+    # FIXME: these provide an undesired backdoor
+    ##########################################################################
+
+    def upload_single_qubit_phase_corrections(self):
+        commandtable_dict = {
+            "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
+            "header": {"version": "0.2"},
+            "table": []
+        }
+
+        # manual waveform index 1-to-1 mapping
+        for ind in np.arange(0, 60, 1):
+            commandtable_dict['table'] += [{"index": int(ind),
+                                            "waveform": {"index": int(ind)}
+                                            }]
+
+        # add phase corrections to the end of the codeword space
+        phase_corr_inds = np.arange(60, 64, 1)
+        for i, d in enumerate(['NW', 'NE', 'SW', 'SE']):
+            phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
+            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i]),
+                                            "phase0": {"value": float(phase), "increment": True},
+                                            "phase1": {"value": float(phase), "increment": True}
+                                            }]
+
+        # Note: Whenever using the command table, the phase offset between I and Q channels on
+        # the HDAWG for real-time modulation have to be set from an index on the table. Index
+        # 1023 will be used as it is un-used for codeword triggering
+        commandtable_dict['table'] += [{"index": 1023,
+                                        "phase0": {"value": 90.0, "increment": False},
+                                        "phase1": {"value": 0.0, "increment": False}
+                                        }]
+
+        # get internal awg sequencer number (indexed 0,1,2,3)
+        awg_nr = (self.channel_I() - 1) // 2
+        commandtable_returned, status = self.AWG.get_instr().upload_commandtable(commandtable_dict, awg_nr)
+
+        return commandtable_returned, status
+
+    ##########################################################################
+    # Private functions
+    ##########################################################################
 
     def _add_phase_correction_parameters(self):
         # corrections for phases that the qubit can acquire during one of its CZ gates
@@ -683,7 +956,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         #                     "Will be applied as increment to sine generator phases via command table."
         #     )
 
-
     def _set_channel_range(self, val):
         awg_nr = (self.channel_I()-1)//2
         assert awg_nr == (self.channel_Q()-1)//2
@@ -699,13 +971,13 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             AWG.set('sigouts_{}_range'.format(self.channel_I()-1), val)
             AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 0)
             AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), val)
-                
 
     def _get_channel_range(self):
         awg_nr = (self.channel_I()-1)//2
         assert awg_nr == (self.channel_Q()-1)//2
         assert self.channel_I() < self.channel_Q()
 
+        AWG = self.AWG.get_instr()  # FIXME: this line was missing, so the code below couldn't execute and is probably untested
         val = AWG.get('sigouts_{}_range'.format(self.channel_I()-1))
         assert val == AWG.get('sigouts_{}_range'.format(self.channel_Q()-1))
         return val
@@ -770,222 +1042,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
         return vals[0]
 
-    def load_waveform_onto_AWG_lookuptable(
-        self, wave_id: str, regenerate_waveforms: bool=False):
-        """
-        Load a waveform into the AWG.
-
-        Args:
-            wave_id: can be either the "name" of a waveform or
-                the integer key in self._wave_dict.
-            regenerate_waveforms (bool) : if True regenerates all waveforms
-        """
-        if regenerate_waveforms:
-            self.generate_standard_waveforms()
-
-        if wave_id not in self.LutMap().keys():
-            wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
-
-        wf_I, wf_Q = self._wave_dict[wave_id]
-
-        wf_name_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(), wave_id)
-        wf_name_Q = 'wave_ch{}_cw{:03}'.format(self.channel_Q(), wave_id)
-
-        self.AWG.get_instr().set(wf_name_I, wf_I)
-        self.AWG.get_instr().set(wf_name_Q, wf_Q)
-
-    def load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms: bool=True, stop_start: bool = True,
-            force_load_sequencer_program: bool=False):
-        """
-        Loads all waveforms specified in the LutMap to an AWG.
-
-        Args:
-            regenerate_waveforms (bool): if True calls
-                generate_standard_waveforms before uploading.
-            stop_start           (bool): if True stops and starts the AWG.
-            force_load_sequencer_program (bool): if True forces a new compilation
-                and upload of the program on the sequencer.
-        """
-        # Uploading the codeword program (again) is needed to link the new
-        # waveforms in case the user has changed the codeword mode.
-        if force_load_sequencer_program:
-            # This ensures only the channels that are relevant get reconfigured
-            if 'channel_GI' in self.parameters:
-                awgs = [self.channel_GI()//2, self.channel_DI()//2]
-            else:
-                awgs = [self.channel_I()//2]
-                # Enforce assumption that channel I precedes channel Q
-                assert self.channel_I() < self.channel_Q()
-                assert (self.channel_I())//2 < (self.channel_Q())//2
-
-            self.AWG.get_instr().upload_codeword_program(awgs=awgs)
-
-        # This ensures that settings other than the sequencer program are updated
-        # for different sideband modulation modes
-        if self.cfg_sideband_mode() == 'static':
-            self.AWG.get_instr().cfg_sideband_mode('static')
-            # Turn off modulation modes
-            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 0)
-            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 0)
-
-        elif self.cfg_sideband_mode() == 'real-time':
-            if (self.channel_I()-1)//2 != (self.channel_Q()-1)//2:
-                raise KeyError('In real-time sideband mode, channel I/Q should share same awg nr.')
-            self.AWG.get_instr().cfg_sideband_mode('real-time')
-
-            # Set same oscillator for I/Q pair and same harmonic
-            self.AWG.get_instr().set('sines_{}_oscselect'.format(self.channel_I()-1), (self.channel_I()-1)//2)
-            self.AWG.get_instr().set('sines_{}_oscselect'.format(self.channel_Q()-1), (self.channel_I()-1)//2)
-            self.AWG.get_instr().set('sines_{}_harmonic'.format(self.channel_I()-1), 1)
-            self.AWG.get_instr().set('sines_{}_harmonic'.format(self.channel_Q()-1), 1)
-            # Create respective cossine/sin signals for modulation through phase-shift
-            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_I()-1), 90)
-            self.AWG.get_instr().set('sines_{}_phaseshift'.format(self.channel_Q()-1), 0)
-            # Create correct modulation modeI
-            self.AWG.get_instr().set('awgs_{}_outputs_0_modulation_mode'.format((self.channel_I()-1)//2), 6)
-            self.AWG.get_instr().set('awgs_{}_outputs_1_modulation_mode'.format((self.channel_Q()-1)//2), 6)
-        else:
-            raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
-
-        super().load_waveforms_onto_AWG_lookuptable(
-            regenerate_waveforms=regenerate_waveforms,
-            stop_start=stop_start)
-
-    def generate_standard_waveforms(
-            self, apply_predistortion_matrix: bool=True):
-        self._wave_dict = OrderedDict()
-
-        if self.cfg_sideband_mode() == 'static':
-            f_modulation = self.mw_modulation()
-        elif self.cfg_sideband_mode() == 'real-time':
-            f_modulation = 0
-            if ((self.channel_I()-1)//2 != (self.channel_Q()-1)//2):
-                raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
-
-            self.AWG.get_instr().set('oscs_{}_freq'.format((self.channel_I()-1)//2),
-                                     self.mw_modulation())
-        else:
-            raise KeyError('Unexpected argument for cfg_sideband_mode')
-
-        # lutmap is expected to obey lutmap mw schema
-        for idx, waveform in self.LutMap().items():
-            if waveform['type'] == 'ge':
-                if waveform['theta'] == 90:
-                    amp = self.mw_amp180()*self.mw_amp90_scale()
-                elif waveform['theta'] == -90:
-                    amp = - self.mw_amp180() * self.mw_amp90_scale()
-                else:
-                    amp = theta_to_amp(theta=waveform['theta'],
-                                       amp180=self.mw_amp180())
-                self._wave_dict[idx] = self.wf_func(
-                    amp=amp,
-                    phase=waveform['phi'],
-                    sigma_length=self.mw_gauss_width(),
-                    f_modulation=f_modulation,
-                    sampling_rate=self.sampling_rate(),
-                    motzoi=self.mw_motzoi(),
-                    delay=self.pulse_delay())
-            elif waveform['type'] == 'ef':
-                amp = theta_to_amp(theta=waveform['theta'],
-                                   amp180=self.mw_ef_amp180())
-                self._wave_dict[idx] = self.wf_func(
-                    amp=amp,
-                    phase=waveform['phi'],
-                    sigma_length=self.mw_gauss_width(),
-                    f_modulation=self.mw_ef_modulation(),
-                    sampling_rate=self.sampling_rate(),
-                    motzoi=0,
-                    delay=self.pulse_delay())
-            elif waveform['type'] == 'raw-drag':
-                self._wave_dict[idx] = self.wf_func(
-                    **waveform["drag_pars"])
-            elif waveform['type'] == 'spec':
-                self._wave_dict[idx] = self.spec_func(
-                    amp=self.spec_amp(),
-                    length=self.spec_length(),
-                    sampling_rate=self.sampling_rate(),
-                    delay=0,
-                    phase=0)
-            elif waveform['type'] == 'square':
-                # Using a slightly different construction as above
-                # as the call signatures of these functions is different.
-                # Apperently the VSM LutMan has both parameters, so make sure
-                # we detect on the one only available in the VSM. Otherwise, we
-                # won't get the needed four waveforms.
-                if 'sq_G_amp' in self.parameters:
-                    self._wave_dict[idx] = wf.mod_square_VSM(
-                        amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
-                        length=self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
-                        sampling_rate=self.sampling_rate())
-                elif 'sq_amp' in self.parameters:
-                    self._wave_dict[idx] = wf.mod_square(
-                        amp=self.sq_amp(), length=self.mw_gauss_width()*4,
-                        f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
-                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
-                else:
-                    raise KeyError('Expected parameter "sq_amp" to exist')
-            elif waveform['type'] == 'phase':
-                # fill codewords that are used for phase correction instructions
-                # with a zero waveform
-                self._wave_dict[idx] = wf.block_pulse(
-                    amp=0, 
-                    sampling_rate=self.sampling_rate(),
-                    length=self.mw_gauss_width()*4,
-                    )
-            else:
-                raise ValueError
-
-        # Add predistortions + test
-        if (self.mixer_apply_predistortion_matrix() and apply_predistortion_matrix and
-          self.cfg_sideband_mode() == 'static'):
-            self._wave_dict = self.apply_mixer_predistortion_corrections(
-                self._wave_dict)
-        return self._wave_dict
-
-    def apply_mixer_predistortion_corrections(self, wave_dict):
-            M = wf.mixer_predistortion_matrix(self.mixer_alpha(), self.mixer_phi())
-            for key, val in wave_dict.items():
-                wave_dict[key] = np.dot(M, val)
-            return wave_dict
-
-    def upload_single_qubit_phase_corrections(self):
-        commandtable_dict = {
-            "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
-            "header": { "version": "0.2" },
-            "table": []
-            }
-
-        # manual waveform index 1-to-1 mapping
-        for ind in np.arange(0,60,1):
-            commandtable_dict['table'] += [{"index": int(ind), 
-                                            "waveform": {"index": int(ind)} 
-                                            }]
-
-        # add phase corrections to the end of the codeword space
-        phase_corr_inds = np.arange(60,64,1)
-        for i,d in enumerate(['NW','NE','SW','SE']):
-            phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
-            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i]), 
-                                            "phase0": {"value": float(phase), "increment": True}, 
-                                            "phase1": {"value": float(phase), "increment": True}
-                                            }]
-
-        # Note: Whenever using the command table, the phase offset between I and Q channels on 
-        # the HDAWG for real-time modulation have to be set from an index on the table. Index
-        # 1023 will be used as it is un-used for codeword triggering 
-        commandtable_dict['table'] += [{"index": 1023, 
-                                        "phase0": {"value": 90.0, "increment": False}, 
-                                        "phase1": {"value":  0.0, "increment": False}
-                                        }]
-
-        # get internal awg sequencer number (indexed 0,1,2,3)
-        awg_nr = (self.channel_I()-1) // 2
-        commandtable_returned, status = self.AWG.get_instr().upload_commandtable(commandtable_dict, awg_nr)
-        
-        return commandtable_returned, status
-
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
     def __init__(self, name, **kw):
@@ -993,6 +1049,10 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         super().__init__(name, **kw)
         self.wf_func = wf.mod_gauss_VSM
         self.spec_func = wf.block_pulse_vsm
+
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
 
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
@@ -1046,6 +1106,10 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         self.AWG.get_instr().set(wf_name_GQ, GQ)
         self.AWG.get_instr().set(wf_name_DI, DI)
         self.AWG.get_instr().set(wf_name_DQ, DQ)
+
+    ##########################################################################
+    # AWG8_MW_LutMan overrides
+    ##########################################################################
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -1154,17 +1218,9 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         self._vqe_lm = ['I', 'X180c',  'Y180c',
                         'X90c',  'Xm90c', 'Y90c',  'Y90c', 'rY180']
 
-    def set_VQE_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        vqe_lm = self._vqe_lm
-        LutMap = {}
-        for cw_idx, cw_key in enumerate(vqe_lm):
-            LutMap[cw_key] = (
-                'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
-        self.LutMap(LutMap)
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
 
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
@@ -1197,6 +1253,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         ########################################
         # STD waveforms
         ########################################
+        # FIXME: this creates _wave_dict, independent of LutMap
         self._wave_dict['I'] = self.wf_func(
             amp=0, sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
@@ -1236,7 +1293,6 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
-
         self._wave_dict['rPhi180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
@@ -1342,9 +1398,30 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                                                         redundant_cw_idx)
             self.AWG.get_instr().set(redundant_cw_Q, waveforms[1])
 
+    ##########################################################################
+    # Functions
+    # FIXME: these provide an undesired backdoor
+    ##########################################################################
+
+    def set_VQE_lutmap(self):
+        """
+        Set's the default lutmap for standard microwave drive pulses.
+        """
+        vqe_lm = self._vqe_lm
+        LutMap = {}
+        for cw_idx, cw_key in enumerate(vqe_lm):
+            LutMap[cw_key] = (
+                'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
+        self.LutMap(LutMap)
+
 
 # Not the cleanest inheritance but whatever - MAR Nov 2017
 class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
+
+    ##########################################################################
+    # Base_LutMan overrides
+    ##########################################################################
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True,  stop_start: bool = True):

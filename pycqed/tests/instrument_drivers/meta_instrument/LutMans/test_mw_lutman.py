@@ -130,11 +130,11 @@ class Test_MW_LutMan(unittest.TestCase):
 
     def test_codeword_idx_to_parnames(self):
 
-        parnames = self.AWG8_MW_LutMan.codeword_idx_to_parnames(3)
+        parnames = self.AWG8_MW_LutMan._codeword_idx_to_parnames(3)
         expected_parnames = ['wave_ch1_cw003', 'wave_ch2_cw003']
         self.assertEqual(parnames, expected_parnames)
 
-        parnames = self.AWG8_VSM_MW_LutMan.codeword_idx_to_parnames(3)
+        parnames = self.AWG8_VSM_MW_LutMan._codeword_idx_to_parnames(3)
         expected_parnames = ['wave_ch1_cw003', 'wave_ch2_cw003',
                              'wave_ch3_cw003', 'wave_ch4_cw003']
         self.assertEqual(parnames, expected_parnames)
