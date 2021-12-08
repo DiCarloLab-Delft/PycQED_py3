@@ -330,7 +330,6 @@ class Test_CCL(unittest.TestCase):
     ###################################################
     #          Test basic experiments                 #
     ###################################################
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)') # error: "AttributeError: 'str' object has no attribute 'decode'"
     def test_cal_mixer_offsets_drive(self):
         self.CCL_qubit.calibrate_mixer_offsets_drive()
 
@@ -396,7 +395,6 @@ class Test_CCL(unittest.TestCase):
         except TypeError:
             pass
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)') # error: "AttributeError: 'str' object has no attribute 'decode'"
     def test_AllXY(self):
         self.CCL_qubit.measure_allxy()
 
