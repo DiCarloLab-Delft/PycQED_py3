@@ -1,4 +1,6 @@
-# FIXME: this file contains 9 errors according to PyCharm
+"""
+fka: CCL_Transmon.py
+"""
 
 import time
 import logging
