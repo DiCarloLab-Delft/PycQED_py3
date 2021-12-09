@@ -1,7 +1,6 @@
 import unittest
 import os
 
-import pycqed as pq
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
 
@@ -20,7 +19,6 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         k = p.create_kernel('my_kernel')
         self.assertEqual(k.name, 'my_kernel')
 
-    #@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')
     def test_compile(self):
         """
         Only tests the compile helper by compiling an empty file.
@@ -31,9 +29,6 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         k = p.create_kernel('test_kernel')
         p.add_kernel(k)
         p.compile()
-
-        # fn_split = os.path.split(p.filename)
-        # self.assertEqual(fn_split[1], 'test_program.qisa')
 
 
 class Test_openql_calibration_point_helpers(unittest.TestCase):
