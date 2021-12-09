@@ -74,9 +74,9 @@ def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
 
 class HAL_Device(Instrument):
     """
-    Device object for systems controlled using the
-    CCLight (CCL), QuMa based CC (QCC) or Distributed CC (CC).
-    FIXME: class name is outdated
+    Device object for systems controlled using the Distributed CC (CC).
+
+    Former support for CCLight (CCL) and QuMa based CC (QCC) is deprecated.
     """
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
@@ -98,6 +98,7 @@ class HAL_Device(Instrument):
         These are set globally. If individual (per channel) setting of latency
         is required in the future, we can add this.
         """
+
         # 2. Setting the latencies
         cc = self.instr_CC.get_instr()
         if cc.IDN()['model']=='CCL':
@@ -134,9 +135,9 @@ class HAL_Device(Instrument):
             )
 
         # NB: Mind that here number precision matters a lot!
-        # Tripple check everything if any changes are to be made
+        # Triple check everything if any changes are to be made
 
-        # Substract lowest value to ensure minimal latency is used.
+        # Subtract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
         # calibrating)
         lowest_value = min(latencies.values())
@@ -6086,98 +6087,28 @@ class HAL_Device(Instrument):
     # private functions
     ##########################################################################
 
-    def _add_parameters(self):
-        self.add_parameter(
-            'qubits',
-            parameter_class=ManualParameter,
-            initial_value=[],
-            vals=vals.Lists(elt_validator=vals.Strings())
-        )
-
-        self.add_parameter(
-            'qubit_edges',
-            parameter_class=ManualParameter,
-            docstring="Denotes edges that connect qubits. "
-                        "Used to define the device topology.",
-            initial_value=[[]],
-            vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
-        )
-
-        self.add_parameter(
-            'qubits_by_feedline',
-            parameter_class=ManualParameter,
-            docstring="Qubits divided by feedline."
-                        "Used to sort qubits for timedomain preparation.",
-            initial_value=[[]],
-            vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
-        )
-
-        self.add_parameter(
-            'ro_lo_freq',
-            unit='Hz',
-            docstring='Frequency of the common LO for all RO pulses.',
-            parameter_class=ManualParameter
-        )
-
-        # actually, it should be possible to build the integration
-        # weights obeying different settings for different
-        # qubits, but for now we use a fixed common value.
-        self.add_parameter(
-            "ro_acq_integration_length",
-            initial_value=500e-9,
-            vals=vals.Numbers(min_value=0, max_value=20e6),
-            parameter_class=ManualParameter,
-        )
-
-        self.add_parameter(
-            "ro_pow_LO",
-            label="RO power LO",
-            unit="dBm",
-            initial_value=20,
-            parameter_class=ManualParameter,
-        )
-        self.add_parameter(
-            "ro_acq_averages",
-            initial_value=1024,
-            vals=vals.Numbers(min_value=0, max_value=1e6),
-            parameter_class=ManualParameter,
-        )
-
-        self.add_parameter(
-            "ro_acq_delay",
-            unit="s",
-            label="Readout acquisition delay",
-            vals=vals.Numbers(min_value=0),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=(
-                "The time between the instruction that trigger the"
-                " readout pulse and the instruction that triggers the "
-                "acquisition. The positive number means that the "
-                "acquisition is started after the pulse is send."
-            ),
-        )
-
+    def _add_instr_parameters(self):
         self.add_parameter(
             "instr_MC",
             label="MeasurementControl",
-            parameter_class=InstrumentRefParameter,)
-        self.add_parameter('instr_nested_MC',
-                           label='Nested MeasurementControl',
-                           parameter_class=InstrumentRefParameter)
+            parameter_class=InstrumentRefParameter, )
+
+        self.add_parameter(
+            'instr_nested_MC',
+            label='Nested MeasurementControl',
+            parameter_class=InstrumentRefParameter)
 
         self.add_parameter(
             "instr_VSM",
             label="Vector Switch Matrix",
             parameter_class=InstrumentRefParameter,
         )
+
         self.add_parameter(
             "instr_CC",
             label="Central Controller",
             docstring=(
-                "Device responsible for controlling the experiment"
-                " using eQASM generated using OpenQL, in the near"
-                " future will be the CC_Light."
+                "Device responsible for controlling the experiment."
             ),
             parameter_class=InstrumentRefParameter,
         )
@@ -6186,6 +6117,7 @@ class HAL_Device(Instrument):
             self.add_parameter(
                 "instr_acq_{}".format(i), parameter_class=InstrumentRefParameter
             )
+
         # Two microwave AWGs are used for S17
         self.add_parameter("instr_AWG_mw_0", parameter_class=InstrumentRefParameter)
         self.add_parameter("instr_AWG_mw_1", parameter_class=InstrumentRefParameter)
@@ -6197,43 +6129,7 @@ class HAL_Device(Instrument):
         self.add_parameter("instr_AWG_flux_1", parameter_class=InstrumentRefParameter)
         self.add_parameter("instr_AWG_flux_2", parameter_class=InstrumentRefParameter)
 
-        ro_acq_docstr = (
-            "Determines what type of integration weights to use: "
-            "\n\t SSB: Single sideband demodulation\n\t"
-            'optimal: waveforms specified in "RO_acq_weight_func_I" '
-            '\n\tand "RO_acq_weight_func_Q"'
-        )
-
-        self.add_parameter(
-            "ro_acq_weight_type",
-            initial_value="SSB",
-            vals=vals.Enum("SSB", "optimal","optimal IQ"),
-            docstring=ro_acq_docstr,
-            parameter_class=ManualParameter,
-        )
-
-        self.add_parameter(
-            "ro_acq_digitized",
-            vals=vals.Bool(),
-            initial_value=False,
-            parameter_class=ManualParameter,
-        )
-
-        self.add_parameter(
-            "cfg_openql_platform_fn",
-            label="OpenQL platform configuration filename",
-            parameter_class=ManualParameter,
-            vals=vals.Strings(),
-        )
-
-        self.add_parameter(
-            "ro_always_all",
-            docstring="If true, configures the UHFQC to RO all qubits "
-            "independent of codeword received.",
-            parameter_class=ManualParameter,
-            vals=vals.Bool(),
-        )
-
+    def _add_tim_parameters(self):
         # Timing related parameters
         self.add_parameter(
             "tim_ro_latency_0",
@@ -6322,6 +6218,120 @@ class HAL_Device(Instrument):
             parameter_class=ManualParameter,
             initial_value=0,
             vals=vals.Numbers(),
+        )
+
+    def _add_ro_parameters(self):
+        self.add_parameter(
+            'ro_lo_freq',
+            unit='Hz',
+            docstring='Frequency of the common LO for all RO pulses.',
+            parameter_class=ManualParameter
+        )
+
+        # actually, it should be possible to build the integration
+        # weights obeying different settings for different
+        # qubits, but for now we use a fixed common value.
+        self.add_parameter(
+            "ro_acq_integration_length",
+            initial_value=500e-9,
+            vals=vals.Numbers(min_value=0, max_value=20e6),
+            parameter_class=ManualParameter,
+        )
+
+        self.add_parameter(
+            "ro_pow_LO",
+            label="RO power LO",
+            unit="dBm",
+            initial_value=20,
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "ro_acq_averages",
+            initial_value=1024,
+            vals=vals.Numbers(min_value=0, max_value=1e6),
+            parameter_class=ManualParameter,
+        )
+
+        self.add_parameter(
+            "ro_acq_delay",
+            unit="s",
+            label="Readout acquisition delay",
+            vals=vals.Numbers(min_value=0),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=(
+                "The time between the instruction that trigger the"
+                " readout pulse and the instruction that triggers the "
+                "acquisition. The positive number means that the "
+                "acquisition is started after the pulse is send."
+            ),
+        )
+
+        ro_acq_docstr = (
+            "Determines what type of integration weights to use: "
+            "\n\t SSB: Single sideband demodulation\n\t"
+            'optimal: waveforms specified in "RO_acq_weight_func_I" '
+            '\n\tand "RO_acq_weight_func_Q"'
+        )
+
+        self.add_parameter(
+            "ro_acq_weight_type",
+            initial_value="SSB",
+            vals=vals.Enum("SSB", "optimal","optimal IQ"),
+            docstring=ro_acq_docstr,
+            parameter_class=ManualParameter,
+        )
+
+        self.add_parameter(
+            "ro_acq_digitized",
+            vals=vals.Bool(),
+            initial_value=False,
+            parameter_class=ManualParameter,
+        )
+
+        self.add_parameter(
+            "ro_always_all",
+            docstring="If true, configures the UHFQC to RO all qubits "
+                      "independent of codeword received.",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+        )
+
+    def _add_parameters(self):
+        self._add_instr_parameters()
+        self._add_tim_parameters()
+        self._add_ro_parameters()
+
+        self.add_parameter(
+            "cfg_openql_platform_fn",
+            label="OpenQL platform configuration filename",
+            parameter_class=ManualParameter,
+            vals=vals.Strings(),
+        )
+
+        self.add_parameter(
+            'qubits',
+            parameter_class=ManualParameter,
+            initial_value=[],
+            vals=vals.Lists(elt_validator=vals.Strings())
+        )
+
+        self.add_parameter(
+            'qubit_edges',
+            parameter_class=ManualParameter,
+            docstring="Denotes edges that connect qubits. "
+                        "Used to define the device topology.",
+            initial_value=[[]],
+            vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
+        )
+
+        self.add_parameter(
+            'qubits_by_feedline',
+            parameter_class=ManualParameter,
+            docstring="Qubits divided by feedline."
+                        "Used to sort qubits for timedomain preparation.",
+            initial_value=[[]],
+            vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
         )
 
         self.add_parameter(

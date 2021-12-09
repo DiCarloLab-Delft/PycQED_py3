@@ -7,7 +7,7 @@ import os
 import pycqed as pq
 
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
-import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon import CCLight_Transmon
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 
@@ -20,13 +20,13 @@ from pycqed.measurement.detector_functions import (
     UHFQC_integration_logging_det,
 )
 
-import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
-import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
+from pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound import virtual_SignalHound_USB_SA124B
+from pycqed.instrument_drivers.virtual_instruments.virtual_MW_source import VirtualMWsource
 
 from pycqed.instrument_drivers.library.Transport import DummyTransport
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 import ZI_HDAWG8
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 
 from qcodes import station
@@ -40,19 +40,19 @@ class Test_Device_obj(unittest.TestCase):
         """
         cls.station = station.Station()
 
-        cls.MW1 = vmw.VirtualMWsource("MW1")
-        cls.MW2 = vmw.VirtualMWsource("MW2")
-        cls.MW3 = vmw.VirtualMWsource("MW3")
-        cls.SH = sh.virtual_SignalHound_USB_SA124B("SH")
-        cls.UHFQC_0 = UHF.UHFQC(
+        cls.MW1 = VirtualMWsource("MW1")
+        cls.MW2 = VirtualMWsource("MW2")
+        cls.MW3 = VirtualMWsource("MW3")
+        cls.SH = virtual_SignalHound_USB_SA124B("SH")
+        cls.UHFQC_0 = UHFQC(
             name="UHFQC_0", server="emulator", device="dev2109", interface="1GbE"
         )
 
-        cls.UHFQC_1 = UHF.UHFQC(
+        cls.UHFQC_1 = UHFQC(
             name="UHFQC_1", server="emulator", device="dev2110", interface="1GbE"
         )
 
-        cls.UHFQC_2 = UHF.UHFQC(
+        cls.UHFQC_2 = UHFQC(
             name="UHFQC_2", server="emulator", device="dev2111", interface="1GbE"
         )
 
@@ -69,7 +69,7 @@ class Test_Device_obj(unittest.TestCase):
         cls.MC.datadir(test_datadir)
         a_tools.datadir = cls.MC.datadir()
 
-        cls.AWG_mw_0 = HDAWG.ZI_HDAWG8(
+        cls.AWG_mw_0 = ZI_HDAWG8(
             name="AWG_mw_0",
             server="emulator",
             num_codewords=32,
@@ -77,14 +77,14 @@ class Test_Device_obj(unittest.TestCase):
             interface="1GbE",
         )
 
-        cls.AWG_mw_1 = HDAWG.ZI_HDAWG8(
+        cls.AWG_mw_1 = ZI_HDAWG8(
             name="AWG_mw_1",
             server="emulator",
             num_codewords=32,
             device="dev8027",
             interface="1GbE",
         )
-        cls.AWG_flux_0 = HDAWG.ZI_HDAWG8(
+        cls.AWG_flux_0 = ZI_HDAWG8(
             name="AWG_flux_0",
             server="emulator",
             num_codewords=32,
@@ -125,7 +125,7 @@ class Test_Device_obj(unittest.TestCase):
         # Assign instruments
         qubits = []
         for q_idx in range(17):
-            q = ct.CCLight_Transmon("q{}".format(q_idx))
+            q = CCLight_Transmon("q{}".format(q_idx))
             qubits.append(q)
 
             q.instr_LutMan_MW(cls.mw_lutman.name)

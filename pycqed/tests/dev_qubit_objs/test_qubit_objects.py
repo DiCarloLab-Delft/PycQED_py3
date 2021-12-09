@@ -1,49 +1,47 @@
 import unittest
-import numpy as np
 import os
-import pycqed as pq
 import time
 import warnings
+import numpy as np
+import pycqed as pq
 
-import pycqed.analysis.analysis_toolbox as a_tools
-from pycqed.measurement import measurement_control
-
-import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
-import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
-
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.HAL_Transmon import HAL_Transmon
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
-import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
+
+from pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound import virtual_SignalHound_USB_SA124B
+from pycqed.instrument_drivers.virtual_instruments.virtual_MW_source import VirtualMWsource
 
 from pycqed.instrument_drivers.library.Transport import DummyTransport
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
-import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 import ZI_HDAWG8
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
+
+import pycqed.analysis.analysis_toolbox as a_tools
+from pycqed.measurement.measurement_control import MeasurementControl
 
 from qcodes import station
 
 
-class Test_CCL(unittest.TestCase):
+class Test_HAL_Transmon(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.station = station.Station()
-        cls.CCL_qubit = ct.CCLight_Transmon('CCL_qubit')
-
-        cls.MW1 = vmw.VirtualMWsource('MW1')
-        cls.MW2 = vmw.VirtualMWsource('MW2')
-        cls.MW3 = vmw.VirtualMWsource('MW3')
-        cls.SH = sh.virtual_SignalHound_USB_SA124B('SH')
-        cls.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
-                              device='dev2109', interface='1GbE')
+        cls.CCL_qubit = HAL_Transmon('HAL_qubit')
 
         cls.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
-        # self.VSM = Dummy_Duplexer('VSM')
         cls.VSM = Dummy_QuTechVSMModule('VSM')
+        cls.UHFQC = UHFQC(name='UHFQC', server='emulator', device='dev2109', interface='1GbE')
+        cls.AWG = ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=128, device='dev8026', interface='1GbE')
 
-        cls.MC = measurement_control.MeasurementControl(
-            'MC', live_plot_enabled=False, verbose=False)
+        cls.MW1 = VirtualMWsource('MW1')
+        cls.MW2 = VirtualMWsource('MW2')
+        cls.MW3 = VirtualMWsource('MW3')
+        cls.SH = virtual_SignalHound_USB_SA124B('SH')
+
+        cls.MC = MeasurementControl('MC', live_plot_enabled=False, verbose=False)
         cls.MC.station = cls.station
         cls.station.add_component(cls.MC)
 
@@ -52,7 +50,7 @@ class Test_CCL(unittest.TestCase):
         cls.MC.datadir(test_datadir)
         a_tools.datadir = cls.MC.datadir()
 
-        cls.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=128, device='dev8026', interface='1GbE')
+
         if 0: # FIXME: broken by _prep_mw_pulses
             cls.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
             cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
@@ -74,8 +72,7 @@ class Test_CCL(unittest.TestCase):
             cls.CCL_qubit.cfg_prepare_mw_awg(False) # FIXME: load_waveform_onto_AWG_lookuptable fails
 
 
-        cls.ro_lutman = UHFQC_RO_LutMan(
-            'RO_lutman', num_res=5, feedline_number=0)
+        cls.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5, feedline_number=0)
         cls.ro_lutman.AWG(cls.UHFQC.name)
 
         # Assign instruments
@@ -92,8 +89,7 @@ class Test_CCL(unittest.TestCase):
 
         cls.CCL_qubit.instr_SH(cls.SH.name)
 
-        config_fn = os.path.join(
-            pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
+        config_fn = os.path.join(pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
         cls.CCL_qubit.cfg_openql_platform_fn(config_fn)
 
         # Setting some "random" initial parameters
@@ -117,6 +113,7 @@ class Test_CCL(unittest.TestCase):
     ##############################################
     # calculate methods
     ##############################################
+
     def test_calc_freq(self):
         self.CCL_qubit.cfg_qubit_freq_calc_method('latest')
         self.CCL_qubit.calculate_frequency()
@@ -159,6 +156,7 @@ class Test_CCL(unittest.TestCase):
     ##############################################
     # Testing prepare for readout
     ##############################################
+
     def test_prep_readout(self):
         self.CCL_qubit.prepare_readout()
 
@@ -267,6 +265,7 @@ class Test_CCL(unittest.TestCase):
     ########################################################
     #          Test prepare for timedomain                 #
     ########################################################
+
     def test_prep_for_timedomain(self):
         self.CCL_qubit.prepare_for_timedomain()
 
@@ -348,6 +347,7 @@ class Test_CCL(unittest.TestCase):
     ###################################################
     #          Test basic experiments                 #
     ###################################################
+
     def test_cal_mixer_offsets_drive(self):
         self.CCL_qubit.calibrate_mixer_offsets_drive()
 
