@@ -72,7 +72,7 @@ def _acq_ch_map_to_IQ_ch_map(acq_ch_map):
     return acq_ch_map_IQ
 
 
-class DeviceCCL(Instrument):
+class HAL_Device(Instrument):
     """
     Device object for systems controlled using the
     CCLight (CCL), QuMa based CC (QCC) or Distributed CC (CC).

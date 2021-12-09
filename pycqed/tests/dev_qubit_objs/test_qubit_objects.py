@@ -27,7 +27,7 @@ from qcodes import station
 
 Dummy_VSM_not_fixed = False
 
-@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # too many problems
+#@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # too many problems
 class Test_CCL(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

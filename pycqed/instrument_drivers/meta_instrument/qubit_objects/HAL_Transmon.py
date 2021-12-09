@@ -51,7 +51,7 @@ from qcodes.instrument.parameter import (
 log = logging.getLogger(__name__)
 
 
-class CCLight_Transmon(Qubit):
+class HAL_Transmon(Qubit):
 
     """
     The CCLight_Transmon
