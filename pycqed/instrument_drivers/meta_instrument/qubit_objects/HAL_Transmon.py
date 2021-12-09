@@ -1039,21 +1039,18 @@ class HAL_Transmon(Qubit):
     #     LO.on()
     #     LO.power(self.ro_pow_LO())
 
-
     def _prep_ro_sources(self):
-        if self.instr_LutMan_RO.get_instr().LO_freq is not None:
-          log.info('Warning: This qubit is using a fixed RO LO frequency.')
-          LO = self.instr_LO_ro.get_instr()
-          Lo_Lutman = self.instr_LutMan_RO.get_instr()
-          LO_freq = Lo_Lutman.LO_freq()
-          LO.frequency.set(LO_freq)
-          mod_freq = self.ro_freq() - LO_freq
-          self.ro_freq_mod(mod_freq)
-          log.info("Setting modulation freq of {} to {}".format(self.name, mod_freq))
-
+        LO = self.instr_LO_ro.get_instr()
+        Lo_Lutman = self.instr_LutMan_RO.get_instr()
+        if Lo_Lutman.LO_freq() is not None:
+            log.info('Warning: This qubit is using a fixed RO LO frequency.')
+            LO_freq = Lo_Lutman.LO_freq()
+            LO.frequency.set(LO_freq)
+            mod_freq = self.ro_freq() - LO_freq
+            self.ro_freq_mod(mod_freq)
+            log.info("Setting modulation freq of {} to {}".format(self.name, mod_freq))
         else:
-          LO = self.instr_LO_ro.get_instr()
-          LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
+            LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
 
         LO.on()
         LO.power(self.ro_pow_LO())
@@ -1256,7 +1253,7 @@ class HAL_Transmon(Qubit):
         if self.instr_spec_source() is not None:
             self.instr_spec_source.get_instr().off()
         self.instr_LO_mw.get_instr().on()
-        self.instr_LO_mw.get_instr().pulsemod_state(False)
+        self.instr_LO_mw.get_instr().pulsemod_state('Off')
 
         if MW_LutMan.cfg_sideband_mode() == 'static':
             # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
@@ -1285,7 +1282,7 @@ class HAL_Transmon(Qubit):
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
         MW_LutMan.channel_amp(self.mw_channel_amp())
-        MW_LutMan.channel_range(self.mw_channel_range())
+        MW_LutMan.channel_range(self.mw_channel_range())  # FIXME: assumes AWG8_MW_LutMan
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
         MW_LutMan.spec_amp(self.spec_amp())
