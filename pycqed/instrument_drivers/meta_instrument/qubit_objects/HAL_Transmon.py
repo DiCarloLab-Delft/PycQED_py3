@@ -3802,7 +3802,7 @@ class HAL_Transmon(Qubit):
         the CCL transmon.
 
         """
-        if times and nr_cz_instead_of_idle_time:
+        if times is not None and nr_cz_instead_of_idle_time is not None:
             raise ValueError("Either idle time or CZ mode must be chosen!")
 
         if nr_cz_instead_of_idle_time is not None and not qb_cz_instead_of_idle_time:

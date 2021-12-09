@@ -394,7 +394,7 @@ class Base_MW_LutMan(Base_LutMan):
             self.AWG.get_instr().set(cw, waveform)
 
     ##########################################################################
-    # Base_MW_LutMan functions (ma be overridden in subclass)
+    # Base_MW_LutMan functions (may be overridden in subclass)
     ##########################################################################
 
     def apply_mixer_predistortion_corrections(self, wave_dict):

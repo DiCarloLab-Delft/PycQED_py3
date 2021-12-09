@@ -329,7 +329,7 @@ class MockDAQServer():
             self.nodes[f'/{self.device}/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
             self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
             for awg_nr in range(4):
-                for i in range(32):
+                for i in range(128):
                     self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
                     self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
