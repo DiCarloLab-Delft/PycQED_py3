@@ -6,26 +6,26 @@ import os
 import pycqed as pq
 import pycqed.analysis.analysis_toolbox as a_tools
 
+from pycqed.measurement import measurement_control
+
+import pycqed.instrument_drivers.meta_instrument.qubit_objects.mock_CCL_Transmon as ct
+import pycqed.instrument_drivers.meta_instrument.device_object_CCL as do
+from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
+from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
+
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
-from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
-import pycqed.instrument_drivers.meta_instrument.qubit_objects.mock_CCL_Transmon as ct
-from pycqed.measurement import measurement_control
-from qcodes import station
+import pycqed.instrument_drivers.virtual_instruments.virtual_SPI_S4g_FluxCurrent as flx
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 
-from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
-import pycqed.instrument_drivers.meta_instrument.device_object_CCL as do
-
 from pycqed.instrument_drivers.library.Transport import DummyTransport
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
-from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
-import pycqed.instrument_drivers.virtual_instruments.virtual_SPI_S4g_FluxCurrent as flx
 
-Dummy_VSM_not_fixed = False
+from qcodes import station
 
 
 class Test_Mock_CCL(unittest.TestCase):
