@@ -869,7 +869,6 @@ class Test_MeasurementControl(unittest.TestCase):
         )
 
     def test_progress_callback(self):
-
         progress_param = ManualParameter("progress", initial_value=0)
 
         def set_progress_param_callable(progress):
