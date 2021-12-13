@@ -102,7 +102,7 @@ class HAL_Transmon(Qubit):
         else:
             # new style parameter definition, with type annotation.
             # FIXME: requires recent QCoDesS, which requires Python 3.7
-            # FIXME: we should intruoduce base class for CC-type devices below CC
+            # FIXME: we should introduce base class for CC-type devices below CC
             self.instr_CC: CC = InstrumentRefParameter(
                 'instr_CC',
                 label='Central Controller',

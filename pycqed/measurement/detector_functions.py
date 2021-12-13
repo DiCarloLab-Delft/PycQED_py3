@@ -427,7 +427,7 @@ class Sweep_pts_detector(Detector_Function):
 
 class ZNB_VNA_detector(Hard_Detector):
 
-    def __init__(self,  VNA, **kw):
+    def __init__(self, VNA, **kw):
         '''
         Detector function for the Rohde & Schwarz ZNB VNA
         '''
