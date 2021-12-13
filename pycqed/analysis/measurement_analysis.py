@@ -4631,7 +4631,6 @@ class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
         return F_discr, opt_threshold
 
 
-@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class T1_Analysis(TD_Analysis):
     """
     Most kw parameters for Rabi_Analysis are also used here.

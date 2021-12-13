@@ -4,6 +4,7 @@
 import logging
 import time
 import numpy as np
+from deprecated import deprecated
 
 from pycqed.analysis_v2.tools import contours2d as c2d
 
@@ -735,7 +736,7 @@ class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
             self.LutMan.UHFQC.acquisition_arm(single=self.single)
 
 
-# FIXME: deprecate?
+@deprecated(version='0.4', reason="broken code")
 class par_dB_attenuation_UHFQC_AWG_direct(Soft_Sweep):
     def __init__(self, UHFQC, **kw):
         self.set_kw()

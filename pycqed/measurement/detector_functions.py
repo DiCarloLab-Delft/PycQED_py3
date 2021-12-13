@@ -11,11 +11,17 @@ import logging
 import time
 from string import ascii_uppercase
 from packaging import version
+from deprecated import deprecated
 
 from pycqed.analysis.fit_toolbox import functions as fn
 from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
+
+# import instruments for type annotations
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
+
 from qcodes.instrument.parameter import _BaseParameter
 
 
@@ -871,8 +877,15 @@ class UHFQC_input_average_detector(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG=None, channels=(0, 1),
-                 nr_averages=1024, nr_samples=4096, **kw):
+    def __init__(
+            self,
+            UHFQC,
+            AWG: CC = None,
+            channels=(0, 1),
+            nr_averages=1024,
+            nr_samples=4096,
+            **kw
+    ):
         super().__init__()
         self.UHFQC = UHFQC
         self.channels = channels
@@ -923,12 +936,20 @@ class UHFQC_input_average_detector(Hard_Detector):
 class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
     '''
     Detector used for acquiring averaged input traces withe the UHFQC.
-    Additionally trace are demoulated.
+    Additionally trace are demodulated.
     '''
 
-    def __init__(self, f_RO_mod, UHFQC,
-                 real_imag=True, AWG=None, channels=(0, 1),
-                 nr_averages=1024, nr_samples=4096, **kw):
+    def __init__(
+            self,
+            f_RO_mod,
+            UHFQC,
+            real_imag=True,
+            AWG=None,
+            channels=(0, 1),
+            nr_averages=1024,
+            nr_samples=4096,
+            **kw
+    ):
         super().__init__(UHFQC=UHFQC, AWG=AWG, channels=channels,
                          nr_averages=nr_averages, nr_samples=nr_samples, **kw)
         self.f_mod = f_RO_mod
@@ -957,9 +978,16 @@ class UHFQC_spectroscopy_detector(Soft_Detector):
     Detector used for the spectroscopy mode
     '''
 
-    def __init__(self, UHFQC, ro_freq_mod,
-                 AWG=None, channels=(0, 1),
-                 nr_averages=1024, integration_length=4096, **kw):
+    def __init__(
+            self,
+            UHFQC: UHFQC,
+            ro_freq_mod,
+            AWG=None,
+            channels=(0, 1),
+            nr_averages=1024,
+            integration_length=4096,
+            **kw
+    ):
         super().__init__()
         # FIXME: code commented out, some __init__ parameters no longer used
         #UHFQC=UHFQC, AWG=AWG, channels=channels,
@@ -980,21 +1008,27 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     '''
     Detector used for integrated average results with the UHFQC
-
     '''
 
-    def __init__(self, UHFQC, AWG=None,
-                 integration_length: float = 1e-6, nr_averages: int = 1024,
-                 channels: list = (0, 1, 2, 3),
-                 result_logging_mode: str = 'raw',
-                 real_imag: bool = True,
-                 value_names: list = None,
-                 seg_per_point: int = 1, single_int_avg: bool = False,
-                 chunk_size: int = None,
-                 values_per_point: int = 1, values_per_point_suffex: list = None,
-                 always_prepare: bool = False,
-                 prepare_function=None, prepare_function_kwargs: dict = None,
-                 **kw):
+    def __init__(
+            self,
+            UHFQC: UHFQC,
+            AWG: CC = None,
+            integration_length: float = 1e-6,
+            nr_averages: int = 1024,
+            channels: list = (0, 1, 2, 3),
+            result_logging_mode: str = 'raw',
+            real_imag: bool = True,
+            value_names: list = None,
+            seg_per_point: int = 1,
+            single_int_avg: bool = False,
+            chunk_size: int = None,
+            values_per_point: int = 1,
+            values_per_point_suffex: list = None,
+            always_prepare: bool = False,
+            prepare_function=None,
+            prepare_function_kwargs: dict = None,
+            **kw):
         """
         Args:
         UHFQC (instrument) : data acquisition device
@@ -1270,12 +1304,22 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     channels 0 and 1 on channel 3.
     '''
 
-    def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
-                 nr_averages=1024, rotate=False, real_imag=True,
-                 channels: list = [0, 1], correlations: list = [(0, 1)],
-                 value_names=None,
-                 seg_per_point=1, single_int_avg=False, thresholding=False,
-                 **kw):
+    def __init__(
+            self,
+            UHFQC: UHFQC,
+            AWG: CC = None,
+            integration_length=1e-6,
+            nr_averages=1024,
+            rotate=False,
+            real_imag=True,
+            channels: list = [0, 1],
+            correlations: list = [(0, 1)],
+            value_names=None,
+            seg_per_point=1,
+            single_int_avg=False,
+            thresholding=False,
+            **kw
+    ):
         super().__init__(
             UHFQC, AWG=AWG, integration_length=integration_length,
             nr_averages=nr_averages, real_imag=real_imag,
@@ -1448,16 +1492,19 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG=None,
-                 integration_length: float = 1e-6,
-                 nr_shots: int = 4094,
-                 channels: list = (0, 1),
-                 result_logging_mode: str = 'raw',
-                 value_names: list = None,
-                 always_prepare: bool = False,
-                 prepare_function=None,
-                 prepare_function_kwargs: dict = None,
-                 **kw):
+    def __init__(
+            self,
+            UHFQC: UHFQC,
+            AWG: CC = None,
+            integration_length: float = 1e-6,
+            nr_shots: int = 4094,
+            channels: list = (0, 1),
+            result_logging_mode: str = 'raw',
+            value_names: list = None,
+            always_prepare: bool = False,
+            prepare_function=None,
+            prepare_function_kwargs: dict = None,
+            **kw):
         """
         Args:
         UHFQC (instrument) : data acquisition device
@@ -1732,12 +1779,17 @@ class UHFQC_statistics_logging_det(Soft_Detector):
 
 class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 
-    def __init__(self, UHFQC, AWG, nr_shots: int,
-                 integration_length: float,
-                 channel: int,
-                 statemap: dict,
-                 channel_name: str = None,
-                 normalize_counts: bool = True):
+    def __init__(
+            self,
+            UHFQC: UHFQC,
+            AWG: CC,
+            nr_shots: int,
+            integration_length: float,
+            channel: int,
+            statemap: dict,
+            channel_name: str = None,
+            normalize_counts: bool = True
+    ):
         """
         Detector for the statistics logger mode in the UHFQC.
 
@@ -1752,8 +1804,6 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
                 e.g.:
                     statemap ={'0': '0', '1':'1'}
             channel_name (str) : optional name of the channel
-
-
         """
         super().__init__(
             UHFQC=UHFQC,
@@ -1796,7 +1846,7 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 # Fake detectors
 # --------------------------------------------
 
-
+@deprecated(version='0.4', reason="broken code")
 class Chevron_sim(Hard_Detector):
 
     """
@@ -1825,6 +1875,7 @@ class Chevron_sim(Hard_Detector):
     #                                   self.simulation_dict['dist_step'])
 
 
+@deprecated(version='0.4', reason="use Function_Detector")
 class Function_Detector_list(Soft_Detector):
     """
     Defines a detector function that wraps around an user-defined function.

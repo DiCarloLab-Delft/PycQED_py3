@@ -1,5 +1,7 @@
 """
-fka: CCL_Transmon.py
+File:   HAL_Transmon.py (originally CCL_Transmon.py)
+Note:   a lot code was moved around within this file in December 2021. As a consequence, the author information provided
+        by 'git blame' makes little sense. See GIT tag 'release_v0.3' for the original file.
 """
 
 import time
@@ -10,6 +12,7 @@ import pytest
 import cma
 import datetime
 import multiprocessing
+from typing import Optional
 
 from .qubit_object import Qubit
 
@@ -39,22 +42,23 @@ from pycqed.utilities.general import gen_sweep_pts
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
     mk_minimization_loss_func, mk_minimization_goal_func
 
-# Imported for a type check
-from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
-    import QuTech_AWG_Module
+# Imported for type checks
+from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
+from pycqed.measurement.measurement_control import MeasurementControl
 
 from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import (
-    ManualParameter, InstrumentRefParameter)
+from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
+
 
 log = logging.getLogger(__name__)
 
 
 class HAL_Transmon(Qubit):
     """
-    The CCLight_Transmon
+    The HAL_Transmon (formerly known as CCL_Transmon)
     Setup configuration:
-        Drive:                 CCLight controlling AWG8's and a VSM
+        Drive:                 CC controlling AWG8's (and historically a VSM)
         Acquisition:           UHFQC
         Readout pulse configuration: LO modulated using UHFQC AWG
     """
@@ -70,10 +74,10 @@ class HAL_Transmon(Qubit):
     ##########################################################################
 
     def add_instrument_ref_parameters(self):
-        self.add_parameter('instr_device',
-                           docstring='Represents sample, contains all qubits '
-                                     'and resonators',
-                           parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_device',
+            docstring='Represents sample, contains all qubits and resonators',
+            parameter_class=InstrumentRefParameter)
         # MW sources
         self.add_parameter(
             'instr_LO_ro',
@@ -89,11 +93,22 @@ class HAL_Transmon(Qubit):
             parameter_class=InstrumentRefParameter)
 
         # Control electronics
-        self.add_parameter(
-            'instr_CC',
-            label='Central Controller',
-            docstring='Device responsible for controlling the experiment.',
-            parameter_class=InstrumentRefParameter)
+        if 1:
+            self.add_parameter(
+                'instr_CC',
+                label='Central Controller',
+                docstring='Device responsible for controlling the experiment.',
+                parameter_class=InstrumentRefParameter)
+        else:
+            # new style parameter definition, with type annotation.
+            # FIXME: requires recent QCoDesS, which requires Python 3.7
+            # FIXME: we should intruoduce base class for CC-type devices below CC
+            self.instr_CC: CC = InstrumentRefParameter(
+                'instr_CC',
+                label='Central Controller',
+            )
+            """Device responsible for controlling the experiment."""
+
         self.add_parameter(
             'instr_acquisition',
             parameter_class=InstrumentRefParameter)
@@ -106,7 +121,7 @@ class HAL_Transmon(Qubit):
             label='Flux control',
             docstring=(
                 'Instrument used to control flux can either be an IVVI rack '
-                'or a meta instrument such as the Flux control.'),
+                'or a meta instrument such as Flux_Control.'),
             parameter_class=InstrumentRefParameter)
 
         self.add_parameter(
@@ -297,7 +312,7 @@ class HAL_Transmon(Qubit):
             parameter_class=ManualParameter)
 
         # FIXME!: Dirty hack because of qusurf issue #63, added 2 hardcoded
-        # delay samples in the optimized weights
+        #  delay samples in the optimized weights
         self.add_parameter(
             'ro_acq_weight_func_delay_samples_hack',
             vals=vals.Ints(),
@@ -992,14 +1007,14 @@ class HAL_Transmon(Qubit):
 
     def _set_mw_fine_delay(self, val):
         if self.cfg_with_vsm():
-            logging.warning('CCL transmon is using VSM. Use mw_vsm_delay to'
+            logging.warning('CCL_Transmon is using VSM. Use mw_vsm_delay to'
                             'adjust delay')
         else:
             lutman = self.find_instrument(self.instr_LutMan_MW())
             AWG = lutman.find_instrument(lutman.AWG())
             if self._using_QWG():
                 logging.warning(
-                    'CCL transmon is using QWG. mw_fine_delay not supported.')
+                    'CCL_Transmon is using QWG. mw_fine_delay not supported.')
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I() - 1), val)
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_Q() - 1), val)
@@ -1013,7 +1028,7 @@ class HAL_Transmon(Qubit):
             lutman = self.find_instrument(self.instr_LutMan_Flux())
             AWG = lutman.find_instrument(lutman.AWG())
             if self._using_QWG():
-                logging.warning('CCL transmon is using QWG. Not implemented.')
+                logging.warning('CCL_Transmon is using QWG. Not implemented.')
             else:
                 AWG.set('sigouts_{}_delay'.format(
                     lutman.cfg_awg_channel() - 1), val)
@@ -1166,6 +1181,7 @@ class HAL_Transmon(Qubit):
             self.instr_spec_source.get_instr().power(self.spec_pow())
 
     # FIXME: UHFQC specific
+    # FIXME: deskewing matrix is shared between all connected qubits 
     def _prep_deskewing_matrix(self):
         UHFQC = self.instr_acquisition.get_instr()
         alpha = self.ro_acq_mixer_alpha()
@@ -1179,6 +1195,7 @@ class HAL_Transmon(Qubit):
         UHFQC.qas_0_deskew_rows_1_cols_1(predistortion_matrix[1, 1])
         return predistortion_matrix
 
+    # FIXME: UHFQC specific
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
         if 'optimal' in self.ro_acq_weight_type():
@@ -1227,21 +1244,26 @@ class HAL_Transmon(Qubit):
             self.int_avg_det = self.get_int_avg_det()
 
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
+                UHFQC=UHFQC,
+                AWG=self.instr_CC.get_instr(),
                 channels=ro_channels,
                 result_logging_mode=result_logging_mode,
                 nr_averages=self.ro_acq_averages(),
-                real_imag=True, single_int_avg=True,
+                real_imag=True,
+                single_int_avg=True,
                 integration_length=self.ro_acq_integration_length())
 
             self.UHFQC_spec_det = det.UHFQC_spectroscopy_detector(
-                UHFQC=UHFQC, ro_freq_mod=self.ro_freq_mod(),
-                AWG=self.instr_CC.get_instr(), channels=ro_channels,
+                UHFQC=UHFQC,
+                ro_freq_mod=self.ro_freq_mod(),
+                AWG=self.instr_CC.get_instr(),  # FIXME: parameters from here now ignored by callee
+                channels=ro_channels,
                 nr_averages=self.ro_acq_averages(),
                 integration_length=self.ro_acq_integration_length())
 
             self.int_log_det = det.UHFQC_integration_logging_det(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
+                UHFQC=UHFQC,
+                AWG=self.instr_CC.get_instr(),
                 channels=ro_channels,
                 result_logging_mode=result_logging_mode,
                 integration_length=self.ro_acq_integration_length())
@@ -1281,6 +1303,7 @@ class HAL_Transmon(Qubit):
     #         LO.power(self.ro_pow_LO())
     #         LO.on()
 
+    # FIXME: UHFQC specific
     def _prep_ro_pulse(self, upload=True, CW=False):
         """
         Sets the appropriate parameters in the RO LutMan and uploads the
@@ -1365,6 +1388,7 @@ class HAL_Transmon(Qubit):
                 warnings.warn('Qubit number of {} is not '.format(self.name) +
                               'present in resonator_combinations of the readout lutman.')
 
+    # FIXME: UHFQC specific
     def _prep_ro_integration_weights(self):
         """
         Sets the ro acquisition integration weights.
@@ -1619,12 +1643,20 @@ class HAL_Transmon(Qubit):
             self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
 
     ##########################################################################
-    # find_ functions (CCLight_Transmon specific)
+    # find_ functions (HAL_Transmon specific)
     ##########################################################################
 
-    def find_frequency_adaptive(self, f_start=None, f_span=1e9, f_step=0.5e6,
-                                MC=None, update=True, use_max=False,
-                                spec_mode='pulsed_marked', verbose=True):
+    def find_frequency_adaptive(
+            self,
+            f_start=None,
+            f_span=1e9,
+            f_step=0.5e6,
+            MC: Optional[MeasurementControl] = None,
+            update=True,
+            use_max=False,
+            spec_mode='pulsed_marked',
+            verbose=True
+    ) -> bool:
         """
         'Adaptive' measurement for finding the qubit frequency. Will look with
         a range of the current frequency estimate, and if it does not find a
@@ -1651,8 +1683,7 @@ class HAL_Transmon(Qubit):
             f_center += f_span * n * (-1) ** n
             n += 1
             if verbose:
-                cfreq, cunit = plt_tools.SI_val_to_msg_str(
-                    f_center, 'Hz', float)
+                cfreq, cunit = plt_tools.SI_val_to_msg_str(f_center, 'Hz', float)
                 sfreq, sunit = plt_tools.SI_val_to_msg_str(f_span, 'Hz', float)
                 print('Doing adaptive spectroscopy around {:.3f} {} with a '
                       'span of {:.0f} {}.'.format(cfreq, cunit, sfreq, sunit))
@@ -1826,8 +1857,7 @@ class HAL_Transmon(Qubit):
         if freqs is None:
             freq_center = self.freq_qubit()
             freq_range = 50e6
-            freqs = np.arange(freq_center - freq_range, freq_center + freq_range,
-                              0.5e6)
+            freqs = np.arange(freq_center - freq_range, freq_center + freq_range, 0.5e6)
         Qubit_frequency = []
         Reson_frequency = []
         flux_channel = self.fl_dc_ch()
@@ -1837,8 +1867,7 @@ class HAL_Transmon(Qubit):
             self.instr_FluxCtrl.get_instr()[flux_channel](dac_value)
 
             # Find Resonator
-            self.find_resonator_frequency(freqs=np.arange(-5e6, 5.1e6, .1e6) + self.freq_res(),
-                                          use_min=True)
+            self.find_resonator_frequency(freqs=np.arange(-5e6, 5.1e6, .1e6) + self.freq_res(), use_min=True)
             # Find Qubit frequency
             self.find_frequency(freqs=freqs)
 
@@ -1877,8 +1906,7 @@ class HAL_Transmon(Qubit):
         if freqs is None:
             freq_center = f02_estimate / 2
             freq_range = 175e6
-            freqs = np.arange(freq_center - 1 / 2 * freq_range, self.freq_qubit() + 1 / 2 * freq_range,
-                              0.5e6)
+            freqs = np.arange(freq_center - 1 / 2 * freq_range, self.freq_qubit() + 1 / 2 * freq_range, 0.5e6)
         old_spec_pow = self.spec_pow()
         self.spec_pow(self.spec_pow() + power_12)
 
@@ -1972,7 +2000,7 @@ class HAL_Transmon(Qubit):
                                            qb_name=self.name)
 
     ##########################################################################
-    # calibrate_ functions (CCLight_Transmon specific)
+    # calibrate_ functions (HAL_Transmon specific)
     ##########################################################################
 
     def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
@@ -3557,7 +3585,7 @@ class HAL_Transmon(Qubit):
                                 analyze: bool = True, close_fig: bool = True,
                                 label: str = ''):
         """
-        Mesures the readout resonator with UHFQC as a function of the pulse power.
+        Measures the readout resonator with UHFQC as a function of the pulse power.
         The pulse power is controlled by changing the amplitude of the UHFQC-generated
         waveform.
 
@@ -3979,9 +4007,6 @@ class HAL_Transmon(Qubit):
                       label: str = '',
                       analyze=True, close_fig=True,
                       prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -4014,8 +4039,7 @@ class HAL_Transmon(Qubit):
     ):
         """
         N.B. this is a good example for a generic timedomain experiment using
-        the CCL transmon.
-
+        the CCL_Transmon.
         """
         if times is not None and nr_cz_instead_of_idle_time is not None:
             raise ValueError("Either idle time or CZ mode must be chosen!")
@@ -4120,9 +4144,6 @@ class HAL_Transmon(Qubit):
                        detector=False,
                        double_fit=False,
                        test_beating=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -4210,9 +4231,6 @@ class HAL_Transmon(Qubit):
                                detector=False,
                                double_fit=False,
                                test_beating=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -4293,9 +4311,6 @@ class HAL_Transmon(Qubit):
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
                      label: str = '', prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -4547,13 +4562,13 @@ class HAL_Transmon(Qubit):
             return a
 
     ##########################################################################
-    # measure_ functions (CCLight_Transmon specific)
+    # measure_ functions (HAL_Transmon specific)
     ##########################################################################
 
     def measure_photon_number_splitting(self, freqs, powers, MC=None,
                                         analyze: bool = True, close_fig: bool = True):
         """
-        Mesures the CW qubit spectrosopy as a function of the RO pulse power
+        Measures the CW qubit spectroscopy as a function of the RO pulse power
         to find a photon splitting.
 
         Refs:
@@ -5661,9 +5676,6 @@ class HAL_Transmon(Qubit):
     def measure_CPMG(self, times=None, orders=None, MC=None, sweep='tau',
                      analyze=True, close_fig=True, update=False,
                      label: str = '', prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -5756,9 +5768,6 @@ class HAL_Transmon(Qubit):
                                     analyze=True, close_fig=True, update=True,
                                     label: str = '', prepare_for_timedomain=True,
                                     tomo=False):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -5820,9 +5829,6 @@ class HAL_Transmon(Qubit):
     def measure_spin_locking_echo(self, times=None, MC=None,
                                   analyze=True, close_fig=True, update=True,
                                   label: str = '', prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -5876,9 +5882,6 @@ class HAL_Transmon(Qubit):
                                analyze=True, close_fig=True, update=True,
                                label: str = '', prepare_for_timedomain=True,
                                tomo=False):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -6600,7 +6603,7 @@ class HAL_Transmon(Qubit):
             return {}
 
     ##########################################################################
-    # other functions (CCLight_Transmon specific)
+    # other functions (HAL_Transmon specific)
     ##########################################################################
 
     def bus_frequency_flux_sweep(self, freqs, spec_source_bus, bus_power, dacs, dac_param, f01=None, label='',
@@ -6826,7 +6829,7 @@ class HAL_Transmon(Qubit):
 
     def calc_current_to_freq(self, curr: float):
         """
-        Converts DC current to requency in Hz for a qubit
+        Converts DC current to frequency in Hz for a qubit
 
         Args:
             curr (float):

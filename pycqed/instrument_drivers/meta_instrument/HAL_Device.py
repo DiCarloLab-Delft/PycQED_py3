@@ -1,5 +1,7 @@
 """
-fka: device_object_CCL.py
+File:   HAL_Device.py (originally device_object_CCL.py)
+Note:   a lot code was moved around within this file in December 2021. As a consequence, the author information provided
+        by 'git blame' makes little sense. See GIT tag 'release_v0.3' for the original file.
 """
 
 import numpy as np
