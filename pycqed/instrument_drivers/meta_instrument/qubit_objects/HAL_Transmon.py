@@ -1670,10 +1670,12 @@ class HAL_Transmon(Qubit):
             f_start = self.freq_qubit()
 
         # Set high power and averages to be sure we find the peak.
+        # FIXME: code commented out
         # self.spec_pow(-30)
         # self.ro_pulse_amp_CW(0.025)
         # old_avg = self.ro_acq_averages()
         # self.ro_acq_averages(2**15)
+
         # Repeat measurement while no peak is found:
         success = False
         f_center = f_start
@@ -1696,22 +1698,24 @@ class HAL_Transmon(Qubit):
 
             # Use 'try' because it can give a TypeError when no peak is found
             try:
-                analysis_spec = ma.Qubit_Spectroscopy_Analysis(label=label,
-                                                               close_fig=True,
-                                                               qb_name=self.name)
+                analysis_spec = ma.Qubit_Spectroscopy_Analysis(
+                    label=label,
+                    close_fig=True,
+                    qb_name=self.name
+                )
             except TypeError:
                 logging.warning('TypeError in Adaptive spectroscopy')
                 continue
+
             # Check for peak and check its height
             freq_peak = analysis_spec.peaks['peak']
             offset = analysis_spec.fit_res.params['offset'].value
             peak_height = np.amax(analysis_spec.data_dist)
 
-            # Check if peak is not another qubit, and if it is move that qubit away
+            # Check if peak is not another qubit, and if it is, move that qubit away
             for qubit_name in self.instr_device.get_instr().qubits():
                 qubit = self.instr_device.get_instr().find_instrument(qubit_name)
                 if qubit.name != self.name and qubit.freq_qubit() is not None:
-
                     if np.abs(qubit.freq_qubit() - freq_peak) < 5e6:
                         if verbose:
                             logging.warning('Peak found at frequency of {}. '
@@ -1920,9 +1924,17 @@ class HAL_Transmon(Qubit):
             self.anharmonicity(f02 - 2 * self.freq_qubit())
             return True
 
-    def find_bus_frequency(self, freqs, spec_source_bus, bus_power, f01=None,
-                           label='', close_fig=True, analyze=True, MC=None,
-                           prepare_for_continuous_wave=True):
+    def find_bus_frequency(
+            self,
+            freqs,
+            spec_source_bus,
+            bus_power,
+            f01=None,
+            label='',
+            close_fig=True,
+            analyze=True,
+            MC=None,
+            prepare_for_continuous_wave=True):
         """
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source
@@ -1960,17 +1972,18 @@ class HAL_Transmon(Qubit):
             self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         # Starting specmode if set in config
         if self.cfg_spec_mode():
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
 
         # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
+        CCL = self.instr_CC.get_instr()
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
@@ -1980,6 +1993,7 @@ class HAL_Transmon(Qubit):
         # spec_source.power(self.spec_pow())
         spec_source_bus.on()
         spec_source_bus.power(bus_power)
+
         MC.set_sweep_function(spec_source_bus.frequency)
         MC.set_sweep_points(freqs)
         if self.cfg_spec_mode():

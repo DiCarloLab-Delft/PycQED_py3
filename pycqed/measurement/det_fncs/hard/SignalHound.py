@@ -16,9 +16,7 @@ from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 
 # import instruments for type annotations
-from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
-
+from pycqed.instrument_drivers.physical_instruments.USB_SA124B import SignalHound_USB_SA124B
 
 log = logging.getLogger(__name__)
 
@@ -27,7 +25,7 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def __init__(
             self,
-            signal_hound,
+            signal_hound: SignalHound_USB_SA124B,
             frequency=None,
             Navg=1,
             delay=0.1,
@@ -73,7 +71,7 @@ class Signal_Hound_sweeped_frequency(Hard_Detector):
 
     def __init__(
             self,
-            signal_hound,
+            signal_hound: SignalHound_USB_SA124B,
             Navg=1,
             delay=0.1,
             **kw
@@ -123,7 +121,7 @@ class SH_mixer_skewness_det(Soft_Detector):
             frequency,
             QI_amp_ratio,
             IQ_phase,
-            SH,
+            SH: SignalHound_USB_SA124B,
             I_ch, Q_ch,
             station,
             Navg=1,
