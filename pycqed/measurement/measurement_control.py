@@ -5,30 +5,6 @@ import numpy as np
 from collections.abc import Iterable
 import operator
 from scipy.optimize import fmin_powell
-from pycqed.measurement import hdf5_data as h5d
-from pycqed.utilities.general import (
-    dict_to_ordered_tuples,
-    delete_keys_from_dict,
-    check_keyboard_interrupt,
-    KeyboardFinish,
-    flatten,
-    get_git_revision_hash,
-)
-from pycqed.utilities.get_default_datadir import get_default_datadir
-from pycqed.utilities.general import get_module_name
-
-# Used for auto qcodes parameter wrapping
-from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
-from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
-from pycqed.analysis.tools.data_manipulation import get_generation_means
-
-from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
-
-from qcodes.instrument.base import Instrument
-from qcodes.instrument.parameter import ManualParameter
-from qcodes.utils import validators as vals
-from qcodes.plots.colors import color_cycle
 
 # Used for adaptive sampling
 from adaptive import runner
@@ -45,10 +21,41 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 # some wise choices for your particular case
 from adaptive.learner import SKOptLearner
 
+from pycqed.measurement import hdf5_data as h5d
+from pycqed.utilities.general import (
+    dict_to_ordered_tuples,
+    delete_keys_from_dict,
+    check_keyboard_interrupt,
+    KeyboardFinish,
+    flatten,
+    get_git_revision_hash,
+)
+from pycqed.utilities.general import get_module_name
+from pycqed.utilities.get_default_datadir import get_default_datadir
+
 # Optimizer based on adaptive sampling
 from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer
 import pycqed.utilities.learner_utils as lu
+
+# Used for auto qcodes parameter wrapping
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
+from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
+
+from pycqed.analysis.tools.data_manipulation import get_generation_means
+from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
+
+# imports for type annotations
+from pycqed.measurement.det_fncs.Base import Detector_Function
+from pycqed.measurement.sweep_functions import Sweep_function
+
+from qcodes.instrument.base import Instrument
+from qcodes.instrument.parameter import ManualParameter
+from qcodes.utils import validators as vals
+from qcodes.plots.colors import color_cycle
+
+
 from . import measurement_control_helpers as mch
 
 from skopt import Optimizer  # imported for checking types
@@ -80,6 +87,7 @@ except Exception:
     )
     print("When instantiating an MC object," " be sure to set live_plot_enabled=False")
 
+
 log = logging.getLogger(__name__)
 
 
@@ -98,6 +106,10 @@ class MeasurementControl(Instrument):
     New version of Measurement Control that allows for adaptively determining
     data points.
     """
+
+    # type annotations for instance variables
+    detector_function: Detector_Function
+    sweep_function: Sweep_function
 
     def __init__(
         self,
@@ -302,7 +314,7 @@ class MeasurementControl(Instrument):
 
                 if mode != "adaptive":
                     try:
-                        # required for 2D plotting and data storing.
+                        # FIXME: required for 2D plotting and data storing.
                         # try except because some swf get the sweep points in the
                         # prepare statement. This needs a proper fix
                         self.xlen = len(self.get_sweep_points())
