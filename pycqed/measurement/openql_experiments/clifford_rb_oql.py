@@ -8,7 +8,6 @@ from importlib import reload
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
-from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import (
     SingleQubitClifford,
     TwoQubitClifford,
@@ -192,9 +191,7 @@ def randomized_benchmarking(
     this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
-    recompile_dict = oqh.check_recompilation_needed_hash_based(
-        program_fn=p.filename,
-        platf_cfg=platf_cfg,
+    recompile_dict = p.check_recompilation_needed_hash_based(
         clifford_rb_oql=this_file,
         recompile=recompile,
     )
@@ -529,9 +526,7 @@ def character_benchmarking(
     this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
-    recompile_dict = oqh.check_recompilation_needed_hash_based(
-        program_fn=p.filename,
-        platf_cfg=platf_cfg,
+    recompile_dict = p.check_recompilation_needed_hash_based(
         clifford_rb_oql=this_file,
         recompile=recompile,
     )
