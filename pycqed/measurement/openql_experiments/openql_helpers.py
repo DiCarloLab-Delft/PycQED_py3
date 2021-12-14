@@ -225,8 +225,12 @@ class OqlProgram:
             # We use a temporary file such that for parallel compilations, if the
             # process is interrupted before the end there will be no hash and
             # recompilation will be forced
-            with open(tmp_fn, "w") as outfile:
-                json.dump(file_hashes, outfile)
+            if 0:
+                with open(tmp_fn, "w") as outfile:
+                    json.dump(file_hashes, outfile)
+            else:
+                pathlib.Path(tmp_fn).parent.mkdir(parents=True, exist_ok=True)
+                pathlib.Path(tmp_fn).write_text(json.dumps(file_hashes))
 
         def load_hashes_from_file():
             with open(rb_system_hashes_fn) as json_file:
