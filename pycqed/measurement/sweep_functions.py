@@ -1361,6 +1361,116 @@ class Nested_spec_source_pow(Soft_Sweep):
         spec_source.on()
         self.cc.start()
 
+class Neuron_sweep(Soft_Sweep):
+    """
+    Sets a parameter and performs a "find_resonator_frequency" measurement
+    after setting the parameter.
+    """
+    def __init__(self, device, MC, program, qinput1, qinput2, qancilla3, qoutput4,
+            toffoli_angle, correction_phi, correction_theta, calibration_points, par, **kw):
+        super().__init__(**kw)
+        self.device = device
+        self.MC = MC
+        self.program = program
+        self.qinput1 = qinput1
+        self.qinput2 = qinput2
+        self.qancilla3 = qancilla3
+        self.qoutput4 = qoutput4
+        self.toffoli_angle = toffoli_angle
+        self.correction_phi = correction_phi
+        self.correction_theta = correction_theta
+        self.calibration_points = calibration_points
+        self.par = par
+
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+
+    def set_parameter(self, val):
+        def translate(angle, plot=False):
+            from scipy.interpolate import interp1d
+            from scipy.optimize import curve_fit
+            def func(x, a, b, c, d, e, f, g):
+                return a + b * x + c * x ** 2 + d * x ** 3 + e * x ** 4 + f * x ** 5 + g * x ** 6
+            def wrap_theta(theta):
+                return ((-theta+180) % 360-180)*-1
+
+            x = np.delete(np.arange(-180,180.1,5),[18,54])
+            x_fine = np.linspace(-180,180,1000)
+            pauli_ZZ_calibration=np.array([-0.98585974, -0.9806269 , -0.97294125, -0.93814186, -0.92427847,
+               -0.91627716, -0.86546412, -0.81735586, -0.78665634, -0.7512207 ,
+               -0.69014446, -0.63696399, -0.56711321, -0.50955839, -0.42164051,
+               -0.3349651 , -0.28114448, -0.18582455,  0.03019467, -0.04843943,
+                0.06638118,  0.13334302,  0.24281146,  0.28972478,  0.39195778,
+                0.4679508 ,  0.55487237,  0.64288506,  0.69540109,  0.77426009,
+                0.81954342,  0.87612956,  0.90296693,  0.93594798,  0.96740893,
+                0.98304491,  0.98171339,  0.98310323,  0.96288893,  0.94684516,
+                0.90472256,  0.88987268,  0.84650986,  0.76775741,  0.70229917,
+                0.62286916,  0.58167099,  0.51274903,  0.43787606,  0.31182572,
+                0.26623596,  0.164686  ,  0.0889164 , -0.01356325,  0.0490054 ,
+               -0.16471999, -0.26979328, -0.34494293, -0.44531908, -0.49547974,
+               -0.5686879 , -0.59818713, -0.6814301 , -0.75068292, -0.78107524,
+               -0.83589275, -0.87599787, -0.90242158, -0.94874772, -0.9634351 ,
+               -0.97753194, -0.98669935, -0.99428514])
+            pauli_ZZ_calibration=np.delete(pauli_ZZ_calibration,[18,54])
+            pauli_ZZ_calibration=2/(max(pauli_ZZ_calibration)-min(pauli_ZZ_calibration))*(pauli_ZZ_calibration-max(pauli_ZZ_calibration))+1
+            angle=wrap_theta(angle)
+
+            sigma = np.ones(len(x))
+            sigma[[np.where(pauli_ZZ_calibration==1)[0][0], np.where(pauli_ZZ_calibration==1)[0][0]]] = 0.15
+            f1, _ = curve_fit(func, x, pauli_ZZ_calibration, sigma=sigma)
+            result = np.argwhere(np.diff(np.sign(func(x_fine, *f1) - np.cos(np.deg2rad(angle))))).flatten()
+            if plot:
+                plt.plot(x, pauli_ZZ_calibration, color='blue')
+                plt.plot(x_fine, func(x_fine, *f1), color='red')
+                plt.plot(x_fine[result], func(x_fine, *f1)[result], 'ro')
+                plt.plot(x_fine, np.cos(np.deg2rad(x_fine)), color='gray', linestyle='--')
+                plt.xlabel('Input Rotation Angle')
+                plt.ylabel('<Z>')
+                plt.title('Microwave Amplitude Correction')
+            if angle>0:
+                value = x_fine[result][-1]
+            else:
+                value = x_fine[result][0]
+            return value
+
+        w1, w2, b = val
+        mw_lutman.bias(b)
+        mw_lutman.w1(w1)
+        mw_lutman.w2(w2)
+
+        mw_lutman = self.device.find_instrument(self.qinput1).instr_LutMan_MW.get_instr()
+        mw_lutman.set_default_lutmap()
+        mw_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        mw_lutman = self.device.find_instrument(self.qinput2).instr_LutMan_MW.get_instr()
+        mw_lutman.set_default_lutmap()
+        mw_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+        mw_lutman = self.device.find_instrument(self.qoutput4).instr_LutMan_MW.get_instr()
+        mw_lutman.set_default_lutmap()
+        lm = mw_lutman.LutMap()
+        lm[17] = {"name": "recover", "theta": self.correction_theta, "phi": self.correction_phi, "type": "ge"}
+        mw_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
+        mw_lutman = self.device.find_instrument(self.qancilla3).instr_LutMan_MW.get_instr()
+        mw_lutman.set_default_lutmap()
+        lm = mw_lutman.LutMap()
+        bias = mw_lutman.bias()
+        w1 = mw_lutman.w1()
+        w2 = mw_lutman.w2()
+        lm[9] =  {"name": "rx2b", "theta": translate(w1+w2+bias),  "phi": 0,  "type": "ge"}
+        lm[10] = {"name": "rxw1", "theta": translate(-w1),      "phi": 0,  "type": "ge"}
+        lm[11] = {"name": "rxw2", "theta": translate(-w2),      "phi": 0,  "type": "ge"}
+        lm[12] = {"name": "ry2b", "theta": translate(-w1-w2-bias), "phi": 90, "type": "ge"}
+        lm[13] = {"name": "ryw1", "theta": translate(w1),       "phi": 90, "type": "ge"}
+        lm[14] = {"name": "ryw2", "theta": translate(w2),       "phi": 90, "type": "ge"}
+        lm[27] = {"name": "rxm45", "theta": translate(-toffoli_angle),  "phi": 0,  "type": "ge"}
+        lm[28] = {"name": "rx45",  "theta": translate(toffoli_angle),   "phi": 0,  "type": "ge"}
+        lm[29] = {"name": "rmX180", "theta": translate(180),    "phi": 180,"type": "ge"}
+        lm[30] = {"name": "rmY180", "theta": translate(180),    "phi": 270,"type": "ge"}
+
+        mw_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+
 class Nested_amp_ro(Soft_Sweep):
     """
     Sets a parameter and performs a "find_resonator_frequency" measurement

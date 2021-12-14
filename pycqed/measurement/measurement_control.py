@@ -820,6 +820,7 @@ class MeasurementControl(Instrument):
                         raise StopIteration()
                 vals = np.multiply(-1, vals)
 
+            print(vals)
             return vals
 
         return func

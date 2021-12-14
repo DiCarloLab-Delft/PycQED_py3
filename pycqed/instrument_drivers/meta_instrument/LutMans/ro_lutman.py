@@ -54,7 +54,7 @@ class Base_RO_LutMan(Base_LutMan):
             if self._feedline_number == 0:
                 self._resonator_codeword_bit_mapping = [13, 16]
             elif self._feedline_number == 1:
-                self._resonator_codeword_bit_mapping = [1,4,5,8,10,7,11,14,15]
+                self._resonator_codeword_bit_mapping = [11,14,15,8,1,4,5,7,10]
             elif self._feedline_number == 2:
                 self._resonator_codeword_bit_mapping = [0,2,3,6,9,12]
             else:

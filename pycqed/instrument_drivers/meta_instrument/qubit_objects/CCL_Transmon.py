@@ -5605,8 +5605,8 @@ class CCLight_Transmon(Qubit):
             #     scale_factor = scale_factor_line
             scale_factor = scale_factor_line
 
-            if abs(scale_factor-1) < 2e-3:
-                print('Pulse amplitude accurate within 0.2%. Amplitude not updated.')
+            if abs(scale_factor-1) < 2e-4:
+                print('Pulse amplitude accurate within 0.02%. Amplitude not updated.')
                 return a
 
             if self.cfg_with_vsm():

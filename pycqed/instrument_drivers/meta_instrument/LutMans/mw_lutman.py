@@ -6,6 +6,7 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
 import time
+import copy
 
 default_mw_lutmap = {
     0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
@@ -226,7 +227,7 @@ class Base_MW_LutMan(Base_LutMan):
 
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
-        self.LutMap(default_mw_lutmap.copy())
+        self.LutMap(copy.deepcopy(default_mw_lutmap))
 
     def set_inspire_lutmap(self):
         """Set the default lutmap for expanded microwave drive pulses."""
