@@ -387,8 +387,10 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str) -> OqlProgram
             p.add_kernel(k)
 
     # adding the calibration points
-    p.add_single_qubit_cal_points(qubit_idx=qubit_idx,
-                                    f_state_cal_pts=True)
+    p.add_single_qubit_cal_points(
+        qubit_idx=qubit_idx,
+        f_state_cal_pts=True
+    )
 
     dt = times[1] - times[0]
     sweep_points = np.concatenate([np.repeat(times, 2),

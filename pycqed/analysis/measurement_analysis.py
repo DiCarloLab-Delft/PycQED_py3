@@ -1110,14 +1110,6 @@ class TD_Analysis(MeasurementAnalysis):
 
         super(TD_Analysis, self).__init__(qb_name=qb_name, **kw)
 
-    # def run_default_analysis(self, close_file=True, **kw):
-    #     self.get_naming_and_values()
-    #     self.fit_data(**kw)
-    #     self.make_figures(**kw)
-    #     if close_file:
-    #         self.data_file.close()
-    #     return self.fit_res
-
     def rotate_and_normalize_data(self):
         if len(self.measured_values) == 1:
             # if only one weight function is used rotation is not required
@@ -5577,7 +5569,6 @@ class OnOff_Analysis(TD_Analysis):
         return self.contrast
 
 
-@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class AllXY_Analysis(TD_Analysis):
     '''
     Performs a rotation and normalization on the data and calculates a

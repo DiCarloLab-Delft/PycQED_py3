@@ -519,8 +519,7 @@ class lutman_par(Soft_Sweep):
 
     def set_parameter(self, val):
         self.LutMan_parameter.set(val)
-        self.LutMan.load_waveforms_onto_AWG_lookuptable(
-            regenerate_waveforms=True)
+        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
 
 class anharmonicity_sweep(Soft_Sweep):

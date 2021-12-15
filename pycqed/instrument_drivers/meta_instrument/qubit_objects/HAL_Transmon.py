@@ -665,14 +665,14 @@ class HAL_Transmon(Qubit):
         self.add_parameter(
             'spec_pulse_length',
             label='Pulsed spec pulse duration',
-            unit='s', 
+            unit='s',
             vals=vals.Numbers(0e-9, 20e-6),  # FIXME validator: should be multiple of 20e-9
             initial_value=500e-9,
             parameter_class=ManualParameter)
 
         self.add_parameter(
-            'spec_type', 
-            parameter_class=ManualParameter, 
+            'spec_type',
+            parameter_class=ManualParameter,
             docstring=(
                 'determines what kind of spectroscopy to do, \n'
                 '"CW":  opens the relevant VSM channel to always let the tone '
@@ -684,23 +684,23 @@ class HAL_Transmon(Qubit):
             vals=vals.Enum('CW', 'IQ', 'vsm_gated'))
 
         self.add_parameter(
-            'spec_amp', 
-            unit='V', 
+            'spec_amp',
+            unit='V',
             docstring=(
                 'Amplitude of the spectroscopy pulse in the mw LutMan. '
                 'The power of the spec pulse should be controlled through '
                 'the vsm amplitude "spec_vsm_amp"'),
-            vals=vals.Numbers(0, 1), 
+            vals=vals.Numbers(0, 1),
             parameter_class=ManualParameter,
             initial_value=0.8)
         self.add_parameter(
-            'spec_pow', 
+            'spec_pow',
             unit='dB',
             vals=vals.Numbers(-70, 20),
             parameter_class=ManualParameter,
             initial_value=-30)
         self.add_parameter(
-            'spec_wait_time', 
+            'spec_wait_time',
             unit='s',
             vals=vals.Numbers(0, 100e-6),
             parameter_class=ManualParameter,
@@ -726,37 +726,37 @@ class HAL_Transmon(Qubit):
             parameter_class=ManualParameter)
 
         self.add_parameter(
-            'fl_dc_I_per_phi0', 
+            'fl_dc_I_per_phi0',
             label='Flux bias I/Phi0',
             docstring='Conversion factor for flux bias, current per flux quantum',
-            vals=vals.Numbers(), 
-            unit='A', 
+            vals=vals.Numbers(),
+            unit='A',
             initial_value=10e-3,
             parameter_class=ManualParameter)
         self.add_parameter(
-            'fl_dc_I', 
-            label='Flux bias', 
+            'fl_dc_I',
+            label='Flux bias',
             unit='A',
-            docstring='Current flux bias setting', 
+            docstring='Current flux bias setting',
             vals=vals.Numbers(),
-            initial_value=0, 
+            initial_value=0,
             parameter_class=ManualParameter)
         self.add_parameter(
-            'fl_dc_I0', 
-            unit='A', 
-            label='Flux bias sweet spot', 
+            'fl_dc_I0',
+            unit='A',
+            label='Flux bias sweet spot',
             docstring=('Flux bias offset corresponding to the sweetspot'),
-            vals=vals.Numbers(), 
+            vals=vals.Numbers(),
             initial_value=0,
             parameter_class=ManualParameter)
         # FIXME: ? not used anywhere
         self.add_parameter(
-            'fl_dc_ch', 
+            'fl_dc_ch',
             label='Flux bias channel',
             docstring=('Used to determine the DAC channel used for DC '
                        'flux biasing. Should be an int when using an IVVI rack'
                        'or a str (channel name) when using an SPI rack.'),
-            vals=vals.Strings(), 
+            vals=vals.Strings(),
             initial_value=None,
             parameter_class=ManualParameter)
 
@@ -1181,7 +1181,7 @@ class HAL_Transmon(Qubit):
             self.instr_spec_source.get_instr().power(self.spec_pow())
 
     # FIXME: UHFQC specific
-    # FIXME: deskewing matrix is shared between all connected qubits 
+    # FIXME: deskewing matrix is shared between all connected qubits
     def _prep_deskewing_matrix(self):
         UHFQC = self.instr_acquisition.get_instr()
         alpha = self.ro_acq_mixer_alpha()
@@ -1985,7 +1985,7 @@ class HAL_Transmon(Qubit):
             platf_cfg=self.cfg_openql_platform_fn())
         CCL = self.instr_CC.get_instr()
         CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+        # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
@@ -3578,7 +3578,7 @@ class HAL_Transmon(Qubit):
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
         CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+        # CC gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
             MW_LO_source=self.instr_LO_ro.get_instr(),
@@ -3621,7 +3621,7 @@ class HAL_Transmon(Qubit):
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
         CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+        # CC gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
             MW_LO_source=self.instr_LO_ro.get_instr(),
@@ -4081,6 +4081,46 @@ class HAL_Transmon(Qubit):
             return a.deviation_total
 
 
+    def allxy_GBT(  # FIXME: prefix with "measure_"
+            self,
+            MC: Optional[MeasurementControl] = None,
+            label: str = '',
+            analyze=True,
+            close_fig=True,
+            prepare_for_timedomain=True,
+            termination_opt=0.02):
+        '''
+        This function is the same as measure AllXY, but with a termination limit
+        This termination limit is as a system metric to evalulate the calibration
+        by GBT if good or not.
+        '''
+        old_avg = self.ro_soft_avg()
+        self.ro_soft_avg(4)
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        p = sqo.AllXY(qubit_idx=self.cfg_qubit_nr(), double_points=True,
+                      platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(42))
+        d = self.int_avg_det
+        MC.set_detector_function(d)
+        MC.run('AllXY' + label + self.msmt_suffix)
+
+        self.ro_soft_avg(old_avg)
+        a = ma.AllXY_Analysis(close_main_fig=close_fig)
+        if a.deviation_total > termination_opt:
+            return False
+        else:
+            return True
+
+
     def measure_T1(
             self,
             times=None,
@@ -4092,8 +4132,9 @@ class HAL_Transmon(Qubit):
             prepare_for_timedomain=True,
             close_fig=True,
             analyze=True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
     ):
+        # FIXME: split into basic T1 and T1 with flux dance
         """
         N.B. this is a good example for a generic timedomain experiment using
         the CCL_Transmon.
@@ -4142,13 +4183,15 @@ class HAL_Transmon(Qubit):
                    nr_flux_dance=nr_flux_dance,
                    wait_time_after_flux_dance=wait_time_after_flux_dance)
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             parameter_name='Time',
-                             unit='s',
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            parameter_name='Time',
+            unit='s',
+            CCL=self.instr_CC.get_instr()
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('T1' + self.msmt_suffix)
 
@@ -4158,11 +4201,17 @@ class HAL_Transmon(Qubit):
                 self.T1(a.T1)
             return a.T1
 
-    def measure_T1_2nd_excited_state(self, times=None, MC=None,
-                                     analyze=True, close_fig=True, update=True,
-                                     prepare_for_timedomain=True):
+
+    def measure_T1_2nd_excited_state(
+            self,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True, close_fig=True, update=True,
+            prepare_for_timedomain=True):
         """
         Performs a T1 experiment on the 2nd excited state.
+
+        Note: changes pulses on instr_LutMan_MW
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4178,29 +4227,43 @@ class HAL_Transmon(Qubit):
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
 
-        p = sqo.T1_second_excited_state(times, qubit_idx=self.cfg_qubit_nr(),
-                                        platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             parameter_name='Time',
-                             unit='s',
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+        p = sqo.T1_second_excited_state(
+            times,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            parameter_name='Time',
+            unit='s',
+            CCL=self.instr_CC.get_instr()
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('T1_2nd_exc_state_' + self.msmt_suffix)
+
         a = ma.T1_Analysis(auto=True, close_fig=True)
         return a.T1
 
-    def measure_ramsey(self, times=None, MC=None,
-                       artificial_detuning: float = None,
-                       freq_qubit: float = None,
-                       label: str = '',
-                       prepare_for_timedomain=True,
-                       analyze=True, close_fig=True, update=True,
-                       detector=False,
-                       double_fit=False,
-                       test_beating=True):
+
+    def measure_ramsey(
+            self,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            artificial_detuning: float = None,
+            freq_qubit: float = None,
+            label: str = '',
+            prepare_for_timedomain=True,
+            analyze=True,
+            close_fig=True,
+            update=True,
+            detector=False,
+            double_fit=False,
+            test_beating=True
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -4224,27 +4287,34 @@ class HAL_Transmon(Qubit):
                                  times[-1] + 2 * dt,
                                  times[-1] + 3 * dt,
                                  times[-1] + 4 * dt)])
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
 
         # adding 'artificial' detuning by detuning the qubit LO
         if freq_qubit is None:
             freq_qubit = self.freq_qubit()
-        # this should have no effect if artificial detuning = 0. This is a bug,
+        # FIXME: this should have no effect if artificial detuning = 0. This is a bug,
         # this is real detuning, not artificial detuning
         old_frequency = self.instr_LO_mw.get_instr().get('frequency')
         self.instr_LO_mw.get_instr().set(
             'frequency', freq_qubit -
                          self.mw_freq_mod.get() + artificial_detuning)
 
-        p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
-                       platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name='Time', unit='s')
+        p = sqo.Ramsey(
+            times,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name='Time',
+            unit='s'
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
-
         d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('Ramsey' + label + self.msmt_suffix)
@@ -4279,6 +4349,7 @@ class HAL_Transmon(Qubit):
                     'frequency': a.qubit_frequency,
                 }
                 return res
+
 
     def measure_complex_ramsey(self, times=None, MC=None,
                                freq_qubit: float = None,
@@ -4365,9 +4436,32 @@ class HAL_Transmon(Qubit):
             #     }
             #     return res
 
-    def measure_echo(self, times=None, MC=None,
-                     analyze=True, close_fig=True, update=True,
-                     label: str = '', prepare_for_timedomain=True):
+
+    def measure_echo(
+            self,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            update=True,
+            label: str = '',
+            prepare_for_timedomain=True
+    ):
+        """
+        Note: changes pulses on instr_LutMan_MW
+
+        Args:
+            times:
+            MC:
+            analyze:
+            close_fig:
+            update:
+            label:
+            prepare_for_timedomain:
+
+        Returns:
+
+        """
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -4387,13 +4481,12 @@ class HAL_Transmon(Qubit):
                                  times[-1] + 3 * dt,
                                  times[-1] + 4 * dt)])
 
-        mw_lutman = self.instr_LutMan_MW.get_instr()
-        # # Checking if pulses are on 20 ns grid
-        if not all([np.round(t * 1e9) % (2 * self.cfg_cycle_time() * 1e9) == 0 for
-                    t in times]):
+        # Checking if pulses are on 20 ns grid
+        if not all([np.round(t * 1e9) % (2 * self.cfg_cycle_time() * 1e9) == 0 for t in times]):
             raise ValueError('timesteps must be multiples of 40e-9')
 
-        # # Checking if pulses are locked to the pulse modulation
+        # Checking if pulses are locked to the pulse modulation
+        mw_lutman = self.instr_LutMan_MW.get_instr()
         if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9) == 0 for t in times]) and \
                 mw_lutman.cfg_sideband_mode() != 'real-time':
             raise ValueError(
@@ -4401,17 +4494,27 @@ class HAL_Transmon(Qubit):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-        p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),
-                     platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name="Time", unit="s")
-        d = self.int_avg_det
+
+        p = sqo.echo(
+            times,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name="Time",
+            unit="s"
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('echo' + label + self.msmt_suffix)
+
         if analyze:
             # N.B. v1.5 analysis
             a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
@@ -4419,9 +4522,17 @@ class HAL_Transmon(Qubit):
                 self.T2_echo(a.fit_res.params['tau'].value)
             return a
 
-    def measure_flipping(self, number_of_flips=np.arange(0, 61, 2), equator=True,
-                         MC=None, analyze=True, close_fig=True, update=False,
-                         ax='x', angle='180'):
+
+    def measure_flipping(
+            self,
+            number_of_flips=np.arange(0, 61, 2),
+            equator=True,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            update=False,
+            ax='x',
+            angle='180'):
         """
         Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
         pi (repeated N-times) - pi/2 - measure
@@ -4468,18 +4579,27 @@ class HAL_Transmon(Qubit):
                               nf[-1] + 4 * dn)])
 
         self.prepare_for_timedomain()
-        p = sqo.flipping(number_of_flips=nf, equator=equator,
-                         qubit_idx=self.cfg_qubit_nr(),
-                         platf_cfg=self.cfg_openql_platform_fn(),
-                         ax=ax.lower(), angle=angle)
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             unit='#',
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+
+        p = sqo.flipping(
+            number_of_flips=nf,
+            equator=equator,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            ax=ax.lower(),
+            angle=angle
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            unit='#',
+            CCL=self.instr_CC.get_instr()
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(nf)
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('flipping_' + ax + angle + self.msmt_suffix)
+
         if analyze:
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})
@@ -4515,9 +4635,10 @@ class HAL_Transmon(Qubit):
 
         return a
 
-    def flipping_GBT(self, nr_sequence: int = 2):
+
+    def flipping_GBT(self, nr_sequence: int = 2):  # FIXME: prefix with "measure_"
         '''
-        This function is to measure flipping sequence for whaterver nr_of times
+        This function is to measure flipping sequence for whatever nr_of times
         a function needs to be run to calibrate the Pi and Pi/2 Pulse.
         Right now this method will always return true no matter what
         Later we can add a condition as a check.
@@ -4530,9 +4651,15 @@ class HAL_Transmon(Qubit):
         else:
             return False
 
-    def measure_motzoi(self, motzoi_amps=None,
-                       prepare_for_timedomain: bool = True,
-                       MC=None, analyze=True, close_fig=True):
+
+    def measure_motzoi(
+            self,
+            motzoi_amps=None,
+            prepare_for_timedomain: bool = True,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True
+    ):
         """
         Sweeps the amplitude of the DRAG coefficients looking for leakage reduction
         and optimal correction for the phase error due to stark shift resulting
@@ -4561,47 +4688,52 @@ class HAL_Transmon(Qubit):
         """
         using_VSM = self.cfg_with_vsm()
         MW_LutMan = self.instr_LutMan_MW.get_instr()
-        AWG = MW_LutMan.AWG.get_instr()
 
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         p = sqo.motzoi_XY(
             qubit_idx=self.cfg_qubit_nr(),
-            platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().eqasm_program(p.filename)
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
 
-        d = self.get_int_avg_det(single_int_avg=True, values_per_point=2,
-                                 values_per_point_suffex=['yX', 'xY'],
-                                 always_prepare=True)
-
+        # determine swf_func and motzoi_amps
         if using_VSM:
             VSM = self.instr_VSM.get_instr()
             if motzoi_amps is None:
                 motzoi_amps = np.linspace(0.1, 1.0, 31)
             mod_out = self.mw_vsm_mod_out()
             ch_in = self.mw_vsm_ch_in()
-            D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
-                mod_out, ch_in)]
+            D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(mod_out, ch_in)]
             swf_func = wrap_par_to_swf(D_par, retrieve_value=True)
         else:
+            if motzoi_amps is None:
+                motzoi_amps = np.linspace(-.3, .3, 31)
             if self._using_QWG():
-                if motzoi_amps is None:
-                    motzoi_amps = np.linspace(-.3, .3, 31)
-                swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
-                                              LutMan_parameter=MW_LutMan.mw_motzoi)
+                swf_func = swf.QWG_lutman_par(
+                    LutMan=MW_LutMan,
+                    LutMan_parameter=MW_LutMan.mw_motzoi
+                )
             else:
-                if motzoi_amps is None:
-                    motzoi_amps = np.linspace(-.3, .3, 31)
-                swf_func = swf.lutman_par(LutMan=MW_LutMan,
-                                          LutMan_parameter=MW_LutMan.mw_motzoi)
+                swf_func = swf.lutman_par(
+                    LutMan=MW_LutMan,
+                    LutMan_parameter=MW_LutMan.mw_motzoi
+                )
 
         MC.set_sweep_function(swf_func)
         MC.set_sweep_points(motzoi_amps)
+        d = self.get_int_avg_det(
+            single_int_avg=True,
+            values_per_point=2,
+            values_per_point_suffex=['yX', 'xY'],
+            always_prepare=True
+        )
         MC.set_detector_function(d)
-
         MC.run('Motzoi_XY' + self.msmt_suffix)
+
         if analyze:
             if self.ro_acq_weight_type() == 'optimal':
                 a = ma2.Intersect_Analysis(
@@ -4619,11 +4751,17 @@ class HAL_Transmon(Qubit):
             return a
 
     ##########################################################################
-    # measure_ functions (HAL_Transmon specific)
+    # measure_ functions (HAL_Transmon specific, not present in parent class Qubit)
     ##########################################################################
 
-    def measure_photon_number_splitting(self, freqs, powers, MC=None,
-                                        analyze: bool = True, close_fig: bool = True):
+    def measure_photon_number_splitting(
+            self,
+            freqs,
+            powers,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            close_fig: bool = True
+    ):
         """
         Measures the CW qubit spectroscopy as a function of the RO pulse power
         to find a photon splitting.
@@ -4645,21 +4783,21 @@ class HAL_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-        # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
-        CCL.stop()
-        p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
-                               platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+
+        p = sqo.CW_RO_sequence(
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        # CC gets started in the int_avg detector
+
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
 
         ro_lm = self.instr_LutMan_RO.get_instr()
-        m_amp_par = ro_lm.parameters[
-            'M_amp_R{}'.format(self.cfg_qubit_nr())]
+        m_amp_par = ro_lm.parameters['M_amp_R{}'.format(self.cfg_qubit_nr())]
         s2 = swf.lutman_par_dB_attenuation_UHFQC_dig_trig(
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
@@ -4669,13 +4807,22 @@ class HAL_Transmon(Qubit):
         label = 'Photon_number_splitting'
         MC.run(name=label + self.msmt_suffix, mode='2D')
         spec_source.off()
+
         if analyze:
             ma.TwoD_Analysis(label=label,
                              close_fig=close_fig, normalize=True)
 
-    def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
-                                             analyze: bool = True, close_fig: bool = True,
-                                             fluxChan=None, label=''):
+
+    def measure_resonator_frequency_dac_scan(
+            self,
+            freqs,
+            dac_values,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            close_fig: bool = True,
+            fluxChan=None,
+            label=''
+    ):
         """
         Performs the resonator spectroscopy as a function of the current applied
         to the flux bias line.
@@ -4707,13 +4854,13 @@ class HAL_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-        # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
-        CCL.stop()
-        p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
-                               platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+
+        p = sqo.CW_RO_sequence(
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        # CC gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
             MW_LO_source=self.instr_LO_ro.get_instr(),
@@ -4736,16 +4883,24 @@ class HAL_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_dac_scan' + self.msmt_suffix + label, mode='2D')
+
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
 
-    def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
-                                         mode='pulsed_marked', MC=None,
-                                         analyze=True, fluxChan=None, close_fig=True,
-                                         nested_resonator_calibration=False,
-                                         nested_resonator_calibration_use_min=False,
-                                         resonator_freqs=None,
-                                         trigger_idx=None):
+
+    def measure_qubit_frequency_dac_scan(
+            self, freqs,
+            dac_values,
+            mode='pulsed_marked',
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            fluxChan=None,
+            close_fig=True,
+            nested_resonator_calibration=False,
+            nested_resonator_calibration_use_min=False,
+            resonator_freqs=None,
+            trigger_idx=None
+    ):
         """
         Performs the qubit spectroscopy while changing the current applied
         to the flux bias line.
@@ -4804,7 +4959,7 @@ class HAL_Transmon(Qubit):
             trigger_idx = self.cfg_qubit_nr()
 
         # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
+        CC = self.instr_CC.get_instr()
         if mode == 'pulsed_marked':
             p = sqo.pulsed_spec_seq_marked(
                 qubit_idx=self.cfg_qubit_nr(),
@@ -4816,9 +4971,9 @@ class HAL_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn())
+        CC.eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        # CC gets started in the int_avg detector
 
-        CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
         if 'ivvi' in self.instr_FluxCtrl().lower():
             IVVI = self.instr_FluxCtrl.get_instr()
             if fluxChan is None:
@@ -4849,7 +5004,7 @@ class HAL_Transmon(Qubit):
                 nested_MC=self.instr_nested_MC.get_instr(),
                 freqs=resonator_freqs,
                 par=dac_par, use_min=nested_resonator_calibration_use_min,
-                reload_sequence=True, sequence_file=p, cc=CCL)
+                reload_sequence=True, sequence_file=p, cc=CC)
             MC.set_sweep_function_2D(res_updating_dac_par)
         else:
             MC.set_sweep_function_2D(dac_par)
@@ -4862,9 +5017,14 @@ class HAL_Transmon(Qubit):
             return ma.TwoD_Analysis(label='Qubit_dac_scan',
                                     close_fig=close_fig)
 
-    def measure_spectroscopy_CW(self, freqs, MC=None,
-                                analyze=True, close_fig=True, label='',
-                                prepare_for_continuous_wave=True):
+    def measure_spectroscopy_CW(
+            self,
+            freqs,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            label='',
+            prepare_for_continuous_wave=True):
         """
         Does a CW spectroscopy experiment by sweeping the frequency of a
         microwave source.
@@ -4890,19 +5050,19 @@ class HAL_Transmon(Qubit):
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
 
-        # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
-            platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+
+        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
         # Set marker mode off for CW:
-        if not spec_source.get_idn()['model'] == 'E8257D':
+        if not spec_source.get_idn()['model'] == 'E8257D':  # FIXME: HW dependency
             spec_source.pulsemod_state('Off')
 
         MC.set_sweep_function(spec_source.frequency)
@@ -4914,18 +5074,26 @@ class HAL_Transmon(Qubit):
             self.int_avg_det_single._set_real_imag(False)
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
+
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
+
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def measure_spectroscopy_pulsed_marked(self, freqs, MC=None,
-                                           analyze=True, close_fig=True,
-                                           label='',
-                                           prepare_for_continuous_wave=True,
-                                           trigger_idx=None):
+
+    def measure_spectroscopy_pulsed_marked(
+            self,
+            freqs,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            label='',
+            prepare_for_continuous_wave=True,
+            trigger_idx=None
+    ):
         """
         Performs a spectroscopy experiment by triggering the spectroscopy source
         with a CCLight trigger.
@@ -4948,18 +5116,17 @@ class HAL_Transmon(Qubit):
         if trigger_idx is None:
             trigger_idx = self.cfg_qubit_nr()
 
-        # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
+        CC = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq_marked(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
-            cc=self.instr_CC(),
-            trigger_idx=trigger_idx if (CCL.name.upper() == 'CCL' or CCL.name.upper() == 'CC') else 15,
+            cc=self.instr_CC(),  # FIXME: add ".get_instr()"
+            trigger_idx=trigger_idx if (CC.name.upper() == 'CCL' or CC.name.upper() == 'CC') else 15,  # FIXME: CCL is deprecated
             wait_time_ns=wait_time_ns)
 
-        CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+        CC.eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
@@ -4978,15 +5145,23 @@ class HAL_Transmon(Qubit):
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
+
         if analyze:
             ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
+
                                            qb_name=self.name)
 
-    def measure_spectroscopy_pulsed_mixer(self, freqs, MC=None,
-                                          analyze=True, close_fig=True,
-                                          label='',
-                                          prepare_for_timedomain=True):
+
+    def measure_spectroscopy_pulsed_mixer(
+            self,
+            freqs,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            label='',
+            prepare_for_timedomain=True
+    ):
         """
         Performs pulsed spectroscopy by modulating a cw pulse with a square
         which is generated by an AWG. Uses the self.mw_LO as spec source, as
@@ -5023,15 +5198,14 @@ class HAL_Transmon(Qubit):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-        # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
+
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
 
-        CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source_2.get_instr()
         # spec_source.on()
@@ -5052,19 +5226,29 @@ class HAL_Transmon(Qubit):
         MC.run(name='pulsed_mixer_spectroscopy' + self.msmt_suffix + label)
 
         self.mw_channel_amp(old_channel_amp)
+
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
+
         if analyze:
             ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
                                            qb_name=self.name)
 
-    def measure_anharmonicity(self, freqs_01=None, freqs_12=None, f_01_power=None,
-                              f_12_power=None,
-                              MC=None, spec_source_2=None,
-                              mode='pulsed_marked', step_size: int = 1e6):
+
+    def measure_anharmonicity(
+            self,
+            freqs_01=None,
+            freqs_12=None,
+            f_01_power=None,
+            f_12_power=None,
+            MC: Optional[MeasurementControl] = None,
+            spec_source_2=None,
+            mode='pulsed_marked',
+            step_size: int = 1e6
+    ):
         """
         Measures the qubit spectroscopy as a function of frequency of the two
         driving tones. The qubit transitions are observed when frequency of one
@@ -5108,7 +5292,7 @@ class HAL_Transmon(Qubit):
             f_12_power = f_01_power + 5
         print('f_anharmonicity estimation', f_anharmonicity)
         print('f_12 estimations', np.mean(freqs_12))
-        CCL = self.instr_CC.get_instr()
+
         if mode == 'pulsed_marked':
             p = sqo.pulsed_spec_seq_marked(
                 qubit_idx=self.cfg_qubit_nr(),
@@ -5121,9 +5305,11 @@ class HAL_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source = self.instr_spec_source.get_instr()
@@ -5153,16 +5339,25 @@ class HAL_Transmon(Qubit):
         MC.set_sweep_points_2D(freqs_12)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run_2D(name='Two_tone_' + self.msmt_suffix)
+
         ma.TwoD_Analysis(auto=True)
+
         spec_source.off()
         spec_source_2.off()
         ma.Three_Tone_Spectroscopy_Analysis(
             label='Two_tone', f01=np.mean(freqs_01), f12=np.mean(freqs_12))
 
-    def measure_anharmonicity_GBT(self, freqs_01=None, freqs_12=None, f_01_power=None,
-                                  f_12_power=None,
-                                  MC=None, spec_source_2=None,
-                                  mode='pulsed_marked'):
+
+    def measure_anharmonicity_GBT(
+            self,
+            freqs_01=None,
+            freqs_12=None,
+            f_01_power=None,
+            f_12_power=None,
+            MC: Optional[MeasurementControl] = None,
+            spec_source_2=None,
+            mode='pulsed_marked'
+    ):
         """
         Measures the qubit spectroscopy as a function of frequency of the two
         driving tones. The qubit transitions are observed when frequency of one
@@ -5202,15 +5397,17 @@ class HAL_Transmon(Qubit):
 
         print('f_anharmonicity estimation', f_anharmonicity)
         print('f_12 estimations', np.mean(freqs_12))
-        CCL = self.instr_CC.get_instr()
+
         p = sqo.pulsed_spec_seq_marked(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             trigger_idx=0)
-        CCL.eqasm_program(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source = self.instr_spec_source.get_instr()
@@ -5262,9 +5459,15 @@ class HAL_Transmon(Qubit):
         else:
             return True
 
-    def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None,
-                                             powers=np.arange(-10, 10, 1), MC=None,
-                                             spec_source_2=None):
+
+    def measure_photon_nr_splitting_from_bus(
+            self,
+            f_bus,
+            freqs_01=None,
+            powers=np.arange(-10, 10, 1),
+            MC: Optional[MeasurementControl] = None,
+            spec_source_2=None
+    ):
         """
         Measures photon splitting of the qubit due to photons in the bus resonators.
         Specifically it is a CW qubit pectroscopy with the second  variable-power CW tone
@@ -5289,15 +5492,17 @@ class HAL_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-        CCL = self.instr_CC.get_instr()
+
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source = self.instr_spec_source.get_instr()
+
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+
         self.int_avg_det_single._set_real_imag(False)
         spec_source.on()
         spec_source.power(self.spec_pow())
@@ -5307,17 +5512,16 @@ class HAL_Transmon(Qubit):
         MC.set_sweep_function(wrap_par_to_swf(
             spec_source.frequency, retrieve_value=True))
         MC.set_sweep_points(freqs_01)
-
         MC.set_sweep_function_2D(wrap_par_to_swf(
             spec_source_2.power, retrieve_value=True))
         MC.set_sweep_points_2D(powers)
         MC.set_detector_function(self.int_avg_det_single)
-
         MC.run_2D(name='Photon_nr_splitting' + self.msmt_suffix)
 
         ma.TwoD_Analysis(auto=True)
         spec_source.off()
         spec_source_2.off()
+
 
     def measure_ssro_vs_frequency_amplitude(
             self, freqs=None, amps_rel=np.linspace(0, 1, 11),
@@ -5359,6 +5563,7 @@ class HAL_Transmon(Qubit):
             optimization_M_amp_down1s=[self.ro_pulse_down_amp1()],
             upload=True
         )
+
 
     def measure_ssro_vs_TWPA_frequency_power(
             self, pump_source, freqs, powers,
@@ -5416,6 +5621,7 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label=label, plot_all=True, auto=True)
 
+
     def measure_ssro_vs_pulse_length(self, lengths=np.arange(100e-9, 1501e-9, 100e-9),
                                      nr_shots=4092 * 4, nested_MC=None, analyze=True,
                                      label_suffix: str = ''):
@@ -5463,12 +5669,12 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
+
     def measure_transients_CCL_switched(self, MC=None, analyze: bool = True,
                                         cases=('off', 'on'),
                                         prepare: bool = True, depletion_analysis: bool = True,
                                         depletion_analysis_plot: bool = True,
                                         depletion_optimization_window=None):
-        # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -5494,6 +5700,7 @@ class HAL_Transmon(Qubit):
                 sampling_rate = 1.8e9
             else:
                 raise NotImplementedError()
+
             MC.set_sweep_points(
                 np.arange(self.input_average_detector.nr_samples) /
                 sampling_rate)
@@ -5512,6 +5719,7 @@ class HAL_Transmon(Qubit):
             return a
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
+
 
     def measure_dispersive_shift_pulsed(self, freqs=None, MC=None, analyze: bool = True,
                                         prepare: bool = True):
@@ -5555,7 +5763,7 @@ class HAL_Transmon(Qubit):
                 initialize=False,
                 platf_cfg=self.cfg_openql_platform_fn())
             self.instr_CC.get_instr().eqasm_program(p.filename)
-            # CCL gets started in the int_avg detector
+            # CC gets started in the int_avg detector
 
             MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
                 MW_LO_source=self.instr_LO_ro.get_instr(),
@@ -5582,6 +5790,7 @@ class HAL_Transmon(Qubit):
                 a.qoi['dispersive_shift'] * 1e-6))
 
             return True
+
 
     def measure_error_fraction(self, MC=None, analyze: bool = True,
                                nr_shots: int = 2048 * 4,
@@ -5650,8 +5859,6 @@ class HAL_Transmon(Qubit):
                                        multi_qubit_platf_cfg=None,
                                        target_qubit_excited=False,
                                        extra_echo=False):
-        # docstring from parent class
-
         # Refs:
         # Schuster PRL 94, 123602 (2005)
         # Gambetta PRA 74, 042318 (2006)
@@ -5729,6 +5936,7 @@ class HAL_Transmon(Qubit):
         # else:
         #    return {'coherence': -1,
         #            'phase' : -1}
+
 
     def measure_CPMG(self, times=None, orders=None, MC=None, sweep='tau',
                      analyze=True, close_fig=True, update=False,
@@ -5997,12 +6205,16 @@ class HAL_Transmon(Qubit):
             a = ma.Echo_analysis_V15(label='rabi_frequency', auto=True, close_fig=True)
             return a
 
+
     def measure_single_qubit_randomized_benchmarking(
-            self, nr_cliffords=2 ** np.arange(12),
+            self,
+            nr_cliffords=2 ** np.arange(12),
             nr_seeds=100,
-            MC=None,
-            recompile: bool = 'as needed', prepare_for_timedomain: bool = True,
-            ignore_f_cal_pts: bool = False, compile_only: bool = False,
+            MC: Optional[MeasurementControl] = None,
+            recompile: bool = 'as needed',
+            prepare_for_timedomain: bool = True,
+            ignore_f_cal_pts: bool = False,
+            compile_only: bool = False,
             rb_tasks=None):
         """
         Measures randomized benchmarking decay including second excited state
@@ -6047,6 +6259,7 @@ class HAL_Transmon(Qubit):
             self.prepare_for_timedomain()
         else:
             self.prepare_readout()
+
         MC.soft_avg(1)
         # set back the settings
         self.ro_acq_weight_type(old_weight_type)
@@ -6131,6 +6344,7 @@ class HAL_Transmon(Qubit):
             cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2))
         return a
 
+
     def measure_randomized_benchmarking_old(self, nr_cliffords=2 ** np.arange(12),
                                             nr_seeds=100,
                                             double_curves=False,
@@ -6195,13 +6409,18 @@ class HAL_Transmon(Qubit):
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
         return a.fit_res.params['fidelity_per_Clifford'].value
 
-    def measure_ef_rabi_2D(self,
-                           amps: list = np.linspace(0, .8, 18),
-                           anharmonicity: list = np.arange(-275e6, -326e6, -5e6),
-                           recovery_pulse: bool = True,
-                           MC=None, label: str = '',
-                           analyze=True, close_fig=True,
-                           prepare_for_timedomain=True):
+
+    def measure_ef_rabi_2D(
+            self,
+            amps: list = np.linspace(0, .8, 18),
+            anharmonicity: list = np.arange(-275e6, -326e6, -5e6),
+            recovery_pulse: bool = True,
+            MC: Optional[MeasurementControl] = None,
+            label: str = '',
+            analyze=True,
+            close_fig=True,
+            prepare_for_timedomain=True
+    ):
         """
         Measures a rabi oscillation of the ef/12 transition.
 
@@ -6221,30 +6440,38 @@ class HAL_Transmon(Qubit):
         p = sqo.ef_rabi_seq(
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
-            platf_cfg=self.cfg_openql_platform_fn())
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             parameter_name='Pulse amp',
-                             unit='dac',
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            parameter_name='Pulse amp',
+            unit='dac',
+            CCL=self.instr_CC.get_instr()
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
-        MC.set_sweep_function_2D(swf.anharmonicity_sweep(qubit=self,
-                                                         amps=amps))
+        MC.set_sweep_function_2D(swf.anharmonicity_sweep(qubit=self, amps=amps))
         MC.set_sweep_points_2D(anharmonicity)
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('ef_rabi_2D' + label + self.msmt_suffix, mode='2D')
+
         if analyze:
             a = ma.TwoD_Analysis()
             return a
 
-    def measure_ef_rabi(self,
-                        amps: list = np.linspace(0, .8, 18),
-                        recovery_pulse: bool = True,
-                        MC=None, label: str = '',
-                        analyze=True, close_fig=True,
-                        prepare_for_timedomain=True):
+
+    def measure_ef_rabi(
+            self,
+            amps: list = np.linspace(0, .8, 18),
+            recovery_pulse: bool = True,
+            MC: Optional[MeasurementControl] = None,
+            label: str = '',
+            analyze=True,
+            close_fig=True,
+            prepare_for_timedomain=True
+    ):
         """
         Measures a rabi oscillation of the ef/12 transition.
 
@@ -6265,23 +6492,28 @@ class HAL_Transmon(Qubit):
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
             platf_cfg=self.cfg_openql_platform_fn(),
-            add_cal_points=True)
+            add_cal_points=True
+        )
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             parameter_name='Pulse amp',
-                             unit='dac',
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            parameter_name='Pulse amp',
+            unit='dac',
+            CCL=self.instr_CC.get_instr()
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('ef_rabi' + label + self.msmt_suffix)
+
         if analyze:
             a2 = ma2.EFRabiAnalysis(close_figs=True, label='ef_rabi')
             # if update:
             #     ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
             #     self.ef_amp180(a2.proc_data_dict['ef_pi_amp'])
             return a2
+
 
     def measure_gst_1Q(self,
                        shots_per_meas: int,
@@ -6443,6 +6675,7 @@ class HAL_Transmon(Qubit):
         MC.set_sweep_points(dac_values)
         MC.set_detector_function(d)
         MC.run(name='Tracked_Spectroscopy')
+
 
     def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
                                                      nested_MC=None, cross_target_qubits=None,
@@ -6726,7 +6959,7 @@ class HAL_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
         CCL.eqasm_program(p.filename)
-        # CCL gets started in the int_avg detector
+        # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
@@ -6756,37 +6989,6 @@ class HAL_Transmon(Qubit):
             self._prep_ro_pulse(upload=True)
         if analyze:
             ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-
-    def allxy_GBT(self, MC=None,
-                  label: str = '',
-                  analyze=True, close_fig=True,
-                  prepare_for_timedomain=True, termination_opt=0.02):
-        '''#
-        This function is the same as measure AllXY, but with a termination limit
-        This termination limit is as a system metric to evalulate the calibration
-        by GBT if good or not.
-        '''
-        old_avg = self.ro_soft_avg()
-        self.ro_soft_avg(4)
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain()
-        p = sqo.AllXY(qubit_idx=self.cfg_qubit_nr(), double_points=True,
-                      platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(42))
-        MC.set_detector_function(d)
-        MC.run('AllXY' + label + self.msmt_suffix)
-        self.ro_soft_avg(old_avg)
-        a = ma.AllXY_Analysis(close_main_fig=close_fig)
-        if a.deviation_total > termination_opt:
-            return False
-        else:
-            return True
 
     def check_qubit_spectroscopy(self, freqs=None, MC=None):
         """
