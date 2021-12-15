@@ -221,38 +221,22 @@ class OqlProgram:
         this_file_hash = get_file_sha256_hash(clifford_rb_oql, return_hexdigest=True)
         file_hashes = {self._platf_cfg: platf_cfg_hash, clifford_rb_oql: this_file_hash}
 
-        def write_hashes_file():
-            # We use a temporary file such that for parallel compilations, if the
-            # process is interrupted before the end there will be no hash and
-            # recompilation will be forced
-            if 0:
-                with open(tmp_fn, "w") as outfile:
-                    json.dump(file_hashes, outfile)
-            else:
-                pathlib.Path(tmp_fn).parent.mkdir(parents=True, exist_ok=True)
-                pathlib.Path(tmp_fn).write_text(json.dumps(file_hashes))
-
-        def load_hashes_from_file():
-            with open(rb_system_hashes_fn) as json_file:
-                hashes_dict = json.load(json_file)
-            return hashes_dict
-
         _recompile = False
-
         if not isfile(self.filename):
             if recompile is False:
                 raise ValueError('No file:\n{}'.format(self.filename))
             else:
                 # Force recompile, there is no program file
-                _recompile |= True
+                _recompile |= True  # FIXME: why "|="?
 
         # Determine if compilation is needed based on the hashed files
         if not isfile(rb_system_hashes_fn):
             # There is no file with the hashes, we must compile to be safe
             _recompile |= True
         else:
-            # Hashes exist we use them to determine if recompilations is needed
-            hashes_dict = load_hashes_from_file()
+            # Hashes exist, we use them to determine if recompilations is needed
+            with open(rb_system_hashes_fn) as json_file:
+                hashes_dict = json.load(json_file)
             # Remove file to signal a compilation in progress
             remove(rb_system_hashes_fn)
 
@@ -262,7 +246,11 @@ class OqlProgram:
                 _recompile |= hashes_dict.get(fn, "") != file_hashes[fn]
 
         # Write the updated hashes
-        write_hashes_file()
+        # We use a temporary file such that for parallel compilations, if the
+        # process is interrupted before the end there will be no hash and
+        # recompilation will be forced
+        pathlib.Path(tmp_fn).parent.mkdir(parents=True, exist_ok=True)
+        pathlib.Path(tmp_fn).write_text(json.dumps(file_hashes))
 
         res_dict = {
             "file": rb_system_hashes_fn,
