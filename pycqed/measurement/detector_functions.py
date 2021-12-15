@@ -21,6 +21,9 @@ from pycqed.measurement.det_fncs.Base import Detector_Function, Mock_Detector, M
 from pycqed.measurement.det_fncs.hard.UHFQC import UHFQC_input_average_detector, UHFQC_demodulated_input_avg_det, \
     UHFQC_spectroscopy_detector, UHFQC_integrated_average_detector, UHFQC_correlation_detector, \
     UHFQC_integration_logging_det, UHFQC_statistics_logging_det, UHFQC_single_qubit_statistics_logging_det
+from pycqed.measurement.det_fncs.hard.SignalHound import Signal_Hound_fixed_frequency, Signal_Hound_sweeped_frequency, \
+    SH_mixer_skewness_det
+
 
 from qcodes.instrument.parameter import _BaseParameter
 
