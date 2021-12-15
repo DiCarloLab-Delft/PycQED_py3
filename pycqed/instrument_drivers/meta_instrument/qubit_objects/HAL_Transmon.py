@@ -3894,9 +3894,17 @@ class HAL_Transmon(Qubit):
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
-    def measure_rabi(self, MC=None, amps=np.linspace(0, 1, 31),
-                     analyze=True, close_fig=True, real_imag=True,
-                     prepare_for_timedomain=True, all_modules=False):
+
+    def measure_rabi(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            amps=np.linspace(0, 1, 31),
+            analyze=True,
+            close_fig=True,
+            real_imag=True,
+            prepare_for_timedomain=True,
+            all_modules=False
+    ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
         while the drive frequency and pulse duration is kept fixed
@@ -3917,17 +3925,36 @@ class HAL_Transmon(Qubit):
         """
 
         if self.cfg_with_vsm():
-            self.measure_rabi_vsm(MC, amps,
-                                  analyze, close_fig, real_imag,
-                                  prepare_for_timedomain, all_modules)
+            self.measure_rabi_vsm(
+                MC,
+                amps,
+                analyze,
+                close_fig,
+                real_imag,
+                prepare_for_timedomain,
+                all_modules
+            )
         else:
-            self.measure_rabi_channel_amp(MC, amps,
-                                          analyze, close_fig, real_imag,
-                                          prepare_for_timedomain)
+            self.measure_rabi_channel_amp(
+                MC,
+                amps,
+                analyze,
+                close_fig,
+                real_imag,
+                prepare_for_timedomain
+            )
 
-    def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.1, 1.0, 31),
-                         analyze=True, close_fig=True, real_imag=True,
-                         prepare_for_timedomain=True, all_modules=False):
+
+    def measure_rabi_vsm(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            amps=np.linspace(0.1, 1.0, 31),
+            analyze=True,
+            close_fig=True,
+            real_imag=True,
+            prepare_for_timedomain=True,
+            all_modules=False
+    ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
         while the drive frequency and pulse duration is kept fixed
@@ -3940,39 +3967,37 @@ class HAL_Transmon(Qubit):
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
             initialize=False,
             platf_cfg=self.cfg_openql_platform_fn())
 
         VSM = self.instr_VSM.get_instr()
-
         mod_out = self.mw_vsm_mod_out()
         ch_in = self.mw_vsm_ch_in()
         if all_modules:
             mod_sweep = []
             for i in range(8):
                 VSM.set('mod{}_ch{}_marker_state'.format(i + 1, ch_in), 'on')
-                G_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
-                    i + 1, ch_in)]
-                D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
-                    i + 1, ch_in)]
+                G_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(i + 1, ch_in)]
+                D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(i + 1, ch_in)]
                 mod_sweep.append(swf.two_par_joint_sweep(
                     G_par, D_par, preserve_ratio=False))
             s = swf.multi_sweep_function(sweep_functions=mod_sweep,
                                          retrieve_value=True)
         else:
-            G_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
-                mod_out, ch_in)]
-            D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
-                mod_out, ch_in)]
+            G_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(mod_out, ch_in)]
+            D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(mod_out, ch_in)]
 
             s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=False,
                                         retrieve_value=True, instr=VSM)
 
         self.instr_CC.get_instr().eqasm_program(p.filename)
+
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         #  real_imag is acutally not polar and as such works for opt weights
@@ -3982,9 +4007,16 @@ class HAL_Transmon(Qubit):
         ma.Rabi_Analysis(label='rabi_')
         return True
 
-    def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
-                                 analyze=True, close_fig=True, real_imag=True,
-                                 prepare_for_timedomain=True):
+
+    def measure_rabi_channel_amp(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            amps=np.linspace(0, 1, 31),
+            analyze=True,
+            close_fig=True,
+            real_imag=True,
+            prepare_for_timedomain=True
+    ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
         while the drive frequency and pulse duration is kept fixed
@@ -3999,8 +4031,10 @@ class HAL_Transmon(Qubit):
 
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
             initialize=False,
@@ -4010,33 +4044,42 @@ class HAL_Transmon(Qubit):
         s = MW_LutMan.channel_amp
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
-        # real_imag is acutally not polar and as such works for opt weights
+        # real_imag is actually not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_' + self.msmt_suffix)
+
         ma.Rabi_Analysis(label='rabi_')
         return True
 
-    def measure_allxy(self, MC=None,
-                      label: str = '',
-                      analyze=True, close_fig=True,
-                      prepare_for_timedomain=True):
+
+    def measure_allxy(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            label: str = '',
+            analyze=True,
+            close_fig=True,
+            prepare_for_timedomain=True
+    ) -> float:
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         p = sqo.AllXY(qubit_idx=self.cfg_qubit_nr(), double_points=True,
                       platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('AllXY' + label + self.msmt_suffix)
+
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
+
 
     def measure_T1(
             self,

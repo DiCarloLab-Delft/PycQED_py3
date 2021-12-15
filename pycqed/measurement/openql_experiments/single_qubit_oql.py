@@ -265,6 +265,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True) -> OqlProg
     """
     p = OqlProgram("AllXY", platf_cfg)
 
+    # define 21 gate pairs
     allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
              ['rx180', 'ry180'], ['ry180', 'rx180'],
              ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],

@@ -8,6 +8,10 @@ from deprecated import deprecated
 
 from pycqed.analysis_v2.tools import contours2d as c2d
 
+# imports for type annotations
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
 class Sweep_function(object):
 
@@ -331,9 +335,14 @@ class Hard_Sweep(Sweep_function):
 
 class OpenQL_Sweep(Hard_Sweep):
 
-    def __init__(self, openql_program, CCL,
-                 parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True):
+    def __init__(
+            self,
+            openql_program: OqlProgram,
+            CCL: CC,
+            parameter_name: str = 'Points',
+            unit: str = 'a.u.',
+            upload: bool = True
+    ):
         super().__init__()
         self.name = 'OpenQL_Sweep'
         self.openql_program = openql_program
@@ -349,9 +358,13 @@ class OpenQL_Sweep(Hard_Sweep):
 
 class OpenQL_File_Sweep(Hard_Sweep):
 
-    def __init__(self, filename: str, CCL,
-                 parameter_name: str ='Points', unit: str='a.u.',
-                 upload: bool=True):
+    def __init__(
+            self,
+            filename: str,
+            CCL: CC,
+            parameter_name: str = 'Points',
+            unit: str = 'a.u.',
+            upload: bool = True):
         super().__init__()
         self.name = 'OpenQL_Sweep'
         self.filename = filename
