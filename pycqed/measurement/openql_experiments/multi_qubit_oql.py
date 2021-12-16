@@ -100,7 +100,7 @@ def multi_qubit_off_on(
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment 
+                k.barrier([])  # alignment
             k.gate("wait", [], wait_time)
 
             # 3. prepare desired state
@@ -1833,7 +1833,7 @@ def conditional_oscillation_seq_multi(
 
     Pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-    parking qbs: includes all qubits to be parked. 
+    parking qbs: includes all qubits to be parked.
 
     Timing of the sequence:
     q0:  X90   --  C-Phase  (repet. C-Phase) Rphi90 RO
@@ -1844,7 +1844,7 @@ def conditional_oscillation_seq_multi(
     Args:
          pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-        parking qbs: includes all qubits to be parked. 
+        parking qbs: includes all qubits to be parked.
 
         flux_codeword (str):
             the gate to be applied to the qubit pair q0, q1
@@ -2002,7 +2002,7 @@ def parity_check_flux_dance(
 
     Pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-    parking qbs: includes all qubits to be parked. 
+    parking qbs: includes all qubits to be parked.
 
     Timing of the sequence:
     q0:  X90   --  C-Phase  (repet. C-Phase) Rphi90 RO
@@ -2013,7 +2013,7 @@ def parity_check_flux_dance(
     Args:
          pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-        parking qbs: includes all qubits to be parked. 
+        parking qbs: includes all qubits to be parked.
 
         flux_codeword (str):
             the gate to be applied to the qubit pair q0, q1
@@ -2165,7 +2165,7 @@ def parity_check_fidelity(
 
     Pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-    parking qbs: includes all qubits to be parked. 
+    parking qbs: includes all qubits to be parked.
 
     Timing of the sequence:
     q0:  X90   --  C-Phase  (repet. C-Phase) Rphi90 RO
@@ -2176,7 +2176,7 @@ def parity_check_fidelity(
     Args:
          pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-        parking qbs: includes all qubits to be parked. 
+        parking qbs: includes all qubits to be parked.
 
         flux_codeword (str):
             the gate to be applied to the qubit pair q0, q1
@@ -2936,8 +2936,9 @@ def two_qubit_state_tomography(
             k.measure(q_idx)
         k.barrier([])
         p.add_kernel(k)
+
     p.compile()
-    p.combinations = combinations
+    p.combinations = combinations  # FIXME: violates class definition, pass separately?
     return p
 
 

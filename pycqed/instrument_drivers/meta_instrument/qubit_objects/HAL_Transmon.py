@@ -1075,6 +1075,7 @@ class HAL_Transmon(Qubit):
         if self.cfg_with_vsm():
             self._prep_td_configure_VSM()
 
+    # FIXME:
     def prepare_for_fluxing(self, reset=True):
         pass
 
@@ -3652,9 +3653,6 @@ class HAL_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # plotting really slows down SSRO (16k shots plotting is slow)
-        old_plot_setting = MC.live_plot_enabled()
-        MC.live_plot_enabled(False)
         if prepare:
             self.prepare_for_timedomain()
 
@@ -3675,15 +3673,22 @@ class HAL_Transmon(Qubit):
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Shot', unit='#',
                              upload=prepare)
-        MC.soft_avg(1)  # don't want to average single shots
+
+        # save and change settings
+        # plotting really slows down SSRO (16k shots plotting is slow)
+        old_plot_setting = MC.live_plot_enabled()
+        MC.live_plot_enabled(False)
+
+        MC.soft_avg(1)  # don't want to average single shots. FIXME changes state
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
         d.nr_shots = np.min([shots_per_meas, nr_shots])
         MC.set_detector_function(d)
-
         MC.run('SSRO_{}{}'.format(label, self.msmt_suffix),
                disable_snapshot_metadata=disable_metadata)
+
+        # restore settings
         MC.live_plot_enabled(old_plot_setting)
 
         ######################################################################

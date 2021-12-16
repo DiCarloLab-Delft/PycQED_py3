@@ -41,6 +41,7 @@ from pycqed.utilities.general import check_keyboard_interrupt, print_exception
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.measurement.measurement_control import MeasurementControl
+from pycqed.measurement.detector_functions import Detector_Function
 
 
 log = logging.getLogger(__name__)
@@ -105,7 +106,7 @@ class HAL_Device(Instrument):
 
         # 2. Setting the latencies
         cc = self.instr_CC.get_instr()
-        if cc.IDN()['model']=='CCL':
+        if cc.IDN()['model']=='CCL':  # FIXME: CCL is deprecated
             latencies = OrderedDict(
                 [
                     ("ro_0", self.tim_ro_latency_0()),
@@ -163,7 +164,7 @@ class HAL_Device(Instrument):
             for key, val in latencies.items():
                 latencies[key] = val + correction_for_multiple
 
-        # Setting the latencies in the CCL
+        # Setting the latencies in the CC
         # Iterate over keys in dio_map as this ensures only relevant
         # timing setting are set.
         for lat_key, dio_ch in self.dio_map().items():
@@ -306,10 +307,13 @@ class HAL_Device(Instrument):
     # public functions: get_*_detector
     ##########################################################################
 
-    def get_correlation_detector(self, qubits: list,
-                                 single_int_avg: bool = False,
-                                 seg_per_point: int = 1,
-                                 always_prepare: bool = False):
+    def get_correlation_detector(
+            self,
+            qubits: list,
+            single_int_avg: bool = False,
+            seg_per_point: int = 1,
+            always_prepare: bool = False
+    ) -> Detector_Function:
         if self.ro_acq_digitized():
             log.warning('Digitized mode gives bad results')
         if len(qubits) != 2:
@@ -348,7 +352,12 @@ class HAL_Device(Instrument):
 
         return d
 
-    def get_int_logging_detector(self, qubits=None, result_logging_mode='raw'):
+
+    def get_int_logging_detector(
+            self,
+            qubits=None,
+            result_logging_mode='raw'
+    ) -> Detector_Function:
         # FIXME: qubits passed to but not used in function
 
         if self.ro_acq_weight_type() == 'SSB':
@@ -393,7 +402,8 @@ class HAL_Device(Instrument):
 
         return int_log_det
 
-    def get_input_avg_det(self, **kw):
+
+    def get_input_avg_det(self, **kw) -> Detector_Function:
         """
         Create an input average multi detector based.
 
@@ -426,7 +436,8 @@ class HAL_Device(Instrument):
 
         return input_average_detector
 
-    def get_int_avg_det(self, qubits=None, **kw):
+
+    def get_int_avg_det(self, qubits=None, **kw) -> Detector_Function:
         """
         """
         if qubits is not None:
@@ -601,15 +612,12 @@ class HAL_Device(Instrument):
         )
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
-
         measured_qubits = [q0, q1]
         if q2 is not None:
             measured_qubits.append(q2)
         if q3 is not None:
             measured_qubits.append(q3)
-
         MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))
-
         MC.run(
             "conditional_oscillation_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}".format(
                 q0, q1, q2, q3, cz_repetitions,
@@ -636,6 +644,7 @@ class HAL_Device(Instrument):
             extract_only=extract_only)
 
         return a
+
 
     def measure_conditional_oscillation_multi(
             self,
@@ -788,12 +797,10 @@ class HAL_Device(Instrument):
             parameter_name="Phase",
             unit="deg",
         )
-
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
         d = self.get_int_avg_det(qubits=list_qubits_used)
         MC.set_detector_function(d)
-
         MC.run(
             "conditional_oscillation_{}_x{}_{}{}".format(
                 list_qubits_used, cz_repetitions,
@@ -843,6 +850,7 @@ class HAL_Device(Instrument):
                 (a.proc_data_dict['quantities_of_interest']['phi_1'].n + 180) % 360 - 180
 
         return result_dict
+
 
     def measure_parity_check_flux_dance(
             self,
@@ -1049,7 +1057,7 @@ class HAL_Device(Instrument):
             Q_idxs_control += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits_by_case]
             cases = control_cases_to_measure
 
-            # for separate preparation of parking qubits in 1, used to study parking
+        # for separate preparation of parking qubits in 1, used to study parking
         if parking_qubits:
             Q_idxs_parking = []
             for i, qb in enumerate(parking_qubits):
@@ -1075,7 +1083,6 @@ class HAL_Device(Instrument):
                 mw_lutman.load_waveform_onto_AWG_lookuptable(27, regenerate_waveforms=True)
 
         for i, qb in enumerate(target_qubits):
-            mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
             mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
             # load_phase_pulses already uploads all waveforms inside
             mw_lutman.load_phase_pulses_to_AWG_lookuptable(
@@ -1142,6 +1149,7 @@ class HAL_Device(Instrument):
 
         return a.result
 
+
     def measure_parity_check_fidelity(
             self,
             target_qubits: list,
@@ -1172,7 +1180,6 @@ class HAL_Device(Instrument):
         Plotting the probabilities of the zero state for each qubit as a function of
         the afterrotation axis angle, and comparing case of q1 in 0 or 1 state, enables to
         measure the conditional phase and estimale the leakage of the Cphase gate.
-
 
         Args:
             pairs (lst(lst)):
@@ -1259,10 +1266,10 @@ class HAL_Device(Instrument):
             wait_time_before_flux=wait_time_before_flux_ns,
             wait_time_after_flux=wait_time_after_flux_ns
         )
+
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
-
         d = self.get_int_logging_detector(
             qubits=target_qubits + control_qubits,
             result_logging_mode=result_logging_mode
@@ -1288,6 +1295,8 @@ class HAL_Device(Instrument):
 
         return True
 
+
+    # FIXME: commented out
     # def measure_phase_corrections(
     #         self,
     #         target_qubits: List[str],
@@ -1331,6 +1340,7 @@ class HAL_Device(Instrument):
 
     #     return self
 
+
     def measure_two_qubit_grovers_repeated(
             self,
             qubits: list,
@@ -1354,8 +1364,9 @@ class HAL_Device(Instrument):
             nr_of_grover_iterations=nr_of_grover_iterations,
             platf_cfg=self.cfg_openql_platform_fn(),
         )
+
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
-        d = self.get_correlation_detector()
+        d = self.get_correlation_detector()  # FIXME: parameter qubits unfilled
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_of_grover_iterations))
         MC.set_detector_function(d)
@@ -1367,6 +1378,7 @@ class HAL_Device(Instrument):
 
         a = ma.MeasurementAnalysis()
         return a
+
 
     def measure_two_qubit_tomo_bell(
             self,
@@ -1426,10 +1438,10 @@ class HAL_Device(Instrument):
             platf_cfg=self.cfg_openql_platform_fn(),
             flux_codeword=flux_codeword
         )
+
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
-        # 36 tomo rotations + 7*4 calibration points
-        cases = np.arange(36 + 7 * 4)
+        cases = np.arange(36 + 7 * 4)        # 36 tomo rotations + 7*4 calibration points
         if not shots_logging:
             d = self.get_correlation_detector([q0, q1])
             MC.set_sweep_points(cases)
@@ -1462,6 +1474,7 @@ class HAL_Device(Instrument):
                 "TwoQubitBellTomo_{}_{}{}".format(q0, q1, self.msmt_suffix) + label,
                 bins=cases,
             )
+
 
     def measure_two_qubit_allxy(
             self,
@@ -1522,8 +1535,8 @@ class HAL_Device(Instrument):
             replace_q1_pulses_with=replace_q1_pulses_with,
             repetitions=repetitions,
         )
-        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         if detector == "correl":
             d = self.get_correlation_detector([q0, q1])
         elif detector == "int_avg":
@@ -1538,6 +1551,7 @@ class HAL_Device(Instrument):
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
             a = ma2.Basic1DAnalysis()
         return a
+
 
     def measure_two_qubit_allXY_crosstalk(
             self, q0: str,
@@ -1580,6 +1594,7 @@ class HAL_Device(Instrument):
 
         return a_full, a_seq
 
+
     def measure_single_qubit_parity(
             self,
             qD: str,
@@ -1615,12 +1630,14 @@ class HAL_Device(Instrument):
             flux_codeword=flux_codeword,
             parity_axis=parity_axis,
         )
-        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         d = self.get_int_logging_detector(qubits=[qA], result_logging_mode="lin_trans")
         # d.nr_shots = 4088  # To ensure proper data binning
         # Because we are using a multi-detector
         d.set_child_attr("nr_shots", 4088)
+
+        # save and change settings
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
         MC.soft_avg(1)
@@ -1632,8 +1649,10 @@ class HAL_Device(Instrument):
         name = "Single_qubit_parity_{}_{}_{}".format(qD, qA, number_of_repetitions)
         MC.run(name)
 
+        # restore settings
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
+
         if analyze:
             a = ma2.Singleshot_Readout_Analysis(
                 t_start=None,
@@ -1649,6 +1668,7 @@ class HAL_Device(Instrument):
                 extract_only=False,
             )
         return a
+
 
     def measure_two_qubit_parity(
             self,
@@ -1720,7 +1740,8 @@ class HAL_Device(Instrument):
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
         d = self.get_int_logging_detector(
-            qubits=[qD1, qD0, qA], result_logging_mode="lin_trans"
+            qubits=[qD1, qD0, qA],
+            result_logging_mode="lin_trans"
         )
 
         if tomo:
@@ -1747,11 +1768,13 @@ class HAL_Device(Instrument):
             nr_shots = 4096 * 8  # To ensure proper data binning
             d.set_child_attr("nr_shots", nr_shots)
 
+        # save and change settings
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
-        self.msmt_suffix = "rounds{}".format(number_of_repetitions)
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
+
+        self.msmt_suffix = "rounds{}".format(number_of_repetitions)
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
@@ -1760,6 +1783,8 @@ class HAL_Device(Instrument):
             parity_axes, qD1, qD0, qA, self.msmt_suffix
         )
         MC.run(name)
+
+        # restore settings
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
 
@@ -1781,6 +1806,7 @@ class HAL_Device(Instrument):
                 extract_only=False,
             )
             return a
+
 
     def measure_residual_ZZ_coupling(
             self,
@@ -1816,6 +1842,7 @@ class HAL_Device(Instrument):
             spectator_state,
             self.cfg_openql_platform_fn(),
         )
+
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         d = self.get_int_avg_det(qubits=all_qubits)
         MC.set_sweep_function(s)
@@ -1825,22 +1852,26 @@ class HAL_Device(Instrument):
                exp_metadata={'target_qubit': q0,
                              'spectator_qubits': str(q_spectators),
                              'spectator_state': spectator_state})
+
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
 
-    def measure_state_tomography(self, qubits=['D2', 'X'],
-                                 MC: Optional[MeasurementControl] = None,
-                                 bell_state: float = None,
-                                 product_state: float = None,
-                                 wait_after_flux: float = None,
-                                 prepare_for_timedomain: bool = False,
-                                 live_plot=False,
-                                 nr_shots_per_case=2 ** 14,
-                                 shots_per_meas=2 ** 16,
-                                 disable_snapshot_metadata: bool = False,
-                                 label='State_Tomography_',
-                                 flux_codeword="cz"):
+
+    def measure_state_tomography(
+            self, qubits=['D2', 'X'],
+            MC: Optional[MeasurementControl] = None,
+            bell_state: float = None,
+            product_state: float = None,
+            wait_after_flux: float = None,
+            prepare_for_timedomain: bool = False,
+            live_plot=False,
+            nr_shots_per_case=2 ** 14,
+            shots_per_meas=2 ** 16,
+            disable_snapshot_metadata: bool = False,
+            label='State_Tomography_',
+            flux_codeword="cz"
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -1848,28 +1879,30 @@ class HAL_Device(Instrument):
 
         qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
                       for qn in qubits]
-        p = mqo.two_qubit_state_tomography(qubit_idxs, bell_state=bell_state,
-                                           product_state=product_state,
-                                           wait_after_flux=wait_after_flux,
-                                           platf_cfg=self.cfg_openql_platform_fn(),
-                                           flux_codeword=flux_codeword)
-        # Special argument added to program
-        combinations = p.combinations
+        p = mqo.two_qubit_state_tomography(
+            qubit_idxs,
+            bell_state=bell_state,
+            product_state=product_state,
+            wait_after_flux=wait_after_flux,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            flux_codeword=flux_codeword
+        )
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
+        # Special argument added to program
+        combinations = p.combinations  # FIXME, see comment in mqo.two_qubit_state_tomography
+
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         d = self.get_int_logging_detector(qubits)
         nr_cases = len(combinations)
         nr_shots = nr_shots_per_case * nr_cases
-        shots_per_meas = int(np.floor(
-            np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases)
+        shots_per_meas = int(np.floor(np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases)
 
         # Ensures shots per measurement is a multiple of the number of cases
         shots_per_meas -= shots_per_meas % nr_cases
 
         d.set_child_attr('nr_shots', shots_per_meas)
 
-        MC.live_plot_enabled(live_plot)
+        MC.live_plot_enabled(live_plot)  # FIXME: changes state
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.tile(np.arange(nr_cases), nr_shots_per_case))
@@ -1877,11 +1910,13 @@ class HAL_Device(Instrument):
         MC.run('{}'.format(label),
                exp_metadata={'combinations': combinations},
                disable_snapshot_metadata=disable_snapshot_metadata)
+
         # mra.Multiplexed_Readout_Analysis(extract_combinations=True, options_dict={'skip_cross_fidelity': True})
         tomo_v2.Full_State_Tomography_2Q(label=label,
                                          qubit_ro_channels=qubits,  # channels we will want to use for tomo
                                          correl_ro_channels=[qubits],  # correlations we will want for the tomo
                                          tomo_qubits_idx=qubits)
+
 
     def measure_ssro_multi_qubit(
             self,
@@ -1936,6 +1971,7 @@ class HAL_Device(Instrument):
             second_excited_state=False,
             platf_cfg=self.cfg_openql_platform_fn(),
         )
+
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
         # right is LSQ
@@ -1957,14 +1993,18 @@ class HAL_Device(Instrument):
 
         d.set_child_attr("nr_shots", shots_per_meas)
 
+        # save and change parameters
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
+
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
         MC.run("{}_{}_{}".format(label, qubits, self.msmt_suffix))
+
+        # restore parameters
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
 
@@ -1996,6 +2036,7 @@ class HAL_Device(Instrument):
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
         return
 
+
     def measure_ssro_single_qubit(
             self,
             qubits: list,
@@ -2011,6 +2052,7 @@ class HAL_Device(Instrument):
             wait_time: float = None,
             label='Mux_SSRO',
             MC=None):
+        # FIXME: lots of similarity with measure_ssro_multi_qubit
         '''
         Performs MUX single shot readout experiments of all possible
         combinations of prepared states of <qubits>. Outputs analysis
@@ -2034,8 +2076,7 @@ class HAL_Device(Instrument):
             initialization.
         '''
 
-        log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(
-            self.name, qubits))
+        log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(self.name, qubits))
 
         # off and on, not including post selection init measurements yet
         nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
@@ -2055,18 +2096,19 @@ class HAL_Device(Instrument):
         qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr()
                       for qn in qubits]
 
-        p = mqo.multi_qubit_off_on(qubit_idxs,
-                                   initialize=initialize,
-                                   nr_flux_dance=nr_flux_dance,
-                                   wait_time=wait_time,
-                                   second_excited_state=second_excited_state,
-                                   platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
+        p = mqo.multi_qubit_off_on(
+            qubit_idxs,
+            initialize=initialize,
+            nr_flux_dance=nr_flux_dance,
+            wait_time=wait_time,
+            second_excited_state=second_excited_state,
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
         # right is LSQ
-        d = self.get_int_logging_detector(qubits,
-                                          result_logging_mode=result_logging_mode)
+        d = self.get_int_logging_detector(qubits, result_logging_mode=result_logging_mode)
 
         # This assumes qubit names do not contain spaces
         det_qubits = [v.split()[-1] for v in d.value_names]
@@ -2081,6 +2123,7 @@ class HAL_Device(Instrument):
 
         d.set_child_attr('nr_shots', shots_per_meas)
 
+        # save and change parameters
         old_soft_avg = MC.soft_avg()
         old_live_plot_enabled = MC.live_plot_enabled()
         MC.soft_avg(1)
@@ -2091,6 +2134,7 @@ class HAL_Device(Instrument):
         MC.set_detector_function(d)
         MC.run('{}_{}_{}'.format(label, q_target, self.msmt_suffix))
 
+        # restore parameters
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
 
@@ -2122,13 +2166,16 @@ class HAL_Device(Instrument):
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
             return a.qoi[q_ch]
 
-    def measure_transients(self,
-                           qubits: list,
-                           q_target: str,
-                           cases: list = ['off', 'on'],
-                           MC: Optional[MeasurementControl] = None,
-                           prepare_for_timedomain: bool = True,
-                           analyze: bool = True):
+
+    def measure_transients(
+            self,
+            qubits: list,
+            q_target: str,
+            cases: list = ['off', 'on'],
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain: bool = True,
+            analyze: bool = True
+    ):
         '''
         Documentation.
         '''
@@ -2161,13 +2208,14 @@ class HAL_Device(Instrument):
             elif 'on' in pulse_comb.lower():
                 self.find_instrument(q_target).instr_LO_mw.get_instr().on()
             else:
-                raise ValueError(
-                    "pulse_comb {} not understood: Only 'on' and 'off' allowed.".
-                        format(pulse_comb))
+                raise ValueError("pulse_comb {} not understood: Only 'on' and 'off' allowed.".format(pulse_comb))
 
-            s = swf.OpenQL_Sweep(openql_program=p,
-                                 parameter_name='Transient time', unit='s',
-                                 CCL=self.instr_CC.get_instr())
+            s = swf.OpenQL_Sweep(
+                openql_program=p,
+                parameter_name='Transient time',
+                unit='s',
+                CCL=self.instr_CC.get_instr()
+            )
 
             if 'UHFQC' in instruments[0]:
                 sampling_rate = 1.8e9
@@ -2184,25 +2232,29 @@ class HAL_Device(Instrument):
             MC.set_sweep_function(s)
             MC.set_sweep_points(np.arange(nr_samples) / sampling_rate)
             MC.set_detector_function(d)
-            MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb,
-                                                    self.msmt_suffix))
+            MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb, self.msmt_suffix))
+
             if analyze:
                 analysis[i] = ma2.Multiplexed_Transient_Analysis(
                     q_target='{}_{}'.format(q_target, pulse_comb))
         return analysis
 
-    def measure_msmt_induced_dephasing_matrix(self, qubits: list,
-                                              analyze=True, MC: Optional[MeasurementControl] = None,
-                                              prepare_for_timedomain=True,
-                                              amps_rel=np.linspace(0, 1, 11),
-                                              verbose=True,
-                                              get_quantum_eff: bool = False,
-                                              dephasing_sequence='ramsey',
-                                              selected_target=None,
-                                              selected_measured=None,
-                                              target_qubit_excited=False,
-                                              extra_echo=False,
-                                              echo_delay=0e-9):
+
+    def measure_msmt_induced_dephasing_matrix(
+            self, qubits: list,
+            analyze=True,
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain=True,
+            amps_rel=np.linspace(0, 1, 11),
+            verbose=True,
+            get_quantum_eff: bool = False,
+            dephasing_sequence='ramsey',
+            selected_target=None,
+            selected_measured=None,
+            target_qubit_excited=False,
+            extra_echo=False,
+            echo_delay=0e-9
+    ):
         """
         Measures the msmt induced dephasing for readout the readout of qubits
         i on qubit j. Additionally measures the SNR as a function of amplitude
@@ -2395,6 +2447,7 @@ class HAL_Device(Instrument):
             q0    -x180-flux-x180-RO-
             qspec ----------------RO- (target_qubit_sequence='ground')
         """
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -2459,11 +2512,10 @@ class HAL_Device(Instrument):
             platf_cfg=self.cfg_openql_platform_fn(),
             target_qubit_sequence=target_qubit_sequence,
             cc=self.instr_CC.get_instr().name,
-            recover_q_spec=recover_q_spec,
+            recover_q_spec=recover_q_spec
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
-
 
         d = self.get_correlation_detector(
             qubits=[q0, q_spec],
@@ -2482,6 +2534,7 @@ class HAL_Device(Instrument):
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
             MC.run(label, mode="2D")
+
             ma.TwoD_Analysis()
         else:
             if adaptive_pars is None:
@@ -2492,7 +2545,9 @@ class HAL_Device(Instrument):
                 }
             MC.set_adaptive_function_parameters(adaptive_pars)
             MC.run(label + " adaptive", mode="adaptive")
+
             ma2.Basic2DInterpolatedAnalysis()
+
 
     def measure_chevron_1D_bias_sweeps(
         self,
@@ -2520,7 +2575,7 @@ class HAL_Device(Instrument):
         flux_buffer_time=40e-9,  # use multiples of 20 ns
     ):
         """
-        Measure a chevron patter resulting from swapping of the excitations
+        Measure a chevron pattern resulting from swapping of the excitations
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
         close to the interaction zone using (usually) a rectangular pulse.
         Meanwhile q1 is prepared in 0, 1 or superposition state. If it is in 0
@@ -2530,8 +2585,10 @@ class HAL_Device(Instrument):
         Args:
             q0 (str):
                 flux-pulsed qubit (prepared in 1 state at the beginning)
+
             q_spec (str):
                 stationary qubit (in 0, 1 or superposition)
+
             q_park (str):
                 qubit to move out of the interaction zone by applying a
                 square flux pulse. Note that this is optional. Not specifying
@@ -2843,12 +2900,13 @@ class HAL_Device(Instrument):
         )
         ma.MeasurementAnalysis()
 
+
     def measure_cryoscope(
         self,
         qubits,
         times,
         MC: Optional[MeasurementControl] = None,
-        nested_MC=None,
+        nested_MC: Optional[MeasurementControl] = None,
         double_projections: bool = False,
         waveform_name: str = "square",
         max_delay=None,
@@ -2883,8 +2941,9 @@ class HAL_Device(Instrument):
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
-        if nested_MC is None:
-            nested_MC = self.instr_nested_MC.get_instr()
+        # FIXME: unused
+        # if nested_MC is None:
+        #     nested_MC = self.instr_nested_MC.get_instr()
 
         for q in qubits:
             assert q in self.qubits()
@@ -2954,6 +3013,7 @@ class HAL_Device(Instrument):
         label = 'Cryoscope_{}_amps'.format('_'.join(qubits))
         MC.run(label)
         ma2.Basic1DAnalysis()
+
 
     def measure_cryoscope_vs_amp(
         self,
@@ -3050,11 +3110,17 @@ class HAL_Device(Instrument):
         MC.run(label)
         ma2.Basic1DAnalysis()
 
-    def measure_timing_diagram(self, qubits: list,
-                               flux_latencies, microwave_latencies,
-                               MC: Optional[MeasurementControl] = None,
-                               pulse_length=40e-9, flux_cw='fl_cw_06',
-                               prepare_for_timedomain: bool = True):
+
+    def measure_timing_diagram(
+            self,
+            qubits: list,
+            flux_latencies,
+            microwave_latencies,
+            MC: Optional[MeasurementControl] = None,
+            pulse_length=40e-9,
+            flux_cw='fl_cw_06',
+            prepare_for_timedomain: bool = True
+    ):
         """
         Measure the ramsey-like sequence with the 40 ns flux pulses played between
         the two pi/2. While playing this sequence the delay of flux and microwave pulses
@@ -3093,14 +3159,13 @@ class HAL_Device(Instrument):
         for lutman in Fl_lutmans:
             lutman.sq_length(pulse_length)
 
-        CC = self.instr_CC.get_instr()
-
-        p = mqo.FluxTimingCalibration(qubit_idxs=Q_idxs,
-                                      platf_cfg=self.cfg_openql_platform_fn(),
-                                      flux_cw=flux_cw,
-                                      cal_points=False)
-
-        CC.eqasm_program(p.filename)
+        p = mqo.FluxTimingCalibration(
+            qubit_idxs=Q_idxs,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            flux_cw=flux_cw,
+            cal_points=False
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
         d = self.get_int_avg_det(qubits=qubits, single_int_avg=True)
         MC.set_detector_function(d)
@@ -3123,11 +3188,18 @@ class HAL_Device(Instrument):
                                  flux_pulse_duration=10e-9,
                                  mw_pulse_separation=80e-9)
 
-    def measure_timing_1d_trace(self, q0, latencies, latency_type='flux',
-                                MC: Optional[MeasurementControl] = None,  label='timing_{}_{}',
-                                buffer_time=40e-9,
-                                prepare_for_timedomain: bool = True,
-                                mw_gate: str = "rx90", sq_length: float = 60e-9):
+
+    def measure_timing_1d_trace(
+            self,
+            q0,
+            latencies,
+            latency_type='flux',
+            MC: Optional[MeasurementControl] = None,
+            label='timing_{}_{}',
+            buffer_time=40e-9,
+            prepare_for_timedomain: bool = True,
+            mw_gate: str = "rx90", sq_length: float = 60e-9
+    ):
         mmt_label = label.format(self.name, q0)
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3136,16 +3208,17 @@ class HAL_Device(Instrument):
         self.prepare_for_timedomain([q0])
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         fl_lutman.sq_length(sq_length)
-        CC = self.instr_CC.get_instr()
 
         # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 120ns
-        p = sqo.FluxTimingCalibration(q0idx,
-                                      times=[buffer_time],
-                                      platf_cfg=self.cfg_openql_platform_fn(),
-                                      flux_cw='fl_cw_06',
-                                      cal_points=False,
-                                      mw_gate=mw_gate)
-        CC.eqasm_program(p.filename)
+        p = sqo.FluxTimingCalibration(
+            q0idx,
+            times=[buffer_time],
+            platf_cfg=self.cfg_openql_platform_fn(),
+            flux_cw='fl_cw_06',
+            cal_points=False,
+            mw_gate=mw_gate
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
         d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
         MC.set_detector_function(d)
@@ -3163,12 +3236,17 @@ class HAL_Device(Instrument):
         a_obj = ma2.Basic1DAnalysis(label=mmt_label)
         return a_obj
 
-    def measure_ramsey_with_flux_pulse(self, q0: str, times,
-                                       MC: Optional[MeasurementControl] = None,
-                                       label='Fluxed_ramsey',
-                                       prepare_for_timedomain: bool = True,
-                                       pulse_shape: str = 'square',
-                                       sq_eps: float = None):
+
+    def measure_ramsey_with_flux_pulse(
+            self,
+            q0: str,
+            times,
+            MC: Optional[MeasurementControl] = None,
+            label='Fluxed_ramsey',
+            prepare_for_timedomain: bool = True,
+            pulse_shape: str = 'square',
+            sq_eps: float = None
+    ):
         """
         Performs a cryoscope experiment to measure the shape of a flux pulse.
 
@@ -3196,6 +3274,8 @@ class HAL_Device(Instrument):
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
         partner_lutman = self.find_instrument(fl_lutman.instr_partner_lutman())
+
+        # save and change parameters
         old_max_length = fl_lutman.cfg_max_wf_length()
         old_sq_length = fl_lutman.sq_length()
         fl_lutman.cfg_max_wf_length(max(times) + 200e-9)
@@ -3268,10 +3348,12 @@ class HAL_Device(Instrument):
         metadata_dict = {"sq_eps": sq_eps}
         MC.run(label, exp_metadata=metadata_dict)
 
+        # restore parameters
         fl_lutman.cfg_max_wf_length(old_max_length)
         partner_lutman.cfg_max_wf_length(old_max_length)
         fl_lutman.sq_length(old_sq_length)
         fl_lutman.load_waveforms_onto_AWG_lookuptable(force_load_sequencer_program=True)
+
 
     def measure_sliding_flux_pulses(
         self,
@@ -3338,6 +3420,7 @@ class HAL_Device(Instrument):
 
         MC.set_detector_function(d)
         MC.run("Sliding flux pulses {}{}".format(q0_name, label))
+
 
     def _measure_sliding_pulse_phase(
         self,
@@ -3412,6 +3495,7 @@ class HAL_Device(Instrument):
 
         return (phi, phi_stderr)
 
+
     def measure_two_qubit_randomized_benchmarking(
         self,
         qubits,
@@ -3473,20 +3557,25 @@ class HAL_Device(Instrument):
 
             flux_codeword (str):
                 flux codeword corresponding to the Cphase gate
+
             sim_cz_qubits (list):
                 A list of qubit names on which a simultaneous cz
                 instruction must be applied. This is for characterizing
                 CZ gates that are intended to be performed in parallel
                 with other CZ gates.
+
             flux_allocated_duration_ns (list):
                 Duration in ns of the flux pulse used when interleaved gate is
                 [100_000], i.e. idle identity
+
             compilation_only (bool):
                 Compile only the RB sequences without measuring, intended for
                 parallelizing iRB sequences compilation with measurements
+
             pool (multiprocessing.Pool):
                 Only relevant for `compilation_only=True`
                 Pool to which the compilation tasks will be assigned
+
             rb_tasks (list):
                 Only relevant when running `compilation_only=True` previously,
                 saving the rb_tasks, waiting for them to finish then running
@@ -3505,7 +3594,7 @@ class HAL_Device(Instrument):
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
-        MC.soft_avg(1)
+        MC.soft_avg(1)  # FIXME: changes state
         # The detector needs to be defined before setting back parameters
         d = self.get_int_logging_detector(qubits=qubits)
         # set back the settings
@@ -3625,6 +3714,7 @@ class HAL_Device(Instrument):
         # N.B. if interleaving cliffords are used, this won't work
         ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
 
+
     def measure_interleaved_randomized_benchmarking_statistics(
             self,
             RB_type: str = "CZ",
@@ -3680,6 +3770,7 @@ class HAL_Device(Instrument):
         ))
         if good_rounds < nr_iRB_runs:
             log.error("Not all iRB measurements were successful!")
+
 
     def measure_two_qubit_interleaved_randomized_benchmarking(
             self,
@@ -3938,7 +4029,7 @@ class HAL_Device(Instrument):
     def measure_single_qubit_interleaved_randomized_benchmarking_parking(
         self,
         qubits: list,
-        MC,
+        MC: MeasurementControl,
         nr_cliffords=2**np.arange(12),
         nr_seeds: int = 100,
         recompile: bool = 'as needed',
@@ -4095,6 +4186,7 @@ class HAL_Device(Instrument):
                 label_base="icl[None]",
                 label_int="icl[200000]"
             )
+
 
     def measure_single_qubit_randomized_benchmarking_parking(
             self,
@@ -4283,6 +4375,7 @@ class HAL_Device(Instrument):
         )
         return a_q2
 
+
     def measure_two_qubit_purity_benchmarking(
             self,
             qubits,
@@ -4335,7 +4428,7 @@ class HAL_Device(Instrument):
                 specified in self.cfg_openql_platform_fn
 
             cal_points (bool):
-                should aclibration point (qubits in 0 and 1 states)
+                should calibration point (qubits in 0 and 1 states)
                 be included in the measurement
         """
 
@@ -4461,6 +4554,7 @@ class HAL_Device(Instrument):
         )
         # N.B. if measurement was interrupted this wont work
         ma2.UnitarityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
+
 
     def measure_two_qubit_character_benchmarking(
         self,
@@ -4594,6 +4688,7 @@ class HAL_Device(Instrument):
         )
         # N.B. if measurement was interrupted this wont work
         ma2.CharacterBenchmarking_TwoQubit_Analysis(ch_idxs=ch_idxs)
+
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self,
@@ -4778,6 +4873,7 @@ class HAL_Device(Instrument):
 
         return a_q0, a_q1
 
+
     def measure_multi_qubit_simultaneous_randomized_benchmarking(
             self,
             qubits,
@@ -4947,13 +5043,18 @@ class HAL_Device(Instrument):
 
         return Analysis
 
-    def measure_performance(self, number_of_repetitions: int = 1,
-                            post_selection: bool = False,
-                            qubit_pairs: list = [['QNW','QC'], ['QNE','QC'],
-                                                ['QC','QSW','QSE'], ['QC','QSE','QSW']],
-                            do_cond_osc: bool = True,
-                            do_1q: bool = True, do_2q: bool = True,
-                            do_ro: bool = True):
+
+    def measure_performance(
+            self,
+            number_of_repetitions: int = 1,
+            post_selection: bool = False,
+            qubit_pairs: list = [['QNW', 'QC'], ['QNE', 'QC'],
+                                 ['QC', 'QSW', 'QSE'], ['QC', 'QSE', 'QSW']],
+            do_cond_osc: bool = True,
+            do_1q: bool = True,
+            do_2q: bool = True,
+            do_ro: bool = True
+    ):
 
         """
         Routine runs readout, single-qubit and two-qubit metrics.
@@ -5018,8 +5119,15 @@ class HAL_Device(Instrument):
             except:
                 print("Exception encountered during measure_device_performance")
 
-    def measure_multi_rabi(self, qubits: list = None, prepare_for_timedomain=True, MC: Optional[MeasurementControl] = None,
-                           amps=np.linspace(0, 1, 31), calibrate=True):
+
+    def measure_multi_rabi(
+            self,
+            qubits: list = None,
+            prepare_for_timedomain=True,
+            MC: Optional[MeasurementControl] = None,
+            amps=np.linspace(0, 1, 31),
+            calibrate=True
+    ):
         if qubits is None:
             qubits = self.qubits()
         if prepare_for_timedomain:
@@ -5055,10 +5163,19 @@ class HAL_Device(Instrument):
                 qub.mw_channel_amp(pi_amp)
         return True
 
-    def measure_multi_ramsey(self, qubits: list = None, times=None, GBT=True,
-                             artificial_periods: float = None, label=None,
-                             MC: Optional[MeasurementControl] = None, prepare_for_timedomain=True,
-                             update_T2=True, update_frequency=False):
+
+    def measure_multi_ramsey(
+            self,
+            qubits: list = None,
+            times=None,
+            GBT=True,
+            artificial_periods: float = None,
+            label=None,
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain=True,
+            update_T2=True,
+            update_frequency=False
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -5098,13 +5215,10 @@ class HAL_Device(Instrument):
         p = mqo.multi_qubit_ramsey(times=times, qubits_idx=qubits_idx,
                                    platf_cfg=self.cfg_openql_platform_fn())
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-
-        d = self.get_int_avg_det(qubits=qubits)
-
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(points))
+        d = self.get_int_avg_det(qubits=qubits)
         MC.set_detector_function(d)
         if label is None:
             label = 'Multi_Ramsey_' + '_'.join(qubits)
@@ -5125,11 +5239,20 @@ class HAL_Device(Instrument):
         else:
             return a
 
-    def measure_multi_AllXY(self, qubits: list = None ,MC: Optional[MeasurementControl] = None,
-                            double_points =True,termination_opt=0.08):
+
+    def measure_multi_AllXY(
+            self,
+            qubits: list = None,
+            MC: Optional[MeasurementControl] = None,
+            double_points=True,
+            termination_opt=0.08
+    ):
 
         if qubits is None:
             qubits = self.qubits()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
         self.ro_acq_weight_type('optimal')
         self.prepare_for_timedomain(qubits=qubits, bypass_flux=True)
 
@@ -5139,19 +5262,19 @@ class HAL_Device(Instrument):
             q_nr = q_ob.cfg_qubit_nr()
             qubits_idx.append(q_nr)
 
-        p = mqo.multi_qubit_AllXY(qubits_idx=qubits_idx,
-                                  platf_cfg=self.cfg_openql_platform_fn(),
-                                  double_points = double_points)
+        p = mqo.multi_qubit_AllXY(
+            qubits_idx=qubits_idx,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            double_points=double_points
+        )
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-        d = self.get_int_avg_det(qubits=qubits)
-        if MC is None:
-            MC = self.instr_MC.get_instr()
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
+        d = self.get_int_avg_det(qubits=qubits)
         MC.set_detector_function(d)
         MC.run('Multi_AllXY_'+'_'.join(qubits))
+
         a = ma2.Multi_AllXY_Analysis(qubits = qubits)
 
         dev = 0
@@ -5162,9 +5285,15 @@ class HAL_Device(Instrument):
             else:
                 return True
 
-    def measure_multi_T1(self, qubits: list = None, times=None, MC: Optional[MeasurementControl] = None,
-                         prepare_for_timedomain=True, analyze=True,
-                         update=True):
+
+    def measure_multi_T1(
+            self,
+            qubits: list = None,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain=True,
+            analyze=True,
+            update=True):
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5190,16 +5319,16 @@ class HAL_Device(Instrument):
 
         points = len(times[0])
 
-        p = mqo.multi_qubit_T1(times=times, qubits_idx=qubits_idx,
-                               platf_cfg=self.cfg_openql_platform_fn())
+        p = mqo.multi_qubit_T1(
+            times=times,
+            qubits_idx=qubits_idx,
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-
-        d = self.get_int_avg_det(qubits=qubits)
-
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(points))
+        d = self.get_int_avg_det(qubits=qubits)
         MC.set_detector_function(d)
         label = 'Multi_T1_' + '_'.join(qubits)
         MC.run(label)
@@ -5214,9 +5343,16 @@ class HAL_Device(Instrument):
 
         return a
 
-    def measure_multi_Echo(self, qubits: list = None, times=None, MC: Optional[MeasurementControl] = None,
-                           prepare_for_timedomain=True, analyze=True,
-                           update=True):
+
+    def measure_multi_Echo(
+            self,
+            qubits: list = None,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain=True,
+            analyze=True,
+            update=True
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -5241,19 +5377,19 @@ class HAL_Device(Instrument):
 
         points = len(times[0])
 
-        p = mqo.multi_qubit_Echo(times=times, qubits_idx=qubits_idx,
-                                 platf_cfg=self.cfg_openql_platform_fn())
+        p = mqo.multi_qubit_Echo(
+            times=times,
+            qubits_idx=qubits_idx,
+            platf_cfg=self.cfg_openql_platform_fn())
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-
-        d = self.get_int_avg_det(qubits=qubits)
-
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(points))
+        d = self.get_int_avg_det(qubits=qubits)
         MC.set_detector_function(d)
         label = 'Multi_Echo_' + '_'.join(qubits)
         MC.run(label)
+
         if analyze:
             a = ma2.Multi_Echo_Analysis(label=label, qubits=qubits, times=times)
         if update:
@@ -5265,17 +5401,19 @@ class HAL_Device(Instrument):
 
         return True
 
-    def measure_multi_flipping(self,
-                               qubits: list = None,
-                               number_of_flips: int = None,
-                               equator=True,
-                               ax='x',
-                               angle='180',
-                               MC: Optional[MeasurementControl] = None,
-                               prepare_for_timedomain=True,
-                               update=False,
-                               scale_factor_based_on_line: bool = False
-                               ):
+
+    def measure_multi_flipping(
+            self,
+            qubits: list = None,
+            number_of_flips: int = None,
+            equator=True,
+            ax='x',
+            angle='180',
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain=True,
+            update=False,
+            scale_factor_based_on_line: bool = False
+    ):
         # allow flipping only with pi/2 or pi, and x or y pulses
         assert angle in ['90', '180']
         assert ax.lower() in ['x', 'y']
@@ -5298,17 +5436,19 @@ class HAL_Device(Instrument):
             qub = self.find_instrument(q)
             qubits_idx.append(qub.cfg_qubit_nr())
 
-        p = mqo.multi_qubit_flipping(number_of_flips=nf, qubits_idx=qubits_idx,
-                                     platf_cfg=self.cfg_openql_platform_fn(),
-                                     equator=equator, ax=ax, angle=angle)
+        p = mqo.multi_qubit_flipping(
+            number_of_flips=nf,
+            qubits_idx=qubits_idx,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            equator=equator,
+            ax=ax,
+            angle=angle
+        )
 
-        s = swf.OpenQL_Sweep(openql_program=p, unit='#',
-                             CCL=self.instr_CC.get_instr())
-
-        d = self.get_int_avg_det(qubits=qubits)
-
+        s = swf.OpenQL_Sweep(openql_program=p, unit='#', CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(nf)
+        d = self.get_int_avg_det(qubits=qubits)
         MC.set_detector_function(d)
         label = 'Multi_flipping_' + '_'.join(qubits)
         MC.run(label)
@@ -5358,14 +5498,23 @@ class HAL_Device(Instrument):
                 print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
                     q, ax, angle, amp_old, scale_factor * amp_old))
 
-    def measure_multi_motzoi(self, qubits: list = None, prepare_for_timedomain=True, MC: Optional[MeasurementControl] = None,
-                             amps=None, calibrate=True):
+
+    def measure_multi_motzoi(
+            self,
+            qubits: list = None,
+            prepare_for_timedomain=True,
+            MC: Optional[MeasurementControl] = None,
+            amps=None,
+            calibrate=True
+    ):
         if qubits is None:
             qubits = self.qubits()
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
         if amps is None:
             amps = np.linspace(-0.3, 0.3, 31)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
 
         qubits_idx = []
         for q in qubits:
@@ -5377,15 +5526,10 @@ class HAL_Device(Instrument):
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
         s = swf.motzoi_lutman_amp_sweep(qubits=qubits, device=self)
-
         d = self.get_int_avg_det(qubits=qubits, single_int_avg=True,
                                  values_per_point=2,
                                  values_per_point_suffex=['yX', 'xY'],
                                  always_prepare=True)
-
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         MC.set_detector_function(d)
@@ -5399,6 +5543,7 @@ class HAL_Device(Instrument):
                 opt_motzoi = a.proc_data_dict['{}_intersect'.format(q)][0]
                 qub.mw_motzoi(opt_motzoi)
             return True
+
 
     # def measure_ramsey_tomo(self,
     #                         qubit_ramsey: list,
@@ -5458,6 +5603,7 @@ class HAL_Device(Instrument):
     #     MC.run('Ramsey_tomo_R_{}_C_{}_S_{}'.format(qubit_ramsey, qubit_control, excited_spectators))
     #     # Analysis
     #     ma2.tqg.Two_qubit_gate_tomo_Analysis(label='Ramsey')
+
 
     def measure_ramsey_tomo(self,
                             qubit_ramsey: list,
@@ -6090,7 +6236,7 @@ class HAL_Device(Instrument):
         return dag
 
     ##########################################################################
-    # private functions
+    # private functions: add parameters
     ##########################################################################
 
     def _add_instr_parameters(self):
@@ -6113,9 +6259,7 @@ class HAL_Device(Instrument):
         self.add_parameter(
             "instr_CC",
             label="Central Controller",
-            docstring=(
-                "Device responsible for controlling the experiment."
-            ),
+            docstring="Device responsible for controlling the experiment.",
             parameter_class=InstrumentRefParameter,
         )
 
@@ -6124,7 +6268,6 @@ class HAL_Device(Instrument):
                 "instr_acq_{}".format(i), parameter_class=InstrumentRefParameter
             )
 
-        # Two microwave AWGs are used for S17
         self.add_parameter("instr_AWG_mw_0", parameter_class=InstrumentRefParameter)
         self.add_parameter("instr_AWG_mw_1", parameter_class=InstrumentRefParameter)
         self.add_parameter("instr_AWG_mw_2", parameter_class=InstrumentRefParameter)
@@ -6375,6 +6518,10 @@ class HAL_Device(Instrument):
             vals=vals.Dict(),
         )
 
+    ##########################################################################
+    # private functions: parameter helpers
+    ##########################################################################
+
     def _set_dio_map(self, dio_map_dict):
         allowed_keys = {"ro_", "mw_", "flux_"}
         for key in dio_map_dict:
@@ -6383,18 +6530,23 @@ class HAL_Device(Instrument):
             ), "Key `{}` must start with:" " `{}`!".format(key, list(allowed_keys))
         return dio_map_dict
 
-    def _grab_instruments_from_qb(self):
-        """
-        initialize instruments that should only exist once from the first
-        qubit. Maybe must be done in a more elegant way (at least check
-        uniqueness).
-        """
+    ##########################################################################
+    # private functions: prepare
+    ##########################################################################
 
-        qb = self.find_instrument(self.qubits()[0])
-        self.instr_MC(qb.instr_MC())
-        self.instr_VSM(qb.instr_VSM())
-        self.instr_CC(qb.instr_CC())
-        self.cfg_openql_platform_fn(qb.cfg_openql_platform_fn())
+    # FIXME: unused
+    # def _grab_instruments_from_qb(self):
+    #     """
+    #     initialize instruments that should only exist once from the first
+    #     qubit. Maybe must be done in a more elegant way (at least check
+    #     uniqueness).
+    #     """
+    #
+    #     qb = self.find_instrument(self.qubits()[0])
+    #     self.instr_MC(qb.instr_MC())
+    #     self.instr_VSM(qb.instr_VSM())
+    #     self.instr_CC(qb.instr_CC())
+    #     self.cfg_openql_platform_fn(qb.cfg_openql_platform_fn())
 
     def _prep_ro_sources(self, qubits):
         """
