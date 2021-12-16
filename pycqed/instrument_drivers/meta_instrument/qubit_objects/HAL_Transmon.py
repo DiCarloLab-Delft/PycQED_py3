@@ -1983,8 +1983,7 @@ class HAL_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL = self.instr_CC.get_instr()
-        CCL.eqasm_program(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()
@@ -2137,15 +2136,16 @@ class HAL_Transmon(Qubit):
         readout first!
         """
         self.prepare_for_timedomain()
-        CCL = self.instr_CC.get_instr()
-        CCL.stop()
+
         p = sqo.vsm_timing_cal_sequence(
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
-        CCL.start()
-        print('CCL program is running. Parameter "mw_vsm_delay" can now be '
+        CC = self.instr_CC.get_instr()
+        CC.eqasm_program(p.filename)
+        CC.start()
+        print('CC program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
+
 
     def calibrate_mixer_skewness_drive(self, MC=None,
                                        mixer_channels: list = ['G', 'D'],
@@ -2179,12 +2179,12 @@ class HAL_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
 
         # Load the sequence
-        CCL = self.instr_CC.get_instr()
         p = sqo.CW_tone(
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
-        CCL.start()
+        CC = self.instr_CC.get_instr()
+        CC.eqasm_program(p.filename)
+        CC.start()
 
         if self.cfg_with_vsm():
             # Open the VSM channel
@@ -2349,12 +2349,12 @@ class HAL_Transmon(Qubit):
                 returns True if succesful. Currently always
                 returns True (i.e., no sanity check implemented)
         """
-        CCL = self.instr_CC.get_instr()
         p = sqo.CW_RO_sequence(
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
-        CCL.start()
+        CC = self.instr_CC.get_instr()
+        CC.eqasm_program(p.filename)
+        CC.start()
 
         # using the restless tuning sequence
         # self.prepare_for_timedomain()
@@ -2451,7 +2451,6 @@ class HAL_Transmon(Qubit):
 
         """
         Performs a standard calibration of microwave pulses consisting of
-
         - mixer offsets
         - mixer skewness
         - pulse ampl coarse (rabi)
@@ -3572,12 +3571,11 @@ class HAL_Transmon(Qubit):
             UHFQC.spec_mode_on(acq_length=self.ro_acq_integration_length(),
                                IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
+
         # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
-        CCL.stop()
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -3588,10 +3586,12 @@ class HAL_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_scan' + self.msmt_suffix + label)
+
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
+
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
@@ -3615,12 +3615,10 @@ class HAL_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-        # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
-        CCL.stop()
+
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -3638,6 +3636,7 @@ class HAL_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_power_scan' + self.msmt_suffix + label, mode='2D')
+
         if analyze:
             ma.TwoD_Analysis(label='Resonator_power_scan',
                              close_fig=close_fig, normalize=True)
@@ -4698,7 +4697,7 @@ class HAL_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn()
         )
-        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
         # determine swf_func and motzoi_amps
         if using_VSM:
@@ -4788,7 +4787,7 @@ class HAL_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn()
         )
-        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()
@@ -4859,7 +4858,7 @@ class HAL_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn()
         )
-        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -4971,7 +4970,7 @@ class HAL_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn())
-        CC.eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        CC.eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         if 'ivvi' in self.instr_FluxCtrl().lower():
@@ -5056,7 +5055,7 @@ class HAL_Transmon(Qubit):
             platf_cfg=self.cfg_openql_platform_fn()
         )
 
-        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()
@@ -5097,8 +5096,6 @@ class HAL_Transmon(Qubit):
         """
         Performs a spectroscopy experiment by triggering the spectroscopy source
         with a CCLight trigger.
-
-        TODO: set the
         """
         UHFQC = self.instr_acquisition.get_instr()
         if prepare_for_continuous_wave:
@@ -5125,7 +5122,7 @@ class HAL_Transmon(Qubit):
             trigger_idx=trigger_idx if (CC.name.upper() == 'CCL' or CC.name.upper() == 'CC') else 15,  # FIXME: CCL is deprecated
             wait_time_ns=wait_time_ns)
 
-        CC.eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        CC.eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()
@@ -5149,7 +5146,6 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
-
                                            qb_name=self.name)
 
 
@@ -5204,7 +5200,7 @@ class HAL_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
 
-        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source_2.get_instr()
@@ -5305,7 +5301,7 @@ class HAL_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5403,7 +5399,7 @@ class HAL_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             trigger_idx=0)
-        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5501,7 +5497,7 @@ class HAL_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().eqasm_program(p.filename)  # NB: needed because we don't perform OpenQL_Sweep
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
         self.int_avg_det_single._set_real_imag(False)
         spec_source.on()
@@ -6952,13 +6948,11 @@ class HAL_Transmon(Qubit):
             UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
                                ro_amp=self.ro_pulse_amp_CW())
 
-        # Snippet here to create and upload the CCL instructions
-        CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
         spec_source = self.instr_spec_source.get_instr()

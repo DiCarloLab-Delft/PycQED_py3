@@ -66,7 +66,7 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str) -> OqlProgram:
 
 
 def pulsed_spec_seq(
-        qubit_idx: int, 
+        qubit_idx: int,
         spec_pulse_length: float,
         platf_cfg: str
 ) -> OqlProgram:
@@ -96,12 +96,12 @@ def pulsed_spec_seq(
 
 
 def pulsed_spec_seq_marked(
-        qubit_idx: int, 
+        qubit_idx: int,
         spec_pulse_length: float,
-        platf_cfg: str, 
-        trigger_idx: int, 
+        platf_cfg: str,
+        trigger_idx: int,
         trigger_idx_2: int = None,
-        wait_time_ns: int = 0, 
+        wait_time_ns: int = 0,
         cc: str = 'CCL'
 ) -> OqlProgram:
     """
@@ -148,7 +148,7 @@ def pulsed_spec_seq_marked(
 def pulsed_spec_seq_v2(
         qubit_idx: int,
         spec_pulse_length: float,
-        platf_cfg: str, 
+        platf_cfg: str,
         trigger_idx: int
 ) -> OqlProgram:
     """
@@ -177,12 +177,12 @@ def pulsed_spec_seq_v2(
 
 
 def flipping(
-        qubit_idx: int, 
-        number_of_flips, 
+        qubit_idx: int,
+        number_of_flips,
         platf_cfg: str,
-        equator: bool = False, 
+        equator: bool = False,
         cal_points: bool = True,
-        ax: str = 'x', 
+        ax: str = 'x',
         angle: str = '180'
 ) -> OqlProgram:
     """
@@ -332,7 +332,7 @@ def T1(
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment 
+                k.barrier([])  # alignment
             k.gate("wait", [], wait_time_after_flux_dance)
 
         k.gate('rx180', [qubit_idx])
@@ -340,12 +340,12 @@ def T1(
         if nr_cz_instead_of_idle_time is not None:
             for n in range(nr_cz_instead_of_idle_time[i]):
                 k.gate("cz", [qubit_idx, qb_cz_idx])
-            k.barrier([])  # alignment 
+            k.barrier([])  # alignment
             k.gate("wait", [], wait_time_after_flux_dance)
         else:
             wait_nanoseconds = int(round(time/1e-9))
             k.gate("wait", [qubit_idx], wait_nanoseconds)
-        
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -610,8 +610,8 @@ def CPMG_SO(orders, tauN: int, qubit_idx: int, platf_cfg: str) -> OqlProgram:
 
 
 def spin_lock_simple(
-        times, 
-        qubit_idx: int, 
+        times,
+        qubit_idx: int,
         platf_cfg: str,
         mw_gate_duration: float = 40e-9,
         tomo: bool = False
@@ -668,8 +668,8 @@ def spin_lock_simple(
 
 
 def rabi_frequency(
-        times, 
-        qubit_idx: int, 
+        times,
+        qubit_idx: int,
         platf_cfg: str,
         mw_gate_duration: float = 40e-9,
         tomo: bool = False
@@ -802,8 +802,6 @@ def idle_error_rate_seq(
         platf_cfg:      filename of the platform config file
     Returns:
         p:              OpenQL Program object
-
-
     """
     allowed_states = ['0', '1', '+']
 
@@ -899,7 +897,7 @@ def off_on(
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment 
+                k.barrier([])  # alignment
             k.gate("wait", [], wait_time)
 
         k.measure(qubit_idx)
@@ -918,8 +916,8 @@ def off_on(
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment 
-            k.gate("wait", [], wait_time) 
+                k.barrier([])  # alignment
+            k.gate("wait", [], wait_time)
 
         k.gate('rx180', [qubit_idx])
         k.measure(qubit_idx)
