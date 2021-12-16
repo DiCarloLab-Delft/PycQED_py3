@@ -14,7 +14,7 @@ import datetime
 from collections import OrderedDict
 import multiprocessing
 from importlib import reload
-from typing import List, Union
+from typing import List, Union, Optional
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -37,8 +37,10 @@ import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
 from pycqed.utilities import learner1D_minimizer as l1dm
 from pycqed.utilities.general import check_keyboard_interrupt, print_exception
 
+# Imported for type checks
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
-
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
+from pycqed.measurement.measurement_control import MeasurementControl
 
 
 log = logging.getLogger(__name__)
@@ -263,11 +265,15 @@ class HAL_Device(Instrument):
 
         #     ro_lm.set_mixer_offsets()
 
-    def prepare_for_timedomain(self, qubits: list, reduced: bool = False,
-                               bypass_flux: bool = False,
-                               prepare_for_readout: bool = True):
+    def prepare_for_timedomain(
+            self,
+            qubits: list,
+            reduced: bool = False,
+            bypass_flux: bool = False,
+            prepare_for_readout: bool = True
+    ):
         """
-        Prepare setup for a timedomain experiment:
+        Prepare setup for a time domain experiment:
 
         Args:
             qubits (list of str):
@@ -343,9 +349,7 @@ class HAL_Device(Instrument):
         return d
 
     def get_int_logging_detector(self, qubits=None, result_logging_mode='raw'):
-
-
-        # qubits passed to but not used in function?
+        # FIXME: qubits passed to but not used in function
 
         if self.ro_acq_weight_type() == 'SSB':
             result_logging_mode = 'raw'
@@ -403,8 +407,8 @@ class HAL_Device(Instrument):
                 CC = self.instr_CC.get_instr()
             else:
                 CC = None
-            UHFQC = self.find_instrument(acq_instr_name)
 
+            UHFQC = self.find_instrument(acq_instr_name)
             input_average_detectors.append(
                 det.UHFQC_input_average_detector(
                     UHFQC=UHFQC,
@@ -482,7 +486,7 @@ class HAL_Device(Instrument):
             parked_qubit_seq=None,
             downsample_swp_points=1,  # x2 and x3 available
             prepare_for_timedomain=True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             disable_cz: bool = False,
             disabled_cz_duration_ns: int = 60,
             cz_repetitions: int = 1,
@@ -642,7 +646,7 @@ class HAL_Device(Instrument):
             parked_qubit_seq=None,
             downsample_swp_points=1,  # x2 and x3 available
             prepare_for_timedomain=True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             disable_cz: bool = False,
             disabled_cz_duration_ns: int = 60,
             cz_repetitions: int = 1,
@@ -858,7 +862,7 @@ class HAL_Device(Instrument):
             wait_time_before_flux_ns: int = 0,
             wait_time_after_flux_ns: int = 0,
             label_suffix="",
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             disable_metadata=False,
             plotting=True,
     ):
@@ -1157,7 +1161,7 @@ class HAL_Device(Instrument):
             wait_time_after_flux_ns: int = 0,
             label_suffix: str = "",
             disable_metadata: bool = False,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
     ):
         """
         Measures a parity check fidelity. In this experiment the conditional phase
@@ -1332,7 +1336,7 @@ class HAL_Device(Instrument):
             qubits: list,
             nr_of_grover_iterations=40,
             prepare_for_timedomain=True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
     ):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
@@ -1372,7 +1376,7 @@ class HAL_Device(Instrument):
             analyze=True,
             close_fig=True,
             prepare_for_timedomain=True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             label="",
             shots_logging: bool = False,
             shots_per_meas=2 ** 16,
@@ -1588,7 +1592,7 @@ class HAL_Device(Instrument):
             analyze: bool = True,
             close_fig: bool = True,
             prepare_for_timedomain: bool = True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             parity_axis="Z",
     ):
         assert qD in self.qubits()
@@ -1667,7 +1671,7 @@ class HAL_Device(Instrument):
             analyze: bool = True,
             close_fig: bool = True,
             prepare_for_timedomain: bool = True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             echo: bool = True,
             post_select_threshold: float = None,
             parity_axes=["ZZ"],
@@ -1787,7 +1791,7 @@ class HAL_Device(Instrument):
             analyze: bool = True,
             close_fig: bool = True,
             prepare_for_timedomain: bool = True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
     ):
 
         assert q0 in self.qubits()
@@ -1826,7 +1830,7 @@ class HAL_Device(Instrument):
         return a
 
     def measure_state_tomography(self, qubits=['D2', 'X'],
-                                 MC=None,
+                                 MC: Optional[MeasurementControl] = None,
                                  bell_state: float = None,
                                  product_state: float = None,
                                  wait_after_flux: float = None,
@@ -2122,7 +2126,7 @@ class HAL_Device(Instrument):
                            qubits: list,
                            q_target: str,
                            cases: list = ['off', 'on'],
-                           MC=None,
+                           MC: Optional[MeasurementControl] = None,
                            prepare_for_timedomain: bool = True,
                            analyze: bool = True):
         '''
@@ -2188,7 +2192,7 @@ class HAL_Device(Instrument):
         return analysis
 
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
-                                              analyze=True, MC=None,
+                                              analyze=True, MC: Optional[MeasurementControl] = None,
                                               prepare_for_timedomain=True,
                                               amps_rel=np.linspace(0, 1, 11),
                                               verbose=True,
@@ -2317,7 +2321,7 @@ class HAL_Device(Instrument):
         adaptive_sampling_pts=None,
         adaptive_pars: dict = None,
         prepare_for_timedomain=True,
-        MC=None,
+        MC: Optional[MeasurementControl] = None,
         freq_tone=6e9,
         pow_tone=-10,
         spec_tone=False,
@@ -2460,7 +2464,7 @@ class HAL_Device(Instrument):
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
-        
+
         d = self.get_correlation_detector(
             qubits=[q0, q_spec],
             single_int_avg=True,
@@ -2497,7 +2501,7 @@ class HAL_Device(Instrument):
         q_parks,
         amps=np.arange(0, 1, 0.05),
         prepare_for_timedomain=True,
-        MC=None,
+        MC: Optional[MeasurementControl] = None,
         freq_tone=6e9,
         pow_tone=-10,
         spec_tone=False,
@@ -2769,7 +2773,7 @@ class HAL_Device(Instrument):
         q_spec: str,
         times,
         prepare_for_timedomain=True,
-        MC=None,
+        MC: Optional[MeasurementControl] = None,
         target_qubit_sequence: str = "excited",
         chunk_size: int = None,
     ):
@@ -2843,7 +2847,7 @@ class HAL_Device(Instrument):
         self,
         qubits,
         times,
-        MC=None,
+        MC: Optional[MeasurementControl] = None,
         nested_MC=None,
         double_projections: bool = False,
         waveform_name: str = "square",
@@ -2884,14 +2888,14 @@ class HAL_Device(Instrument):
 
         for q in qubits:
             assert q in self.qubits()
-        
+
         Q_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
 
         if max_delay is None:
-            max_delay = 0 
+            max_delay = 0
         else:
             max_delay = np.max(times) + 40e-9
 
@@ -2905,7 +2909,7 @@ class HAL_Device(Instrument):
             flux_cw = "fl_cw_06"
 
         elif waveform_name == "custom_wf":
-            Sw_functions = [swf.FLsweep(lutman, lutman.custom_wf_length, 
+            Sw_functions = [swf.FLsweep(lutman, lutman.custom_wf_length,
                             waveform_name="custom_wf") for lutman in Fl_lutmans]
             swfs = swf.multi_sweep_function(Sw_functions)
             flux_cw = "fl_cw_05"
@@ -2958,7 +2962,7 @@ class HAL_Device(Instrument):
         flux_cw: str = 'fl_cw_06',
         duration: float = 100e-9,
         amp_parameter: str = "channel",
-        MC=None,
+        MC: Optional[MeasurementControl] = None,
         twoq_pair=[2, 0],
         label="Cryoscope",
         max_delay: float = "auto",
@@ -3046,9 +3050,9 @@ class HAL_Device(Instrument):
         MC.run(label)
         ma2.Basic1DAnalysis()
 
-    def measure_timing_diagram(self, qubits: list, 
+    def measure_timing_diagram(self, qubits: list,
                                flux_latencies, microwave_latencies,
-                               MC=None,
+                               MC: Optional[MeasurementControl] = None,
                                pulse_length=40e-9, flux_cw='fl_cw_06',
                                prepare_for_timedomain: bool = True):
         """
@@ -3081,7 +3085,7 @@ class HAL_Device(Instrument):
 
         for q in qubits:
             assert q in self.qubits()
-        
+
         Q_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
 
         Fl_lutmans = [self.find_instrument(q).instr_LutMan_Flux.get_instr() \
@@ -3100,7 +3104,7 @@ class HAL_Device(Instrument):
 
         d = self.get_int_avg_det(qubits=qubits, single_int_avg=True)
         MC.set_detector_function(d)
-        
+
         s = swf.tim_flux_latency_sweep(self)
         s2 = swf.tim_mw_latency_sweep(self)
         MC.set_sweep_functions([s, s2])
@@ -3120,7 +3124,7 @@ class HAL_Device(Instrument):
                                  mw_pulse_separation=80e-9)
 
     def measure_timing_1d_trace(self, q0, latencies, latency_type='flux',
-                                MC=None,  label='timing_{}_{}',
+                                MC: Optional[MeasurementControl] = None,  label='timing_{}_{}',
                                 buffer_time=40e-9,
                                 prepare_for_timedomain: bool = True,
                                 mw_gate: str = "rx90", sq_length: float = 60e-9):
@@ -3160,7 +3164,7 @@ class HAL_Device(Instrument):
         return a_obj
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
-                                       MC=None,
+                                       MC: Optional[MeasurementControl] = None,
                                        label='Fluxed_ramsey',
                                        prepare_for_timedomain: bool = True,
                                        pulse_shape: str = 'square',
@@ -3622,9 +3626,9 @@ class HAL_Device(Instrument):
         ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
 
     def measure_interleaved_randomized_benchmarking_statistics(
-            self, 
-            RB_type: str = "CZ", 
-            nr_iRB_runs: int = 30, 
+            self,
+            RB_type: str = "CZ",
+            nr_iRB_runs: int = 30,
             **iRB_kw
         ):
         """
@@ -4097,7 +4101,7 @@ class HAL_Device(Instrument):
             qubits: list,
             nr_cliffords=2**np.arange(10),
             nr_seeds: int = 100,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             recompile: bool = 'as needed',
             prepare_for_timedomain: bool = True,
             cal_points: bool = True,
@@ -4594,7 +4598,7 @@ class HAL_Device(Instrument):
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self,
             qubits,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             nr_cliffords=2 ** np.arange(11),
             nr_seeds=100,
             interleaving_cliffords=[None],
@@ -4777,7 +4781,7 @@ class HAL_Device(Instrument):
     def measure_multi_qubit_simultaneous_randomized_benchmarking(
             self,
             qubits,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             nr_cliffords=2 ** np.arange(11),
             nr_seeds=100,
             recompile: bool = "as needed",
@@ -4891,7 +4895,7 @@ class HAL_Device(Instrument):
             sweep_points = np.append(
                 np.repeat(nr_cliffords, 2),
                 [nr_cliffords[-1] + 0.5]
-                + [nr_cliffords[-1] + 1.5] 
+                + [nr_cliffords[-1] + 1.5]
                 + [nr_cliffords[-1] + 2.5],
             )
         else:
@@ -5014,7 +5018,7 @@ class HAL_Device(Instrument):
             except:
                 print("Exception encountered during measure_device_performance")
 
-    def measure_multi_rabi(self, qubits: list = None, prepare_for_timedomain=True, MC=None,
+    def measure_multi_rabi(self, qubits: list = None, prepare_for_timedomain=True, MC: Optional[MeasurementControl] = None,
                            amps=np.linspace(0, 1, 31), calibrate=True):
         if qubits is None:
             qubits = self.qubits()
@@ -5053,7 +5057,7 @@ class HAL_Device(Instrument):
 
     def measure_multi_ramsey(self, qubits: list = None, times=None, GBT=True,
                              artificial_periods: float = None, label=None,
-                             MC=None, prepare_for_timedomain=True,
+                             MC: Optional[MeasurementControl] = None, prepare_for_timedomain=True,
                              update_T2=True, update_frequency=False):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5121,7 +5125,7 @@ class HAL_Device(Instrument):
         else:
             return a
 
-    def measure_multi_AllXY(self, qubits: list = None ,MC=None,
+    def measure_multi_AllXY(self, qubits: list = None ,MC: Optional[MeasurementControl] = None,
                             double_points =True,termination_opt=0.08):
 
         if qubits is None:
@@ -5158,7 +5162,7 @@ class HAL_Device(Instrument):
             else:
                 return True
 
-    def measure_multi_T1(self, qubits: list = None, times=None, MC=None,
+    def measure_multi_T1(self, qubits: list = None, times=None, MC: Optional[MeasurementControl] = None,
                          prepare_for_timedomain=True, analyze=True,
                          update=True):
 
@@ -5210,7 +5214,7 @@ class HAL_Device(Instrument):
 
         return a
 
-    def measure_multi_Echo(self, qubits: list = None, times=None, MC=None,
+    def measure_multi_Echo(self, qubits: list = None, times=None, MC: Optional[MeasurementControl] = None,
                            prepare_for_timedomain=True, analyze=True,
                            update=True):
         if MC is None:
@@ -5267,7 +5271,7 @@ class HAL_Device(Instrument):
                                equator=True,
                                ax='x',
                                angle='180',
-                               MC=None,
+                               MC: Optional[MeasurementControl] = None,
                                prepare_for_timedomain=True,
                                update=False,
                                scale_factor_based_on_line: bool = False
@@ -5354,7 +5358,7 @@ class HAL_Device(Instrument):
                 print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
                     q, ax, angle, amp_old, scale_factor * amp_old))
 
-    def measure_multi_motzoi(self, qubits: list = None, prepare_for_timedomain=True, MC=None,
+    def measure_multi_motzoi(self, qubits: list = None, prepare_for_timedomain=True, MC: Optional[MeasurementControl] = None,
                              amps=None, calibrate=True):
         if qubits is None:
             qubits = self.qubits()
@@ -5681,7 +5685,7 @@ class HAL_Device(Instrument):
         flux_codeword_park=None,
         update: bool = True,
         prepare_for_timedomain: bool = True,
-        MC=None,
+        MC: Optional[MeasurementControl] = None,
     ):
         """
         Calibrate single qubit phase corrections of CZ pulse.
@@ -5941,7 +5945,7 @@ class HAL_Device(Instrument):
 
     def calibrate_multi_frequency_fine(self, qubits: list = None, times=None,
                                        artificial_periods: float = None,
-                                       MC=None, prepare_for_timedomain=True,
+                                       MC: Optional[MeasurementControl] = None, prepare_for_timedomain=True,
                                        update_T2=False, update_frequency=True,
                                        stepsize: float = None, termination_opt=0,
                                        steps=[1, 1, 3, 10, 30, 100, 300, 1000]):
@@ -6406,6 +6410,7 @@ class HAL_Device(Instrument):
         LO.on()
 
         for qb_name in qubits:
+            # FIXME: implementation differs from HAL_Transmon::_prep_ro_sources
             qb = self.find_instrument(qb_name)
             ro_lutman = qb.instr_LutMan_RO.get_instr()
             # set RO modulation to use common LO frequency

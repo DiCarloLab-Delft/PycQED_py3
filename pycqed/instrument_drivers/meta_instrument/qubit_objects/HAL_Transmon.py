@@ -12,6 +12,7 @@ import pytest
 import cma
 import datetime
 import multiprocessing
+import deprecated
 from typing import Optional
 
 from .qubit_object import Qubit
@@ -386,10 +387,6 @@ class HAL_Transmon(Qubit):
             vals=vals.Ints(min_value=1),
             parameter_class=ManualParameter)
 
-        # self.add_parameter('ro_power_cw', label='RO power cw',
-        #                    unit='dBm',
-        #                    parameter_class=ManualParameter)
-
         # Single shot readout specific parameters
         self.add_parameter(
             'ro_acq_digitized',
@@ -419,17 +416,6 @@ class HAL_Transmon(Qubit):
             docstring=('sets weight function elements to 0 beyond this time'),
             initial_value=4096 / 1.8e9,
             parameter_class=ManualParameter)
-
-        # self.add_parameter('cal_pt_zero',
-        #                    initial_value=None,
-        #                    vals=vals.Anything(),  # should be a tuple validator
-        #                    label='Calibration point |0>',
-        #                    parameter_class=ManualParameter)
-        # self.add_parameter('cal_pt_one',
-        #                    initial_value=None,
-        #                    vals=vals.Anything(),  # should be a tuple validator
-        #                    label='Calibration point |1>',
-        #                    parameter_class=ManualParameter)
 
     def add_mw_parameters(self):
         # Mixer skewness correction
@@ -579,19 +565,6 @@ class HAL_Transmon(Qubit):
             set_cmd=self._set_mw_fine_delay,
             get_cmd=self._get_mw_fine_delay)
 
-        self._flux_fine_delay = 0
-        self.add_parameter(
-            'flux_fine_delay',
-            label='fine delay of the AWG channel',
-            unit='s',
-            docstring='This parameters serves for fine tuning of '
-                      'the RO, MW and flux pulses. It should be kept '
-                      'positive and below 20e-9. Any larger adjustments'
-                      'should be done by changing CCL dio delay'
-                      'through device object.',
-            set_cmd=self._set_flux_fine_delay,
-            get_cmd=self._get_flux_fine_delay)
-
         self.add_parameter(
             'mw_vsm_ch_in',
             label='VSM input channel Gaussian component',
@@ -707,8 +680,20 @@ class HAL_Transmon(Qubit):
             initial_value=0)
 
     def add_flux_parameters(self):
+        self._flux_fine_delay = 0
+        self.add_parameter(
+            'flux_fine_delay',
+            label='fine delay of the AWG channel',
+            unit='s',
+            docstring='This parameters serves for fine tuning of '
+                      'the RO, MW and flux pulses. It should be kept '
+                      'positive and below 20e-9. Any larger adjustments'
+                      'should be done by changing CCL dio delay'
+                      'through device object.',
+            set_cmd=self._set_flux_fine_delay,
+            get_cmd=self._get_flux_fine_delay)
+
         # fl_dc_ is the prefix for DC flux bias related params
-        # FIXME:
         self.add_parameter(
             'fl_dc_polycoeff',
             docstring='Polynomial coefficients for current to frequency conversion',
@@ -749,7 +734,6 @@ class HAL_Transmon(Qubit):
             vals=vals.Numbers(),
             initial_value=0,
             parameter_class=ManualParameter)
-        # FIXME: ? not used anywhere
         self.add_parameter(
             'fl_dc_ch',
             label='Flux bias channel',
@@ -863,18 +847,17 @@ class HAL_Transmon(Qubit):
             parameter_class=ManualParameter,
             # this is to effectively hardcode the cycle time
             vals=vals.Enum(20e-9))
-            # TODO: add docstring (Oct 2017)
         self.add_parameter(
             'cfg_prepare_ro_awg',
             vals=vals.Bool(),
-            docstring=('If False disables uploading pulses to UHFQC'),
+            docstring=('If False, disables uploading pulses to UHFQC'),
             initial_value=True,
             parameter_class=ManualParameter)
 
         self.add_parameter(
             'cfg_prepare_mw_awg',
             vals=vals.Bool(),
-            docstring=('If False disables uploading pulses to AWG8'),
+            docstring=('If False, disables uploading pulses to AWG8'),
             initial_value=True,
             parameter_class=ManualParameter)
         self.add_parameter(
@@ -987,7 +970,9 @@ class HAL_Transmon(Qubit):
             vals=vals.Numbers(0, 1.0),
             parameter_class=ManualParameter)
 
+    ##########################################################################
     # Parameter helpers
+    ##########################################################################
 
     def _using_QWG(self):
         """
@@ -998,8 +983,7 @@ class HAL_Transmon(Qubit):
 
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter
-        self.instr_CC.get_instr().set(
-            'vsm_channel_delay{}'.format(self.cfg_qubit_nr()), val)
+        self.instr_CC.get_instr().set('vsm_channel_delay{}'.format(self.cfg_qubit_nr()), val)
         self._mw_vsm_delay = val
 
     def _get_mw_vsm_delay(self):
@@ -1007,14 +991,12 @@ class HAL_Transmon(Qubit):
 
     def _set_mw_fine_delay(self, val):
         if self.cfg_with_vsm():
-            logging.warning('CCL_Transmon is using VSM. Use mw_vsm_delay to'
-                            'adjust delay')
+            logging.warning('HAL_Transmon is using VSM. Use mw_vsm_delay to adjust delay')
         else:
             lutman = self.find_instrument(self.instr_LutMan_MW())
             AWG = lutman.find_instrument(lutman.AWG())
             if self._using_QWG():
-                logging.warning(
-                    'CCL_Transmon is using QWG. mw_fine_delay not supported.')
+                logging.warning('HAL_Transmon is using QWG. mw_fine_delay not supported.')
             else:
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_I() - 1), val)
                 AWG.set('sigouts_{}_delay'.format(lutman.channel_Q() - 1), val)
@@ -1028,14 +1010,12 @@ class HAL_Transmon(Qubit):
             lutman = self.find_instrument(self.instr_LutMan_Flux())
             AWG = lutman.find_instrument(lutman.AWG())
             if self._using_QWG():
-                logging.warning('CCL_Transmon is using QWG. Not implemented.')
+                logging.warning('HAL_Transmon is using QWG. Not implemented.')
             else:
-                AWG.set('sigouts_{}_delay'.format(
-                    lutman.cfg_awg_channel() - 1), val)
+                AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel() - 1), val)
                 # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
         else:
-            logging.warning(
-                'No Flux LutMan specified, could not set flux timing fine')
+            logging.warning('No Flux LutMan specified, could not set flux timing fine')
         self._flux_fine_delay = val
 
     def _get_flux_fine_delay(self):
@@ -1135,6 +1115,10 @@ class HAL_Transmon(Qubit):
         fluxcurrent[self.fl_dc_ch()](self.fl_dc_I0())
         return True
 
+    ##########################################################################
+    # Other functions
+    ##########################################################################
+
     def get_int_avg_det(self, **kw):
         """
         Instantiates an integration average detector using parameters from
@@ -1160,7 +1144,9 @@ class HAL_Transmon(Qubit):
             channels=ro_channels,
             result_logging_mode=result_logging_mode,
             nr_averages=self.ro_acq_averages(),
-            integration_length=self.ro_acq_integration_length(), **kw)
+            integration_length=self.ro_acq_integration_length(),
+            **kw
+        )
 
         return int_avg_det
 
@@ -1270,12 +1256,6 @@ class HAL_Transmon(Qubit):
         else:
             raise NotImplementedError()
 
-    # def _prep_ro_sources(self):
-    #     LO = self.instr_LO_ro.get_instr()
-    #     LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
-    #     LO.on()
-    #     LO.power(self.ro_pow_LO())
-
     def _prep_ro_sources(self):
         LO = self.instr_LO_ro.get_instr()
         Lo_Lutman = self.instr_LutMan_RO.get_instr()
@@ -1291,17 +1271,6 @@ class HAL_Transmon(Qubit):
 
         LO.on()
         LO.power(self.ro_pow_LO())
-
-    # def _prep_ro_sources(self, qubits):
-    #     """
-    #     turn on and configure the RO LO's of all qubits to be measured.
-    #     """
-
-    #     for qb_name in qubits:
-    #         LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
-    #         LO.frequency.set(self.ro_lo_freq())
-    #         LO.power(self.ro_pow_LO())
-    #         LO.on()
 
     # FIXME: UHFQC specific
     def _prep_ro_pulse(self, upload=True, CW=False):
@@ -1394,14 +1363,13 @@ class HAL_Transmon(Qubit):
         Sets the ro acquisition integration weights.
         The relevant parameters here are
             ro_acq_weight_type   -> 'SSB', 'DSB' or 'Optimal'
-            ro_acq_weight_chI    -> Specifies which integration weight
-                (channel) to use
+            ro_acq_weight_chI    -> Specifies which integration weight (channel) to use
             ro_acq_weight_chQ    -> The second channel in case of SSB/DSB
             RO_acq_weight_func_I -> A custom integration weight (array)
             RO_acq_weight_func_Q ->  ""
 
         """
-        if 'UHFQC' in self.instr_acquisition():
+        if 'UHFQC' in self.instr_acquisition():  # FIXME: checks name, not type
             UHFQC = self.instr_acquisition.get_instr()
             if self.ro_acq_weight_type() == 'SSB':
                 UHFQC.prepare_SSB_weight_and_rotation(
@@ -1416,8 +1384,7 @@ class HAL_Transmon(Qubit):
             elif 'optimal' in self.ro_acq_weight_type():
                 if (self.ro_acq_weight_func_I() is None or
                         self.ro_acq_weight_func_Q() is None):
-                    logging.warning('Optimal weights are None,' +
-                                    ' not setting integration weights')
+                    logging.warning('Optimal weights are None, not setting integration weights')
                 elif self.ro_acq_rotated_SSB_when_optimal():
                     # this allows bypasing the optimal weights for poor SNR qubits
                     # working around the limitation of threshold in UHFQC
@@ -1473,31 +1440,21 @@ class HAL_Transmon(Qubit):
                             self.ro_acq_weight_chQ()), 1.0 + 1.0j)
 
         else:
-            raise NotImplementedError(
-                'CBox, DDM or other are currently not supported')
+            raise NotImplementedError('CBox, DDM or other are currently not supported')
 
     def _prep_td_sources(self):
-        # if self.instr_spec_source() is not None:
-        #     self.instr_spec_source.get_instr().off()
-        # self.instr_LO_mw.get_instr().on()
-        # self.instr_LO_mw.get_instr().pulsemod_state(False)
-        # # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
-        # self.instr_LO_mw.get_instr().frequency.set(
-        #     self.freq_qubit.get() - self.mw_freq_mod.get())
-
-        # self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
-
-        MW_LutMan = self.instr_LutMan_MW.get_instr()
-
+        # turn off spec_source
         if self.instr_spec_source() is not None:
             self.instr_spec_source.get_instr().off()
+
+        # configure LO_mw
         self.instr_LO_mw.get_instr().on()
         self.instr_LO_mw.get_instr().pulsemod_state('Off')
 
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
         if MW_LutMan.cfg_sideband_mode() == 'static':
             # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
-            self.instr_LO_mw.get_instr().frequency.set(
-                self.freq_qubit.get() - self.mw_freq_mod.get())
+            self.instr_LO_mw.get_instr().frequency.set(self.freq_qubit.get() - self.mw_freq_mod.get())
         elif MW_LutMan.cfg_sideband_mode() == 'real-time':
             # For historic reasons, will maintain the change qubit frequency here in
             # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
@@ -1512,6 +1469,10 @@ class HAL_Transmon(Qubit):
         self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
 
     def _prep_mw_pulses(self):
+        """
+        Configure MW_Lutman parameters and upload waveforms
+        """
+
         # 1. Gets instruments and prepares cases
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
@@ -1528,11 +1489,8 @@ class HAL_Transmon(Qubit):
 
         # used for ef pulsing
         MW_LutMan.mw_ef_amp180(self.mw_ef_amp())
-        # MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
-        #                            self.anharmonicity())
         if MW_LutMan.cfg_sideband_mode() != 'real-time':
-            MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
-                                       self.anharmonicity())
+            MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() + self.anharmonicity())
         else:
             MW_LutMan.mw_ef_modulation(self.anharmonicity())
 
@@ -1575,7 +1533,7 @@ class HAL_Transmon(Qubit):
                 # case without VSM and with QWG
                 if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
                         or (self.mw_G_mixer_alpha() != self.mw_D_mixer_alpha())):
-                    logging.warning('CCL_Transmon {}; _prep_mw_pulses: '
+                    logging.warning('HAL_Transmon {}; _prep_mw_pulses: '
                                     'no VSM detected, using mixer parameters'
                                     ' from gaussian channel.'.format(self.name))
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
@@ -1600,8 +1558,7 @@ class HAL_Transmon(Qubit):
         if self.cfg_prepare_mw_awg():
             MW_LutMan.load_waveforms_onto_AWG_lookuptable()
         else:
-            warnings.warn('"cfg_prepare_mw_awg" set to False, '
-                          'not preparing microwave pulses.')
+            warnings.warn('"cfg_prepare_mw_awg" set to False, not preparing microwave pulses.')
 
         # 5. upload commandtable for virtual-phase gates
         MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
@@ -1635,12 +1592,9 @@ class HAL_Transmon(Qubit):
         # Configure VSM
         VSM = self.instr_VSM.get_instr()
         for mod in range(1, 9):
-            VSM.set('mod{}_ch{}_marker_state'.format(
-                mod, self.mw_vsm_ch_in()), 'off')
-        VSM.set('mod{}_ch{}_marker_state'.format(
-            self.mw_vsm_mod_out(), self.spec_vsm_ch_in()), 'on')
-        VSM.set('mod{}_marker_source'.format(
-            self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
+            VSM.set('mod{}_ch{}_marker_state'.format(mod, self.mw_vsm_ch_in()), 'off')
+        VSM.set('mod{}_ch{}_marker_state'.format(self.mw_vsm_mod_out(), self.spec_vsm_ch_in()), 'on')
+        VSM.set('mod{}_marker_source'.format(self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
 
     ##########################################################################
     # find_ functions (HAL_Transmon specific)
@@ -4136,7 +4090,7 @@ class HAL_Transmon(Qubit):
         # FIXME: split into basic T1 and T1 with flux dance
         """
         N.B. this is a good example for a generic timedomain experiment using
-        the CCL_Transmon.
+        the HAL_Transmon.
         """
         if times is not None and nr_cz_instead_of_idle_time is not None:
             raise ValueError("Either idle time or CZ mode must be chosen!")
