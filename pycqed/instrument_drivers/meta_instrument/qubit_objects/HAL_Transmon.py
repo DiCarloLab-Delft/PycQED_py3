@@ -1056,14 +1056,12 @@ class HAL_Transmon(Qubit):
         - set the integration weights
         """
         if self.cfg_prepare_ro_awg():
-            self.instr_acquisition.get_instr().load_default_settings(
-                upload_sequence=False)
+            self.instr_acquisition.get_instr().load_default_settings(upload_sequence=False)
             self._prep_ro_pulse(CW=CW)
             self._prep_ro_integration_weights()
             self._prep_deskewing_matrix()
         else:
-            warnings.warn(
-                '"cfg_prepare_ro_awg" set to False, not preparing readout .')
+            warnings.warn('"cfg_prepare_ro_awg" set to False, not preparing readout .')
 
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
@@ -1175,7 +1173,8 @@ class HAL_Transmon(Qubit):
         phi = self.ro_acq_mixer_phi()
         predistortion_matrix = np.array(
             ((1, -alpha * np.sin(phi * 2 * np.pi / 360)),
-             (0, alpha * np.cos(phi * 2 * np.pi / 360))))
+             (0, alpha * np.cos(phi * 2 * np.pi / 360)))
+        )
         UHFQC.qas_0_deskew_rows_0_cols_0(predistortion_matrix[0, 0])
         UHFQC.qas_0_deskew_rows_0_cols_1(predistortion_matrix[0, 1])
         UHFQC.qas_0_deskew_rows_1_cols_0(predistortion_matrix[1, 0])
@@ -1278,6 +1277,7 @@ class HAL_Transmon(Qubit):
         """
         Sets the appropriate parameters in the RO LutMan and uploads the
         desired wave.
+
         Relevant parameters are:
             ro_pulse_type ("up_down_down", "square")
             ro_freq_mod
@@ -1306,7 +1306,7 @@ class HAL_Transmon(Qubit):
         else:
             ro_amp = self.ro_pulse_amp()
 
-        if 'UHFQC' not in self.instr_acquisition():
+        if 'UHFQC' not in self.instr_acquisition():  # FIXME: checks name, not type
             raise NotImplementedError()
         UHFQC = self.instr_acquisition.get_instr()
 
@@ -1321,36 +1321,26 @@ class HAL_Transmon(Qubit):
             # These parameters affect all resonators
             ro_lm.set('resonator_combinations', [[idx]])
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
-            ro_lm.set('mixer_alpha',
-                      self.ro_pulse_mixer_alpha())
-            ro_lm.set('mixer_phi',
-                      self.ro_pulse_mixer_phi())
+            ro_lm.set('mixer_alpha', self.ro_pulse_mixer_alpha())
+            ro_lm.set('mixer_phi', self.ro_pulse_mixer_phi())
 
             ro_lm.set('M_modulation_R{}'.format(idx), self.ro_freq_mod())
-            ro_lm.set('M_length_R{}'.format(idx),
-                      self.ro_pulse_length())
-            ro_lm.set('M_amp_R{}'.format(idx),
-                      ro_amp)
-            ro_lm.set('M_delay_R{}'.format(idx),
-                      self.ro_pulse_delay())
-            ro_lm.set('M_phi_R{}'.format(idx),
-                      self.ro_pulse_phi())
-            ro_lm.set('M_down_length0_R{}'.format(idx),
-                      self.ro_pulse_down_length0())
-            ro_lm.set('M_down_amp0_R{}'.format(idx),
-                      self.ro_pulse_down_amp0())
-            ro_lm.set('M_down_phi0_R{}'.format(idx),
-                      self.ro_pulse_down_phi0())
-            ro_lm.set('M_down_length1_R{}'.format(idx),
-                      self.ro_pulse_down_length1())
-            ro_lm.set('M_down_amp1_R{}'.format(idx),
-                      self.ro_pulse_down_amp1())
-            ro_lm.set('M_down_phi1_R{}'.format(idx),
-                      self.ro_pulse_down_phi1())
+            ro_lm.set('M_length_R{}'.format(idx), self.ro_pulse_length())
+            ro_lm.set('M_amp_R{}'.format(idx), ro_amp)
+            ro_lm.set('M_delay_R{}'.format(idx), self.ro_pulse_delay())
+            ro_lm.set('M_phi_R{}'.format(idx), self.ro_pulse_phi())
+            ro_lm.set('M_down_length0_R{}'.format(idx), self.ro_pulse_down_length0())
+            ro_lm.set('M_down_amp0_R{}'.format(idx), self.ro_pulse_down_amp0())
+            ro_lm.set('M_down_phi0_R{}'.format(idx), self.ro_pulse_down_phi0())
+            ro_lm.set('M_down_length1_R{}'.format(idx), self.ro_pulse_down_length1())
+            ro_lm.set('M_down_amp1_R{}'.format(idx), self.ro_pulse_down_amp1())
+            ro_lm.set('M_down_phi1_R{}'.format(idx), self.ro_pulse_down_phi1())
 
             ro_lm.acquisition_delay(self.ro_acq_delay())
+
             if upload:
                 ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
+
             UHFQC.sigouts_0_offset(self.ro_pulse_mixer_offs_I())
             UHFQC.sigouts_1_offset(self.ro_pulse_mixer_offs_Q())
 
@@ -1376,15 +1366,16 @@ class HAL_Transmon(Qubit):
                 UHFQC.prepare_SSB_weight_and_rotation(
                     IF=self.ro_freq_mod(),
                     weight_function_I=self.ro_acq_weight_chI(),
-                    weight_function_Q=self.ro_acq_weight_chQ())
+                    weight_function_Q=self.ro_acq_weight_chQ()
+                )
             elif self.ro_acq_weight_type() == 'DSB':
                 UHFQC.prepare_DSB_weight_and_rotation(
                     IF=self.ro_freq_mod(),
                     weight_function_I=self.ro_acq_weight_chI(),
-                    weight_function_Q=self.ro_acq_weight_chQ())
+                    weight_function_Q=self.ro_acq_weight_chQ()
+                )
             elif 'optimal' in self.ro_acq_weight_type():
-                if (self.ro_acq_weight_func_I() is None or
-                        self.ro_acq_weight_func_Q() is None):
+                if (self.ro_acq_weight_func_I() is None or self.ro_acq_weight_func_Q() is None):
                     logging.warning('Optimal weights are None, not setting integration weights')
                 elif self.ro_acq_rotated_SSB_when_optimal():
                     # this allows bypasing the optimal weights for poor SNR qubits
@@ -1401,44 +1392,34 @@ class HAL_Transmon(Qubit):
                         weight_function_Q=None,
                         rotation_angle=self.ro_acq_rotated_SSB_rotation_angle(),
                         length=self.ro_acq_integration_length_weigth_function(),
-                        scaling_factor=scaling_factor)
+                        scaling_factor=scaling_factor
+                    )
                 else:
-                    # When optimal weights are used, only the RO I weight
-                    # channel is used
+                    # When optimal weights are used, only the RO I weight channel is used
 
-                    # FIXME!: Dirty hack because of qusurf issue #63, adds
-                    # delay samples in the optimized weights
+                    # FIXME!: Dirty hack because of qusurf issue #63, adds delay samples in the optimized weights
                     opt_WI = self.ro_acq_weight_func_I()
                     opt_WQ = self.ro_acq_weight_func_Q()
                     del_sampl = self.ro_acq_weight_func_delay_samples_hack()
                     if del_sampl > 0:
                         zeros = np.zeros(abs(del_sampl))
-                        opt_WI = np.concatenate(
-                            [opt_WI[abs(del_sampl):], zeros])
-                        opt_WQ = np.concatenate(
-                            [opt_WQ[abs(del_sampl):], zeros])
+                        opt_WI = np.concatenate([opt_WI[abs(del_sampl):], zeros])
+                        opt_WQ = np.concatenate([opt_WQ[abs(del_sampl):], zeros])
                     elif del_sampl < 0:
                         zeros = np.zeros(abs(del_sampl))
-                        opt_WI = np.concatenate(
-                            [zeros, opt_WI[:-abs(del_sampl)]])
-                        opt_WQ = np.concatenate(
-                            [zeros, opt_WQ[:-abs(del_sampl)]])
+                        opt_WI = np.concatenate([zeros, opt_WI[:-abs(del_sampl)]])
+                        opt_WQ = np.concatenate([zeros, opt_WQ[:-abs(del_sampl)]])
                     else:
                         pass
-                    UHFQC.set('qas_0_integration_weights_{}_real'.format(
-                        self.ro_acq_weight_chI()), opt_WI)
-                    UHFQC.set('qas_0_integration_weights_{}_imag'.format(
-                        self.ro_acq_weight_chI()), opt_WQ)
-                    UHFQC.set('qas_0_rotations_{}'.format(
-                        self.ro_acq_weight_chI()), 1.0 - 1.0j)
+
+                    UHFQC.set('qas_0_integration_weights_{}_real'.format(self.ro_acq_weight_chI()), opt_WI)
+                    UHFQC.set('qas_0_integration_weights_{}_imag'.format(self.ro_acq_weight_chI()), opt_WQ)
+                    UHFQC.set('qas_0_rotations_{}'.format(self.ro_acq_weight_chI()), 1.0 - 1.0j)
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
-                        UHFQC.set('qas_0_integration_weights_{}_real'.format(
-                            self.ro_acq_weight_chQ()), opt_WQ)
-                        UHFQC.set('qas_0_integration_weights_{}_imag'.format(
-                            self.ro_acq_weight_chQ()), opt_WI)
-                        UHFQC.set('qas_0_rotations_{}'.format(
-                            self.ro_acq_weight_chQ()), 1.0 + 1.0j)
+                        UHFQC.set('qas_0_integration_weights_{}_real'.format(self.ro_acq_weight_chQ()), opt_WQ)
+                        UHFQC.set('qas_0_integration_weights_{}_imag'.format(self.ro_acq_weight_chQ()), opt_WI)
+                        UHFQC.set('qas_0_rotations_{}'.format(self.ro_acq_weight_chQ()), 1.0 + 1.0j)
 
         else:
             raise NotImplementedError('CBox, DDM or other are currently not supported')
@@ -1888,7 +1869,7 @@ class HAL_Transmon(Qubit):
             label='',
             close_fig=True,
             analyze=True,
-            MC=None,
+            MC: Optional[MeasurementControl] = None,
             prepare_for_continuous_wave=True):
         """
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
@@ -2007,7 +1988,7 @@ class HAL_Transmon(Qubit):
     def calibrate_mw_pulse_amplitude_coarse(self,
                                             amps=None,
                                             close_fig=True, verbose=False,
-                                            MC=None, update=True,
+                                            MC: Optional[MeasurementControl] = None, update=True,
                                             all_modules=False):
         """
         Calibrates the pulse amplitude using a single rabi oscillation.
@@ -2039,7 +2020,7 @@ class HAL_Transmon(Qubit):
     # def calibrate_mw_pulse_amplitude_coarse_test(self,
     #                                              amps=None,
     #                                              close_fig=True, verbose=False,
-    #                                              MC=None, update=True,
+    #                                              MC: Optional[MeasurementControl] = None, update=True,
     #                                              all_modules=False):
     #     """
     #     Calibrates the pulse amplitude using a single rabi oscillation.
@@ -2102,7 +2083,7 @@ class HAL_Transmon(Qubit):
               'calibrated by hand.')
 
 
-    def calibrate_mixer_skewness_drive(self, MC=None,
+    def calibrate_mixer_skewness_drive(self, MC: Optional[MeasurementControl] = None,
                                        mixer_channels: list = ['G', 'D'],
                                        x0: list = [1.0, 0.0],
                                        cma_stds: list = [.15, 10],
@@ -2437,8 +2418,8 @@ class HAL_Transmon(Qubit):
         self.ro_soft_avg(old_soft_avg)
         return True
 
-    def calibrate_ssro_coarse(self, MC=None,
-                              nested_MC=None,
+    def calibrate_ssro_coarse(self, MC: Optional[MeasurementControl] = None,
+                              nested_MC: Optional[MeasurementControl] = None,
                               freqs=None,
                               amps=None,
                               analyze: bool = True,
@@ -2515,8 +2496,8 @@ class HAL_Transmon(Qubit):
 
             return True
 
-    def calibrate_ssro_pulse_duration(self, MC=None,
-                                      nested_MC=None,
+    def calibrate_ssro_pulse_duration(self, MC: Optional[MeasurementControl] = None,
+                                      nested_MC: Optional[MeasurementControl] = None,
                                       amps=None,
                                       amp_lim=None,
                                       times=None,
@@ -2615,8 +2596,8 @@ class HAL_Transmon(Qubit):
                 A = ma.TwoD_Analysis(label='RO_duration_tuneup', auto=True)
             return True
 
-    def calibrate_ssro_fine(self, MC=None,
-                            nested_MC=None,
+    def calibrate_ssro_fine(self, MC: Optional[MeasurementControl] = None,
+                            nested_MC: Optional[MeasurementControl] = None,
                             start_freq=None,
                             start_amp=None,
                             start_freq_step=None,
@@ -2695,7 +2676,7 @@ class HAL_Transmon(Qubit):
             ma.OptimizationAnalysis(label='RO_fine_tuneup')
             return True
 
-    def calibrate_ro_acq_delay(self, MC=None,
+    def calibrate_ro_acq_delay(self, MC: Optional[MeasurementControl] = None,
                                analyze: bool = True,
                                prepare: bool = True,
                                disable_metadata: bool = False):
@@ -2752,7 +2733,7 @@ class HAL_Transmon(Qubit):
             return True
 
     def calibrate_mw_gates_restless(
-            self, MC=None,
+            self, MC: Optional[MeasurementControl] = None,
             parameter_list: list = ['G_amp', 'D_amp', 'freq'],
             initial_values: list = None,
             initial_steps: list = [0.05, 0.05, 1e6],
@@ -2774,8 +2755,9 @@ class HAL_Transmon(Qubit):
             prepare_for_timedomain=prepare_for_timedomain,
             method='restless')
 
+
     def calibrate_mw_gates_rb(
-            self, MC=None,
+            self, MC: Optional[MeasurementControl] = None,
             parameter_list: list = ['G_amp', 'D_amp', 'freq'],
             initial_values: list = None,
             initial_steps: list = [0.05, 0.05, 1e6],
@@ -2912,16 +2894,16 @@ class HAL_Transmon(Qubit):
                     self.freq_qubit(opt_par_values[freq_idx] +
                                     self.mw_freq_mod.get())
 
-    def calibrate_mw_gates_allxy(self, nested_MC=None,
+    def calibrate_mw_gates_allxy(self, nested_MC: Optional[MeasurementControl] = None,
                                  start_values=None,
                                  initial_steps=None,
                                  parameter_list=None,
                                  termination_opt=0.01):
         # FIXME: this tuneup does not update the qubit object parameters
-        # update: Fixed on the the pagani set-up
+        #  update: Fixed on the the pagani set-up
 
-        # FIXME2: this tuneup does not return True upon success
-        # update: Fixed on the pagani set-up
+        # FIXME: this tuneup does not return True upon success
+        #  update: Fixed on the pagani set-up
 
         if initial_steps is None:
             if parameter_list is None:
@@ -2973,7 +2955,7 @@ class HAL_Transmon(Qubit):
         else:
             return True
 
-    def calibrate_mw_gates_allxy2(self, nested_MC=None,
+    def calibrate_mw_gates_allxy2(self, nested_MC: Optional[MeasurementControl] = None,
                                   start_values=None,
                                   initial_steps=None, f_termination=0.01):
         '''
@@ -3049,7 +3031,7 @@ class HAL_Transmon(Qubit):
         else:
             return True
 
-    def calibrate_RO(self, nested_MC=None,
+    def calibrate_RO(self, nested_MC: Optional[MeasurementControl] = None,
                      start_params=None,
                      initial_step=None,
                      threshold=0.05):
@@ -3115,7 +3097,7 @@ class HAL_Transmon(Qubit):
             return True
 
     def calibrate_depletion_pulse(
-            self, nested_MC=None, amp0=None,
+            self, nested_MC: Optional[MeasurementControl] = None, amp0=None,
             amp1=None, phi0=180, phi1=0, initial_steps=None, two_par=True,
             depletion_optimization_window=None, depletion_analysis_plot=False,
             use_RTE_cost_function=False):
@@ -3145,7 +3127,7 @@ class HAL_Transmon(Qubit):
         """
 
         # FIXME: this calibration does not update the qubit object params
-        # FIXME2: this calibration does not return a boolean upon success
+        # FIXME: this calibration does not return a boolean upon success
 
         # tuneup requires nested MC as the transients detector will use MC
         self.ro_pulse_type('up_down_down')
@@ -3223,7 +3205,7 @@ class HAL_Transmon(Qubit):
     def calibrate_ef_rabi(self,
                           amps: list = np.linspace(-.8, .8, 18),
                           recovery_pulse: bool = True,
-                          MC=None, label: str = '',
+                          MC: Optional[MeasurementControl] = None, label: str = '',
                           analyze=True, close_fig=True,
                           prepare_for_timedomain=True, update=True):
         """
@@ -3248,7 +3230,7 @@ class HAL_Transmon(Qubit):
     # calibrate_ functions (overrides for class Qubit)
     ##########################################################################
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True, motzois=None):
+    def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, motzois=None):
         """
         Calibrates the DRAG coeffcieint value, named motzoi (after Felix Motzoi)
         for legacy reasons.
@@ -3403,7 +3385,7 @@ class HAL_Transmon(Qubit):
 
         return True
 
-    def calibrate_optimal_weights(self, MC=None, verify: bool = True,
+    def calibrate_optimal_weights(self, MC: Optional[MeasurementControl] = None, verify: bool = True,
                                   analyze: bool = True, update: bool = True,
                                   no_figs: bool = False,
                                   optimal_IQ: bool = False,
@@ -3498,7 +3480,7 @@ class HAL_Transmon(Qubit):
     # NB: functions closely related to overrides are also also included here
     ##########################################################################
 
-    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
+    def measure_heterodyne_spectroscopy(self, freqs, MC: Optional[MeasurementControl] = None,
                                         analyze=True, close_fig=True,
                                         label=''):
         """
@@ -3550,7 +3532,7 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def measure_resonator_power(self, freqs, powers, MC=None,
+    def measure_resonator_power(self, freqs, powers, MC: Optional[MeasurementControl] = None,
                                 analyze: bool = True, close_fig: bool = True,
                                 label: str = ''):
         """
@@ -3596,7 +3578,7 @@ class HAL_Transmon(Qubit):
             ma.TwoD_Analysis(label='Resonator_power_scan',
                              close_fig=close_fig, normalize=True)
 
-    def measure_ssro(self, MC=None,
+    def measure_ssro(self, MC: Optional[MeasurementControl] = None,
                      nr_shots_per_case: int = 2 ** 13,  # 8192
                      cases=('off', 'on'),
                      prepare: bool = True, no_figs: bool = False,
@@ -3740,7 +3722,7 @@ class HAL_Transmon(Qubit):
                 'relaxation': a.proc_data_dict['relaxation_events'],
                 'excitation': a.proc_data_dict['residual_excitation']}
 
-    def measure_spectroscopy(self, freqs, mode='pulsed_marked', MC=None,
+    def measure_spectroscopy(self, freqs, mode='pulsed_marked', MC: Optional[MeasurementControl] = None,
                              analyze=True, close_fig=True, label='',
                              prepare_for_continuous_wave=True):
         """
@@ -3786,7 +3768,7 @@ class HAL_Transmon(Qubit):
             logging.error('Mode {} not recognized. Available modes: "CW", \
                           "pulsed_marked", "pulsed_mixer"'.format(mode))
 
-    def measure_transients(self, MC=None, analyze: bool = True,
+    def measure_transients(self, MC: Optional[MeasurementControl] = None, analyze: bool = True,
                            cases=('off', 'on'),
                            prepare: bool = True, depletion_analysis: bool = True,
                            depletion_analysis_plot: bool = True,
@@ -4309,7 +4291,7 @@ class HAL_Transmon(Qubit):
                 return res
 
 
-    def measure_complex_ramsey(self, times=None, MC=None,
+    def measure_complex_ramsey(self, times=None, MC: Optional[MeasurementControl] = None,
                                freq_qubit: float = None,
                                label: str = '',
                                prepare_for_timedomain=True,
@@ -5480,7 +5462,7 @@ class HAL_Transmon(Qubit):
 
     def measure_ssro_vs_frequency_amplitude(
             self, freqs=None, amps_rel=np.linspace(0, 1, 11),
-            nr_shots=4092 * 4, nested_MC=None, analyze=True,
+            nr_shots=4092 * 4, nested_MC: Optional[MeasurementControl] = None, analyze=True,
             use_optimal_weights=False, label='SSRO_freq_amp_sweep'):
         """
         Measures SNR and readout fidelities as a function of the readout pulse amplitude
@@ -5522,7 +5504,7 @@ class HAL_Transmon(Qubit):
 
     def measure_ssro_vs_TWPA_frequency_power(
             self, pump_source, freqs, powers,
-            nr_shots=4092 * 4, nested_MC=None, analyze=True):
+            nr_shots=4092 * 4, nested_MC: Optional[MeasurementControl] = None, analyze=True):
         """
         Measures the SNR and readout fidelities as a function of the TWPA
             pump frequency and power.
@@ -5578,7 +5560,7 @@ class HAL_Transmon(Qubit):
 
 
     def measure_ssro_vs_pulse_length(self, lengths=np.arange(100e-9, 1501e-9, 100e-9),
-                                     nr_shots=4092 * 4, nested_MC=None, analyze=True,
+                                     nr_shots=4092 * 4, nested_MC: Optional[MeasurementControl] = None, analyze=True,
                                      label_suffix: str = ''):
         """
         Measures the SNR and readout fidelities as a function of the duration
@@ -5625,7 +5607,7 @@ class HAL_Transmon(Qubit):
             ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
 
-    def measure_transients_CCL_switched(self, MC=None, analyze: bool = True,
+    def measure_transients_CCL_switched(self, MC: Optional[MeasurementControl] = None, analyze: bool = True,
                                         cases=('off', 'on'),
                                         prepare: bool = True, depletion_analysis: bool = True,
                                         depletion_analysis_plot: bool = True,
@@ -5676,7 +5658,7 @@ class HAL_Transmon(Qubit):
             return [np.array(t, dtype=np.float64) for t in transients]
 
 
-    def measure_dispersive_shift_pulsed(self, freqs=None, MC=None, analyze: bool = True,
+    def measure_dispersive_shift_pulsed(self, freqs=None, MC: Optional[MeasurementControl] = None, analyze: bool = True,
                                         prepare: bool = True):
         """
         Measures the RO resonator spectroscopy with the qubit in ground and excited state.
@@ -5747,27 +5729,38 @@ class HAL_Transmon(Qubit):
             return True
 
 
-    def measure_error_fraction(self, MC=None, analyze: bool = True,
-                               nr_shots: int = 2048 * 4,
-                               sequence_type='echo', prepare: bool = True,
-                               feedback=False,
-                               depletion_time=None, net_gate='pi'):
+    def measure_error_fraction(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            nr_shots: int = 2048 * 4,
+            sequence_type='echo',
+            prepare: bool = True,
+            feedback=False,
+            depletion_time=None,
+            net_gate='pi'
+    ):
         """
-        This performs a multiround experiment, the repetition rate is defined
+        This performs a multi round experiment, the repetition rate is defined
         by the ro_duration which can be changed by regenerating the
         configuration file.
         The analysis counts single errors. The definition of an error is
         adapted automatically by choosing feedback or the net_gate.
         it requires high SNR single shot readout and a calibrated threshold.
         """
-        self.ro_acq_digitized(True)
+
+        self.ro_acq_digitized(True)  # FIXME: changes state
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
+        # save and change parameters
         # plotting really slows down SSRO (16k shots plotting is slow)
         old_plot_setting = MC.live_plot_enabled()
         MC.live_plot_enabled(False)
-        MC.soft_avg(1)  # don't want to average single shots
+
+        MC.soft_avg(1)  # don't want to average single shots # FIXME: changes state
+
         if prepare:
             self.prepare_for_timedomain()
             # off/on switching is achieved by turning the MW source on and
@@ -5779,10 +5772,14 @@ class HAL_Transmon(Qubit):
             self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
             p = None  # object needs to exist for the openql_sweep to work
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name='shot nr', unit='#',
-                             upload=prepare)
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name='shot nr',
+            unit='#',
+            upload=prepare
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
@@ -5794,8 +5791,12 @@ class HAL_Transmon(Qubit):
             depletion_time, self.ro_pulse_type(), feedback, net_gate)
         MC.run(
             'RTE_{}_{}'.format(self.msmt_suffix, suffix),
-            exp_metadata=exp_metadata)
+            exp_metadata=exp_metadata
+        )
+
+        # restore parameters
         MC.live_plot_enabled(old_plot_setting)
+
         if analyze:
             a = ma2.Single_Qubit_RoundsToEvent_Analysis(
                 t_start=None, t_stop=None,
@@ -5804,16 +5805,21 @@ class HAL_Transmon(Qubit):
                 extract_only=True)
             return {'error fraction': a.proc_data_dict['frac_single']}
 
-    def measure_msmt_induced_dephasing(self, MC=None, sequence='ramsey',
-                                       label: str = '',
-                                       verbose: bool = True,
-                                       analyze: bool = True,
-                                       close_fig: bool = True,
-                                       update: bool = True,
-                                       cross_target_qubits: list = None,
-                                       multi_qubit_platf_cfg=None,
-                                       target_qubit_excited=False,
-                                       extra_echo=False):
+
+    def measure_msmt_induced_dephasing(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            sequence='ramsey',
+            label: str = '',
+            verbose: bool = True,
+            analyze: bool = True,
+            close_fig: bool = True,
+            update: bool = True,
+            cross_target_qubits: list = None,
+            multi_qubit_platf_cfg=None,
+            target_qubit_excited=False,
+            extra_echo=False
+    ):
         # Refs:
         # Schuster PRL 94, 123602 (2005)
         # Gambetta PRA 74, 042318 (2006)
@@ -5838,6 +5844,7 @@ class HAL_Transmon(Qubit):
         angles = np.concatenate(
             [np.arange(0, 101, 20), np.arange(140, 421, 20)])  # avoid CW15, issue
 
+        # generate OpenQL program
         if sequence == 'ramsey':
             readout_pulse_length = self.ro_pulse_length()
             readout_pulse_length += self.ro_pulse_down_length0()
@@ -5847,11 +5854,13 @@ class HAL_Transmon(Qubit):
             else:
                 wait_time = 0
 
-            p = mqo.Ramsey_msmt_induced_dephasing(qubits=qubits, angles=angles,
-                                                  platf_cfg=platf_cfg,
-                                                  target_qubit_excited=target_qubit_excited,
-                                                  extra_echo=extra_echo,
-                                                  wait_time=wait_time)
+            p = mqo.Ramsey_msmt_induced_dephasing(
+                qubits=qubits, angles=angles,
+                platf_cfg=platf_cfg,
+                target_qubit_excited=target_qubit_excited,
+                extra_echo=extra_echo,
+                wait_time=wait_time
+            )
         elif sequence == 'echo':
             readout_pulse_length = self.ro_pulse_length()
             readout_pulse_length += self.ro_pulse_down_length0()
@@ -5860,26 +5869,36 @@ class HAL_Transmon(Qubit):
                 wait_time = readout_pulse_length / 2 + 20e-9
             else:
                 wait_time = readout_pulse_length + 40e-9
-            p = mqo.echo_msmt_induced_dephasing(qubits=qubits, angles=angles,
-                                                platf_cfg=platf_cfg,
-                                                wait_time=wait_time,
-                                                target_qubit_excited=target_qubit_excited,
-                                                extra_echo=extra_echo)
+            p = mqo.echo_msmt_induced_dephasing(
+                qubits=qubits, angles=angles,
+                platf_cfg=platf_cfg,
+                wait_time=wait_time,
+                target_qubit_excited=target_qubit_excited,
+                extra_echo=extra_echo)
         else:
             raise ValueError('sequence must be set to ramsey or echo')
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name='angle', unit='degree')
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name='angle',
+            unit='degree'
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(angles)
         d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run(sequence + label + self.msmt_suffix)
+
         if analyze:
-            a = ma.Ramsey_Analysis(label=sequence, auto=True, close_fig=True,
-                                   freq_qubit=self.freq_qubit(),
-                                   artificial_detuning=0,  # fixme
-                                   phase_sweep_only=True)
+            a = ma.Ramsey_Analysis(
+                label=sequence,
+                auto=True,
+                close_fig=True,
+                freq_qubit=self.freq_qubit(),
+                artificial_detuning=0,  # FIXME
+                phase_sweep_only=True
+            )
             phase_deg = (a.fit_res.params['phase'].value) * 360 / (2 * np.pi) % 360
             res = {
                 'coherence': a.fit_res.params['amplitude'].value,
@@ -5893,9 +5912,18 @@ class HAL_Transmon(Qubit):
         #            'phase' : -1}
 
 
-    def measure_CPMG(self, times=None, orders=None, MC=None, sweep='tau',
-                     analyze=True, close_fig=True, update=False,
-                     label: str = '', prepare_for_timedomain=True):
+    def measure_CPMG(
+            self,
+            times=None,
+            orders=None,
+            MC: Optional[MeasurementControl] = None,
+            sweep='tau',
+            analyze=True,
+            close_fig=True,
+            update=False,
+            label: str = '',
+            prepare_for_timedomain=True
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -5946,21 +5974,38 @@ class HAL_Transmon(Qubit):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+
+        # generate OpenQL program
         if sweep == 'tau':
             print(times)
-            p = sqo.CPMG(times, orders, qubit_idx=self.cfg_qubit_nr(),
-                         platf_cfg=self.cfg_openql_platform_fn())
-            s = swf.OpenQL_Sweep(openql_program=p,
-                                 CCL=self.instr_CC.get_instr(),
-                                 parameter_name="Time", unit="s")
+            p = sqo.CPMG(
+                times,
+                orders,
+                qubit_idx=self.cfg_qubit_nr(),
+                platf_cfg=self.cfg_openql_platform_fn()
+            )
+            s = swf.OpenQL_Sweep(
+                openql_program=p,
+                CCL=self.instr_CC.get_instr(),
+                parameter_name="Time",
+                unit="s"
+            )
         elif sweep == 'order':
-            p = sqo.CPMG_SO(times, orders, qubit_idx=self.cfg_qubit_nr(),
-                            platf_cfg=self.cfg_openql_platform_fn())
-            s = swf.OpenQL_Sweep(openql_program=p,
-                                 CCL=self.instr_CC.get_instr(),
-                                 parameter_name="Order", unit="")
+            p = sqo.CPMG_SO(
+                times,
+                orders,
+                qubit_idx=self.cfg_qubit_nr(),
+                platf_cfg=self.cfg_openql_platform_fn()
+            )
+            s = swf.OpenQL_Sweep(
+                openql_program=p,
+                CCL=self.instr_CC.get_instr(),
+                parameter_name="Order", unit=""
+            )
+
         d = self.int_avg_det
         MC.set_sweep_function(s)
         if sweep == 'tau':
@@ -5973,6 +6018,7 @@ class HAL_Transmon(Qubit):
         elif sweep == 'order':
             msmt_title = 'CPMG_tauN_' + str(times) + label + self.msmt_suffix
         MC.run(msmt_title)
+
         if analyze:
             # N.B. v1.5 analysis
             if sweep == 'tau':
@@ -5984,10 +6030,18 @@ class HAL_Transmon(Qubit):
 
             return a
 
-    def measure_spin_locking_simple(self, times=None, MC=None,
-                                    analyze=True, close_fig=True, update=True,
-                                    label: str = '', prepare_for_timedomain=True,
-                                    tomo=False):
+
+    def measure_spin_locking_simple(
+            self,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            update=True,
+            label: str = '',
+            prepare_for_timedomain=True,
+            tomo=False
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -6031,11 +6085,20 @@ class HAL_Transmon(Qubit):
             self.prepare_for_timedomain()
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_square_waves_to_AWG_lookuptable()
-        p = sqo.spin_lock_simple(times, qubit_idx=self.cfg_qubit_nr(),
-                                 platf_cfg=self.cfg_openql_platform_fn(), tomo=tomo)
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name="Time", unit="s")
+
+        p = sqo.spin_lock_simple(
+            times,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            tomo=tomo
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name="Time",
+            unit="s"
+        )
         d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
@@ -6046,9 +6109,17 @@ class HAL_Transmon(Qubit):
             a = ma.T1_Analysis(label='spin_lock_simple', auto=True, close_fig=True)
             return a
 
-    def measure_spin_locking_echo(self, times=None, MC=None,
-                                  analyze=True, close_fig=True, update=True,
-                                  label: str = '', prepare_for_timedomain=True):
+
+    def measure_spin_locking_echo(
+            self,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            update=True,
+            label: str = '',
+            prepare_for_timedomain=True
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -6081,13 +6152,21 @@ class HAL_Transmon(Qubit):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_square_waves_to_AWG_lookuptable()
-        p = sqo.spin_lock_echo(times, qubit_idx=self.cfg_qubit_nr(),
-                               platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name="Time", unit="s")
+
+        p = sqo.spin_lock_echo(
+            times,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name="Time",
+            unit="s"
+        )
         d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
@@ -6098,10 +6177,18 @@ class HAL_Transmon(Qubit):
             a = ma.T1_Analysis(label='spin_lock_echo', auto=True, close_fig=True)
             return a
 
-    def measure_rabi_frequency(self, times=None, MC=None,
-                               analyze=True, close_fig=True, update=True,
-                               label: str = '', prepare_for_timedomain=True,
-                               tomo=False):
+
+    def measure_rabi_frequency(
+            self,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            update=True,
+            label: str = '',
+            prepare_for_timedomain=True,
+            tomo=False
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -6143,16 +6230,25 @@ class HAL_Transmon(Qubit):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_square_waves_to_AWG_lookuptable()
-        p = sqo.rabi_frequency(times, qubit_idx=self.cfg_qubit_nr(),
-                               platf_cfg=self.cfg_openql_platform_fn(), tomo=tomo)
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name="Time", unit="s")
-        d = self.int_avg_det
+
+        p = sqo.rabi_frequency(
+            times,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            tomo=tomo
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name="Time", unit="s"
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('rabi_frequency' + label + self.msmt_suffix)
 
@@ -6215,8 +6311,9 @@ class HAL_Transmon(Qubit):
         else:
             self.prepare_readout()
 
-        MC.soft_avg(1)
-        # set back the settings
+        MC.soft_avg(1)  # FIXME: changes state
+
+        # restore settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
@@ -6303,7 +6400,7 @@ class HAL_Transmon(Qubit):
     def measure_randomized_benchmarking_old(self, nr_cliffords=2 ** np.arange(12),
                                             nr_seeds=100,
                                             double_curves=False,
-                                            MC=None, analyze=True, close_fig=True,
+                                            MC: Optional[MeasurementControl] = None, analyze=True, close_fig=True,
                                             verbose: bool = True, upload=True,
                                             update=True):
         # Old version not including two-state calibration points and logging
@@ -6316,7 +6413,8 @@ class HAL_Transmon(Qubit):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.instr_MC.get_instr()
-        MC.soft_avg(nr_seeds)
+
+        MC.soft_avg(nr_seeds)  # FIXME: changes state
         counter_param = ManualParameter('name_ctr', initial_value=0)
         programs = []
         if verbose:
@@ -6470,12 +6568,14 @@ class HAL_Transmon(Qubit):
             return a2
 
 
-    def measure_gst_1Q(self,
-                       shots_per_meas: int,
-                       maxL: int = 256,
-                       MC=None,
-                       recompile='as needed',
-                       prepare_for_timedomain: bool = True):
+    def measure_gst_1Q(
+            self,
+            shots_per_meas: int,
+            maxL: int = 256,
+            MC: Optional[MeasurementControl] = None,
+            recompile='as needed',
+            prepare_for_timedomain: bool = True
+    ):
         """
         Performs single qubit Gate Set Tomography experiment of the StdXYI gateset.
 
@@ -6505,8 +6605,10 @@ class HAL_Transmon(Qubit):
             self.prepare_for_timedomain()
         else:
             self.prepare_readout()
-        MC.soft_avg(1)
-        # set back the settings
+
+        MC.soft_avg(1)  # FIXME: changes state
+
+        # restore the settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
@@ -6518,12 +6620,12 @@ class HAL_Transmon(Qubit):
             q0=self.cfg_qubit_nr(),
             maxL=maxL,
             platf_cfg=self.cfg_openql_platform_fn(),
-            recompile=recompile)
+            recompile=recompile
+        )
 
         counter_param = ManualParameter('name_ctr', initial_value=0)
 
-        s = swf.OpenQL_Sweep(openql_program=programs[0],
-                             CCL=self.instr_CC.get_instr())
+        s = swf.OpenQL_Sweep(openql_program=programs[0], CCL=self.instr_CC.get_instr())
         d = self.int_log_det
 
         # poor man's GST contains 731 distinct gatestrings
@@ -6543,7 +6645,7 @@ class HAL_Transmon(Qubit):
 
         shots = np.tile(sweep_points, shots_per_meas)
 
-        MC.soft_avg(1)
+        MC.soft_avg(1)  # FIXME: changes state
         MC.set_sweep_function(s)
         MC.set_sweep_points(shots)
         MC.set_detector_function(d)
@@ -6553,9 +6655,15 @@ class HAL_Transmon(Qubit):
         a = ma2.GST_SingleQubit_DataExtraction(label='Single_qubit_GST')
         return a
 
-    def measure_flux_arc_tracked_spectroscopy(self, dac_values=None,
-                                              polycoeffs=None, MC=None,
-                                              nested_MC=None, fluxChan=None):
+
+    def measure_flux_arc_tracked_spectroscopy(
+            self,
+            dac_values=None,
+            polycoeffs=None,
+            MC: Optional[MeasurementControl] = None,
+            nested_MC: Optional[MeasurementControl] = None,
+            fluxChan=None
+    ):
         """
         Creates a qubit DAC arc by fitting a polynomial function through qubit
         frequencies obtained by spectroscopy.
@@ -6619,12 +6727,14 @@ class HAL_Transmon(Qubit):
         if polycoeffs is None:
             polycoeffs = self.fl_dc_polycoeff()
 
-        d = cdf.Tracked_Qubit_Spectroscopy(qubit=self,
-                                           nested_MC=nested_MC,
-                                           qubit_initial_frequency=self.freq_qubit(),
-                                           resonator_initial_frequency=self.freq_res(),
-                                           sweep_points=dac_values,
-                                           polycoeffs=polycoeffs)
+        d = cdf.Tracked_Qubit_Spectroscopy(
+            qubit=self,
+            nested_MC=nested_MC,
+            qubit_initial_frequency=self.freq_qubit(),
+            resonator_initial_frequency=self.freq_res(),
+            sweep_points=dac_values,
+            polycoeffs=polycoeffs
+        )
 
         MC.set_sweep_function(dac_par)
         MC.set_sweep_points(dac_values)
@@ -6632,12 +6742,18 @@ class HAL_Transmon(Qubit):
         MC.run(name='Tracked_Spectroscopy')
 
 
-    def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
-                                                     nested_MC=None, cross_target_qubits=None,
-                                                     multi_qubit_platf_cfg=None, analyze=False,
-                                                     verbose: bool = True, sequence='ramsey',
-                                                     target_qubit_excited=False,
-                                                     extra_echo=False):
+    def measure_msmt_induced_dephasing_sweeping_amps(
+            self,
+            amps_rel=None,
+            nested_MC: Optional[MeasurementControl] = None,
+            cross_target_qubits=None,
+            multi_qubit_platf_cfg=None,
+            analyze=False,
+            verbose: bool = True,
+            sequence='ramsey',
+            target_qubit_excited=False,
+            extra_echo=False
+    ):
         waveform_name = 'up_down_down_final'
 
         if nested_MC is None:
@@ -6666,38 +6782,37 @@ class HAL_Transmon(Qubit):
             for cross_target_qubit in cross_target_qubits:
                 cfg_qubit_nrs.append(cross_target_qubit.cfg_qubit_nr())
                 optimization_M_amps.append(cross_target_qubit.ro_pulse_amp())
-                optimization_M_amp_down0s.append(
-                    cross_target_qubit.ro_pulse_down_amp0())
-                optimization_M_amp_down1s.append(
-                    cross_target_qubit.ro_pulse_down_amp1())
+                optimization_M_amp_down0s.append(cross_target_qubit.ro_pulse_down_amp0())
+                optimization_M_amp_down1s.append(cross_target_qubit.ro_pulse_down_amp1())
                 ro_len = cross_target_qubit.ro_pulse_length()
                 ro_len += cross_target_qubit.ro_pulse_down_length0()
                 ro_len += cross_target_qubit.ro_pulse_down_length1()
                 readout_pulse_lengths.append(ro_len)
+
             readout_pulse_length = np.max(readout_pulse_lengths)
 
         RO_lutman = self.instr_LutMan_RO.get_instr()
         if sequence == 'ramsey':
-            RO_lutman.set('M_final_delay_R{}'.format(
-                self.cfg_qubit_nr()), 200e-9)
+            RO_lutman.set('M_final_delay_R{}'.format(self.cfg_qubit_nr()), 200e-9)
         elif sequence == 'echo':
-            RO_lutman.set('M_final_delay_R{}'.format(self.cfg_qubit_nr()),
-                          200e-9)  # +readout_pulse_length)
+            RO_lutman.set('M_final_delay_R{}'.format(self.cfg_qubit_nr()), 200e-9)  # +readout_pulse_length)
         else:
             raise NotImplementedError('dephasing sequence not recognized')
 
+        RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()), self.ro_pulse_amp())
+
+        # save and change parameters
         old_waveform_name = self.ro_pulse_type()
         self.ro_pulse_type(waveform_name)
-        RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()),
-                      self.ro_pulse_amp())
         old_delay = self.ro_acq_delay()
-        d = RO_lutman.get('M_final_delay_R{}'.format(self.cfg_qubit_nr()))
-
+        d = RO_lutman.get('M_final_delay_R{}'.format(self.cfg_qubit_nr()))  # FIXME: just set a few lines above
         self.ro_acq_delay(old_delay + readout_pulse_length + d)
 
         # self.ro_acq_integration_length(readout_pulse_length+100e-9)
-        self.ro_acq_weight_type('SSB')
+        self.ro_acq_weight_type('SSB')  # FIXME: changes state
         self.prepare_for_timedomain()
+
+        # save and change some more parameters
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
         self.cfg_prepare_ro_awg(False)
 
@@ -6729,18 +6844,24 @@ class HAL_Transmon(Qubit):
         label = 'ro_amp_sweep_dephasing' + self.msmt_suffix
         nested_MC.run(label)
 
-        # Reset qubit objects parameters tp previous settings
+        # Restore qubit objects parameters to previous settings
         self.ro_pulse_type(old_waveform_name)
-        self.cfg_prepare_ro_awg(old_ro_prepare_state)
         self.ro_acq_delay(old_delay)
+        self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
         if analyze:
             res = ma.MeasurementAnalysis(
                 label=label, plot_all=False, auto=True)
             return res
 
-    def measure_SNR_sweeping_amps(self, amps_rel, nr_shots=2 * 4094,
-                                  nested_MC=None, analyze=True):
+
+    def measure_SNR_sweeping_amps(
+            self,
+            amps_rel,
+            nr_shots=2 * 4094,
+            nested_MC: Optional[MeasurementControl] = None,
+            analyze=True
+    ):
         """
         Measures SNR and readout fidelities as a function of the readout pulse
         amplitude. Resonator depletion pulses are automatically scaled.
@@ -6757,8 +6878,12 @@ class HAL_Transmon(Qubit):
 
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
+
         self.prepare_for_timedomain()
+
         RO_lutman = self.instr_LutMan_RO.get_instr()
+
+        # save and change parameters
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
         self.cfg_prepare_ro_awg(False)
 
@@ -6786,14 +6911,21 @@ class HAL_Transmon(Qubit):
         label = 'ro_amp_sweep_SNR' + self.msmt_suffix
         nested_MC.run(label)
 
+        # restore parameters
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
         if analyze:
             ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
-    def measure_quantum_efficiency(self, amps_rel=None, nr_shots=2 * 4094,
-                                   analyze=True, verbose=True,
-                                   dephasing_sequence='ramsey'):
+
+    def measure_quantum_efficiency(
+            self,
+            amps_rel=None,
+            nr_shots=2 * 4094,
+            analyze=True,
+            verbose=True,
+            dephasing_sequence='ramsey'
+    ):
         # requires the cc light to have the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
         # it requires an optimized depletion pulse
@@ -6805,20 +6937,28 @@ class HAL_Transmon(Qubit):
         self.measure_msmt_induced_dephasing_sweeping_amps(
             amps_rel=amps_rel,
             analyze=False,
-            sequence=dephasing_sequence)
+            sequence=dephasing_sequence
+        )
         readout_pulse_length = self.ro_pulse_length()
         readout_pulse_length += self.ro_pulse_down_length0()
         readout_pulse_length += self.ro_pulse_down_length1()
         # self.ro_acq_integration_length(readout_pulse_length+0e-9)
 
-        self.ro_pulse_type('up_down_down')
+        self.ro_pulse_type('up_down_down')  # FIXME: changes state
         # setting acquisition weights to optimal
-        self.ro_acq_weight_type('optimal')
+        self.ro_acq_weight_type('optimal')  # FIXME: changes state
 
         # calibrate residual excitation and relaxation at high power
-        self.measure_ssro(cal_residual_excitation=True, SNR_detector=True,
-                          nr_shots=nr_shots, update_threshold=False)
-        self.measure_SNR_sweeping_amps(amps_rel=amps_rel, analyze=False)
+        self.measure_ssro(
+            cal_residual_excitation=True,
+            SNR_detector=True,
+            nr_shots=nr_shots,
+            update_threshold=False
+        )
+        self.measure_SNR_sweeping_amps(
+            amps_rel=amps_rel,
+            analyze=False
+        )
 
         end_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -6851,9 +6991,20 @@ class HAL_Transmon(Qubit):
     # other functions (HAL_Transmon specific)
     ##########################################################################
 
-    def bus_frequency_flux_sweep(self, freqs, spec_source_bus, bus_power, dacs, dac_param, f01=None, label='',
-                                 close_fig=True, analyze=True, MC=None,
-                                 prepare_for_continuous_wave=True):
+    def bus_frequency_flux_sweep(
+            self,
+            freqs,
+            spec_source_bus,
+            bus_power,
+            dacs,
+            dac_param,
+            f01=None,
+            label='',
+            close_fig=True,
+            analyze=True,
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_continuous_wave=True
+    ):
         """
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source. At the same time sweep dac channel specified by dac_param over
@@ -6902,15 +7053,19 @@ class HAL_Transmon(Qubit):
             self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         # Starting specmode if set in config
         if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
-                               ro_amp=self.ro_pulse_amp_CW())
+            UHFQC.spec_mode_on(
+                IF=self.ro_freq_mod(),
+                ro_amp=self.ro_pulse_amp_CW()
+            )
 
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
-            platf_cfg=self.cfg_openql_platform_fn())
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
         self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
@@ -6943,6 +7098,7 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
+
     def check_qubit_spectroscopy(self, freqs=None, MC=None):
         """
         Check the qubit frequency with spectroscopy of 15 points.
@@ -6964,8 +7120,11 @@ class HAL_Transmon(Qubit):
         self.measure_spectroscopy(MC=MC, freqs=freqs)
 
         label = 'spec'
-        a = ma.Qubit_Spectroscopy_Analysis(label=label, close_fig=True,
-                                           qb_name=self.name)
+        a = ma.Qubit_Spectroscopy_Analysis(
+            label=label,
+            close_fig=True,
+            qb_name=self.name
+        )
 
         freq_peak = a.peaks['peak']
         if freq_peak is None:
@@ -6975,7 +7134,8 @@ class HAL_Transmon(Qubit):
             result = np.abs(self.freq_qubit() - freq) / self.freq_qubit()
         return result
 
-    def check_rabi(self, MC=None, amps=None):
+
+    def check_rabi(self, MC: Optional[MeasurementControl] = None, amps=None):
         """
         Takes 5 equidistantly space points: 3 before channel amp, one at
         channel amp and one after. Compares them with the expected Rabi curve
@@ -6988,7 +7148,8 @@ class HAL_Transmon(Qubit):
         old_amp = self.mw_channel_amp()
         return np.abs(amp - old_amp)
 
-    def check_ramsey(self, MC=None, times=None, artificial_detuning=None):
+
+    def check_ramsey(self, MC: Optional[MeasurementControl] = None, times=None, artificial_detuning=None):
 
         if artificial_detuning is None:
             artificial_detuning = 0.1e6
@@ -7002,11 +7163,14 @@ class HAL_Transmon(Qubit):
         check_result = (freq - self.freq_qubit()) / freq
         return check_result
 
-    def create_ssro_detector(self,
-                             calibrate_optimal_weights: bool = False,
-                             prepare_function=None,
-                             prepare_function_kwargs: dict = None,
-                             ssro_kwargs: dict = None):
+
+    def create_ssro_detector(
+            self,
+            calibrate_optimal_weights: bool = False,
+            prepare_function=None,
+            prepare_function_kwargs: dict = None,
+            ssro_kwargs: dict = None
+    ):
         """
         Wraps measure_ssro using the Function Detector.
 
@@ -7039,6 +7203,7 @@ class HAL_Transmon(Qubit):
                 always_prepare=True)
         return d
 
+
     def calc_current_to_freq(self, curr: float):
         """
         Converts DC current to frequency in Hz for a qubit
@@ -7050,6 +7215,7 @@ class HAL_Transmon(Qubit):
         polycoeffs = self.fl_dc_polycoeff()
 
         return np.polyval(polycoeffs, curr)
+
 
     def calc_freq_to_current(self, freq, kind='root_parabola', **kw):
         """
@@ -7064,22 +7230,26 @@ class HAL_Transmon(Qubit):
                 of calculations.
         """
 
-        return ct.freq_to_amp_root_parabola(freq=freq,
-                                            poly_coeffs=self.fl_dc_polycoeff(),
-                                            **kw)
+        return ct.freq_to_amp_root_parabola(
+            freq=freq,
+            poly_coeffs=self.fl_dc_polycoeff(),
+            **kw)
 
-    def set_target_freqency(self, target_frequency=6e9,
-                            sweetspot_current=None,
-                            sweetspot_frequency=None,
-                            phi0=30e-3,
-                            Ec=270e6,
-                            span_res=30e6,
-                            span_q=0.5e9,
-                            step_q=1e6,
-                            step_res=0.5e6,
-                            I_correct=0.1e-3,
-                            accuracy=0.1e9,
-                            fine_tuning=False):
+
+    def set_target_freqency(
+            self, target_frequency=6e9,
+            sweetspot_current=None,
+            sweetspot_frequency=None,
+            phi0=30e-3,
+            Ec=270e6,
+            span_res=30e6,
+            span_q=0.5e9,
+            step_q=1e6,
+            step_res=0.5e6,
+            I_correct=0.1e-3,
+            accuracy=0.1e9,
+            fine_tuning=False
+    ):
         """
         Fluxing a qubit to a targeted frequency based on an estimation using the fluxarc.
 

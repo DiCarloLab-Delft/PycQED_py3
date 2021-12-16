@@ -83,6 +83,13 @@ class HAL_Device(Instrument):
 
     Former support for CCLight (CCL) and QuMa based CC (QCC) is deprecated.
     """
+
+    # Constants
+    _NUM_INSTR_ACQ = 3    # S17 has 3 acquisition instruments (for 3 feedlines)
+    _NUM_INSTR_AWG_MW = 5
+    _NUM_INSTR_AWG_FLUX = 3
+
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
 
@@ -97,7 +104,7 @@ class HAL_Device(Instrument):
         """
         Responsible for ensuring timing is configured correctly.
         Takes parameters starting with `tim_` and uses them to set the correct
-        latencies on the DIO ports of the CCL or QCC.
+        latencies on the DIO ports of the CC.
         N.B. latencies are set in multiples of 20ns in the DIO.
         Latencies shorter than 20ns are set as channel delays in the AWGs.
         These are set globally. If individual (per channel) setting of latency
@@ -5605,14 +5612,16 @@ class HAL_Device(Instrument):
     #     ma2.tqg.Two_qubit_gate_tomo_Analysis(label='Ramsey')
 
 
-    def measure_ramsey_tomo(self,
-                            qubit_ramsey: list,
-                            qubit_control: list,
-                            excited_spectators: list = [],
-                            nr_shots_per_case: int = 2 ** 10,
-                            flux_codeword: str = 'cz',
-                            prepare_for_timedomain: bool = True,
-                            MC=None):
+    def measure_ramsey_tomo(
+            self,
+            qubit_ramsey: list,
+            qubit_control: list,
+            excited_spectators: list = [],
+            nr_shots_per_case: int = 2 ** 10,
+            flux_codeword: str = 'cz',
+            prepare_for_timedomain: bool = True,
+            MC: Optional[MeasurementControl] = None
+    ):
         '''
         Doc string
 
@@ -5639,18 +5648,21 @@ class HAL_Device(Instrument):
             self.prepare_for_timedomain(qubits=[*excited_spectators], prepare_for_readout=False)
             self.prepare_for_timedomain(qubits=[*qubit_ramsey, *qubit_control])
 
-        p = mqo.Ramsey_tomo(qR=qubitR_idxs,
-                            qC=qubitC_idxs,
-                            exc_specs=qubitS_idxs,
-                            flux_codeword=flux_codeword,
-                            platf_cfg=self.cfg_openql_platform_fn())
+        p = mqo.Ramsey_tomo(
+            qR=qubitR_idxs,
+            qC=qubitC_idxs,
+            exc_specs=qubitS_idxs,
+            flux_codeword=flux_codeword,
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
         # d = self.get_int_log_det(qubits=[qubit_ramsey, qubit_control])
-        d = self.get_int_logging_detector(qubits=[*qubit_ramsey, *qubit_control],
-                                          result_logging_mode='raw')
+        d = self.get_int_logging_detector(
+            qubits=[*qubit_ramsey, *qubit_control],
+            result_logging_mode='raw'
+        )
         d.detectors[0].nr_shots = 4096
         try:
             d.detectors[1].nr_shots = 4096
@@ -5668,6 +5680,7 @@ class HAL_Device(Instrument):
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
         MC.run('Ramsey_tomo_R_{}_C_{}_S_{}'.format(qubit_ramsey, qubit_control, excited_spectators))
+
         # Analysis
         a = ma2.tqg.Two_qubit_gate_tomo_Analysis(label='Ramsey', n_pairs=len(qubit_ramsey))
 
@@ -5677,15 +5690,15 @@ class HAL_Device(Instrument):
     # public functions: calibrate
     ##########################################################################
 
-    def calibrate_optimal_weights_mux(self,
-                                      qubits: list,
-                                      q_target: str,
-                                      update=True,
-                                      verify=True,
-                                      averages=2**15,
-                                      return_analysis=True
-                                      ):
-
+    def calibrate_optimal_weights_mux(
+            self,
+            qubits: list,
+            q_target: str,
+            update=True,
+            verify=True,
+            averages=2 ** 15,
+            return_analysis=True
+    ):
         """
         Measures the multiplexed readout transients of <qubits> for <q_target>
         in ground and excited state. After that, it calculates optimal
@@ -5696,11 +5709,14 @@ class HAL_Device(Instrument):
             qubits (list):
                 List of strings specifying qubits included in the multiplexed
                 readout signal.
+
             q_target (str):
                 ()
+
             verify (bool):
                 indicates whether to run measure_ssro at the end of the routine
                 to find the new SNR and readout fidelities with optimized weights
+
             update (bool):
                 specifies whether to update the weights in the qubit object
         """
@@ -5713,16 +5729,23 @@ class HAL_Device(Instrument):
 
         Q_target = self.find_instrument(q_target)
         # Transient analysis
-        A = self.measure_transients(qubits=qubits, q_target=q_target,
-                                    cases=['on', 'off'])
-        #return parameters
+        A = self.measure_transients(
+            qubits=qubits,
+            q_target=q_target,
+            cases=['on', 'off']
+        )
+
+        # resore parameters
         self.ro_acq_averages(old_avg)
 
         # Optimal weights
-        B = ma2.Multiplexed_Weights_Analysis(q_target=q_target,
-                                             IF=Q_target.ro_freq_mod(),
-                                             pulse_duration=Q_target.ro_pulse_length(),
-                                             A_ground=A[1], A_excited=A[0])
+        B = ma2.Multiplexed_Weights_Analysis(
+            q_target=q_target,
+            IF=Q_target.ro_freq_mod(),
+            pulse_duration=Q_target.ro_pulse_length(),
+            A_ground=A[1],
+            A_excited=A[0]
+        )
 
         if update:
             Q_target.ro_acq_weight_func_I(B.qoi['W_I'])
@@ -5732,19 +5755,22 @@ class HAL_Device(Instrument):
             if verify:
                 Q_target._prep_ro_integration_weights()
                 Q_target._prep_ro_instantiate_detectors()
-                ssro_dict= self.measure_ssro_single_qubit(qubits=qubits,
-                                                          q_target=q_target)
+                ssro_dict= self.measure_ssro_single_qubit(
+                    qubits=qubits,
+                    q_target=q_target
+                )
             if return_analysis:
                 return ssro_dict
             else:
                 return True
+
 
     def calibrate_mux_ro(
         self,
         qubits,
         calibrate_optimal_weights=True,
         calibrate_threshold=True,
-        # option should be here but is currently not implementd
+        # option should be here but is currently not implemented:
         # update_threshold: bool=True,
         mux_ro_label="Mux_SSRO",
         update_cross_talk_matrix: bool = False,
@@ -5820,6 +5846,7 @@ class HAL_Device(Instrument):
         # a = self.check_mux_RO(update=update, update_threshold=update_threshold)
         return True
 
+
     def calibrate_cz_single_q_phase(
         self,
         q_osc: str,
@@ -5889,7 +5916,7 @@ class HAL_Device(Instrument):
             flux_codeword=flux_codeword,
             flux_codeword_park=flux_codeword_park,
             platf_cfg=self.cfg_openql_platform_fn(),
-            CZ_disabled=False,
+#            CZ_disabled=False,
             add_cal_points=False,
             angles=[90],
         )
@@ -5921,10 +5948,16 @@ class HAL_Device(Instrument):
                 phase_par(phase_corr_amp)
             return True
 
-    def calibrate_phases(self, phase_offset_park: float = 0.003,
-            phase_offset_sq: float = 0.05, do_park_cal: bool = True, do_sq_cal: bool = True,
-            operation_pairs: list = [(['QNW','QC'],'SE'), (['QNE','QC'],'SW'),
-                                    (['QC','QSW','QSE'],'SW'), (['QC','QSE','QSW'],'SE')]):
+
+    def calibrate_phases(
+            self,
+            phase_offset_park: float = 0.003,
+            phase_offset_sq: float = 0.05,
+            do_park_cal: bool = True,
+            do_sq_cal: bool = True,
+            operation_pairs: list = [(['QNW', 'QC'], 'SE'), (['QNE', 'QC'], 'SW'),
+                                     (['QC', 'QSW', 'QSE'], 'SW'), (['QC', 'QSE', 'QSW'], 'SE')]
+    ):
 
         # First, fix parking phases
         # Set 'qubits': [q0.name, q1.name, q2.name] and 'parked_qubit_seq': 'ramsey'
@@ -6040,9 +6073,12 @@ class HAL_Device(Instrument):
                     getattr(flux_lm, 'cz_phase_corr_amp_' + gate )(crossed_value)
 
 
-    def calibrate_cz_thetas(self, phase_offset: float = 1,
-            operation_pairs: list = [(['QNW','QC'],'SE'), (['QNE','QC'],'SW'),
-                                    (['QC','QSW','QSE'],'SW'), (['QC','QSE','QSW'],'SE')]):
+    def calibrate_cz_thetas(
+            self,
+            phase_offset: float = 1,
+            operation_pairs: list = [(['QNW', 'QC'], 'SE'), (['QNE', 'QC'], 'SW'),
+                                     (['QC', 'QSW', 'QSE'], 'SW'), (['QC', 'QSE', 'QSW'], 'SE')]
+    ):
 
         # Set 'qubits': [q0.name, q1.name] and 'parked_qubit_seq': 'ground'
         for operation_tuple in operation_pairs:
@@ -6089,12 +6125,20 @@ class HAL_Device(Instrument):
             crossed_value = a_obj.proc_data_dict['root']
             getattr(flux_lm, 'cz_theta_f_' + gate )(crossed_value)
 
-    def calibrate_multi_frequency_fine(self, qubits: list = None, times=None,
-                                       artificial_periods: float = None,
-                                       MC: Optional[MeasurementControl] = None, prepare_for_timedomain=True,
-                                       update_T2=False, update_frequency=True,
-                                       stepsize: float = None, termination_opt=0,
-                                       steps=[1, 1, 3, 10, 30, 100, 300, 1000]):
+
+    def calibrate_multi_frequency_fine(
+            self,
+            qubits: list = None,
+            times=None,
+            artificial_periods: float = None,
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain=True,
+            update_T2=False,
+            update_frequency=True,
+            stepsize: float = None,
+            termination_opt=0,
+            steps=[1, 1, 3, 10, 30, 100, 300, 1000]
+    ):
         if qubits is None:
             qubits = self.qubits()
         if artificial_periods is None:
@@ -6110,12 +6154,18 @@ class HAL_Device(Instrument):
 
             label = 'Multi_Ramsey_{}_pulse_sep_'.format(n) + '_'.join(qubits)
 
-            a = self.measure_multi_ramsey(qubits=qubits, times=times, MC=MC, GBT=False,
-                                          artificial_periods=artificial_periods, label=label,
-                                          prepare_for_timedomain=prepare_for_timedomain,
-                                          update_frequency=False, update_T2=update_T2)
+            a = self.measure_multi_ramsey(
+                qubits=qubits,
+                times=times,
+                MC=MC,
+                GBT=False,
+                artificial_periods=artificial_periods,
+                label=label,
+                prepare_for_timedomain=prepare_for_timedomain,
+                update_frequency=False,
+                update_T2=update_T2
+            )
             for q in qubits:
-
                 qub = self.find_instrument(q)
                 freq = a.proc_data_dict['quantities_of_interest'][q]['freq_new']
                 T2 = a.proc_data_dict['quantities_of_interest'][q]['tau']
@@ -6131,6 +6181,7 @@ class HAL_Device(Instrument):
 
                 print('Breaking of measurement because of T2*')
                 break
+
         return True
 
     ########################################################
@@ -6263,111 +6314,46 @@ class HAL_Device(Instrument):
             parameter_class=InstrumentRefParameter,
         )
 
-        for i in range(3):  # S17 has 3 feedlines
-            self.add_parameter(
-                "instr_acq_{}".format(i), parameter_class=InstrumentRefParameter
-            )
+        for i in range(self._NUM_INSTR_ACQ):
+            self.add_parameter(f"instr_acq_{i}", parameter_class=InstrumentRefParameter)
 
-        self.add_parameter("instr_AWG_mw_0", parameter_class=InstrumentRefParameter)
-        self.add_parameter("instr_AWG_mw_1", parameter_class=InstrumentRefParameter)
-        self.add_parameter("instr_AWG_mw_2", parameter_class=InstrumentRefParameter)
-        self.add_parameter("instr_AWG_mw_3", parameter_class=InstrumentRefParameter)
-        self.add_parameter("instr_AWG_mw_4", parameter_class=InstrumentRefParameter)
+        for i in range(self._NUM_INSTR_AWG_MW):
+            self.add_parameter(f"instr_AWG_mw_{i}", parameter_class=InstrumentRefParameter)
 
-        self.add_parameter("instr_AWG_flux_0", parameter_class=InstrumentRefParameter)
-        self.add_parameter("instr_AWG_flux_1", parameter_class=InstrumentRefParameter)
-        self.add_parameter("instr_AWG_flux_2", parameter_class=InstrumentRefParameter)
+        for i in range(self._NUM_INSTR_AWG_FLUX):
+            self.add_parameter(f"instr_AWG_flux_{i}", parameter_class=InstrumentRefParameter)
 
     def _add_tim_parameters(self):
         # Timing related parameters
-        self.add_parameter(
-            "tim_ro_latency_0",
-            unit="s",
-            label="Readout latency 0",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_ro_latency_1",
-            unit="s",
-            label="Readout latency 1",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_ro_latency_2",
-            unit="s",
-            label="Readout latency 2",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_flux_latency_0",
-            unit="s",
-            label="Flux latency 0",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_flux_latency_1",
-            unit="s",
-            label="Flux latency 1",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_flux_latency_2",
-            unit="s",
-            label="Flux latency 2",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_mw_latency_0",
-            unit="s",
-            label="Microwave latency 0",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_mw_latency_1",
-            unit="s",
-            label="Microwave latency 1",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_mw_latency_2",
-            unit="s",
-            label="Microwave latency 2",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_mw_latency_3",
-            unit="s",
-            label="Microwave latency 3",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
-        self.add_parameter(
-            "tim_mw_latency_4",
-            unit="s",
-            label="Microwave latency 4",
-            parameter_class=ManualParameter,
-            initial_value=0,
-            vals=vals.Numbers(),
-        )
+        for i in range(self._NUM_INSTR_ACQ):
+            self.add_parameter(
+                f"tim_ro_latency_{i}",
+                unit="s",
+                label=f"Readout latency {i}",
+                parameter_class=ManualParameter,
+                initial_value=0,
+                vals=vals.Numbers(),
+            )
+
+        for i in range(self._NUM_INSTR_AWG_FLUX):
+            self.add_parameter(
+                f"tim_flux_latency_{i}",
+                unit="s",
+                label="Flux latency 0",
+                parameter_class=ManualParameter,
+                initial_value=0,
+                vals=vals.Numbers(),
+            )
+
+        for i in range(self._NUM_INSTR_AWG_MW):
+            self.add_parameter(
+                f"tim_mw_latency_{i}",
+                unit="s",
+                label=f"Microwave latency {i}",
+                parameter_class=ManualParameter,
+                initial_value=0,
+                vals=vals.Numbers(),
+            )
 
     def _add_ro_parameters(self):
         self.add_parameter(
@@ -6394,6 +6380,7 @@ class HAL_Device(Instrument):
             initial_value=20,
             parameter_class=ManualParameter,
         )
+        
         self.add_parameter(
             "ro_acq_averages",
             initial_value=1024,
@@ -6409,7 +6396,7 @@ class HAL_Device(Instrument):
             initial_value=0,
             parameter_class=ManualParameter,
             docstring=(
-                "The time between the instruction that trigger the"
+                "The time between the instruction that triggers the"
                 " readout pulse and the instruction that triggers the "
                 "acquisition. The positive number means that the "
                 "acquisition is started after the pulse is send."
@@ -6468,8 +6455,7 @@ class HAL_Device(Instrument):
         self.add_parameter(
             'qubit_edges',
             parameter_class=ManualParameter,
-            docstring="Denotes edges that connect qubits. "
-                        "Used to define the device topology.",
+            docstring="Denotes edges that connect qubits. Used to define the device topology.",
             initial_value=[[]],
             vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
         )
@@ -6477,41 +6463,14 @@ class HAL_Device(Instrument):
         self.add_parameter(
             'qubits_by_feedline',
             parameter_class=ManualParameter,
-            docstring="Qubits divided by feedline."
-                        "Used to sort qubits for timedomain preparation.",
+            docstring="Qubits divided by feedline. Used to sort qubits for timedomain preparation.",
             initial_value=[[]],
             vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
         )
 
         self.add_parameter(
             "dio_map",
-            docstring="The map between DIO"
-            " channel number and functionality (ro_x, mw_x, flux_x). "
-            "From 2020-03-19 on, Requires to be configured by the user in each set up. "
-            "For convenience here are the mapping for the devices with fixed mappings:\n"
-            "CCL:\n"
-            "    {\n"
-            "        'ro_0': 1,\n"
-            "        'ro_1': 2,\n"
-            "        'flux_0': 3,\n"
-            "        'mw_0': 4,\n"
-            "        'mw_1': 5\n"
-            "    }\n"
-            "QCC:\n"
-            "    {\n"
-            "        'ro_0': 1,\n"
-            "        'ro_1': 2,\n"
-            "        'ro_2': 3,\n"
-            "        'mw_0': 4,\n"
-            "        'mw_1': 5,\n"
-            "        'flux_0': 6,\n"
-            "        'flux_1': 7,\n"
-            "        'flux_2': 8,\n"
-            "        'flux_3': 9,\n"
-            "        'mw_2': 10,\n"
-            "        'mw_3': 11\n"
-            "        'mw_4': 12\n"
-            "    }\n"
+            docstring="The map between DIO channel number and functionality (ro_x, mw_x, flux_x). "
             "Tip: run `device.dio_map?` to print the docstring of this parameter",
             initial_value=None,
             set_cmd=self._set_dio_map,
@@ -6632,7 +6591,7 @@ class HAL_Device(Instrument):
         log.info("acq_channel_map: \n\t{}".format(acq_ch_map))
 
         log.info("Clearing UHF correlation settings")
-        for acq_instr_name in acq_ch_map.keys():
+        for acq_instr_name in acq_ch_map.keys():  # FIXME: acq_instr_name not used, but acq_instr is
             self.find_instrument(acq_instr).reset_correlation_params()
             self.find_instrument(acq_instr).reset_crosstalk_matrix()
 
@@ -6677,28 +6636,22 @@ class HAL_Device(Instrument):
                     log.warning("No optimal weights defined for"
                                 " {}, not updating weights".format(qb_name))
                 else:
-                    acq_instr.set("qas_0_integration_weights_{}_real".format(
-                                qb.ro_acq_weight_chI()), opt_WI,)
-                    acq_instr.set("qas_0_integration_weights_{}_imag".format(
-                                qb.ro_acq_weight_chI()), opt_WQ,)
+                    acq_instr.set("qas_0_integration_weights_{}_real".format(qb.ro_acq_weight_chI()), opt_WI,)
+                    acq_instr.set("qas_0_integration_weights_{}_imag".format(qb.ro_acq_weight_chI()), opt_WQ,)
                     acq_instr.set("qas_0_rotations_{}".format(
                                 qb.ro_acq_weight_chI()), 1.0 - 1.0j)
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
-                        acq_instr.set('qas_0_integration_weights_{}_real'.format(
-                            qb.ro_acq_weight_chQ()), opt_WQ)
-                        acq_instr.set('qas_0_integration_weights_{}_imag'.format(
-                            qb.ro_acq_weight_chQ()), opt_WI)
-                        acq_instr.set('qas_0_rotations_{}'.format(
-                            qb.ro_acq_weight_chQ()), 1.0 + 1.0j)
+                        acq_instr.set('qas_0_integration_weights_{}_real'.format(qb.ro_acq_weight_chQ()), opt_WQ)
+                        acq_instr.set('qas_0_integration_weights_{}_imag'.format(qb.ro_acq_weight_chQ()), opt_WI)
+                        acq_instr.set('qas_0_rotations_{}'.format(qb.ro_acq_weight_chQ()), 1.0 + 1.0j)
 
                 if self.ro_acq_digitized():
                     # Update the RO theshold
                     if (qb.ro_acq_rotated_SSB_when_optimal() and
                             abs(qb.ro_acq_threshold()) > 32):
                         threshold = 32
-                        log.warning(
-                            "Clipping ro_acq threshold of {} to 32".format(qb.name))
+                        log.warning("Clipping ro_acq threshold of {} to 32".format(qb.name))
                         # working around the limitation of threshold in UHFQC
                         # which cannot be >abs(32).
                         # See also self._prep_ro_integration_weights scaling the weights
@@ -6782,6 +6735,7 @@ class HAL_Device(Instrument):
         Args:
             qubits (list of str):
                 list of qubit names that have to be prepared
+
             acq_ch_map (dict)
                 dict specifying the mapping
         """
