@@ -7323,48 +7323,6 @@ class HAL_Transmon(Qubit):
                 self.find_frequency(freqs=np.arange(-span_q / 5, span_q / 5, step_q) + center_q)
                 return True
 
-    # FIXME: the parameters of the function below are gone
-    # def ssro_and_optimal_weights():
-    #     self.calibrate_optimal_weights(verify=False,
-    #                                    analyze=True,
-    #                                    update=True)
-    #     ret = self.measure_ssro(nr_shots=nr_shots,
-    #                             analyze=True, SNR_detector=True,
-    #                             cal_residual_excitation=True,
-    #                             prepare=False,
-    #                             disable_metadata=True)
-    #     return ret
-    #     if use_optimal_weights:
-    #         d = det.Function_Detector(
-    #             ssro_and_optimal_weights,
-    #             msmt_kw={},
-    #             result_keys=['SNR', 'F_d', 'F_a']
-    #         )
-    #     else:
-    #         d = det.Function_Detector(
-    #             self.measure_ssro,
-    #             msmt_kw={
-    #                 'shots_per_meas': nr_shots,
-    #                 # 'SNR_detector': True,
-    #                 'prepare': False,
-    #                 'disable_metadata': True
-    #             },
-    #             result_keys=['SNR', 'F_d', 'F_a']
-    #         )
-    #     nested_MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
-    #         MW_LO_source=self.instr_LO_ro.get_instr(),
-    #         IF=self.ro_freq_mod()))
-    #     nested_MC.set_sweep_points(freqs)
-    #     nested_MC.set_detector_function(d)
-    #     nested_MC.set_sweep_function_2D(sweep_function)
-    #     nested_MC.set_sweep_points_2D(amps_rel)
-    #     label = label + self.msmt_suffix
-    #     nested_MC.run(label, mode='2D')
-    #
-    #     self.cfg_prepare_ro_awg(old_ro_prepare_state)
-    #
-    #     if analyze:
-    #         ma.TwoD_Analysis(label=label, plot_all=True, auto=True)
 
     ###########################################################################
     # Dep graph check functions
