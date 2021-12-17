@@ -6380,7 +6380,7 @@ class HAL_Device(Instrument):
             initial_value=20,
             parameter_class=ManualParameter,
         )
-        
+
         self.add_parameter(
             "ro_acq_averages",
             initial_value=1024,
