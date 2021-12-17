@@ -2924,7 +2924,7 @@ def chirpz(x, A, W, M):
     """
     A = complex(A)
     W = complex(W)
-    if np.issubdtype(complex, x.dtype) or np.issubdtype(np.float, x.dtype):
+    if np.issubdtype(complex, x.dtype) or np.issubdtype(float, x.dtype):
         dtype = x.dtype
     else:
         dtype = float
