@@ -1218,7 +1218,7 @@ class HAL_Transmon(Qubit):
                            self.ro_acq_weight_chQ()]
             result_logging_mode = 'raw'
 
-        if 'UHFQC' in self.instr_acquisition():
+        if 'UHFQC' in self.instr_acquisition():  # FIXME: checks name, not type
             UHFQC = self.instr_acquisition.get_instr()
 
             self.input_average_detector = det.UHFQC_input_average_detector(
@@ -1935,7 +1935,7 @@ class HAL_Transmon(Qubit):
             print('Enter loop')
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)
+            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Bus_spectroscopy_' + self.msmt_suffix + label)
         spec_source_bus.off()
@@ -2830,15 +2830,13 @@ class HAL_Transmon(Qubit):
                 channel=self.ro_acq_weight_chI(),
                 statemap={'0': '1', '1': '0'})
             minimize = False
-            msmt_string = 'Restless_tuneup_{}Cl_{}seeds'.format(
-                nr_cliffords, nr_seeds) + self.msmt_suffix
+            msmt_string = f'Restless_tuneup_{nr_cliffords}Cl_{nr_seeds}seeds' + self.msmt_suffix
 
         else:
             net_clifford = 0  # not flipping sequence
             d = self.int_avg_det_single
             minimize = True
-            msmt_string = 'ORBIT_tuneup_{}Cl_{}seeds'.format(
-                nr_cliffords, nr_seeds) + self.msmt_suffix
+            msmt_string = f'ORBIT_tuneup_{nr_cliffords}Cl_{nr_seeds}seeds' + self.msmt_suffix
 
         p = sqo.randomized_benchmarking(
             self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
@@ -3501,8 +3499,10 @@ class HAL_Transmon(Qubit):
         """
         UHFQC = self.instr_acquisition.get_instr()
         self.prepare_for_continuous_wave()
+
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         # Starting specmode if set in config
         if self.cfg_spec_mode():
             UHFQC.spec_mode_on(acq_length=self.ro_acq_integration_length(),
@@ -3520,7 +3520,7 @@ class HAL_Transmon(Qubit):
             IF=self.ro_freq_mod()))
         MC.set_sweep_points(freqs)
 
-        self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_scan' + self.msmt_suffix + label)
 
@@ -3570,7 +3570,7 @@ class HAL_Transmon(Qubit):
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)
-        self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_power_scan' + self.msmt_suffix + label, mode='2D')
 
@@ -3941,7 +3941,7 @@ class HAL_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         #  real_imag is acutally not polar and as such works for opt weights
-        self.int_avg_det_single._set_real_imag(real_imag)
+        self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_' + self.msmt_suffix)
         ma.Rabi_Analysis(label='rabi_')
@@ -3985,7 +3985,7 @@ class HAL_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         # real_imag is actually not polar and as such works for opt weights
-        self.int_avg_det_single._set_real_imag(real_imag)
+        self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_' + self.msmt_suffix)
 
@@ -4742,7 +4742,7 @@ class HAL_Transmon(Qubit):
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)
-        self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
         label = 'Photon_number_splitting'
         MC.run(name=label + self.msmt_suffix, mode='2D')
@@ -4820,7 +4820,7 @@ class HAL_Transmon(Qubit):
 
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
-        self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_dac_scan' + self.msmt_suffix + label, mode='2D')
 
@@ -4949,7 +4949,7 @@ class HAL_Transmon(Qubit):
         else:
             MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
-        self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         self.int_avg_det_single.always_prepare = True
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
@@ -5011,7 +5011,7 @@ class HAL_Transmon(Qubit):
             print('Enter loop')
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)
+            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
 
@@ -5076,18 +5076,21 @@ class HAL_Transmon(Qubit):
         if self.cfg_spec_mode():
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)
+            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='pulsed_marker_spectroscopy' + self.msmt_suffix + label)
+
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
 
         if analyze:
-            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
-                                           close_fig=close_fig,
-                                           qb_name=self.name)
+            ma.Qubit_Spectroscopy_Analysis(
+                label=self.msmt_suffix,
+                close_fig=close_fig,
+                qb_name=self.name
+            )
 
 
     def measure_spectroscopy_pulsed_mixer(
@@ -5155,7 +5158,7 @@ class HAL_Transmon(Qubit):
             print('Enter loop')
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)
+            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
 
         # d = self.int_avg_det
@@ -5252,7 +5255,7 @@ class HAL_Transmon(Qubit):
         spec_source = self.instr_spec_source.get_instr()
 
         self.prepare_for_continuous_wave()
-        self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         spec_source.on()
         if mode == 'pulsed_marked':
             spec_source.pulsemod_state('On')
@@ -5348,18 +5351,20 @@ class HAL_Transmon(Qubit):
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source = self.instr_spec_source.get_instr()
-        old_spec_pow = self.spec_pow()
+        old_spec_pow = self.spec_pow()  # FIXME: also changed by prepare_for_continuous_wave
 
         self.prepare_for_continuous_wave()
-        self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+
+        # configure spec_source
         spec_source.on()
         if mode == 'pulsed_marked':
             spec_source.pulsemod_state('On')
         else:
             spec_source.pulsemod_state('Off')
-
         spec_source.power(f_01_power)
 
+        # configure spec_source
         spec_source_2.on()
         if mode == 'pulsed_marked':
             spec_source_2.pulsemod_state('On')
@@ -5367,15 +5372,14 @@ class HAL_Transmon(Qubit):
             spec_source_2.pulsemod_state('Off')
         spec_source_2.power(f_12_power)
 
-        MC.set_sweep_function(wrap_par_to_swf(
-            spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_function(wrap_par_to_swf(spec_source.frequency, retrieve_value=True))
         MC.set_sweep_points(freqs_01)
-        MC.set_sweep_function_2D(wrap_par_to_swf(
-            spec_source_2.frequency, retrieve_value=True))
+        MC.set_sweep_function_2D(wrap_par_to_swf(spec_source_2.frequency, retrieve_value=True))
         MC.set_sweep_points_2D(freqs_12)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run_2D(name='Two_tone_' + self.msmt_suffix)
         ma.TwoD_Analysis(auto=True)
+
         spec_source.off()
         spec_source_2.off()
         self.spec_pow(old_spec_pow)
@@ -5387,9 +5391,11 @@ class HAL_Transmon(Qubit):
         #     return a.T1
 
         ma_obj = ma.Three_Tone_Spectroscopy_Analysis_test(
-            label='Two_tone', f01=np.mean(freqs_01), f12=np.mean(freqs_12))
-        rel_change = (abs(self.anharmonicity()) -
-                      ma_obj.Anharm_dict['anharmonicity']) / self.anharmonicity()
+            label='Two_tone',
+            f01=np.mean(freqs_01),
+            f12=np.mean(freqs_12)
+        )
+        rel_change = (abs(self.anharmonicity()) - ma_obj.Anharm_dict['anharmonicity']) / self.anharmonicity()
         threshold_for_change = 0.1
         if np.abs(rel_change) > threshold_for_change:
             return False
@@ -5437,20 +5443,20 @@ class HAL_Transmon(Qubit):
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
-            platf_cfg=self.cfg_openql_platform_fn())
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
-        self.int_avg_det_single._set_real_imag(False)
+        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+
         spec_source.on()
         spec_source.power(self.spec_pow())
         spec_source_2.on()
         spec_source_2.frequency(f_bus)
 
-        MC.set_sweep_function(wrap_par_to_swf(
-            spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_function(wrap_par_to_swf(spec_source.frequency, retrieve_value=True))
         MC.set_sweep_points(freqs_01)
-        MC.set_sweep_function_2D(wrap_par_to_swf(
-            spec_source_2.power, retrieve_value=True))
+        MC.set_sweep_function_2D(wrap_par_to_swf(spec_source_2.power, retrieve_value=True))
         MC.set_sweep_points_2D(powers)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run_2D(name='Photon_nr_splitting' + self.msmt_suffix)
@@ -5707,9 +5713,10 @@ class HAL_Transmon(Qubit):
                 IF=self.ro_freq_mod()))
             MC.set_sweep_points(freqs)
 
-            self.int_avg_det_single._set_real_imag(False)
+            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
             MC.run(name='Resonator_scan_' + pulse_comb + self.msmt_suffix)
+
             if analyze:
                 ma.MeasurementAnalysis()
                 a = ma.Homodyne_Analysis(
@@ -5832,6 +5839,7 @@ class HAL_Transmon(Qubit):
 
         self.prepare_for_timedomain()
         self.instr_LutMan_MW.get_instr().load_phase_pulses_to_AWG_lookuptable()
+
         if cross_target_qubits is None:
             qubits = [self.cfg_qubit_nr()]
         else:
@@ -5841,8 +5849,7 @@ class HAL_Transmon(Qubit):
             qubits.append(self.cfg_qubit_nr())
 
         # angles = np.arange(0, 421, 20)
-        angles = np.concatenate(
-            [np.arange(0, 101, 20), np.arange(140, 421, 20)])  # avoid CW15, issue
+        angles = np.concatenate([np.arange(0, 101, 20), np.arange(140, 421, 20)])  # avoid CW15, issue
 
         # generate OpenQL program
         if sequence == 'ramsey':
@@ -5869,6 +5876,7 @@ class HAL_Transmon(Qubit):
                 wait_time = readout_pulse_length / 2 + 20e-9
             else:
                 wait_time = readout_pulse_length + 40e-9
+
             p = mqo.echo_msmt_induced_dephasing(
                 qubits=qubits, angles=angles,
                 platf_cfg=platf_cfg,
@@ -5967,14 +5975,11 @@ class HAL_Transmon(Qubit):
 
         # # Checking if pulses are locked to the pulse modulation
         if sweep == 'tau':
-            if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9)
-                        == 0 for t in times]):
-                raise ValueError(
-                    'timesteps must be multiples of 2 modulation periods')
+            if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9) == 0 for t in times]):
+                raise ValueError('timesteps must be multiples of 2 modulation periods')
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_phase_pulses_to_AWG_lookuptable()
 
@@ -6047,8 +6052,7 @@ class HAL_Transmon(Qubit):
 
         # default timing
         if times is None:
-            # funny default is because there is no real time sideband
-            # modulation
+            # funny default is because there is no real time sideband modulation
             stepsize = max((self.T2_echo() * 2 / 61) // (abs(self.cfg_cycle_time()))
                            * abs(self.cfg_cycle_time()), 20e-9)
             times = np.arange(0, self.T2_echo() * 4, stepsize * 2)
@@ -6071,15 +6075,12 @@ class HAL_Transmon(Qubit):
                                      times[-1] + 4 * dt)])
 
         # # Checking if pulses are on 20 ns grid
-        if not all([np.round(t * 1e9) % (self.cfg_cycle_time() * 1e9) == 0 for
-                    t in times]):
+        if not all([np.round(t * 1e9) % (self.cfg_cycle_time() * 1e9) == 0 for t in times]):
             raise ValueError('timesteps must be multiples of 20e-9')
 
         # # Checking if pulses are locked to the pulse modulation
-        if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9)
-                    == 0 for t in times]):
-            raise ValueError(
-                'timesteps must be multiples of 2 modulation periods')
+        if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9) == 0 for t in times]):
+            raise ValueError('timesteps must be multiples of 2 modulation periods')
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
@@ -6125,8 +6126,7 @@ class HAL_Transmon(Qubit):
 
         # default timing
         if times is None:
-            # funny default is because there is no real time sideband
-            # modulation
+            # funny default is because there is no real time sideband modulation
             stepsize = max((self.T2_echo() * 2 / 61) // (abs(self.cfg_cycle_time()))
                            * abs(self.cfg_cycle_time()), 20e-9)
             times = np.arange(0, self.T2_echo() * 4, stepsize * 2)
@@ -6140,19 +6140,15 @@ class HAL_Transmon(Qubit):
                                  times[-1] + 4 * dt)])
 
         # # Checking if pulses are on 20 ns grid
-        if not all([np.round(t * 1e9) % (self.cfg_cycle_time() * 1e9) == 0 for
-                    t in times]):
+        if not all([np.round(t * 1e9) % (self.cfg_cycle_time() * 1e9) == 0 for t in times]):
             raise ValueError('timesteps must be multiples of 20e-9')
 
         # # Checking if pulses are locked to the pulse modulation
-        if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9)
-                    == 0 for t in times]):
-            raise ValueError(
-                'timesteps must be multiples of 2 modulation periods')
+        if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9) == 0 for t in times]):
+            raise ValueError('timesteps must be multiples of 2 modulation periods')
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.load_square_waves_to_AWG_lookuptable()
 
@@ -6161,15 +6157,16 @@ class HAL_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn()
         )
+
         s = swf.OpenQL_Sweep(
             openql_program=p,
             CCL=self.instr_CC.get_instr(),
             parameter_name="Time",
             unit="s"
         )
-        d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
+        d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('spin_lock_echo' + label + self.msmt_suffix)
 
@@ -6376,33 +6373,37 @@ class HAL_Transmon(Qubit):
             [nr_cliffords[-1] + 2.5] * 2,
         )
 
+        s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
+        MC.set_sweep_function(s)
+        reps_per_seed = 4094 // len(sweep_points)
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
         d = self.int_log_det
         d.prepare_function = load_range_of_oql_programs_from_filenames
         d.prepare_function_kwargs = prepare_function_kwargs
-        reps_per_seed = 4094 // len(sweep_points)
         d.nr_shots = reps_per_seed * len(sweep_points)
-
-        s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
-
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
         MC.set_detector_function(d)
-        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix,
-               exp_metadata={'bins': sweep_points})
+        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points})
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
             label='RB_',
             rates_I_quad_ch_idx=0,
-            cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2))
+            cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
+        )
         return a
 
 
-    def measure_randomized_benchmarking_old(self, nr_cliffords=2 ** np.arange(12),
-                                            nr_seeds=100,
-                                            double_curves=False,
-                                            MC: Optional[MeasurementControl] = None, analyze=True, close_fig=True,
-                                            verbose: bool = True, upload=True,
-                                            update=True):
+    def measure_randomized_benchmarking_old(
+            self,
+            nr_cliffords=2 ** np.arange(12),
+            nr_seeds=100,
+            double_curves=False,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            verbose: bool = True,
+            upload=True,
+            update=True
+    ):
         # Old version not including two-state calibration points and logging
         # detector.
         # Adding calibration points
@@ -6437,19 +6438,18 @@ class HAL_Transmon(Qubit):
             'programs': programs,
             'CC': self.instr_CC.get_instr()}
 
-        d = self.int_avg_det
-        d.prepare_function = load_range_of_oql_programs
-        d.prepare_function_kwargs = prepare_function_kwargs
-        d.nr_averages = 128
-
         s = swf.None_Sweep()
         s.parameter_name = 'Number of Cliffords'
         s.unit = '#'
         MC.set_sweep_function(s)
         MC.set_sweep_points(nr_cliffords)
-
+        d = self.int_avg_det
+        d.prepare_function = load_range_of_oql_programs
+        d.prepare_function_kwargs = prepare_function_kwargs
+        d.nr_averages = 128
         MC.set_detector_function(d)
         MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix)
+
         if double_curves:
             a = ma.RB_double_curve_Analysis(
                 T1=self.T1(),
@@ -7073,6 +7073,7 @@ class HAL_Transmon(Qubit):
         spec_source.on()
         spec_source.frequency(f01)
         # spec_source.power(self.spec_pow())
+
         spec_source_bus.on()
         spec_source_bus.power(bus_power)
 
@@ -7086,9 +7087,10 @@ class HAL_Transmon(Qubit):
             print('Enter loop')
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)
+            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Bus_flux_sweep_' + self.msmt_suffix + label, mode='2D')
+
         spec_source_bus.off()
 
         # Stopping specmode

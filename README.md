@@ -68,6 +68,7 @@ Mind however that the code is continuously under development so if you think som
     + [testing](scripts/testing/)
     + [personal_folders](scripts/personal_folders/)
 
+FIXME: init/utilities/scripts have been moved out of PycQED 
 
 ### The init folder
 Contains script that are to be used when setting up an experiment. Used to store configuration info and create instruments.
