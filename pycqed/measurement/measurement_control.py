@@ -1,7 +1,7 @@
 import types
 import logging
 import time
-import deprecated
+from deprecated import deprecated
 import numpy as np
 from collections.abc import Iterable
 import operator
@@ -1887,7 +1887,7 @@ class MeasurementControl(Instrument):
     # Small helper/utility functions #
     ##################################
 
-    #@deprecated(version='0.4', reason="hack")
+    @deprecated(version='0.4', reason="hack")
     def get_data_object(self):
         """
         Used for external functions to write to a datafile.

@@ -12,7 +12,7 @@ import pytest
 import cma
 import datetime
 import multiprocessing
-import deprecated
+from deprecated import deprecated
 from typing import Optional
 
 from .qubit_object import Qubit
@@ -271,18 +271,16 @@ class HAL_Transmon(Qubit):
         # RO acquisition parameters #
         #############################
 
-        ro_acq_docstr = (
-            'Determines what type of integration weights to use: '
-            '\n\t SSB: Single sideband demodulation\n\t'
-            'DSB: Double sideband demodulation\n\t'
-            'optimal: waveforms specified in "RO_acq_weight_func_I" '
-            '\n\tand "RO_acq_weight_func_Q"')
-
         self.add_parameter(
             'ro_acq_weight_type',
             initial_value='SSB',
             vals=vals.Enum('SSB', 'DSB', 'optimal', 'optimal IQ'),
-            docstring=ro_acq_docstr,
+            docstring=(
+                'Determines what type of integration weights to use: '
+                '\n\t SSB: Single sideband demodulation\n\t'
+                'DSB: Double sideband demodulation\n\t'
+                'optimal: waveforms specified in "RO_acq_weight_func_I" '
+                '\n\tand "RO_acq_weight_func_Q"'),
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -333,6 +331,7 @@ class HAL_Transmon(Qubit):
                 ' readout pulse and the instruction that triggers the '
                 'acquisition. The positive number means that the '
                 'acquisition is started after the pulse is send.'))
+
         self.add_parameter(
             'ro_pulse_delay', unit='s',
             label='Readout acquisition delay',
@@ -571,6 +570,7 @@ class HAL_Transmon(Qubit):
             vals=vals.Ints(1, 4),
             initial_value=1,
             parameter_class=ManualParameter)
+
         self.add_parameter(
             'mw_vsm_mod_out',
             label='VSM output module for microwave pulses',
@@ -666,12 +666,14 @@ class HAL_Transmon(Qubit):
             vals=vals.Numbers(0, 1),
             parameter_class=ManualParameter,
             initial_value=0.8)
+
         self.add_parameter(
             'spec_pow',
             unit='dB',
             vals=vals.Numbers(-70, 20),
             parameter_class=ManualParameter,
             initial_value=-30)
+
         self.add_parameter(
             'spec_wait_time',
             unit='s',
@@ -816,11 +818,13 @@ class HAL_Transmon(Qubit):
             initial_value=200e-6,
             parameter_class=ManualParameter,
             vals=vals.Numbers(min_value=1e-6, max_value=327668e-9))
+
         self.add_parameter(
             'cfg_openql_platform_fn',
             label='OpenQL platform configuration filename',
             parameter_class=ManualParameter,
             vals=vals.Strings())
+
         self.add_parameter(
             'cfg_qubit_nr',
             label='Qubit number',
@@ -834,6 +838,7 @@ class HAL_Transmon(Qubit):
             initial_value='latest',
             parameter_class=ManualParameter,
             vals=vals.Enum('latest', 'flux'))
+
         self.add_parameter(
             'cfg_rb_calibrate_method',
             initial_value='restless',
@@ -847,6 +852,7 @@ class HAL_Transmon(Qubit):
             parameter_class=ManualParameter,
             # this is to effectively hardcode the cycle time
             vals=vals.Enum(20e-9))
+
         self.add_parameter(
             'cfg_prepare_ro_awg',
             vals=vals.Bool(),
@@ -860,6 +866,7 @@ class HAL_Transmon(Qubit):
             docstring=('If False, disables uploading pulses to AWG8'),
             initial_value=True,
             parameter_class=ManualParameter)
+
         self.add_parameter(
             'cfg_with_vsm',
             vals=vals.Bool(),
@@ -5465,7 +5472,7 @@ class HAL_Transmon(Qubit):
         spec_source.off()
         spec_source_2.off()
 
-
+    @deprecated(version='0.4', reason="broken")
     def measure_ssro_vs_frequency_amplitude(
             self, freqs=None, amps_rel=np.linspace(0, 1, 11),
             nr_shots=4092 * 4, nested_MC: Optional[MeasurementControl] = None, analyze=True,
@@ -5492,11 +5499,13 @@ class HAL_Transmon(Qubit):
             nested_MC = self.instr_nested_MC.get_instr()
         if freqs is None:
             freqs = np.linspace(self.ro_freq() - 4e6, self.ro_freq() + 2e6, 11)
+
         self.prepare_for_timedomain()
         RO_lutman = self.instr_LutMan_RO.get_instr()
+
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
-        self.ro_acq_digitized(False)
-        self.cfg_prepare_ro_awg(False)
+        self.ro_acq_digitized(False)  # FIXME: changes state
+        self.cfg_prepare_ro_awg(False)  # FIXME: changes state (old_ro_prepare_state above is unused)
 
         sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
             LutMan=RO_lutman,
@@ -5506,6 +5515,7 @@ class HAL_Transmon(Qubit):
             optimization_M_amp_down1s=[self.ro_pulse_down_amp1()],
             upload=True
         )
+        # FIXME: code missing here (already gone in GIT tag "v0.2")
 
 
     def measure_ssro_vs_TWPA_frequency_power(
