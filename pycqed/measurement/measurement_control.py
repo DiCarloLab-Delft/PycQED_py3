@@ -899,7 +899,7 @@ class MeasurementControl(Instrument):
                 type(self.sweep_points_2D[0]), np.integer
             ):
                 c = np.column_stack(
-                    (x_tiled.astype(np.object), y_rep)
+                    (x_tiled.astype(object), y_rep)
                 )  # this preserves types
             else:
                 c = np.column_stack((x_tiled, y_rep))

@@ -1,17 +1,17 @@
-import time
+#import time
 import numpy as np
-from pycqed.analysis import analysis_toolbox as a_tools
-import pycqed.analysis_v2.base_analysis as ba
+# from pycqed.analysis import analysis_toolbox as a_tools
+# import pycqed.analysis_v2.base_analysis as ba
 # import dataprep for tomography module
 # import tomography module
 # using the data prep module of analysis V2
 # from pycqed.analysis_v2 import tomography_dataprep as dataprep
 from pycqed.analysis import measurement_analysis as ma
-try:
-    import qutip as qt
-except ImportError as e:
-    pass
-    # logging.warning('Could not import qutip, tomo code will not work')
+# try:
+#     import qutip as qt
+# except ImportError as e:
+#     pass
+#     # logging.warning('Could not import qutip, tomo code will not work')
 
 def reshape_block(shots_data, segments_per_block=16, block_size=4092, mode='truncate'):
     """
@@ -306,7 +306,7 @@ class ExpectationValueCalculation:
         avg_h12 = self.ma_obj.measured_values[2]
 
         #this should be implemented with a flag
-        #but 
+        #but
         h1_00 = np.mean(avg_h1[36:36+7])
         h1_01 = np.mean(avg_h1[43:43+7])
         h1_10 = np.mean(avg_h1[50:50+7])
@@ -322,7 +322,7 @@ class ExpectationValueCalculation:
         h12_10 = np.mean(avg_h12[50:50+7])
         h12_11 = np.mean(avg_h12[57:])
 
-        
+
         mean_h1 = (h1_00+h1_10+h1_01+h1_11)/4
         mean_h2 = (h2_00+h2_01+h2_10+h2_11)/4
         mean_h12 = (h12_00+h12_11+h12_01+h12_10)/4
@@ -451,7 +451,7 @@ class ExpectationValueCalculation:
         Block2 = self.assemble_M_matrix_single_block(self.betas_p)
         Block3 = self.assemble_M_matrix_single_block(self.betas_pp)
         self.M_matrix = np.vstack((Block1, Block2, Block3)).reshape(24, 9)
-        
+
         return self.M_matrix
 
     def invert_M_matrix(self):
@@ -473,7 +473,7 @@ class ExpectationValueCalculation:
         self._calibrate_betas()
         self.assemble_M_matrix()
         self.inverse_matrix = np.linalg.pinv(self.M_matrix)
-        
+
         # use it to get terms back from RO
         rescaled_measurements_tomo = self.measurements_tomo
         self.expect_values = np.dot(self.inverse_matrix,

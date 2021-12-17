@@ -3082,7 +3082,7 @@ class Motzoi_XY_analysis(TD_Analysis):
         return self.optimal_motzoi
 
 
-@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
+@deprecated(version='0.4', reason="only used for testing in PycQED_py3, not used within pycqed_scripts")
 class QScale_Analysis(TD_Analysis):
     '''
     Analysis for a DRAG pulse calibration measurement as described in
@@ -4323,7 +4323,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                       close_fig=self.close_fig, **kw)
 
 
-@deprecated(version='0.4', reason="not really used within PycQED_py3 and pycqed_scripts")
+@deprecated(version='0.4', reason="only used for test in PycQED_py3, not used within pycqed_scripts")
 class SSRO_discrimination_analysis(MeasurementAnalysis):
     '''
     Analysis that takes IQ-shots and extracts discrimination fidelity from
@@ -5770,7 +5770,6 @@ class FFC_Analysis(TD_Analysis):
         self.save_fig(fig2, ylabel='Amplitude', **kw)
 
 
-@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class RandomizedBenchmarking_Analysis(TD_Analysis):
     '''
     Rotates and normalizes the data before doing a fit with a decaying
@@ -6722,7 +6721,6 @@ class Hanger_Analysis_CosBackground(MeasurementAnalysis):
         return fit_res
 
 
-@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
     """
     Analysis script for a regular (ge peak/dip only) or a high power
