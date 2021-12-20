@@ -2,12 +2,14 @@ import logging
 import numpy as np
 import time
 import warnings
+from deprecated import deprecated
+
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
-from pycqed.measurement import detector_functions as det
 from qcodes.instrument.parameter import ManualParameter
 
+from pycqed.measurement import detector_functions as det
 from pycqed.utilities.general import gen_sweep_pts
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
@@ -394,6 +396,7 @@ class Qubit(Instrument):
     def add_operation(self, operation_name):
         self._operations[operation_name] = {}
 
+    @deprecated(version='0.4', reason="not used anywhere")
     def link_param_to_operation(self, operation_name, parameter_name,
                                 argument_name):
         """
@@ -478,6 +481,7 @@ class Qubit(Instrument):
     ##########################################################################
 
     def measure_individual_resonators(self, with_VNA=False, use_min=True):
+        # USED_BY: find_resonator_frequency_initial()
         """
         Specifically designed for use in automation, not recommended to use by
         hand!
@@ -539,9 +543,18 @@ class Qubit(Instrument):
                     new_resonators.append(res)
         return new_resonators
 
-    def find_resonators(self, start_freq=6.8e9, stop_freq=8e9, VNA_power=-40,
-                        bandwidth=200, timeout=200, f_step=1e6, with_VNA=None,
-                        verbose=True):
+    def find_resonators(
+            self,
+            start_freq=6.8e9,
+            stop_freq=8e9,
+            VNA_power=-40,
+            bandwidth=200,
+            timeout=200,
+            f_step=1e6,
+            with_VNA=None,
+            verbose=True
+    ):
+        # USED_BY: device_dependency_graphs.py,
         """
         Performs a wide range scan to find all resonator dips. Will use VNA if
         one is connected and linked to the qubit object, or if specified via
@@ -650,13 +663,22 @@ class Qubit(Instrument):
 
         return True
 
-    def find_resonator_frequency_initial(self, start_freq=6.9e9, stop_freq=8.1e9,
-                                         npts=50001, use_min=True, MC=None,
-                                         update=True, with_VNA=None,
-                                         resonators=None, look_for_missing=True):
+    def find_resonator_frequency_initial(
+            self,
+            start_freq=6.9e9,
+            stop_freq=8.1e9,
+            npts=50001,
+            use_min=True,
+            MC=None,
+            update=True,
+            with_VNA=None,
+            resonators=None,
+            look_for_missing=True
+    ):
+        # USED_BY: device_dependency_graphs.py,
         """
         DISCLAIMER: designed for automation routines, seperate usage not
-        adviced.
+        advised.
 
         First checks whether the number of found resonators from a wide scan
         matches the number of expected resonators as specified in the device
@@ -782,6 +804,7 @@ class Qubit(Instrument):
         # return True
 
     def find_test_resonators(self, with_VNA=None, resonators=None):
+        # USED_BY: device_dependency_graphs.py,
         """
         Does a power sweep over the resonators to see if they have a qubit
         attached or not, and changes the state in the resonator object
@@ -864,6 +887,7 @@ class Qubit(Instrument):
 
         return True
 
+    @deprecated(version='0.4', reason="not used anywhere")
     def find_test_resonators_test(self, with_VNA=None, resonators=None):
         """
         Does a power sweep over the resonators to see if they have a qubit
@@ -957,6 +981,7 @@ class Qubit(Instrument):
 
     def find_qubit_resonator_fluxline(self, with_VNA=None, dac_values=None,
                                       verbose=True, resonators=None):
+        # USED_BY: device_dependency_graphs.py,
         """
         --- WARNING: UPDATING PARAMETERS ONLY WORKS WITH DEVICE OBJECT! ---
 
@@ -1067,6 +1092,7 @@ class Qubit(Instrument):
                                          np.abs((70e6)**2/(res.shift)))
         return True
 
+    @deprecated(version='0.4', reason="not used anywhere")
     def find_resonator_sweetspot(self, freqs=None, dac_values=None,
                                  fluxChan=None, update=True):
         """
@@ -1109,12 +1135,17 @@ class Qubit(Instrument):
 
         return True
 
-    def find_resonator_frequency(self, use_min=True,
-                                 update=True,
-                                 freqs=None,
-                                 MC=None, close_fig=True):
+    def find_resonator_frequency(
+            self,
+            use_min=True,
+            update=True,
+            freqs=None,
+            MC=None,
+            close_fig=True
+    ):
+        # USED_BY: device_dependency_graphs.py,
         """
-        Performs heterodyne spectroscopy to identify the frequecy of the (readout)
+        Performs heterodyne spectroscopy to identify the frequency of the (readout)
         resonator frequency.
 
         Args:
@@ -1166,19 +1197,23 @@ class Qubit(Instrument):
     # Normal functions:
     ##########################################################################
 
-    # FIXME: overridden in unused class Transmon
-    def find_frequency(self, method='spectroscopy', spec_mode='pulsed_marked',
-                       steps=[1, 3, 10, 30, 100],
-                       artificial_periods=4,
-                       freqs=None,
-                       f_span=100e6,
-                       use_max=False,
-                       f_step=1e6,
-                       verbose=True,
-                       update=True,
-                       close_fig=True,
-                       MC=None,
-                       label = ''):
+    def find_frequency(
+            self,
+            method='spectroscopy',
+            spec_mode='pulsed_marked',
+            steps=[1, 3, 10, 30, 100],
+            artificial_periods=4,
+            freqs=None,
+            f_span=100e6,
+            use_max=False,
+            f_step=1e6,
+            verbose=True,
+            update=True,
+            close_fig=True,
+            MC=None,
+            label=''
+    ):
+        # USED_BY: device_dependency_graphs.py
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
         method.
@@ -1271,8 +1306,15 @@ class Qubit(Instrument):
                 close_fig=close_fig)
         return analysis_spec.fitted_freq
 
-    def calibrate_spec_pow(self, freqs=None, start_power=-55, power_step = 5,
-                           threshold=0.5, verbose=True):
+    def calibrate_spec_pow(
+            self,
+            freqs=None,
+            start_power=-55,
+            power_step=5,
+            threshold=0.5,
+            verbose=True
+    ):
+        # USED_BY: device_dependency_graphs.py
         """
         Finds the optimal spectroscopy power for qubit spectroscopy (not pulsed)
         by varying it in steps of 5 dBm, and ending when the peak has power
@@ -1311,7 +1353,14 @@ class Qubit(Instrument):
         self.spec_pow(power-power_step)
         return True
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
+    def calibrate_motzoi(
+            self,
+            MC=None,
+            verbose=True,
+            update=True
+    ):
+        # USED_BY: device_dependency_graphs.py
+
         motzois = gen_sweep_pts(center=0, span=1, num=31)
 
         # large range
@@ -1337,7 +1386,6 @@ class Qubit(Instrument):
             self.motzoi(opt_motzoi)
         return opt_motzoi
 
-    # FIXME: overridden in unused class Transmon
     def calibrate_frequency_ramsey(
             self,
             steps=[1, 1, 3, 10, 30, 100, 300, 1000],
@@ -1349,6 +1397,8 @@ class Qubit(Instrument):
             test_beating: bool = True
     ):
         # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs.py
         """
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
@@ -1413,8 +1463,8 @@ class Qubit(Instrument):
             self.freq_qubit(cur_freq)
         return cur_freq
 
-    # FIXME: overridden in unused class Transmon
     def calculate_frequency(self, calc_method=None, I_per_phi0=None, I=None):
+        # USED_BY: find_frequency()
         """
         Calculates an estimate for the qubit frequency.
         Arguments are optional and parameters of the object are used if not
@@ -1465,6 +1515,7 @@ class Qubit(Instrument):
 
         return qubit_freq_est
 
+    @deprecated(version='0.4', reason="not used anywhere")
     def tune_freq_to_sweetspot(self, freqs=None, dac_values=None, verbose=True,
                                fit_phase=False, use_dips=False):
         """
@@ -1560,6 +1611,7 @@ class Qubit(Instrument):
         self.fl_dc_I(dac_sweetspot)
         self.fl_dc_I0(dac_sweetspot)
 
+    @deprecated(version='0.4', reason="not used anywhere")
     def tune_freq_to(self,
                      target_frequency,
                      MC=None,

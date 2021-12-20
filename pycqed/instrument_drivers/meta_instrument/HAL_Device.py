@@ -5256,6 +5256,7 @@ class HAL_Device(Instrument):
             double_points=True,
             termination_opt=0.08
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
 
         if qubits is None:
             qubits = self.qubits()

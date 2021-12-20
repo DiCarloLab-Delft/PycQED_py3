@@ -101,7 +101,7 @@ class HAL_Transmon(Qubit):
                 parameter_class=InstrumentRefParameter)
         else:
             # new style parameter definition, with type annotation.
-            # FIXME: requires recent QCoDesS, which requires Python 3.7
+            # FIXME: requires recent QCoDeS, which requires Python 3.7
             # FIXME: we should introduce base class for CC-type devices below CC
             self.instr_CC: CC = InstrumentRefParameter(
                 'instr_CC',
@@ -1084,6 +1084,7 @@ class HAL_Transmon(Qubit):
         pass
 
     def prepare_characterizing(self, exceptions: list = [], verbose=True):
+        # USED_BY: device_dependency_graphs.py
         """
         Prepares the qubit for (automatic) characterisation. Will park all
         other qubits in the device object to their 'anti-sweetspot' (which is a
@@ -1599,6 +1600,7 @@ class HAL_Transmon(Qubit):
             spec_mode='pulsed_marked',
             verbose=True
     ) -> bool:
+        # USED_BY: device_dependency_graphs.py
         """
         'Adaptive' measurement for finding the qubit frequency. Will look with
         a range of the current frequency estimate, and if it does not find a
@@ -1697,6 +1699,7 @@ class HAL_Transmon(Qubit):
             fluxChan=None,
             spec_mode='pulsed_marked'
     ):
+        # USED_BY: device_dependency_graphs.py
         """
         Should be edited such that it contains reference to different measurement
         methods (tracking / 2D scan / broad spectroscopy)
@@ -1847,6 +1850,8 @@ class HAL_Transmon(Qubit):
             update=True,
             power_12=10
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs.py
         """
         Finds an estimate of the anharmonicity by doing a spectroscopy around
         150 MHz below the qubit frequency.
@@ -1973,6 +1978,7 @@ class HAL_Transmon(Qubit):
     ##########################################################################
 
     def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
+        # USED_BY: device_dependency_graphs.py
         """
         Does a resonator power scan and determines at which power the low power
         regime is exited. If update=True, will set the readout power to this
@@ -2014,6 +2020,8 @@ class HAL_Transmon(Qubit):
             update=True,
             all_modules=False
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs.py
         """
         Calibrates the pulse amplitude using a single rabi oscillation.
         Depending on self.cfg_with_vsm uses VSM or AWG channel amplitude
@@ -2114,6 +2122,7 @@ class HAL_Transmon(Qubit):
             maxfevals: int = 250,
             update: bool = True
     ) -> bool:
+        # USED_BY: device_dependency_graphs.py
         """
         Calibrates the mixer skewness and updates values in the qubit object.
 
@@ -2362,6 +2371,10 @@ class HAL_Transmon(Qubit):
             self, update: bool = True,
             ftarget=-110
     ) -> bool:
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs.py
+        # USED_BY: device_dependency_graphs
+
         """
         Calibrates the mixer offset and updates the I and Q offsets in
         the qubit object.
@@ -2454,6 +2467,9 @@ class HAL_Transmon(Qubit):
             analyze: bool = True,
             update: bool = True
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         '''
         Performs a 2D sweep of <qubit>.ro_freq and <qubit>.ro_pulse_amp and
         measures SSRO parameters (SNR, F_a, F_d).
@@ -2538,6 +2554,9 @@ class HAL_Transmon(Qubit):
             analyze: bool = True,
             update: bool = True
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         '''
         Calibrates the RO pulse duration by measuring the assignment fidelity of
         SSRO experiments as a function of the RO pulse duration and amplitude.
@@ -2641,6 +2660,9 @@ class HAL_Transmon(Qubit):
             analyze: bool = True,
             update: bool = True
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         '''
         Runs an optimizer routine on the SSRO assignment fidelity of the
         <qubit>.ro_freq and <qubit>.ro_pulse_amp parameters.
@@ -2719,6 +2741,9 @@ class HAL_Transmon(Qubit):
             prepare: bool = True,
             disable_metadata: bool = False
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         """
         Calibrates the ro_acq_delay parameter for the readout.
         For that it analyzes the transients.
@@ -3299,6 +3324,7 @@ class HAL_Transmon(Qubit):
 
     def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, motzois=None):
         # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
         """
         Calibrates the DRAG coeffcieint value, named motzoi (after Felix Motzoi)
         for legacy reasons.
@@ -3335,6 +3361,7 @@ class HAL_Transmon(Qubit):
             ftarget=-110,
             maxiter=300
     ) -> bool:
+        # USED_BY: device_dependency_graphs.py
         """
         Calibrates the mixer offset and updates the I and Q offsets in
         the qubit object.
@@ -3561,6 +3588,7 @@ class HAL_Transmon(Qubit):
             close_fig=True,
             label=''
     ):
+        # USED_BY: device_dependency_graphs.py (via find_resonator_frequency)
         """
         Measures a transmission through the feedline as a function of frequency.
         Usually used to find and characterize the resonators in routines such as
@@ -3681,6 +3709,9 @@ class HAL_Transmon(Qubit):
             disable_metadata: bool = False,
             label: str = ''
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         """
         Performs a number of single shot measurements with qubit in ground and excited state
         to extract the SNR and readout fidelities.
@@ -4127,6 +4158,8 @@ class HAL_Transmon(Qubit):
             prepare_for_timedomain=True,
             termination_opt=0.02):
         # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
         '''
         This function is the same as measure AllXY, but with a termination limit
         This termination limit is as a system metric to evalulate the calibration
@@ -4172,6 +4205,9 @@ class HAL_Transmon(Qubit):
             MC: Optional[MeasurementControl] = None,
     ):
         # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         # FIXME: split into basic T1 and T1 with flux dance
         """
         N.B. this is a good example for a generic timedomain experiment using the HAL_Transmon.
@@ -4300,6 +4336,9 @@ class HAL_Transmon(Qubit):
             test_beating=True
     ):
         # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -4486,6 +4525,8 @@ class HAL_Transmon(Qubit):
             prepare_for_timedomain=True
     ):
         # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
         """
         Note: changes pulses on instr_LutMan_MW
 
@@ -4675,6 +4716,8 @@ class HAL_Transmon(Qubit):
 
     def flipping_GBT(self, nr_sequence: int = 2):  # FIXME: prefix with "measure_"
         # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs.py
         '''
         This function is to measure flipping sequence for whatever nr_of times
         a function needs to be run to calibrate the Pi and Pi/2 Pulse.
@@ -4697,6 +4740,7 @@ class HAL_Transmon(Qubit):
             analyze=True,
             close_fig=True
     ):
+        # USED_BY: device_dependency_graphs.py (via calibrate_motzoi)
         """
         Sweeps the amplitude of the DRAG coefficients looking for leakage reduction
         and optimal correction for the phase error due to stark shift resulting
@@ -5777,6 +5821,9 @@ class HAL_Transmon(Qubit):
             analyze: bool = True,
             prepare: bool = True
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs
+
         """
         Measures the RO resonator spectroscopy with the qubit in ground and excited state.
         Specifically, performs two experiments. Applies sequence:
@@ -6516,6 +6563,8 @@ class HAL_Transmon(Qubit):
             upload=True,
             update=True
     ):
+        # USED_BY: device_dependency_graphs_v2.py,
+
         # Old version not including two-state calibration points and logging
         # detector.
         # Adding calibration points
@@ -7264,6 +7313,7 @@ class HAL_Transmon(Qubit):
 
 
     def check_ramsey(self, MC: Optional[MeasurementControl] = None, times=None, artificial_detuning=None):
+        # USED_BY: device_dependency_graphs.py
 
         if artificial_detuning is None:
             artificial_detuning = 0.1e6
