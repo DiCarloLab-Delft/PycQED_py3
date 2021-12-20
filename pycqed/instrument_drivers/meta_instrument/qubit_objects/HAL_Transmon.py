@@ -51,7 +51,6 @@ from pycqed.measurement.measurement_control import MeasurementControl
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 
-
 log = logging.getLogger(__name__)
 
 
@@ -978,7 +977,7 @@ class HAL_Transmon(Qubit):
             parameter_class=ManualParameter)
 
     ##########################################################################
-    # Parameter helpers
+    # Private parameter helpers
     ##########################################################################
 
     def _using_QWG(self):
@@ -1688,9 +1687,16 @@ class HAL_Transmon(Qubit):
                 self.freq_qubit(analysis_spec.fitted_freq)
             return True
 
-    def find_qubit_sweetspot(self, freqs=None, dac_values=None, update=True,
-                             set_to_sweetspot=True, method='DAC', fluxChan=None,
-                             spec_mode='pulsed_marked'):
+    def find_qubit_sweetspot(
+            self,
+            freqs=None,
+            dac_values=None,
+            update=True,
+            set_to_sweetspot=True,
+            method='DAC',
+            fluxChan=None,
+            spec_mode='pulsed_marked'
+    ):
         """
         Should be edited such that it contains reference to different measurement
         methods (tracking / 2D scan / broad spectroscopy)
@@ -1703,8 +1709,7 @@ class HAL_Transmon(Qubit):
         if freqs is None:
             freq_center = self.freq_qubit()
             freq_range = 50e6
-            freqs = np.arange(freq_center - freq_range, freq_center + freq_range,
-                              1e6)
+            freqs = np.arange(freq_center - freq_range, freq_center + freq_range, 1e6)
         if dac_values is None:
             if self.fl_dc_I0() is not None:
                 dac_values = np.linspace(self.fl_dc_I0() - 1e-3,
@@ -1721,18 +1726,20 @@ class HAL_Transmon(Qubit):
 
         if method == 'DAC':
             t_start = time.strftime('%Y%m%d_%H%M%S')
-            self.measure_qubit_frequency_dac_scan(freqs=freqs,
-                                                  dac_values=dac_values,
-                                                  fluxChan=fluxChan,
-                                                  analyze=False,
-                                                  mode=spec_mode,
-                                                  nested_resonator_calibration=False,
-                                                  # nested_resonator_calibration_use_min=False,
-                                                  resonator_freqs=np.arange(-5e6, 5e6, 0.2e6) + self.freq_res())
+            self.measure_qubit_frequency_dac_scan(
+                freqs=freqs,
+                dac_values=dac_values,
+                fluxChan=fluxChan,
+                analyze=False,
+                mode=spec_mode,
+                nested_resonator_calibration=False,
+                # nested_resonator_calibration_use_min=False,
+                resonator_freqs=np.arange(-5e6, 5e6, 0.2e6) + self.freq_res()
+            )
 
-            timestamp = a_tools.get_timestamps_in_range(t_start,
-                                                        label='Qubit_dac_scan' +
-                                                              self.msmt_suffix)
+            timestamp = a_tools.get_timestamps_in_range(
+                t_start,
+                label='Qubit_dac_scan' + self.msmt_suffix)
             timestamp = timestamp[0]
             a = ma2.da.DAC_analysis(timestamp=timestamp)
             self.fl_dc_polycoeff(a.dac_fit_res['fit_polycoeffs'])
@@ -1750,10 +1757,12 @@ class HAL_Transmon(Qubit):
 
             t_end = time.strftime('%Y%m%d_%H%M%S')
 
-            a = ma2.DACarcPolyFit(t_start=t_start, t_stop=t_end,
-                                  label='spectroscopy__' + self.name,
-                                  dac_key='Instrument settings.fluxcurrent.' + self.fl_dc_ch(),
-                                  degree=2)
+            a = ma2.DACarcPolyFit(
+                t_start=t_start,
+                t_stop=t_end,
+                label='spectroscopy__' + self.name,
+                dac_key='Instrument settings.fluxcurrent.' + self.fl_dc_ch(),
+                degree=2)
 
             pc = a.fit_res['fit_polycoeffs']
 
@@ -1761,8 +1770,7 @@ class HAL_Transmon(Qubit):
             sweetspot_current = -pc[1] / (2 * pc[0])
 
         else:
-            logging.error('Sweetspot method {} unknown. '
-                          'Use "DAC" or "tracked".'.format(method))
+            logging.error('Sweetspot method {} unknown. Use "DAC" or "tracked".'.format(method))
 
         if update:
             self.fl_dc_I0(sweetspot_current)
@@ -1778,13 +1786,11 @@ class HAL_Transmon(Qubit):
         if check_vals[0] == pytest.approx(check_vals[1], abs=0.5e6):
             if check_vals[0] == pytest.approx(check_vals[2], abs=0.5e6):
                 if check_vals[1] == pytest.approx(check_vals[2], abs=0.5e6):
-                    logging.warning('No qubit shift found with varying flux. '
-                                    'Peak is not a qubit')
+                    logging.warning('No qubit shift found with varying flux. Peak is not a qubit')
                     return False
 
         if self.fl_dc_polycoeff()[1] < 1e6 and self.fl_dc_polycoeff()[2] < 1e6:
-            logging.warning('No qubit shift found with varying flux. Peak is '
-                            'not a qubit')
+            logging.warning('No qubit shift found with varying flux. Peak is not a qubit')
             return False
 
         return True
@@ -1834,8 +1840,13 @@ class HAL_Transmon(Qubit):
 
         return frequency_sweet_spot
 
-    def find_anharmonicity_estimate(self, freqs=None, anharmonicity=None,
-                                    mode='pulsed_marked', update=True, power_12=10):
+    def find_anharmonicity_estimate(
+            self, freqs=None,
+            anharmonicity=None,
+            mode='pulsed_marked',
+            update=True,
+            power_12=10
+    ):
         """
         Finds an estimate of the anharmonicity by doing a spectroscopy around
         150 MHz below the qubit frequency.
@@ -1877,7 +1888,8 @@ class HAL_Transmon(Qubit):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
-            prepare_for_continuous_wave=True):
+            prepare_for_continuous_wave=True
+    ):
         """
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
         bus_spec_source
@@ -1910,11 +1922,12 @@ class HAL_Transmon(Qubit):
         if f01 is None:
             f01 = self.freq_qubit()
 
-        UHFQC = self.instr_acquisition.get_instr()
         if prepare_for_continuous_wave:
             self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
+
+        UHFQC = self.instr_acquisition.get_instr()
 
         # Starting specmode if set in config
         if self.cfg_spec_mode():
@@ -1992,11 +2005,15 @@ class HAL_Transmon(Qubit):
 
         return True
 
-    def calibrate_mw_pulse_amplitude_coarse(self,
-                                            amps=None,
-                                            close_fig=True, verbose=False,
-                                            MC: Optional[MeasurementControl] = None, update=True,
-                                            all_modules=False):
+    def calibrate_mw_pulse_amplitude_coarse(
+            self,
+            amps=None,
+            close_fig=True,
+            verbose=False,
+            MC: Optional[MeasurementControl] = None,
+            update=True,
+            all_modules=False
+    ):
         """
         Calibrates the pulse amplitude using a single rabi oscillation.
         Depending on self.cfg_with_vsm uses VSM or AWG channel amplitude
@@ -2086,16 +2103,17 @@ class HAL_Transmon(Qubit):
         CC = self.instr_CC.get_instr()
         CC.eqasm_program(p.filename)
         CC.start()
-        print('CC program is running. Parameter "mw_vsm_delay" can now be '
-              'calibrated by hand.')
+        print('CC program is running. Parameter "mw_vsm_delay" can now be calibrated by hand.')
 
-
-    def calibrate_mixer_skewness_drive(self, MC: Optional[MeasurementControl] = None,
-                                       mixer_channels: list = ['G', 'D'],
-                                       x0: list = [1.0, 0.0],
-                                       cma_stds: list = [.15, 10],
-                                       maxfevals: int = 250,
-                                       update: bool = True) -> bool:
+    def calibrate_mixer_skewness_drive(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            mixer_channels: list = ['G', 'D'],
+            x0: list = [1.0, 0.0],
+            cma_stds: list = [.15, 10],
+            maxfevals: int = 250,
+            update: bool = True
+    ) -> bool:
         """
         Calibrates the mixer skewness and updates values in the qubit object.
 
@@ -2311,10 +2329,8 @@ class HAL_Transmon(Qubit):
         LutMan = self.instr_LutMan_RO.get_instr()
         LutMan.mixer_apply_predistortion_matrix(True)
         MC = self.instr_MC.get_instr()
-        S1 = swf.lutman_par_UHFQC_dig_trig(
-            LutMan, LutMan.mixer_alpha, single=False, run=True)
-        S2 = swf.lutman_par_UHFQC_dig_trig(
-            LutMan, LutMan.mixer_phi, single=False, run=True)
+        S1 = swf.lutman_par_UHFQC_dig_trig(LutMan, LutMan.mixer_alpha, single=False, run=True)
+        S2 = swf.lutman_par_UHFQC_dig_trig(LutMan, LutMan.mixer_phi, single=False, run=True)
 
         detector = det.Signal_Hound_fixed_frequency(
             self.instr_SH.get_instr(),
@@ -2342,8 +2358,10 @@ class HAL_Transmon(Qubit):
             LutMan.mixer_alpha(alpha)
             LutMan.mixer_phi(phi)
 
-    def calibrate_mixer_offsets_RO(self, update: bool = True,
-                                   ftarget=-110) -> bool:
+    def calibrate_mixer_offsets_RO(
+            self, update: bool = True,
+            ftarget=-110
+    ) -> bool:
         """
         Calibrates the mixer offset and updates the I and Q offsets in
         the qubit object.
@@ -2378,19 +2396,21 @@ class HAL_Transmon(Qubit):
             self.ro_pulse_mixer_offs_Q(offset_Q)
         return True
 
-    def calibrate_mw_pulses_basic(self,
-                                  cal_steps=['offsets', 'amp_coarse', 'freq',
-                                             'drag', 'amp_fine', 'amp_fine',
-                                             'amp_fine'],
-                                  kw_freqs={'steps': [1, 3, 10, 30, 100,
-                                                      300, 1000]},
-                                  kw_amp_coarse={'amps': np.linspace(0, 1, 31)},
-                                  kw_amp_fine={'update': True},
-                                  soft_avg_allxy=3,
-                                  kw_offsets={'ftarget': -120},
-                                  kw_skewness={},
-                                  kw_motzoi={'update': True},
-                                  f_target_skewness=-120):
+    def calibrate_mw_pulses_basic(
+            self,
+            cal_steps=['offsets', 'amp_coarse', 'freq',
+                       'drag', 'amp_fine', 'amp_fine',
+                       'amp_fine'],
+            kw_freqs={'steps': [1, 3, 10, 30, 100,
+                                300, 1000]},
+            kw_amp_coarse={'amps': np.linspace(0, 1, 31)},
+            kw_amp_fine={'update': True},
+            soft_avg_allxy=3,
+            kw_offsets={'ftarget': -120},
+            kw_skewness={},
+            kw_motzoi={'update': True},
+            f_target_skewness=-120
+    ):
 
         """
         Performs a standard calibration of microwave pulses consisting of
@@ -2425,12 +2445,15 @@ class HAL_Transmon(Qubit):
         self.ro_soft_avg(old_soft_avg)
         return True
 
-    def calibrate_ssro_coarse(self, MC: Optional[MeasurementControl] = None,
-                              nested_MC: Optional[MeasurementControl] = None,
-                              freqs=None,
-                              amps=None,
-                              analyze: bool = True,
-                              update: bool = True):
+    def calibrate_ssro_coarse(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            nested_MC: Optional[MeasurementControl] = None,
+            freqs=None,
+            amps=None,
+            analyze: bool = True,
+            update: bool = True
+    ):
         '''
         Performs a 2D sweep of <qubit>.ro_freq and <qubit>.ro_pulse_amp and
         measures SSRO parameters (SNR, F_a, F_d).
@@ -2503,15 +2526,18 @@ class HAL_Transmon(Qubit):
 
             return True
 
-    def calibrate_ssro_pulse_duration(self, MC: Optional[MeasurementControl] = None,
-                                      nested_MC: Optional[MeasurementControl] = None,
-                                      amps=None,
-                                      amp_lim=None,
-                                      times=None,
-                                      use_adaptive: bool = True,
-                                      n_points: int = 80,
-                                      analyze: bool = True,
-                                      update: bool = True):
+    def calibrate_ssro_pulse_duration(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            nested_MC: Optional[MeasurementControl] = None,
+            amps=None,
+            amp_lim=None,
+            times=None,
+            use_adaptive: bool = True,
+            n_points: int = 80,
+            analyze: bool = True,
+            update: bool = True
+    ):
         '''
         Calibrates the RO pulse duration by measuring the assignment fidelity of
         SSRO experiments as a function of the RO pulse duration and amplitude.
@@ -2603,15 +2629,18 @@ class HAL_Transmon(Qubit):
                 A = ma.TwoD_Analysis(label='RO_duration_tuneup', auto=True)
             return True
 
-    def calibrate_ssro_fine(self, MC: Optional[MeasurementControl] = None,
-                            nested_MC: Optional[MeasurementControl] = None,
-                            start_freq=None,
-                            start_amp=None,
-                            start_freq_step=None,
-                            start_amp_step=None,
-                            threshold: float = .99,
-                            analyze: bool = True,
-                            update: bool = True):
+    def calibrate_ssro_fine(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            nested_MC: Optional[MeasurementControl] = None,
+            start_freq=None,
+            start_amp=None,
+            start_freq_step=None,
+            start_amp_step=None,
+            threshold: float = .99,
+            analyze: bool = True,
+            update: bool = True
+    ):
         '''
         Runs an optimizer routine on the SSRO assignment fidelity of the
         <qubit>.ro_freq and <qubit>.ro_pulse_amp parameters.
@@ -2683,10 +2712,13 @@ class HAL_Transmon(Qubit):
             ma.OptimizationAnalysis(label='RO_fine_tuneup')
             return True
 
-    def calibrate_ro_acq_delay(self, MC: Optional[MeasurementControl] = None,
-                               analyze: bool = True,
-                               prepare: bool = True,
-                               disable_metadata: bool = False):
+    def calibrate_ro_acq_delay(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            prepare: bool = True,
+            disable_metadata: bool = False
+    ):
         """
         Calibrates the ro_acq_delay parameter for the readout.
         For that it analyzes the transients.
@@ -2719,15 +2751,13 @@ class HAL_Transmon(Qubit):
         MC.set_sweep_function(s)
 
         if 'UHFQC' in self.instr_acquisition():
-            sampling_rate = 1.8e9
+            sampling_rate = 1.8e9  # FIXME: get from instrument
         else:
             raise NotImplementedError()
 
-        MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) /
-                            sampling_rate)
+        MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) / sampling_rate)
         MC.set_detector_function(self.input_average_detector)
-        MC.run(name='Measure_Acq_Delay_{}'.format(self.msmt_suffix),
-               disable_snapshot_metadata=disable_metadata)
+        MC.run(name=f'Measure_Acq_Delay_{self.msmt_suffix}', disable_snapshot_metadata=disable_metadata)
 
         self.ro_pulse_amp(old_pow)
 
@@ -2740,13 +2770,15 @@ class HAL_Transmon(Qubit):
             return True
 
     def calibrate_mw_gates_restless(
-            self, MC: Optional[MeasurementControl] = None,
+            self,
+            MC: Optional[MeasurementControl] = None,
             parameter_list: list = ['G_amp', 'D_amp', 'freq'],
             initial_values: list = None,
             initial_steps: list = [0.05, 0.05, 1e6],
             nr_cliffords: int = 80, nr_seeds: int = 200,
             verbose: bool = True, update: bool = True,
-            prepare_for_timedomain: bool = True):
+            prepare_for_timedomain: bool = True
+    ):
         """
         Refs:
             Rol PR Applied 7, 041001 (2017)
@@ -2762,9 +2794,9 @@ class HAL_Transmon(Qubit):
             prepare_for_timedomain=prepare_for_timedomain,
             method='restless')
 
-
     def calibrate_mw_gates_rb(
-            self, MC: Optional[MeasurementControl] = None,
+            self,
+            MC: Optional[MeasurementControl] = None,
             parameter_list: list = ['G_amp', 'D_amp', 'freq'],
             initial_values: list = None,
             initial_steps: list = [0.05, 0.05, 1e6],
@@ -2772,7 +2804,8 @@ class HAL_Transmon(Qubit):
             verbose: bool = True, update: bool = True,
             prepare_for_timedomain: bool = True,
             method: bool = None,
-            optimizer: str = 'NM'):
+            optimizer: str = 'NM'
+    ):
         """
         Calibrates microwave pulses using a randomized benchmarking based
         cost-function.
@@ -2899,11 +2932,14 @@ class HAL_Transmon(Qubit):
                     self.freq_qubit(opt_par_values[freq_idx] +
                                     self.mw_freq_mod.get())
 
-    def calibrate_mw_gates_allxy(self, nested_MC: Optional[MeasurementControl] = None,
-                                 start_values=None,
-                                 initial_steps=None,
-                                 parameter_list=None,
-                                 termination_opt=0.01):
+    def calibrate_mw_gates_allxy(
+            self,
+            nested_MC: Optional[MeasurementControl] = None,
+            start_values=None,
+            initial_steps=None,
+            parameter_list=None,
+            termination_opt=0.01
+    ):
         # FIXME: this tuneup does not update the qubit object parameters
         #  update: Fixed on the the pagani set-up
 
@@ -2960,9 +2996,12 @@ class HAL_Transmon(Qubit):
         else:
             return True
 
-    def calibrate_mw_gates_allxy2(self, nested_MC: Optional[MeasurementControl] = None,
-                                  start_values=None,
-                                  initial_steps=None, f_termination=0.01):
+    def calibrate_mw_gates_allxy2(
+            self,
+            nested_MC: Optional[MeasurementControl] = None,
+            start_values=None,
+            initial_steps=None, f_termination=0.01
+    ):
         '''
         FIXME! Merge both calibrate allxy methods.
         Optimizes ALLXY sequency by tunning 2 parameters:
@@ -3036,10 +3075,13 @@ class HAL_Transmon(Qubit):
         else:
             return True
 
-    def calibrate_RO(self, nested_MC: Optional[MeasurementControl] = None,
-                     start_params=None,
-                     initial_step=None,
-                     threshold=0.05):
+    def calibrate_RO(
+            self,
+            nested_MC: Optional[MeasurementControl] = None,
+            start_params=None,
+            initial_step=None,
+            threshold=0.05
+    ):
         '''
         Optimizes the RO assignment fidelity using 2 parameters:
         ro_freq and ro_pulse_amp.
@@ -3102,10 +3144,18 @@ class HAL_Transmon(Qubit):
             return True
 
     def calibrate_depletion_pulse(
-            self, nested_MC: Optional[MeasurementControl] = None, amp0=None,
-            amp1=None, phi0=180, phi1=0, initial_steps=None, two_par=True,
-            depletion_optimization_window=None, depletion_analysis_plot=False,
-            use_RTE_cost_function=False):
+            self,
+            nested_MC: Optional[MeasurementControl] = None,
+            amp0=None,
+            amp1=None,
+            phi0=180,
+            phi1=0,
+            initial_steps=None,
+            two_par=True,
+            depletion_optimization_window=None,
+            depletion_analysis_plot=False,
+            use_RTE_cost_function=False
+    ):
         """
         this function automatically tunes up a two step, four-parameter
         depletion pulse.
@@ -3113,7 +3163,7 @@ class HAL_Transmon(Qubit):
         cost function.
 
         Refs:
-        Bultnik PR Applied 6, 034008 (2016)
+        Bultink PR Applied 6, 034008 (2016)
 
         Args:
             two_par:    if readout is performed at the symmetry point and in the
@@ -3157,62 +3207,72 @@ class HAL_Transmon(Qubit):
                 self.ro_pulse_down_amp0,
                 self.ro_pulse_down_amp1])
         else:
-            nested_MC.set_sweep_functions([self.ro_pulse_down_phi0,
-                                           self.ro_pulse_down_phi1,
-                                           self.ro_pulse_down_amp0,
-                                           self.ro_pulse_down_amp1])
+            nested_MC.set_sweep_functions([
+                self.ro_pulse_down_phi0,
+                self.ro_pulse_down_phi1,
+                self.ro_pulse_down_amp0,
+                self.ro_pulse_down_amp1])
         if use_RTE_cost_function:
-            d = det.Function_Detector(self.measure_error_fraction,
-                                      msmt_kw={'net_gate': 'pi',
-                                               'feedback': False,
-                                               'sequence_type': 'echo'},
-                                      value_names=['error fraction'],
-                                      value_units=['au'],
-                                      result_keys=['error fraction'])
+            d = det.Function_Detector(
+                self.measure_error_fraction,
+                msmt_kw={'net_gate': 'pi',
+                         'feedback': False,
+                         'sequence_type': 'echo'},
+                value_names=['error fraction'],
+                value_units=['au'],
+                result_keys=['error fraction'])
         else:
-            d = det.Function_Detector(self.measure_transients,
-                                      msmt_kw={'depletion_analysis': True,
-                                               'depletion_analysis_plot':
-                                                   depletion_analysis_plot,
-                                               'depletion_optimization_window':
-                                                   depletion_optimization_window},
-                                      value_names=['depletion cost'],
-                                      value_units=['au'],
-                                      result_keys=['depletion_cost'])
+            d = det.Function_Detector(
+                self.measure_transients,
+                msmt_kw={'depletion_analysis': True,
+                         'depletion_analysis_plot':
+                             depletion_analysis_plot,
+                         'depletion_optimization_window':
+                             depletion_optimization_window},
+                value_names=['depletion cost'],
+                value_units=['au'],
+                result_keys=['depletion_cost'])
         nested_MC.set_detector_function(d)
 
         if two_par:
             if initial_steps is None:
                 initial_steps = [-0.5 * amp0, -0.5 * amp1]
-            ad_func_pars = {'adaptive_function': nelder_mead,
-                            'x0': [amp0, amp1],
-                            'initial_step': initial_steps,
-                            'no_improv_break': 12,
-                            'minimize': True,
-                            'maxiter': 500}
+            ad_func_pars = {
+                'adaptive_function': nelder_mead,
+                'x0': [amp0, amp1],
+                'initial_step': initial_steps,
+                'no_improv_break': 12,
+                'minimize': True,
+                'maxiter': 500}
             self.ro_pulse_down_phi0(180)
             self.ro_pulse_down_phi1(0)
 
         else:
             if initial_steps is None:
                 initial_steps = [15, 15, -0.1 * amp0, -0.1 * amp1]
-            ad_func_pars = {'adaptive_function': nelder_mead,
-                            'x0': [phi0, phi1, amp0, amp1],
-                            'initial_step': initial_steps,
-                            'no_improv_break': 12,
-                            'minimize': True,
-                            'maxiter': 500}
+            ad_func_pars = {
+                'adaptive_function': nelder_mead,
+                'x0': [phi0, phi1, amp0, amp1],
+                'initial_step': initial_steps,
+                'no_improv_break': 12,
+                'minimize': True,
+                'maxiter': 500}
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
         nested_MC.set_optimization_method('nelder_mead')
         nested_MC.run(name='depletion_tuneup', mode='adaptive')
         ma.OptimizationAnalysis(label='depletion_tuneup')
 
-    def calibrate_ef_rabi(self,
-                          amps: list = np.linspace(-.8, .8, 18),
-                          recovery_pulse: bool = True,
-                          MC: Optional[MeasurementControl] = None, label: str = '',
-                          analyze=True, close_fig=True,
-                          prepare_for_timedomain=True, update=True):
+    def calibrate_ef_rabi(
+            self,
+            amps: list = np.linspace(-.8, .8, 18),
+            recovery_pulse: bool = True,
+            MC: Optional[MeasurementControl] = None,
+            label: str = '',
+            analyze=True,
+            close_fig=True,
+            prepare_for_timedomain=True,
+            update=True
+    ):
         """
         Calibrates the pi pulse of the ef/12 transition using
          a rabi oscillation of the ef/12 transition.
@@ -3222,11 +3282,13 @@ class HAL_Transmon(Qubit):
         Hint: the expected pi-pulse amplitude of the ef/12 transition is ~1/2
             the pi-pulse amplitude of the ge/01 transition.
         """
-        a2 = self.measure_ef_rabi(amps=amps,
-                                  recovery_pulse=recovery_pulse,
-                                  MC=MC, label=label,
-                                  analyze=analyze, close_fig=close_fig,
-                                  prepare_for_timedomain=prepare_for_timedomain)
+        a2 = self.measure_ef_rabi(
+            amps=amps,
+            recovery_pulse=recovery_pulse,
+            MC=MC, label=label,
+            analyze=analyze, close_fig=close_fig,
+            prepare_for_timedomain=prepare_for_timedomain
+        )
         if update:
             ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
             self.mw_ef_amp(a2.proc_data_dict['ef_pi_amp'])
@@ -3265,9 +3327,13 @@ class HAL_Transmon(Qubit):
                 self.mw_motzoi(opt_motzoi)
         return opt_motzoi
 
-    def calibrate_mixer_offsets_drive(self, mixer_channels=['G', 'D'],
-                                      update: bool = True, ftarget=-110,
-                                      maxiter=300) -> bool:
+    def calibrate_mixer_offsets_drive(
+            self,
+            mixer_channels=['G', 'D'],
+            update: bool = True,
+            ftarget=-110,
+            maxiter=300
+    ) -> bool:
         """
         Calibrates the mixer offset and updates the I and Q offsets in
         the qubit object.
@@ -3390,18 +3456,22 @@ class HAL_Transmon(Qubit):
 
         return True
 
-    def calibrate_optimal_weights(self, MC: Optional[MeasurementControl] = None, verify: bool = True,
-                                  analyze: bool = True, update: bool = True,
-                                  no_figs: bool = False,
-                                  optimal_IQ: bool = False,
-                                  measure_transients_CCL_switched: bool = False,
-                                  prepare: bool = True,
-                                  disable_metadata: bool = False,
-                                  nr_shots_per_case: int = 2 ** 13,
-                                  post_select: bool = False,
-                                  averages: int = 2 ** 15,
-                                  post_select_threshold: float = None,
-                                  ) -> bool:
+    def calibrate_optimal_weights(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            verify: bool = True,
+            analyze: bool = True,
+            update: bool = True,
+            no_figs: bool = False,
+            optimal_IQ: bool = False,
+            measure_transients_CCL_switched: bool = False,
+            prepare: bool = True,
+            disable_metadata: bool = False,
+            nr_shots_per_case: int = 2 ** 13,
+            post_select: bool = False,
+            averages: int = 2 ** 15,
+            post_select_threshold: float = None,
+    ) -> bool:
         """
         Measures readout transients for the qubit in ground and excited state to indicate
         at what times the transients differ. Based on the transients calculates weights
@@ -3454,10 +3524,8 @@ class HAL_Transmon(Qubit):
         # fixme: deviding the weight functions by four to not have overflow in
         # thresholding of the UHFQC
         weight_scale_factor = 1. / (4 * np.max([maxI, maxQ]))
-        optimized_weights_I = np.array(
-            weight_scale_factor * optimized_weights_I)
-        optimized_weights_Q = np.array(
-            weight_scale_factor * optimized_weights_Q)
+        optimized_weights_I = np.array(weight_scale_factor * optimized_weights_I)
+        optimized_weights_Q = np.array(weight_scale_factor * optimized_weights_Q)
 
         if update:
             self.ro_acq_weight_func_I(optimized_weights_I)
@@ -3485,9 +3553,13 @@ class HAL_Transmon(Qubit):
     # NB: functions closely related to overrides are also also included here
     ##########################################################################
 
-    def measure_heterodyne_spectroscopy(self, freqs, MC: Optional[MeasurementControl] = None,
-                                        analyze=True, close_fig=True,
-                                        label=''):
+    def measure_heterodyne_spectroscopy(
+            self,
+            freqs, MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            label=''
+    ):
         """
         Measures a transmission through the feedline as a function of frequency.
         Usually used to find and characterize the resonators in routines such as
@@ -3539,9 +3611,15 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def measure_resonator_power(self, freqs, powers, MC: Optional[MeasurementControl] = None,
-                                analyze: bool = True, close_fig: bool = True,
-                                label: str = ''):
+    def measure_resonator_power(
+            self,
+            freqs,
+            powers,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            close_fig: bool = True,
+            label: str = ''
+    ):
         """
         Measures the readout resonator with UHFQC as a function of the pulse power.
         The pulse power is controlled by changing the amplitude of the UHFQC-generated
@@ -3560,8 +3638,7 @@ class HAL_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
-                               platf_cfg=self.cfg_openql_platform_fn())
+        p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(), platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
@@ -3585,19 +3662,24 @@ class HAL_Transmon(Qubit):
             ma.TwoD_Analysis(label='Resonator_power_scan',
                              close_fig=close_fig, normalize=True)
 
-    def measure_ssro(self, MC: Optional[MeasurementControl] = None,
-                     nr_shots_per_case: int = 2 ** 13,  # 8192
-                     cases=('off', 'on'),
-                     prepare: bool = True, no_figs: bool = False,
-                     post_select: bool = False,
-                     post_select_threshold: float = None,
-                     nr_flux_dance: float = None,
-                     wait_time: float = None,
-                     update: bool = True,
-                     SNR_detector: bool = False,
-                     shots_per_meas: int = 2 ** 16,
-                     vary_residual_excitation: bool = True,
-                     disable_metadata: bool = False, label: str = ''):
+    def measure_ssro(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            nr_shots_per_case: int = 2 ** 13,  # 8192
+            cases=('off', 'on'),
+            prepare: bool = True,
+            no_figs: bool = False,
+            post_select: bool = False,
+            post_select_threshold: float = None,
+            nr_flux_dance: float = None,
+            wait_time: float = None,
+            update: bool = True,
+            SNR_detector: bool = False,
+            shots_per_meas: int = 2 ** 16,
+            vary_residual_excitation: bool = True,
+            disable_metadata: bool = False,
+            label: str = ''
+    ):
         """
         Performs a number of single shot measurements with qubit in ground and excited state
         to extract the SNR and readout fidelities.
@@ -3729,9 +3811,16 @@ class HAL_Transmon(Qubit):
                 'relaxation': a.proc_data_dict['relaxation_events'],
                 'excitation': a.proc_data_dict['residual_excitation']}
 
-    def measure_spectroscopy(self, freqs, mode='pulsed_marked', MC: Optional[MeasurementControl] = None,
-                             analyze=True, close_fig=True, label='',
-                             prepare_for_continuous_wave=True):
+    def measure_spectroscopy(
+            self,
+            freqs,
+            mode='pulsed_marked',
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            label='',
+            prepare_for_continuous_wave=True
+    ):
         """
         Performs a two-tone spectroscopy experiment where one tone is kept
         fixed at the resonator readout frequency and another frequency is swept.
@@ -3775,13 +3864,18 @@ class HAL_Transmon(Qubit):
             logging.error('Mode {} not recognized. Available modes: "CW", \
                           "pulsed_marked", "pulsed_mixer"'.format(mode))
 
-    def measure_transients(self, MC: Optional[MeasurementControl] = None, analyze: bool = True,
-                           cases=('off', 'on'),
-                           prepare: bool = True, depletion_analysis: bool = True,
-                           depletion_analysis_plot: bool = True,
-                           depletion_optimization_window=None,
-                           disable_metadata: bool = False,
-                           plot_max_time=None):
+    def measure_transients(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            cases=('off', 'on'),
+            prepare: bool = True,
+            depletion_analysis: bool = True,
+            depletion_analysis_plot: bool = True,
+            depletion_optimization_window=None,
+            disable_metadata: bool = False,
+            plot_max_time=None
+    ):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3841,7 +3935,6 @@ class HAL_Transmon(Qubit):
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
-
     def measure_rabi(
             self,
             MC: Optional[MeasurementControl] = None,
@@ -3890,7 +3983,6 @@ class HAL_Transmon(Qubit):
                 real_imag,
                 prepare_for_timedomain
             )
-
 
     def measure_rabi_vsm(
             self,
@@ -3954,7 +4046,6 @@ class HAL_Transmon(Qubit):
         ma.Rabi_Analysis(label='rabi_')
         return True
 
-
     def measure_rabi_channel_amp(
             self,
             MC: Optional[MeasurementControl] = None,
@@ -3999,7 +4090,6 @@ class HAL_Transmon(Qubit):
         ma.Rabi_Analysis(label='rabi_')
         return True
 
-
     def measure_allxy(
             self,
             MC: Optional[MeasurementControl] = None,
@@ -4026,7 +4116,6 @@ class HAL_Transmon(Qubit):
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
-
 
     def allxy_GBT(  # FIXME: prefix with "measure_"
             self,
@@ -4066,7 +4155,6 @@ class HAL_Transmon(Qubit):
             return False
         else:
             return True
-
 
     def measure_T1(
             self,
@@ -4148,7 +4236,6 @@ class HAL_Transmon(Qubit):
                 self.T1(a.T1)
             return a.T1
 
-
     def measure_T1_2nd_excited_state(
             self,
             times=None,
@@ -4194,7 +4281,6 @@ class HAL_Transmon(Qubit):
 
         a = ma.T1_Analysis(auto=True, close_fig=True)
         return a.T1
-
 
     def measure_ramsey(
             self,
@@ -4297,15 +4383,18 @@ class HAL_Transmon(Qubit):
                 }
                 return res
 
-
-    def measure_complex_ramsey(self, times=None, MC: Optional[MeasurementControl] = None,
-                               freq_qubit: float = None,
-                               label: str = '',
-                               prepare_for_timedomain=True,
-                               analyze=True, close_fig=True, update=True,
-                               detector=False,
-                               double_fit=False,
-                               test_beating=True):
+    def measure_complex_ramsey(
+            self,
+            times=None,
+            MC: Optional[MeasurementControl] = None,
+            freq_qubit: float = None,
+            label: str = '',
+            prepare_for_timedomain=True,
+            analyze=True, close_fig=True, update=True,
+            detector=False,
+            double_fit=False,
+            test_beating=True
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -4382,7 +4471,6 @@ class HAL_Transmon(Qubit):
             #         'frequency': a.qubit_frequency,
             #     }
             #     return res
-
 
     def measure_echo(
             self,
@@ -4468,7 +4556,6 @@ class HAL_Transmon(Qubit):
             if update:
                 self.T2_echo(a.fit_res.params['tau'].value)
             return a
-
 
     def measure_flipping(
             self,
@@ -4582,7 +4669,6 @@ class HAL_Transmon(Qubit):
 
         return a
 
-
     def flipping_GBT(self, nr_sequence: int = 2):  # FIXME: prefix with "measure_"
         '''
         This function is to measure flipping sequence for whatever nr_of times
@@ -4597,7 +4683,6 @@ class HAL_Transmon(Qubit):
                 return True
         else:
             return False
-
 
     def measure_motzoi(
             self,
@@ -4759,7 +4844,6 @@ class HAL_Transmon(Qubit):
             ma.TwoD_Analysis(label=label,
                              close_fig=close_fig, normalize=True)
 
-
     def measure_resonator_frequency_dac_scan(
             self,
             freqs,
@@ -4833,7 +4917,6 @@ class HAL_Transmon(Qubit):
 
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
-
 
     def measure_qubit_frequency_dac_scan(
             self, freqs,
@@ -5030,7 +5113,6 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-
     def measure_spectroscopy_pulsed_marked(
             self,
             freqs,
@@ -5067,7 +5149,8 @@ class HAL_Transmon(Qubit):
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC(),  # FIXME: add ".get_instr()"
-            trigger_idx=trigger_idx if (CC.name.upper() == 'CCL' or CC.name.upper() == 'CC') else 15,  # FIXME: CCL is deprecated
+            trigger_idx=trigger_idx if (CC.name.upper() == 'CCL' or CC.name.upper() == 'CC') else 15,
+            # FIXME: CCL is deprecated
             wait_time_ns=wait_time_ns)
 
         CC.eqasm_program(p.filename)
@@ -5098,7 +5181,6 @@ class HAL_Transmon(Qubit):
                 close_fig=close_fig,
                 qb_name=self.name
             )
-
 
     def measure_spectroscopy_pulsed_mixer(
             self,
@@ -5183,7 +5265,6 @@ class HAL_Transmon(Qubit):
             ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
                                            qb_name=self.name)
-
 
     def measure_anharmonicity(
             self,
@@ -5293,7 +5374,6 @@ class HAL_Transmon(Qubit):
         spec_source_2.off()
         ma.Three_Tone_Spectroscopy_Analysis(
             label='Two_tone', f01=np.mean(freqs_01), f12=np.mean(freqs_12))
-
 
     def measure_anharmonicity_GBT(
             self,
@@ -5409,7 +5489,6 @@ class HAL_Transmon(Qubit):
         else:
             return True
 
-
     def measure_photon_nr_splitting_from_bus(
             self,
             f_bus,
@@ -5517,10 +5596,15 @@ class HAL_Transmon(Qubit):
         )
         # FIXME: code missing here (already gone in GIT tag "v0.2")
 
-
     def measure_ssro_vs_TWPA_frequency_power(
-            self, pump_source, freqs, powers,
-            nr_shots=4092 * 4, nested_MC: Optional[MeasurementControl] = None, analyze=True):
+            self,
+            pump_source,
+            freqs,
+            powers,
+            nr_shots=4092 * 4,
+            nested_MC: Optional[MeasurementControl] = None,
+            analyze=True
+    ):
         """
         Measures the SNR and readout fidelities as a function of the TWPA
             pump frequency and power.
@@ -5574,10 +5658,14 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label=label, plot_all=True, auto=True)
 
-
-    def measure_ssro_vs_pulse_length(self, lengths=np.arange(100e-9, 1501e-9, 100e-9),
-                                     nr_shots=4092 * 4, nested_MC: Optional[MeasurementControl] = None, analyze=True,
-                                     label_suffix: str = ''):
+    def measure_ssro_vs_pulse_length(
+            self,
+            lengths=np.arange(100e-9, 1501e-9, 100e-9),
+            nr_shots=4092 * 4,
+            nested_MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            label_suffix: str = ''
+    ):
         """
         Measures the SNR and readout fidelities as a function of the duration
             of the readout pulse. For each pulse duration transients are
@@ -5622,12 +5710,16 @@ class HAL_Transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
-
-    def measure_transients_CCL_switched(self, MC: Optional[MeasurementControl] = None, analyze: bool = True,
-                                        cases=('off', 'on'),
-                                        prepare: bool = True, depletion_analysis: bool = True,
-                                        depletion_analysis_plot: bool = True,
-                                        depletion_optimization_window=None):
+    def measure_transients_CCL_switched(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            cases=('off', 'on'),
+            prepare: bool = True,
+            depletion_analysis: bool = True,
+            depletion_analysis_plot: bool = True,
+            depletion_optimization_window=None
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -5674,8 +5766,12 @@ class HAL_Transmon(Qubit):
             return [np.array(t, dtype=np.float64) for t in transients]
 
 
-    def measure_dispersive_shift_pulsed(self, freqs=None, MC: Optional[MeasurementControl] = None, analyze: bool = True,
-                                        prepare: bool = True):
+    def measure_dispersive_shift_pulsed(
+            self, freqs=None,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            prepare: bool = True
+    ):
         """
         Measures the RO resonator spectroscopy with the qubit in ground and excited state.
         Specifically, performs two experiments. Applies sequence:
@@ -5744,7 +5840,6 @@ class HAL_Transmon(Qubit):
                 a.qoi['dispersive_shift'] * 1e-6))
 
             return True
-
 
     def measure_error_fraction(
             self,
@@ -6273,7 +6368,8 @@ class HAL_Transmon(Qubit):
             prepare_for_timedomain: bool = True,
             ignore_f_cal_pts: bool = False,
             compile_only: bool = False,
-            rb_tasks=None):
+            rb_tasks=None
+    ):
         """
         Measures randomized benchmarking decay including second excited state
         population.
