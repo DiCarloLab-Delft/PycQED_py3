@@ -2261,7 +2261,7 @@ class TD_UHFQC(TD_Analysis):
         self.save_fig(fig, fig_tight=False, **kw)
 
 
-@deprecated(version='0.4', reason="not really used within PycQED_py3 and pycqed_scripts")
+@deprecated(version='0.4', reason="only used for tests in PycQED_py3, not used within pycqed_scripts")
 class Echo_analysis(TD_Analysis):
     def __init__(self,vary_n=False,**kw):
         self.vary_n = vary_n
@@ -4493,7 +4493,7 @@ class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
         self.finish(**kw)
 
 
-@deprecated(version='0.4', reason="not really used within PycQED_py3 and pycqed_scripts")
+@deprecated(version='0.4', reason="only used for tests in PycQED_py3, not used within pycqed_scripts")
 class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
     '''
     Analysis that fits two gaussians to a histogram of a dataset.
@@ -8322,7 +8322,7 @@ class rounds_to_failure_analysis(MeasurementAnalysis):
         return self.mean_rtf, self.std_err_rtf, self.RO_err_frac, self.flip_err_frac
 
 
-@deprecated(version='0.4', reason="not really used within PycQED_py3 and pycqed_scripts")
+@deprecated(version='0.4', reason="only used for tests in PycQED_py3, not used within pycqed_scripts")
 class butterfly_analysis(MeasurementAnalysis):
     '''
     Extracts the coefficients for the post-measurement butterfly

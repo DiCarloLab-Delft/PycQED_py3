@@ -9,9 +9,10 @@ Legend:
 . Generic bullet
 
 v0.4 - Work In Progress
-# openql_helpers:
-    - created class OqlProgram to separate the OpenQl 'Program' from our additional data
-    - added support for cqasm compilation
+# removed support for CCL and QCC
+. openql_helpers:
+    + created class OqlProgram to separate the OpenQl 'Program' from our additional data
+    + added support for cqasm compilation
 * removed calls to OpenQL's Program.set_sweep_points (which generate an unused ".json" file) from *_oql.py
 . added package 'deprecated' to streamline deprecation
 

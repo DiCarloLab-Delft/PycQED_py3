@@ -1,7 +1,7 @@
 import numpy as np
-from pycqed.measurement.randomized_benchmarking import \
-    randomized_benchmarking as rb
+from deprecated import deprecated
 
+from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
 
@@ -65,6 +65,7 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str) -> OqlProgram:
     return p
 
 
+@deprecated(version='0.4', reason="seems to depend on CCL and VSM")
 def pulsed_spec_seq(
         qubit_idx: int,
         spec_pulse_length: float,
@@ -145,6 +146,7 @@ def pulsed_spec_seq_marked(
     return p
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3, used in pycqed_scripts")
 def pulsed_spec_seq_v2(
         qubit_idx: int,
         spec_pulse_length: float,

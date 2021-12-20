@@ -78,6 +78,7 @@ class HAL_Transmon(Qubit):
             'instr_device',
             docstring='Represents sample, contains all qubits and resonators',
             parameter_class=InstrumentRefParameter)
+
         # MW sources
         self.add_parameter(
             'instr_LO_ro',
@@ -87,9 +88,11 @@ class HAL_Transmon(Qubit):
             parameter_class=InstrumentRefParameter)
         self.add_parameter(
             'instr_spec_source',
+            docstring='instrument used to apply CW excitation',
             parameter_class=InstrumentRefParameter)
         self.add_parameter(
             'instr_spec_source_2',
+            docstring='instrument used to apply second MW drive',
             parameter_class=InstrumentRefParameter)
 
         # Control electronics
@@ -1046,8 +1049,10 @@ class HAL_Transmon(Qubit):
 
         self.prepare_readout(CW=True)
         self._prep_cw_spec()
+
         # source is turned on in measure spec when needed
         self.instr_LO_mw.get_instr().off()
+
         if self.instr_spec_source() != None:
             self.instr_spec_source.get_instr().off()
         if self.instr_spec_source_2() != None:
@@ -1079,7 +1084,7 @@ class HAL_Transmon(Qubit):
         if self.cfg_with_vsm():
             self._prep_td_configure_VSM()
 
-    # FIXME:
+    @deprecated(version='0.4', reason="unused")
     def prepare_for_fluxing(self, reset=True):
         pass
 
@@ -1122,6 +1127,76 @@ class HAL_Transmon(Qubit):
         return True
 
     ##########################################################################
+    # HAL functions
+    # FIXME: WIP to move instrument handling out of measurement/calibration/etc
+    #  routines to separate functions.
+    #  These are *identical* to the original code that was replaced by function calls
+    ##########################################################################
+
+    def hal_acq_spec_mode_on(self):
+        """Starting specmode of acquisition instrument if set in config"""
+        if self.cfg_spec_mode():
+            UHFQC = self.instr_acquisition.get_instr()
+            UHFQC.spec_mode_on(
+                IF=self.ro_freq_mod(),
+                ro_amp=self.ro_pulse_amp_CW()
+            )
+
+    def hal_acq_spec_mode_off(self):
+        """Stopping specmode of acquisition instrument"""
+        if self.cfg_spec_mode():
+            UHFQC = self.instr_acquisition.get_instr()
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
+
+    def hal_spec_source_on(self, power: float, pulsed: bool = False):
+        """
+
+        Args:
+            power:
+            pulsed:
+
+        Returns:
+
+        """
+        # FIXME: pulsed operation requires:
+        # - a generator that supports it
+        # - a device that generates the pulses (e.g. CC with marker output)
+        # - a connection between the two
+        # FIXME: some functions use pulsed operation, but leave the generator in that state. Other functions don't
+        #  touch pulsemod_state, and thus depend on what runs before
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        if pulsed:
+            spec_source.pulsemod_state('On')
+        else:
+            spec_source.pulsemod_state('Off')
+        spec_source.power(power)
+        return spec_source  # FIXME: exposes hardware detail, but needed for sweeps
+
+    def hal_spec_source_off(self):
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.off()
+
+    def hal_flux_get_parameters(self, flux_chan):
+        if 'ivvi' in self.instr_FluxCtrl().lower():  # FIXME: checks name, not type
+            IVVI = self.instr_FluxCtrl.get_instr()
+            if flux_chan is None:
+                dac_par = IVVI.parameters['dac{}'.format(self.fl_dc_ch())]
+            else:
+                dac_par = IVVI.parameters[flux_chan]
+        else:
+            # Assume the flux is controlled using an SPI rack
+            fluxcontrol = self.instr_FluxCtrl.get_instr()
+            if flux_chan == None:
+                dac_par = fluxcontrol.parameters[(self.fl_dc_ch())]
+            else:
+                dac_par = fluxcontrol.parameters[(flux_chan)]
+
+        return dac_par
+
+    ##########################################################################
     # Other functions
     ##########################################################################
 
@@ -1162,12 +1237,12 @@ class HAL_Transmon(Qubit):
 
     def _prep_cw_spec(self):
         # FIXME: this code block has no effect
-        if self.cfg_with_vsm():
-            VSM = self.instr_VSM.get_instr()
-        if self.spec_type() == 'CW':
-            marker_source = 'int'
-        else:
-            marker_source = 'ext'
+        # if self.cfg_with_vsm():
+        #     VSM = self.instr_VSM.get_instr()
+        # if self.spec_type() == 'CW':
+        #     marker_source = 'int'
+        # else:
+        #     marker_source = 'ext'
 
         if self.instr_spec_source() != None:
             self.instr_spec_source.get_instr().power(self.spec_pow())
@@ -1932,14 +2007,8 @@ class HAL_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        UHFQC = self.instr_acquisition.get_instr()
+        self.hal_acq_spec_mode_on()
 
-        # Starting specmode if set in config
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
-                               ro_amp=self.ro_pulse_amp_CW())
-
-        # Snippet here to create and upload the CCL instructions
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
@@ -1951,6 +2020,7 @@ class HAL_Transmon(Qubit):
         spec_source.on()
         spec_source.frequency(f01)
         # spec_source.power(self.spec_pow())
+
         spec_source_bus.on()
         spec_source_bus.power(bus_power)
 
@@ -1964,10 +2034,9 @@ class HAL_Transmon(Qubit):
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Bus_spectroscopy_' + self.msmt_suffix + label)
         spec_source_bus.off()
-        # Stopping specmode
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_off()
-            self._prep_ro_pulse(upload=True)
+
+        self.hal_acq_spec_mode_off()
+
         if analyze:
             ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
@@ -3605,19 +3674,16 @@ class HAL_Transmon(Qubit):
             label (str):
                 suffix to append to the measurement label
         """
-        UHFQC = self.instr_acquisition.get_instr()
+
         self.prepare_for_continuous_wave()
 
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # Starting specmode if set in config
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(acq_length=self.ro_acq_integration_length(),
-                               IF=self.ro_freq_mod(),
-                               ro_amp=self.ro_pulse_amp_CW())
+        # NB: the code replaced by this call contained an extra parameter "acq_length=self.ro_acq_integration_length()"
+        # to UHFQC.spec_mode_on(), but that function no longer uses that parameter
+        self.hal_acq_spec_mode_on()
 
-        # Snippet here to create and upload the CCL instructions
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
@@ -3632,10 +3698,7 @@ class HAL_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_scan' + self.msmt_suffix + label)
 
-        # Stopping specmode
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_off()
-            self._prep_ro_pulse(upload=True)
+        self.hal_acq_spec_mode_off()
 
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
@@ -3876,25 +3939,28 @@ class HAL_Transmon(Qubit):
         arguments to the appropriate method.
         """
         if mode == 'CW':
-            self.measure_spectroscopy_CW(freqs=freqs, MC=MC,
-                                         analyze=analyze, close_fig=close_fig,
-                                         label=label,
-                                         prepare_for_continuous_wave=prepare_for_continuous_wave)
+            self._measure_spectroscopy_CW(
+                freqs=freqs, MC=MC,
+                analyze=analyze, close_fig=close_fig,
+                label=label,
+                prepare_for_continuous_wave=prepare_for_continuous_wave
+            )
         elif mode == 'pulsed_marked':
-            self.measure_spectroscopy_pulsed_marked(
+            self._measure_spectroscopy_pulsed_marked(
                 freqs=freqs, MC=MC,
                 analyze=analyze, close_fig=close_fig,
                 label=label,
-                prepare_for_continuous_wave=prepare_for_continuous_wave)
+                prepare_for_continuous_wave=prepare_for_continuous_wave
+            )
         elif mode == 'pulsed_mixer':
-            self.measure_spectroscopy_pulsed_mixer(
+            self._measure_spectroscopy_pulsed_mixer(
                 freqs=freqs, MC=MC,
                 analyze=analyze, close_fig=close_fig,
                 label=label,
-                prepare_for_timedomain=prepare_for_continuous_wave)
+                prepare_for_timedomain=prepare_for_continuous_wave
+            )
         else:
-            logging.error('Mode {} not recognized. Available modes: "CW", \
-                          "pulsed_marked", "pulsed_mixer"'.format(mode))
+            logging.error(f'Mode {mode} not recognized. Available modes: "CW", "pulsed_marked", "pulsed_mixer"')
 
     def measure_transients(
             self,
@@ -4874,6 +4940,7 @@ class HAL_Transmon(Qubit):
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
+
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
 
@@ -4887,6 +4954,7 @@ class HAL_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
         label = 'Photon_number_splitting'
         MC.run(name=label + self.msmt_suffix, mode='2D')
+
         spec_source.off()
 
         if analyze:
@@ -4929,7 +4997,7 @@ class HAL_Transmon(Qubit):
                 instrument controlling the current bias
 
             fluxChan (str):
-                chanel of the flux control instrument corresponding to the qubit
+                channel of the flux control instrument corresponding to the qubit
         """
         self.prepare_for_continuous_wave()
         if MC is None:
@@ -4947,16 +5015,18 @@ class HAL_Transmon(Qubit):
             IF=self.ro_freq_mod()))
         MC.set_sweep_points(freqs)
 
-        if 'ivvi' in self.instr_FluxCtrl().lower():
-            IVVI = self.instr_FluxCtrl.get_instr()
-            dac_par = IVVI.parameters['dac{}'.format(self.fl_dc_ch())]
-        else:
-            # Assume the flux is controlled using an SPI rack
-            fluxcontrol = self.instr_FluxCtrl.get_instr()
-            if fluxChan == None:
-                dac_par = fluxcontrol.parameters[(self.fl_dc_ch())]
-            else:
-                dac_par = fluxcontrol.parameters[(fluxChan)]
+        dac_par = self.hal_flux_get_parameters(fluxChan)
+        # FIXME: the original code below ignores flucChan on ivvi, but not on SPI. This is probably a bug
+        # if 'ivvi' in self.instr_FluxCtrl().lower():
+        #     IVVI = self.instr_FluxCtrl.get_instr()
+        #     dac_par = IVVI.parameters['dac{}'.format(self.fl_dc_ch())]
+        # else:
+        #     # Assume the flux is controlled using an SPI rack
+        #     fluxcontrol = self.instr_FluxCtrl.get_instr()
+        #     if fluxChan == None:
+        #         dac_par = fluxcontrol.parameters[(self.fl_dc_ch())]
+        #     else:
+        #         dac_par = fluxcontrol.parameters[(fluxChan)]
 
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
@@ -5020,7 +5090,7 @@ class HAL_Transmon(Qubit):
                 instrument controlling the current bias
 
             fluxChan (str):
-                chanel of the flux control instrument corresponding to the qubit
+                channel of the flux control instrument corresponding to the qubit
         """
 
         if mode == 'pulsed_mixer':
@@ -5037,7 +5107,6 @@ class HAL_Transmon(Qubit):
         if trigger_idx is None:
             trigger_idx = self.cfg_qubit_nr()
 
-        # Snippet here to create and upload the CCL instructions
         CC = self.instr_CC.get_instr()
         if mode == 'pulsed_marked':
             p = sqo.pulsed_spec_seq_marked(
@@ -5053,19 +5122,8 @@ class HAL_Transmon(Qubit):
         CC.eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
-        if 'ivvi' in self.instr_FluxCtrl().lower():
-            IVVI = self.instr_FluxCtrl.get_instr()
-            if fluxChan is None:
-                dac_par = IVVI.parameters['dac{}'.format(self.fl_dc_ch())]
-            else:
-                dac_par = IVVI.parameters[fluxChan]
-        else:
-            # Assume the flux is controlled using an SPI rack
-            fluxcontrol = self.instr_FluxCtrl.get_instr()
-            if fluxChan == None:
-                dac_par = fluxcontrol.parameters[(self.fl_dc_ch())]
-            else:
-                dac_par = fluxcontrol.parameters[(fluxChan)]
+        dac_par = self.hal_flux_get_parameters(fluxChan)
+
         if mode == 'pulsed_mixer':
             spec_source = self.instr_spec_source_2.get_instr()
             spec_source.on()
@@ -5092,11 +5150,12 @@ class HAL_Transmon(Qubit):
         self.int_avg_det_single.always_prepare = True
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
+
         if analyze:
             return ma.TwoD_Analysis(label='Qubit_dac_scan',
                                     close_fig=close_fig)
 
-    def measure_spectroscopy_CW(
+    def _measure_spectroscopy_CW(
             self,
             freqs,
             MC: Optional[MeasurementControl] = None,
@@ -5114,20 +5173,17 @@ class HAL_Transmon(Qubit):
 
             spec_pow (float):
                 power of the MW excitation at the output of the spec_source (dBm)
+                FIXME: parameter disappeared, and power not set
 
             label (str):
                 suffix to append to the measurement label
         """
-        UHFQC = self.instr_acquisition.get_instr()
         if prepare_for_continuous_wave:
             self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # Starting specmode if set in config
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
-                               ro_amp=self.ro_pulse_amp_CW())
+        self.hal_acq_spec_mode_on()
 
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
@@ -5141,7 +5197,7 @@ class HAL_Transmon(Qubit):
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
         # Set marker mode off for CW:
-        if not spec_source.get_idn()['model'] == 'E8257D':  # FIXME: HW dependency
+        if not spec_source.get_idn()['model'] == 'E8257D':  # FIXME: HW dependency on old HP/Keysight model
             spec_source.pulsemod_state('Off')
 
         MC.set_sweep_function(spec_source.frequency)
@@ -5154,15 +5210,12 @@ class HAL_Transmon(Qubit):
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
 
-        # Stopping specmode
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_off()
-            self._prep_ro_pulse(upload=True)
+        self.hal_acq_spec_mode_off()
 
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def measure_spectroscopy_pulsed_marked(
+    def _measure_spectroscopy_pulsed_marked(
             self,
             freqs,
             MC: Optional[MeasurementControl] = None,
@@ -5176,16 +5229,13 @@ class HAL_Transmon(Qubit):
         Performs a spectroscopy experiment by triggering the spectroscopy source
         with a CCLight trigger.
         """
-        UHFQC = self.instr_acquisition.get_instr()
+
         if prepare_for_continuous_wave:
             self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # Starting specmode if set in config
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
-                               ro_amp=self.ro_pulse_amp_CW())
+        self.hal_acq_spec_mode_on()
 
         wait_time_ns = self.spec_wait_time() * 1e9
 
@@ -5219,10 +5269,7 @@ class HAL_Transmon(Qubit):
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='pulsed_marker_spectroscopy' + self.msmt_suffix + label)
 
-        # Stopping specmode
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_off()
-            self._prep_ro_pulse(upload=True)
+        self.hal_acq_spec_mode_off()
 
         if analyze:
             ma.Qubit_Spectroscopy_Analysis(
@@ -5231,7 +5278,7 @@ class HAL_Transmon(Qubit):
                 qb_name=self.name
             )
 
-    def measure_spectroscopy_pulsed_mixer(
+    def _measure_spectroscopy_pulsed_mixer(
             self,
             freqs,
             MC: Optional[MeasurementControl] = None,
@@ -5260,14 +5307,11 @@ class HAL_Transmon(Qubit):
                 controlled by the qisa file, which indicates how many 20 ns long
                 square pulses should be triggered back-to-back
         """
-        UHFQC = self.instr_acquisition.get_instr()
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # Starting specmode if set in config
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
-                               ro_amp=self.ro_pulse_amp_CW())
+        self.hal_acq_spec_mode_on()
 
         # Save current value of mw_channel_amp to make this measurement
         # independent of the value.
@@ -5305,10 +5349,7 @@ class HAL_Transmon(Qubit):
 
         self.mw_channel_amp(old_channel_amp)
 
-        # Stopping specmode
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_off()
-            self._prep_ro_pulse(upload=True)
+        self.hal_acq_spec_mode_off()
 
         if analyze:
             ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
@@ -5387,20 +5428,14 @@ class HAL_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        if spec_source_2 is None:
-            spec_source_2 = self.instr_spec_source_2.get_instr()
-        spec_source = self.instr_spec_source.get_instr()
-
         self.prepare_for_continuous_wave()
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
-        spec_source.on()
-        if mode == 'pulsed_marked':
-            spec_source.pulsemod_state('On')
-        else:
-            spec_source.pulsemod_state('Off')
 
-        spec_source.power(f_01_power)
+        spec_source = self.hal_spec_source_on(f_01_power, mode == 'pulsed_marked')
 
+        # FIXME:WIP: also handle spec_source_2
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source_2.on()
         if mode == 'pulsed_marked':
             spec_source_2.pulsemod_state('On')
@@ -5419,8 +5454,9 @@ class HAL_Transmon(Qubit):
 
         ma.TwoD_Analysis(auto=True)
 
-        spec_source.off()
+        self.hal_spec_source_off()
         spec_source_2.off()
+
         ma.Three_Tone_Spectroscopy_Analysis(
             label='Two_tone', f01=np.mean(freqs_01), f12=np.mean(freqs_12))
 
@@ -5484,23 +5520,17 @@ class HAL_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        if spec_source_2 is None:
-            spec_source_2 = self.instr_spec_source_2.get_instr()
-        spec_source = self.instr_spec_source.get_instr()
-        old_spec_pow = self.spec_pow()  # FIXME: also changed by prepare_for_continuous_wave
+        # save parameter
+        old_spec_pow = self.spec_pow()  # FIXME: changed by prepare_for_continuous_wave
 
         self.prepare_for_continuous_wave()
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
 
-        # configure spec_source
-        spec_source.on()
-        if mode == 'pulsed_marked':
-            spec_source.pulsemod_state('On')
-        else:
-            spec_source.pulsemod_state('Off')
-        spec_source.power(f_01_power)
+        spec_source = self.hal_spec_source_on(f_01_power, mode == 'pulsed_marked')
 
         # configure spec_source
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
         spec_source_2.on()
         if mode == 'pulsed_marked':
             spec_source_2.pulsemod_state('On')
@@ -5516,8 +5546,10 @@ class HAL_Transmon(Qubit):
         MC.run_2D(name='Two_tone_' + self.msmt_suffix)
         ma.TwoD_Analysis(auto=True)
 
-        spec_source.off()
+        self.hal_spec_source_off()
         spec_source_2.off()
+
+        # restore parameter
         self.spec_pow(old_spec_pow)
 
         # if analyze:
@@ -5573,7 +5605,6 @@ class HAL_Transmon(Qubit):
 
         if spec_source_2 is None:
             spec_source_2 = self.instr_spec_source_2.get_instr()
-        spec_source = self.instr_spec_source.get_instr()
 
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
@@ -5584,8 +5615,11 @@ class HAL_Transmon(Qubit):
 
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
 
+        spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
         spec_source.power(self.spec_pow())
+        # FIXME: does not touch pulsed mode, which is touched in other functions
+
         spec_source_2.on()
         spec_source_2.frequency(f_bus)
 
@@ -7209,18 +7243,12 @@ class HAL_Transmon(Qubit):
         if f01 == None:
             f01 = self.freq_qubit()
 
-        UHFQC = self.instr_acquisition.get_instr()
         if prepare_for_continuous_wave:
             self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # Starting specmode if set in config
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(
-                IF=self.ro_freq_mod(),
-                ro_amp=self.ro_pulse_amp_CW()
-            )
+        self.hal_acq_spec_mode_on()
 
         p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
@@ -7253,11 +7281,9 @@ class HAL_Transmon(Qubit):
         MC.run(name='Bus_flux_sweep_' + self.msmt_suffix + label, mode='2D')
 
         spec_source_bus.off()
+        # FIXME: spec_source not touched
+        self.hal_acq_spec_mode_off()
 
-        # Stopping specmode
-        if self.cfg_spec_mode():
-            UHFQC.spec_mode_off()
-            self._prep_ro_pulse(upload=True)
         if analyze:
             ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
