@@ -3298,6 +3298,7 @@ class HAL_Transmon(Qubit):
     ##########################################################################
 
     def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, motzois=None):
+        # USED_BY: inspire_dependency_graph.py,
         """
         Calibrates the DRAG coeffcieint value, named motzoi (after Felix Motzoi)
         for legacy reasons.
@@ -4125,6 +4126,7 @@ class HAL_Transmon(Qubit):
             close_fig=True,
             prepare_for_timedomain=True,
             termination_opt=0.02):
+        # USED_BY: inspire_dependency_graph.py,
         '''
         This function is the same as measure AllXY, but with a termination limit
         This termination limit is as a system metric to evalulate the calibration
@@ -4169,10 +4171,10 @@ class HAL_Transmon(Qubit):
             analyze=True,
             MC: Optional[MeasurementControl] = None,
     ):
+        # USED_BY: inspire_dependency_graph.py,
         # FIXME: split into basic T1 and T1 with flux dance
         """
-        N.B. this is a good example for a generic timedomain experiment using
-        the HAL_Transmon.
+        N.B. this is a good example for a generic timedomain experiment using the HAL_Transmon.
         """
         if times is not None and nr_cz_instead_of_idle_time is not None:
             raise ValueError("Either idle time or CZ mode must be chosen!")
@@ -4297,6 +4299,7 @@ class HAL_Transmon(Qubit):
             double_fit=False,
             test_beating=True
     ):
+        # USED_BY: inspire_dependency_graph.py,
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -4482,6 +4485,7 @@ class HAL_Transmon(Qubit):
             label: str = '',
             prepare_for_timedomain=True
     ):
+        # USED_BY: inspire_dependency_graph.py,
         """
         Note: changes pulses on instr_LutMan_MW
 
@@ -4670,6 +4674,7 @@ class HAL_Transmon(Qubit):
         return a
 
     def flipping_GBT(self, nr_sequence: int = 2):  # FIXME: prefix with "measure_"
+        # USED_BY: inspire_dependency_graph.py,
         '''
         This function is to measure flipping sequence for whatever nr_of times
         a function needs to be run to calibrate the Pi and Pi/2 Pulse.
@@ -6370,6 +6375,7 @@ class HAL_Transmon(Qubit):
             compile_only: bool = False,
             rb_tasks=None
     ):
+        # USED_BY: inspire_dependency_graph.py,
         """
         Measures randomized benchmarking decay including second excited state
         population.

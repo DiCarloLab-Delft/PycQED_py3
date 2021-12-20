@@ -516,6 +516,7 @@ class HAL_Device(Instrument):
             disable_metadata=False,
             extract_only=False,
     ):
+        # USED_BY: inspire_dependency_graph.py,
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
@@ -3797,6 +3798,7 @@ class HAL_Device(Instrument):
             maxtasksperchild=None,
             MC = None,
         ):
+        # USED_BY: inspire_dependency_graph.py,
         """
         Perform two qubit interleaved randomized benchmarking with an
         interleaved CZ gate, and optionally an interleaved idle identity with
@@ -5699,6 +5701,7 @@ class HAL_Device(Instrument):
             averages=2 ** 15,
             return_analysis=True
     ):
+        # USED_BY: inspire_dependency_graph.py,
         """
         Measures the multiplexed readout transients of <qubits> for <q_target>
         in ground and excited state. After that, it calculates optimal
@@ -5958,6 +5961,7 @@ class HAL_Device(Instrument):
             operation_pairs: list = [(['QNW', 'QC'], 'SE'), (['QNE', 'QC'], 'SW'),
                                      (['QC', 'QSW', 'QSE'], 'SW'), (['QC', 'QSE', 'QSW'], 'SE')]
     ):
+        # USED_BY: inspire_dependency_graph.py,
 
         # First, fix parking phases
         # Set 'qubits': [q0.name, q1.name, q2.name] and 'parked_qubit_seq': 'ramsey'
@@ -6079,6 +6083,7 @@ class HAL_Device(Instrument):
             operation_pairs: list = [(['QNW', 'QC'], 'SE'), (['QNE', 'QC'], 'SW'),
                                      (['QC', 'QSW', 'QSE'], 'SW'), (['QC', 'QSE', 'QSW'], 'SE')]
     ):
+        # USED_BY: inspire_dependency_graph.py,
 
         # Set 'qubits': [q0.name, q1.name] and 'parked_qubit_seq': 'ground'
         for operation_tuple in operation_pairs:

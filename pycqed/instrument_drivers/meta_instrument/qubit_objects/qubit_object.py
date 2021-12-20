@@ -1338,13 +1338,17 @@ class Qubit(Instrument):
         return opt_motzoi
 
     # FIXME: overridden in unused class Transmon
-    def calibrate_frequency_ramsey(self,
-                                   steps=[1, 1, 3, 10, 30, 100, 300, 1000],
-                                   artificial_periods = 2.5,
-                                   stepsize:float =20e-9,
-                                   verbose: bool=True, update: bool=True,
-                                   close_fig: bool=True,
-                                   test_beating: bool=True):
+    def calibrate_frequency_ramsey(
+            self,
+            steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+            artificial_periods=2.5,
+            stepsize: float = 20e-9,
+            verbose: bool = True,
+            update: bool = True,
+            close_fig: bool = True,
+            test_beating: bool = True
+    ):
+        # USED_BY: inspire_dependency_graph.py,
         """
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
