@@ -29,7 +29,7 @@ from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantum
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 import ZI_HDAWG8
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 
-from qcodes import station
+from qcodes import station, Instrument
 
 
 class Test_Device_obj(unittest.TestCase):
@@ -210,6 +210,10 @@ class Test_Device_obj(unittest.TestCase):
         }
 
         cls.device.dio_map(cls.dio_map_CC)
+
+    @classmethod
+    def tearDownClass(cls):
+        Instrument.close_all()
 
     @unittest.skip("CCL/QCC is removed")
     def test_get_dio_map(self):
@@ -623,14 +627,6 @@ class Test_Device_obj(unittest.TestCase):
     def test_prepare_readout_mixer_settings(self):
         pass
 
-    @classmethod
-    def tearDownClass(cls):
-        for instr_name in list(cls.device._all_instruments):
-            try:
-                inst = cls.device.find_instrument(instr_name)
-                inst.close()
-            except KeyError:
-                pass
 
 
 def test_acq_ch_map_to_IQ_ch_map():

@@ -6,6 +6,7 @@ import numpy as np
 import pycqed as pq
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.HAL_Transmon import HAL_Transmon
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.HAL_ShimSQ import HAL_ShimSQ
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
@@ -22,103 +23,108 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dum
 import pycqed.analysis.analysis_toolbox as a_tools
 from pycqed.measurement.measurement_control import MeasurementControl
 
-from qcodes import station
+from qcodes import station, Instrument
 
 
-class Test_HAL_Transmon(unittest.TestCase):
+def _setup_hw(cls, qubit_obj):
+    cls.CCL_qubit = qubit_obj
+
+    ##############################################
+    # setup (virtual) hardware
+    ##############################################
+    cls.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
+    cls.VSM = Dummy_QuTechVSMModule('VSM')
+    cls.UHFQC = UHFQC(name='UHFQC', server='emulator', device='dev2109', interface='1GbE')
+    cls.AWG = ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=128, device='dev8026', interface='1GbE')
+
+    cls.MW1 = VirtualMWsource('MW1')
+    cls.MW2 = VirtualMWsource('MW2')
+    cls.MW3 = VirtualMWsource('MW3')
+    cls.SH = virtual_SignalHound_USB_SA124B('SH')
+
+    ##############################################
+    # setup LutMans
+    ##############################################
+    if 0:  # FIXME: broken by _prep_mw_pulses
+        cls.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
+        cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
+        cls.AWG8_VSM_MW_LutMan.channel_GI(1)
+        cls.AWG8_VSM_MW_LutMan.channel_GQ(2)
+        cls.AWG8_VSM_MW_LutMan.channel_DI(3)
+        cls.AWG8_VSM_MW_LutMan.channel_DQ(4)
+        cls.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
+        cls.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
+    else:
+        cls.AWG8_VSM_MW_LutMan = mwl.AWG8_MW_LutMan('MW_LutMan')
+        cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
+        cls.AWG8_VSM_MW_LutMan.channel_I(1)
+        cls.AWG8_VSM_MW_LutMan.channel_Q(2)
+        cls.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
+        cls.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
+
+        cls.CCL_qubit.cfg_with_vsm(False)
+        cls.CCL_qubit.cfg_prepare_mw_awg(False)  # FIXME: load_waveform_onto_AWG_lookuptable fails
+    cls.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5, feedline_number=0)
+    cls.ro_lutman.AWG(cls.UHFQC.name)
+
+    ##############################################
+    # Assign instruments
+    ##############################################
+    cls.CCL_qubit.instr_LutMan_MW(cls.AWG8_VSM_MW_LutMan.name)
+    cls.CCL_qubit.instr_LO_ro(cls.MW1.name)
+    cls.CCL_qubit.instr_LO_mw(cls.MW2.name)
+    cls.CCL_qubit.instr_spec_source(cls.MW3.name)
+
+    cls.CCL_qubit.instr_acquisition(cls.UHFQC.name)
+    cls.CCL_qubit.instr_VSM(cls.VSM.name)
+    cls.CCL_qubit.instr_CC(cls.CC.name)
+    cls.CCL_qubit.instr_LutMan_RO(cls.ro_lutman.name)
+
+    cls.CCL_qubit.instr_SH(cls.SH.name)
+
+    ##############################################
+    # setup MC. FIXME: move out of class HAL_ShimSQ
+    ##############################################
+    cls.station = station.Station()
+
+    cls.MC = MeasurementControl('MC', live_plot_enabled=False, verbose=False)
+    cls.MC.station = cls.station
+    cls.station.add_component(cls.MC)
+
+    # Required to set it to the testing datadir
+    test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
+    cls.MC.datadir(test_datadir)
+    a_tools.datadir = cls.MC.datadir()
+
+    cls.CCL_qubit.instr_MC(cls.MC.name)
+
+    ##############################################
+    # Setting some "random" initial parameters
+    ##############################################
+    cls.CCL_qubit.ro_freq(5.43e9)
+    cls.CCL_qubit.ro_freq_mod(200e6)
+
+    cls.CCL_qubit.mw_freq_mod(-100e6)
+    cls.CCL_qubit.mw_awg_ch(1)
+    cls.CCL_qubit.cfg_qubit_nr(0)
+
+    cls.CCL_qubit.mw_vsm_delay(15)
+
+    cls.CCL_qubit.mw_mixer_offs_GI(.1)
+    cls.CCL_qubit.mw_mixer_offs_GQ(.2)
+    cls.CCL_qubit.mw_mixer_offs_DI(.3)
+    cls.CCL_qubit.mw_mixer_offs_DQ(.4)
+
+
+class test_HAL_ShimSQ(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.station = station.Station()
-        cls.CCL_qubit = HAL_Transmon('HAL_qubit')
+        qubit_obj = HAL_ShimSQ('HAL_ShimSQ')
+        _setup_hw(cls, qubit_obj)
 
-        cls.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
-        cls.VSM = Dummy_QuTechVSMModule('VSM')
-        cls.UHFQC = UHFQC(name='UHFQC', server='emulator', device='dev2109', interface='1GbE')
-        cls.AWG = ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=128, device='dev8026', interface='1GbE')
-
-        cls.MW1 = VirtualMWsource('MW1')
-        cls.MW2 = VirtualMWsource('MW2')
-        cls.MW3 = VirtualMWsource('MW3')
-        cls.SH = virtual_SignalHound_USB_SA124B('SH')
-
-        cls.MC = MeasurementControl('MC', live_plot_enabled=False, verbose=False)
-        cls.MC.station = cls.station
-        cls.station.add_component(cls.MC)
-
-        # Required to set it to the testing datadir
-        test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
-        cls.MC.datadir(test_datadir)
-        a_tools.datadir = cls.MC.datadir()
-
-
-        if 0: # FIXME: broken by _prep_mw_pulses
-            cls.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
-            cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
-            cls.AWG8_VSM_MW_LutMan.channel_GI(1)
-            cls.AWG8_VSM_MW_LutMan.channel_GQ(2)
-            cls.AWG8_VSM_MW_LutMan.channel_DI(3)
-            cls.AWG8_VSM_MW_LutMan.channel_DQ(4)
-            cls.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
-            cls.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
-        else:
-            cls.AWG8_VSM_MW_LutMan = mwl.AWG8_MW_LutMan('MW_LutMan')
-            cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
-            cls.AWG8_VSM_MW_LutMan.channel_I(1)
-            cls.AWG8_VSM_MW_LutMan.channel_Q(2)
-            cls.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
-            cls.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
-
-            cls.CCL_qubit.cfg_with_vsm(False)
-            cls.CCL_qubit.cfg_prepare_mw_awg(False) # FIXME: load_waveform_onto_AWG_lookuptable fails
-
-
-        cls.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5, feedline_number=0)
-        cls.ro_lutman.AWG(cls.UHFQC.name)
-
-        # Assign instruments
-        cls.CCL_qubit.instr_LutMan_MW(cls.AWG8_VSM_MW_LutMan.name)
-        cls.CCL_qubit.instr_LO_ro(cls.MW1.name)
-        cls.CCL_qubit.instr_LO_mw(cls.MW2.name)
-        cls.CCL_qubit.instr_spec_source(cls.MW3.name)
-
-        cls.CCL_qubit.instr_acquisition(cls.UHFQC.name)
-        cls.CCL_qubit.instr_VSM(cls.VSM.name)
-        cls.CCL_qubit.instr_CC(cls.CC.name)
-        cls.CCL_qubit.instr_LutMan_RO(cls.ro_lutman.name)
-        cls.CCL_qubit.instr_MC(cls.MC.name)
-
-        cls.CCL_qubit.instr_SH(cls.SH.name)
-
-        config_fn = os.path.join(pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
-        cls.CCL_qubit.cfg_openql_platform_fn(config_fn)
-
-        # Setting some "random" initial parameters
-        cls.CCL_qubit.ro_freq(5.43e9)
-        cls.CCL_qubit.ro_freq_mod(200e6)
-
-        cls.CCL_qubit.freq_qubit(4.56e9)
-        cls.CCL_qubit.freq_max(4.62e9)
-
-        cls.CCL_qubit.mw_freq_mod(-100e6)
-        cls.CCL_qubit.mw_awg_ch(1)
-        cls.CCL_qubit.cfg_qubit_nr(0)
-
-        cls.CCL_qubit.mw_vsm_delay(15)
-
-        cls.CCL_qubit.mw_mixer_offs_GI(.1)
-        cls.CCL_qubit.mw_mixer_offs_GQ(.2)
-        cls.CCL_qubit.mw_mixer_offs_DI(.3)
-        cls.CCL_qubit.mw_mixer_offs_DQ(.4)
-
-    ##############################################
-    # calculate methods
-    ##############################################
-
-    def test_calc_freq(self):
-        self.CCL_qubit.cfg_qubit_freq_calc_method('latest')
-        self.CCL_qubit.calculate_frequency()
-        self.CCL_qubit.cfg_qubit_freq_calc_method('flux')
-        self.CCL_qubit.calculate_frequency()
+    @classmethod
+    def tearDownClass(cls):
+        Instrument.close_all()
 
     ##############################################
     # basic prepare methods
@@ -129,8 +135,67 @@ class Test_HAL_Transmon(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             self.CCL_qubit.prepare_for_continuous_wave()
             self.assertEqual(str(w[0].message), 'Changing ro_acq_weight_type to SSB.')
+
         self.CCL_qubit.ro_acq_weight_type('SSB')
         self.CCL_qubit.prepare_for_continuous_wave()
+
+    def test_prep_readout(self):
+        self.CCL_qubit.prepare_readout()
+
+    def test_prep_ro_instantiate_detectors(self):
+        self.MC.soft_avg(1)
+
+        self.CCL_qubit.ro_soft_avg(4)
+        detector_attributes = [
+            'int_avg_det', 'int_log_det', 'int_avg_det_single',
+            'input_average_detector']
+        for det_attr in detector_attributes:
+            if hasattr(self.CCL_qubit, det_attr):
+                delattr(self.CCL_qubit, det_attr)
+        # Test there are no detectors to start with
+        for det_attr in detector_attributes:
+            self.assertFalse(hasattr(self.CCL_qubit, det_attr))
+        self.CCL_qubit.prepare_readout()
+        # Test that the detectors have been instantiated
+        for det_attr in detector_attributes:
+            self.assertTrue(hasattr(self.CCL_qubit, det_attr))
+
+        self.assertEqual(self.MC.soft_avg(), 4)
+
+
+class Test_HAL_Transmon(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+
+        qubit_obj = HAL_Transmon('HAL_qubit')
+        _setup_hw(cls, qubit_obj)
+
+        config_fn = os.path.join(pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
+        cls.CCL_qubit.cfg_openql_platform_fn(config_fn)
+
+        # Setting some "random" initial parameters
+        cls.CCL_qubit.freq_qubit(4.56e9)
+        cls.CCL_qubit.freq_max(4.62e9)
+
+
+    @classmethod
+    def tearDownClass(self):
+        Instrument.close_all()
+
+    ##############################################
+    # calculate methods
+    ##############################################
+
+    def test_calc_freq(self):
+        self.CCL_qubit.cfg_qubit_freq_calc_method('latest')
+        self.CCL_qubit.calculate_frequency()
+
+        self.CCL_qubit.cfg_qubit_freq_calc_method('flux')
+        self.CCL_qubit.calculate_frequency()
+
+    ##############################################
+    # basic prepare methods
+    ##############################################
 
     @unittest.skipIf(True, 'Test for use with an old duplexer.')
     def test_prep_cw_config_vsm(self):
@@ -156,29 +221,6 @@ class Test_HAL_Transmon(unittest.TestCase):
     ##############################################
     # Testing prepare for readout
     ##############################################
-
-    def test_prep_readout(self):
-        self.CCL_qubit.prepare_readout()
-
-    def test_prep_ro_instantiate_detectors(self):
-        self.MC.soft_avg(1)
-
-        self.CCL_qubit.ro_soft_avg(4)
-        detector_attributes = [
-            'int_avg_det', 'int_log_det', 'int_avg_det_single',
-            'input_average_detector']
-        for det_attr in detector_attributes:
-            if hasattr(self.CCL_qubit, det_attr):
-                delattr(self.CCL_qubit, det_attr)
-        # Test there are no detectors to start with
-        for det_attr in detector_attributes:
-            self.assertFalse(hasattr(self.CCL_qubit, det_attr))
-        self.CCL_qubit.prepare_readout()
-        # Test that the detectors have been instantiated
-        for det_attr in detector_attributes:
-            self.assertTrue(hasattr(self.CCL_qubit, det_attr))
-
-        self.assertEqual(self.MC.soft_avg(), 4)
 
     def test_prep_ro_MW_sources(self):
         LO = self.CCL_qubit.instr_LO_ro.get_instr()
@@ -443,15 +485,6 @@ class Test_HAL_Transmon(unittest.TestCase):
             invalid_times = np.arange(0, 2e-6, 60e-9)
             self.CCL_qubit.measure_echo(times=invalid_times)
             self.CCL_qubit.mw_freq_mod(100e6)
-
-    @classmethod
-    def tearDownClass(self):
-        for inststr in list(self.CCL_qubit._all_instruments):
-            try:
-                inst = self.CCL_qubit.find_instrument(inststr)
-                inst.close()
-            except KeyError:
-                pass
 
 
 class Test_Instantiate(unittest.TestCase):

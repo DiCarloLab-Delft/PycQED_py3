@@ -44,241 +44,8 @@ class HAL_ShimSQ(Instrument):
         self._add_mw_parameters()
         self._add_spec_parameters()
         self._add_flux_parameters()
-        # FIXME: add parameters: *delay*, *_ch_*
-
-
-    def _add_instrument_ref_parameters(self):
-        self.add_parameter(
-            'instr_device',
-            docstring='Represents sample, contains all qubits and resonators',
-            parameter_class=InstrumentRefParameter)
-
-        # MW sources
-        self.add_parameter(
-            'instr_LO_ro',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_LO_mw',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_spec_source',
-            docstring='instrument used to apply CW excitation',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_spec_source_2',
-            docstring='instrument used to apply second MW drive',
-            parameter_class=InstrumentRefParameter)
-
-        # Control electronics
-        if 1:
-            self.add_parameter(
-                'instr_CC',
-                label='Central Controller',
-                docstring='Device responsible for controlling the experiment.',
-                parameter_class=InstrumentRefParameter)
-        else:
-            # new style parameter definition, with type annotation.
-            # FIXME: requires recent QCoDeS, which requires Python 3.7
-            # FIXME: we should introduce base class for CC-type devices below CC
-            self.instr_CC: CC = InstrumentRefParameter(
-                'instr_CC',
-                label='Central Controller',
-            )
-            """Device responsible for controlling the experiment."""
-
-        self.add_parameter(
-            'instr_acquisition',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_VSM',
-            label='Vector Switch Matrix',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_FluxCtrl',
-            label='Flux control',
-            docstring=(
-                'Instrument used to control flux can either be an IVVI rack '
-                'or a meta instrument such as Flux_Control.'),
-            parameter_class=InstrumentRefParameter)
-
-        self.add_parameter(
-            'instr_SH',
-            label='SignalHound',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_VNA',
-            docstring='Vector Network Analyzer',
-            parameter_class=InstrumentRefParameter,
-            initial_value=None)
-
-        # Measurement Control
-        self.add_parameter(
-            'instr_MC',
-            label='MeasurementControl',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_nested_MC',
-            label='Nested MeasurementControl',
-            parameter_class=InstrumentRefParameter)
-
-        # LutMan's
-        self.add_parameter(
-            'instr_LutMan_MW',
-            docstring='Lookuptable manager for microwave control pulses.',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_LutMan_RO',
-            docstring='Lookuptable manager responsible for microwave readout pulses.',
-            parameter_class=InstrumentRefParameter)
-        self.add_parameter(
-            'instr_LutMan_Flux',
-            docstring='Lookuptable manager responsible for flux pulses.',
-            initial_value=None,
-            parameter_class=InstrumentRefParameter)
-
-    def _add_config_parameters(self):
-        self.add_parameter(
-            'cfg_prepare_ro_awg',
-            vals=vals.Bool(),
-            docstring=('If False, disables uploading pulses to UHFQC'),
-            initial_value=True,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'cfg_prepare_mw_awg',
-            vals=vals.Bool(),
-            docstring=('If False, disables uploading pulses to AWG8'),
-            initial_value=True,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'cfg_with_vsm',
-            vals=vals.Bool(),
-            docstring=('to avoid using the VSM if set to False bypasses all commands to vsm if set False'),
-            initial_value=True,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'cfg_spec_mode',
-            vals=vals.Bool(),
-            docstring=('Used to activate spec mode in measurements'),
-            initial_value=False,
-            parameter_class=ManualParameter)
-
-    def _add_mw_parameters(self):
-        self.add_parameter(
-            'mw_channel_range',
-            label='AWG channel range. WARNING: Check your hardware specific limits!',
-            unit='V',
-            initial_value=.8,
-            vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
-            parameter_class=ManualParameter)
-
-        self._mw_vsm_delay = 0
-
-        self.add_parameter(
-            'mw_vsm_delay',
-            label='CCL VSM trigger delay',
-            vals=vals.Ints(0, 127),
-            unit='samples',
-            docstring=
-            ('This value needs to be calibrated to ensure that '
-             'the VSM mask aligns with the microwave pulses. '
-             'Calibration is done using'
-             ' self.calibrate_mw_vsm_delay.'),
-            set_cmd=self._set_mw_vsm_delay,
-            get_cmd=self._get_mw_vsm_delay)
-
-        self._mw_fine_delay = 0
-
-        self.add_parameter(
-            'mw_fine_delay',
-            label='fine delay of the AWG channel',
-            unit='s',
-            docstring='This parameters serves for fine tuning of '
-                      'the RO, MW and flux pulses. It should be kept '
-                      'positive and below 20e-9. Any larger adjustments'
-                      'should be done by changing CCL dio delay'
-                      'through device object.',
-            set_cmd=self._set_mw_fine_delay,
-            get_cmd=self._get_mw_fine_delay)
-
-    def _add_spec_parameters(self):
-        self.add_parameter(
-            'spec_vsm_ch_in',
-            label='VSM input channel for spec pulses',
-            docstring=(
-                'VSM input channel for spec pulses'
-                ' generally this should be the same as '
-                ' the mw_vsm_ch_Gin parameter.'),
-            vals=vals.Ints(1, 4),
-            initial_value=1,
-            parameter_class=ManualParameter)
-
-    def _add_flux_parameters(self):
-        self._flux_fine_delay = 0
-        self.add_parameter(
-            'flux_fine_delay',
-            label='fine delay of the AWG channel',
-            unit='s',
-            docstring='This parameters serves for fine tuning of '
-                      'the RO, MW and flux pulses. It should be kept '
-                      'positive and below 20e-9. Any larger adjustments'
-                      'should be done by changing CCL dio delay'
-                      'through device object.',
-            set_cmd=self._set_flux_fine_delay,
-            get_cmd=self._get_flux_fine_delay)
-
-    ##########################################################################
-    # Private parameter helpers
-    ##########################################################################
-
-    def _using_QWG(self):
-        """
-        Checks if a QWG is used for microwave control.
-        """
-        AWG = self.instr_LutMan_MW.get_instr().AWG.get_instr()
-        return isinstance(AWG, QuTech_AWG_Module)
-
-    def _set_mw_vsm_delay(self, val):
-        # sort of a pseudo Manual Parameter
-        self.instr_CC.get_instr().set('vsm_channel_delay{}'.format(self.cfg_qubit_nr()), val)
-        self._mw_vsm_delay = val
-
-    def _get_mw_vsm_delay(self):
-        return self._mw_vsm_delay
-
-    def _set_mw_fine_delay(self, val):
-        if self.cfg_with_vsm():
-            logging.warning('HAL_Transmon is using VSM. Use mw_vsm_delay to adjust delay')
-        else:
-            lutman = self.find_instrument(self.instr_LutMan_MW())
-            AWG = lutman.find_instrument(lutman.AWG())
-            if self._using_QWG():
-                logging.warning('HAL_Transmon is using QWG. mw_fine_delay not supported.')
-            else:
-                AWG.set('sigouts_{}_delay'.format(lutman.channel_I() - 1), val)
-                AWG.set('sigouts_{}_delay'.format(lutman.channel_Q() - 1), val)
-        self._mw_fine_delay = val
-
-    def _get_mw_fine_delay(self):
-        return self._mw_fine_delay
-
-    def _set_flux_fine_delay(self, val):
-        if self.instr_LutMan_Flux() is not None:
-            lutman = self.find_instrument(self.instr_LutMan_Flux())
-            AWG = lutman.find_instrument(lutman.AWG())
-            if self._using_QWG():
-                logging.warning('HAL_Transmon is using QWG. Not implemented.')
-            else:
-                AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel() - 1), val)
-                # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
-        else:
-            logging.warning('No Flux LutMan specified, could not set flux timing fine')
-        self._flux_fine_delay = val
-
-    def _get_flux_fine_delay(self):
-        return self._flux_fine_delay
+        self._add_ro_parameters()
+        self._add_prep_parameters()
 
     ##########################################################################
     # Prepare functions
@@ -378,6 +145,8 @@ class HAL_ShimSQ(Instrument):
 
     ##########################################################################
     # HAL functions
+    # naming convention: hal_<subsystem>_<function>
+    #
     # FIXME: WIP to move instrument handling out of measurement/calibration/etc
     #  routines to separate functions.
     #  These are *identical* to the original code that was replaced by function calls
@@ -447,6 +216,572 @@ class HAL_ShimSQ(Instrument):
         return dac_par
 
     ##########################################################################
+    # Other functions
+    ##########################################################################
+
+    # FIXME: check against self.int_avg_det_single provided by _prep_ro_instantiate_detectors, and why is this detector
+    #  created on demand
+
+    def get_int_avg_det(self, **kw):
+        """
+        Instantiates an integration average detector using parameters from
+        the qubit object. **kw get passed on to the class when instantiating
+        the detector function.
+        """
+
+        if self.ro_acq_weight_type() == 'optimal':
+            ro_channels = [self.ro_acq_weight_chI()]
+
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
+            else:
+                result_logging_mode = 'lin_trans'
+        else:
+            ro_channels = [self.ro_acq_weight_chI(),
+                           self.ro_acq_weight_chQ()]
+            result_logging_mode = 'raw'
+
+        int_avg_det = det.UHFQC_integrated_average_detector(
+            UHFQC=self.instr_acquisition.get_instr(),
+            AWG=self.instr_CC.get_instr(),
+            channels=ro_channels,
+            result_logging_mode=result_logging_mode,
+            nr_averages=self.ro_acq_averages(),
+            integration_length=self.ro_acq_integration_length(),
+            **kw
+        )
+
+        return int_avg_det
+
+
+    ##########################################################################
+    # Private _add_*_parameters
+    ##########################################################################
+
+    def _add_instrument_ref_parameters(self):
+        self.add_parameter(
+            'instr_device',
+            docstring='Represents sample, contains all qubits and resonators',
+            parameter_class=InstrumentRefParameter)
+
+        # MW sources
+        self.add_parameter(
+            'instr_LO_ro',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_LO_mw',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_spec_source',
+            docstring='instrument used to apply CW excitation',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_spec_source_2',
+            docstring='instrument used to apply second MW drive',
+            parameter_class=InstrumentRefParameter)
+
+        # Control electronics
+        if 1:
+            self.add_parameter(
+                'instr_CC',
+                label='Central Controller',
+                docstring='Device responsible for controlling the experiment.',
+                parameter_class=InstrumentRefParameter)
+        else:
+            # new style parameter definition, with type annotation.
+            # FIXME: requires recent QCoDeS, which requires Python 3.7
+            # FIXME: we should introduce base class for CC-type devices below CC
+            self.instr_CC: CC = InstrumentRefParameter(
+                'instr_CC',
+                label='Central Controller',
+            )
+            """Device responsible for controlling the experiment."""
+
+        self.add_parameter(
+            'instr_acquisition',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_VSM',
+            label='Vector Switch Matrix',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_FluxCtrl',
+            label='Flux control',
+            docstring=(
+                'Instrument used to control flux can either be an IVVI rack '
+                'or a meta instrument such as Flux_Control.'),
+            parameter_class=InstrumentRefParameter)
+
+        self.add_parameter(
+            'instr_SH',
+            label='SignalHound',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_VNA',
+            docstring='Vector Network Analyzer',
+            parameter_class=InstrumentRefParameter,
+            initial_value=None)
+
+        # Measurement Control
+        # FIXME: move back to HAL_Transmon
+        self.add_parameter(
+            'instr_MC',
+            label='MeasurementControl',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_nested_MC',
+            label='Nested MeasurementControl',
+            parameter_class=InstrumentRefParameter)
+
+        # LutMan's
+        self.add_parameter(
+            'instr_LutMan_MW',
+            docstring='Lookuptable manager for microwave control pulses.',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_LutMan_RO',
+            docstring='Lookuptable manager responsible for microwave readout pulses.',
+            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_LutMan_Flux',
+            docstring='Lookuptable manager responsible for flux pulses.',
+            initial_value=None,
+            parameter_class=InstrumentRefParameter)
+
+    def _add_config_parameters(self):
+        self.add_parameter(
+            'cfg_prepare_ro_awg',
+            vals=vals.Bool(),
+            docstring=('If False, disables uploading pulses to UHFQC'),
+            initial_value=True,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'cfg_prepare_mw_awg',
+            vals=vals.Bool(),
+            docstring=('If False, disables uploading pulses to AWG8'),
+            initial_value=True,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'cfg_with_vsm',
+            vals=vals.Bool(),
+            docstring=('to avoid using the VSM if set to False bypasses all commands to vsm if set False'),
+            initial_value=True,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'cfg_spec_mode',
+            vals=vals.Bool(),
+            docstring=('Used to activate spec mode in measurements'),
+            initial_value=False,
+            parameter_class=ManualParameter)
+
+    def _add_mw_parameters(self):
+        self.add_parameter(
+            'mw_awg_ch', parameter_class=ManualParameter,
+            initial_value=1,
+            vals=vals.Ints())
+
+        self.add_parameter(
+            'mw_channel_range',
+            label='AWG channel range. WARNING: Check your hardware specific limits!',
+            unit='V',
+            initial_value=.8,
+            vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
+            parameter_class=ManualParameter)
+
+        self._mw_vsm_delay = 0
+
+        self.add_parameter(
+            'mw_vsm_delay',
+            label='CCL VSM trigger delay',
+            vals=vals.Ints(0, 127),
+            unit='samples',
+            docstring=
+            ('This value needs to be calibrated to ensure that '
+             'the VSM mask aligns with the microwave pulses. '
+             'Calibration is done using'
+             ' self.calibrate_mw_vsm_delay.'),
+            set_cmd=self._set_mw_vsm_delay,
+            get_cmd=self._get_mw_vsm_delay)
+
+        self._mw_fine_delay = 0
+
+        self.add_parameter(
+            'mw_fine_delay',
+            label='fine delay of the AWG channel',
+            unit='s',
+            docstring='This parameters serves for fine tuning of '
+                      'the RO, MW and flux pulses. It should be kept '
+                      'positive and below 20e-9. Any larger adjustments'
+                      'should be done by changing CCL dio delay'
+                      'through device object.',
+            set_cmd=self._set_mw_fine_delay,
+            get_cmd=self._get_mw_fine_delay)
+
+    def _add_spec_parameters(self):
+        self.add_parameter(
+            'spec_vsm_ch_in',
+            label='VSM input channel for spec pulses',
+            docstring=(
+                'VSM input channel for spec pulses'
+                ' generally this should be the same as '
+                ' the mw_vsm_ch_Gin parameter.'),
+            vals=vals.Ints(1, 4),
+            initial_value=1,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'spec_pow',
+            unit='dB',
+            vals=vals.Numbers(-70, 20),
+            parameter_class=ManualParameter,
+            initial_value=-30)
+
+    def _add_flux_parameters(self):
+        self._flux_fine_delay = 0
+        self.add_parameter(
+            'flux_fine_delay',
+            label='fine delay of the AWG channel',
+            unit='s',
+            docstring='This parameters serves for fine tuning of '
+                      'the RO, MW and flux pulses. It should be kept '
+                      'positive and below 20e-9. Any larger adjustments'
+                      'should be done by changing CCL dio delay'
+                      'through device object.',
+            set_cmd=self._set_flux_fine_delay,
+            get_cmd=self._get_flux_fine_delay)
+
+    def _add_ro_parameters(self):
+        self.add_parameter(
+            'ro_acq_weight_type',
+            initial_value='SSB',
+            vals=vals.Enum('SSB', 'DSB', 'optimal', 'optimal IQ'),
+            docstring=(
+                'Determines what type of integration weights to use: '
+                '\n\t SSB: Single sideband demodulation\n\t'
+                'DSB: Double sideband demodulation\n\t'
+                'optimal: waveforms specified in "RO_acq_weight_func_I" '
+                '\n\tand "RO_acq_weight_func_Q"'),
+            parameter_class=ManualParameter)
+
+    def _add_prep_parameters(self):
+        # FIXME: these are parameters referred to in functions "prepare_*".
+        #  An assessment needs to be made whether they really should be in this class, and if so,
+        #  they should be moved to the appropriate _add_*_parameters section
+
+        self.add_parameter(
+            'cfg_qubit_nr',
+            label='Qubit number',
+            vals=vals.Ints(0, 20),
+            parameter_class=ManualParameter,
+            initial_value=0,
+            docstring='The qubit number is used in the OpenQL compiler.')
+
+        ################################
+        # RO stimulus/pulse parameters #
+        ################################
+        self.add_parameter(
+            'ro_freq',
+            label='Readout frequency',
+            unit='Hz',
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_freq_mod',
+            label='Readout-modulation frequency',
+            unit='Hz',
+            initial_value=-20e6,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pow_LO',
+            label='RO power LO',
+            unit='dBm',
+            initial_value=20,
+            parameter_class=ManualParameter)
+
+
+        #############################
+        # RO acquisition parameters #
+        #############################
+
+        self.add_parameter(
+            'ro_acq_input_average_length',
+            unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
+            initial_value=4096 / 1.8e9,
+            parameter_class=ManualParameter,
+            docstring=('The measurement time in input averaging.'))
+
+        self.add_parameter(
+            'ro_acq_integration_length',
+            initial_value=500e-9,
+            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_pulse_delay', unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(0, 1e-6),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('The delay time for the readout pulse'))
+
+        self.add_parameter(
+            'ro_acq_delay',
+            unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(min_value=0),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=(
+                'The time between the instruction that trigger the'
+                ' readout pulse and the instruction that triggers the '
+                'acquisition. The positive number means that the '
+                'acquisition is started after the pulse is send.'))
+
+        self.add_parameter(
+            'ro_acq_weight_chI',
+            initial_value=0,
+            docstring=(
+                'Determines the I-channel for integration. When the'
+                ' ro_acq_weight_type is optimal only this channel will '
+                'affect the result.'),
+            vals=vals.Ints(0, 9),
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_acq_weight_chQ',
+            initial_value=1,
+            docstring=('Determines the Q-channel for integration.'),
+            vals=vals.Ints(0, 9),
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_acq_mixer_phi',
+            unit='degree',
+            label='Readout mixer phi',
+            vals=vals.Numbers(),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('acquisition mixer phi, used for mixer deskewing in real time'))
+
+        self.add_parameter(
+            'ro_acq_mixer_alpha',
+            unit='',
+            label='Readout mixer alpha',
+            vals=vals.Numbers(min_value=0.8),
+            initial_value=1,
+            parameter_class=ManualParameter,
+            docstring=('acquisition mixer alpha, used for mixer deskewing in real time'))
+
+        #############################
+        # RO pulse parameters
+        #############################
+        self.add_parameter(
+            'ro_pulse_type',
+            initial_value='simple',
+            vals=vals.Enum('gated', 'simple', 'up_down_down', 'up_down_down_final'),
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_acq_averages',
+            initial_value=1024,
+            vals=vals.Numbers(min_value=0, max_value=1e6),
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_soft_avg',
+            initial_value=1,
+            docstring=('Number of soft averages to be performed using the MC.'),
+            vals=vals.Ints(min_value=1),
+            parameter_class=ManualParameter)
+
+        # Mixer offsets correction, RO pulse
+        self.add_parameter(
+            'ro_pulse_mixer_offs_I',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'ro_pulse_mixer_offs_Q',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'ro_pulse_mixer_alpha',
+            initial_value=1,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_mixer_phi',
+            initial_value=0,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_pulse_length',
+            label='Readout pulse length',
+            initial_value=100e-9,
+            unit='s',
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_amp',
+            unit='V',
+            label='Readout pulse amplitude',
+            initial_value=0.1,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_amp_CW',
+            unit='V',
+            label='Readout pulse amplitude',
+            initial_value=0.1,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_phi',
+            unit='deg',
+            initial_value=0,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_pulse_down_length0',
+            unit='s',
+            initial_value=1e-9,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_down_amp0',
+            unit='V',
+            initial_value=0,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_down_phi0',
+            unit='deg',
+            initial_value=0,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_down_length1',
+            unit='s',
+            initial_value=1e-9,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_down_amp1',
+            unit='V',
+            initial_value=0,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_down_phi1',
+            unit='deg',
+            initial_value=0,
+            parameter_class=ManualParameter)
+
+        #############################
+        # mw parameters
+        #############################
+        self.add_parameter(
+            'mw_freq_mod',
+            initial_value=-100e6,
+            label='pulse-modulation frequency',
+            unit='Hz',
+            parameter_class=ManualParameter)
+
+        # Mixer skewness correction
+        self.add_parameter(
+            'mw_G_mixer_phi',
+            unit='deg',
+            label='Mixer skewness phi Gaussian quadrature',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_G_mixer_alpha',
+            unit='',
+            label='Mixer skewness alpha Gaussian quadrature',
+            parameter_class=ManualParameter,
+            initial_value=1)
+        self.add_parameter(
+            'mw_D_mixer_phi',
+            unit='deg',
+            label='Mixer skewness phi Derivative quadrature',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_D_mixer_alpha',
+            unit='',
+            label='Mixer skewness alpha Derivative quadrature',
+            parameter_class=ManualParameter,
+            initial_value=1)
+
+        # Mixer offsets correction, qubit drive
+        self.add_parameter(
+            'mw_mixer_offs_GI',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_GQ',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_DI',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_DQ',
+            unit='V',
+            parameter_class=ManualParameter, initial_value=0)
+
+
+    ##########################################################################
+    # Private parameter helpers
+    ##########################################################################
+
+    def _using_QWG(self):
+        """
+        Checks if a QWG is used for microwave control.
+        """
+        AWG = self.instr_LutMan_MW.get_instr().AWG.get_instr()
+        return isinstance(AWG, QuTech_AWG_Module)
+
+    def _set_mw_vsm_delay(self, val):
+        # sort of a pseudo Manual Parameter
+        self.instr_CC.get_instr().set('vsm_channel_delay{}'.format(self.cfg_qubit_nr()), val)
+        self._mw_vsm_delay = val
+
+    def _get_mw_vsm_delay(self):
+        return self._mw_vsm_delay
+
+    def _set_mw_fine_delay(self, val):
+        if self.cfg_with_vsm():
+            logging.warning('HAL_Transmon is using VSM. Use mw_vsm_delay to adjust delay')
+        else:
+            lutman = self.find_instrument(self.instr_LutMan_MW())
+            AWG = lutman.find_instrument(lutman.AWG())
+            if self._using_QWG():
+                logging.warning('HAL_Transmon is using QWG. mw_fine_delay not supported.')
+            else:
+                AWG.set('sigouts_{}_delay'.format(lutman.channel_I() - 1), val)
+                AWG.set('sigouts_{}_delay'.format(lutman.channel_Q() - 1), val)
+        self._mw_fine_delay = val
+
+    def _get_mw_fine_delay(self):
+        return self._mw_fine_delay
+
+    def _set_flux_fine_delay(self, val):
+        if self.instr_LutMan_Flux() is not None:
+            lutman = self.find_instrument(self.instr_LutMan_Flux())
+            AWG = lutman.find_instrument(lutman.AWG())
+            if self._using_QWG():
+                logging.warning('HAL_Transmon is using QWG. Not implemented.')
+            else:
+                AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel() - 1), val)
+                # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
+        else:
+            logging.warning('No Flux LutMan specified, could not set flux timing fine')
+        self._flux_fine_delay = val
+
+    def _get_flux_fine_delay(self):
+        return self._flux_fine_delay
+
+    ##########################################################################
     # Prepare functions: private
     ##########################################################################
 
@@ -481,40 +816,38 @@ class HAL_ShimSQ(Instrument):
     # FIXME: UHFQC specific
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
+
+        # determine ro_channels and result_logging_mode (needed for detectors)
         if 'optimal' in self.ro_acq_weight_type():
             if self.ro_acq_weight_type() == 'optimal':
                 ro_channels = [self.ro_acq_weight_chI()]
             elif self.ro_acq_weight_type() == 'optimal IQ':
-                ro_channels = [
-                    self.ro_acq_weight_chI(), self.ro_acq_weight_chQ()]
-            result_logging_mode = 'lin_trans'
+                ro_channels = [self.ro_acq_weight_chI(), self.ro_acq_weight_chQ()]
 
+            result_logging_mode = 'lin_trans'
             if self.ro_acq_digitized():
                 result_logging_mode = 'digitized'
-            # Update the RO theshold
-            acq_ch = self.ro_acq_weight_chI()
 
+            # Update the RO threshold
+            acq_ch = self.ro_acq_weight_chI()
             # The threshold that is set in the hardware  needs to be
             # corrected for the offset as this is only applied in
             # software.
-
             if abs(self.ro_acq_threshold()) > 32:
                 threshold = 32
-                warnings.warn('Clipping {}.ro_acq_threshold {}>32'.format(
-                    self.name, self.ro_acq_threshold()))
+                warnings.warn(f'Clipping {self.name}.ro_acq_threshold {self.ro_acq_threshold()}>32')
                 # working around the limitation of threshold in UHFQC
                 # which cannot be >abs(32).
             else:
                 threshold = self.ro_acq_threshold()
-
-            self.instr_acquisition.get_instr().set(
-                'qas_0_thresholds_{}_level'.format(acq_ch), threshold)
+            self.instr_acquisition.get_instr().set('qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
         else:
             ro_channels = [self.ro_acq_weight_chI(),
                            self.ro_acq_weight_chQ()]
             result_logging_mode = 'raw'
 
+        # instantiate detectors
         if 'UHFQC' in self.instr_acquisition():  # FIXME: checks name, not type
             UHFQC = self.instr_acquisition.get_instr()
 
@@ -598,19 +931,16 @@ class HAL_ShimSQ(Instrument):
             ro_pulse_mixer_offs_Q
 
         """
-        if CW:
-            ro_amp = self.ro_pulse_amp_CW()
-        else:
-            ro_amp = self.ro_pulse_amp()
 
         if 'UHFQC' not in self.instr_acquisition():  # FIXME: checks name, not type
             raise NotImplementedError()
+
         UHFQC = self.instr_acquisition.get_instr()
 
         if 'gated' in self.ro_pulse_type().lower():
             UHFQC.awg_sequence_acquisition()
-
         else:
+            # propagate parameters to readout lutman
             ro_lm = self.instr_LutMan_RO.get_instr()
             ro_lm.AWG(self.instr_acquisition())
 
@@ -623,6 +953,10 @@ class HAL_ShimSQ(Instrument):
 
             ro_lm.set('M_modulation_R{}'.format(idx), self.ro_freq_mod())
             ro_lm.set('M_length_R{}'.format(idx), self.ro_pulse_length())
+            if CW:
+                ro_amp = self.ro_pulse_amp_CW()
+            else:
+                ro_amp = self.ro_pulse_amp()
             ro_lm.set('M_amp_R{}'.format(idx), ro_amp)
             ro_lm.set('M_delay_R{}'.format(idx), self.ro_pulse_delay())
             ro_lm.set('M_phi_R{}'.format(idx), self.ro_pulse_phi())
@@ -659,6 +993,7 @@ class HAL_ShimSQ(Instrument):
         """
         if 'UHFQC' in self.instr_acquisition():  # FIXME: checks name, not type
             UHFQC = self.instr_acquisition.get_instr()
+
             if self.ro_acq_weight_type() == 'SSB':
                 UHFQC.prepare_SSB_weight_and_rotation(
                     IF=self.ro_freq_mod(),
@@ -845,27 +1180,17 @@ class HAL_ShimSQ(Instrument):
     def _prep_td_configure_VSM(self):
         # Configure VSM
         VSM = self.instr_VSM.get_instr()
-        VSM.set('ch{}_frequency'.format(
-            self.mw_vsm_ch_in()), self.freq_qubit())
+        VSM.set('ch{}_frequency'.format(self.mw_vsm_ch_in()), self.freq_qubit())
         for mod in range(1, 9):
-            VSM.set('mod{}_ch{}_marker_state'.format(
-                mod, self.spec_vsm_ch_in()), 'off')
-        VSM.set('mod{}_ch{}_marker_state'.format(
-            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), 'on')
-        VSM.set('mod{}_marker_source'.format(
-            self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
-        VSM.set('mod{}_ch{}_derivative_amp'.format(
-            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_D_amp())
-        VSM.set('mod{}_ch{}_derivative_phase'.format(
-            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_D_phase())
-        VSM.set('mod{}_ch{}_gaussian_amp'.format(
-            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_amp())
-        VSM.set('mod{}_ch{}_gaussian_phase'.format(
-            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_phase())
+            VSM.set('mod{}_ch{}_marker_state'.format(mod, self.spec_vsm_ch_in()), 'off')
+        VSM.set('mod{}_ch{}_marker_state'.format(self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), 'on')
+        VSM.set('mod{}_marker_source'.format(self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
+        VSM.set('mod{}_ch{}_derivative_amp'.format(self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_D_amp())
+        VSM.set('mod{}_ch{}_derivative_phase'.format(self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_D_phase())
+        VSM.set('mod{}_ch{}_gaussian_amp'.format(self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_amp())
+        VSM.set('mod{}_ch{}_gaussian_phase'.format(self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_phase())
 
-        self.instr_CC.get_instr().set(
-            'vsm_channel_delay{}'.format(self.cfg_qubit_nr()),
-            self.mw_vsm_delay())
+        self.instr_CC.get_instr().set('vsm_channel_delay{}'.format(self.cfg_qubit_nr()), self.mw_vsm_delay())
 
     def _prep_cw_configure_VSM(self):
         # Configure VSM

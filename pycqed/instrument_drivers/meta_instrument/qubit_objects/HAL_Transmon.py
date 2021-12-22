@@ -84,140 +84,10 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         """
         Adding the parameters relevant for readout.
         """
-        ################################
-        # RO stimulus/pulse parameters #
-        ################################
-        self.add_parameter(
-            'ro_freq',
-            label='Readout frequency',
-            unit='Hz',
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_freq_mod',
-            label='Readout-modulation frequency',
-            unit='Hz',
-            initial_value=-20e6,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pow_LO',
-            label='RO power LO',
-            unit='dBm',
-            initial_value=20,
-            parameter_class=ManualParameter)
-
-        # RO pulse parameters
-        self.add_parameter(
-            'ro_pulse_type',
-            initial_value='simple',
-            vals=vals.Enum('gated', 'simple', 'up_down_down', 'up_down_down_final'),
-            parameter_class=ManualParameter)
-
-        # Mixer offsets correction, RO pulse
-        self.add_parameter(
-            'ro_pulse_mixer_offs_I',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'ro_pulse_mixer_offs_Q',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'ro_pulse_mixer_alpha',
-            initial_value=1,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_mixer_phi',
-            initial_value=0,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'ro_pulse_length',
-            label='Readout pulse length',
-            initial_value=100e-9,
-            unit='s',
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_amp',
-            unit='V',
-            label='Readout pulse amplitude',
-            initial_value=0.1,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_amp_CW',
-            unit='V',
-            label='Readout pulse amplitude',
-            initial_value=0.1,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_phi',
-            unit='deg',
-            initial_value=0,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'ro_pulse_down_length0',
-            unit='s',
-            initial_value=1e-9,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_down_amp0',
-            unit='V',
-            initial_value=0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_down_phi0',
-            unit='deg',
-            initial_value=0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_down_length1',
-            unit='s',
-            initial_value=1e-9,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_down_amp1',
-            unit='V',
-            initial_value=0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_down_phi1',
-            unit='deg',
-            initial_value=0,
-            parameter_class=ManualParameter)
 
         #############################
         # RO acquisition parameters #
         #############################
-
-        self.add_parameter(
-            'ro_acq_weight_type',
-            initial_value='SSB',
-            vals=vals.Enum('SSB', 'DSB', 'optimal', 'optimal IQ'),
-            docstring=(
-                'Determines what type of integration weights to use: '
-                '\n\t SSB: Single sideband demodulation\n\t'
-                'DSB: Double sideband demodulation\n\t'
-                'optimal: waveforms specified in "RO_acq_weight_func_I" '
-                '\n\tand "RO_acq_weight_func_Q"'),
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'ro_acq_weight_chI',
-            initial_value=0,
-            docstring=(
-                'Determines the I-channel for integration. When the'
-                ' ro_acq_weight_type is optimal only this channel will '
-                'affect the result.'),
-            vals=vals.Ints(0, 9),
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_acq_weight_chQ',
-            initial_value=1,
-            docstring=('Determines the Q-channel for integration.'),
-            vals=vals.Ints(0, 9),
-            parameter_class=ManualParameter)
 
         self.add_parameter(
             'ro_acq_weight_func_I',
@@ -237,73 +107,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             vals=vals.Ints(),
             initial_value=0,
             label='weight function delay samples',
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'ro_acq_delay',
-            unit='s',
-            label='Readout acquisition delay',
-            vals=vals.Numbers(min_value=0),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=(
-                'The time between the instruction that trigger the'
-                ' readout pulse and the instruction that triggers the '
-                'acquisition. The positive number means that the '
-                'acquisition is started after the pulse is send.'))
-
-        self.add_parameter(
-            'ro_pulse_delay', unit='s',
-            label='Readout acquisition delay',
-            vals=vals.Numbers(0, 1e-6),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=('The delay time for the readout pulse'))
-
-        self.add_parameter(
-            'ro_acq_mixer_phi',
-            unit='degree',
-            label='Readout mixer phi',
-            vals=vals.Numbers(),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=('acquisition mixer phi, used for mixer deskewing in real time'))
-
-        self.add_parameter(
-            'ro_acq_mixer_alpha',
-            unit='',
-            label='Readout mixer alpha',
-            vals=vals.Numbers(min_value=0.8),
-            initial_value=1,
-            parameter_class=ManualParameter,
-            docstring=('acquisition mixer alpha, used for mixer deskewing in real time'))
-
-        self.add_parameter(
-            'ro_acq_input_average_length',
-            unit='s',
-            label='Readout acquisition delay',
-            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
-            initial_value=4096 / 1.8e9,
-            parameter_class=ManualParameter,
-            docstring=('The measurement time in input averaging.'))
-
-        self.add_parameter(
-            'ro_acq_integration_length',
-            initial_value=500e-9,
-            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'ro_acq_averages',
-            initial_value=1024,
-            vals=vals.Numbers(min_value=0, max_value=1e6),
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'ro_soft_avg',
-            initial_value=1,
-            docstring=('Number of soft averages to be performed using the MC.'),
-            vals=vals.Ints(min_value=1),
             parameter_class=ManualParameter)
 
         # Single shot readout specific parameters
@@ -337,65 +140,11 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             parameter_class=ManualParameter)
 
     def add_mw_parameters(self):
-        # Mixer skewness correction
-        self.add_parameter(
-            'mw_G_mixer_phi',
-            unit='deg',
-            label='Mixer skewness phi Gaussian quadrature',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_G_mixer_alpha',
-            unit='',
-            label='Mixer skewness alpha Gaussian quadrature',
-            parameter_class=ManualParameter,
-            initial_value=1)
-        self.add_parameter(
-            'mw_D_mixer_phi',
-            unit='deg',
-            label='Mixer skewness phi Derivative quadrature',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_D_mixer_alpha',
-            unit='',
-            label='Mixer skewness alpha Derivative quadrature',
-            parameter_class=ManualParameter,
-            initial_value=1)
-
-        # Mixer offsets correction, qubit drive
-        self.add_parameter(
-            'mw_mixer_offs_GI',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_GQ',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_DI',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_DQ',
-            unit='V',
-            parameter_class=ManualParameter, initial_value=0)
-
         self.add_parameter(
             'mw_pow_td_source',
             label='Time-domain power',
             unit='dBm',
             initial_value=20,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'mw_freq_mod',
-            initial_value=-100e6,
-            label='pulse-modulation frequency',
-            unit='Hz',
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -427,10 +176,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             initial_value=.4,
             parameter_class=ManualParameter)
 
-        self.add_parameter(
-            'mw_awg_ch', parameter_class=ManualParameter,
-            initial_value=1,
-            vals=vals.Ints())
         self.add_parameter(
             'mw_gauss_width', unit='s',
             initial_value=10e-9,
@@ -538,13 +283,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             vals=vals.Numbers(0, 1),
             parameter_class=ManualParameter,
             initial_value=0.8)
-
-        self.add_parameter(
-            'spec_pow',
-            unit='dB',
-            vals=vals.Numbers(-70, 20),
-            parameter_class=ManualParameter,
-            initial_value=-30)
 
         self.add_parameter(
             'spec_wait_time',
@@ -686,14 +424,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             vals=vals.Strings())
 
         self.add_parameter(
-            'cfg_qubit_nr',
-            label='Qubit number',
-            vals=vals.Ints(0, 20),
-            parameter_class=ManualParameter,
-            initial_value=0,
-            docstring='The qubit number is used in the OpenQL compiler.')
-
-        self.add_parameter(
             'cfg_qubit_freq_calc_method',
             initial_value='latest',
             parameter_class=ManualParameter,
@@ -808,42 +538,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             label='RB single qubit Clifford fidelity',
             vals=vals.Numbers(0, 1.0),
             parameter_class=ManualParameter)
-
-    ##########################################################################
-    # Other functions
-    ##########################################################################
-
-    def get_int_avg_det(self, **kw):
-        """
-        Instantiates an integration average detector using parameters from
-        the qubit object. **kw get passed on to the class when instantiating
-        the detector function.
-        """
-
-        if self.ro_acq_weight_type() == 'optimal':
-            ro_channels = [self.ro_acq_weight_chI()]
-
-            if self.ro_acq_digitized():
-                result_logging_mode = 'digitized'
-            else:
-                result_logging_mode = 'lin_trans'
-        else:
-            ro_channels = [self.ro_acq_weight_chI(),
-                           self.ro_acq_weight_chQ()]
-            result_logging_mode = 'raw'
-
-        int_avg_det = det.UHFQC_integrated_average_detector(
-            UHFQC=self.instr_acquisition.get_instr(),
-            AWG=self.instr_CC.get_instr(),
-            channels=ro_channels,
-            result_logging_mode=result_logging_mode,
-            nr_averages=self.ro_acq_averages(),
-            integration_length=self.ro_acq_integration_length(),
-            **kw
-        )
-
-        return int_avg_det
-
 
     ##########################################################################
     # find_ functions (HAL_Transmon specific)
@@ -6134,8 +5828,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             target_qubit_excited=False,
             extra_echo=False
     ):
-        waveform_name = 'up_down_down_final'
-
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
@@ -6182,6 +5874,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()), self.ro_pulse_amp())
 
         # save and change parameters
+        waveform_name = 'up_down_down_final'  # FIXME: misnomer
         old_waveform_name = self.ro_pulse_type()
         self.ro_pulse_type(waveform_name)
         old_delay = self.ro_acq_delay()
