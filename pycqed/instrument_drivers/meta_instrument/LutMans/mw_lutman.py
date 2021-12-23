@@ -234,61 +234,107 @@ class Base_MW_LutMan(Base_LutMan):
         self._add_channel_params()
         self._add_mixer_corr_pars()
 
-        self.add_parameter('cfg_sideband_mode',
-                           vals=vals.Enum('real-time', 'static'),
-                           initial_value='static',
-                           parameter_class=ManualParameter)
-        self.add_parameter('mw_amp180', unit='frac', vals=vals.Numbers(-1, 1),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('mw_amp90_scale',
-                           vals=vals.Numbers(-1, 1),
-                           parameter_class=ManualParameter,
-                           initial_value=0.5)
-        self.add_parameter('mw_motzoi', vals=vals.Numbers(-2, 2),
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
-        self.add_parameter('mw_gauss_width',
-                           vals=vals.Numbers(min_value=1e-9), unit='s',
-                           parameter_class=ManualParameter,
-                           initial_value=4e-9)
-        self.add_parameter('mw_phi', label='Phase of Rphi pulse',
-                           vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0)
+        self.add_parameter(
+            'cfg_sideband_mode',
+            vals=vals.Enum('real-time', 'static'),
+            initial_value='static',
+            parameter_class=ManualParameter
+        )
 
-        self.add_parameter('spec_length',
-                           vals=vals.Numbers(), unit='s',
-                           parameter_class=ManualParameter,
-                           initial_value=20e-9)
-        self.add_parameter('spec_amp',
-                           vals=vals.Numbers(), unit='frac',
-                           parameter_class=ManualParameter,
-                           initial_value=1)
-        # parameters related to timings
-        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 1e-6),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
-        # square pulse duratio for larger pulses
-        self.add_parameter('sq_pulse_duration', unit='s', vals=vals.Numbers(0, 1e-6),
-                           parameter_class=ManualParameter,
-                           initial_value=40e-9)
+        # pulse parameters
+        self.add_parameter(
+            'mw_amp180',
+            unit='frac',
+            vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter,
+            initial_value=1.0
+        )
+        self.add_parameter(
+            'mw_amp90_scale',
+            vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter,
+            initial_value=0.5
+        )
+        self.add_parameter(
+            'mw_motzoi',
+            vals=vals.Numbers(-2, 2),
+            parameter_class=ManualParameter,
+            initial_value=0.0
+        )
+        self.add_parameter(
+            'mw_gauss_width',
+            vals=vals.Numbers(min_value=1e-9),
+            unit='s',
+            parameter_class=ManualParameter,
+            initial_value=4e-9
+        )
+        self.add_parameter(
+            'mw_phi',
+            label='Phase of Rphi pulse',
+            vals=vals.Numbers(),
+            unit='deg',
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
 
         self.add_parameter(
-            'mw_modulation', vals=vals.Numbers(), unit='Hz',
+            'spec_length',
+            vals=vals.Numbers(),
+            unit='s',
+            parameter_class=ManualParameter,
+            initial_value=20e-9
+        )
+        self.add_parameter(
+            'spec_amp',
+            vals=vals.Numbers(),
+            unit='frac',
+            parameter_class=ManualParameter,
+            initial_value=1
+        )
+
+        # parameters related to timings
+        self.add_parameter(
+            'pulse_delay',
+            unit='s',
+            vals=vals.Numbers(0, 1e-6),
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
+        # square pulse duration for larger pulses
+        self.add_parameter(
+            'sq_pulse_duration',
+            unit='s',
+            vals=vals.Numbers(0, 1e-6),
+            parameter_class=ManualParameter,
+            initial_value=40e-9
+        )
+
+        self.add_parameter(
+            'mw_modulation',
+            vals=vals.Numbers(),
+            unit='Hz',
             docstring=('Modulation frequency for qubit driving pulses. Note'
-                       ' that when using an AWG with build in modulation this'
+                       ' that when using an AWG with builtin modulation this'
                        ' should be set to 0.'),
-            parameter_class=ManualParameter, initial_value=50.0e6)
-        self.add_parameter('mw_ef_modulation', vals=vals.Numbers(), unit='Hz',
-                           docstring=('Modulation frequency for driving pulses to the '
-                                      'second excited-state.'),
-                           parameter_class=ManualParameter, initial_value=50.0e6)
-        self.add_parameter('mw_ef_amp180', unit='frac',
-                           docstring=(
-                               'Pulse amplitude for pulsing the ef/12 transition'),
-                           vals=vals.Numbers(-1, 1),
-                           parameter_class=ManualParameter, initial_value=.2)
+            parameter_class=ManualParameter,
+            initial_value=50.0e6
+        )
+        self.add_parameter(
+            'mw_ef_modulation',
+            vals=vals.Numbers(),
+            unit='Hz',
+            docstring=('Modulation frequency for driving pulses to the second excited-state.'),
+            parameter_class=ManualParameter,
+            initial_value=50.0e6
+        )
+        self.add_parameter(
+            'mw_ef_amp180',
+            unit='frac',
+            docstring=('Pulse amplitude for pulsing the ef/12 transition'),
+            vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter,
+            initial_value=.2
+        )
 
     def generate_standard_waveforms(
             self, apply_predistortion_matrix: bool=True):
@@ -398,37 +444,53 @@ class Base_MW_LutMan(Base_LutMan):
     ##########################################################################
 
     def apply_mixer_predistortion_corrections(self, wave_dict):
-        M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
-                                          self.mixer_phi())
+        M = wf.mixer_predistortion_matrix(
+            self.mixer_alpha(),
+            self.mixer_phi()
+        )
         for key, val in wave_dict.items():
             wave_dict[key] = np.dot(M, val)
         return wave_dict
 
     def _add_mixer_corr_pars(self):
-        self.add_parameter('mixer_alpha', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
         self.add_parameter(
-            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
+            'mixer_alpha',
+            vals=vals.Numbers(),
+            parameter_class=ManualParameter,
+            initial_value=1.0
+        )
+        self.add_parameter(
+            'mixer_phi',
+            vals=vals.Numbers(),
+            unit='deg',
+            parameter_class=ManualParameter,
+            initial_value=0.0
+        )
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix',
+            vals=vals.Bool(),
+            docstring=(
                 'If True applies a mixer correction using mixer_phi and '
-                'mixer_alpha to all microwave pulses using.'),
-            parameter_class=ManualParameter, initial_value=True)
+                'mixer_alpha to all microwave pulses.'),
+            parameter_class=ManualParameter,
+            initial_value=True
+        )
 
     def _add_channel_params(self):
         """
         add parameters that define connectivity of logical channels to
         hardware channel numbers of the instrument involved (i.e. self.AWG)
         """
-        self.add_parameter('channel_I',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-
-        self.add_parameter('channel_Q',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
+        self.add_parameter(
+            'channel_I',
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(1, self._num_channels)
+        )
+        self.add_parameter(
+            'channel_Q',
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(1, self._num_channels)
+        )
 
     ##########################################################################
     # Functions
@@ -440,8 +502,7 @@ class Base_MW_LutMan(Base_LutMan):
         """Set the default lutmap for expanded microwave drive pulses."""
         self.LutMap(inspire_mw_lutmap.copy())
 
-    def load_phase_pulses_to_AWG_lookuptable(self,
-                                             phases=np.arange(0, 360, 20)):
+    def load_phase_pulses_to_AWG_lookuptable(self, phases=np.arange(0, 360, 20)):
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
         """
@@ -455,8 +516,7 @@ class Base_MW_LutMan(Base_LutMan):
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     # FIXME: function is almost identical to load_phase_pulses_to_AWG_lookuptable, except for phi vs. theta
-    def load_x_pulses_to_AWG_lookuptable(self,
-                                             phases=np.arange(0, 360, 20)):
+    def load_x_pulses_to_AWG_lookuptable(self, phases=np.arange(0, 360, 20)):
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
         """
@@ -557,31 +617,42 @@ class QWG_MW_LutMan(Base_MW_LutMan):
     # Base_LutMan overrides
     ##########################################################################
 
+    # FIXME: the parameter set depends on the subclass, which is awkward to handle in HAL_Transmon
     def _add_channel_params(self):
         super()._add_channel_params()
-        self.add_parameter('channel_amp',
-                           unit='a.u.',
-                           vals=vals.Numbers(-1.8, 1.8),
-                           set_cmd=self._set_channel_amp,
-                           get_cmd=self._get_channel_amp,
-                           docstring=('using the channel amp as additional'
-                                      'parameter to allow rabi-type experiments without'
-                                      'wave reloading. Should not be using VSM'))
+        self.add_parameter(
+            'channel_amp',
+            unit='a.u.',
+            vals=vals.Numbers(-1.8, 1.8),
+            set_cmd=self._set_channel_amp,
+            get_cmd=self._get_channel_amp,
+            docstring=('using the channel amp as additional'
+                       'parameter to allow rabi-type experiments without'
+                       'wave reloading. Should not be using VSM')
+        )
         # parameters related to codeword bits
-        self.add_parameter('bit_shift', unit='', vals=vals.Ints(0, 8),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
-        self.add_parameter('bit_width', unit='', vals=vals.Ints(0, 8),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
+        self.add_parameter(
+            'bit_shift',
+            unit='',
+            vals=vals.Ints(0, 8),
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
+        self.add_parameter(
+            'bit_width', unit='', vals=vals.Ints(0, 8),
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
 
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
         # Parameters for a square pulse
-        self.add_parameter('sq_amp',
-                           unit='frac', vals=vals.Numbers(-1, 1),
-                           parameter_class=ManualParameter,
-                           initial_value=0.5)
+        self.add_parameter(
+            'sq_amp',
+            unit='frac', vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter,
+            initial_value=0.5
+        )
 
     def load_waveform_onto_AWG_lookuptable(
             self, wave_id: str, regenerate_waveforms: bool=False):
@@ -653,18 +724,25 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     # Base_LutMan overrides
     ##########################################################################
 
+    # FIXME: the parameter set depends on the subclass, which is awkward to handle in HAL_Transmon
     def _add_channel_params(self):
         super()._add_channel_params()
         self.add_parameter(
-            'channel_amp', unit='a.u.', vals=vals.Numbers(0, 1),
-            set_cmd=self._set_channel_amp, get_cmd=self._get_channel_amp,
+            'channel_amp',
+            unit='a.u.', vals=vals.Numbers(0, 1),
+            set_cmd=self._set_channel_amp,
+            get_cmd=self._get_channel_amp,
             docstring=('using the channel amp as additional'
                        'parameter to allow rabi-type experiments without'
-                       'wave reloading. Should not be using VSM'))
+                       'wave reloading. Should not be using VSM')
+        )
         self.add_parameter(
-            'channel_range', unit='V', vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
-            set_cmd=self._set_channel_range, get_cmd=self._get_channel_range,
-            docstring=('defines the channel range for the AWG sequencer output'))
+            'channel_range',
+            unit='V', vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
+            set_cmd=self._set_channel_range,
+            get_cmd=self._get_channel_range,
+            docstring=('defines the channel range for the AWG sequencer output')
+        )
 
         # Setting variable to track channel amplitude since it cannot be directly extracted from
         # HDAWG while using real-time modulation (because of mixer amplitude imbalance corrections)
@@ -917,8 +995,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         for gate in ['NW','NE','SW','SE']:
             self.add_parameter(
                 name=f'vcz_virtual_q_ph_corr_{gate}',
-                parameter_class=ManualParameter, 
-                unit='deg', 
+                parameter_class=ManualParameter,
+                unit='deg',
                 vals=vals.Numbers(-360, 360),
                 initial_value=0.0,
                 docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
@@ -926,30 +1004,30 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             )
 
         # corrections for phases that the qubit can acquire during parking as spectator of a CZ gate.
-        # this can happen in general for each of its neighbouring qubits (below: 'direction'), 
+        # this can happen in general for each of its neighbouring qubits (below: 'direction'),
         # while it is doing a gate in each possible direction (below: 'gate')
         # for direction in ['NW','NE','SW','SE']:
         #     for gate in ['NW','NE','SW','SE']:
         #         self.add_parameter(
         #             name=f'vcz_virtual_q_ph_corr_spec_{direction}_gate_{gate}',
-        #             parameter_class=ManualParameter, 
-        #             unit='deg', 
+        #             parameter_class=ManualParameter,
+        #             unit='deg',
         #             vals=vals.Numbers(0, 360),
         #             initial_value=0.0,
-        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, " 
+        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, "
         #                       f"that is doing a gate in direction {gate}."
         #                         "Will be applied as increment to sine generator phases via command table."
         #         )
 
         # corrections for phases that the qubit can acquire during parking as part of a flux-dance step
         # there are 8 flux-dance steps for the S17 scheme.
-        # NOTE: this correction must not be the same as the above one for the case of a spectator 
-        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates 
+        # NOTE: this correction must not be the same as the above one for the case of a spectator
+        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
         # for step in np.arange(1,9):
         #     self.add_parameter(
         #         name=f'vcz_virtual_q_ph_corr_step_{step}',
-        #         parameter_class=ManualParameter, 
-        #         unit='deg', 
+        #         parameter_class=ManualParameter,
+        #         unit='deg',
         #         vals=vals.Numbers(0, 360),
         #         initial_value=0.0,
         #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
@@ -1054,30 +1132,44 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
     # Base_LutMan overrides
     ##########################################################################
 
+    # FIXME: the parameter set depends on the subclass, which is awkward to handle in HAL_Transmon
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
         # Base_MW_LutMan._add_waveform_parameters(self)
         # Parameters for a square pulse
-        self.add_parameter('sq_G_amp', unit='frac', vals=vals.Numbers(-1, 1),
-                           parameter_class=ManualParameter,
-                           initial_value=0.5)
-        self.add_parameter('sq_D_amp', unit='frac', vals=vals.Numbers(-1, 1),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
+        self.add_parameter(
+            'sq_G_amp',
+            unit='frac',
+            vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter,
+            initial_value=0.5
+        )
+        self.add_parameter(
+            'sq_D_amp',
+            unit='frac',
+            vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
 
     def _add_channel_params(self):
         self.add_parameter(
-            'channel_amp', unit='a.u.', vals=vals.Numbers(0, 1),
+            'channel_amp',
+            unit='a.u.',
+            vals=vals.Numbers(0, 1),
             set_cmd=self._set_channel_amp,
             get_cmd=self._get_channel_amp,
             docstring=('using the channel amp as additional'
                        'parameter to allow rabi-type experiments without'
-                       'wave reloading. Should not be using VSM'))
+                       'wave reloading. Should not be using VSM')
+        )
 
         for ch in ['GI', 'GQ', 'DI', 'DQ']:
             self.add_parameter(
-                'channel_{}'.format(ch), parameter_class=ManualParameter,
-                vals=vals.Numbers(1, self._num_channels))
+                'channel_{}'.format(ch),
+                parameter_class=ManualParameter,
+                vals=vals.Numbers(1, self._num_channels)
+            )
 
     def load_waveform_onto_AWG_lookuptable(
         self, wave_id: str, regenerate_waveforms: bool=False):
@@ -1132,31 +1224,53 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         return vals[0]
 
     def _add_mixer_corr_pars(self):
-        self.add_parameter('G_mixer_alpha', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('G_mixer_phi', vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
-        self.add_parameter('D_mixer_alpha', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('D_mixer_phi', vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
+        self.add_parameter(
+            'G_mixer_alpha',
+            vals=vals.Numbers(),
+            parameter_class=ManualParameter,
+            initial_value=1.0
+        )
+        self.add_parameter(
+            'G_mixer_phi',
+            vals=vals.Numbers(),
+            unit='deg',
+            parameter_class=ManualParameter,
+            initial_value=0.0
+        )
+        self.add_parameter(
+            'D_mixer_alpha',
+            vals=vals.Numbers(),
+            parameter_class=ManualParameter,
+            initial_value=1.0
+        )
+        self.add_parameter(
+            'D_mixer_phi',
+            vals=vals.Numbers(),
+            unit='deg',
+            parameter_class=ManualParameter,
+            initial_value=0.0
+        )
 
         self.add_parameter(
-            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
+            'mixer_apply_predistortion_matrix',
+            vals=vals.Bool(),
+            docstring=(
                 'If True applies a mixer correction using mixer_phi and '
                 'mixer_alpha to all microwave pulses using.'),
-            parameter_class=ManualParameter, initial_value=True)
+            parameter_class=ManualParameter,
+            initial_value=True
+        )
 
     def apply_mixer_predistortion_corrections(self, wave_dict):
 
-        M_G = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
-                                            self.G_mixer_phi())
-        M_D = wf.mixer_predistortion_matrix(self.D_mixer_alpha(),
-                                            self.D_mixer_phi())
+        M_G = wf.mixer_predistortion_matrix(
+            self.G_mixer_alpha(),
+            self.G_mixer_phi()
+        )
+        M_D = wf.mixer_predistortion_matrix(
+            self.D_mixer_alpha(),
+            self.D_mixer_phi()
+        )
 
         for key, val in wave_dict.items():
             GI, GQ = np.dot(M_G, val[0:2])  # Mixer correction Gaussian comp.
@@ -1225,20 +1339,35 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
     def _add_waveform_parameters(self):
         super()._add_waveform_parameters()
         # parameters related to codeword bits
-        self.add_parameter('bit_shift', unit='', vals=vals.Ints(0, 4),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
-        self.add_parameter('bit_width', unit='', vals=vals.Ints(0, 4),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
+        self.add_parameter(
+            'bit_shift',
+            unit='',
+            vals=vals.Ints(0, 4),
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
+        self.add_parameter(
+            'bit_width',
+            unit='', vals=vals.Ints(0, 4),
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
         # parameters related to phase compilation
-        self.add_parameter('phi', unit='rad', vals=vals.Numbers(0, 360),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
+        self.add_parameter(
+            'phi',
+            unit='rad',  # FIXME: does not match vals values
+            vals=vals.Numbers(0, 360),
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
         # parameters related to timings
-        self.add_parameter('pulse_delay', unit='s', vals=vals.Numbers(0, 1e-6),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
+        self.add_parameter(
+            'pulse_delay',
+            unit='s',
+            vals=vals.Numbers(0, 1e-6),
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
 
     def generate_standard_waveforms(self):
         self._wave_dict = {}
@@ -1246,8 +1375,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
             f_modulation = self.mw_modulation()
         else:
             f_modulation = 0
-            self.AWG.get_instr().set('ch_pair{}_sideband_frequency'.format(self.channel_I()),
-                                     self.mw_modulation())
+            self.AWG.get_instr().set('ch_pair{}_sideband_frequency'.format(self.channel_I()), self.mw_modulation())
             self.AWG.get_instr().syncSidebandGenerators()
 
         ########################################
@@ -1370,12 +1498,10 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
 
         if self.mixer_apply_predistortion_matrix():
-            self._wave_dict = self.apply_mixer_predistortion_corrections(
-                self._wave_dict)
+            self._wave_dict = self.apply_mixer_predistortion_corrections(self._wave_dict)
         return self._wave_dict
 
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str, regenerate_waveforms: bool=False):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
         # waveform_name is pulse string (i.e. 'X180')
@@ -1391,11 +1517,9 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                                                     bit_shift=self.bit_shift())
         # update all of them
         for redundant_cw_idx in redundant_cw_list:
-            redundant_cw_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(),
-                                                        redundant_cw_idx)
+            redundant_cw_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(), redundant_cw_idx)
             self.AWG.get_instr().set(redundant_cw_I, waveforms[0])
-            redundant_cw_Q = 'wave_ch{}_cw{:03}'.format(self.channel_Q(),
-                                                        redundant_cw_idx)
+            redundant_cw_Q = 'wave_ch{}_cw{:03}'.format(self.channel_Q(), redundant_cw_idx)
             self.AWG.get_instr().set(redundant_cw_Q, waveforms[1])
 
     ##########################################################################
@@ -1423,8 +1547,7 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
     # Base_LutMan overrides
     ##########################################################################
 
-    def load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms: bool=True,  stop_start: bool = True):
+    def load_waveforms_onto_AWG_lookuptable(self, regenerate_waveforms: bool=True,  stop_start: bool = True):
         AWG = self.AWG.get_instr()
         if self.cfg_sideband_mode() == 'real-time':
             AWG.ch_pair1_sideband_frequency(self.mw_modulation())

@@ -674,6 +674,7 @@ class HAL_ShimSQ(Instrument):
             initial_value=0,
             parameter_class=ManualParameter)
 
+        #
         self.add_parameter(
             'ro_pulse_length',
             label='Readout pulse length',
@@ -745,72 +746,6 @@ class HAL_ShimSQ(Instrument):
             unit='dBm',
             initial_value=20,
             parameter_class=ManualParameter)
-
-        # Mixer skewness correction
-        self.add_parameter(
-            'mw_G_mixer_phi',
-            unit='deg',
-            label='Mixer skewness phi Gaussian quadrature',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_G_mixer_alpha',
-            unit='',
-            label='Mixer skewness alpha Gaussian quadrature',
-            parameter_class=ManualParameter,
-            initial_value=1)
-        self.add_parameter(
-            'mw_D_mixer_phi',
-            unit='deg',
-            label='Mixer skewness phi Derivative quadrature',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_D_mixer_alpha',
-            unit='',
-            label='Mixer skewness alpha Derivative quadrature',
-            parameter_class=ManualParameter,
-            initial_value=1)
-
-        # Mixer offsets correction, qubit drive
-        self.add_parameter(
-            'mw_mixer_offs_GI',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_GQ',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_DI',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_DQ',
-            unit='V',
-            parameter_class=ManualParameter, initial_value=0)
-
-        # FIXME: move to HAL_Transmon
-        self.add_parameter(
-            'mw_ef_amp',
-            label='Pi-pulse amplitude ef-transition',
-            unit='V',
-            initial_value=.4,
-            parameter_class=ManualParameter)
-        # self.add_parameter(
-        #     'anharmonicity',
-        #     unit='Hz',
-        #     label='Anharmonicity',
-        #     docstring='Anharmonicity, negative by convention',
-        #     parameter_class=ManualParameter,
-        #     # typical target value
-        #     initial_value=-300e6,
-        #     vals=vals.Numbers())
-
-
 
     ##########################################################################
     # Private parameter helpers

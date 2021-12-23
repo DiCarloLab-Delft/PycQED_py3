@@ -88,7 +88,16 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
 
 
     def add_mw_parameters(self):
+        # parameters for *MW_LutMan
+        self.add_parameter(
+            'mw_channel_amp',
+            label='AWG channel amplitude. WARNING: Check your hardware specific limits!',
+            unit='',
+            initial_value=.5,
+            vals=vals.Numbers(min_value=0, max_value=1.6),
+            parameter_class=ManualParameter)
 
+        # parameters for *MW_LutMan: pulse attributes
         self.add_parameter(
             'mw_amp180',
             label='Pi-pulse amplitude',
@@ -102,15 +111,12 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             initial_value=.5,
             vals=vals.Numbers(min_value=0, max_value=1.0),
             parameter_class=ManualParameter)
-
         self.add_parameter(
-            'mw_channel_amp',
-            label='AWG channel amplitude. WARNING: Check your hardware specific limits!',
-            unit='',
-            initial_value=.5,
-            vals=vals.Numbers(min_value=0, max_value=1.6),
+            'mw_ef_amp',
+            label='Pi-pulse amplitude ef-transition',
+            unit='V',
+            initial_value=.4,
             parameter_class=ManualParameter)
-
         self.add_parameter(
             'mw_gauss_width', unit='s',
             initial_value=10e-9,
@@ -120,6 +126,57 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             unit='',
             initial_value=0,
             parameter_class=ManualParameter)
+
+        # parameters for *MW_LutMan: mixer skewness correction
+        self.add_parameter(
+            'mw_G_mixer_phi',
+            unit='deg',
+            label='Mixer skewness phi Gaussian quadrature',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_G_mixer_alpha',
+            unit='',
+            label='Mixer skewness alpha Gaussian quadrature',
+            parameter_class=ManualParameter,
+            initial_value=1)
+        self.add_parameter(
+            'mw_D_mixer_phi',
+            unit='deg',
+            label='Mixer skewness phi Derivative quadrature',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_D_mixer_alpha',
+            unit='',
+            label='Mixer skewness alpha Derivative quadrature',
+            parameter_class=ManualParameter,
+            initial_value=1)
+
+        # Mixer offsets correction (currently applied to hardware directly)
+        self.add_parameter(
+            'mw_mixer_offs_GI',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_GQ',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_DI',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_DQ',
+            unit='V',
+            parameter_class=ManualParameter, initial_value=0)
+
+
+        # other parameters: VSM
+        # FIXME: move to HAL_ShimSQ?
         self.add_parameter(
             'mw_vsm_marker_source',
             label='VSM switch state',
@@ -169,6 +226,20 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             parameter_class=ManualParameter)
 
     def add_spec_parameters(self):
+        # parameters for *MW_LutMan
+        self.add_parameter(
+            'spec_amp',
+            unit='V',
+            docstring=(
+                'Amplitude of the spectroscopy pulse in the mw LutMan. '
+                'The power of the spec pulse should be controlled through '
+                'the vsm amplitude "spec_vsm_amp"'),
+            vals=vals.Numbers(0, 1),
+            parameter_class=ManualParameter,
+            initial_value=0.8)
+
+
+        # other parameters
         self.add_parameter(
             'spec_vsm_amp',
             label='VSM amplitude for spec pulses',
@@ -207,17 +278,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
                 '"IQ" uses the TD source and AWG8 to generate a spec pulse'),
             initial_value='CW',
             vals=vals.Enum('CW', 'IQ', 'vsm_gated'))
-
-        self.add_parameter(
-            'spec_amp',
-            unit='V',
-            docstring=(
-                'Amplitude of the spectroscopy pulse in the mw LutMan. '
-                'The power of the spec pulse should be controlled through '
-                'the vsm amplitude "spec_vsm_amp"'),
-            vals=vals.Numbers(0, 1),
-            parameter_class=ManualParameter,
-            initial_value=0.8)
 
         self.add_parameter(
             'spec_wait_time',
@@ -6312,20 +6372,27 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
                 return True
 
     ##########################################################################
-    # HAL_ShimSQ overrides, for stuff not relating to hardware
+    # HAL_ShimSQ overrides, for stuff not relating to hardware (e.g. LutMan)
     ##########################################################################
 
     def _prep_mw_pulses(self):
         """
         Configure MW_Lutman parameters and upload waveforms
         """
-        # FIXME: move HW handling to HAL_ShimSQ, keep LutMan handling here
+        # FIXME: the HW handles:
+        #  - mixer offsets
+        #  and the LutMan handles:
+        #  - pulse attributes
+        #  - mixer parameters other then offsets (phi, alfa)
+        #  This maps badly to the HW capabilities, e.g. the QWG has hardware offset control
+        #  A better approach may be to pass a standard set of parameters describing pulse attributes and signal chain
+        #  settings to the LutMan (maybe as a class/dict instead of QCoDeS parameters), and then have the LutMan do
+        #  everything necessary
 
         super()._prep_mw_pulses()
 
-
         # 1. Gets instruments and prepares cases
-        MW_LutMan: Base_MW_LutMan = self.instr_LutMan_MW.get_instr()
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
 
         # 2. Prepares map and parameters for waveforms (except pi-pulse amp, which depends on VSM usage)
@@ -6348,7 +6415,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         #                mixers offset+skewness
         #                pi-pulse amplitude
         if self.cfg_with_vsm():
-            # case with VSM (both QWG and AWG8)
+            # case with VSM (both QWG and AWG8) : e.g. AWG8_VSM_MW_LutMan
             MW_LutMan.mw_amp180(self.mw_amp180())
             MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
             MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
@@ -6384,10 +6451,8 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
                                     ' from gaussian channel.'.format(self.name))
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
-                AWG.set('ch{}_offset'.format(MW_LutMan.channel_I()),
-                        self.mw_mixer_offs_GI())
-                AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()),
-                        self.mw_mixer_offs_GQ())
+                AWG.set('ch{}_offset'.format(MW_LutMan.channel_I()), self.mw_mixer_offs_GI())
+                AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()), self.mw_mixer_offs_GQ())
             else:
                 # case without VSM (and AWG8)
                 MW_LutMan.mw_amp180(1)

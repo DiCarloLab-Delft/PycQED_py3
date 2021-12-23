@@ -47,21 +47,21 @@ def _setup_hw(cls, qubit_obj):
     # setup LutMans
     ##############################################
     if 0:  # FIXME: broken by _prep_mw_pulses
-        cls.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
-        cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
-        cls.AWG8_VSM_MW_LutMan.channel_GI(1)
-        cls.AWG8_VSM_MW_LutMan.channel_GQ(2)
-        cls.AWG8_VSM_MW_LutMan.channel_DI(3)
-        cls.AWG8_VSM_MW_LutMan.channel_DQ(4)
-        cls.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
-        cls.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
+        cls.MW_LutMan = mwl.MW_LutMan('MW_LutMan_VSM')
+        cls.MW_LutMan.AWG(cls.AWG.name)
+        cls.MW_LutMan.channel_GI(1)
+        cls.MW_LutMan.channel_GQ(2)
+        cls.MW_LutMan.channel_DI(3)
+        cls.MW_LutMan.channel_DQ(4)
+        cls.MW_LutMan.mw_modulation(100e6)
+        cls.MW_LutMan.sampling_rate(2.4e9)
     else:
-        cls.AWG8_VSM_MW_LutMan = mwl.AWG8_MW_LutMan('MW_LutMan')
-        cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
-        cls.AWG8_VSM_MW_LutMan.channel_I(1)
-        cls.AWG8_VSM_MW_LutMan.channel_Q(2)
-        cls.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
-        cls.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
+        cls.MW_LutMan = mwl.AWG8_MW_LutMan('MW_LutMan')
+        cls.MW_LutMan.AWG(cls.AWG.name)
+        cls.MW_LutMan.channel_I(1)
+        cls.MW_LutMan.channel_Q(2)
+        cls.MW_LutMan.mw_modulation(100e6)
+        cls.MW_LutMan.sampling_rate(2.4e9)
 
         cls.transmon.cfg_with_vsm(False)
         cls.transmon.cfg_prepare_mw_awg(False)  # FIXME: load_waveform_onto_AWG_lookuptable fails
@@ -71,7 +71,7 @@ def _setup_hw(cls, qubit_obj):
     ##############################################
     # Assign instruments
     ##############################################
-    cls.transmon.instr_LutMan_MW(cls.AWG8_VSM_MW_LutMan.name)
+    cls.transmon.instr_LutMan_MW(cls.MW_LutMan.name)
     cls.transmon.instr_LO_ro(cls.MW1.name)
     cls.transmon.instr_LO_mw(cls.MW2.name)
     cls.transmon.instr_spec_source(cls.MW3.name)
@@ -110,11 +110,6 @@ def _setup_hw(cls, qubit_obj):
     cls.transmon.cfg_qubit_nr(0)
 
     cls.transmon.mw_vsm_delay(15)
-
-    cls.transmon.mw_mixer_offs_GI(.1)
-    cls.transmon.mw_mixer_offs_GQ(.2)
-    cls.transmon.mw_mixer_offs_DI(.3)
-    cls.transmon.mw_mixer_offs_DQ(.4)
 
     # FIXME" move out of test_HAL_ShimSQ
     cls.transmon.freq_qubit(4.56e9)
@@ -159,19 +154,21 @@ class test_HAL_ShimSQ(unittest.TestCase):
         self.transmon.prepare_readout()
 
     def test_prep_ro_instantiate_detectors(self):
-        self.MC.soft_avg(1)
-
-        self.transmon.ro_soft_avg(4)
-        detector_attributes = [
-            'int_avg_det', 'int_log_det', 'int_avg_det_single',
-            'input_average_detector']
+        # delete detectors
+        detector_attributes = ['int_avg_det', 'int_log_det', 'int_avg_det_single', 'input_average_detector']
         for det_attr in detector_attributes:
             if hasattr(self.transmon, det_attr):
                 delattr(self.transmon, det_attr)
-        # Test there are no detectors to start with
+
+        # check there are no detectors to start with
         for det_attr in detector_attributes:
             self.assertFalse(hasattr(self.transmon, det_attr))
+
+        # run test
+        self.MC.soft_avg(1)
+        self.transmon.ro_soft_avg(4)
         self.transmon.prepare_readout()
+
         # Test that the detectors have been instantiated
         for det_attr in detector_attributes:
             self.assertTrue(hasattr(self.transmon, det_attr))
@@ -208,10 +205,11 @@ class test_HAL_ShimSQ(unittest.TestCase):
         LO.off()
         LO.frequency(4e9)
         LO.power(10)
+
         self.assertEqual(LO.status(), 'off')
         self.assertEqual(LO.frequency(), 4e9)
-        self.transmon.mw_pow_td_source(20)
 
+        self.transmon.mw_pow_td_source(20)
         self.transmon.ro_freq(5.43e9)
         self.transmon.ro_freq_mod(200e6)
         self.transmon.prepare_readout()
@@ -279,7 +277,9 @@ class test_HAL_ShimSQ(unittest.TestCase):
         upl_Q = self.UHFQC.qas_0_integration_weights_3_imag()
         np.testing.assert_array_almost_equal(test_I, upl_I)
         np.testing.assert_array_almost_equal(test_Q, upl_Q)
+
         self.assertEqual(self.UHFQC.qas_0_rotations_3(), 1 - 1j)
+
         # These should not have been touched by optimal weights
         self.assertEqual(self.UHFQC.qas_0_rotations_4(), .21 + .108j)
 
@@ -331,6 +331,11 @@ class Test_HAL_Transmon(unittest.TestCase):
         cls.transmon.cfg_openql_platform_fn(config_fn)
 
         # Setting some "random" initial parameters
+        cls.transmon.mw_mixer_offs_GI(.1)
+        cls.transmon.mw_mixer_offs_GQ(.2)
+        cls.transmon.mw_mixer_offs_DI(.3)
+        cls.transmon.mw_mixer_offs_DQ(.4)
+
         cls.transmon.freq_max(4.62e9)
 
     @classmethod
@@ -361,14 +366,8 @@ class Test_HAL_Transmon(unittest.TestCase):
         self.transmon.mw_G_mixer_alpha(1.02)
         self.transmon.mw_D_mixer_phi(8)
 
-        if 0:  # FIXME: not using VSM
-            self.transmon.mw_mixer_offs_GI(.1)
-            self.transmon.mw_mixer_offs_GQ(.2)
-            self.transmon.mw_mixer_offs_DI(.3)
-            self.transmon.mw_mixer_offs_DQ(.4)
-        else:
-            self.transmon.mw_mixer_offs_GI(.1)
-            self.transmon.mw_mixer_offs_GQ(.2)
+        self.transmon.mw_mixer_offs_GI(.1)
+        self.transmon.mw_mixer_offs_GQ(.2)
 
         self.transmon.mw_ef_amp(.34)
         self.transmon.mw_freq_mod(-100e6)
@@ -376,35 +375,59 @@ class Test_HAL_Transmon(unittest.TestCase):
 
         self.transmon.prepare_for_timedomain()
 
-        if 0:  # FIXME: not using VSM
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_GI(), 5)
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_GQ(), 6)
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_DI(), 7)
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_DQ(), 8)
-        else:
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_I(), 1)
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_Q(), 2)
+        self.assertEqual(self.MW_LutMan.channel_I(), 1)
+        self.assertEqual(self.MW_LutMan.channel_Q(), 2)
 
-        if 0:  # FIXME: not using VSM
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.G_mixer_alpha(), 1.02)
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.D_mixer_phi(), 8)
-        else:
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.mixer_alpha(), 1.02)
-            self.assertEqual(self.AWG8_VSM_MW_LutMan.mixer_phi(), 0)  # FIXME: why not 8 as set above
+        self.assertEqual(self.MW_LutMan.mixer_alpha(), 1.02)
+        self.assertEqual(self.MW_LutMan.mixer_phi(), 0)  # FIXME: why not 8 as set above
 
         self.assertEqual(self.CC.vsm_channel_delay0(), self.transmon.mw_vsm_delay())
 
-        if 0:  # FIXME: not using VSM
-            self.assertEqual(self.AWG.sigouts_4_offset(), .1)
-            self.assertEqual(self.AWG.sigouts_5_offset(), .2)
-            self.assertEqual(self.AWG.sigouts_6_offset(), .3)
-            self.assertEqual(self.AWG.sigouts_7_offset(), .4)
-        else:
-            self.assertEqual(self.AWG.sigouts_4_offset(), 0.1)
-            self.assertEqual(self.AWG.sigouts_5_offset(), 0.2)
+        self.assertEqual(self.AWG.sigouts_4_offset(), 0.1)
+        self.assertEqual(self.AWG.sigouts_5_offset(), 0.2)
 
-        self.assertEqual(self.AWG8_VSM_MW_LutMan.mw_ef_amp180(), 0.34)
-        self.assertEqual(self.AWG8_VSM_MW_LutMan.mw_ef_modulation(), -335e6)
+        self.assertEqual(self.MW_LutMan.mw_ef_amp180(), 0.34)
+        self.assertEqual(self.MW_LutMan.mw_ef_modulation(), -335e6)
+
+
+    @unittest.skip('not configure for VSM')
+    def test_prep_td_pulses_vsm(self):
+        # this function contains the original test_prep_td_pulses, which used the VSM.
+        # To make this work again, the initialization needs to be corrected, and maybe parts of HAL_Transmon
+        self.transmon.mw_awg_ch(5)
+
+        # set mixer parameters
+        self.transmon.mw_G_mixer_alpha(1.02)
+        self.transmon.mw_D_mixer_phi(8)
+
+        self.transmon.mw_mixer_offs_GI(.1)
+        self.transmon.mw_mixer_offs_GQ(.2)
+        self.transmon.mw_mixer_offs_DI(.3)
+        self.transmon.mw_mixer_offs_DQ(.4)
+
+        self.transmon.mw_ef_amp(.34)
+        self.transmon.mw_freq_mod(-100e6)
+        self.transmon.anharmonicity(-235e6)
+
+        self.transmon.prepare_for_timedomain()
+
+        self.assertEqual(self.MW_LutMan.channel_GI(), 5)
+        self.assertEqual(self.MW_LutMan.channel_GQ(), 6)
+        self.assertEqual(self.MW_LutMan.channel_DI(), 7)
+        self.assertEqual(self.MW_LutMan.channel_DQ(), 8)
+
+        self.assertEqual(self.MW_LutMan.G_mixer_alpha(), 1.02)
+        self.assertEqual(self.MW_LutMan.D_mixer_phi(), 8)
+
+        self.assertEqual(self.CC.vsm_channel_delay0(), self.transmon.mw_vsm_delay())
+
+        self.assertEqual(self.AWG.sigouts_4_offset(), .1)
+        self.assertEqual(self.AWG.sigouts_5_offset(), .2)
+        self.assertEqual(self.AWG.sigouts_6_offset(), .3)
+        self.assertEqual(self.AWG.sigouts_7_offset(), .4)
+
+        self.assertEqual(self.MW_LutMan.mw_ef_amp180(), 0.34)
+        self.assertEqual(self.MW_LutMan.mw_ef_modulation(), -335e6)
 
 
     ###################################################
