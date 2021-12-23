@@ -48,6 +48,7 @@ from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.measurement.measurement_control import MeasurementControl
+from pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman import Base_MW_LutMan
 
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
@@ -85,67 +86,8 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         Adding the parameters relevant for readout.
         """
 
-        #############################
-        # RO acquisition parameters #
-        #############################
-
-        self.add_parameter(
-            'ro_acq_weight_func_I',
-            vals=vals.Arrays(),
-            label='Optimized weights for I channel',
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_acq_weight_func_Q',
-            vals=vals.Arrays(),
-            label='Optimized weights for Q channel',
-            parameter_class=ManualParameter)
-
-        # FIXME!: Dirty hack because of qusurf issue #63, added 2 hardcoded
-        #  delay samples in the optimized weights
-        self.add_parameter(
-            'ro_acq_weight_func_delay_samples_hack',
-            vals=vals.Ints(),
-            initial_value=0,
-            label='weight function delay samples',
-            parameter_class=ManualParameter)
-
-        # Single shot readout specific parameters
-        self.add_parameter(
-            'ro_acq_digitized',
-            vals=vals.Bool(),
-            initial_value=False,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_acq_threshold',
-            unit='dac-value',
-            initial_value=0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_acq_rotated_SSB_when_optimal',
-            vals=vals.Bool(),
-            docstring=('bypasses optimal weights, and uses rotated SSB instead'),
-            initial_value=False,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_acq_rotated_SSB_rotation_angle',
-            vals=vals.Numbers(min_value=-np.pi, max_value=np.pi),
-            docstring=('uses this as the rotation angle for rotated SSB'),
-            initial_value=0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_acq_integration_length_weigth_function',
-            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
-            docstring=('sets weight function elements to 0 beyond this time'),
-            initial_value=4096 / 1.8e9,
-            parameter_class=ManualParameter)
 
     def add_mw_parameters(self):
-        self.add_parameter(
-            'mw_pow_td_source',
-            label='Time-domain power',
-            unit='dBm',
-            initial_value=20,
-            parameter_class=ManualParameter)
 
         self.add_parameter(
             'mw_amp180',
@@ -167,13 +109,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             unit='',
             initial_value=.5,
             vals=vals.Numbers(min_value=0, max_value=1.6),
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'mw_ef_amp',
-            label='Pi-pulse amplitude ef-transition',
-            unit='V',
-            initial_value=.4,
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -472,11 +407,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             vals=vals.Numbers(0, 200e-6))
 
         self.add_parameter(
-            'freq_qubit',
-            label='Qubit frequency',
-            unit='Hz',
-            parameter_class=ManualParameter)
-        self.add_parameter(
             'freq_max',
             label='qubit sweet spot frequency',
             unit='Hz',
@@ -486,6 +416,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             label='Resonator frequency',
             unit='Hz',
             parameter_class=ManualParameter)
+
         self.add_parameter(
             'asymmetry',
             unit='',
@@ -520,6 +451,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             label='Single shot readout discrimination fidelity',
             vals=vals.Numbers(0.0, 1.0),
             parameter_class=ManualParameter)
+
         self.add_parameter(
             'ro_rel_events',
             initial_value=0,
@@ -6378,3 +6310,100 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
                 self.find_resonator_frequency(freqs=np.arange(-span_res / 2, span_res / 2, step_res) + center_res)
                 self.find_frequency(freqs=np.arange(-span_q / 5, span_q / 5, step_q) + center_q)
                 return True
+
+    ##########################################################################
+    # HAL_ShimSQ overrides, for stuff not relating to hardware
+    ##########################################################################
+
+    def _prep_mw_pulses(self):
+        """
+        Configure MW_Lutman parameters and upload waveforms
+        """
+        # FIXME: move HW handling to HAL_ShimSQ, keep LutMan handling here
+
+        super()._prep_mw_pulses()
+
+
+        # 1. Gets instruments and prepares cases
+        MW_LutMan: Base_MW_LutMan = self.instr_LutMan_MW.get_instr()
+        AWG = MW_LutMan.AWG.get_instr()
+
+        # 2. Prepares map and parameters for waveforms (except pi-pulse amp, which depends on VSM usage)
+        MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
+        MW_LutMan.mw_gauss_width(self.mw_gauss_width())
+        MW_LutMan.channel_amp(self.mw_channel_amp())
+        MW_LutMan.channel_range(self.mw_channel_range())  # FIXME: assumes AWG8_MW_LutMan
+        MW_LutMan.mw_motzoi(self.mw_motzoi())
+        MW_LutMan.mw_modulation(self.mw_freq_mod())
+        MW_LutMan.spec_amp(self.spec_amp())
+
+        # used for ef pulsing
+        MW_LutMan.mw_ef_amp180(self.mw_ef_amp())
+        if MW_LutMan.cfg_sideband_mode() != 'real-time':
+            MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() + self.anharmonicity())
+        else:
+            MW_LutMan.mw_ef_modulation(self.anharmonicity())
+
+        # 3. Does case-dependent things:
+        #                mixers offset+skewness
+        #                pi-pulse amplitude
+        if self.cfg_with_vsm():
+            # case with VSM (both QWG and AWG8)
+            MW_LutMan.mw_amp180(self.mw_amp180())
+            MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
+            MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
+            MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
+            MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
+
+            MW_LutMan.channel_GI(0 + self.mw_awg_ch())
+            MW_LutMan.channel_GQ(1 + self.mw_awg_ch())
+            MW_LutMan.channel_DI(2 + self.mw_awg_ch())
+            MW_LutMan.channel_DQ(3 + self.mw_awg_ch())
+
+            if self._using_QWG():
+                # N.B. This part is QWG specific
+                if hasattr(MW_LutMan, 'channel_GI'):
+                    # 4-channels are used for VSM based AWG's.
+                    AWG.ch1_offset(self.mw_mixer_offs_GI())
+                    AWG.ch2_offset(self.mw_mixer_offs_GQ())
+                    AWG.ch3_offset(self.mw_mixer_offs_DI())
+                    AWG.ch4_offset(self.mw_mixer_offs_DQ())
+            else:  # using_AWG8
+                # N.B. This part is AWG8 specific
+                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() - 1), self.mw_mixer_offs_GI())
+                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
+                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 1), self.mw_mixer_offs_DI())
+                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 2), self.mw_mixer_offs_DQ())
+        else:
+            if self._using_QWG():
+                # case without VSM and with QWG
+                if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
+                        or (self.mw_G_mixer_alpha() != self.mw_D_mixer_alpha())):
+                    logging.warning('HAL_Transmon {}; _prep_mw_pulses: '
+                                    'no VSM detected, using mixer parameters'
+                                    ' from gaussian channel.'.format(self.name))
+                MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
+                MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
+                AWG.set('ch{}_offset'.format(MW_LutMan.channel_I()),
+                        self.mw_mixer_offs_GI())
+                AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()),
+                        self.mw_mixer_offs_GQ())
+            else:
+                # case without VSM (and AWG8)
+                MW_LutMan.mw_amp180(1)
+                MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
+                MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
+
+                # N.B. This part is AWG8 specific
+                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() - 1), self.mw_mixer_offs_GI())
+                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
+
+        # 4. reloads the waveforms
+        if self.cfg_prepare_mw_awg():
+            MW_LutMan.load_waveforms_onto_AWG_lookuptable()
+        else:
+            warnings.warn('"cfg_prepare_mw_awg" set to False, not preparing microwave pulses.')
+
+        # 5. upload commandtable for virtual-phase gates
+        MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
+

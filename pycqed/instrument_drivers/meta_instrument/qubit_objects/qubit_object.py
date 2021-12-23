@@ -1495,6 +1495,7 @@ class Qubit(Instrument):
         Flux can be specified both in terms of dac voltage or flux but not
         both.
         """
+        # FIXME: parameter cfg_qubit_freq_calc_method is added in derived class
         if self.cfg_qubit_freq_calc_method() == 'latest':
             qubit_freq_est = self.freq_qubit()
 
