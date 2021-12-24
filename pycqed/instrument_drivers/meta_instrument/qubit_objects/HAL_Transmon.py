@@ -90,7 +90,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
     def add_mw_parameters(self):
         # parameters for *MW_LutMan
         self.add_parameter(
-            'mw_channel_amp',
+            'mw_channel_amp',  # FIXME: actually sets a (dimensionless) *gain* relative to the available hardware amplitude, not an *amplitude*
             label='AWG channel amplitude. WARNING: Check your hardware specific limits!',
             unit='',
             initial_value=.5,
@@ -127,104 +127,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             initial_value=0,
             parameter_class=ManualParameter)
 
-        # parameters for *MW_LutMan: mixer skewness correction
-        self.add_parameter(
-            'mw_G_mixer_phi',
-            unit='deg',
-            label='Mixer skewness phi Gaussian quadrature',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_G_mixer_alpha',
-            unit='',
-            label='Mixer skewness alpha Gaussian quadrature',
-            parameter_class=ManualParameter,
-            initial_value=1)
-        self.add_parameter(
-            'mw_D_mixer_phi',
-            unit='deg',
-            label='Mixer skewness phi Derivative quadrature',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_D_mixer_alpha',
-            unit='',
-            label='Mixer skewness alpha Derivative quadrature',
-            parameter_class=ManualParameter,
-            initial_value=1)
-
-        # Mixer offsets correction (currently applied to hardware directly)
-        self.add_parameter(
-            'mw_mixer_offs_GI',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_GQ',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_DI',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'mw_mixer_offs_DQ',
-            unit='V',
-            parameter_class=ManualParameter, initial_value=0)
-
-
-        # other parameters: VSM
-        # FIXME: move to HAL_ShimSQ?
-        self.add_parameter(
-            'mw_vsm_marker_source',
-            label='VSM switch state',
-            initial_value='int',
-            vals=vals.Enum('ext', 'int'),
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'mw_vsm_ch_in',
-            label='VSM input channel Gaussian component',
-            vals=vals.Ints(1, 4),
-            initial_value=1,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'mw_vsm_mod_out',
-            label='VSM output module for microwave pulses',
-            docstring=(
-                'Selects the VSM output module for MW'
-                ' pulses. N.B. for spec the '
-                'spec_vsm_ch_out parameter is used.'),
-            vals=vals.Ints(1, 8),
-            initial_value=1,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'mw_vsm_G_amp',
-            label='VSM amp Gaussian component',
-            vals=vals.Numbers(0.1, 1.0),
-            initial_value=1.0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'mw_vsm_D_amp',
-            label='VSM amp Derivative component',
-            vals=vals.Numbers(0.1, 1.0),
-            initial_value=1.0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'mw_vsm_G_phase',
-            vals=vals.Numbers(-125, 45),
-            initial_value=0, unit='deg',
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'mw_vsm_D_phase',
-            vals=vals.Numbers(-125, 45),
-            initial_value=0, unit='deg',
-            parameter_class=ManualParameter)
-
     def add_spec_parameters(self):
         # parameters for *MW_LutMan
         self.add_parameter(
@@ -238,24 +140,12 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             parameter_class=ManualParameter,
             initial_value=0.8)
 
-
         # other parameters
         self.add_parameter(
             'spec_vsm_amp',
             label='VSM amplitude for spec pulses',
             vals=vals.Numbers(0.1, 1.0),
             initial_value=1.0,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'spec_vsm_mod_out',
-            label='VSM output module for spectroscopy pulses',
-            docstring=(
-                'Selects the VSM output channel for spec'
-                ' pulses. N.B. for mw pulses the '
-                'spec_mw_ch_out parameter is used.'),
-            vals=vals.Ints(1, 8),
-            initial_value=1,
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -338,66 +228,67 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             initial_value=None,
             parameter_class=ManualParameter)
 
-        # Currently this has only the parameters for 1 CZ gate.
-        # in the future there will be 5 distinct flux operations for which
-        # parameters have to be stored.
-        # cz to all nearest neighbours (of which 2 are only phase corr) and
-        # the "park" operation.
-        self.add_parameter(
-            'fl_cz_length',
-            vals=vals.Numbers(),
-            unit='s',
-            initial_value=35e-9,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_lambda_2',
-            vals=vals.Numbers(),
-            initial_value=0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_lambda_3',
-            vals=vals.Numbers(),
-            initial_value=0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_theta_f',
-            vals=vals.Numbers(),
-            unit='deg',
-            initial_value=80,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_V_per_phi0',
-            vals=vals.Numbers(),
-            unit='V',
-            initial_value=1,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_freq_01_max',
-            vals=vals.Numbers(),
-            unit='Hz',
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_J2',
-            vals=vals.Numbers(),
-            unit='Hz',
-            initial_value=50e6,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_freq_interaction',
-            vals=vals.Numbers(),
-            unit='Hz',
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_phase_corr_length',
-            unit='s',
-            initial_value=5e-9,
-            vals=vals.Numbers(),
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_cz_phase_corr_amp',
-            unit='V',
-            initial_value=0, vals=vals.Numbers(),
-            parameter_class=ManualParameter)
+        if 0:  # FIXME: unused
+            # Currently this has only the parameters for 1 CZ gate.
+            # in the future there will be 5 distinct flux operations for which
+            # parameters have to be stored.
+            # cz to all nearest neighbours (of which 2 are only phase corr) and
+            # the "park" operation.
+            self.add_parameter(
+                'fl_cz_length',
+                vals=vals.Numbers(),
+                unit='s',
+                initial_value=35e-9,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_lambda_2',
+                vals=vals.Numbers(),
+                initial_value=0,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_lambda_3',
+                vals=vals.Numbers(),
+                initial_value=0,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_theta_f',
+                vals=vals.Numbers(),
+                unit='deg',
+                initial_value=80,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_V_per_phi0',
+                vals=vals.Numbers(),
+                unit='V',
+                initial_value=1,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_freq_01_max',
+                vals=vals.Numbers(),
+                unit='Hz',
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_J2',
+                vals=vals.Numbers(),
+                unit='Hz',
+                initial_value=50e6,
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_freq_interaction',
+                vals=vals.Numbers(),
+                unit='Hz',
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_phase_corr_length',
+                unit='s',
+                initial_value=5e-9,
+                vals=vals.Numbers(),
+                parameter_class=ManualParameter)
+            self.add_parameter(
+                'fl_cz_phase_corr_amp',
+                unit='V',
+                initial_value=0, vals=vals.Numbers(),
+                parameter_class=ManualParameter)
 
     def add_config_parameters(self):
         # FIXME: unused
@@ -499,6 +390,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             parameter_class=ManualParameter,
             vals=vals.Numbers())
 
+        # output parameters for some experiments
         self.add_parameter(
             'F_ssro',
             initial_value=0,
@@ -521,7 +413,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         self.add_parameter(
             'ro_res_ext',
             initial_value=0,
-            label='residual extiction errors from ssro fit',
+            label='residual excitation errors from ssro fit',
             vals=vals.Numbers(0.0, 1.0),
             parameter_class=ManualParameter)
         self.add_parameter(
@@ -975,10 +867,13 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             else:
                 amps = np.linspace(0, 1, 31)
 
-        self.measure_rabi(amps=amps, MC=MC, analyze=False,
-                          all_modules=all_modules)
+        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules)
+
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
+
+        # update QCDeS parameter
         try:
+            # FIXME: move to HAL_ShimSQ
             if self.cfg_with_vsm():
                 self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
             else:
@@ -1622,7 +1517,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
                 Starting amplitude step of the optimizer.
 
             threshold (float):
-                Fidelity thershold after which the optimizer stops iterating.
+                Fidelity threshold after which the optimizer stops iterating.
         '''
 
         if MC is None:
@@ -2763,10 +2658,8 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
 
             self.F_ssro(a.proc_data_dict['F_assignment_raw'])
             self.F_discr(a.proc_data_dict['F_discr'])
-            self.ro_rel_events(
-                a.proc_data_dict['quantities_of_interest']['relaxation_events'])
-            self.ro_res_ext(
-                a.proc_data_dict['quantities_of_interest']['residual_excitation'])
+            self.ro_rel_events(a.proc_data_dict['quantities_of_interest']['relaxation_events'])
+            self.ro_res_ext(a.proc_data_dict['quantities_of_interest']['residual_excitation'])
 
             warnings.warn("FIXME rotation angle could not be set")
             # self.ro_acq_rotated_SSB_rotation_angle(a.theta)
@@ -2930,7 +2823,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
                 amplitude of the waveform corresponding to pi pulse (from 0 to 1)
 
             mw_channel_amp (float):
-                AWG channel amplitude (digitally scaling the waveform; form 0 to 1)
+                AWG channel amplitude (digitally scaling the waveform; from 0 to 1)
         """
 
         if self.cfg_with_vsm():
@@ -6379,30 +6272,31 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         """
         Configure MW_Lutman parameters and upload waveforms
         """
-        # FIXME: the HW handles:
+        # FIXME: here we handle:
         #  - mixer offsets
         #  and the LutMan handles:
         #  - pulse attributes
         #  - mixer parameters other then offsets (phi, alfa)
-        #  This maps badly to the HW capabilities, e.g. the QWG has hardware offset control
+        #  This maps badly to the actual hardware capabilities, e.g. the QWG has hardware offset control
         #  A better approach may be to pass a standard set of parameters describing pulse attributes and signal chain
         #  settings to the LutMan (maybe as a class/dict instead of QCoDeS parameters), and then have the LutMan do
-        #  everything necessary
+        #  everything necessary.
+        #  Or, to have the LutMan only handle pulse attibutes, and move all signal chain handling to HAL_ShimSQ
 
         super()._prep_mw_pulses()
 
         # 1. Gets instruments and prepares cases
         MW_LutMan = self.instr_LutMan_MW.get_instr()
-        AWG = MW_LutMan.AWG.get_instr()
 
         # 2. Prepares map and parameters for waveforms (except pi-pulse amp, which depends on VSM usage)
+        MW_LutMan.channel_amp(self.mw_channel_amp())
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
-        MW_LutMan.channel_amp(self.mw_channel_amp())
-        MW_LutMan.channel_range(self.mw_channel_range())  # FIXME: assumes AWG8_MW_LutMan
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
         MW_LutMan.spec_amp(self.spec_amp())
+
+        MW_LutMan.channel_range(self.mw_channel_range())  # FIXME: assumes AWG8_MW_LutMan
 
         # used for ef pulsing
         MW_LutMan.mw_ef_amp180(self.mw_ef_amp())
@@ -6414,9 +6308,11 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         # 3. Does case-dependent things:
         #                mixers offset+skewness
         #                pi-pulse amplitude
+        AWG = MW_LutMan.AWG.get_instr()
         if self.cfg_with_vsm():
             # case with VSM (both QWG and AWG8) : e.g. AWG8_VSM_MW_LutMan
             MW_LutMan.mw_amp180(self.mw_amp180())
+
             MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
             MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
             MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
@@ -6441,7 +6337,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 1), self.mw_mixer_offs_DI())
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 2), self.mw_mixer_offs_DQ())
-        else:
+        else:  # no VSM
             if self._using_QWG():
                 # case without VSM and with QWG
                 if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())

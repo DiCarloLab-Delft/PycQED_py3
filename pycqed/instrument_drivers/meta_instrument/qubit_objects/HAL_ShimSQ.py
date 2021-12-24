@@ -10,6 +10,15 @@ QCoDeS parameters referring to instrument hardware are added here, and not in ch
 originally added. These parameters should only accessed here (although nothing really stops you from violating this
 design). Note that we try to find a balance between compatibility with exiting code and proper design here.
 
+The following hardware related attributes are managed here:
+- physical instruments of the signal chain, and their
+    - connectivity
+    - settings
+    - modes (if any)
+    - signal chain related properties (e.g. modulation, mixer calibration)
+    - FIXME: etc
+
+
 A future improvement is to merge this HAL functions for Single Qubits with those for Multi Qubits.
 
 Note:   a lot code was moved around within this file in December 2021. As a consequence, the author information provided
@@ -42,6 +51,7 @@ class HAL_ShimSQ(Instrument):
         self._add_instrument_ref_parameters()
         self._add_config_parameters()
         self._add_mw_parameters()
+        self._add_mw_vsm_parameters()
         self._add_spec_parameters()
         self._add_flux_parameters()
         self._add_ro_parameters()
@@ -383,7 +393,7 @@ class HAL_ShimSQ(Instrument):
             initial_value=1,
             vals=vals.Ints())
 
-        self.add_parameter(
+        self.add_parameter(  # NB: only used for/available on HDAWG
             'mw_channel_range',
             label='AWG channel range. WARNING: Check your hardware specific limits!',
             unit='V',
@@ -391,8 +401,116 @@ class HAL_ShimSQ(Instrument):
             vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
             parameter_class=ManualParameter)
 
-        self._mw_vsm_delay = 0
+        # parameters for *MW_LutMan: mixer skewness correction
+        self.add_parameter(
+            'mw_G_mixer_phi',
+            unit='deg',
+            label='Mixer skewness phi Gaussian quadrature',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_G_mixer_alpha',
+            unit='',
+            label='Mixer skewness alpha Gaussian quadrature',
+            parameter_class=ManualParameter,
+            initial_value=1)
+        self.add_parameter(
+            'mw_D_mixer_phi',
+            unit='deg',
+            label='Mixer skewness phi Derivative quadrature',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_D_mixer_alpha',
+            unit='',
+            label='Mixer skewness alpha Derivative quadrature',
+            parameter_class=ManualParameter,
+            initial_value=1)
 
+        # Mixer offsets correction (currently applied to hardware directly)
+        self.add_parameter(
+            'mw_mixer_offs_GI',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_GQ',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_DI',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'mw_mixer_offs_DQ',
+            unit='V',
+            parameter_class=ManualParameter, initial_value=0)
+
+        self._mw_fine_delay = 0
+        self.add_parameter(
+            'mw_fine_delay',
+            label='fine delay of the AWG channel',
+            unit='s',
+            docstring='This parameters serves for fine tuning of '
+                      'the RO, MW and flux pulses. It should be kept '
+                      'positive and below 20e-9. Any larger adjustments'
+                      'should be done by changing CCL dio delay'
+                      'through device object.',
+            set_cmd=self._set_mw_fine_delay,
+            get_cmd=self._get_mw_fine_delay)
+
+    def _add_mw_vsm_parameters(self):
+        self.add_parameter(
+            'mw_vsm_marker_source',
+            label='VSM switch state',
+            initial_value='int',
+            vals=vals.Enum('ext', 'int'),
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'mw_vsm_ch_in',
+            label='VSM input channel Gaussian component',
+            vals=vals.Ints(1, 4),
+            initial_value=1,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'mw_vsm_mod_out',
+            label='VSM output module for microwave pulses',
+            docstring=(
+                'Selects the VSM output module for MW'
+                ' pulses. N.B. for spec the '
+                'spec_vsm_ch_out parameter is used.'),
+            vals=vals.Ints(1, 8),
+            initial_value=1,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'mw_vsm_G_amp',
+            label='VSM amp Gaussian component',
+            vals=vals.Numbers(0.1, 1.0),
+            initial_value=1.0,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'mw_vsm_D_amp',
+            label='VSM amp Derivative component',
+            vals=vals.Numbers(0.1, 1.0),
+            initial_value=1.0,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'mw_vsm_G_phase',
+            vals=vals.Numbers(-125, 45),
+            initial_value=0, unit='deg',
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'mw_vsm_D_phase',
+            vals=vals.Numbers(-125, 45),
+            initial_value=0, unit='deg',
+            parameter_class=ManualParameter)
+
+        self._mw_vsm_delay = 0
         self.add_parameter(
             'mw_vsm_delay',
             label='CCL VSM trigger delay',
@@ -406,21 +524,14 @@ class HAL_ShimSQ(Instrument):
             set_cmd=self._set_mw_vsm_delay,
             get_cmd=self._get_mw_vsm_delay)
 
-        self._mw_fine_delay = 0
-
-        self.add_parameter(
-            'mw_fine_delay',
-            label='fine delay of the AWG channel',
-            unit='s',
-            docstring='This parameters serves for fine tuning of '
-                      'the RO, MW and flux pulses. It should be kept '
-                      'positive and below 20e-9. Any larger adjustments'
-                      'should be done by changing CCL dio delay'
-                      'through device object.',
-            set_cmd=self._set_mw_fine_delay,
-            get_cmd=self._get_mw_fine_delay)
-
     def _add_spec_parameters(self):
+        self.add_parameter(
+            'spec_pow',
+            unit='dB',
+            vals=vals.Numbers(-70, 20),
+            parameter_class=ManualParameter,
+            initial_value=-30)
+
         self.add_parameter(
             'spec_vsm_ch_in',
             label='VSM input channel for spec pulses',
@@ -433,11 +544,15 @@ class HAL_ShimSQ(Instrument):
             parameter_class=ManualParameter)
 
         self.add_parameter(
-            'spec_pow',
-            unit='dB',
-            vals=vals.Numbers(-70, 20),
-            parameter_class=ManualParameter,
-            initial_value=-30)
+            'spec_vsm_mod_out',
+            label='VSM output module for spectroscopy pulses',
+            docstring=(
+                'Selects the VSM output channel for spec'
+                ' pulses. N.B. for mw pulses the '
+                'spec_mw_ch_out parameter is used.'),
+            vals=vals.Ints(1, 8),
+            initial_value=1,
+            parameter_class=ManualParameter)
 
     def _add_flux_parameters(self):
         self._flux_fine_delay = 0
@@ -756,7 +871,7 @@ class HAL_ShimSQ(Instrument):
         Checks if a QWG is used for microwave control.
         """
         AWG = self.instr_LutMan_MW.get_instr().AWG.get_instr()
-        return isinstance(AWG, QuTech_AWG_Module)
+        return isinstance(AWG, QuTech_AWG_Module)  # FIXME: QuTech_AWG_Module will be replaced by QWG
 
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter
@@ -920,6 +1035,7 @@ class HAL_ShimSQ(Instrument):
         LO.power(self.ro_pow_LO())
 
     # FIXME: UHFQC specific
+    # FIXME: move to HAL_Transmon, just as _prep_mw_pulses
     def _prep_ro_pulse(self, upload=True, CW=False):
         """
         Sets the appropriate parameters in the RO LutMan and uploads the

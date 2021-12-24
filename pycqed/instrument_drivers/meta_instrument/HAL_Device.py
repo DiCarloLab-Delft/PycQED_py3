@@ -303,6 +303,7 @@ class HAL_Device(Instrument):
 
         # self._prep_td_configure_VSM()
 
+    # FIXME: setup dependent
     def prepare_for_inspire(self):
         for lutman in ['mw_lutman_QNW','mw_lutman_QNE','mw_lutman_QC','mw_lutman_QSW','mw_lutman_QSE']:
             self.find_instrument(lutman).set_inspire_lutmap()

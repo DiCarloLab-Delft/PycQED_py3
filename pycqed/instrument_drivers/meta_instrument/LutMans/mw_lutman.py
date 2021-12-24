@@ -277,6 +277,7 @@ class Base_MW_LutMan(Base_LutMan):
             initial_value=0
         )
 
+        # spec parameters
         self.add_parameter(
             'spec_length',
             vals=vals.Numbers(),
@@ -1040,10 +1041,11 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         assert self.channel_I() < self.channel_Q()
         AWG = self.AWG.get_instr()
         if val == 0.8:
-            AWG.set('sigouts_{}_range'.format(self.channel_I()-1), .8)
             AWG.set('sigouts_{}_direct'.format(self.channel_I()-1), 1)
-            AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), .8)
+            AWG.set('sigouts_{}_range'.format(self.channel_I()-1), .8)
             AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 1)
+            AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), .8)
+            # FIXME: according to the ZI node documentation for SIGOUTS/*/DIRECT, offset control is not avaiable in this mode
         else:
             AWG.set('sigouts_{}_direct'.format(self.channel_I()-1), 0)
             AWG.set('sigouts_{}_range'.format(self.channel_I()-1), val)
@@ -1209,7 +1211,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                        self.channel_DI(), self.channel_DQ()]:
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
-            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair), val)
+            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair), val)  # FIXME: awgs_{}_outputs_{}_amplitude superceeded by awgs_{}_outputs_{}_
 
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
