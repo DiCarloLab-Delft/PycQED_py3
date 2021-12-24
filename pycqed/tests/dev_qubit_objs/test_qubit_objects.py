@@ -28,8 +28,6 @@ from qcodes import station, Instrument
 
 
 def _setup_hw(cls, qubit_obj):
-    cls.transmon = qubit_obj
-
     ##############################################
     # setup (virtual) hardware
     ##############################################
@@ -63,25 +61,25 @@ def _setup_hw(cls, qubit_obj):
         cls.MW_LutMan.mw_modulation(100e6)
         cls.MW_LutMan.sampling_rate(2.4e9)
 
-        cls.transmon.cfg_with_vsm(False)
-        cls.transmon.cfg_prepare_mw_awg(False)  # FIXME: load_waveform_onto_AWG_lookuptable fails
+        qubit_obj.cfg_with_vsm(False)
+        qubit_obj.cfg_prepare_mw_awg(False)  # FIXME: load_waveform_onto_AWG_lookuptable fails
     cls.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5, feedline_number=0)
     cls.ro_lutman.AWG(cls.UHFQC.name)
 
     ##############################################
     # Assign instruments
     ##############################################
-    cls.transmon.instr_LutMan_MW(cls.MW_LutMan.name)
-    cls.transmon.instr_LO_ro(cls.MW1.name)
-    cls.transmon.instr_LO_mw(cls.MW2.name)
-    cls.transmon.instr_spec_source(cls.MW3.name)
+    qubit_obj.instr_LutMan_MW(cls.MW_LutMan.name)
+    qubit_obj.instr_LO_ro(cls.MW1.name)
+    qubit_obj.instr_LO_mw(cls.MW2.name)
+    qubit_obj.instr_spec_source(cls.MW3.name)
 
-    cls.transmon.instr_acquisition(cls.UHFQC.name)
-    cls.transmon.instr_VSM(cls.VSM.name)
-    cls.transmon.instr_CC(cls.CC.name)
-    cls.transmon.instr_LutMan_RO(cls.ro_lutman.name)
+    qubit_obj.instr_acquisition(cls.UHFQC.name)
+    qubit_obj.instr_VSM(cls.VSM.name)
+    qubit_obj.instr_CC(cls.CC.name)
+    qubit_obj.instr_LutMan_RO(cls.ro_lutman.name)
 
-    cls.transmon.instr_SH(cls.SH.name)
+    qubit_obj.instr_SH(cls.SH.name)
 
     ##############################################
     # setup MC. FIXME: move out of class HAL_ShimSQ
@@ -97,22 +95,27 @@ def _setup_hw(cls, qubit_obj):
     cls.MC.datadir(test_datadir)
     a_tools.datadir = cls.MC.datadir()
 
-    cls.transmon.instr_MC(cls.MC.name)
+    qubit_obj.instr_MC(cls.MC.name)
 
     ##############################################
     # Setting some "random" initial parameters
     ##############################################
-    cls.transmon.ro_freq(5.43e9)
-    cls.transmon.ro_freq_mod(200e6)
+    qubit_obj.ro_freq(5.43e9)
+    qubit_obj.ro_freq_mod(200e6)
 
-    cls.transmon.mw_freq_mod(-100e6)
-    cls.transmon.mw_awg_ch(1)
-    cls.transmon.cfg_qubit_nr(0)
+    qubit_obj.mw_freq_mod(-100e6)
+    qubit_obj.mw_awg_ch(1)
+    qubit_obj.cfg_qubit_nr(0)
 
-    cls.transmon.mw_vsm_delay(15)
+    qubit_obj.mw_vsm_delay(15)
+
+    qubit_obj.mw_mixer_offs_GI(.1)
+    qubit_obj.mw_mixer_offs_GQ(.2)
+    qubit_obj.mw_mixer_offs_DI(.3)
+    qubit_obj.mw_mixer_offs_DQ(.4)
 
     # FIXME" move out of test_HAL_ShimSQ
-    cls.transmon.freq_qubit(4.56e9)
+    qubit_obj.freq_qubit(4.56e9)
 
 
 class test_Qubit(unittest.TestCase):
@@ -131,6 +134,7 @@ class test_HAL_ShimSQ(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         qubit_obj = HAL_ShimSQ('HAL_ShimSQ')
+        cls.shim = qubit_obj
         _setup_hw(cls, qubit_obj)
 
     @classmethod
@@ -142,46 +146,46 @@ class test_HAL_ShimSQ(unittest.TestCase):
     ##############################################
 
     def test_prep_for_continuous_wave(self):
-        self.transmon.ro_acq_weight_type('optimal')
+        self.shim.ro_acq_weight_type('optimal')
         with warnings.catch_warnings(record=True) as w:
-            self.transmon.prepare_for_continuous_wave()
+            self.shim.prepare_for_continuous_wave()
             self.assertEqual(str(w[0].message), 'Changing ro_acq_weight_type to SSB.')
 
-        self.transmon.ro_acq_weight_type('SSB')
-        self.transmon.prepare_for_continuous_wave()
+        self.shim.ro_acq_weight_type('SSB')
+        self.shim.prepare_for_continuous_wave()
 
     def test_prep_readout(self):
-        self.transmon.prepare_readout()
+        self.shim.prepare_readout()
 
     def test_prep_ro_instantiate_detectors(self):
         # delete detectors
         detector_attributes = ['int_avg_det', 'int_log_det', 'int_avg_det_single', 'input_average_detector']
         for det_attr in detector_attributes:
-            if hasattr(self.transmon, det_attr):
-                delattr(self.transmon, det_attr)
+            if hasattr(self.shim, det_attr):
+                delattr(self.shim, det_attr)
 
         # check there are no detectors to start with
         for det_attr in detector_attributes:
-            self.assertFalse(hasattr(self.transmon, det_attr))
+            self.assertFalse(hasattr(self.shim, det_attr))
 
         # run test
         self.MC.soft_avg(1)
-        self.transmon.ro_soft_avg(4)
-        self.transmon.prepare_readout()
+        self.shim.ro_soft_avg(4)
+        self.shim.prepare_readout()
 
         # Test that the detectors have been instantiated
         for det_attr in detector_attributes:
-            self.assertTrue(hasattr(self.transmon, det_attr))
+            self.assertTrue(hasattr(self.shim, det_attr))
 
         self.assertEqual(self.MC.soft_avg(), 4)
 
     @unittest.skipIf(True, 'Test for use with an old duplexer.')
     def test_prep_cw_config_vsm(self):
-        self.transmon.spec_vsm_ch_in(2)
-        self.transmon.spec_vsm_ch_out(1)
-        self.transmon.spec_vsm_amp(0.5)
+        self.shim.spec_vsm_ch_in(2)
+        self.shim.spec_vsm_ch_out(1)
+        self.shim.spec_vsm_amp(0.5)
 
-        self.transmon.prepare_for_continuous_wave()
+        self.shim.prepare_for_continuous_wave()
 
         self.assertEqual(self.VSM.in1_out1_switch(), 'OFF')
         self.assertEqual(self.VSM.in1_out2_switch(), 'OFF')
@@ -190,7 +194,7 @@ class test_HAL_ShimSQ(unittest.TestCase):
         self.assertEqual(self.VSM.in2_out1_amp(), 0.5)
 
     def test_prep_for_fluxing(self):
-        self.transmon.prepare_for_fluxing()
+        self.shim.prepare_for_fluxing()
 
     @unittest.skip('Not Implemented')
     def test_prep_flux_bias(self):
@@ -201,7 +205,7 @@ class test_HAL_ShimSQ(unittest.TestCase):
     ##############################################
 
     def test_prep_ro_MW_sources(self):
-        LO = self.transmon.instr_LO_ro.get_instr()
+        LO = self.shim.instr_LO_ro.get_instr()
         LO.off()
         LO.frequency(4e9)
         LO.power(10)
@@ -209,26 +213,26 @@ class test_HAL_ShimSQ(unittest.TestCase):
         self.assertEqual(LO.status(), 'off')
         self.assertEqual(LO.frequency(), 4e9)
 
-        self.transmon.mw_pow_td_source(20)
-        self.transmon.ro_freq(5.43e9)
-        self.transmon.ro_freq_mod(200e6)
-        self.transmon.prepare_readout()
+        self.shim.mw_pow_td_source(20)
+        self.shim.ro_freq(5.43e9)
+        self.shim.ro_freq_mod(200e6)
+        self.shim.prepare_readout()
 
         self.assertEqual(LO.status(), 'on')
         self.assertEqual(LO.frequency(), 5.43e9-200e6)
         self.assertEqual(LO.power(), 20)
 
     def test_prep_ro_pulses(self):
-        self.transmon.ro_pulse_mixer_alpha(1.1)
-        self.transmon.ro_pulse_mixer_phi(4)
-        self.transmon.ro_pulse_length(312e-9)
-        self.transmon.ro_pulse_down_amp0(.1)
-        self.transmon.ro_pulse_down_length0(23e-9)
+        self.shim.ro_pulse_mixer_alpha(1.1)
+        self.shim.ro_pulse_mixer_phi(4)
+        self.shim.ro_pulse_length(312e-9)
+        self.shim.ro_pulse_down_amp0(.1)
+        self.shim.ro_pulse_down_length0(23e-9)
 
-        self.transmon.ro_pulse_mixer_offs_I(.01)
-        self.transmon.ro_pulse_mixer_offs_Q(.02)
+        self.shim.ro_pulse_mixer_offs_I(.01)
+        self.shim.ro_pulse_mixer_offs_Q(.02)
 
-        self.transmon.prepare_readout()
+        self.shim.prepare_readout()
 
         self.assertEqual(self.ro_lutman.mixer_phi(), 4)
         self.assertEqual(self.ro_lutman.mixer_alpha(), 1.1)
@@ -241,14 +245,14 @@ class test_HAL_ShimSQ(unittest.TestCase):
 
     def test_prep_ro_integration_weigths(self):
         IF = 50e6
-        self.transmon.ro_freq_mod(IF)
-        self.transmon.ro_acq_weight_chI(3)
-        self.transmon.ro_acq_weight_chQ(4)
+        self.shim.ro_freq_mod(IF)
+        self.shim.ro_acq_weight_chI(3)
+        self.shim.ro_acq_weight_chQ(4)
 
         # Testing SSB
         trace_length = 4096
-        self.transmon.ro_acq_weight_type('SSB')
-        self.transmon.prepare_readout()
+        self.shim.ro_acq_weight_type('SSB')
+        self.shim.prepare_readout()
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
 
@@ -258,19 +262,19 @@ class test_HAL_ShimSQ(unittest.TestCase):
         uploaded_wf = self.UHFQC.qas_0_integration_weights_3_real()
         np.testing.assert_array_almost_equal(cosI, uploaded_wf)
         # Testing DSB case
-        self.transmon.ro_acq_weight_type('DSB')
-        self.transmon.prepare_readout()
+        self.shim.ro_acq_weight_type('DSB')
+        self.shim.prepare_readout()
         self.assertEqual(self.UHFQC.qas_0_rotations_3(), 2)
         self.assertEqual(self.UHFQC.qas_0_rotations_4(), 2)
 
         # Testing Optimal weight uploading
         test_I = np.ones(10)
         test_Q = 0.5*test_I
-        self.transmon.ro_acq_weight_func_I(test_I)
-        self.transmon.ro_acq_weight_func_Q(test_Q)
+        self.shim.ro_acq_weight_func_I(test_I)
+        self.shim.ro_acq_weight_func_Q(test_Q)
 
-        self.transmon.ro_acq_weight_type('optimal')
-        self.transmon.prepare_readout()
+        self.shim.ro_acq_weight_type('optimal')
+        self.shim.prepare_readout()
 
         self.UHFQC.qas_0_rotations_4(.21 + 0.108j)
         upl_I = self.UHFQC.qas_0_integration_weights_3_real()
@@ -283,23 +287,23 @@ class test_HAL_ShimSQ(unittest.TestCase):
         # These should not have been touched by optimal weights
         self.assertEqual(self.UHFQC.qas_0_rotations_4(), .21 + .108j)
 
-        self.transmon.ro_acq_weight_type('SSB')
+        self.shim.ro_acq_weight_type('SSB')
 
     ########################################################
     #          Test prepare for timedomain                 #
     ########################################################
 
     def test_prep_for_timedomain(self):
-        self.transmon.prepare_for_timedomain()
+        self.shim.prepare_for_timedomain()
 
     def test_prep_td_sources(self):
         self.MW1.off()
         self.MW2.off()
-        self.transmon.freq_qubit(4.56e9)
-        self.transmon.mw_freq_mod(-100e6)
-        self.transmon.mw_pow_td_source(13)
+        self.shim.freq_qubit(4.56e9)
+        self.shim.mw_freq_mod(-100e6)
+        self.shim.mw_pow_td_source(13)
 
-        self.transmon.prepare_for_timedomain()
+        self.shim.prepare_for_timedomain()
         self.assertEqual(self.MW1.status(), 'on')
         self.assertEqual(self.MW2.status(), 'on')
         self.assertEqual(self.MW2.frequency(), 4.56e9 + 100e6)
@@ -310,11 +314,11 @@ class test_HAL_ShimSQ(unittest.TestCase):
 
     @unittest.skip('VSM not setup in __init__')
     def test_prep_td_config_vsm(self):
-        self.transmon.mw_vsm_G_amp(0.8)
-        self.transmon.mw_vsm_D_phase(0)
-        self.transmon.mw_vsm_ch_in(2)
-        self.transmon.mw_vsm_mod_out(5)
-        self.transmon.prepare_for_timedomain()
+        self.shim.mw_vsm_G_amp(0.8)
+        self.shim.mw_vsm_D_phase(0)
+        self.shim.mw_vsm_ch_in(2)
+        self.shim.mw_vsm_mod_out(5)
+        self.shim.prepare_for_timedomain()
 
         self.assertEqual(self.VSM.mod5_ch2_gaussian_amp(), 0.8)
         self.assertEqual(self.VSM.mod5_ch2_derivative_phase(), 0)
@@ -325,16 +329,11 @@ class Test_HAL_Transmon(unittest.TestCase):
     def setUpClass(cls):
 
         qubit_obj = HAL_Transmon('HAL_qubit')
+        cls.transmon = qubit_obj
         _setup_hw(cls, qubit_obj)
 
         config_fn = os.path.join(pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
         cls.transmon.cfg_openql_platform_fn(config_fn)
-
-        # Setting some "random" initial parameters
-        cls.transmon.mw_mixer_offs_GI(.1)
-        cls.transmon.mw_mixer_offs_GQ(.2)
-        cls.transmon.mw_mixer_offs_DI(.3)
-        cls.transmon.mw_mixer_offs_DQ(.4)
 
         cls.transmon.freq_max(4.62e9)
 

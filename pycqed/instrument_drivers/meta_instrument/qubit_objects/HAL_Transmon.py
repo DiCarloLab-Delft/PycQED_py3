@@ -6281,7 +6281,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         #  A better approach may be to pass a standard set of parameters describing pulse attributes and signal chain
         #  settings to the LutMan (maybe as a class/dict instead of QCoDeS parameters), and then have the LutMan do
         #  everything necessary.
-        #  Or, to have the LutMan only handle pulse attibutes, and move all signal chain handling to HAL_ShimSQ
+        #  Or, to have the LutMan only handle pulse attributes, and move all signal chain handling to HAL_ShimSQ
 
         super()._prep_mw_pulses()
 
