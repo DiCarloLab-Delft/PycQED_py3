@@ -309,8 +309,38 @@ class test_HAL_ShimSQ(unittest.TestCase):
         self.assertEqual(self.MW2.frequency(), 4.56e9 + 100e6)
         self.assertEqual(self.MW2.power(), 13)
 
+    # def test_prep_td_pulses(self):
+    #     pass # FIXME: moved to HAL_Transmon
+    # NB: lutman handling resides in HAL_Transmon, not HAL_ShimSQ
     def test_prep_td_pulses(self):
-        pass # FIXME: moved to HAL_Transmon
+        self.shim.mw_awg_ch(5)
+
+        # set mixer parameters
+        self.shim.mw_G_mixer_alpha(1.02)
+        self.shim.mw_D_mixer_phi(8)
+
+        self.shim.mw_mixer_offs_GI(.1)
+        self.shim.mw_mixer_offs_GQ(.2)
+
+        # self.shim.mw_ef_amp(.34)
+        self.shim.mw_freq_mod(-100e6)
+        # self.shim.anharmonicity(-235e6)
+
+        self.shim.prepare_for_timedomain()
+
+        self.assertEqual(self.MW_LutMan.channel_I(), 1)
+        self.assertEqual(self.MW_LutMan.channel_Q(), 2)
+
+        self.assertEqual(self.MW_LutMan.mixer_alpha(), 1.02)
+        self.assertEqual(self.MW_LutMan.mixer_phi(), 0)  # FIXME: why not 8 as set above
+
+        self.assertEqual(self.CC.vsm_channel_delay0(), self.shim.mw_vsm_delay())
+
+        self.assertEqual(self.AWG.sigouts_4_offset(), 0.1)
+        self.assertEqual(self.AWG.sigouts_5_offset(), 0.2)
+
+        # self.assertEqual(self.MW_LutMan.mw_ef_amp180(), 0.34)
+        # self.assertEqual(self.MW_LutMan.mw_ef_modulation(), -335e6)
 
     @unittest.skip('VSM not setup in __init__')
     def test_prep_td_config_vsm(self):
@@ -362,11 +392,11 @@ class Test_HAL_Transmon(unittest.TestCase):
         self.transmon.mw_awg_ch(5)
 
         # set mixer parameters
-        self.transmon.mw_G_mixer_alpha(1.02)
-        self.transmon.mw_D_mixer_phi(8)
-
-        self.transmon.mw_mixer_offs_GI(.1)
-        self.transmon.mw_mixer_offs_GQ(.2)
+        # self.transmon.mw_G_mixer_alpha(1.02)
+        # self.transmon.mw_D_mixer_phi(8)
+        #
+        # self.transmon.mw_mixer_offs_GI(.1)
+        # self.transmon.mw_mixer_offs_GQ(.2)
 
         self.transmon.mw_ef_amp(.34)
         self.transmon.mw_freq_mod(-100e6)
@@ -374,16 +404,16 @@ class Test_HAL_Transmon(unittest.TestCase):
 
         self.transmon.prepare_for_timedomain()
 
-        self.assertEqual(self.MW_LutMan.channel_I(), 1)
-        self.assertEqual(self.MW_LutMan.channel_Q(), 2)
-
-        self.assertEqual(self.MW_LutMan.mixer_alpha(), 1.02)
-        self.assertEqual(self.MW_LutMan.mixer_phi(), 0)  # FIXME: why not 8 as set above
-
-        self.assertEqual(self.CC.vsm_channel_delay0(), self.transmon.mw_vsm_delay())
-
-        self.assertEqual(self.AWG.sigouts_4_offset(), 0.1)
-        self.assertEqual(self.AWG.sigouts_5_offset(), 0.2)
+        # self.assertEqual(self.MW_LutMan.channel_I(), 1)
+        # self.assertEqual(self.MW_LutMan.channel_Q(), 2)
+        #
+        # self.assertEqual(self.MW_LutMan.mixer_alpha(), 1.02)
+        # self.assertEqual(self.MW_LutMan.mixer_phi(), 0)  # FIXME: why not 8 as set above
+        #
+        # self.assertEqual(self.CC.vsm_channel_delay0(), self.transmon.mw_vsm_delay())
+        #
+        # self.assertEqual(self.AWG.sigouts_4_offset(), 0.1)
+        # self.assertEqual(self.AWG.sigouts_5_offset(), 0.2)
 
         self.assertEqual(self.MW_LutMan.mw_ef_amp180(), 0.34)
         self.assertEqual(self.MW_LutMan.mw_ef_modulation(), -335e6)

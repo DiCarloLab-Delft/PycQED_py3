@@ -99,7 +99,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
 
         # parameters for *MW_LutMan: pulse attributes
         self.add_parameter(
-            'mw_amp180',
+            'mw_amp180',  # FIXME: appears to have been replaced by mw_channel_amp (to allow iterating without waveform reloading), but is still present all over the place
             label='Pi-pulse amplitude',
             unit='V',
             initial_value=.8,
@@ -135,18 +135,19 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             docstring=(
                 'Amplitude of the spectroscopy pulse in the mw LutMan. '
                 'The power of the spec pulse should be controlled through '
-                'the vsm amplitude "spec_vsm_amp"'),
+                'the vsm amplitude "spec_vsm_amp"'),  # FIXME: outdated
             vals=vals.Numbers(0, 1),
             parameter_class=ManualParameter,
             initial_value=0.8)
 
         # other parameters
-        self.add_parameter(
-            'spec_vsm_amp',
-            label='VSM amplitude for spec pulses',
-            vals=vals.Numbers(0.1, 1.0),
-            initial_value=1.0,
-            parameter_class=ManualParameter)
+        # FIXME: unused
+        # self.add_parameter(
+        #     'spec_vsm_amp',
+        #     label='VSM amplitude for spec pulses',
+        #     vals=vals.Numbers(0.1, 1.0),
+        #     initial_value=1.0,
+        #     parameter_class=ManualParameter)
 
         self.add_parameter(
             'spec_pulse_length',
@@ -156,19 +157,21 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             initial_value=500e-9,
             parameter_class=ManualParameter)
 
-        self.add_parameter(
-            'spec_type',
-            parameter_class=ManualParameter,
-            docstring=(
-                'determines what kind of spectroscopy to do, \n'
-                '"CW":  opens the relevant VSM channel to always let the tone '
-                'through. \n'
-                '"vsm_gated":  uses the  VSM in external mode to gate the spec '
-                'source. \n '
-                '"IQ" uses the TD source and AWG8 to generate a spec pulse'),
-            initial_value='CW',
-            vals=vals.Enum('CW', 'IQ', 'vsm_gated'))
+        # FIXME: unused
+        # self.add_parameter(
+        #     'spec_type',
+        #     parameter_class=ManualParameter,
+        #     docstring=(
+        #         'determines what kind of spectroscopy to do, \n'
+        #         '"CW":  opens the relevant VSM channel to always let the tone '
+        #         'through. \n'
+        #         '"vsm_gated":  uses the  VSM in external mode to gate the spec '
+        #         'source. \n '
+        #         '"IQ" uses the TD source and AWG8 to generate a spec pulse'),
+        #     initial_value='CW',
+        #     vals=vals.Enum('CW', 'IQ', 'vsm_gated'))
 
+        # NB: only used in _measure_spectroscopy_pulsed_marked()
         self.add_parameter(
             'spec_wait_time',
             unit='s',
@@ -186,13 +189,14 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             initial_value=np.array([0, 0, -1e12, 0, 6e9]),
             parameter_class=ManualParameter)
 
-        self.add_parameter(
-            'fl_ac_polycoeff',
-            docstring='Polynomial coefficients for current to frequency conversion',
-            vals=vals.Arrays(),
-            # initial value is chosen to not raise errors
-            initial_value=np.array([0, 0, -1e12, 0, 6e9]),
-            parameter_class=ManualParameter)
+        # FIXME: unused
+        # self.add_parameter(
+        #     'fl_ac_polycoeff',
+        #     docstring='Polynomial coefficients for current to frequency conversion',
+        #     vals=vals.Arrays(),
+        #     # initial value is chosen to not raise errors
+        #     initial_value=np.array([0, 0, -1e12, 0, 6e9]),
+        #     parameter_class=ManualParameter)
 
         self.add_parameter(
             'fl_dc_I_per_phi0',
@@ -217,15 +221,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
             docstring=('Flux bias offset corresponding to the sweetspot'),
             vals=vals.Numbers(),
             initial_value=0,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'fl_dc_ch',
-            label='Flux bias channel',
-            docstring=('Used to determine the DAC channel used for DC '
-                       'flux biasing. Should be an int when using an IVVI rack'
-                       'or a str (channel name) when using an SPI rack.'),
-            vals=vals.Strings(),
-            initial_value=None,
             parameter_class=ManualParameter)
 
         if 0:  # FIXME: unused
@@ -1789,8 +1784,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
                 elif par == 'freq':
                     freq_idx = parameter_list.index('freq')
                     # We are varying the LO frequency in the opt, not the q freq.
-                    self.freq_qubit(opt_par_values[freq_idx] +
-                                    self.mw_freq_mod.get())
+                    self.freq_qubit(opt_par_values[freq_idx] + self.mw_freq_mod.get())
 
     def calibrate_mw_gates_allxy(
             self,
@@ -6283,13 +6277,14 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         #  everything necessary.
         #  Or, to have the LutMan only handle pulse attributes, and move all signal chain handling to HAL_ShimSQ
 
-        super()._prep_mw_pulses()
-
         # 1. Gets instruments and prepares cases
         MW_LutMan = self.instr_LutMan_MW.get_instr()
 
-        # 2. Prepares map and parameters for waveforms (except pi-pulse amp, which depends on VSM usage)
+        # 2. Prepares parameters for waveforms (except pi-pulse amp 'mw_amp180', which depends on VSM usage)
         MW_LutMan.channel_amp(self.mw_channel_amp())
+        # FIXME: it looks like the semantics of channel_amp vs. mw_amp180 depend on the connected instruments, and
+        #  that the calibration routines have awareness of these details. Also, many (time domain) routines don't touch
+        #  mw_channel_amp, and thus depend on each other (in undocumented but probably intended ways)
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
         MW_LutMan.mw_motzoi(self.mw_motzoi())
@@ -6300,71 +6295,75 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
 
         # used for ef pulsing
         MW_LutMan.mw_ef_amp180(self.mw_ef_amp())
+
         if MW_LutMan.cfg_sideband_mode() != 'real-time':
             MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() + self.anharmonicity())
         else:
             MW_LutMan.mw_ef_modulation(self.anharmonicity())
 
-        # 3. Does case-dependent things:
-        #                mixers offset+skewness
-        #                pi-pulse amplitude
-        AWG = MW_LutMan.AWG.get_instr()
-        if self.cfg_with_vsm():
-            # case with VSM (both QWG and AWG8) : e.g. AWG8_VSM_MW_LutMan
-            MW_LutMan.mw_amp180(self.mw_amp180())
+        if 1:
+            super()._prep_mw_pulses()
+        else:  # FIXME: hardware handling moved to HAL_ShimSQ::_prep_mw_pulses()
+            # 3. Does case-dependent things:
+            #                mixers offset+skewness
+            #                pi-pulse amplitude
+            AWG = MW_LutMan.AWG.get_instr()
+            if self.cfg_with_vsm():
+                # case with VSM (both QWG and AWG8) : e.g. AWG8_VSM_MW_LutMan
+                MW_LutMan.mw_amp180(self.mw_amp180())
 
-            MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
-            MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
-            MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
-            MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
+                MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
+                MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
+                MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
+                MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
 
-            MW_LutMan.channel_GI(0 + self.mw_awg_ch())
-            MW_LutMan.channel_GQ(1 + self.mw_awg_ch())
-            MW_LutMan.channel_DI(2 + self.mw_awg_ch())
-            MW_LutMan.channel_DQ(3 + self.mw_awg_ch())
+                MW_LutMan.channel_GI(0 + self.mw_awg_ch())
+                MW_LutMan.channel_GQ(1 + self.mw_awg_ch())
+                MW_LutMan.channel_DI(2 + self.mw_awg_ch())
+                MW_LutMan.channel_DQ(3 + self.mw_awg_ch())
 
-            if self._using_QWG():
-                # N.B. This part is QWG specific
-                if hasattr(MW_LutMan, 'channel_GI'):
-                    # 4-channels are used for VSM based AWG's.
-                    AWG.ch1_offset(self.mw_mixer_offs_GI())
-                    AWG.ch2_offset(self.mw_mixer_offs_GQ())
-                    AWG.ch3_offset(self.mw_mixer_offs_DI())
-                    AWG.ch4_offset(self.mw_mixer_offs_DQ())
-            else:  # using_AWG8
-                # N.B. This part is AWG8 specific
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() - 1), self.mw_mixer_offs_GI())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 1), self.mw_mixer_offs_DI())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 2), self.mw_mixer_offs_DQ())
-        else:  # no VSM
-            if self._using_QWG():
-                # case without VSM and with QWG
-                if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
-                        or (self.mw_G_mixer_alpha() != self.mw_D_mixer_alpha())):
-                    logging.warning('HAL_Transmon {}; _prep_mw_pulses: '
-                                    'no VSM detected, using mixer parameters'
-                                    ' from gaussian channel.'.format(self.name))
-                MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
-                MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
-                AWG.set('ch{}_offset'.format(MW_LutMan.channel_I()), self.mw_mixer_offs_GI())
-                AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()), self.mw_mixer_offs_GQ())
+                if self._using_QWG():
+                    # N.B. This part is QWG specific
+                    if hasattr(MW_LutMan, 'channel_GI'):
+                        # 4-channels are used for VSM based AWG's.
+                        AWG.ch1_offset(self.mw_mixer_offs_GI())
+                        AWG.ch2_offset(self.mw_mixer_offs_GQ())
+                        AWG.ch3_offset(self.mw_mixer_offs_DI())
+                        AWG.ch4_offset(self.mw_mixer_offs_DQ())
+                else:  # using_AWG8
+                    # N.B. This part is AWG8 specific
+                    AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() - 1), self.mw_mixer_offs_GI())
+                    AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
+                    AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 1), self.mw_mixer_offs_DI())
+                    AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 2), self.mw_mixer_offs_DQ())
+            else:  # no VSM
+                if self._using_QWG():
+                    # case without VSM and with QWG : QWG_MW_LutMan
+                    if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
+                            or (self.mw_G_mixer_alpha() != self.mw_D_mixer_alpha())):
+                        logging.warning('HAL_Transmon {}; _prep_mw_pulses: '
+                                        'no VSM detected, using mixer parameters'
+                                        ' from gaussian channel.'.format(self.name))
+                    MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
+                    MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
+                    AWG.set('ch{}_offset'.format(MW_LutMan.channel_I()), self.mw_mixer_offs_GI())
+                    AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()), self.mw_mixer_offs_GQ())
+                    # FIXME: MW_LutMan.mw_amp180 untouched
+                else:
+                    # case without VSM (and with AWG8) : AWG8_MW_LutMan
+                    MW_LutMan.mw_amp180(1)  #  AWG8_MW_LutMan uses 'channel_amp' to allow rabi-type experiments without wave reloading.
+                    MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
+                    MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
+
+                    # N.B. This part is AWG8 specific
+                    AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() - 1), self.mw_mixer_offs_GI())
+                    AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
+
+            # 4. reloads the waveforms
+            if self.cfg_prepare_mw_awg():
+                MW_LutMan.load_waveforms_onto_AWG_lookuptable()
             else:
-                # case without VSM (and AWG8)
-                MW_LutMan.mw_amp180(1)
-                MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
-                MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
+                warnings.warn('"cfg_prepare_mw_awg" set to False, not preparing microwave pulses.')
 
-                # N.B. This part is AWG8 specific
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() - 1), self.mw_mixer_offs_GI())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
-
-        # 4. reloads the waveforms
-        if self.cfg_prepare_mw_awg():
-            MW_LutMan.load_waveforms_onto_AWG_lookuptable()
-        else:
-            warnings.warn('"cfg_prepare_mw_awg" set to False, not preparing microwave pulses.')
-
-        # 5. upload commandtable for virtual-phase gates
-        MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
-
+            # 5. upload command table for virtual-phase gates
+            MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
