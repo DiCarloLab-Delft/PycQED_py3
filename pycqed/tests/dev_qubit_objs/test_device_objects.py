@@ -107,19 +107,13 @@ class Test_Device_obj(unittest.TestCase):
         cls.mw_lutman.mw_modulation(100e6)
         cls.mw_lutman.sampling_rate(2.4e9)
 
-        cls.ro_lutman_0 = UHFQC_RO_LutMan(
-            "ro_lutman_0", feedline_number=0, feedline_map="S17", num_res=9
-        )
+        cls.ro_lutman_0 = UHFQC_RO_LutMan("ro_lutman_0", feedline_number=0, feedline_map="S17", num_res=9)
         cls.ro_lutman_0.AWG(cls.UHFQC_0.name)
 
-        cls.ro_lutman_1 = UHFQC_RO_LutMan(
-            "ro_lutman_1", feedline_number=1, feedline_map="S17", num_res=9
-        )
+        cls.ro_lutman_1 = UHFQC_RO_LutMan("ro_lutman_1", feedline_number=1, feedline_map="S17", num_res=9)
         cls.ro_lutman_1.AWG(cls.UHFQC_1.name)
 
-        cls.ro_lutman_2 = UHFQC_RO_LutMan(
-            "ro_lutman_2", feedline_number=2, feedline_map="S17", num_res=9
-        )
+        cls.ro_lutman_2 = UHFQC_RO_LutMan("ro_lutman_2", feedline_number=2, feedline_map="S17", num_res=9)
         cls.ro_lutman_2.AWG(cls.UHFQC_2.name)
 
         # Assign instruments
@@ -133,15 +127,27 @@ class Test_Device_obj(unittest.TestCase):
             q.instr_LO_mw(cls.MW2.name)
             q.instr_spec_source(cls.MW3.name)
 
-            if q_idx in [13, 16]:
-                q.instr_acquisition(cls.UHFQC_0.name)
-                q.instr_LutMan_RO(cls.ro_lutman_0.name)
-            elif q_idx in [1, 4, 5, 7, 8, 10, 11, 14, 15]:
-                q.instr_acquisition(cls.UHFQC_1.name)
-                q.instr_LutMan_RO(cls.ro_lutman_1.name)
-            elif q_idx in [0, 2, 3, 6, 9, 12]:
-                q.instr_acquisition(cls.UHFQC_2.name)
-                q.instr_LutMan_RO(cls.ro_lutman_2.name)
+            # map qubits to UHFQC, *must* match mapping inside Base_RO_LutMan (Yuk)
+            if 0:
+                if q_idx in [13, 16]:
+                    q.instr_acquisition(cls.UHFQC_0.name)
+                    q.instr_LutMan_RO(cls.ro_lutman_0.name)
+                elif q_idx in [1, 4, 5, 7, 8, 10, 11, 14, 15]:
+                    q.instr_acquisition(cls.UHFQC_1.name)
+                    q.instr_LutMan_RO(cls.ro_lutman_1.name)
+                elif q_idx in [0, 2, 3, 6, 9, 12]:
+                    q.instr_acquisition(cls.UHFQC_2.name)
+                    q.instr_LutMan_RO(cls.ro_lutman_2.name)
+            else:
+                if q_idx in [6, 11]:
+                    q.instr_acquisition(cls.UHFQC_0.name)
+                    q.instr_LutMan_RO(cls.ro_lutman_0.name)
+                elif q_idx in [0, 1, 2, 3, 7, 8, 12, 13, 15]:
+                    q.instr_acquisition(cls.UHFQC_1.name)
+                    q.instr_LutMan_RO(cls.ro_lutman_1.name)
+                elif q_idx in [4, 5, 9, 10, 14, 16]:
+                    q.instr_acquisition(cls.UHFQC_2.name)
+                    q.instr_LutMan_RO(cls.ro_lutman_2.name)
 
             q.instr_VSM(cls.VSM.name)
             q.instr_CC(cls.CC.name)
@@ -177,7 +183,13 @@ class Test_Device_obj(unittest.TestCase):
         cls.device.instr_AWG_mw_1(cls.AWG_mw_1.name)
         cls.device.instr_AWG_flux_0(cls.AWG_flux_0.name)
 
-        cls.device.ro_lo_freq(6e9)
+        if 0:
+            cls.device.ro_lo_freq(6e9)
+        else:  # FIXME: frequency now per LutMan
+            cls.ro_lutman_0.LO_freq(6e9)
+            cls.ro_lutman_1.LO_freq(6e9)
+            cls.ro_lutman_2.LO_freq(6e9)
+
 
         if 0:  # FIXME: CCL/QCC deprecated
             # Fixed by design
@@ -343,40 +355,46 @@ class Test_Device_obj(unittest.TestCase):
         assert self.CC.dio6_out_delay() == 0
         assert self.CC.dio7_out_delay() == 7
 
-    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_lo_freqs_config(self):
-        # Test that the modulation frequencies of all qubits
-        # are set correctly.
+        # Test that the modulation frequencies of all qubits are set correctly.
         self.device.ro_acq_weight_type("optimal")
         qubits = self.device.qubits()
 
-        self.device.ro_lo_freq(6e9)
+        self.ro_lutman_0.LO_freq(6e9)
+        self.ro_lutman_1.LO_freq(6e9)
+        self.ro_lutman_2.LO_freq(6e9)
         self.device.prepare_readout(qubits=qubits)
 
         # MW1 is specified as the readout LO source
         assert self.MW1.frequency() == 6e9
         for qname in qubits:
             q = self.device.find_instrument(qname)
-            6e9 + q.ro_freq_mod() == q.ro_freq()
+            assert 6e9 + q.ro_freq_mod() == q.ro_freq()
 
-        self.device.ro_lo_freq(5.8e9)
+
+        self.ro_lutman_0.LO_freq(5.8e9)
+        self.ro_lutman_1.LO_freq(5.8e9)
+        self.ro_lutman_2.LO_freq(5.8e9)
         self.device.prepare_readout(qubits=qubits)
 
         # MW1 is specified as the readout LO source
         assert self.MW1.frequency() == 5.8e9
         for qname in qubits:
             q = self.device.find_instrument(qname)
-            5.8e9 + q.ro_freq_mod() == q.ro_freq()
+            assert 5.8e9 + q.ro_freq_mod() == q.ro_freq()
 
-        q = self.device.find_instrument("q5")
-        q.instr_LO_ro(self.MW3.name)
-        with pytest.raises(ValueError):
-            self.device.prepare_readout(qubits=qubits)
-        q.instr_LO_ro(self.MW1.name)
 
-    @unittest.skip('FIXME: disabled, see PR #643')
+        # FIXME: no longer raises exception
+        # q = self.device.find_instrument("q5")
+        # q.instr_LO_ro(self.MW3.name)
+        # with pytest.raises(ValueError):
+        #     self.device.prepare_readout(qubits=qubits)
+        # q.instr_LO_ro(self.MW1.name)
+
     def test_prepare_readout_assign_weights(self):
-        self.device.ro_lo_freq(6e9)
+        self.ro_lutman_0.LO_freq(6e9)
+        self.ro_lutman_1.LO_freq(6e9)
+        self.ro_lutman_2.LO_freq(6e9)
 
         self.device.ro_acq_weight_type("optimal")
         qubits = self.device.qubits()
@@ -387,62 +405,50 @@ class Test_Device_obj(unittest.TestCase):
 
         self.device.prepare_readout(qubits=qubits)
         exp_ch_map = {
-            "UHFQC_0": {"q13": 0, "q16": 1},
-            "UHFQC_1": {
-                "q1": 0,
-                "q4": 1,
-                "q5": 2,
-                "q7": 3,
-                "q8": 4,
-                "q10": 5,
-                "q11": 6,
-                "q14": 7,
-                "q15": 8,
-            },
-            "UHFQC_2": {"q0": 0, "q2": 1, "q3": 2, "q6": 3, "q9": 4, "q12": 5},
+            'UHFQC_1': {'q0': 0, 'q1': 1, 'q2': 2, 'q3': 3, 'q7': 4, 'q8': 5, 'q12': 6, 'q13': 7, 'q15': 8},
+            'UHFQC_2': {'q4': 0, 'q5': 1, 'q9': 2, 'q10': 3, 'q14': 4, 'q16': 5},
+            'UHFQC_0': {'q6': 0, 'q11': 1}
         }
         assert exp_ch_map == self.device._acq_ch_map
 
         qb = self.device.find_instrument("q12")
-        assert qb.ro_acq_weight_chI() == 5
-        assert qb.ro_acq_weight_chQ() == 6
+        assert qb.ro_acq_weight_chI() == 6
+        assert qb.ro_acq_weight_chQ() == 7
 
-    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_assign_weights_order_matters(self):
         # Test that the order of the channels is as in the order iterated over
         qubits = ["q2", "q3", "q0"]
         self.device.ro_acq_weight_type("optimal")
         self.device.prepare_readout(qubits=qubits)
-        exp_ch_map = {"UHFQC_2": {"q0": 2, "q2": 0, "q3": 1}}
+
+        exp_ch_map = {"UHFQC_1": {"q0": 2, "q2": 0, "q3": 1}}
         assert exp_ch_map == self.device._acq_ch_map
         qb = self.device.find_instrument("q3")
         assert qb.ro_acq_weight_chI() == 1
         assert qb.ro_acq_weight_chQ() == 2
 
-    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_assign_weights_IQ_counts_double(self):
         qubits = ["q2", "q3", "q0", "q13", "q16"]
         self.device.ro_acq_weight_type("SSB")
         self.device.prepare_readout(qubits=qubits)
         exp_ch_map = {
-            "UHFQC_0": {"q13": 0, "q16": 2},
-            "UHFQC_2": {"q0": 4, "q2": 0, "q3": 2},
+            'UHFQC_1': {'q0': 4, 'q13': 6, 'q2': 0, 'q3': 2},
+            'UHFQC_2': {'q16': 0}
         }
+
         assert exp_ch_map == self.device._acq_ch_map
         qb = self.device.find_instrument("q16")
-        assert qb.ro_acq_weight_chI() == 2
-        assert qb.ro_acq_weight_chQ() == 3
+        assert qb.ro_acq_weight_chI() == 0
+        assert qb.ro_acq_weight_chQ() == 1
 
-    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_assign_weights_too_many_raises(self):
         qubits = self.device.qubits()
         self.device.ro_acq_weight_type("SSB")
         with pytest.raises(ValueError):
             self.device.prepare_readout(qubits=qubits)
 
-    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_readout_resets_UHF(self):
-        uhf = self.device.find_instrument("UHFQC_2")
+        uhf = self.device.find_instrument("UHFQC_1")
 
         uhf.qas_0_correlations_5_enable(1)
         uhf.qas_0_correlations_5_source(3)
@@ -461,7 +467,6 @@ class Test_Device_obj(unittest.TestCase):
         assert uhf.qas_0_thresholds_5_correlation_enable() == 0
         assert uhf.qas_0_thresholds_5_correlation_source() == 0
 
-    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_ro_pulses_resonator_combinations(self):
         # because not all combinations are supported the default is to
         # support
@@ -471,157 +476,138 @@ class Test_Device_obj(unittest.TestCase):
 
         # Combinations are based on qubit number
         res_combs0 = self.ro_lutman_0.resonator_combinations()
-        if 0:  # FIXME: PR #638
-            exp_res_combs0 = [[13], [16], [13, 16]]
-        else:
-            exp_res_combs0 = [[13]]
+        exp_res_combs0 = [[11]]
         assert res_combs0 == exp_res_combs0
 
+        res_combs1 = self.ro_lutman_1.resonator_combinations()
+        exp_res_combs1 = [[2, 3, 0, 13]]
+        assert res_combs1 == exp_res_combs1
+
         res_combs2 = self.ro_lutman_2.resonator_combinations()
-        if 0:  # FIXME: PR #638
-            exp_res_combs2 = [[2], [3], [0], [2, 3, 0]]
-        else:
-            exp_res_combs2 = [[0]]
+        exp_res_combs2 = [[16]]
         assert res_combs2 == exp_res_combs2
 
-    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prepare_ro_pulses_lutman_pars_updated(self):
         q = self.device.find_instrument("q5")
         q.ro_pulse_amp(0.4)
         self.device.prepare_readout(["q5"])
-        ro_amp = self.ro_lutman_1.M_amp_R5()
+        ro_amp = self.ro_lutman_2.M_amp_R5()
         assert ro_amp == 0.4
 
         q.ro_pulse_amp(0.2)
         self.device.prepare_readout(["q5"])
-        ro_amp = self.ro_lutman_1.M_amp_R5()
+        ro_amp = self.ro_lutman_2.M_amp_R5()
         assert ro_amp == 0.2
 
-    @unittest.skip('FIXME: disabled, see PR #643')
     def test_prep_ro_input_avg_det(self):
         qubits = self.device.qubits()
         self.device.ro_acq_weight_type("optimal")
         self.device.prepare_readout(qubits=qubits)
 
-        exp_ch_map = {
-            "UHFQC_0": {"q13": 0, "q16": 1},
-            "UHFQC_1": {
-                "q1": 0,
-                "q4": 1,
-                "q5": 2,
-                "q7": 3,
-                "q8": 4,
-                "q10": 5,
-                "q11": 6,
-                "q14": 7,
-                "q15": 8,
-            },
-            "UHFQC_2": {"q0": 0, "q2": 1, "q3": 2, "q6": 3, "q9": 4, "q12": 5},
-        }
-
-        inp_avg_det = self.device.input_average_detector
+        inp_avg_det = self.device.get_input_avg_det()
         assert isinstance(inp_avg_det, Multi_Detector_UHF)
         assert len(inp_avg_det.detectors) == 3
         for ch_det in inp_avg_det.detectors:
             assert isinstance(ch_det, UHFQC_input_average_detector)
-        # Note taht UHFQC_2 is first because q0 is the first in device.qubits
+
+        # Note that UHFQC_1 is first because q0 is the first in device.qubits
         assert inp_avg_det.value_names == [
-            "UHFQC_2 ch0",
-            "UHFQC_2 ch1",
             "UHFQC_1 ch0",
             "UHFQC_1 ch1",
+            "UHFQC_2 ch0",
+            "UHFQC_2 ch1",
             "UHFQC_0 ch0",
             "UHFQC_0 ch1",
         ]
 
-    @unittest.skip('FIXME: disabled, see PR #643')
-    def test_prepare_ro_instantiate_detectors_int_avg(self):
-        qubits = ["q13", "q16", "q1", "q5", "q0"]
+    def test_prepare_ro_instantiate_detectors_int_avg_optimal(self):
+        qubits = ["q11", "q16", "q1", "q5", "q0"]
         self.device.ro_acq_weight_type("optimal")
         self.device.prepare_readout(qubits=qubits)
 
-        int_avg_det = self.device.int_avg_det
+        int_avg_det = self.device.get_int_avg_det()
         assert isinstance(int_avg_det, Multi_Detector_UHF)
         assert len(int_avg_det.detectors) == 3
         for ch_det in int_avg_det.detectors:
             assert isinstance(ch_det, UHFQC_integrated_average_detector)
-        # Note that UHFQC_2 is first because q0 is the first in device.qubits
+
         assert int_avg_det.value_names == [
-            "UHFQC_0 w0 q13",
-            "UHFQC_0 w1 q16",
+            "UHFQC_0 w0 q11",
+            "UHFQC_2 w0 q16",
+            "UHFQC_2 w1 q5",
             "UHFQC_1 w0 q1",
-            "UHFQC_1 w1 q5",
-            "UHFQC_2 w0 q0",
+            "UHFQC_1 w1 q0",
         ]
 
-        qubits = ["q13", "q16", "q1", "q5", "q0"]
+    def test_prepare_ro_instantiate_detectors_int_avg_ssb(self):
+        qubits = ["q11", "q16", "q1", "q5", "q0"]
         self.device.ro_acq_weight_type("SSB")
         self.device.prepare_readout(qubits=qubits)
 
-        int_avg_det = self.device.int_avg_det
+        int_avg_det = self.device.get_int_avg_det()
         assert isinstance(int_avg_det, Multi_Detector_UHF)
         assert len(int_avg_det.detectors) == 3
         for ch_det in int_avg_det.detectors:
             assert isinstance(ch_det, UHFQC_integrated_average_detector)
-        # Note that UHFQC_2 is first because q0 is the first in device.qubits
+
         assert int_avg_det.value_names == [
-            "UHFQC_0 w0 q13 I",
-            "UHFQC_0 w1 q13 Q",
-            "UHFQC_0 w2 q16 I",
-            "UHFQC_0 w3 q16 Q",
+            "UHFQC_0 w0 q11 I",
+            "UHFQC_0 w1 q11 Q",
+            "UHFQC_2 w0 q16 I",
+            "UHFQC_2 w1 q16 Q",
+            "UHFQC_2 w2 q5 I",
+            "UHFQC_2 w3 q5 Q",
             "UHFQC_1 w0 q1 I",
             "UHFQC_1 w1 q1 Q",
-            "UHFQC_1 w2 q5 I",
-            "UHFQC_1 w3 q5 Q",
-            "UHFQC_2 w0 q0 I",
-            "UHFQC_2 w1 q0 Q",
+            "UHFQC_1 w2 q0 I",
+            "UHFQC_1 w3 q0 Q",
         ]
-
         # Note that the order of channels gets ordered per feedline
         # because of the way the multi detector works
 
-    @unittest.skip('FIXME: disabled, see PR #643')
-    def test_prepare_ro_instantiate_detectors_int_logging(self):
-        qubits = ["q13", "q16", "q1", "q5", "q0"]
+    def test_prepare_ro_instantiate_detectors_int_logging_optimal(self):
+        qubits = ["q11", "q16", "q1", "q5", "q0"]
         self.device.ro_acq_weight_type("optimal")
         self.device.prepare_readout(qubits=qubits)
 
-        int_log_det = self.device.int_log_det
+        int_log_det = self.device.get_int_logging_detector()
         assert isinstance(int_log_det, Multi_Detector_UHF)
         assert len(int_log_det.detectors) == 3
         for ch_det in int_log_det.detectors:
             assert isinstance(ch_det, UHFQC_integration_logging_det)
-        # Note that UHFQC_2 is first because q0 is the first in device.qubits
+
         assert int_log_det.value_names == [
-            "UHFQC_0 w0 q13",
-            "UHFQC_0 w1 q16",
+            "UHFQC_0 w0 q11",
+            "UHFQC_2 w0 q16",
+            "UHFQC_2 w1 q5",
             "UHFQC_1 w0 q1",
-            "UHFQC_1 w1 q5",
-            "UHFQC_2 w0 q0",
+            "UHFQC_1 w1 q0",
         ]
 
         qubits = self.device.qubits()
-        qubits = ["q13", "q16", "q1", "q5", "q0"]
+
+    def test_prepare_ro_instantiate_detectors_int_logging_ssb(self):
+        qubits = ["q11", "q16", "q1", "q5", "q0"]
         self.device.ro_acq_weight_type("SSB")
         self.device.prepare_readout(qubits=qubits)
 
-        int_log_det = self.device.int_log_det
+        int_log_det = self.device.get_int_logging_detector()
         assert isinstance(int_log_det, Multi_Detector_UHF)
         assert len(int_log_det.detectors) == 3
         for ch_det in int_log_det.detectors:
             assert isinstance(ch_det, UHFQC_integration_logging_det)
-        # Note that UHFQC_2 is first because q0 is the first in device.qubits
+
         assert int_log_det.value_names == [
-            "UHFQC_0 w0 q13 I",
-            "UHFQC_0 w1 q13 Q",
-            "UHFQC_0 w2 q16 I",
-            "UHFQC_0 w3 q16 Q",
+            "UHFQC_0 w0 q11 I",
+            "UHFQC_0 w1 q11 Q",
+            "UHFQC_2 w0 q16 I",
+            "UHFQC_2 w1 q16 Q",
+            "UHFQC_2 w2 q5 I",
+            "UHFQC_2 w3 q5 Q",
             "UHFQC_1 w0 q1 I",
             "UHFQC_1 w1 q1 Q",
-            "UHFQC_1 w2 q5 I",
-            "UHFQC_1 w3 q5 Q",
-            "UHFQC_2 w0 q0 I",
-            "UHFQC_2 w1 q0 Q",
+            "UHFQC_1 w2 q0 I",
+            "UHFQC_1 w3 q0 Q",
         ]
 
     def test_prepare_readout_mixer_settings(self):

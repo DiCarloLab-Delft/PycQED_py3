@@ -32,6 +32,8 @@ import warnings
 import numpy as np
 from deprecated import deprecated
 
+
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object import Qubit
 from pycqed.measurement import detector_functions as det
 
 # Imported for type checks
@@ -45,9 +47,9 @@ from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 log = logging.getLogger(__name__)
 
 
-class HAL_ShimSQ(Instrument):
+class HAL_ShimSQ(Qubit):
     def __init__(self, name, **kw):
-        super().__init__(name+'_shimSQ', **kw)  # FIXME: this changes device name that may be used in data files
+        super().__init__(name, **kw)  # FIXME: Qubit should be below us in object hierarchy, but it inherits from Instrument
 
         self._add_instrument_ref_parameters()
         self._add_config_parameters()
@@ -1047,7 +1049,7 @@ class HAL_ShimSQ(Instrument):
         LO.power(self.ro_pow_LO())
 
     # FIXME: UHFQC specific
-    # FIXME: move to HAL_Transmon, just as _prep_mw_pulses
+    # FIXME: align with HAL_ShimMQ::_prep_ro_pulses
     def _prep_ro_pulse(self, upload=True, CW=False):
         """
         Sets the appropriate parameters in the RO LutMan and uploads the

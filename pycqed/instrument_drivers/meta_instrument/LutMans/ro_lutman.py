@@ -36,8 +36,14 @@ def create_pulse(shape: str,
 
 class Base_RO_LutMan(Base_LutMan):
 
-    def __init__(self, name, num_res=2, feedline_number: int=0,
-                 feedline_map='S7', **kw):
+    def __init__(
+            self,
+            name,
+            num_res=2,
+            feedline_number: int = 0,
+            feedline_map='S7',
+            **kw
+    ):
         if num_res > 10:  # FIXME: this is UHFQA limit
             raise ValueError('At most 10 resonators can be read out.')
         self._num_res = num_res
@@ -50,16 +56,14 @@ class Base_RO_LutMan(Base_LutMan):
             elif self._feedline_number == 1:
                 self._resonator_codeword_bit_mapping = [1]
             else:
-                raise NotImplementedError(
-                    'Hardcoded for feedline 0 and 1 of Surface-5')
+                raise NotImplementedError('Hardcoded for feedline 0 and 1 of Surface-5')
         elif feedline_map == 'S7':
             if self._feedline_number == 0:
                 self._resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]
             elif self._feedline_number == 1:
                 self._resonator_codeword_bit_mapping = [1, 4]
             else:
-                raise NotImplementedError(
-                    'Hardcoded for feedline 0 and 1 of Surface-7')
+                raise NotImplementedError('Hardcoded for feedline 0 and 1 of Surface-7')
         elif feedline_map == 'S17':
             if self._feedline_number == 0:
                 self._resonator_codeword_bit_mapping = [6, 11]
@@ -68,8 +72,7 @@ class Base_RO_LutMan(Base_LutMan):
             elif self._feedline_number == 2:
                 self._resonator_codeword_bit_mapping = [4, 5, 9, 10, 14, 16]
             else:
-                raise NotImplementedError(
-                    'Hardcoded for feedline 0, 1 and 2 of Surface-17')
+                raise NotImplementedError('Hardcoded for feedline 0, 1 and 2 of Surface-17')
         else:
             raise ValueError('Feedline map not in {"S5", "S7", "S17"}.')
 
@@ -88,104 +91,173 @@ class Base_RO_LutMan(Base_LutMan):
 
     def _add_waveform_parameters(self):
         # mixer corrections are done globally, can be specified per resonator
-        self.add_parameter('mixer_apply_predistortion_matrix',
-                           vals=vals.Bool(),
-                           parameter_class=ManualParameter,
-                           initial_value=False)
-        self.add_parameter('gaussian_convolution',
-                           vals=vals.Bool(),
-                           parameter_class=ManualParameter,
-                           initial_value=False)
-        self.add_parameter('gaussian_convolution_sigma', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=5.0e-9,
-                           unit='s')
-        self.add_parameter('mixer_alpha', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
-        self.add_parameter('mixer_offs_I', unit='V',
-                           parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('mixer_offs_Q', unit='V',
-                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix',
+            vals=vals.Bool(),
+            parameter_class=ManualParameter,
+            initial_value=False
+        )
+        self.add_parameter(
+            'gaussian_convolution',
+            vals=vals.Bool(),
+            parameter_class=ManualParameter,
+            initial_value=False
+        )
+        self.add_parameter(
+            'gaussian_convolution_sigma',
+            vals=vals.Numbers(),
+            parameter_class=ManualParameter,
+            initial_value=5.0e-9,
+            unit='s'
+        )
+        self.add_parameter(
+            'mixer_alpha',
+            vals=vals.Numbers(),
+            parameter_class=ManualParameter,
+            initial_value=1.0
+        )
+        self.add_parameter(
+            'mixer_phi',
+            vals=vals.Numbers(),
+            unit='deg',
+            parameter_class=ManualParameter,
+            initial_value=0.0
+        )
+        self.add_parameter(
+            'mixer_offs_I',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
+        self.add_parameter(
+            'mixer_offs_Q',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0
+        )
         comb_msg = (
             'Resonator combinations specifies which pulses are uploaded to'
             'the device. Given as a list of lists:'
             'e.g. [[0], [2], [0, 2]] specifies that pulses for readout'
             'of resonator 0, 2, and a pulse for mux readout on both should be'
             'uploaded.')
-        self.add_parameter('resonator_combinations',
-                           vals=vals.Lists(),
-                           docstring=comb_msg,
-                           set_cmd=self._set_resonator_combinations,
-                           get_cmd=self._get_resonator_combinations)
-        self.add_parameter('pulse_type', vals=vals.Enum(
-            'M_up_down_down', 'M_simple', 'M_up_down_down_final'),
+        self.add_parameter(
+            'resonator_combinations',
+            vals=vals.Lists(),
+            docstring=comb_msg,
+            set_cmd=self._set_resonator_combinations,
+            get_cmd=self._get_resonator_combinations
+        )
+        self.add_parameter(
+            'pulse_type',
+            vals=vals.Enum('M_up_down_down', 'M_simple', 'M_up_down_down_final'),
             set_cmd=self._set_pulse_type,
             get_cmd=self._get_pulse_type,
             docstring='defines sequence of segments of the pulse')
-        self.add_parameter('pulse_primitive_shape', vals=vals.Enum(
-            'square', 'gaussian'),
+        self.add_parameter(
+            'pulse_primitive_shape',
+            vals=vals.Enum('square', 'gaussian'),
             parameter_class=ManualParameter,
             docstring='defines the shape of the segments of the pulse',
-            initial_value='square')
+            initial_value='square'
+        )
         for res in self._resonator_codeword_bit_mapping:
-            self.add_parameter('M_modulation_R{}'.format(res),
-                               vals=vals.Numbers(), unit='Hz',
-                               parameter_class=ManualParameter,
-                               initial_value=20.0e6)
-            self.add_parameter('M_length_R{}'.format(res), unit='s',
-                               vals=vals.Numbers(1e-9, 8000e-9),
-                               parameter_class=ManualParameter,
-                               initial_value=2000e-9)
-            self.add_parameter('M_amp_R{}'.format(res), unit='V',
-                               vals=vals.Numbers(0, 1),
-                               parameter_class=ManualParameter,
-                               initial_value=0.1)
-            self.add_parameter('M_delay_R{}'.format(res), unit='V',
-                               vals=vals.Numbers(0, 500e-9),
-                               parameter_class=ManualParameter,
-                               initial_value=0)
-            self.add_parameter('M_final_amp_R{}'.format(res), unit='V',
-                               vals=vals.Numbers(0, 1),
-                               parameter_class=ManualParameter,
-                               initial_value=0.1)
-            self.add_parameter('M_final_length_R{}'.format(res), unit='s',
-                               vals=vals.Numbers(1e-9, 8000e-9),
-                               parameter_class=ManualParameter,
-                               initial_value=1000e-9)
-            self.add_parameter('M_final_delay_R{}'.format(res), unit='s',
-                               vals=vals.Numbers(1e-9, 8000e-9),
-                               parameter_class=ManualParameter,
-                               initial_value=200e-9)
-            self.add_parameter('M_phi_R{}'.format(res), unit='deg',
-                               vals=vals.Numbers(0, 360),
-                               parameter_class=ManualParameter,
-                               initial_value=0.0)
-            self.add_parameter('M_down_length0_R{}'.format(res), unit='s',
-                               vals=vals.Numbers(1e-9, 8000e-9),
-                               parameter_class=ManualParameter,
-                               initial_value=200.0e-9)
-            self.add_parameter('M_down_length1_R{}'.format(res), unit='s',
-                               vals=vals.Numbers(1e-9, 8000e-9),
-                               parameter_class=ManualParameter,
-                               initial_value=200.0e-9)
-            self.add_parameter('M_down_amp0_R{}'.format(res), unit='V',
-                               vals=vals.Numbers(-1, 1),
-                               parameter_class=ManualParameter,
-                               initial_value=0.1)
-            self.add_parameter('M_down_amp1_R{}'.format(res), unit='V',
-                               vals=vals.Numbers(-1, 1),
-                               parameter_class=ManualParameter,
-                               initial_value=0.1)
-            self.add_parameter('M_down_phi0_R{}'.format(res), unit='deg',
-                               parameter_class=ManualParameter,
-                               initial_value=180.0)
-            self.add_parameter('M_down_phi1_R{}'.format(res), unit='deg',
-                               parameter_class=ManualParameter,
-                               initial_value=180.0)
+            self.add_parameter(
+                'M_modulation_R{}'.format(res),
+                vals=vals.Numbers(),
+                unit='Hz',
+                parameter_class=ManualParameter,
+                initial_value=20.0e6
+            )
+            self.add_parameter(
+                'M_length_R{}'.format(res),
+                unit='s',
+                vals=vals.Numbers(1e-9, 8000e-9),
+                parameter_class=ManualParameter,
+                initial_value=2000e-9
+            )
+            self.add_parameter(
+                'M_amp_R{}'.format(res),
+                unit='V',
+                vals=vals.Numbers(0, 1),
+                parameter_class=ManualParameter,
+                initial_value=0.1
+            )
+            self.add_parameter(
+                'M_delay_R{}'.format(res),
+                unit='V',
+                vals=vals.Numbers(0, 500e-9),
+                parameter_class=ManualParameter,
+                initial_value=0
+            )
+            self.add_parameter(
+                'M_final_amp_R{}'.format(res),
+                unit='V',
+                vals=vals.Numbers(0, 1),
+                parameter_class=ManualParameter,
+                initial_value=0.1
+            )
+            self.add_parameter(
+                'M_final_length_R{}'.format(res),
+                unit='s',
+                vals=vals.Numbers(1e-9, 8000e-9),
+                parameter_class=ManualParameter,
+                initial_value=1000e-9
+            )
+            self.add_parameter(
+                'M_final_delay_R{}'.format(res),
+                unit='s',
+                vals=vals.Numbers(1e-9, 8000e-9),
+                parameter_class=ManualParameter,
+                initial_value=200e-9
+            )
+            self.add_parameter(
+                'M_phi_R{}'.format(res),
+                unit='deg',
+                vals=vals.Numbers(0, 360),
+                parameter_class=ManualParameter,
+                initial_value=0.0
+            )
+            self.add_parameter(
+                'M_down_length0_R{}'.format(res),
+                unit='s',
+                vals=vals.Numbers(1e-9, 8000e-9),
+                parameter_class=ManualParameter,
+                initial_value=200.0e-9
+            )
+            self.add_parameter(
+                'M_down_length1_R{}'.format(res),
+                unit='s',
+                vals=vals.Numbers(1e-9, 8000e-9),
+                parameter_class=ManualParameter,
+                initial_value=200.0e-9
+            )
+            self.add_parameter(
+                'M_down_amp0_R{}'.format(res),
+                unit='V',
+                vals=vals.Numbers(-1, 1),
+                parameter_class=ManualParameter,
+                initial_value=0.1
+            )
+            self.add_parameter(
+                'M_down_amp1_R{}'.format(res),
+                unit='V',
+                vals=vals.Numbers(-1, 1),
+                parameter_class=ManualParameter,
+                initial_value=0.1
+            )
+            self.add_parameter(
+                'M_down_phi0_R{}'.format(res),
+                unit='deg',
+                parameter_class=ManualParameter,
+                initial_value=180.0
+            )
+            self.add_parameter(
+                'M_down_phi1_R{}'.format(res),
+                unit='deg',
+                parameter_class=ManualParameter,
+                initial_value=180.0
+            )
 
     def set_default_lutmap(self):
         """
@@ -364,19 +436,44 @@ class Base_RO_LutMan(Base_LutMan):
 
 class UHFQC_RO_LutMan(Base_RO_LutMan):
 
-    def __init__(self, name, num_res: int=1, feedline_number: int=0,
-                 feedline_map='S7', **kw):
-        super().__init__(name, num_res=num_res,
-                         feedline_number=feedline_number,
-                         feedline_map=feedline_map, **kw)
-        self.add_parameter('acquisition_delay',
-                           vals=vals.Numbers(min_value=0), unit='s',
-                           parameter_class=ManualParameter,
-                           initial_value=270e-9)
-        self.add_parameter('timeout',
-                           vals=vals.Numbers(min_value=0), unit='s',
-                           parameter_class=ManualParameter,
-                           initial_value=5)
+    def __init__(
+            self,
+            name,
+            num_res: int = 1,
+            feedline_number: int = 0,
+            feedline_map='S7',
+            **kw
+    ):
+        super().__init__(
+            name,
+            num_res=num_res,
+            feedline_number=feedline_number,
+            feedline_map=feedline_map,
+            **kw
+        )
+
+        self.add_parameter(
+            'acquisition_delay',
+            vals=vals.Numbers(min_value=0),
+            unit='s',
+            parameter_class=ManualParameter,
+            initial_value=270e-9
+        )
+        self.add_parameter(
+            'timeout',
+            vals=vals.Numbers(min_value=0),
+            unit='s',
+            parameter_class=ManualParameter,
+            initial_value=5
+        )
+        # Parameter that stores LO frequency
+        self.add_parameter(
+            'LO_freq',
+            vals=vals.Numbers(),
+            unit='Hz',
+            parameter_class=ManualParameter,
+            initial_value=None
+        )
 
         # Set to a default because box is not expected to change
         self._voltage_min = -1.0
@@ -386,12 +483,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         # By default, use the DIO triggered mode
         self._mode = 'DIO_triggered'
         # Sample rate of the instrument
-        self.sampling_rate(1.8e9)
-        # Parameter that stores LO frequency
-        self.add_parameter('LO_freq',
-                           vals=vals.Numbers(), unit='Hz',
-                           parameter_class=ManualParameter,
-                           initial_value=None)
+        self.sampling_rate(1.8e9)  # FIXME: hardcoded
+
 
     ##########################################################################
     # Base_LutMan overrides

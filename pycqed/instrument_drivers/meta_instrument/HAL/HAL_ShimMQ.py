@@ -199,7 +199,7 @@ class HAL_ShimMQ(Instrument):
         if not reduced:
             self._prep_ro_sources(qubits=qubits)
 
-        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits)  # FIXME: cleanup use of acq_ch_map vs. self.acq_ch_map
+        self._prep_ro_assign_weights(qubits=qubits)  # NB: sets self.acq_ch_map
         self._prep_ro_integration_weights(qubits=qubits)
         if not reduced:
             self._prep_ro_pulses(qubits=qubits)
@@ -542,12 +542,13 @@ class HAL_ShimMQ(Instrument):
             )
 
     def _add_ro_parameters(self):
-        self.add_parameter(
-            'ro_lo_freq',
-            unit='Hz',
-            docstring='Frequency of the common LO for all RO pulses.',
-            parameter_class=ManualParameter
-        )
+        # FIXME: no longer used, now in UHFQC_RO_LutMan.LO_freq
+        # self.add_parameter(
+        #     'ro_lo_freq',
+        #     unit='Hz',
+        #     docstring='Frequency of the common LO for all RO pulses.',
+        #     parameter_class=ManualParameter
+        # )
 
         # actually, it should be possible to build the integration
         # weights obeying different settings for different
@@ -698,11 +699,11 @@ class HAL_ShimMQ(Instrument):
         turn on and configure the RO LO's of all qubits to be measured and
         update the modulation frequency of all qubits.
         """
-        # This device object works under the assumption that a single LO
-        # is used to drive all readout lines.
+        # FIXME: This device object works under the assumption that a single LO
+        #  is used to drive all readout lines.
         LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
-        LO_lutman = self.find_instrument(qubits[0]).instr_LutMan_RO.get_instr()
-        LO.frequency.set(LO_lutman.LO_freq())
+        RO_lutman = self.find_instrument(qubits[0]).instr_LutMan_RO.get_instr()
+        LO.frequency.set(RO_lutman.LO_freq())
         LO.power(self.ro_pow_LO())
         LO.on()
 
@@ -856,6 +857,7 @@ class HAL_ShimMQ(Instrument):
             raise NotImplementedError('ro_acq_weight_type "{}" not supported'.format(
                 self.ro_acq_weight_type()))
 
+    # FIXME: align with HAL_ShimSQ::_prep_ro_pulses
     def _prep_ro_pulses(self, qubits):
         """
         Configure the ro lutmans.
@@ -874,8 +876,7 @@ class HAL_ShimMQ(Instrument):
 
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
-            # qubit and resonator number are identical
-            res_nr = qb.cfg_qubit_nr()
+            res_nr = qb.cfg_qubit_nr()  # qubit and resonator number are identical
             ro_lm = qb.instr_LutMan_RO.get_instr()
 
             # Add resonator to list of resonators in lm

@@ -15,7 +15,6 @@ import multiprocessing
 from deprecated import deprecated
 from typing import Optional
 
-from .qubit_object import Qubit
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimSQ import HAL_ShimSQ
 
 from pycqed.measurement import calibration_toolbox as cal_toolbox
@@ -53,7 +52,7 @@ from qcodes.instrument.parameter import ManualParameter
 log = logging.getLogger(__name__)
 
 
-class HAL_Transmon(HAL_ShimSQ, Qubit):
+class HAL_Transmon(HAL_ShimSQ):
     """
     The HAL_Transmon (formerly known as CCL_Transmon)
     Setup configuration:
@@ -64,8 +63,7 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
 
     def __init__(self, name, **kw):
         t0 = time.time()
-        Qubit.__init__(self, name, **kw)
-        HAL_ShimSQ.__init__(self, name, **kw)
+        super().__init__(name, **kw)
 
         self.add_parameters()
         self.connect_message(begin_time=t0)
