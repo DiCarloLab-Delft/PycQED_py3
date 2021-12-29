@@ -1,5 +1,6 @@
 """
 File:   HAL_ShimSQ.py : HAL shim Single Qubit
+Note:   extracted from HAL_Transmon.py (originally CCL_Transmon.py)
 
 This file provides class HAL_ShimSQ, which implements a shim between the HAL_Transmon and the instrument hardware for
 single qubit operations. It contains hardware dependent functions extracted from CCL_Transmon.py, extended with

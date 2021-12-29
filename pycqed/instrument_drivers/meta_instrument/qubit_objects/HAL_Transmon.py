@@ -44,11 +44,8 @@ from pycqed.utilities.general import gen_sweep_pts
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
     mk_minimization_loss_func, mk_minimization_goal_func
 
-# Imported for type checks
-from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
-from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
+# Imported for type annotations
 from pycqed.measurement.measurement_control import MeasurementControl
-from pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman import Base_MW_LutMan
 
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
