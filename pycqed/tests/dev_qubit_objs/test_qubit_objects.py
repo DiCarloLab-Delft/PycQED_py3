@@ -6,8 +6,8 @@ import numpy as np
 import pycqed as pq
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object import Qubit
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.HAL_Transmon import HAL_Transmon
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimSQ import HAL_ShimSQ
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.HAL_Transmon import HAL_Transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
@@ -44,25 +44,25 @@ def _setup_hw(cls, qubit_obj):
     ##############################################
     # setup LutMans
     ##############################################
-    if 0:  # FIXME: broken by _prep_mw_pulses
+    if 0:  # FIXME: VSM configuration
         cls.MW_LutMan = mwl.MW_LutMan('MW_LutMan_VSM')
-        cls.MW_LutMan.AWG(cls.AWG.name)
         cls.MW_LutMan.channel_GI(1)
         cls.MW_LutMan.channel_GQ(2)
         cls.MW_LutMan.channel_DI(3)
         cls.MW_LutMan.channel_DQ(4)
-        cls.MW_LutMan.mw_modulation(100e6)
-        cls.MW_LutMan.sampling_rate(2.4e9)
     else:
         cls.MW_LutMan = mwl.AWG8_MW_LutMan('MW_LutMan')
-        cls.MW_LutMan.AWG(cls.AWG.name)
         cls.MW_LutMan.channel_I(1)
         cls.MW_LutMan.channel_Q(2)
         cls.MW_LutMan.mw_modulation(100e6)
         cls.MW_LutMan.sampling_rate(2.4e9)
 
         qubit_obj.cfg_with_vsm(False)
-        qubit_obj.cfg_prepare_mw_awg(False)  # FIXME: load_waveform_onto_AWG_lookuptable fails
+        qubit_obj.cfg_prepare_mw_awg(True)  # FIXME: load_waveform_onto_AWG_lookuptable fails
+    cls.MW_LutMan.AWG(cls.AWG.name)
+    cls.MW_LutMan.mw_modulation(100e6)
+    cls.MW_LutMan.sampling_rate(2.4e9)
+
     cls.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5, feedline_number=0)
     cls.ro_lutman.AWG(cls.UHFQC.name)
 
@@ -419,7 +419,7 @@ class Test_HAL_Transmon(unittest.TestCase):
         self.assertEqual(self.MW_LutMan.mw_ef_modulation(), -335e6)
 
 
-    @unittest.skip('not configure for VSM')
+    @unittest.skip('not configured for VSM')
     def test_prep_td_pulses_vsm(self):
         # this function contains the original test_prep_td_pulses, which used the VSM.
         # To make this work again, the initialization needs to be corrected, and maybe parts of HAL_Transmon
@@ -502,7 +502,6 @@ class Test_HAL_Transmon(unittest.TestCase):
         self.transmon.ro_acq_input_average_length(2e-6)
         self.transmon.measure_transients()
 
-    @unittest.skip('OpenQL bug for CCL config')
     def test_qubit_spec(self):
         freqs = np.linspace(6e9, 6.5e9, 31)
         # Data cannot be analyzed as dummy data is just random numbers

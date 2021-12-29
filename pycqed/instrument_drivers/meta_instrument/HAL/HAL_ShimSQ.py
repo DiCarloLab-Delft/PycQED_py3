@@ -642,6 +642,8 @@ class HAL_ShimSQ(Qubit):
             unit='Hz',
             initial_value=-20e6,
             parameter_class=ManualParameter)
+
+        # NB: shared between qubits on same feedline
         self.add_parameter(
             'ro_pow_LO',
             label='RO power LO',
@@ -649,8 +651,17 @@ class HAL_ShimSQ(Qubit):
             initial_value=20,
             parameter_class=ManualParameter)
 
+        self.add_parameter(
+            'ro_pulse_delay', unit='s',
+            label='Readout pulse delay',
+            vals=vals.Numbers(0, 1e-6),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('The delay time for the readout pulse'))
+
         #############################
         # RO pulse parameters
+        # FIXME: move to HAL_Transmon
         #############################
         self.add_parameter(
             'ro_pulse_type',
@@ -714,6 +725,7 @@ class HAL_ShimSQ(Qubit):
             parameter_class=ManualParameter)
 
         # Mixer offsets correction, RO pulse
+        # NB: shared between qubits on same feedline
         self.add_parameter(
             'ro_pulse_mixer_offs_I',
             unit='V',
@@ -753,7 +765,7 @@ class HAL_ShimSQ(Qubit):
         self.add_parameter(
             'ro_acq_input_average_length',
             unit='s',
-            label='Readout acquisition delay',
+            label='Readout input averaging time',
             vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
             initial_value=4096 / 1.8e9,
             parameter_class=ManualParameter,
@@ -766,14 +778,6 @@ class HAL_ShimSQ(Qubit):
             parameter_class=ManualParameter)
 
         self.add_parameter(
-            'ro_pulse_delay', unit='s',
-            label='Readout acquisition delay',
-            vals=vals.Numbers(0, 1e-6),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=('The delay time for the readout pulse'))
-
-        self.add_parameter(
             'ro_acq_delay',
             unit='s',
             label='Readout acquisition delay',
@@ -784,7 +788,7 @@ class HAL_ShimSQ(Qubit):
                 'The time between the instruction that trigger the'
                 ' readout pulse and the instruction that triggers the '
                 'acquisition. The positive number means that the '
-                'acquisition is started after the pulse is send.'))
+                'acquisition is started after the pulse is sent.'))
 
         self.add_parameter(
             'ro_acq_weight_func_I',
@@ -813,6 +817,8 @@ class HAL_ShimSQ(Qubit):
             vals=vals.Ints(0, 9),
             parameter_class=ManualParameter)
 
+        # Mixer correction parameters
+        # NB: shared between qubits on same feedline
         self.add_parameter(
             'ro_acq_mixer_phi',
             unit='degree',

@@ -8,12 +8,14 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 
 
-def create_pulse(shape: str,
-                 amplitude: float,
-                 length: float,
-                 phase: float,
-                 delay: float=0,
-                 sampling_rate: float=1.8e9):
+def create_pulse(
+        shape: str,
+        amplitude: float,
+        length: float,
+        phase: float,
+        delay: float = 0,
+        sampling_rate: float = 1.8e9
+):
     kw = {}
     if shape == 'square':
         shape_function = wf.block_pulse
@@ -24,14 +26,14 @@ def create_pulse(shape: str,
         kw['sigma_length'] = length/nr_sigma
         kw['nr_sigma'] = nr_sigma
     else:
-        raise NotImplementedError('Primitive pulse shape ' +
-                                  shape +
-                                  ' not implemented.')
+        raise NotImplementedError('Primitive pulse shape ' + shape + ' not implemented.')
 
-    return shape_function(amp=amplitude,
-                          sampling_rate=sampling_rate,
-                          delay=delay,
-                          phase=phase, **kw)
+    return shape_function(
+        amp=amplitude,
+        sampling_rate=sampling_rate,
+        delay=delay,
+        phase=phase, **kw
+    )
 
 
 class Base_RO_LutMan(Base_LutMan):
@@ -327,43 +329,45 @@ class Base_RO_LutMan(Base_LutMan):
             # 1. Generate Pulse envelopes
             # Simple pulse
             up_len = self.get('M_length_R{}'.format(res))-gauss_length
-            M = create_pulse(shape=self.pulse_primitive_shape(),
-                             amplitude=self.get('M_amp_R{}'.format(res)),
-                             length=up_len,
-                             delay=self.get('M_delay_R{}'.format(res)),
-                             phase=self.get('M_phi_R{}'.format(res)),
-                             sampling_rate=sampling_rate)
+            M = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_amp_R{}'.format(res)),
+                length=up_len,
+                delay=self.get('M_delay_R{}'.format(res)),
+                phase=self.get('M_phi_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
             res_wave_dict['M_simple_R{}'.format(res)] = M
 
             # 3-step RO pulse with ramp-up and double depletion
             up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
-            M_up = create_pulse(shape=self.pulse_primitive_shape(),
-                                amplitude=self.get('M_amp_R{}'.format(res)),
-                                length=up_len,
-                                delay=0,
-                                phase=self.get('M_phi_R{}'.format(res)),
-                                sampling_rate=sampling_rate)
+            M_up = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_amp_R{}'.format(res)),
+                length=up_len,
+                delay=0,
+                phase=self.get('M_phi_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
 
-            M_down0 = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get(
-                                       'M_down_amp0_R{}'.format(res)),
-                                   length=self.get(
-                                       'M_down_length0_R{}'.format(res)),  # ns
-                                   delay=0,
-                                   phase=self.get(
-                                       'M_down_phi0_R{}'.format(res)),
-                                   sampling_rate=sampling_rate)
+            M_down0 = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_down_amp0_R{}'.format(res)),
+                length=self.get('M_down_length0_R{}'.format(res)),  # ns
+                delay=0,
+                phase=self.get('M_down_phi0_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
 
-            down1_len = self.get(
-                'M_down_length1_R{}'.format(res))-gauss_length/2
-            M_down1 = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get(
-                                       'M_down_amp1_R{}'.format(res)),
-                                   length=down1_len,
-                                   delay=0,
-                                   phase=self.get(
-                                       'M_down_phi1_R{}'.format(res)),
-                                   sampling_rate=sampling_rate)
+            down1_len = self.get('M_down_length1_R{}'.format(res))-gauss_length/2
+            M_down1 = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_down_amp1_R{}'.format(res)),
+                length=down1_len,
+                delay=0,
+                phase=self.get('M_down_phi1_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
 
             M_up_down_down = (np.concatenate((M_up[0], M_down0[0], M_down1[0])),
                               np.concatenate((M_up[1], M_down0[1], M_down1[1])))
@@ -371,20 +375,18 @@ class Base_RO_LutMan(Base_LutMan):
 
             # pulse with up, down, down depletion with an additional final
             # strong measurement at some delay
-            M_final = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get(
-                                       'M_final_amp_R{}'.format(res)),
-                                   length=self.get(
-                                       'M_final_length_R{}'.format(res)),  # ns
-                                   delay=self.get(
-                                       'M_final_delay_R{}'.format(res)),
-                                   phase=self.get('M_phi_R{}'.format(res)),
-                                   sampling_rate=sampling_rate)
+            M_final = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_final_amp_R{}'.format(res)),
+                length=self.get('M_final_length_R{}'.format(res)),  # ns
+                delay=self.get('M_final_delay_R{}'.format(res)),
+                phase=self.get('M_phi_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
 
             M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
                                     np.concatenate((M_up_down_down[1], M_final[1])))
-            res_wave_dict['M_up_down_down_final_R{}'.format(
-                res)] = M_up_down_down_final
+            res_wave_dict['M_up_down_down_final_R{}'.format(res)] = M_up_down_down_final
 
             # 2. convolve with gaussian (if desired)
             if self.gaussian_convolution():
@@ -393,15 +395,16 @@ class Base_RO_LutMan(Base_LutMan):
                     M_conv1 = np.convolve(val[1], norm_gauss_p)
                     #M_conv0 = M_conv0[hgsl: -hgsl+1]
                     #M_conv1 = M_conv1[hgsl: -hgsl+1]
-                    res_wave_dict[key] = (
-                        M_conv0/sampling_rate, M_conv1/sampling_rate)
+                    res_wave_dict[key] = (M_conv0/sampling_rate, M_conv1/sampling_rate)
 
             # 3. modulation with base frequency
             for key, val in res_wave_dict.items():
-                res_wave_dict[key] = wf.mod_pulse(pulse_I=val[0], pulse_Q=val[1],
-                                                  f_modulation=self.get(
-                                                      'M_modulation_R{}'.format(res)),
-                                                  sampling_rate=self.get('sampling_rate'))
+                res_wave_dict[key] = wf.mod_pulse(
+                    pulse_I=val[0],
+                    pulse_Q=val[1],
+                    f_modulation=self.get('M_modulation_R{}'.format(res)),
+                    sampling_rate=self.get('sampling_rate')
+                )
 
             # 4. apply mixer predistortion
             if self.mixer_apply_predistortion_matrix():
@@ -491,7 +494,10 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
     ##########################################################################
 
     def load_waveform_onto_AWG_lookuptable(
-            self, wave_id: str, regenerate_waveforms: bool=False):
+            self,
+            wave_id: str,
+            regenerate_waveforms: bool=False
+    ):
         """
         Load a waveform into the AWG.
 
@@ -514,10 +520,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             # Create the waveform name
             wavename = self.pulse_type() + '_R' + str(resonator)
             # adding new wave (not necessarily same length)
-            I_wave = add_waves_different_length(
-                I_wave, self._wave_dict[wavename][0])
-            Q_wave = add_waves_different_length(
-                Q_wave, self._wave_dict[wavename][1])
+            I_wave = add_waves_different_length(I_wave, self._wave_dict[wavename][0])
+            Q_wave = add_waves_different_length(Q_wave, self._wave_dict[wavename][1])
 
         # clipping the waveform
         I_wave = np.clip(I_wave, self._voltage_min, self._voltage_max)
@@ -533,10 +537,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                 self.AWG.get_instr().set('wave_ch1_cw000', I_wave)
                 self.AWG.get_instr().set('wave_ch2_cw000', Q_wave)
         else:
-            self.AWG.get_instr().set(
-                'wave_ch1_cw{:03}'.format(wave_id), I_wave)
-            self.AWG.get_instr().set(
-                'wave_ch2_cw{:03}'.format(wave_id), Q_wave)
+            self.AWG.get_instr().set('wave_ch1_cw{:03}'.format(wave_id), I_wave)
+            self.AWG.get_instr().set('wave_ch2_cw{:03}'.format(wave_id), Q_wave)
 
     def load_waveforms_onto_AWG_lookuptable(
             self,
@@ -549,16 +551,19 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         if force_load_sequencer_program:
             if self._mode == 'single_pulse':
                 self.AWG.get_instr().awg_sequence_acquisition_and_pulse(
-                    acquisition_delay=self.acquisition_delay())
+                    acquisition_delay=self.acquisition_delay()
+                )
             else:
                 self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
                     cases=list(self.LutMap().keys()),
                     acquisition_delay=self.acquisition_delay(),
-                    timeout=self.timeout())
+                    timeout=self.timeout()
+                )
 
         super().load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms,
-            stop_start=stop_start)
+            stop_start=stop_start
+        )
 
     ##########################################################################
     # Functions
@@ -571,8 +576,11 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         UHFQC.sigouts_0_offset(self.mixer_offs_I())
         UHFQC.sigouts_1_offset(self.mixer_offs_Q())
 
-    def load_single_pulse_sequence_onto_UHFQC(self, pulse_name,
-                                              regenerate_waveforms=True):
+    def load_single_pulse_sequence_onto_UHFQC(
+            self,
+            pulse_name,
+            regenerate_waveforms=True
+    ):
         '''
         Load a single pulse to the lookuptable, it uses the lut_mapping to
             determine which lookuptable to load to.
@@ -587,9 +595,11 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self.load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms)
 
-    def load_DIO_triggered_sequence_onto_UHFQC(self,
-                                               regenerate_waveforms=True,
-                                               timeout=5):
+    def load_DIO_triggered_sequence_onto_UHFQC(
+            self,
+            regenerate_waveforms=True,
+            timeout=5
+    ):
         '''
         Load a single pulse to the lookuptable.
         '''
