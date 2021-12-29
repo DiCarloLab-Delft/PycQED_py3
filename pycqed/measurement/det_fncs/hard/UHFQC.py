@@ -1012,6 +1012,3 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         # Returns only the data for the relevant channel and then
         # reverts the order to start with the number of flips
         return super().acquire_data_point()[:2][::-1]
-
-
-

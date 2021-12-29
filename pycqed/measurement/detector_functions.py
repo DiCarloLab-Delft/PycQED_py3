@@ -1,7 +1,7 @@
 '''
 Module containing a collection of detector functions used by the
 Measurement Control.
-FIXME: split off hardware-specific detectors in separate files
+NB: hardware-specific detectors have been split-off in separate files, see the compatibility imports below
 '''
 
 import numpy as np
@@ -10,10 +10,6 @@ import time
 from deprecated import deprecated
 
 from pycqed.analysis.fit_toolbox import functions as fn
-
-# import instruments for type annotations
-# from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
-# from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
 
 # compatibility imports for functions that were moved under directory det_funcs. New code should use new locations
 from pycqed.measurement.det_fncs.Base import Detector_Function, Mock_Detector, Multi_Detector, Soft_Detector, \
