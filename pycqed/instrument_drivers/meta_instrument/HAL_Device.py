@@ -7,7 +7,6 @@ Note:   a lot code was moved around within this file in December 2021. As a cons
 import numpy as np
 import time
 import logging
-import warnings
 import adaptive
 import networkx as nx
 import datetime
@@ -15,7 +14,7 @@ import multiprocessing
 from importlib import reload
 from typing import List, Union, Optional
 
-from pycqed.instrument_drivers.meta_instrument.HAL_ShimMQ import HAL_ShimMQ
+from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import HAL_ShimMQ
 
 from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det

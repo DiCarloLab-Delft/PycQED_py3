@@ -7,7 +7,7 @@ import pycqed as pq
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object import Qubit
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.HAL_Transmon import HAL_Transmon
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.HAL_ShimSQ import HAL_ShimSQ
+from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimSQ import HAL_ShimSQ
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan

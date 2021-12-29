@@ -4,4 +4,4 @@ This file provides compatibility for existing code. The functionality of this fi
 
 # these imports just rename the new names to the legacy names
 from .HAL_Device import HAL_Device as DeviceCCL
-from .HAL_ShimMQ import _acq_ch_map_to_IQ_ch_map
+from .HAL.HAL_ShimMQ import _acq_ch_map_to_IQ_ch_map

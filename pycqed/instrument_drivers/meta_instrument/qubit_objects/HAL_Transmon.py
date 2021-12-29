@@ -16,7 +16,7 @@ from deprecated import deprecated
 from typing import Optional
 
 from .qubit_object import Qubit
-from .HAL_ShimSQ import HAL_ShimSQ
+from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimSQ import HAL_ShimSQ
 
 from pycqed.measurement import calibration_toolbox as cal_toolbox
 from pycqed.measurement import sweep_functions as swf
