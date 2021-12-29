@@ -320,6 +320,8 @@ class MeasurementControl(Instrument):
                         self.xlen = len(self.get_sweep_points())
                     except Exception:
                         self.xlen = 1
+
+                # perform the measurement
                 if self.mode == "1D":
                     self._measure()
                 elif self.mode == "2D":
@@ -346,6 +348,7 @@ class MeasurementControl(Instrument):
         self.finish(result)
         return return_dict
 
+    # NB: called from run() and _measure_2D()
     def _measure(self, *kw):
         if self.live_plot_enabled():
             self._initialize_plot_monitor()
@@ -397,7 +400,7 @@ class MeasurementControl(Instrument):
         self._update_plotmon(force_update=True)
         if self.mode == "2D":
             self._update_plotmon_2D(force_update=True)
-        elif self.mode == "adaptive":
+        elif self.mode == "adaptive":  # FIXME: seems always false, handled by _measure_soft_adaptive
             self._update_plotmon_adaptive(force_update=True)
         for sweep_function in self.sweep_functions:
             sweep_function.finish()

@@ -229,7 +229,7 @@ class HAL_ShimSQ(Instrument):
     # Other functions
     ##########################################################################
 
-    # FIXME: check against self.int_avg_det_single provided by _prep_ro_instantiate_detectors, and why is this detector
+    # FIXME: compare against self.int_avg_det_single provided by _prep_ro_instantiate_detectors, and why is this detector
     #  created on demand
 
     def get_int_avg_det(self, **kw):
@@ -1229,6 +1229,17 @@ class HAL_ShimSQ(Instrument):
     def _prep_mw_pulses(self):
         # FIXME: hardware handling moved here from HAL_Transmon, cleanup
 
+        # here we handle hardware specific functionality like:
+        #  - mixer offsets : directly
+        #  - mixer parameters other then offsets (phi, alfa) : through the MW_Lutman
+
+        #  FIXME: This maps badly to the actual hardware capabilities, e.g. the QWG has hardware offset control
+        #   A better approach may be to pass a standard set of parameters describing pulse attributes and signal chain
+        #   settings to the LutMan (maybe as a class/dict instead of QCoDeS parameters), and then have the LutMan do
+        #   everything necessary.
+        #   Or, to have the LutMan only handle pulse attributes, and move all signal chain handling here
+
+
         MW_LutMan = self.instr_LutMan_MW.get_instr()
 
         # 3. Does case-dependent things:
@@ -1278,8 +1289,7 @@ class HAL_ShimSQ(Instrument):
                 # FIXME: MW_LutMan.mw_amp180 untouched
             else:
                 # case without VSM (and with AWG8) : AWG8_MW_LutMan
-                MW_LutMan.mw_amp180(
-                    1)  # AWG8_MW_LutMan uses 'channel_amp' to allow rabi-type experiments without wave reloading.
+                MW_LutMan.mw_amp180(1)  # AWG8_MW_LutMan uses 'channel_amp' to allow rabi-type experiments without wave reloading.
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 

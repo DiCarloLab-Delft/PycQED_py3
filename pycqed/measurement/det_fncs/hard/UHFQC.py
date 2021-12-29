@@ -8,7 +8,7 @@ import numpy as np
 import numpy.fft as fft
 from string import ascii_uppercase
 
-from pycqed.measurement.det_fncs.Base import Soft_Detector, Hard_Detector
+from pycqed.measurement.det_fncs.Base import Soft_Detector, Hard_Detector, Multi_Detector
 
 # import instruments for type annotations
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
@@ -16,6 +16,45 @@ from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantum
 
 
 log = logging.getLogger(__name__)
+
+
+class Multi_Detector_UHF(Multi_Detector):
+    """
+    Special multi detector
+    """
+
+    def get_values(self):
+        values_list = []
+
+        # Since master (holding cc object) is first in self.detectors,
+        self.detectors[0].AWG.stop()
+
+        # Prepare and arm
+        for detector in self.detectors:
+            # Ramiro pointed out that prepare gets called by MC
+            # detector.prepare()
+            detector.arm()
+            detector.UHFQC.sync()
+
+        # Run (both in parallel and implicitly)
+        self.detectors[0].AWG.start()
+
+        # Get data
+        for detector in self.detectors:
+            new_values = detector.get_values(arm=False, is_single_detector=False)
+            values_list.append(new_values)
+        values = np.concatenate(values_list)
+        return values
+
+    def acquire_data_point(self):
+        # N.B. get_values and acquire_data point are virtually identical.
+        # the only reason for their existence is a historical distinction
+        # between hard and soft detectors that leads to some confusing data
+        # shape related problems, hence the append vs concatenate
+
+        # FIXME: It is not clear if this construction works with multiple
+        # segments
+        return self.get_values().flatten()
 
 
 class UHFQC_input_average_detector(Hard_Detector):
@@ -332,7 +371,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
             if self.AWG is not None:
                 self.AWG.stop()
-                # self.AWG.get_operation_complete()
 
             if arm:
                 self.arm()

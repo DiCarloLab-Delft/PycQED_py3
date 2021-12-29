@@ -18,7 +18,8 @@ from pycqed.analysis.fit_toolbox import functions as fn
 # compatibility imports for functions that were moved under directory det_funcs. New code should use new locations
 from pycqed.measurement.det_fncs.Base import Detector_Function, Mock_Detector, Multi_Detector, Soft_Detector, \
     Hard_Detector
-from pycqed.measurement.det_fncs.hard.UHFQC import UHFQC_input_average_detector, UHFQC_demodulated_input_avg_det, \
+from pycqed.measurement.det_fncs.hard.UHFQC import Multi_Detector_UHF, \
+    UHFQC_input_average_detector, UHFQC_demodulated_input_avg_det, \
     UHFQC_spectroscopy_detector, UHFQC_integrated_average_detector, UHFQC_correlation_detector, \
     UHFQC_integration_logging_det, UHFQC_statistics_logging_det, UHFQC_single_qubit_statistics_logging_det
 from pycqed.measurement.det_fncs.hard.SignalHound import Signal_Hound_fixed_frequency, Signal_Hound_sweeped_frequency, \
@@ -28,47 +29,6 @@ from pycqed.measurement.det_fncs.hard.SignalHound import Signal_Hound_fixed_freq
 from qcodes.instrument.parameter import _BaseParameter
 
 log = logging.getLogger(__name__)
-
-
-class Multi_Detector_UHF(Multi_Detector):
-    """
-    Special multi detector
-    """
-
-    def get_values(self):
-        values_list = []
-
-        # Since master (holding cc object) is first in self.detectors,
-        self.detectors[0].AWG.stop()
-        self.detectors[0].AWG.get_operation_complete()
-
-        # Prepare and arm
-        for detector in self.detectors:
-            # Ramiro pointed out that prepare gets called by MC
-            # detector.prepare()
-            detector.arm()
-            detector.UHFQC.sync()
-
-        # Run (both in parallel and implicitly)
-        self.detectors[0].AWG.start()
-        self.detectors[0].AWG.get_operation_complete()
-
-        # Get data
-        for detector in self.detectors:
-            new_values = detector.get_values(arm=False, is_single_detector=False)
-            values_list.append(new_values)
-        values = np.concatenate(values_list)
-        return values
-
-    def acquire_data_point(self):
-        # N.B. get_values and acquire_data point are virtually identical.
-        # the only reason for their existence is a historical distinction
-        # between hard and soft detectors that leads to some confusing data
-        # shape related problems, hence the append vs concatenate
-
-        # FIXME: It is not clear if this construction works with multiple
-        # segments
-        return self.get_values().flatten()
 
 
 ##########################################################################

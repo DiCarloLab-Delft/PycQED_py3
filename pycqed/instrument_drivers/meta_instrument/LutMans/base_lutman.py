@@ -125,8 +125,7 @@ class Base_LutMan(Instrument):
         Loads all waveforms specified in the LutMap to an AWG.
 
         Args:
-            regenerate_waveforms (bool): if True calls
-                generate_standard_waveforms before uploading.
+            regenerate_waveforms (bool): if True calls generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
             FIXME: inefficient if multiple LutMans (qubits) per instrument are updated
         """

@@ -626,7 +626,7 @@ class HAL_Device(Instrument):
             measured_qubits.append(q2)
         if q3 is not None:
             measured_qubits.append(q3)
-        MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))
+        MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))  # FIXME: qubits ignored by callee
         MC.run(
             "conditional_oscillation_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}".format(
                 q0, q1, q2, q3, cz_repetitions,
@@ -5099,11 +5099,14 @@ class HAL_Device(Instrument):
                         qubit_obj.measure_T1()
                         qubit_obj.measure_ramsey()
                         qubit_obj.measure_echo()
+
                         qubit_obj.ro_acq_weight_type('SSB')
                         qubit_obj.ro_soft_avg(3)
                         qubit_obj.measure_allxy()
+
                         qubit_obj.ro_soft_avg(1)
                         qubit_obj.measure_single_qubit_randomized_benchmarking()
+
                         qubit_obj.ro_acq_weight_type('optimal')
 
                 self.ro_acq_weight_type('optimal')

@@ -3031,7 +3031,6 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
-
         # FIXME: split into basic T1 and T1 with flux dance
         """
         N.B. this is a good example for a generic timedomain experiment using the HAL_Transmon.
@@ -6266,16 +6265,11 @@ class HAL_Transmon(HAL_ShimSQ, Qubit):
         """
         Configure MW_Lutman parameters and upload waveforms
         """
-        # FIXME: here we handle:
-        #  - mixer offsets
-        #  and the LutMan handles:
-        #  - pulse attributes
-        #  - mixer parameters other then offsets (phi, alfa)
-        #  This maps badly to the actual hardware capabilities, e.g. the QWG has hardware offset control
-        #  A better approach may be to pass a standard set of parameters describing pulse attributes and signal chain
-        #  settings to the LutMan (maybe as a class/dict instead of QCoDeS parameters), and then have the LutMan do
-        #  everything necessary.
-        #  Or, to have the LutMan only handle pulse attributes, and move all signal chain handling to HAL_ShimSQ
+        # NB: the original code of this function was split in the part still present here, which sets pulse
+        # attributes on the MW_Lutman, and the part in HAL_ShimSQ::_prep_mw_pulses, that handles hardware specific
+        # functionality.
+        # FIXME: this is a first step towards a real abstraction layer
+
 
         # 1. Gets instruments and prepares cases
         MW_LutMan = self.instr_LutMan_MW.get_instr()
