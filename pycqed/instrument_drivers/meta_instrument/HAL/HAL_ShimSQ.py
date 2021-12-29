@@ -934,7 +934,7 @@ class HAL_ShimSQ(Qubit):
         return isinstance(AWG, QuTech_AWG_Module)  # FIXME: QuTech_AWG_Module will be replaced by QWG
 
     ##########################################################################
-    # Prepare functions: private
+    # Private prepare functions: CW
     ##########################################################################
 
     def _prep_cw_spec(self):
@@ -949,16 +949,30 @@ class HAL_ShimSQ(Qubit):
         if self.instr_spec_source() != None:
             self.instr_spec_source.get_instr().power(self.spec_pow())
 
+    def _prep_cw_configure_VSM(self):
+        # Configure VSM
+        VSM = self.instr_VSM.get_instr()
+        for mod in range(1, 9):
+            VSM.set('mod{}_ch{}_marker_state'.format(mod, self.mw_vsm_ch_in()), 'off')
+        VSM.set('mod{}_ch{}_marker_state'.format(self.mw_vsm_mod_out(), self.spec_vsm_ch_in()), 'on')
+        VSM.set('mod{}_marker_source'.format(self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
+
+    ##########################################################################
+    # Private prepare functions: ro
+    ##########################################################################
+
     # FIXME: UHFQC specific
     # FIXME: deskewing matrix is shared between all connected qubits
     def _prep_deskewing_matrix(self):
         UHFQC = self.instr_acquisition.get_instr()
+
         alpha = self.ro_acq_mixer_alpha()
         phi = self.ro_acq_mixer_phi()
         predistortion_matrix = np.array(
             ((1, -alpha * np.sin(phi * 2 * np.pi / 360)),
              (0, alpha * np.cos(phi * 2 * np.pi / 360)))
         )
+
         UHFQC.qas_0_deskew_rows_0_cols_0(predistortion_matrix[0, 0])
         UHFQC.qas_0_deskew_rows_0_cols_1(predistortion_matrix[0, 1])
         UHFQC.qas_0_deskew_rows_1_cols_0(predistortion_matrix[1, 0])
@@ -982,14 +996,13 @@ class HAL_ShimSQ(Qubit):
 
             # Update the RO threshold
             acq_ch = self.ro_acq_weight_chI()
-            # The threshold that is set in the hardware  needs to be
+            # The threshold that is set in the hardware needs to be
             # corrected for the offset as this is only applied in
             # software.
             if abs(self.ro_acq_threshold()) > 32:
                 threshold = 32
                 warnings.warn(f'Clipping {self.name}.ro_acq_threshold {self.ro_acq_threshold()}>32')
-                # working around the limitation of threshold in UHFQC
-                # which cannot be >abs(32).
+                # working around the limitation of threshold in UHFQC which cannot be >abs(32).
             else:
                 threshold = self.ro_acq_threshold()
             self.instr_acquisition.get_instr().set('qas_0_thresholds_{}_level'.format(acq_ch), threshold)
@@ -1040,10 +1053,10 @@ class HAL_ShimSQ(Qubit):
 
     def _prep_ro_sources(self):
         LO = self.instr_LO_ro.get_instr()
-        Lo_Lutman = self.instr_LutMan_RO.get_instr()
-        if Lo_Lutman.LO_freq() is not None:
-            log.info('Warning: This qubit is using a fixed RO LO frequency.')
-            LO_freq = Lo_Lutman.LO_freq()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        if RO_lutman.LO_freq() is not None:
+            log.info('Warning: This qubit is using a fixed RO LO frequency.')  # FIXME: log.warning?
+            LO_freq = RO_lutman.LO_freq()
             LO.frequency.set(LO_freq)
             mod_freq = self.ro_freq() - LO_freq
             self.ro_freq_mod(mod_freq)
@@ -1076,13 +1089,16 @@ class HAL_ShimSQ(Qubit):
             ro_pulse_down_amp1
             ro_pulse_down_phi1
 
-
             ro_pulse_mixer_alpha
             ro_pulse_mixer_phi
-
             ro_pulse_mixer_offs_I
             ro_pulse_mixer_offs_Q
 
+        Note that the local parameters exist for each individual qubit, but qubits on the same feedline share a single
+        RO_LutMan (and hardware channel, because of the multiplexed nature of the UHFQC; this situation is different
+        for MW_LutMan and Flux_LutMan, ).
+        To sort of cope with that, LutMan parameters starting with "M_" exist per 'channel', but clashes on other
+        parameters are not explicitly managed.
         """
 
         if 'UHFQC' not in self.instr_acquisition():  # FIXME: checks name, not type
@@ -1120,11 +1136,14 @@ class HAL_ShimSQ(Qubit):
             ro_lm.set('M_down_amp1_R{}'.format(idx), self.ro_pulse_down_amp1())
             ro_lm.set('M_down_phi1_R{}'.format(idx), self.ro_pulse_down_phi1())
 
-            ro_lm.acquisition_delay(self.ro_acq_delay())
+            ro_lm.acquisition_delay(self.ro_acq_delay())  # FIXME: better located in _prep_ro_integration_weights?
 
             if upload:
                 ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
+            # set mixer offset (NB: affects all channels)
+            # FIXME: note that ro_lm.set_mixer_offsets() is not used. _prep_mw_pulses also sets mixer offset locally,
+            #  and alpha/phi through LutMan. This requires cleanup
             UHFQC.sigouts_0_offset(self.ro_pulse_mixer_offs_I())
             UHFQC.sigouts_1_offset(self.ro_pulse_mixer_offs_Q())
 
@@ -1140,8 +1159,8 @@ class HAL_ShimSQ(Qubit):
             ro_acq_weight_type   -> 'SSB', 'DSB' or 'Optimal'
             ro_acq_weight_chI    -> Specifies which integration weight (channel) to use
             ro_acq_weight_chQ    -> The second channel in case of SSB/DSB
-            RO_acq_weight_func_I -> A custom integration weight (array)
-            RO_acq_weight_func_Q ->  ""
+            ro_acq_weight_func_I -> A custom integration weight (array)
+            ro_acq_weight_func_Q ->  ""
 
         """
         if 'UHFQC' in self.instr_acquisition():  # FIXME: checks name, not type
@@ -1150,7 +1169,7 @@ class HAL_ShimSQ(Qubit):
             if self.ro_acq_weight_type() == 'SSB':
                 UHFQC.prepare_SSB_weight_and_rotation(
                     IF=self.ro_freq_mod(),
-                    weight_function_I=self.ro_acq_weight_chI(),
+                    weight_function_I=self.ro_acq_weight_chI(),  # FIXME: 'weight_function_I' is a misnomer, it specifies a channel
                     weight_function_Q=self.ro_acq_weight_chQ()
                 )
             elif self.ro_acq_weight_type() == 'DSB':
@@ -1163,9 +1182,8 @@ class HAL_ShimSQ(Qubit):
                 if (self.ro_acq_weight_func_I() is None or self.ro_acq_weight_func_Q() is None):
                     logging.warning('Optimal weights are None, not setting integration weights')
                 elif self.ro_acq_rotated_SSB_when_optimal():
-                    # this allows bypasing the optimal weights for poor SNR qubits
-                    # working around the limitation of threshold in UHFQC
-                    # which cannot be >abs(32)
+                    # this allows bypassing the optimal weights for poor SNR qubits
+                    # working around the limitation of threshold in UHFQC which cannot be >abs(32)
                     if self.ro_acq_digitized() and abs(self.ro_acq_threshold()) > 32:
                         scaling_factor = 32 / self.ro_acq_threshold()
                     else:
@@ -1181,33 +1199,40 @@ class HAL_ShimSQ(Qubit):
                     )
                 else:
                     # When optimal weights are used, only the RO I weight channel is used
-
-                    # FIXME!: Dirty hack because of qusurf issue #63, adds delay samples in the optimized weights
                     opt_WI = self.ro_acq_weight_func_I()
                     opt_WQ = self.ro_acq_weight_func_Q()
-                    del_sampl = self.ro_acq_weight_func_delay_samples_hack()
-                    if del_sampl > 0:
-                        zeros = np.zeros(abs(del_sampl))
-                        opt_WI = np.concatenate([opt_WI[abs(del_sampl):], zeros])
-                        opt_WQ = np.concatenate([opt_WQ[abs(del_sampl):], zeros])
-                    elif del_sampl < 0:
-                        zeros = np.zeros(abs(del_sampl))
-                        opt_WI = np.concatenate([zeros, opt_WI[:-abs(del_sampl)]])
-                        opt_WQ = np.concatenate([zeros, opt_WQ[:-abs(del_sampl)]])
-                    else:
-                        pass
 
-                    UHFQC.set('qas_0_integration_weights_{}_real'.format(self.ro_acq_weight_chI()), opt_WI)
-                    UHFQC.set('qas_0_integration_weights_{}_imag'.format(self.ro_acq_weight_chI()), opt_WQ)
-                    UHFQC.set('qas_0_rotations_{}'.format(self.ro_acq_weight_chI()), 1.0 - 1.0j)
+                    if 0:  # FIXME: remove
+                        # FIXME!: Dirty hack because of qusurf issue #63, adds delay samples in the optimized weights
+                        #  NB: https://github.com/DiCarloLab-Delft/QuSurf-IssueTracker/issues/63 was closed in 2018
+                        del_sampl = self.ro_acq_weight_func_delay_samples_hack()
+                        if del_sampl > 0:
+                            zeros = np.zeros(abs(del_sampl))
+                            opt_WI = np.concatenate([opt_WI[abs(del_sampl):], zeros])
+                            opt_WQ = np.concatenate([opt_WQ[abs(del_sampl):], zeros])
+                        elif del_sampl < 0:
+                            zeros = np.zeros(abs(del_sampl))
+                            opt_WI = np.concatenate([zeros, opt_WI[:-abs(del_sampl)]])
+                            opt_WQ = np.concatenate([zeros, opt_WQ[:-abs(del_sampl)]])
+                        else:
+                            pass
+
+                    # FIXME: direct access to UHFQC nodes, consider adding function to UHFQA (like prepare_SSB_weight_and_rotation)
+                    UHFQC.set(f'qas_0_integration_weights_{self.ro_acq_weight_chI()}_real', opt_WI)
+                    UHFQC.set(f'qas_0_integration_weights_{self.ro_acq_weight_chI()}_imag', opt_WQ)
+                    UHFQC.set(f'qas_0_rotations_{self.ro_acq_weight_chI()}', 1.0 - 1.0j)
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
-                        UHFQC.set('qas_0_integration_weights_{}_real'.format(self.ro_acq_weight_chQ()), opt_WQ)
-                        UHFQC.set('qas_0_integration_weights_{}_imag'.format(self.ro_acq_weight_chQ()), opt_WI)
-                        UHFQC.set('qas_0_rotations_{}'.format(self.ro_acq_weight_chQ()), 1.0 + 1.0j)
+                        UHFQC.set(f'qas_0_integration_weights_{self.ro_acq_weight_chQ()}_real', opt_WQ)
+                        UHFQC.set(f'qas_0_integration_weights_{self.ro_acq_weight_chQ()}_imag', opt_WI)
+                        UHFQC.set(f'qas_0_rotations_{self.ro_acq_weight_chQ()}', 1.0 + 1.0j)
 
         else:
             raise NotImplementedError('CBox, DDM or other are currently not supported')
+
+    ##########################################################################
+    # Private prepare functions: MW
+    ##########################################################################
 
     def _prep_td_sources(self):
         # turn off spec_source
@@ -1225,6 +1250,7 @@ class HAL_ShimSQ(Qubit):
         elif MW_LutMan.cfg_sideband_mode() == 'real-time':
             # For historic reasons, will maintain the change qubit frequency here in
             # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
+            # FIXME: HDAWG specific, does not support QWG
             if ((MW_LutMan.channel_I() - 1) // 2 != (MW_LutMan.channel_Q() - 1) // 2):
                 raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
             self.mw_freq_mod(self.freq_qubit.get() - self.instr_LO_mw.get_instr().frequency.get())
@@ -1394,11 +1420,3 @@ class HAL_ShimSQ(Qubit):
         VSM.set('mod{}_ch{}_gaussian_phase'.format(self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_phase())
 
         self.instr_CC.get_instr().set('vsm_channel_delay{}'.format(self.cfg_qubit_nr()), self.mw_vsm_delay())
-
-    def _prep_cw_configure_VSM(self):
-        # Configure VSM
-        VSM = self.instr_VSM.get_instr()
-        for mod in range(1, 9):
-            VSM.set('mod{}_ch{}_marker_state'.format(mod, self.mw_vsm_ch_in()), 'off')
-        VSM.set('mod{}_ch{}_marker_state'.format(self.mw_vsm_mod_out(), self.spec_vsm_ch_in()), 'on')
-        VSM.set('mod{}_marker_source'.format(self.mw_vsm_mod_out()), self.mw_vsm_marker_source())

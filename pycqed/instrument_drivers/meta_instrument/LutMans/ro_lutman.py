@@ -79,11 +79,12 @@ class Base_RO_LutMan(Base_LutMan):
             raise ValueError('Feedline map not in {"S5", "S7", "S17"}.')
 
         # capping the resonator bit mapping in case a limited number of resonators is used
-        self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[
-            :self._num_res]
+        self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self._num_res]
+
         # Initial values on parameters that otherwise depend on each other
         self._resonator_combinations = [
-            [self._resonator_codeword_bit_mapping[0]]]
+            [self._resonator_codeword_bit_mapping[0]]
+        ]
         self._pulse_type = 'M_simple'
         super().__init__(name, **kw)
 
@@ -92,12 +93,13 @@ class Base_RO_LutMan(Base_LutMan):
     ##########################################################################
 
     def _add_waveform_parameters(self):
-        # mixer corrections are done globally, can be specified per resonator
+        # parameters really set manually by user, not touched within PycQED
         self.add_parameter(
-            'mixer_apply_predistortion_matrix',
-            vals=vals.Bool(),
+            'pulse_primitive_shape',
+            vals=vals.Enum('square', 'gaussian'),
             parameter_class=ManualParameter,
-            initial_value=False
+            docstring='defines the shape of the segments of the pulse',
+            initial_value='square'
         )
         self.add_parameter(
             'gaussian_convolution',
@@ -111,6 +113,14 @@ class Base_RO_LutMan(Base_LutMan):
             parameter_class=ManualParameter,
             initial_value=5.0e-9,
             unit='s'
+        )
+
+        # mixer corrections are done globally, can be specified per resonator
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix',
+            vals=vals.Bool(),
+            parameter_class=ManualParameter,
+            initial_value=False
         )
         self.add_parameter(
             'mixer_alpha',
@@ -126,42 +136,38 @@ class Base_RO_LutMan(Base_LutMan):
             initial_value=0.0
         )
         self.add_parameter(
-            'mixer_offs_I',
+            'mixer_offs_I',  # FIXME: not really used
             unit='V',
             parameter_class=ManualParameter,
             initial_value=0
         )
         self.add_parameter(
-            'mixer_offs_Q',
+            'mixer_offs_Q',  # FIXME: not really used
             unit='V',
             parameter_class=ManualParameter,
             initial_value=0
         )
-        comb_msg = (
+
+        self.add_parameter(
+            'resonator_combinations',
+            vals=vals.Lists(),
+            docstring=(
             'Resonator combinations specifies which pulses are uploaded to'
             'the device. Given as a list of lists:'
             'e.g. [[0], [2], [0, 2]] specifies that pulses for readout'
             'of resonator 0, 2, and a pulse for mux readout on both should be'
-            'uploaded.')
-        self.add_parameter(
-            'resonator_combinations',
-            vals=vals.Lists(),
-            docstring=comb_msg,
+            'uploaded.'),
             set_cmd=self._set_resonator_combinations,
             get_cmd=self._get_resonator_combinations
         )
+
+        # pulse attributes
         self.add_parameter(
             'pulse_type',
             vals=vals.Enum('M_up_down_down', 'M_simple', 'M_up_down_down_final'),
             set_cmd=self._set_pulse_type,
             get_cmd=self._get_pulse_type,
-            docstring='defines sequence of segments of the pulse')
-        self.add_parameter(
-            'pulse_primitive_shape',
-            vals=vals.Enum('square', 'gaussian'),
-            parameter_class=ManualParameter,
-            docstring='defines the shape of the segments of the pulse',
-            initial_value='square'
+            docstring='defines sequence of segments of the pulse'
         )
         for res in self._resonator_codeword_bit_mapping:
             self.add_parameter(
@@ -282,8 +288,7 @@ class Base_RO_LutMan(Base_LutMan):
                 for resonator in resonator_combination:
                     wavename += '_R' + str(resonator)
                     try:
-                        case += 2**self._resonator_codeword_bit_mapping.index(
-                            resonator)
+                        case += 2**self._resonator_codeword_bit_mapping.index(resonator)
                     except ValueError:
                         # The allowed resonators is determined by the feedline
                         raise ValueError(
@@ -419,7 +424,7 @@ class Base_RO_LutMan(Base_LutMan):
         return self._wave_dict
 
     ##########################################################################
-    # Private functions
+    # Private parameter helpers
     ##########################################################################
 
     def _set_resonator_combinations(self, value):
@@ -545,8 +550,10 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             regenerate_waveforms: bool=True,
             stop_start: bool = True,
             # FIXME, force load should be False but is here now to hack around the _upload_updated_waveforms
-            force_load_sequencer_program: bool=True):
-        # Uploading the codeword program (again) is needed to if the user
+            force_load_sequencer_program: bool=True
+    ):
+        # FIXME: handle this at the proper place
+        # Uploading the codeword program (again) is needed too if the user
         # has changed the mode of the instrument.
         if force_load_sequencer_program:
             if self._mode == 'single_pulse':
@@ -571,11 +578,13 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
     ##########################################################################
 
     # FIXME: move to UHFQC driver?
+    # FIXME: unused
     def set_mixer_offsets(self):
         UHFQC = self.AWG.get_instr()
         UHFQC.sigouts_0_offset(self.mixer_offs_I())
         UHFQC.sigouts_1_offset(self.mixer_offs_Q())
 
+    # FIXME: seems unused
     def load_single_pulse_sequence_onto_UHFQC(
             self,
             pulse_name,
@@ -592,8 +601,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
 
         self._mode = 'single_pulse'
         self._single_pulse_name = pulse_name
-        self.load_waveforms_onto_AWG_lookuptable(
-            regenerate_waveforms=regenerate_waveforms)
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=regenerate_waveforms)
 
     def load_DIO_triggered_sequence_onto_UHFQC(
             self,
@@ -605,8 +613,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         '''
         self._mode = 'DIO_triggered'
         self.timeout(timeout)
-        self.load_waveforms_onto_AWG_lookuptable(
-            regenerate_waveforms=regenerate_waveforms)
+        self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=regenerate_waveforms)
 
 
 def add_waves_different_length(a, b):

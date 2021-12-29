@@ -6376,3 +6376,12 @@ class HAL_Transmon(HAL_ShimSQ):
 
             # 5. upload command table for virtual-phase gates
             MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
+
+
+    def _prep_ro_pulse(self, upload=True, CW=False):
+        # FIXME: move LutMan support here from HAL_ShimSQ
+        super()._prep_ro_pulse(upload, CW)
+
+    def _prep_ro_integration_weights(self):
+        # FIXME: move LutMan support here from HAL_ShimSQ
+        super()._prep_ro_integration_weights()

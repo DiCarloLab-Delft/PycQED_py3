@@ -710,15 +710,15 @@ class HAL_ShimMQ(Instrument):
         for qb_name in qubits:
             # FIXME: implementation differs from HAL_Transmon::_prep_ro_sources
             qb = self.find_instrument(qb_name)
-            ro_lutman = qb.instr_LutMan_RO.get_instr()
+            lm = qb.instr_LutMan_RO.get_instr()
             # set RO modulation to use common LO frequency
-            mod_freq = qb.ro_freq() - ro_lutman.LO_freq()
+            mod_freq = qb.ro_freq() - lm.LO_freq()
             log.info("Setting modulation freq of {} to {}".format(qb_name, mod_freq))
             qb.ro_freq_mod(mod_freq)
 
             LO_q = qb.instr_LO_ro.get_instr()
             if LO_q is not LO:
-                LO_q.frequency.set(ro_lutman.LO_freq())
+                LO_q.frequency.set(lm.LO_freq())
                 #LO_q.power(self.ro_pow_LO())
                 LO_q.on()
                 #raise ValueError("Expect a single LO to drive all feedlines")
