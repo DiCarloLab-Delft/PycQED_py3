@@ -203,7 +203,7 @@ class HAL_ShimMQ(Instrument):
         self._prep_ro_integration_weights(qubits=qubits)
         if not reduced:
             self._prep_ro_pulses(qubits=qubits)
-            self._prep_ro_instantiate_detectors(qubits=qubits, acq_ch_map=acq_ch_map)
+            self._prep_ro_instantiate_detectors()
 
         # TODO:
         # - update global readout parameters (relating to mixer settings)
@@ -914,27 +914,21 @@ class HAL_ShimMQ(Instrument):
             ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
-    def _prep_ro_instantiate_detectors(self, qubits, acq_ch_map):
+    def _prep_ro_instantiate_detectors(self):
         """
         Instantiate acquisition detectors.
-
-        Args:
-            qubits (list of str):
-                list of qubit names that have to be prepared
-
-            acq_ch_map (dict)
-                dict specifying the mapping
         """
         log.info("Instantiating readout detectors")
-        self.input_average_detector = self.get_input_avg_det()
-        self.int_avg_det = self.get_int_avg_det()
+        # self.input_average_detector = self.get_input_avg_det()  # FIXME: unused
+        # self.int_avg_det = self.get_int_avg_det()  # FIXME: unused
         self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True)
-        self.int_log_det = self.get_int_logging_detector()
+        # self.int_log_det = self.get_int_logging_detector()  # FIXME: unused
 
-        if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
-            self.corr_det = self.get_correlation_detector(qubits=qubits)
-        else:
-            self.corr_det = None
+        # FIXME: unused
+        # if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
+        #     self.corr_det = self.get_correlation_detector(qubits=qubits)
+        # else:
+        #     self.corr_det = None
 
 
     @deprecated(version='0.4', reason="VSM support is broken")

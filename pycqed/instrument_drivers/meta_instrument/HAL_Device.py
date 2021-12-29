@@ -957,7 +957,7 @@ class HAL_Device(HAL_ShimMQ):
         )
 
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
-        d = self.get_correlation_detector()  # FIXME: parameter qubits unfilled
+        d = self.get_correlation_detector()  # FIXME: broken, parameter qubits missing
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_of_grover_iterations))
         MC.set_detector_function(d)
