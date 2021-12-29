@@ -364,7 +364,8 @@ class OpenQL_File_Sweep(Hard_Sweep):
             CCL: CC,
             parameter_name: str = 'Points',
             unit: str = 'a.u.',
-            upload: bool = True):
+            upload: bool = True
+    ):
         super().__init__()
         self.name = 'OpenQL_Sweep'
         self.filename = filename
@@ -930,7 +931,7 @@ class multi_sweep_function_ranges(Soft_Sweep):
                 raise ValueError('units of the sweepfunctions are not equal')
 
     def set_parameter(self, val):
-        Sweep_points = [ np.linspace(self.sweep_ranges[i][0], 
+        Sweep_points = [ np.linspace(self.sweep_ranges[i][0],
                                      self.sweep_ranges[i][1],
                                      self.n_points) for i in range(len(self.sweep_ranges)) ]
         for i, sweep_function in enumerate(self.sweep_functions):
@@ -975,11 +976,11 @@ class FLsweep(Soft_Sweep):
     """
     Special sweep function for AWG8 and QWG flux pulses.
     """
-    def __init__(self, 
-            lm, 
-            par, 
-            waveform_name: str, 
-            amp_for_generation: float = None, 
+    def __init__(self,
+            lm,
+            par,
+            waveform_name: str,
+            amp_for_generation: float = None,
             upload_waveforms_always: bool=True,
             bypass_waveform_upload: bool=False
         ):
@@ -1034,8 +1035,8 @@ class FLsweep(Soft_Sweep):
 
 class flux_t_middle_sweep(Soft_Sweep):
 
-    def __init__(self, 
-            fl_lm_tm: list, 
+    def __init__(self,
+            fl_lm_tm: list,
             fl_lm_park: list,
             which_gate: list,
             t_pulse: list
@@ -1053,12 +1054,12 @@ class flux_t_middle_sweep(Soft_Sweep):
         which_gate = self.which_gate
         t_pulse = np.repeat(self.t_pulse, 2)
         sampling_rate = self.fl_lm_tm[0].sampling_rate()
-        
+
         # Calculate vcz times for each flux pulse
         time_mid = val / sampling_rate
         n_points  = [ np.ceil(tp / 2 * sampling_rate) for tp in t_pulse ]
         time_sq  = [ n / sampling_rate for n in n_points ]
-        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate 
+        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate
         time_pad = np.abs(np.array(time_sq)-np.max(time_sq))
 
         # set flux lutman parameters of CZ qubits
@@ -1089,9 +1090,18 @@ class Nested_resonator_tracker(Soft_Sweep):
     Sets a parameter and performs a "find_resonator_frequency" measurement
     after setting the parameter.
     """
-    def __init__(self, qubit, nested_MC, par,
-                 use_min=False, freqs=None, reload_sequence=False,
-                 cc=None, sequence_file=None, **kw):
+    def __init__(
+            self,
+            qubit,
+            nested_MC,
+            par,
+            use_min=False,
+            freqs=None,
+            reload_sequence=False,
+            cc: CC=None,
+            sequence_file: OqlProgram=None,
+            **kw
+    ):
         super().__init__(**kw)
         self.qubit = qubit
         self.freqs = freqs
@@ -1125,8 +1135,16 @@ class Nested_spec_source_pow(Soft_Sweep):
     Sets a parameter and performs a "find_resonator_frequency" measurement
     after setting the parameter.
     """
-    def __init__(self, qubit, nested_MC, par, reload_sequence=False,
-                 cc=None, sequence_file=None, **kw):
+    def __init__(
+            self,
+            qubit,
+            nested_MC,
+            par,
+            reload_sequence=False,
+            cc: CC=None,
+            sequence_file: OqlProgram=None,
+            **kw
+    ):
         super().__init__(**kw)
         self.qubit = qubit
         self.par = par
@@ -1152,8 +1170,16 @@ class Nested_amp_ro(Soft_Sweep):
     Sets a parameter and performs a "find_resonator_frequency" measurement
     after setting the parameter.
     """
-    def __init__(self, qubit, nested_MC, par, reload_sequence=False,
-                 cc=None, sequence_file=None, **kw):
+    def __init__(
+            self,
+            qubit,
+            nested_MC,
+            par,
+            reload_sequence=False,
+            cc: CC=None,
+            sequence_file: OqlProgram=None,
+            **kw
+    ):
         super().__init__(**kw)
         self.qubit = qubit
         self.par = par

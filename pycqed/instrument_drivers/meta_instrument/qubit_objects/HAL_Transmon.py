@@ -2735,6 +2735,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         if prepare:
             self.prepare_for_timedomain()
+
             # off/on switching is achieved by turning the MW source on and
             # off as this is much faster than recompiling/uploading
             p = sqo.off_on(
@@ -2752,8 +2753,7 @@ class HAL_Transmon(HAL_ShimSQ):
             elif 'on' in pulse_comb.lower():
                 self.instr_LO_mw.get_instr().on()
             else:
-                raise ValueError(
-                    "pulse_comb {} not understood: Only 'on' and 'off' allowed.".format(pulse_comb))
+                raise ValueError(f"pulse_comb {pulse_comb} not understood: Only 'on' and 'off' allowed.")
 
             s = swf.OpenQL_Sweep(openql_program=p,
                                  CCL=self.instr_CC.get_instr(),
@@ -3066,13 +3066,15 @@ class HAL_Transmon(HAL_ShimSQ):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
 
-        p = sqo.T1(qubit_idx=self.cfg_qubit_nr(),
-                   platf_cfg=self.cfg_openql_platform_fn(),
-                   times=times,
-                   nr_cz_instead_of_idle_time=nr_cz_instead_of_idle_time,
-                   qb_cz_idx=qb_cz_idx if qb_cz_instead_of_idle_time else None,
-                   nr_flux_dance=nr_flux_dance,
-                   wait_time_after_flux_dance=wait_time_after_flux_dance)
+        p = sqo.T1(
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            times=times,
+            nr_cz_instead_of_idle_time=nr_cz_instead_of_idle_time,
+            qb_cz_idx=qb_cz_idx if qb_cz_instead_of_idle_time else None,
+            nr_flux_dance=nr_flux_dance,
+            wait_time_after_flux_dance=wait_time_after_flux_dance
+        )
 
         s = swf.OpenQL_Sweep(
             openql_program=p,
@@ -3216,9 +3218,12 @@ class HAL_Transmon(HAL_ShimSQ):
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)
 
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=True,
-                                   freq_qubit=freq_qubit,
-                                   artificial_detuning=artificial_detuning)
+            a = ma.Ramsey_Analysis(
+                auto=True,
+                close_fig=True,
+                freq_qubit=freq_qubit,
+                artificial_detuning=artificial_detuning
+            )
             if test_beating and a.fit_res.chisqr > 0.4:
                 logging.warning('Found double frequency in Ramsey: large '
                                 'deviation found in single frequency fit.'
@@ -3498,16 +3503,14 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.run('flipping_' + ax + angle + self.msmt_suffix)
 
         if analyze:
-            a = ma2.FlippingAnalysis(
-                options_dict={'scan_label': 'flipping'})
+            a = ma2.FlippingAnalysis(options_dict={'scan_label': 'flipping'})
 
         if update:
             # choose scale factor based on simple goodness-of-fit comparison
             # This method gives priority to the line fit:
             # the cos fit will only be chosen if its chi^2 relative to the
             # chi^2 of the line fit is at least 10% smaller
-            if (a.fit_res['line_fit'].chisqr - a.fit_res['cos_fit'].chisqr) / a.fit_res['line_fit'].chisqr \
-                    > 0.1:
+            if (a.fit_res['line_fit'].chisqr - a.fit_res['cos_fit'].chisqr) / a.fit_res['line_fit'].chisqr > 0.1:
                 scale_factor = a._get_scale_factor_cos()
             else:
                 scale_factor = a._get_scale_factor_line()
@@ -3865,12 +3868,14 @@ class HAL_Transmon(HAL_ShimSQ):
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn(),
-                trigger_idx=trigger_idx)
+                trigger_idx=trigger_idx
+            )
         else:
             p = sqo.pulsed_spec_seq(
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
-                platf_cfg=self.cfg_openql_platform_fn())
+                platf_cfg=self.cfg_openql_platform_fn()
+            )
         CC.eqasm_program(p.filename)
         # CC gets started in the int_avg detector
 
@@ -3892,8 +3897,12 @@ class HAL_Transmon(HAL_ShimSQ):
                 qubit=self,
                 nested_MC=self.instr_nested_MC.get_instr(),
                 freqs=resonator_freqs,
-                par=dac_par, use_min=nested_resonator_calibration_use_min,
-                reload_sequence=True, sequence_file=p, cc=CC)
+                par=dac_par,
+                use_min=nested_resonator_calibration_use_min,
+                reload_sequence=True,
+                sequence_file=p,
+                cc=CC
+            )
             MC.set_sweep_function_2D(res_updating_dac_par)
         else:
             MC.set_sweep_function_2D(dac_par)
@@ -3904,8 +3913,10 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
 
         if analyze:
-            return ma.TwoD_Analysis(label='Qubit_dac_scan',
-                                    close_fig=close_fig)
+            return ma.TwoD_Analysis(
+                label='Qubit_dac_scan',
+                close_fig=close_fig
+            )
 
     def _measure_spectroscopy_CW(
             self,
@@ -4104,9 +4115,11 @@ class HAL_Transmon(HAL_ShimSQ):
         self.hal_acq_spec_mode_off()
 
         if analyze:
-            ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
-                                           close_fig=close_fig,
-                                           qb_name=self.name)
+            ma.Qubit_Spectroscopy_Analysis(
+                label=self.msmt_suffix,
+                close_fig=close_fig,
+                qb_name=self.name
+            )
 
     def measure_anharmonicity(
             self,
@@ -4169,12 +4182,14 @@ class HAL_Transmon(HAL_ShimSQ):
                 spec_pulse_length=self.spec_pulse_length(),
                 platf_cfg=self.cfg_openql_platform_fn(),
                 trigger_idx=0,
-                trigger_idx_2=9)
+                trigger_idx_2=9
+            )
         else:
             p = sqo.pulsed_spec_seq(
                 qubit_idx=self.cfg_qubit_nr(),
                 spec_pulse_length=self.spec_pulse_length(),
-                platf_cfg=self.cfg_openql_platform_fn())
+                platf_cfg=self.cfg_openql_platform_fn()
+            )
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
         if MC is None:
@@ -4210,7 +4225,10 @@ class HAL_Transmon(HAL_ShimSQ):
         spec_source_2.off()
 
         ma.Three_Tone_Spectroscopy_Analysis(
-            label='Two_tone', f01=np.mean(freqs_01), f12=np.mean(freqs_12))
+            label='Two_tone',
+            f01=np.mean(freqs_01),
+            f12=np.mean(freqs_12)
+        )
 
     def measure_anharmonicity_GBT(
             self,
@@ -4512,7 +4530,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
             nr_shots (int):
                 number of single-shot measurements used to estimate SNR
-                and redout fidelities
+                and readout fidelities
         """
         warnings.warn('FIXME: Does not make use of the SSRO detector')
 
@@ -4567,13 +4585,16 @@ class HAL_Transmon(HAL_ShimSQ):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
                 initialize=False,
-                platf_cfg=self.cfg_openql_platform_fn())
+                platf_cfg=self.cfg_openql_platform_fn()
+            )
             self.instr_CC.get_instr().eqasm_program(p.filename)
 
-            s = swf.OpenQL_Sweep(openql_program=p,
-                                 CCL=self.instr_CC.get_instr(),
-                                 parameter_name='Transient time', unit='s',
-                                 upload=prepare)
+            s = swf.OpenQL_Sweep(
+                openql_program=p,
+                CCL=self.instr_CC.get_instr(),
+                parameter_name='Transient time', unit='s',
+                upload=prepare
+            )
             MC.set_sweep_function(s)
 
             if 'UHFQC' in self.instr_acquisition():
@@ -4581,12 +4602,9 @@ class HAL_Transmon(HAL_ShimSQ):
             else:
                 raise NotImplementedError()
 
-            MC.set_sweep_points(
-                np.arange(self.input_average_detector.nr_samples) /
-                sampling_rate)
+            MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) / sampling_rate)
             MC.set_detector_function(self.input_average_detector)
-            data = MC.run(
-                'Measure_transients{}_{}'.format(self.msmt_suffix, i))
+            data = MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i))
             dset = data['dset']
             transients.append(dset.T[1:])
             if analyze:
@@ -4595,7 +4613,8 @@ class HAL_Transmon(HAL_ShimSQ):
             a = ma.Input_average_analysis(
                 IF=self.ro_freq_mod(),
                 optimization_window=depletion_optimization_window,
-                plot=depletion_analysis_plot)
+                plot=depletion_analysis_plot
+            )
             return a
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
@@ -4629,15 +4648,12 @@ class HAL_Transmon(HAL_ShimSQ):
 
         if freqs is None:
             if self.freq_res() is None:
-                raise ValueError(
-                    "Qubit has no resonator frequency.\
-                     \nUpdate freq_res parameter.")
+                raise ValueError("Qubit has no resonator frequency. Update freq_res parameter.")
             else:
                 freqs = self.freq_res() + np.arange(-10e6, 5e6, .1e6)
 
         if 'optimal' in self.ro_acq_weight_type():
-            raise NotImplementedError(
-                "Change readout demodulation to SSB.")
+            raise NotImplementedError("Change readout demodulation to SSB.")
 
         self.prepare_for_timedomain()
 
@@ -4749,10 +4765,12 @@ class HAL_Transmon(HAL_ShimSQ):
 
         if analyze:
             a = ma2.Single_Qubit_RoundsToEvent_Analysis(
-                t_start=None, t_stop=None,
+                t_start=None,
+                t_stop=None,
                 options_dict={'typ_data_idx': 0,
                               'scan_label': 'RTE'},
-                extract_only=True)
+                extract_only=True
+            )
             return {'error fraction': a.proc_data_dict['frac_single']}
 
 
@@ -4805,7 +4823,8 @@ class HAL_Transmon(HAL_ShimSQ):
                 wait_time = 0
 
             p = mqo.Ramsey_msmt_induced_dephasing(
-                qubits=qubits, angles=angles,
+                qubits=qubits,
+                angles=angles,
                 platf_cfg=platf_cfg,
                 target_qubit_excited=target_qubit_excited,
                 extra_echo=extra_echo,
@@ -4821,11 +4840,13 @@ class HAL_Transmon(HAL_ShimSQ):
                 wait_time = readout_pulse_length + 40e-9
 
             p = mqo.echo_msmt_induced_dephasing(
-                qubits=qubits, angles=angles,
+                qubits=qubits,
+                angles=angles,
                 platf_cfg=platf_cfg,
                 wait_time=wait_time,
                 target_qubit_excited=target_qubit_excited,
-                extra_echo=extra_echo)
+                extra_echo=extra_echo
+            )
         else:
             raise ValueError('sequence must be set to ramsey or echo')
 
@@ -4889,8 +4910,7 @@ class HAL_Transmon(HAL_ShimSQ):
         if orders is None and sweep == 'tau':
             orders = 2
         if orders < 1 and sweep == 'tau':
-            raise ValueError(
-                'Orders must be larger than 1')
+            raise ValueError('Orders must be larger than 1')
 
         # append the calibration points, times are for location in plot
         if sweep == 'tau':
@@ -4909,8 +4929,7 @@ class HAL_Transmon(HAL_ShimSQ):
                                       orders[-1] + 4 * dn)])
         # # Checking if pulses are on 20 ns grid
         if sweep == 'tau':
-            if not all([np.round((t * 1e9) / (2 * orders)) % (self.cfg_cycle_time() * 1e9) == 0 for
-                        t in times]):
+            if not all([np.round((t * 1e9) / (2 * orders)) % (self.cfg_cycle_time() * 1e9) == 0 for t in times]):
                 raise ValueError('timesteps must be multiples of 40e-9')
         elif sweep == 'order':
             if not np.round(times / 2) % (self.cfg_cycle_time() * 1e9) == 0:
@@ -5274,8 +5293,7 @@ class HAL_Transmon(HAL_ShimSQ):
                     net_cliffords=net_cliffords,  # always measure double sided
                     nr_seeds=1,
                     platf_cfg=self.cfg_openql_platform_fn(),
-                    program_name='RB_s{}_ncl{}_net{}_{}'.format(
-                        i, nr_cliffords, net_cliffords, self.name),
+                    program_name='RB_s{}_ncl{}_net{}_{}'.format(i, nr_cliffords, net_cliffords, self.name),
                     recompile=recompile
                 )
                 tasks_inputs.append(task_dict)
@@ -5374,16 +5392,17 @@ class HAL_Transmon(HAL_ShimSQ):
                 nr_cliffords=nr_cliffords,
                 platf_cfg=self.cfg_openql_platform_fn(),
                 nr_seeds=1, program_name='RB_{}'.format(i),
-                double_curves=double_curves)
+                double_curves=double_curves
+            )
             programs.append(p)
         if verbose:
-            print('Succesfully generated {} RB programs in {:.1f}s'.format(
-                nr_seeds, time.time() - t0))
+            print('Succesfully generated {} RB programs in {:.1f}s'.format(nr_seeds, time.time() - t0))
 
         prepare_function_kwargs = {
             'counter_param': counter_param,
             'programs': programs,
-            'CC': self.instr_CC.get_instr()}
+            'CC': self.instr_CC.get_instr()
+        }
 
         s = swf.None_Sweep()
         s.parameter_name = 'Number of Cliffords'
@@ -5400,11 +5419,13 @@ class HAL_Transmon(HAL_ShimSQ):
         if double_curves:
             a = ma.RB_double_curve_Analysis(
                 T1=self.T1(),
-                pulse_delay=self.mw_gauss_width.get() * 4)
+                pulse_delay=self.mw_gauss_width.get() * 4
+            )
         else:
             a = ma.RandomizedBenchmarking_Analysis(
                 close_main_fig=close_fig, T1=self.T1(),
-                pulse_delay=self.mw_gauss_width.get() * 4)
+                pulse_delay=self.mw_gauss_width.get() * 4
+            )
         if update:
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
         return a.fit_res.params['fidelity_per_Clifford'].value
@@ -5716,8 +5737,7 @@ class HAL_Transmon(HAL_ShimSQ):
             readout_pulse_length = self.ro_pulse_length()
             readout_pulse_length += self.ro_pulse_down_length0()
             readout_pulse_length += self.ro_pulse_down_length1()
-            amps_rel = np.linspace(
-                0, 0.5, 11) if amps_rel is None else amps_rel
+            amps_rel = np.linspace(0, 0.5, 11) if amps_rel is None else amps_rel
         else:
             cfg_qubit_nrs = []
             optimization_M_amps = []
