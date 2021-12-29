@@ -266,6 +266,34 @@ class HAL_ShimMQ(Instrument):
         return True
 
     ##########################################################################
+    # HAL functions
+    # naming convention: hal_<subsystem>_<function>
+    #
+    # FIXME: WIP to move instrument handling out of measurement/calibration/etc
+    #  routines to separate functions.
+    #  These are *identical* to the original code that was replaced by function calls
+    ##########################################################################
+
+    def hal_get_flux_amp_parameter(self, q: str) -> ManualParameter:
+        fl_lutman = self.find_instrument(q).instr_LutMan_Flux.get_instr()
+        awg = fl_lutman.AWG.get_instr()
+        using_QWG = isinstance(awg, QuTech_AWG_Module)
+        if using_QWG:
+            awg_ch = fl_lutman.cfg_awg_channel()
+            amp_par = awg.parameters["ch{}_amp".format(awg_ch)]
+        else:
+            awg_ch = (
+                    fl_lutman.cfg_awg_channel() - 1
+            )  # -1 is to account for starting at 1
+            ch_pair = awg_ch % 2
+            awg_nr = awg_ch // 2
+
+            amp_par = awg.parameters[
+                "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
+            ]
+        return amp_par
+
+    ##########################################################################
     # public functions: get_*_detector
     ##########################################################################
 
@@ -908,6 +936,8 @@ class HAL_ShimMQ(Instrument):
         else:
             self.corr_det = None
 
+
+    @deprecated(version='0.4', reason="VSM support is broken")
     def _prep_td_configure_VSM(self):
         """
         turn off all VSM channels and then use qubit settings to
@@ -945,8 +975,4 @@ class HAL_ShimMQ(Instrument):
             # self.instr_CC.get_instr().set(
             #     'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
             #     qb.mw_vsm_delay())
-
-    ##########################################################################
-    # private functions
-    ##########################################################################
 

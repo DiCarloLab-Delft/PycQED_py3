@@ -30,7 +30,7 @@ from pycqed.utilities import learner1D_minimizer as l1dm
 from pycqed.utilities.general import check_keyboard_interrupt, print_exception
 
 # Imported for type checks
-from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
+#from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
 from pycqed.measurement.measurement_control import MeasurementControl
 
 from qcodes.instrument.parameter import ManualParameter, Parameter
@@ -2074,22 +2074,25 @@ class HAL_Device(HAL_ShimMQ):
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q_spec])
 
-        # FIXME: HW dependency
-        awg = fl_lutman.AWG.get_instr()
-        using_QWG = isinstance(awg, QuTech_AWG_Module)
-        if using_QWG:
-            awg_ch = fl_lutman.cfg_awg_channel()
-            amp_par = awg.parameters["ch{}_amp".format(awg_ch)]
+        if 1:
+            amp_par = self.hal_get_flux_amp_parameter(q0)
         else:
-            awg_ch = (
-                fl_lutman.cfg_awg_channel() - 1
-            )  # -1 is to account for starting at 1
-            ch_pair = awg_ch % 2
-            awg_nr = awg_ch // 2
+            # FIXME: HW dependency
+            awg = fl_lutman.AWG.get_instr()
+            using_QWG = isinstance(awg, QuTech_AWG_Module)
+            if using_QWG:
+                awg_ch = fl_lutman.cfg_awg_channel()
+                amp_par = awg.parameters["ch{}_amp".format(awg_ch)]
+            else:
+                awg_ch = (
+                    fl_lutman.cfg_awg_channel() - 1
+                )  # -1 is to account for starting at 1
+                ch_pair = awg_ch % 2
+                awg_nr = awg_ch // 2
 
-            amp_par = awg.parameters[
-                "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
-            ]
+                amp_par = awg.parameters[
+                    "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
+                ]
 
         sw = swf.FLsweep(fl_lutman, length_par, waveform_name=waveform_name)
 
@@ -2250,27 +2253,30 @@ class HAL_Device(HAL_ShimMQ):
 
         if waveform_name == "square":
             length_par = fl_lutman.sq_length
-            flux_cw = 6  # Hard-coded for now [2020-04-28]
+            flux_cw = 6  # FIXME: Hard-coded for now [2020-04-28]
             if sq_duration is None:
                 raise ValueError("Square pulse duration must be specified.")
         else:
             raise ValueError("Waveform name not recognized.")
 
-        # FIXME: HW dependency
-        awg = fl_lutman.AWG.get_instr()
-        using_QWG = isinstance(awg, QuTech_AWG_Module)
-        if using_QWG:
-            awg_ch = fl_lutman.cfg_awg_channel()
-            amp_par = awg.parameters["ch{}_amp".format(awg_ch)]
+        if 1:
+            amp_par = self.hal_get_flux_amp_parameter(q0)
         else:
-            # -1 is to account for starting at 1
-            awg_ch = fl_lutman.cfg_awg_channel() - 1
-            ch_pair = awg_ch % 2
-            awg_nr = awg_ch // 2
+            # FIXME: HW dependency
+            awg = fl_lutman.AWG.get_instr()
+            using_QWG = isinstance(awg, QuTech_AWG_Module)
+            if using_QWG:
+                awg_ch = fl_lutman.cfg_awg_channel()
+                amp_par = awg.parameters["ch{}_amp".format(awg_ch)]
+            else:
+                # -1 is to account for starting at 1
+                awg_ch = fl_lutman.cfg_awg_channel() - 1
+                ch_pair = awg_ch % 2
+                awg_nr = awg_ch // 2
 
-            amp_par = awg.parameters[
-                "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
-            ]
+                amp_par = awg.parameters[
+                    "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
+                ]
 
         p = mqo.Chevron(
             q0idx,
