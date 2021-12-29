@@ -199,7 +199,7 @@ class HAL_ShimMQ(Instrument):
         if not reduced:
             self._prep_ro_sources(qubits=qubits)
 
-        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits)
+        acq_ch_map = self._prep_ro_assign_weights(qubits=qubits)  # FIXME: cleanup use of acq_ch_map vs. self.acq_ch_map
         self._prep_ro_integration_weights(qubits=qubits)
         if not reduced:
             self._prep_ro_pulses(qubits=qubits)
@@ -320,7 +320,7 @@ class HAL_ShimMQ(Instrument):
 
         if q0.instr_acquisition.get_instr() == q1.instr_acquisition.get_instr():
             d = det.UHFQC_correlation_detector(
-                UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
+                UHFQC=q0.instr_acquisition.get_instr(),  # <- FIXME: hack line
                 thresholding=self.ro_acq_digitized(),
                 AWG=self.instr_CC.get_instr(),
                 channels=[w0, w1], correlations=[(w0, w1)],
@@ -333,10 +333,9 @@ class HAL_ShimMQ(Instrument):
                              '{} w{}'.format(qubits[1], w1),
                              'Corr ({}, {})'.format(qubits[0], qubits[1])]
         else:
-            # This should raise a ValueError but exists for legacy reasons.
+            # FIXME: This should raise a ValueError but exists for legacy reasons.
             # WARNING DEBUG HACK
-            d = self.get_int_avg_det(qubits=qubits,
-                                     single_int_avg=single_int_avg,
+            d = self.get_int_avg_det(single_int_avg=single_int_avg,
                                      seg_per_point=seg_per_point,
                                      always_prepare=always_prepare)
 
@@ -395,12 +394,13 @@ class HAL_ShimMQ(Instrument):
 
     def get_input_avg_det(self, **kw) -> Detector_Function:
         """
-        Create an input average multi detector based.
+        Create an multi detector based input average detector.
 
-        The input average multi detector is based on the self._acq_ch_map
-        that gets set when calling self.prepare_readout(qubits).
+        The multi detector is based on the self._acq_ch_map that gets set when calling self.prepare_readout(qubits).
         """
         input_average_detectors = []
+
+        # FIXME: check self.ro_acq_weight_type?
 
         for i, acq_instr_name in enumerate(self._acq_ch_map.keys()):
             if i == 0:
@@ -427,12 +427,12 @@ class HAL_ShimMQ(Instrument):
         return input_average_detector
 
 
-    def get_int_avg_det(self, qubits=None, **kw) -> Detector_Function:
+    def get_int_avg_det(self, **kw) -> Detector_Function:
         """
-        """
-        if qubits is not None:
-            log.warning("qubits is deprecated")
+        Create an multi detector based integration average detector.
 
+        The multi detector is based on the self._acq_ch_map that gets set when calling self.prepare_readout(qubits).
+        """
         if self.ro_acq_weight_type() == "SSB":
             result_logging_mode = "raw"
         elif 'optimal' in self.ro_acq_weight_type():
@@ -740,7 +740,7 @@ class HAL_ShimMQ(Instrument):
         has no implicit feedline or UHFQC contraint built in.
 
         The mapping of acq_channels to qubits is stored in self._acq_ch_map
-        for debugging purposes.
+        for debugging purposes. FIXME: also for get_int_logging_detector, etc
         """
         log.info('Setting up acquisition channels')
         if self.ro_acq_weight_type() == 'optimal':
@@ -781,7 +781,7 @@ class HAL_ShimMQ(Instrument):
             self.find_instrument(acq_instr).reset_correlation_params()
             self.find_instrument(acq_instr).reset_crosstalk_matrix()
 
-        # Stored as a private attribute for debugging purposes.
+        # Stored as a private attribute for debugging purposes. FIXME: also for get_int_logging_detector, etc
         self._acq_ch_map = acq_ch_map
 
         return acq_ch_map

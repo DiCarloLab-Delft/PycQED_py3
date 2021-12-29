@@ -202,12 +202,13 @@ class HAL_Device(HAL_ShimMQ):
         )
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
-        measured_qubits = [q0, q1]
-        if q2 is not None:
-            measured_qubits.append(q2)
-        if q3 is not None:
-            measured_qubits.append(q3)
-        MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))  # FIXME: qubits ignored by callee
+        # FIXME: unused now get_int_avg_det no longer has parameter 'qubits'
+        # measured_qubits = [q0, q1]
+        # if q2 is not None:
+        #     measured_qubits.append(q2)
+        # if q3 is not None:
+        #     measured_qubits.append(q3)
+        MC.set_detector_function(self.get_int_avg_det())
         MC.run(
             "conditional_oscillation_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}".format(
                 q0, q1, q2, q3, cz_repetitions,
@@ -389,7 +390,7 @@ class HAL_Device(HAL_ShimMQ):
         )
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
-        d = self.get_int_avg_det(qubits=list_qubits_used)
+        d = self.get_int_avg_det()
         MC.set_detector_function(d)
         MC.run(
             "conditional_oscillation_{}_x{}_{}{}".format(
@@ -719,7 +720,7 @@ class HAL_Device(HAL_ShimMQ):
             unit="a.u."
         )
 
-        d = self.get_int_avg_det(qubits=target_qubits + control_qubits)
+        d = self.get_int_avg_det()
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
@@ -1130,7 +1131,7 @@ class HAL_Device(HAL_ShimMQ):
         if detector == "correl":
             d = self.get_correlation_detector([q0, q1])
         elif detector == "int_avg":
-            d = self.get_int_avg_det(qubits=[q0, q1])
+            d = self.get_int_avg_det()
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(21 * repetitions))
         MC.set_detector_function(d)
@@ -1434,7 +1435,7 @@ class HAL_Device(HAL_ShimMQ):
         )
 
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
-        d = self.get_int_avg_det(qubits=all_qubits)
+        d = self.get_int_avg_det()
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
@@ -2293,7 +2294,7 @@ class HAL_Device(HAL_ShimMQ):
 
         qubits = [q0, q_spec]
 
-        d = self.get_int_avg_det(qubits=qubits)
+        d = self.get_int_avg_det()
 
         # if we want to add a spec tone
         # NB: not tested [2020-04-27]
@@ -2601,7 +2602,6 @@ class HAL_Device(HAL_ShimMQ):
             values_per_point_suffex = ["cos", "sin"]
 
         d = self.get_int_avg_det(
-            qubits=qubits,
             values_per_point=values_per_point,
             values_per_point_suffex=values_per_point_suffex,
             single_int_avg=True,
@@ -2698,7 +2698,6 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_function(sw)
         MC.set_sweep_points(amps)
         d = self.get_int_avg_det(
-            qubits=[q0],
             values_per_point=2,
             values_per_point_suffex=["cos", "sin"],
             single_int_avg=True,
@@ -2765,7 +2764,7 @@ class HAL_Device(HAL_ShimMQ):
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
-        d = self.get_int_avg_det(qubits=qubits, single_int_avg=True)
+        d = self.get_int_avg_det(single_int_avg=True)
         MC.set_detector_function(d)
 
         s = swf.tim_flux_latency_sweep(self)
@@ -2818,7 +2817,7 @@ class HAL_Device(HAL_ShimMQ):
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
-        d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
+        d = self.get_int_avg_det(single_int_avg=True)
         MC.set_detector_function(d)
 
         if latency_type == 'flux':
@@ -2936,7 +2935,6 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_function(flux_pulse_time)
         MC.set_sweep_points(times)
         d = self.get_int_avg_det(
-            qubits=[q0],
             values_per_point=2,
             values_per_point_suffex=["final x90", "final y90"],
             single_int_avg=True,
@@ -4820,7 +4818,7 @@ class HAL_Device(HAL_ShimMQ):
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(points))
-        d = self.get_int_avg_det(qubits=qubits)
+        d = self.get_int_avg_det()
         MC.set_detector_function(d)
         if label is None:
             label = 'Multi_Ramsey_' + '_'.join(qubits)
@@ -4874,7 +4872,7 @@ class HAL_Device(HAL_ShimMQ):
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
-        d = self.get_int_avg_det(qubits=qubits)
+        d = self.get_int_avg_det()
         MC.set_detector_function(d)
         MC.run('Multi_AllXY_'+'_'.join(qubits))
 
@@ -4931,7 +4929,7 @@ class HAL_Device(HAL_ShimMQ):
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(points))
-        d = self.get_int_avg_det(qubits=qubits)
+        d = self.get_int_avg_det()
         MC.set_detector_function(d)
         label = 'Multi_T1_' + '_'.join(qubits)
         MC.run(label)
@@ -4988,7 +4986,7 @@ class HAL_Device(HAL_ShimMQ):
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(points))
-        d = self.get_int_avg_det(qubits=qubits)
+        d = self.get_int_avg_det()
         MC.set_detector_function(d)
         label = 'Multi_Echo_' + '_'.join(qubits)
         MC.run(label)
@@ -5051,7 +5049,7 @@ class HAL_Device(HAL_ShimMQ):
         s = swf.OpenQL_Sweep(openql_program=p, unit='#', CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(nf)
-        d = self.get_int_avg_det(qubits=qubits)
+        d = self.get_int_avg_det()
         MC.set_detector_function(d)
         label = 'Multi_flipping_' + '_'.join(qubits)
         MC.run(label)
@@ -5129,7 +5127,7 @@ class HAL_Device(HAL_ShimMQ):
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
         s = swf.motzoi_lutman_amp_sweep(qubits=qubits, device=self)
-        d = self.get_int_avg_det(qubits=qubits, single_int_avg=True,
+        d = self.get_int_avg_det(single_int_avg=True,
                                  values_per_point=2,
                                  values_per_point_suffex=['yX', 'xY'],
                                  always_prepare=True)
@@ -5148,6 +5146,7 @@ class HAL_Device(HAL_ShimMQ):
             return True
 
 
+    # FIXME commented out
     # def measure_ramsey_tomo(self,
     #                         qubit_ramsey: list,
     #                         qubit_control: list,
