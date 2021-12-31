@@ -1,5 +1,6 @@
 """
 File:   HAL_Device.py (originally device_object_CCL.py)
+Note:   see file "HAL.md"
 Note:   a lot code was moved around within this file in December 2021. As a consequence, the author information provided
         by 'git blame' makes little sense. See GIT tag 'release_v0.3' for the original file.
 """
@@ -2779,11 +2780,14 @@ class HAL_Device(HAL_ShimMQ):
         MC.run_2D(label)
 
         # This is the analysis that should be run but with custom delays
-        ma2.Timing_Cal_Flux_Fine(ch_idx=0, close_figs=False,
-                                 ro_latency=-100e-9,
-                                 flux_latency=0,
-                                 flux_pulse_duration=10e-9,
-                                 mw_pulse_separation=80e-9)
+        ma2.Timing_Cal_Flux_Fine(
+            ch_idx=0,
+            close_figs=False,
+            ro_latency=-100e-9,
+            flux_latency=0,
+            flux_pulse_duration=10e-9,
+            mw_pulse_separation=80e-9
+        )
 
 
     def measure_timing_1d_trace(

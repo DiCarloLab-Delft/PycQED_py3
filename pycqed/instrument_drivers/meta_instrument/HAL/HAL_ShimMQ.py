@@ -1,9 +1,7 @@
 """
 File:   HAL_ShimMQ.py : HAL shim Multi Qubit
+Note:   see file "HAL.md"
 Note:   extracted from HAL_Device.py (originally device_object_CCL.py)
-
-see the notes in qubit_objects/HAL_ShimSQ.py
-
 Note:   a lot code was moved around within this file in December 2021. As a consequence, the author information provided
         by 'git blame' makes little sense. See GIT tag 'release_v0.3' for the original file.
 """

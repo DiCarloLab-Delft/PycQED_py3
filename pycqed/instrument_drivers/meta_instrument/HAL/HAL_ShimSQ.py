@@ -1,27 +1,7 @@
 """
 File:   HAL_ShimSQ.py : HAL shim Single Qubit
+Note:   see file "HAL.md"
 Note:   extracted from HAL_Transmon.py (originally CCL_Transmon.py)
-
-This file provides class HAL_ShimSQ, which implements a shim between the HAL_Transmon and the instrument hardware for
-single qubit operations. It contains hardware dependent functions extracted from CCL_Transmon.py, extended with
-functions that abstract the instrument hardware that was directly accessed by the end user methods.
-FIXME: the latter is Work In Progress, so old style code is still present in HAL_Transmon
-
-QCoDeS parameters referring to instrument hardware are added here, and not in child class HAL_Transmon where they were
-originally added. These parameters should only accessed here (although nothing really stops you from violating this
-design). Note that we try to find a balance between compatibility with exiting code and proper design here.
-
-The following hardware related attributes are managed here:
-- physical instruments of the signal chain, and their
-    - connectivity
-    - settings
-    - modes (if any)
-    - signal chain related properties (e.g. modulation, mixer calibration)
-    - FIXME: etc
-
-
-A future improvement is to merge this HAL functions for Single Qubits with those for Multi Qubits.
-
 Note:   a lot code was moved around within this file in December 2021. As a consequence, the author information provided
         by 'git blame' makes little sense. See GIT tag 'release_v0.3' for the original file.
 """
