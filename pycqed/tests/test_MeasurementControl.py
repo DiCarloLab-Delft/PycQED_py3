@@ -43,7 +43,6 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.soft_avg(1)
 
     def test_soft_sweep_1D(self):
-
         sweep_pts = np.linspace(0, 10, 30)
         self.MC.set_sweep_function(None_Sweep())
         self.MC.set_sweep_points(sweep_pts)
@@ -80,7 +79,7 @@ class Test_MeasurementControl(unittest.TestCase):
 
     def test_soft_sweep_1D_alt_shape(self):
         # This is a generalization of a 1D sweep function where instead of
-        # a shape (2,) it has a shape (2,1). This isinconsistent with the
+        # a shape (2,) it has a shape (2,1). This is inconsistent with the
         # N-D hard sweeps. and should be addressed
 
         sweep_pts = np.linspace(0, 10, 30)

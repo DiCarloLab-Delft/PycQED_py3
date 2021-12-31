@@ -510,6 +510,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             wave_id: can be either the "name" of a waveform or
                 the integer codeword corresponding to a combination of
                 readout waveforms.
+
             regenerate_waveforms (bool) : if True regenerates all waveforms
         """
         if regenerate_waveforms:
