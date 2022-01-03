@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
+import weakref
+from typing import Dict
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
@@ -19,14 +21,20 @@ class Base_LutMan(Instrument):
     an AWG.
 
     The LutMan provides
-        - A set of basic waveforms that are generated based on
-            parameters specified in the LutMan
-        - A LutMap, relating waveform names to specific lookuptable indices
+        - LutMap
+            a dict that relates specific lookuptable indices (or 'codewords') to a 'waveform', which is a dict
+            containing a name ("name") and properties ("type", and depending on that, other properties)
+
+        - _wave_dict
+            a dict with generated LutMap waveforms based on parameters specified in the LutMan, and the LutMap properties
+
         - Methods to upload and regenerate these waveforms.
         - Methods to render waves.
 
     The Base LutMan does not provide a set of FIXME: comment ends
     """
+
+    _all_lutmans: Dict[str, weakref.ref] = {}
 
     def __init__(self, name, **kw):
         logging.info(__name__ + " : Initializing instrument")
@@ -43,7 +51,7 @@ class Base_LutMan(Instrument):
             vals=vals.Strings(),
         )
 
-        # FIXME: allowing direct access requires that user maintains consistence
+        # FIXME: allowing direct access requires that user maintains consistency
         #  between LutMap and _wave_dict (and instrument), see all the handling
         #  (e.g. *lutman.load_*) in CCL_Transmon/device_object_CCL/sweep_functions,
         #  and issue #626
@@ -79,6 +87,15 @@ class Base_LutMan(Instrument):
         self._wave_dict = {}
         self.set_default_lutmap()
 
+        # support for make()
+        self._record_instance(self)
+        self._current_lutmap = {}
+        self._current_wave_dict = {}
+
+    def __del__(self) -> None:
+        self._remove_instance(self)
+        super().__del__()
+
     ##########################################################################
     # Abstract functions
     ##########################################################################
@@ -94,7 +111,7 @@ class Base_LutMan(Instrument):
 
     def set_default_lutmap(self):
         """
-        Sets the "LutMap" parameter to
+        Sets the "LutMap" parameter to its default
 
         """
         raise NotImplementedError()
@@ -106,9 +123,7 @@ class Base_LutMan(Instrument):
         """
         raise NotImplementedError()
 
-    def load_waveform_onto_AWG_lookuptable(
-        self, waveform_name: str, regenerate_waveforms: bool = False
-    ):
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str, regenerate_waveforms: bool = False):
         """
         Loads a specific waveform to the AWG
         """
@@ -119,7 +134,9 @@ class Base_LutMan(Instrument):
     ##########################################################################
 
     def load_waveforms_onto_AWG_lookuptable(
-        self, regenerate_waveforms: bool = True, stop_start: bool = True
+            self,
+            regenerate_waveforms: bool = True,
+            stop_start: bool = True
     ):
         """
         Loads all waveforms specified in the LutMap to an AWG.
@@ -143,7 +160,11 @@ class Base_LutMan(Instrument):
             AWG.start()
 
     def render_wave(
-        self, wave_id, show=True, time_units="lut_index", reload_pulses=True
+            self,
+            wave_id,
+            show=True,
+            time_units="lut_index",
+            reload_pulses=True
     ):
         """
         Render a waveform to a figure.
@@ -204,7 +225,12 @@ class Base_LutMan(Instrument):
     ##########################################################################
 
     def render_wave_PSD(
-        self, wave_id, show=True, reload_pulses=True, f_bounds=None, y_bounds=None
+            self,
+            wave_id,
+            show=True,
+            reload_pulses=True,
+            f_bounds=None,
+            y_bounds=None
     ):
         """
         Create a Power Spectral Density plot
@@ -237,6 +263,46 @@ class Base_LutMan(Instrument):
         Takes a time in seconds and returns the corresponding sample
         """
         return int(time * self.sampling_rate())
+
+    def make(self) -> None:
+        """
+
+        Returns:
+
+        """
+        # FIXME: smart start_stop
+        if self.LutMap() != self._current_lutmap:
+            self.generate_standard_waveforms()  # NB: updates self._wave_dict
+            self._current_lutmap = self.LutMap()
+
+        if self._wave_dict != self._current_wave_dict:
+            self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=False)
+            self._current_wave_dict = self._wave_dict
+
+    ##########################################################################
+    # Class methods
+    ##########################################################################
+
+    @classmethod
+    def _record_instance(cls, instance: 'Base_LutMan') -> None:
+        wr = weakref.ref(instance)
+        name = instance.name
+        cls._all_lutmans[name] = wr  # NB: we don't check uniqueness since Instrument already does
+
+    @classmethod
+    def _remove_instance(cls, instance: 'Base_LutMan') -> None:
+        wr = weakref.ref(instance)
+
+        # remove from _all_lutmans, but don't depend on the name to do it, in case name has changed or been deleted
+        all_lm = cls._all_lutmans
+        for name, ref in list(all_lm.items()):
+            if ref is wr:
+                del all_lm[name]
+
+    @classmethod
+    def make_all(cls):
+        for name, ref in list(cls._all_lutmans.items()):
+            ref.make()
 
 
 # FIXME: this is specific for very early versions of the QWG that only supported a single codeword triggering all 4

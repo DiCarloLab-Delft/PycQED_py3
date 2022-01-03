@@ -278,16 +278,15 @@ class MeasurementControl(Instrument):
             _measure
                 sweep_function.prepare
                 detector_function.prepare
-                _measure_soft_static
-                    _measurement_function(sweep_point)
-                        sweep_function.set_parameter
-                        self.detector_function.acquire_data_point
+                _measurement_function(sweep_point)
+                    sweep_function.set_parameter
+                    self.detector_function.acquire_data_point
             sweep_function.finish
             detector_function.finish
             finish
 
         hard:
-            measure
+            _measure
                 sweep_function.prepare
                 sweep_function.set_parameter()
                 detector_function.prepare
@@ -373,7 +372,7 @@ class MeasurementControl(Instrument):
         self.finish(result)
         return return_dict
 
-    # NB: called from run() and _measure_2D()
+    # NB: called both from run() and _measure_2D()
     def _measure(self, *kw):
         if self.live_plot_enabled():
             self._initialize_plot_monitor()
@@ -387,7 +386,9 @@ class MeasurementControl(Instrument):
         ):
             self.detector_function.prepare()
             self._get_measurement_preparetime()
-            self._measure_soft_static()
+            for self.soft_iteration in range(self.soft_avg()):
+                for i, sweep_point in enumerate(self.sweep_points):
+                    self._measurement_function(sweep_point)
 
         elif self.detector_function.detector_control == "hard":
             self._get_measurement_preparetime()
@@ -414,11 +415,9 @@ class MeasurementControl(Instrument):
                     self._measure_hard()
         else:
             raise Exception(
-                "Sweep and Detector functions not "
-                + "of the same type. \nAborting measurement"
+                "Unsupported combination of Sweep and Detector function types: " +
+                f"sweep={self.sweep_function.sweep_control}, det={self.detector_function.detector_control}"
             )
-            print(self.sweep_function.sweep_control)
-            print(self.detector_function.detector_control)
 
         check_keyboard_interrupt()
         self._update_instrument_monitor()
@@ -432,11 +431,6 @@ class MeasurementControl(Instrument):
         self.detector_function.finish()
 
         return
-
-    def _measure_soft_static(self):
-        for self.soft_iteration in range(self.soft_avg()):
-            for i, sweep_point in enumerate(self.sweep_points):
-                self._measurement_function(sweep_point)
 
     def _measure_soft_adaptive(self, method=None):
         """

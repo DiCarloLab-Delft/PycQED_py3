@@ -599,7 +599,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # second channel as channel to correlate with.
             log.info('Setting w{} on {} as correlation weight for w{}'.format(correlation_channel, self.UHFQC.name, corr))
 
-            log.debug('Coppying weights of w{} to w{}'.format(corr[0], correlation_channel))
+            log.debug('Copying weights of w{} to w{}'.format(corr[0], correlation_channel))
 
             copy_int_weights_real = self.UHFQC.get('qas_0_integration_weights_{}_real'.format(corr[0]))
             copy_int_weights_imag = self.UHFQC.get('qas_0_integration_weights_{}_imag'.format(corr[0]))
@@ -690,18 +690,15 @@ class UHFQC_integration_logging_det(Hard_Detector):
         super().__init__()
 
         self.UHFQC = UHFQC
-        self.name = '{}_UHFQC_integration_logging_det'.format(
-            result_logging_mode)
+        self.name = '{}_UHFQC_integration_logging_det'.format(result_logging_mode)
         self.channels = channels
 
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             if value_names is None:
-                self.value_names[i] = '{} w{}'.format(result_logging_mode,
-                                                      channel)
+                self.value_names[i] = '{} w{}'.format(result_logging_mode, channel)
             else:
-                self.value_names[i] = 'w{} {}'.format(channel,
-                                                      value_names[i])
+                self.value_names[i] = 'w{} {}'.format(channel, value_names[i])
 
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
@@ -710,8 +707,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             # to set the acq threshold one needs to correct for this
             # scaling factor. Note that this should never be needed as
             # digitized mode is supposed to work with optimal weights.
-            log.debug('Setting scale factor for int log to {}'.format(
-                self.scaling_factor))
+            log.debug('Setting scale factor for int log to {}'.format(self.scaling_factor))
         else:
             self.value_units = ['']*len(self.channels)
             self.scaling_factor = 1
@@ -792,12 +788,17 @@ class UHFQC_statistics_logging_det(Soft_Detector):
     Detector used for the statistics logging mode of the UHFQC
     """
 
-    def __init__(self, UHFQC, AWG, nr_shots: int,
-                 integration_length: float,
-                 channels: list,
-                 statemap: dict,
-                 channel_names: list = None,
-                 normalize_counts: bool = True):
+    def __init__(
+            self,
+            UHFQC: UHFQC,
+            AWG: CC,
+            nr_shots: int,
+            integration_length: float,
+            channels: list,
+            statemap: dict,
+            channel_names: list = None,
+            normalize_counts: bool = True
+    ):
         """
         Detector for the statistics logger mode in the UHFQC.
 
@@ -838,7 +839,7 @@ class UHFQC_statistics_logging_det(Soft_Detector):
             self.value_units = ['frac']*len(self.value_names)
         self.statemap = statemap
 
-        self.max_shots = 4095  # hardware limit of UHFQC
+        self.max_shots = 4095  # hardware limit of UHFQC. FIXME: no longer true, but apparently unused
 
     @staticmethod
     def statemap_to_array(statemap: dict):
@@ -872,14 +873,11 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         # Configure the statistics logger (sl)
         self.UHFQC.qas_0_result_statistics_enable(1)
         self.UHFQC.qas_0_result_statistics_length(self.nr_shots)
-        self.UHFQC.qas_0_result_statistics_statemap(
-            self.statemap_to_array(self.statemap))
+        self.UHFQC.qas_0_result_statistics_statemap(self.statemap_to_array(self.statemap))
 
         # above should be all
-        self.UHFQC.qas_0_integration_length(
-            int(self.integration_length*(1.8e9)))
-        self.UHFQC.acquisition_initialize(
-            samples=self.nr_shots, averages=1, channels=self.channels, mode='rl')
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
+        self.UHFQC.acquisition_initialize(samples=self.nr_shots, averages=1, channels=self.channels, mode='rl')
 
     def finish(self):
         if self.AWG is not None:
@@ -900,9 +898,11 @@ class UHFQC_statistics_logging_det(Soft_Detector):
             self.AWG.start()
 
         # We don't actually care about this result
-        self.UHFQC.acquisition_poll(samples=self.nr_shots,  # double check this
-                                    arm=False,
-                                    acquisition_time=0.01)
+        self.UHFQC.acquisition_poll(
+            samples=self.nr_shots,  # double check this
+            arm=False,
+            acquisition_time=0.01
+        )
 
         # Get statistics of the individual channels
         data = np.array([])

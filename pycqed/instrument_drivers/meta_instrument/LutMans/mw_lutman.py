@@ -337,8 +337,7 @@ class Base_MW_LutMan(Base_LutMan):
             initial_value=.2
         )
 
-    def generate_standard_waveforms(
-            self, apply_predistortion_matrix: bool=True):
+    def generate_standard_waveforms(self, apply_predistortion_matrix: bool=True):
         self._wave_dict = OrderedDict()
 
         if self.cfg_sideband_mode() == 'static':
@@ -399,17 +398,24 @@ class Base_MW_LutMan(Base_LutMan):
                     sq_pulse_duration = waveform['duration']
                 else:
                     sq_pulse_duration = self.sq_pulse_duration()
+
                 if 'sq_G_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square_VSM(
-                        amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
+                        amp_G=self.sq_G_amp(),
+                        amp_D=self.sq_D_amp(),
                         length=sq_pulse_duration,#self.mw_gauss_width()*4,
                         f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
-                        sampling_rate=self.sampling_rate())
+                        sampling_rate=self.sampling_rate()
+                    )
                 elif 'sq_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square(
-                        amp=self.sq_amp(), length=sq_pulse_duration,
+                        amp=self.sq_amp(),
+                        length=sq_pulse_duration,
                         f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
-                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
+                        phase=0,
+                        motzoi=0,
+                        sampling_rate=self.sampling_rate()
+                    )
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
             else:
@@ -423,8 +429,7 @@ class Base_MW_LutMan(Base_LutMan):
         return self._wave_dict
 
     # FIXME: seems to be overridden in all derived classes: remove
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str, regenerate_waveforms: bool=False):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
@@ -781,14 +786,16 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         self.AWG.get_instr().set(wf_name_Q, wf_Q)
 
     def load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms: bool=True, stop_start: bool = True,
-            force_load_sequencer_program: bool=False):
+            self,
+            regenerate_waveforms: bool=True,
+            stop_start: bool = True,
+            force_load_sequencer_program: bool=False
+    ):
         """
         Loads all waveforms specified in the LutMap to an AWG.
 
         Args:
-            regenerate_waveforms (bool): if True calls
-                generate_standard_waveforms before uploading.
+            regenerate_waveforms (bool): if True calls generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
             force_load_sequencer_program (bool): if True forces a new compilation
                 and upload of the program on the sequencer. FIXME: parameter pack incompatible with base class
@@ -916,15 +923,20 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 # won't get the needed four waveforms.
                 if 'sq_G_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square_VSM(
-                        amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
+                        amp_G=self.sq_G_amp(),
+                        amp_D=self.sq_D_amp(),
                         length=self.mw_gauss_width()*4,
                         f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
-                        sampling_rate=self.sampling_rate())
+                        sampling_rate=self.sampling_rate()
+                    )
                 elif 'sq_amp' in self.parameters:
                     self._wave_dict[idx] = wf.mod_square(
-                        amp=self.sq_amp(), length=self.mw_gauss_width()*4,
+                        amp=self.sq_amp(),
+                        length=self.mw_gauss_width()*4,
                         f_modulation=self.mw_modulation() if self.cfg_sideband_mode()!='real-time' else 0,
-                        phase=0, motzoi=0, sampling_rate=self.sampling_rate())
+                        phase=0,
+                        sampling_rate=self.sampling_rate()
+                    )
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
 

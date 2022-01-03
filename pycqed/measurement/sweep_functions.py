@@ -64,8 +64,25 @@ class Soft_Sweep(Sweep_function):
         self.set_kw()
         self.sweep_control = 'soft'
 
-##############################################################################
 
+# FIXME: in fact there seems to be very little difference with a Soft_Sweep, apart from the fact that MeasurementControl
+#  requires soft detectors to use a Soft_Sweep, and allows either sweep for hard detectors
+class Hard_Sweep(Sweep_function):
+
+    def __init__(self, **kw):
+        super(Hard_Sweep, self).__init__()
+        self.name = 'Hard_Sweep'
+        self.parameter_name = 'None'
+        self.unit = 'a.u.'
+        self.sweep_control = 'hard'
+
+    # FIXME: UNUSED
+    # def start_acquistion(self):
+    #     pass
+
+###############################################################################
+########################          Soft Sweeps      ############################
+###############################################################################
 
 @deprecated(version='0.4', reason='not used within pyqed')
 class Elapsed_Time_Sweep(Soft_Sweep):
@@ -339,203 +356,7 @@ class motzoi_lutman_amp_sweep(Soft_Sweep):
           qub = self.device.find_instrument(q)
           mw_lutman = qub.instr_LutMan_MW.get_instr()
           mw_lutman.mw_motzoi(val)
-          mw_lutman.load_waveforms_onto_AWG_lookuptable(
-            regenerate_waveforms=True)
-
-###############################################################################
-####################          Hardware Sweeps      ############################
-###############################################################################
-
-
-class Hard_Sweep(Sweep_function):
-
-    def __init__(self, **kw):
-        super(Hard_Sweep, self).__init__()
-        self.name = 'Hard_Sweep'
-        self.parameter_name = 'None'
-        self.unit = 'a.u.'
-        self.sweep_control = 'hard'
-
-    def start_acquistion(self):
-        pass
-
-
-class OpenQL_Sweep(Hard_Sweep):
-
-    def __init__(
-            self,
-            openql_program: OqlProgram,
-            CCL: CC,
-            parameter_name: str = 'Points',
-            unit: str = 'a.u.',
-            upload: bool = True
-    ):
-        super().__init__()
-        self.name = 'OpenQL_Sweep'
-        self.parameter_name = parameter_name
-        self.unit = unit
-
-        self.openql_program = openql_program
-        self.CCL = CCL
-        self.upload = upload
-
-    def prepare(self, **kw):
-        if self.upload:
-            self.CCL.eqasm_program(self.openql_program.filename)
-
-
-class OpenQL_File_Sweep(Hard_Sweep):
-
-    def __init__(
-            self,
-            filename: str,
-            CCL: CC,
-            parameter_name: str = 'Points',
-            unit: str = 'a.u.',
-            upload: bool = True
-    ):
-        super().__init__()
-        self.name = 'OpenQL_Sweep'
-        self.parameter_name = parameter_name
-        self.unit = unit
-
-        self.filename = filename
-        self.CCL = CCL
-        self.upload = upload
-
-    def prepare(self, **kw):
-        if self.upload:
-            self.CCL.eqasm_program(self.filename)
-
-
-@deprecated(version='0.4', reason='not used within pyqed')
-class ZNB_VNA_sweep(Hard_Sweep):
-
-    def __init__(self, VNA,
-                 start_freq=None, stop_freq=None,
-                 center_freq=None, span=None,
-                 segment_list=None,
-                 npts=100, force_reset=False):
-        '''
-        Frequencies are in Hz.
-        Defines the frequency sweep using one of the following methods:
-        1) start a and stop frequency
-        2) center frequency and span
-        3) segment sweep (this requires a list of elements. Each element fully
-           defines a sweep)
-           segment_list = [[start_frequency, stop_frequency, nbr_points,
-                            power, segment_time, mesurement_delay, bandwidth],
-                           [elements for segment #2],
-                           ...,
-                           [elements for segment #n]]
-
-        If force_reset = True the VNA is reset to default settings
-        '''
-        super(ZNB_VNA_sweep, self).__init__()
-        self.name = 'ZNB_VNA_sweep'
-        self.parameter_name = 'frequency'
-        self.unit = 'Hz'
-
-        self.VNA = VNA
-        self.filename = 'VNA_sweep'
-        self.start_freq = start_freq
-        self.stop_freq = stop_freq
-        self.center_freq = center_freq
-        self.segment_list = segment_list
-        self.span = span
-        self.npts = npts
-
-        if force_reset == True:
-            VNA.reset()
-
-    def prepare(self):
-        '''
-        Prepare the VNA for measurements by defining basic settings.
-        Set the frequency sweep and get the frequency points back from the insturment
-        '''
-        self.VNA.continuous_mode_all('off')  # measure only if required
-        # optimize the sweep time for the fastest measurement
-        self.VNA.min_sweep_time('on')
-        # start a measurement once the trigger signal arrives
-        self.VNA.trigger_source('immediate')
-        # trigger signal is generated with the command:
-        # VNA.start_sweep_all()
-        self.VNA.rf_on()
-        if self.segment_list == None:
-            self.VNA.sweep_type('linear')  # set a linear sweep
-            if self.start_freq != None and self.stop_freq != None:
-                self.VNA.start_frequency(self.start_freq)
-                self.VNA.stop_frequency(self.stop_freq)
-            elif self.center_freq != None and self.span != None:
-                self.VNA.center_frequency(self.center_freq)
-                self.VNA.span_frequency(self.span)
-
-            self.VNA.npts(self.npts)
-        elif self.segment_list != None:
-            # delete all previous stored segments
-            self.VNA.delete_all_segments()
-
-            # Load segments in reverse order to have them executed properly
-            for idx_segment in range(len(self.segment_list), 0, -1):
-                current_segment = self.segment_list[idx_segment-1]
-                str_to_write = 'SENSE:SEGMENT:INSERT %s, %s, %s, %s, %s, %s, %s' % (current_segment[0], current_segment[
-                                                                                    1], current_segment[2], current_segment[3], current_segment[4], current_segment[5], current_segment[6])
-                self.VNA.write(str_to_write)
-
-            self.VNA.sweep_type('segment')  # set a segment sweep
-
-        # get the list of frequency used in the span from the VNA
-        self.sweep_points = self.VNA.get_stimulus()
-
-    def finish(self, **kw):
-        self.VNA.rf_off()
-
-
-@deprecated(version='0.4', reason='not used within pyqed')
-class QWG_lutman_par(Soft_Sweep):
-
-    def __init__(self, LutMan, LutMan_parameter, **kw):
-        self.name = LutMan_parameter.name
-        self.parameter_name = LutMan_parameter.label
-        self.unit = LutMan_parameter.unit
-        self.sweep_control = 'soft'
-        self.set_kw()
-
-        self.LutMan = LutMan
-        self.LutMan_parameter = LutMan_parameter
-
-    def set_parameter(self, val):
-        self.LutMan.AWG.get_instr().stop()
-        self.LutMan_parameter.set(val)
-        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
-        self.LutMan.AWG.get_instr().start()
-        self.LutMan.AWG.get_instr().getOperationComplete()  # FIXME: outdated and no longer necessary. And why special-case QWG
-
-
-@deprecated(version='0.4', reason='not used within pyqed')
-class QWG_flux_amp(Soft_Sweep):
-    """
-    Sweep function
-    """
-
-    def __init__(self, QWG, channel: int, frac_amp: float, **kw):
-        self.name = 'Flux_amp'
-        self.parameter_name = 'Flux_amp'
-        self.unit = 'V'
-        self.sweep_control = 'soft'
-        self.set_kw()
-
-        self.QWG = QWG
-        self.qwg_channel_amp_par = QWG.parameters['ch{}_amp'.format(channel)]
-
-        # Amp = frac * Vpp/2
-        self.scale_factor = 2/frac_amp
-
-    def set_parameter(self, val):
-        Vpp = val * self.scale_factor
-        self.qwg_channel_amp_par(Vpp)
-        # Ensure the amplitude was set correctly
-        self.QWG.getOperationComplete()
+          mw_lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
 
 class lutman_par(Soft_Sweep):
@@ -590,7 +411,7 @@ class anharmonicity_sweep(Soft_Sweep):
 
 class joint_HDAWG_lutman_parameters(Soft_Sweep):
     """
-    Sweeps two parameteres together, assigning the same value.
+    Sweeps two parameters together, assigning the same value.
     name is defined by user
     label and units are grabbed from parameter_1
     """
@@ -624,7 +445,6 @@ class joint_HDAWG_lutman_parameters(Soft_Sweep):
 
 class RO_freq_sweep(Soft_Sweep):
     """
-    Sweeps two parameteres toghether, assigning the same value
     name is defined by user
     label and units are grabbed from parameter_1
     """
@@ -862,7 +682,7 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
             upload=True,
             **kw
     ):
-        # sweeps the readout-and depletion pules of the listed resonators.
+        # sweeps the readout-and depletion pulses of the listed resonators.
         # sets the remaining readout and depletion pulses to 0 amplitude.
 
         self.set_kw()
@@ -888,12 +708,9 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
         for resonator_number in self.LutMan._resonator_codeword_bit_mapping:
             if resonator_number in self.resonator_numbers:
                 i = self.resonator_numbers.index(resonator_number)
-                self.LutMan.set('M_amp_R{}'.format(resonator_number),
-                                val*self.optimization_M_amps[i])
-                self.LutMan.set('M_down_amp0_R{}'.format(resonator_number),
-                                val*self.optimization_M_amp_down0s[i])
-                self.LutMan.set('M_down_amp1_R{}'.format(resonator_number),
-                                val*self.optimization_M_amp_down1s[i])
+                self.LutMan.set('M_amp_R{}'.format(resonator_number), val*self.optimization_M_amps[i])
+                self.LutMan.set('M_down_amp0_R{}'.format(resonator_number), val*self.optimization_M_amp_down0s[i])
+                self.LutMan.set('M_down_amp1_R{}'.format(resonator_number), val*self.optimization_M_amp_down1s[i])
             else:
                 self.LutMan.set('M_amp_R{}'.format(resonator_number), 0)
                 self.LutMan.set('M_down_amp0_R{}'.format(resonator_number), 0)
@@ -1121,8 +938,7 @@ class FLsweep(Soft_Sweep):
         old_par_val = self.par()
         self.par(val)
         updated_par_val = self.par()
-        if self.upload_waveforms_always \
-                or (updated_par_val != old_par_val and not self.bypass_waveform_upload):
+        if self.upload_waveforms_always or (updated_par_val != old_par_val and not self.bypass_waveform_upload):
             if self.awg_model_QWG:
                 self.set_parameter_QWG(val)
             else:
@@ -1134,8 +950,7 @@ class FLsweep(Soft_Sweep):
             old_val_amp = self.lm.cfg_awg_channel_amplitude()
             self.lm.cfg_awg_channel_amplitude(self.amp_for_generation)
         self.AWG.stop()
-        self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name,
-                                                   regenerate_waveforms=True)
+        self.lm.load_waveform_onto_AWG_lookuptable(self.waveform_name, regenerate_waveforms=True)
         if self.amp_for_generation:
             self.lm.cfg_awg_channel_amplitude(abs(old_val_amp))
 
@@ -1428,3 +1243,186 @@ class SweepAlong2DContour(Soft_Sweep):
         self.par_B(val_par_B)
 
         return val
+
+###############################################################################
+####################          Hardware Sweeps      ############################
+###############################################################################
+
+class OpenQL_Sweep(Hard_Sweep):
+
+    def __init__(
+            self,
+            openql_program: OqlProgram,
+            CCL: CC,
+            parameter_name: str = 'Points',
+            unit: str = 'a.u.',
+            upload: bool = True
+    ):
+        super().__init__()
+        self.name = 'OpenQL_Sweep'
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+        self.openql_program = openql_program
+        self.CCL = CCL
+        self.upload = upload
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CCL.eqasm_program(self.openql_program.filename)
+
+
+class OpenQL_File_Sweep(Hard_Sweep):
+
+    def __init__(
+            self,
+            filename: str,
+            CCL: CC,
+            parameter_name: str = 'Points',
+            unit: str = 'a.u.',
+            upload: bool = True
+    ):
+        super().__init__()
+        self.name = 'OpenQL_Sweep'
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+        self.filename = filename
+        self.CCL = CCL
+        self.upload = upload
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CCL.eqasm_program(self.filename)
+
+
+@deprecated(version='0.4', reason='not used within pyqed')
+class ZNB_VNA_sweep(Hard_Sweep):
+
+    def __init__(self, VNA,
+                 start_freq=None, stop_freq=None,
+                 center_freq=None, span=None,
+                 segment_list=None,
+                 npts=100, force_reset=False):
+        '''
+        Frequencies are in Hz.
+        Defines the frequency sweep using one of the following methods:
+        1) start a and stop frequency
+        2) center frequency and span
+        3) segment sweep (this requires a list of elements. Each element fully
+           defines a sweep)
+           segment_list = [[start_frequency, stop_frequency, nbr_points,
+                            power, segment_time, mesurement_delay, bandwidth],
+                           [elements for segment #2],
+                           ...,
+                           [elements for segment #n]]
+
+        If force_reset = True the VNA is reset to default settings
+        '''
+        super(ZNB_VNA_sweep, self).__init__()
+        self.name = 'ZNB_VNA_sweep'
+        self.parameter_name = 'frequency'
+        self.unit = 'Hz'
+
+        self.VNA = VNA
+        self.filename = 'VNA_sweep'
+        self.start_freq = start_freq
+        self.stop_freq = stop_freq
+        self.center_freq = center_freq
+        self.segment_list = segment_list
+        self.span = span
+        self.npts = npts
+
+        if force_reset == True:
+            VNA.reset()
+
+    def prepare(self):
+        '''
+        Prepare the VNA for measurements by defining basic settings.
+        Set the frequency sweep and get the frequency points back from the insturment
+        '''
+        self.VNA.continuous_mode_all('off')  # measure only if required
+        # optimize the sweep time for the fastest measurement
+        self.VNA.min_sweep_time('on')
+        # start a measurement once the trigger signal arrives
+        self.VNA.trigger_source('immediate')
+        # trigger signal is generated with the command:
+        # VNA.start_sweep_all()
+        self.VNA.rf_on()
+        if self.segment_list == None:
+            self.VNA.sweep_type('linear')  # set a linear sweep
+            if self.start_freq != None and self.stop_freq != None:
+                self.VNA.start_frequency(self.start_freq)
+                self.VNA.stop_frequency(self.stop_freq)
+            elif self.center_freq != None and self.span != None:
+                self.VNA.center_frequency(self.center_freq)
+                self.VNA.span_frequency(self.span)
+
+            self.VNA.npts(self.npts)
+        elif self.segment_list != None:
+            # delete all previous stored segments
+            self.VNA.delete_all_segments()
+
+            # Load segments in reverse order to have them executed properly
+            for idx_segment in range(len(self.segment_list), 0, -1):
+                current_segment = self.segment_list[idx_segment-1]
+                str_to_write = 'SENSE:SEGMENT:INSERT %s, %s, %s, %s, %s, %s, %s' % (current_segment[0], current_segment[
+                                                                                    1], current_segment[2], current_segment[3], current_segment[4], current_segment[5], current_segment[6])
+                self.VNA.write(str_to_write)
+
+            self.VNA.sweep_type('segment')  # set a segment sweep
+
+        # get the list of frequency used in the span from the VNA
+        self.sweep_points = self.VNA.get_stimulus()
+
+    def finish(self, **kw):
+        self.VNA.rf_off()
+
+
+@deprecated(version='0.4', reason='not used within pyqed')
+class QWG_lutman_par(Soft_Sweep):
+
+    def __init__(self, LutMan, LutMan_parameter, **kw):
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = LutMan_parameter.unit
+        self.sweep_control = 'soft'
+        self.set_kw()
+
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+
+    def set_parameter(self, val):
+        self.LutMan.AWG.get_instr().stop()
+        self.LutMan_parameter.set(val)
+        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.LutMan.AWG.get_instr().start()
+        self.LutMan.AWG.get_instr().getOperationComplete()  # FIXME: outdated and no longer necessary. And why special-case QWG
+
+
+@deprecated(version='0.4', reason='not used within pyqed')
+class QWG_flux_amp(Soft_Sweep):
+    """
+    Sweep function
+    """
+
+    def __init__(self, QWG, channel: int, frac_amp: float, **kw):
+        self.name = 'Flux_amp'
+        self.parameter_name = 'Flux_amp'
+        self.unit = 'V'
+        self.sweep_control = 'soft'
+        self.set_kw()
+
+        self.QWG = QWG
+        self.qwg_channel_amp_par = QWG.parameters['ch{}_amp'.format(channel)]
+
+        # Amp = frac * Vpp/2
+        self.scale_factor = 2/frac_amp
+
+    def set_parameter(self, val):
+        Vpp = val * self.scale_factor
+        self.qwg_channel_amp_par(Vpp)
+        # Ensure the amplitude was set correctly
+        self.QWG.getOperationComplete()
+
+

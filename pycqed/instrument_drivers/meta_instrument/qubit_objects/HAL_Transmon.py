@@ -1133,7 +1133,7 @@ class HAL_Transmon(HAL_ShimSQ):
     def calibrate_mixer_skewness_RO(self, update=True):
         """
         Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
-        see calibration toolbox for details
+        see calibration toolbox for details FIXME: outdated
 
         Args:
             update (bool):
@@ -4540,12 +4540,6 @@ class HAL_Transmon(HAL_ShimSQ):
         self.prepare_for_timedomain()
         RO_lutman = self.instr_LutMan_RO.get_instr()
 
-        sweep_function = swf.lutman_par_UHFQC_dig_trig(
-            LutMan=RO_lutman,
-            LutMan_parameter=RO_lutman['M_length_R{}'.format(
-                self.cfg_qubit_nr())]
-        )
-
         d = det.Function_Detector(
             self.calibrate_optimal_weights,
             msmt_kw={
@@ -4553,6 +4547,11 @@ class HAL_Transmon(HAL_ShimSQ):
             },
             result_keys=['SNR', 'F_d', 'F_a', 'relaxation', 'excitation']
         )
+        # sweep_function = swf.lutman_par_UHFQC_dig_trig(
+        #     LutMan=RO_lutman,
+        #     LutMan_parameter=RO_lutman['M_length_R{}'.format(
+        #         self.cfg_qubit_nr())]
+        # )
         # nested_MC.set_sweep_function(sweep_function)
         nested_MC.set_sweep_function(self.ro_pulse_length)
         nested_MC.set_sweep_points(lengths)

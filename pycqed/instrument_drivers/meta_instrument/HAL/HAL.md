@@ -1,7 +1,6 @@
 FIXME: WIP
 
-Original architecture
----------------------
+# Original architecture
 
 Classes
 - CCLight_Transmon
@@ -14,17 +13,20 @@ Classes
 Problems:
 - hardware support scattered over many files
 - duplicate functionality in single vs. multi qubit support (CCLight_Transmon vs. DeviceCCL)
-- manual control of waveform set used
-- manual control of waveform uploading
+- LutMans
+    - manual control of waveform set used
+    - manual control of waveform uploading
+    - manual editing of _wave_dict
 - not scalable in terms of number of qubits (hardware instruments)
 - flaky use of classes in some places
 - lots of unused code and code not covered by tests
 
-HAL_Transmon
-------------
+# Refactoring
 
-HAL_ShimSQ
-----------
+## Qubit
+### HAL_Transmon
+
+### HAL_ShimSQ
 
 Class HAL_ShimSQ implements a shim between the HAL_Transmon and the instrument hardware for
 single qubit operations. It contains hardware dependent functions extracted from CCL_Transmon.py, extended with
@@ -47,17 +49,22 @@ The following hardware related attributes are managed here:
 
 A future improvement is to merge this HAL functions for Single Qubits with those for Multi Qubits.
 
-HAL_Device
-----------
+
+## Device
+### HAL_Device
 
 
-HAL_ShimMQ
-----------
+### HAL_ShimMQ
 
+## LutMans
 
+Plan
+- set LutMap from new OpenQL output (in MC.run() ?). But, should be almost free if nothing is changed
+- remove generate_standard_waveforms/load_waveform_onto_AWG_lookuptable/load_waveforms_onto_AWG_lookuptable 
 
-Ideas
------
+## MC, SF, DF
+
+# Ideas
 
 - allow sweeping of LutMan parameters without manually uploading and stop/starting
 
