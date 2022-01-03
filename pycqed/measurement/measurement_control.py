@@ -521,33 +521,33 @@ class MeasurementControl(Instrument):
                     opt_func = self._mk_optimization_function()
 
                 if is_subclass(self.adaptive_function, BaseLearner):
-                    Learner = self.adaptive_function
+                    learner = self.adaptive_function
                     mch.scale_bounds(af_pars=af_pars, x_scale=self.x_scale)
 
                     # Pass the right parameters two each type of learner
-                    if issubclass(Learner, Learner1D):
-                        self.learner = Learner(
+                    if issubclass(learner, Learner1D):
+                        self.learner = learner(
                             opt_func,
                             bounds=af_pars["bounds"],
                             loss_per_interval=af_pars.get("loss_per_interval", None),
                         )
-                    elif issubclass(Learner, Learner2D):
-                        self.learner = Learner(
+                    elif issubclass(learner, Learner2D):
+                        self.learner = learner(
                             opt_func,
                             bounds=af_pars["bounds"],
                             loss_per_triangle=af_pars.get("loss_per_triangle", None),
                         )
-                    elif issubclass(Learner, LearnerND):
-                        self.learner = Learner(
+                    elif issubclass(learner, LearnerND):
+                        self.learner = learner(
                             opt_func,
                             bounds=af_pars["bounds"],
                             loss_per_simplex=af_pars.get("loss_per_simplex", None),
                         )
-                    elif issubclass(Learner, SKOptLearner):
+                    elif issubclass(learner, SKOptLearner):
                         # NB: This learner expects the `optimization_function`
                         # to be scalar
                         # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
-                        self.learner = Learner(
+                        self.learner = learner(
                             opt_func,
                             dimensions=af_pars["dimensions"],
                             base_estimator=af_pars.get("base_estimator", "gp"),

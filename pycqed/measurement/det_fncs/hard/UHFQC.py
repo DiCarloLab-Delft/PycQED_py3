@@ -7,6 +7,7 @@ import logging
 import numpy as np
 import numpy.fft as fft
 from string import ascii_uppercase
+from deprecated import deprecated
 
 from pycqed.measurement.det_fncs.Base import Soft_Detector, Hard_Detector, Multi_Detector
 
@@ -159,6 +160,7 @@ class UHFQC_demodulated_input_avg_det(UHFQC_input_average_detector):
         return ret_data
 
 
+@deprecated(version='0.4', reason="broken code")
 class UHFQC_spectroscopy_detector(Soft_Detector):
     '''
     Detector used for the spectroscopy mode
@@ -214,7 +216,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             always_prepare: bool = False,
             prepare_function=None,
             prepare_function_kwargs: dict = None,
-            **kw):
+            **kw
+    ):
         """
         Args:
         UHFQC (instrument) : data acquisition device
@@ -380,8 +383,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             if self.AWG is not None:
                 self.AWG.start()
 
-        data_raw = self.UHFQC.acquisition_poll(
-            samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
         # if len(data_raw[next(iter(data_raw))])>1:
         #     print('[DEBUG UHF SWF] SHOULD HAVE HAD AN ERROR')
@@ -461,11 +463,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             if self.prepare_function is not None:
                 self.prepare_function()
 
-        self.UHFQC.qas_0_integration_length(
-            int(self.integration_length*self.UHFQC.clock_freq()))
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*self.UHFQC.clock_freq()))
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(
-            samples=self.nr_sweep_points, averages=self.nr_averages, channels=self.channels, mode='rl')
+            samples=self.nr_sweep_points,
+            averages=self.nr_averages,
+            channels=self.channels,
+            mode='rl'
+        )
 
     def finish(self):
         self.UHFQC.acquisition_finalize()
@@ -537,11 +542,14 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
 
-        self.UHFQC.qas_0_integration_length(
-            int(self.integration_length*(self.UHFQC.clock_freq())))
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*(self.UHFQC.clock_freq())))
         self.set_up_correlation_weights()
         self.UHFQC.acquisition_initialize(
-            samples=self.nr_sweep_points, averages=self.nr_averages, channels=self.channels, mode='rl')
+            samples=self.nr_sweep_points,
+            averages=self.nr_averages,
+            channels=self.channels,
+            mode='rl'
+        )
 
     def define_correlation_channels(self):
         self.correlation_channels = []
@@ -555,10 +563,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # 10 is the (current) max number of weights in the UHFQC (release 19.05)
             for ch in range(10):
                 if ch in self.channels:
-                    # Disable correlation mode as this is used for normal
-                    # acquisition
-                    self.UHFQC.set(
-                        'qas_0_correlations_{}_enable'.format(ch), 0)
+                    # Disable correlation mode as this is used for normal acquisition
+                    self.UHFQC.set('qas_0_correlations_{}_enable'.format(ch), 0)
 
                 # Find the first unused channel to set up as correlation
                 if ch not in self.channels:
@@ -581,64 +587,41 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # correlations mode after threshold
             # NOTE: thresholds need to be set outside the detctor object.
             self.UHFQC.qas_0_result_source(5)
-            log.info('Setting {} result source to 5 (corr threshold)'.format(
-                self.UHFQC.name))
+            log.info('Setting {} result source to 5 (corr threshold)'.format(self.UHFQC.name))
         else:
             # correlations mode before threshold
             self.UHFQC.qas_0_result_source(4)
             log.info('Setting {} result source to 4 (corr no threshold)'.format(
                 self.UHFQC.name))
         # Configure correlation mode
-        for correlation_channel, corr in zip(self.correlation_channels,
-                                             self.correlations):
+        for correlation_channel, corr in zip(self.correlation_channels, self.correlations):
             # Duplicate source channel to the correlation channel and select
             # second channel as channel to correlate with.
-            log.info('Setting w{} on {} as correlation weight for w{}'.format(
-                correlation_channel, self.UHFQC.name, corr))
+            log.info('Setting w{} on {} as correlation weight for w{}'.format(correlation_channel, self.UHFQC.name, corr))
 
-            log.debug('Coppying weights of w{} to w{}'.format(
-                corr[0], correlation_channel))
+            log.debug('Coppying weights of w{} to w{}'.format(corr[0], correlation_channel))
 
-            copy_int_weights_real = \
-                self.UHFQC.get(
-                    'qas_0_integration_weights_{}_real'.format(corr[0]))
-            copy_int_weights_imag = \
-                self.UHFQC.get(
-                    'qas_0_integration_weights_{}_imag'.format(corr[0]))
-            self.UHFQC.set(
-                'qas_0_integration_weights_{}_real'.format(
-                    correlation_channel),
-                copy_int_weights_real)
-            self.UHFQC.set(
-                'qas_0_integration_weights_{}_imag'.format(
-                    correlation_channel),
-                copy_int_weights_imag)
+            copy_int_weights_real = self.UHFQC.get('qas_0_integration_weights_{}_real'.format(corr[0]))
+            copy_int_weights_imag = self.UHFQC.get('qas_0_integration_weights_{}_imag'.format(corr[0]))
+            self.UHFQC.set('qas_0_integration_weights_{}_real'.format(correlation_channel), copy_int_weights_real)
+            self.UHFQC.set('qas_0_integration_weights_{}_imag'.format(correlation_channel), copy_int_weights_imag)
 
             copy_rot = self.UHFQC.get('qas_0_rotations_{}'.format(corr[0]))
-            self.UHFQC.set('qas_0_rotations_{}'.format(correlation_channel),
-                           copy_rot)
+            self.UHFQC.set('qas_0_rotations_{}'.format(correlation_channel), copy_rot)
 
-            log.debug('Setting correlation source of w{} to w{}'.format(
-                correlation_channel, corr[1]))
+            log.debug('Setting correlation source of w{} to w{}'.format(correlation_channel, corr[1]))
             # Enable correlation mode one the correlation output channel and
             # set the source to the second source channel
-            self.UHFQC.set('qas_0_correlations_{}_enable'.format(
-                correlation_channel), 1)
-            self.UHFQC.set('qas_0_correlations_{}_source'.format(correlation_channel),
-                           corr[1])
+            self.UHFQC.set('qas_0_correlations_{}_enable'.format(correlation_channel), 1)
+            self.UHFQC.set('qas_0_correlations_{}_source'.format(correlation_channel), corr[1])
 
-            # If thresholding is enabled, set the threshold for the correlation
-            # channel.
+            # If thresholding is enabled, set the threshold for the correlation channel.
             if self.thresholding:
-                # Becasue correlation happens after threshold, the threshold
+                # Because correlation happens after threshold, the threshold
                 # has to be set to whatever the weight function is set to.
-                log.debug('Copying threshold for w{} to w{}'.format(
-                    corr[0],  correlation_channel))
-                thresh_level = \
-                    self.UHFQC.get('qas_0_thresholds_{}_level'.format(corr[0]))
-                self.UHFQC.set(
-                    'qas_0_thresholds_{}_level'.format(correlation_channel),
-                    thresh_level)
+                log.debug('Copying threshold for w{} to w{}'.format(corr[0],  correlation_channel))
+                thresh_level = self.UHFQC.get('qas_0_thresholds_{}_level'.format(corr[0]))
+                self.UHFQC.set('qas_0_thresholds_{}_level'.format(correlation_channel), thresh_level)
 
     def get_values(self):
 
@@ -649,9 +632,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         if self.AWG is not None:
             self.AWG.start()
 
-        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                               arm=False,
-                                               acquisition_time=0.01)
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
         data = []
 
@@ -775,20 +756,18 @@ class UHFQC_integration_logging_det(Hard_Detector):
                 self.AWG.start()
 
         # Get the data
-        data_raw = self.UHFQC.acquisition_poll(
-            samples=self.nr_shots, arm=False, acquisition_time=0.01)
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
         # data = np.array([data_raw[key][-1]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
 
-        # Corrects offsets after crosstalk suppression matrix in UFHQC
+        # Corrects offsets after crosstalk suppression matrix in UHFQC
         if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
-                data[i] = data[i]-self.UHFQC.get(
-                    'qas_0_trans_offset_weightfunction_{}'.format(channel))
+                data[i] = data[i] - self.UHFQC.get('qas_0_trans_offset_weightfunction_{}'.format(channel))
         return data
 
-    def prepare(self, sweep_points):
+    def prepare(self):
         if self.AWG is not None:
             self.AWG.stop()
 
@@ -799,11 +778,9 @@ class UHFQC_integration_logging_det(Hard_Detector):
             if self.prepare_function is not None:
                 self.prepare_function()
 
-        self.UHFQC.qas_0_integration_length(
-            int(self.integration_length*(1.8e9)))
+        self.UHFQC.qas_0_integration_length(int(self.integration_length*(1.8e9)))
         self.UHFQC.qas_0_result_source(self.result_logging_mode_idx)
-        self.UHFQC.acquisition_initialize(
-            samples=self.nr_shots, averages=1, channels=self.channels, mode='rl')
+        self.UHFQC.acquisition_initialize(samples=self.nr_shots, averages=1, channels=self.channels, mode='rl')
 
     def finish(self):
         if self.AWG is not None:
@@ -930,12 +907,9 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         # Get statistics of the individual channels
         data = np.array([])
         for c in self.channels:
-            ones = self.UHFQC.get(
-                'qas_0_result_statistics_data_{}_ones'.format(c))
-            flips = self.UHFQC.get(
-                'qas_0_result_statistics_data_{}_flips'.format(c))
-            errors = self.UHFQC.get(
-                'qas_0_result_statistics_data_{}_errors'.format(c))
+            ones = self.UHFQC.get('qas_0_result_statistics_data_{}_ones'.format(c))
+            flips = self.UHFQC.get('qas_0_result_statistics_data_{}_flips'.format(c))
+            errors = self.UHFQC.get('qas_0_result_statistics_data_{}_errors'.format(c))
             data = np.concatenate((data, np.array([ones, flips, errors])))
 
         # Add total number of state errors at the end
@@ -982,11 +956,10 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
             nr_shots=nr_shots,
             integration_length=integration_length,
             channels=[channel],
-            statemap=UHFQC_single_qubit_statistics_logging_det.statemap_one2two_bit(
-                statemap),
-            channel_names=[
-                channel_name if channel_name is not None else 'ch{}'.format(channel)],
-            normalize_counts=normalize_counts)
+            statemap=UHFQC_single_qubit_statistics_logging_det.statemap_one2two_bit(statemap),
+            channel_names=[channel_name if channel_name is not None else 'ch{}'.format(channel)],
+            normalize_counts=normalize_counts
+        )
 
         self.value_names = ['ch{} flips'.format(channel),
                             'ch{} 1-counts'.format(channel)]

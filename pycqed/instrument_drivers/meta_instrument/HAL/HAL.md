@@ -6,7 +6,7 @@ Original architecture
 Classes
 - CCLight_Transmon
 - Base_LutMan and its descendants
-- DeviceCCL
+- DeviceCCL (and file calibration_toolbox.py)
 - MeasurementControl
 - Sweep_function and its descendants
 - Detector_Function and its descendants

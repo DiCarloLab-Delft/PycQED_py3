@@ -35,6 +35,7 @@ class Detector_Function(object):
         """
         pass
 
+    # FIXME: seems to be overridden by every class except None_Detector, so probably misplaced
     def prepare(self, **kw):
         if self.prepare_function_kwargs is not None:
             if self.prepare_function is not None:
@@ -151,10 +152,12 @@ class Multi_Detector(Detector_Function):
         for detector in self.detectors:
             detector.prepare(**kw)
 
-    def set_prepare_function(self,
-                             prepare_function,
-                             prepare_function_kw: dict = dict(),
-                             detectors: str = 'all'):
+    def set_prepare_function(
+            self,
+            prepare_function,
+            prepare_function_kw: dict = dict(),
+            detectors: str = 'all'
+    ):
         """
         Set an optional custom prepare function.
 
@@ -247,6 +250,9 @@ class Soft_Detector(Detector_Function):
         super().__init__(**kw)
         self.detector_control = 'soft'
 
+    def prepare(self, sweep_points=None):
+        pass
+
     def acquire_data_point(self, **kw):
         return np.random.random()
 
@@ -256,3 +262,6 @@ class Hard_Detector(Detector_Function):
     def __init__(self, **kw):
         super().__init__()
         self.detector_control = 'hard'
+
+    def prepare(self, sweep_points=None):
+        pass
