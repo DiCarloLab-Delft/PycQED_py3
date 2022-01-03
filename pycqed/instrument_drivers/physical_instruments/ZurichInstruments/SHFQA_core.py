@@ -177,8 +177,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
                 'Invalid AWG index of {} detected!'.format(awg_nr))
 
     def _num_channels(self) -> int:
-        # TODO(TP): Adapt to SHFQA
-        return 2
+        return int(self.devtype.split('SHFQA')[1])
 
     def _add_extra_parameters(self) -> None:
         # TODO(TP): Adapt to SHFQA
