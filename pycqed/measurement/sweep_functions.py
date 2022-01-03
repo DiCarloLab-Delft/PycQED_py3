@@ -1,5 +1,5 @@
 # FIXME: split-off QWG/UHFQA/etc sweeps into separate files
-# FIXME: cleanup all 'set_kw' calls, ans use super().__init everywhere
+# FIXME: cleanup all 'set_kw' calls, and use super().__init everywhere, And get rid of **kw everywhere
 
 import logging
 import time
@@ -13,7 +13,9 @@ from pycqed.analysis_v2.tools import contours2d as c2d
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
+from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import Base_LutMan
 from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman_vcz import Base_Flux_LutMan  # FIXME: do we stick to flux_lutman_vcz
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
 class Sweep_function(object):
 
@@ -65,7 +67,7 @@ class Soft_Sweep(Sweep_function):
 ##############################################################################
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class Elapsed_Time_Sweep(Soft_Sweep):
     """
     A sweep function to do a measurement periodically.
@@ -103,7 +105,7 @@ class Elapsed_Time_Sweep(Soft_Sweep):
         return elapsed_time
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class Heterodyne_Frequency_Sweep(Soft_Sweep):
     """
     Performs a joint sweep of two microwave sources for the purpose of
@@ -193,7 +195,7 @@ class None_Sweep(Soft_Sweep):
         pass
 
 
-@deprecated(version='0.4', 'not used within pyqed (except tests)')
+@deprecated(version='0.4', reason='not used within pyqed (except tests)')
 class None_Sweep_With_Parameter_Returned(Soft_Sweep):
 
     def __init__(self, sweep_control='soft', sweep_points=None,
@@ -215,7 +217,7 @@ class None_Sweep_With_Parameter_Returned(Soft_Sweep):
         return val+0.1
 
 
-@deprecated(version='0.4', 'not used within pyqed (except tests)')
+@deprecated(version='0.4', reason='not used within pyqed (except tests)')
 class None_Sweep_idx(None_Sweep):
 
     def __init__(self, **kw):
@@ -226,7 +228,7 @@ class None_Sweep_idx(None_Sweep):
         self.num_calls += 1
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class Delayed_None_Sweep(Soft_Sweep):
 
     def __init__(self, sweep_control='soft', delay=0, **kw):
@@ -276,7 +278,7 @@ class AWG_amp(Soft_Sweep):
         self.AWG.start()
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class AWG_multi_channel_amplitude(Soft_Sweep):
 
     '''
@@ -406,7 +408,7 @@ class OpenQL_File_Sweep(Hard_Sweep):
             self.CCL.eqasm_program(self.filename)
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class ZNB_VNA_sweep(Hard_Sweep):
 
     def __init__(self, VNA,
@@ -489,7 +491,7 @@ class ZNB_VNA_sweep(Hard_Sweep):
         self.VNA.rf_off()
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class QWG_lutman_par(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, **kw):
@@ -507,10 +509,10 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan_parameter.set(val)
         self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
         self.LutMan.AWG.get_instr().start()
-        self.LutMan.AWG.get_instr().getOperationComplete()
+        self.LutMan.AWG.get_instr().getOperationComplete()  # FIXME: outdated and no longer necessary. And why special-case QWG
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class QWG_flux_amp(Soft_Sweep):
     """
     Sweep function
@@ -542,7 +544,11 @@ class lutman_par(Soft_Sweep):
     supported)
     """
 
-    def __init__(self, LutMan, LutMan_parameter):
+    def __init__(
+            self,
+            LutMan: Base_LutMan,
+            LutMan_parameter
+    ):
         self.set_kw()
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
@@ -584,12 +590,19 @@ class anharmonicity_sweep(Soft_Sweep):
 
 class joint_HDAWG_lutman_parameters(Soft_Sweep):
     """
-    Sweeps two parameteres together, assigning the same value
+    Sweeps two parameteres together, assigning the same value.
     name is defined by user
     label and units are grabbed from parameter_1
     """
 
-    def __init__(self, name, parameter_1, parameter_2, AWG, lutman):
+    def __init__(
+            self,
+            name,
+            parameter_1,
+            parameter_2,
+            AWG,
+            lutman: Base_LutMan
+    ):
         self.set_kw()
         self.name = name
         self.parameter_name = parameter_1.label
@@ -639,7 +652,7 @@ class RO_freq_sweep(Soft_Sweep):
         self.ro_lm.load_waveforms_onto_AWG_lookuptable()
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class QWG_lutman_par_chunks(Soft_Sweep):
     '''
     Sweep function that divides sweep points into chunks. Every chunk is
@@ -699,7 +712,7 @@ class QWG_lutman_par_chunks(Soft_Sweep):
         QWG.getOperationComplete()
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class QWG_lutman_custom_wave_chunks(Soft_Sweep):
     '''
     Sweep function that divides sweep points into chunks. Every chunk is
@@ -749,7 +762,7 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
                 pulse_name=pulseName, codeword=self.codewords[i])
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class lutman_par_dB_attenuation_QWG(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, **kw):
@@ -769,7 +782,7 @@ class lutman_par_dB_attenuation_QWG(Soft_Sweep):
         self.LutMan.QWG.get_instr().getOperationComplete()
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, run=False, single=True,**kw):
@@ -810,7 +823,14 @@ class par_dB_attenuation_UHFQC_AWG_direct(Soft_Sweep):
 
 
 class lutman_par_UHFQC_dig_trig(Soft_Sweep):
-    def __init__(self, LutMan, LutMan_parameter, single=True, run=False,**kw):
+    def __init__(
+            self,
+            LutMan: UHFQC_RO_LutMan,
+            LutMan_parameter,
+            single=True,
+            run=False,
+            **kw
+    ):
         self.set_kw()  # FIXME
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
@@ -832,9 +852,16 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
 
 
 class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
-    def __init__(self, LutMan, resonator_numbers, optimization_M_amps,
-                 optimization_M_amp_down0s, optimization_M_amp_down1s,
-                 upload=True, **kw):
+    def __init__(
+            self,
+            LutMan: UHFQC_RO_LutMan,
+            resonator_numbers,
+            optimization_M_amps,
+            optimization_M_amp_down0s,
+            optimization_M_amp_down1s,
+            upload=True,
+            **kw
+    ):
         # sweeps the readout-and depletion pules of the listed resonators.
         # sets the remaining readout and depletion pulses to 0 amplitude.
 
@@ -876,7 +903,13 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
 
 
 class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
-    def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
+    def __init__(
+            self,
+            LutMan: UHFQC_RO_LutMan,
+            LutMan_parameter,
+            run=False,
+            **kw
+    ):
         self.set_kw()
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
@@ -896,9 +929,15 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
 
-@deprecated(version='0.4', 'not used within pyqed')
+@deprecated(version='0.4', reason='not used within pyqed')
 class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
-    def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
+    def __init__(
+            self,
+            LutMan: UHFQC_RO_LutMan,
+            LutMan_parameter,
+            run=False,
+            **kw
+    ):
         self.set_kw()
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
@@ -921,7 +960,13 @@ class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
 @deprecated('not used within pyqed')
 class UHFQC_pulse_dB_attenuation(Soft_Sweep):
 
-    def __init__(self, UHFQC, IF, dig_trigger=True,**kw):
+    def __init__(
+            self,
+            UHFQC,
+            IF,
+            dig_trigger=True,
+            **kw
+    ):
         self.set_kw()
         self.name = 'UHFQC pulse attenuation'
         self.parameter_name = 'pulse attenuation'
@@ -933,7 +978,13 @@ class UHFQC_pulse_dB_attenuation(Soft_Sweep):
         self.IF = IF
 
     def set_parameter(self, val):
-        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.IF,RO_amp=10**(val/20),RO_pulse_length=2e-6,acquisition_delay=200e-9,dig_trigger=self.dig_trigger)
+        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+            f_RO_mod=self.IF,
+            RO_amp=10**(val/20),
+            RO_pulse_length=2e-6,
+            acquisition_delay=200e-9,
+            dig_trigger=self.dig_trigger
+        )
         time.sleep(1)
         #print('refreshed UHFQC')
 
@@ -942,8 +993,14 @@ class multi_sweep_function(Soft_Sweep):
     '''
     cascades several sweep functions into a single joint sweep functions.
     '''
-    def __init__(self, sweep_functions: list, sweep_point_ratios: list=None,
-                 parameter_name=None, name=None, **kw):
+    def __init__(
+            self,
+            sweep_functions: list,
+            sweep_point_ratios: list = None,
+            parameter_name=None,
+            name=None,
+            **kw
+    ):
         self.set_kw()
         self.name = name or 'multi_sweep'
         self.parameter_name = parameter_name or 'multiple_parameters'

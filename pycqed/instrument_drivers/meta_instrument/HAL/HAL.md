@@ -54,3 +54,11 @@ HAL_Device
 HAL_ShimMQ
 ----------
 
+
+
+Ideas
+-----
+
+- allow sweeping of LutMan parameters without manually uploading and stop/starting
+
+

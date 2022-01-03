@@ -1251,7 +1251,8 @@ class HAL_ShimSQ(Qubit):
         #  FIXME: This maps badly to the actual hardware capabilities, e.g. the QWG has hardware offset control
         #   A better approach may be to pass a standard set of parameters describing pulse attributes and signal chain
         #   settings to the LutMan (maybe as a class/dict instead of QCoDeS parameters), and then have the LutMan do
-        #   everything necessary.
+        #   everything necessary. BUT: note that LutMan parameters are also used by sweep functions, e.g.
+        #   joint_HDAWG_lutman_parameters. BUT: shouldn't it sweep the underlying HAL_Transmon parameters?
         #   Or, to have the LutMan only handle pulse attributes, and move all signal chain handling here
 
 

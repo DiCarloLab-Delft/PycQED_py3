@@ -35,9 +35,6 @@ class Detector_Function(object):
         """
         pass
 
-    def get_values(self):
-        pass
-
     def prepare(self, **kw):
         if self.prepare_function_kwargs is not None:
             if self.prepare_function is not None:
@@ -62,6 +59,9 @@ class Detector_Function(object):
         """
         self.prepare_function = prepare_function
         self.prepare_function_kwargs = prepare_function_kwargs
+
+    def get_values(self):  # FIXME: only for Hard_Detector?
+        pass
 
     def finish(self, **kw):
         pass
@@ -250,18 +250,9 @@ class Soft_Detector(Detector_Function):
     def acquire_data_point(self, **kw):
         return np.random.random()
 
-    def prepare(self, sweep_points=None):
-        pass
-
 
 class Hard_Detector(Detector_Function):
 
     def __init__(self, **kw):
         super().__init__()
         self.detector_control = 'hard'
-
-    def prepare(self, sweep_points=None):
-        pass
-
-    def finish(self):
-        pass

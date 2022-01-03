@@ -273,6 +273,31 @@ class MeasurementControl(Instrument):
                     should always be explicitly diabled in order to prevent
                     accidentally leaving it off.
 
+        This function calls the following main control functions:
+        soft:
+            _measure
+                sweep_function.prepare
+                detector_function.prepare
+                _measure_soft_static
+                    _measurement_function(sweep_point)
+                        sweep_function.set_parameter
+                        self.detector_function.acquire_data_point
+            sweep_function.finish
+            detector_function.finish
+            finish
+
+        hard:
+            measure
+                sweep_function.prepare
+                sweep_function.set_parameter()
+                detector_function.prepare
+                _measure_hard
+                    detector_function.get_values
+                sweep_function.finish
+                detector_function.finish
+            finish
+
+
         """
         # Setting to zero at the start of every run, used in soft avg
         self.soft_iteration = 0
@@ -666,8 +691,7 @@ class MeasurementControl(Instrument):
                 1 + self.soft_iteration
             )
 
-            self.dset[start_idx:stop_idx, len(self.sweep_functions)] = new_vals.astype(
-                np.float64
+            self.dset[start_idx:stop_idx, len(self.sweep_functions)] = new_vals.astype(np.float64
             )
         else:
             old_vals = self.dset[start_idx:stop_idx, len(self.sweep_functions) :]
