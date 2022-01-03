@@ -132,8 +132,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def _check_devtype(self) -> None:
-        # TODO(TP): Adapt to SHFQA
-        if self.devtype != 'SHFQA':
+        if not self.devtype.startswith('SHFQA'):
             raise zibase.ziDeviceError(
                 'Device {} of type {} is not a SHFQA instrument!'.format(self.devname, self.devtype))
 
@@ -142,6 +141,9 @@ class SHFQA_core(zibase.ZI_base_instrument):
         """
         Checks that the correct options are installed on the instrument.
         """
+
+        """
+        #UHFQA code:
         options = self.gets('features/options').split('\n')
         if 'QA' not in options and 'QC' not in options:
             raise zibase.ziOptionsError(
@@ -149,9 +151,9 @@ class SHFQA_core(zibase.ZI_base_instrument):
         if 'AWG' not in options:
             raise zibase.ziOptionsError(
                 'Device {} is missing the AWG option!'.format(self.devname))
+        """
 
     def _check_versions(self) -> None:
-        # TODO(TP): Adapt to SHFQA
         """
         Checks that sufficient versions of the firmware are available.
         """
