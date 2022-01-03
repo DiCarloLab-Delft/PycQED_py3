@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 ##########################################################################
 
 class SHFQA(shf.SHFQA_core, DIO.CalInterface):
+    # TODO(TP): Adapt to SHFQA
     """
     This is the PycQED driver for the 1.8 Gsample/s SHFQA developed
     by Zurich Instruments.
@@ -68,6 +69,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
                  nr_integration_channels: int = 10,
                  server:                  str = '',
                  **kw) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Input arguments:
             name:           (str) name of the instrument
@@ -104,6 +106,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     ##########################################################################
 
     def load_default_settings(self, upload_sequence=True) -> None:
+        # TODO(TP): Adapt to SHFQA
         super().load_default_settings()
 
         # Load an AWG program
@@ -132,6 +135,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     ##########################################################################
 
     def load_awg_program_from_file(self, filename) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Loads an awg sequence onto the SHFQA from a text file.
         File needs to obey formatting specified in the manual.
@@ -143,13 +147,16 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
             self._awg_needs_configuration[0] = True
 
     def _do_set_AWG_file(self, filename) -> None:
+        # TODO(TP): Adapt to SHFQA
         self.load_awg_program_from_file('UHFLI_AWG_sequences/'+filename)
 
     def awg_file(self, filename) -> None:
+        # TODO(TP): Adapt to SHFQA
         """Only provided for backwards compatibility purposes."""
         self.load_awg_program_from_file(filename)
 
     def awg_update_waveform(self, index, data) -> None:
+        # TODO(TP): Adapt to SHFQA
         raise NotImplementedError(
             'Method not implemented! Please use the corresponding waveform parameters \'wave_chN_cwM\' to update waveforms!')
 
@@ -158,6 +165,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     ##########################################################################
 
     def plot_dio(self, bits=range(32), line_length=64) -> None:
+        # TODO(TP): Adapt to SHFQA
         data = self.getv('awgs/0/dio/data')
         zibase.plot_timing_diagram(data, bits, line_length)
 
@@ -171,6 +179,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
                                         rotation_angle=0,
                                         length=4096 / 1.8e9,
                                         scaling_factor=1) -> None:
+        # TODO(TP): Adapt to SHFQA
 # FIXME: merge conflict 20200918
 #=======
 #    def check_errors(self, errors_to_ignore=None) -> None:
@@ -203,6 +212,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
                 weight_function_Q), scaling_factor*(1.0 - 1.0j))
 
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1) -> None:
+        # TODO(TP): Adapt to SHFQA
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2 * np.pi*IF*tbase))
@@ -220,6 +230,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     ##########################################################################
 
     def _add_extra_parameters(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         We add a few additional custom parameters on top of the ones defined in the device files. These are:
           AWG_file - allows the user to configure the AWG with a SeqC program from a specific file.
@@ -283,6 +294,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
             vals=validators.Numbers())
 
     def _codeword_table_preamble(self, awg_nr) -> str:
+        # TODO(TP): Adapt to SHFQA
         """
         Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
         The generated code depends on the instrument type. For the UHF-QA we simply define the raw waveforms.
@@ -309,6 +321,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
         return program
 
     def plot_dio_snapshot(self, bits=range(32)):
+        # TODO(TP): Adapt to SHFQA
         zibase.plot_timing_diagram(self.getv('awgs/0/dio/data'), bits, 64)
 
     ##########################################################################
@@ -318,6 +331,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     def snapshot_base(self, update: bool=False,
                       params_to_skip_update =None,
                       params_to_exclude = None ):
+        # TODO(TP): Adapt to SHFQA
         """
         State of the instrument as a JSON-compatible dict.
         Args:
@@ -366,6 +380,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     ##########################################################################
 
     def _reset_awg_program_features(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Resets the self._awg_program_features to disable all features. The SHFQA can be configured with a number
         of application-specific AWG programs using this driver. However, all the programs share some characteristics that
@@ -385,6 +400,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
             'diocws': False}
 
     def _set_dio_calibration_delay(self, value) -> None:
+        # TODO(TP): Adapt to SHFQA
         # Sanity check the value
         if value < 0 or value > 15:
             raise zibase.ziValueError(
@@ -399,9 +415,11 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
         self.setd('raw/dios/0/delay', self._dio_calibration_delay)
 
     def _get_dio_calibration_delay(self):
+        # TODO(TP): Adapt to SHFQA
         return self._dio_calibration_delay
 
     def _get_minimum_holdoff(self):
+        # TODO(TP): Adapt to SHFQA
         if self.qas_0_result_averages() == 1:
             holdoff = np.max((800, self.qas_0_integration_length(), self.qas_0_delay()+16))/self.clock_freq()
         else:
@@ -410,12 +428,15 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
         return holdoff
 
     def _set_wait_dly(self, value) -> None:
+        # TODO(TP): Adapt to SHFQA
         self.set('awgs_0_userregs_{}'.format(SHFQA.USER_REG_WAIT_DLY), value)
 
     def _get_wait_dly(self):
+        # TODO(TP): Adapt to SHFQA
         return self.get('awgs_0_userregs_{}'.format(SHFQA.USER_REG_WAIT_DLY))
 
     def _set_cases(self, value) -> None:
+        # TODO(TP): Adapt to SHFQA
         # Generate error if we don't have an AWG program that supports cases
         if not self._awg_program_features['cases']:
             raise zibase.ziValueError(
@@ -488,9 +509,11 @@ setUserReg(4, err_cnt);"""
         self._awg_needs_configuration[0] = True
 
     def _get_cases(self):
+        # TODO(TP): Adapt to SHFQA
         return self._cases
 
     def _get_waveform_table(self, awg_nr: int) -> list:
+        # TODO(TP): Adapt to SHFQA
         """
         Returns the waveform table.
 
@@ -549,6 +572,7 @@ setUserReg(4, err_cnt);"""
 
     def awg_sequence_acquisition_and_DIO_triggered_pulse(
             self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0, timeout=5) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Loads the program for DIO acquisition on the AWG of the SHFQA.
 
@@ -627,7 +651,7 @@ setUserReg(4, err_cnt);"""
     def awg_sequence_acquisition_and_DIO_RED_test(
             self, Iwaves=None, Qwaves=None, cases=None, acquisition_delay=0,
             dio_out_vect=None, timeout=5):
-
+        # TODO(TP): Adapt to SHFQA
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
         # setting the delay in the instrument
@@ -658,7 +682,7 @@ setUserReg(4, err_cnt);"""
     def awg_sequence_test_pattern(
             self,
             dio_out_vect=None):
-
+        # TODO(TP): Adapt to SHFQA
         # setting the acquisition delay samples
         sequence = f"""
         cvar i = 0;
@@ -683,6 +707,7 @@ setUserReg(4, err_cnt);"""
         self._awg_needs_configuration[0] = True
 
     def awg_sequence_acquisition_and_pulse(self, Iwave=None, Qwave=None, acquisition_delay=0, dig_trigger=True) -> None:
+        # TODO(TP): Adapt to SHFQA
         if Iwave is not None and (np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0):
             raise KeyError(
                 "exceeding AWG range for I channel, all values should be within +/-1")
@@ -756,6 +781,7 @@ setTrigger(0);
         self._awg_needs_configuration[0] = True
 
     def awg_sequence_acquisition(self):
+        # TODO(TP): Adapt to SHFQA
         self._reset_awg_program_features()
         self._awg_program_features['loop_cnt'] = True
 
@@ -772,6 +798,7 @@ setTrigger(0);
         self._awg_needs_configuration[0] = True
 
     def awg_debug_acquisition(self, dly=0):
+        # TODO(TP): Adapt to SHFQA
         self._reset_awg_program_features()
         self._awg_program_features['avg_cnt']  = True
         self._awg_program_features['loop_cnt'] = True
@@ -793,6 +820,7 @@ setTrigger(0);
 
     def awg_sequence_acquisition_and_pulse_SSB(
             self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay, dig_trigger=True) -> None:
+        # TODO(TP): Adapt to SHFQA
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
         array = np.arange(int(samples))
@@ -804,6 +832,7 @@ setTrigger(0);
             Iwave, Qwave, acquisition_delay, dig_trigger=dig_trigger)
 
     def spec_mode_on(self, acq_length=1/1500, IF=20e6, ro_amp=0.1, wint_length=2**14) -> None:
+        # TODO(TP): Adapt to SHFQA
         self._reset_awg_program_features()
         self._awg_program_features['loop_cnt'] = True
         self._awg_program_features['avg_cnt'] = True
@@ -909,6 +938,7 @@ setTrigger(0);
         self._awg_needs_configuration[0] = True
 
     def spec_mode_off(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         # Resetting To regular Mode
         # changing int length
         self.qas_0_integration_mode(0)
@@ -932,6 +962,7 @@ setTrigger(0);
     ##########################################################################
 
     def _ensure_activity(self, awg_nr, mask_value: int, timeout=5):
+        # TODO(TP): Adapt to SHFQA
         """
         Record DIO data and test whether there is activity on the bits activated in the DIO protocol for the given AWG.
         """
@@ -977,6 +1008,7 @@ setTrigger(0);
         return False
 
     def _get_awg_dio_data(self, awg):
+        # TODO(TP): Adapt to SHFQA
         data = self.getv('awgs/' + str(awg) + '/dio/data')
         ts = len(data)*[0]
         cw = len(data)*[0]
@@ -986,6 +1018,7 @@ setTrigger(0);
         return (ts, cw)
 
     def _find_valid_delays(self, awg_nr, mask_value: int):
+        # TODO(TP): Adapt to SHFQA
         """Finds valid DIO delay settings for a given AWG by testing all allowed delay settings for timing violations on the
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
@@ -1026,6 +1059,7 @@ setTrigger(0);
     ##########################################################################
 
     def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+        # TODO(TP): Adapt to SHFQA
         # NB: ignoring dio_mode and port, because we have single mode only
         program = """
         // program: triggered upstream DIO calibration program
@@ -1049,6 +1083,7 @@ setTrigger(0);
         return dio_mask,expected_sequence
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+        # TODO(TP): Adapt to SHFQA
         log.info(f"{self.devname}: Calibrating DIO protocol")
         self.assure_ext_clock()
 
@@ -1106,6 +1141,7 @@ setTrigger(0);
     ##########################################################################
 
     def calibrate_CC_dio_protocol(self, CC, feedline=None, verbose=False) -> None:
+        # TODO(TP): Adapt to SHFQA
         raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")
 
 
@@ -1114,6 +1150,7 @@ setTrigger(0);
 ##########################################################################
 
 def awg_sequence_acquisition_preamble():
+    # TODO(TP): Adapt to SHFQA
     """
     This function defines a standard AWG program preamble, which is used
     regardless of the specific acquisition mode. The preamble defines standard
@@ -1145,6 +1182,7 @@ if (ro_mode) {
     return preamble
 
 def _array2vect(array, name):
+    # TODO(TP): Adapt to SHFQA
     # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
     # this is to avoid python crashes (was found to crash for vectors of
     # length> 1490)

@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 ##########################################################################
 
 class ziSHFQASeqCError(Exception):
+    # TODO(TP): Adapt to SHFQA
     """Exception raised when the configured SeqC program does
        not match the structure needed for a given measurement in terms
        of number of samples, number of averages or the use of a delay."""
@@ -27,17 +28,20 @@ class ziSHFQASeqCError(Exception):
 
 
 class ziSHFQAHoldoffError(Exception):
+    # TODO(TP): Adapt to SHFQA
     """Exception raised when a holdoff error has occurred in either the
     input monitor or result logging unit. Increase the delay between triggers
     sent to these units to solve the problem."""
     pass
 
 class ziSHFQADIOActivityError(Exception):
+    # TODO(TP): Adapt to SHFQA
     """Exception raised when insufficient activity is detected on the bits
     of the DIO to be used for controlling which qubits to measure."""
     pass
 
 class ziSHFQADIOCalibrationError(Exception):
+    # TODO(TP): Adapt to SHFQA
     """Exception raised when the DIO calibration fails, meaning no signal
     delay can be found where no timing violations are detected."""
     pass
@@ -47,6 +51,7 @@ class ziSHFQADIOCalibrationError(Exception):
 ##########################################################################
 
 class SHFQA_core(zibase.ZI_base_instrument):
+    # TODO(TP): Adapt to SHFQA
     """
     This is the base PycQED driver for the 1.8 Gsample/s SHFQA developed
     by Zurich Instruments. The class implements functionality that os
@@ -79,6 +84,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
                  nr_integration_channels: int = 10,
                  server:                  str = '',
                  **kw) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Input arguments:
             name:           (str) name of the instrument
@@ -126,11 +132,13 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def _check_devtype(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         if self.devtype != 'SHFQA':
             raise zibase.ziDeviceError(
                 'Device {} of type {} is not a SHFQA instrument!'.format(self.devname, self.devtype))
 
     def _check_options(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Checks that the correct options are installed on the instrument.
         """
@@ -143,6 +151,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
                 'Device {} is missing the AWG option!'.format(self.devname))
 
     def _check_versions(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Checks that sufficient versions of the firmware are available.
         """
@@ -155,6 +164,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
                 SHFQA_core.MIN_FPGAREVISION, self.geti('system/fpgarevision')))
 
     def _check_awg_nr(self, awg_nr) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Checks that the given AWG index is valid for the device.
         """
@@ -163,9 +173,11 @@ class SHFQA_core(zibase.ZI_base_instrument):
                 'Invalid AWG index of {} detected!'.format(awg_nr))
 
     def _num_channels(self) -> int:
+        # TODO(TP): Adapt to SHFQA
         return 2
 
     def _add_extra_parameters(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         We add a few additional custom parameters on top of the ones defined in the device files. These are:
           qas_0_trans_offset_weightfunction - an offset correction parameter for all weight functions,
@@ -204,6 +216,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def assure_ext_clock(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Make sure the instrument is using an external reference clock
         """
@@ -232,11 +245,13 @@ class SHFQA_core(zibase.ZI_base_instrument):
         log.info(f"{self.devname}: Switching to external clock done.")
 
     def clear_errors(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         super().clear_errors()
         self.qas_0_result_reset(1)
         self.qas_0_monitor_reset(1)
 
     def load_default_settings(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         # standard configurations adapted from Haandbaek's notebook
 
         # Setting the clock to external
@@ -287,6 +302,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def clock_freq(self):
+        # TODO(TP): Adapt to SHFQA
         return 1.8e9
 
     ##########################################################################
@@ -294,6 +310,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def reset_acquisition_params(self):
+        # TODO(TP): Adapt to SHFQA
         log.info(f'{self.devname}: Setting user registers to 0')
         for i in range(16):
             self.set('awgs_0_userregs_{}'.format(i), 0)
@@ -303,9 +320,11 @@ class SHFQA_core(zibase.ZI_base_instrument):
         self.reset_rotation_params()
 
     def reset_crosstalk_matrix(self):
+        # TODO(TP): Adapt to SHFQA
         self.upload_crosstalk_matrix(np.eye(self._nr_integration_channels))
 
     def reset_correlation_params(self):
+        # TODO(TP): Adapt to SHFQA
         for i in range(self._nr_integration_channels):
             self.set('qas_0_correlations_{}_enable'.format(i), 0)
             self.set('qas_0_correlations_{}_source'.format(i), 0)
@@ -313,10 +332,12 @@ class SHFQA_core(zibase.ZI_base_instrument):
             self.set('qas_0_thresholds_{}_correlation_source'.format(i), 0)
 
     def reset_rotation_params(self):
+        # TODO(TP): Adapt to SHFQA
         for i in range(self._nr_integration_channels):
             self.set('qas_0_rotations_{}'.format(i), 1+1j)
 
     def upload_crosstalk_matrix(self, matrix) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Upload parameters for the 10*10 crosstalk suppression matrix.
 
@@ -328,6 +349,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
                     j, i), matrix[i][j])
 
     def download_crosstalk_matrix(self, nr_rows=10, nr_cols=10):
+        # TODO(TP): Adapt to SHFQA
         """
         Upload parameters for the 10*10 crosstalk suppression matrix.
 
@@ -345,6 +367,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def print_correlation_overview(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         msg = '\tCorrelations overview \n'
         for i in range(10):
             enabled = self.get('qas_0_correlations_{}_enable'.format(i))
@@ -362,6 +385,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         print(msg)
 
     def print_deskew_overview(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         msg = '\tDeskew overview \n'
 
         deskew_mat = np.zeros((2, 2))
@@ -374,6 +398,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         print(msg)
 
     def print_crosstalk_overview(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         msg = '\tCrosstalk overview \n'
         msg += 'Bypass crosstalk: {} \n'.format(self.qas_0_crosstalk_bypass())
 
@@ -387,6 +412,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         print(crosstalk_mat)
 
     def print_integration_overview(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         msg = '\tIntegration overview \n'
         msg += 'Integration mode: {} \n'.format(
             self.qas_0_integration_mode())
@@ -396,6 +422,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         print(msg)
 
     def print_rotations_overview(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         msg = '\tRotations overview \n'
         for i in range(10):
             msg += 'Rotations {}: {}\n'.format(
@@ -403,6 +430,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         print(msg)
 
     def print_thresholds_overview(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         msg = '\t Thresholds overview \n'
         for i in range(10):
             msg += 'Threshold {}: {}\n'.format(
@@ -410,6 +438,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         print(msg)
 
     def print_user_regs_overview(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         msg = '\t User registers overview \n'
         user_reg_funcs = ['']*16
         user_reg_funcs[0] = 'Loop count'
@@ -424,6 +453,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         print(msg)
 
     def print_overview(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         """
         Print a readable overview of relevant parameters of the SHFQA.
 
@@ -450,6 +480,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
                     channels=(0, 1), 
                     mode='rl', 
                     poll=True):
+        # TODO(TP): Adapt to SHFQA
         self.timeout(timeout)
         self.acquisition_initialize(samples, averages, channels, mode, poll)
         if poll:
@@ -467,6 +498,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
                                channels=(0, 1),
                                mode='rl', 
                                poll=True) -> None:
+        # TODO(TP): Adapt to SHFQA
         # Define the channels to use and subscribe to them
         self._acquisition_nodes = []
 
@@ -526,12 +558,14 @@ class SHFQA_core(zibase.ZI_base_instrument):
         self.auxins_0_averaging(8)
     
     def acquisition_arm(self, single=True) -> None:
+        # TODO(TP): Adapt to SHFQA
         # time.sleep(0.01)
         self.awgs_0_single(single)
         self.start()
 
     def acquisition_poll(self, samples, arm=True,
                          acquisition_time=0.010):
+        # TODO(TP): Adapt to SHFQA
         """
         Polls the SHFQA for data.
 
@@ -584,6 +618,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
 
     def acquisition_get(self, samples, arm=True,
                          acquisition_time=0.010):
+        # TODO(TP): Adapt to SHFQA
         """
         Waits for the SHFQA to finish a measurement then reads the data.
 
@@ -629,6 +664,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         return data
 
     def acquisition_finalize(self) -> None:
+        # TODO(TP): Adapt to SHFQA
         self.stop()
         self.unsubs()
 
@@ -647,6 +683,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         uses these features to keep track of what the current AWG program can do. It then raises errors in case
         the user tries to do something that is not supported.
         """
+        # TODO(TP): Adapt to SHFQA
         self._awg_program_features = {
             'loop_cnt': False,
             'avg_cnt': False,
@@ -656,7 +693,9 @@ class SHFQA_core(zibase.ZI_base_instrument):
             'diocws': False}
 
     def _set_wait_dly(self, value) -> None:
+        # TODO(TP): Adapt to SHFQA
         self.set('awgs_0_userregs_{}'.format(SHFQA_core.USER_REG_WAIT_DLY), value)
 
     def _get_wait_dly(self):
+        # TODO(TP): Adapt to SHFQA
         return self.get('awgs_0_userregs_{}'.format(SHFQA_core.USER_REG_WAIT_DLY))
