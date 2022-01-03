@@ -53,7 +53,7 @@ class ziSHFQADIOCalibrationError(Exception):
 class SHFQA_core(zibase.ZI_base_instrument):
     # TODO(TP): Adapt to SHFQA
     """
-    This is the base PycQED driver for the 1.8 Gsample/s SHFQA developed
+    This is the base PycQED driver for the 2.0 Gsample/s SHFQA developed
     by Zurich Instruments. The class implements functionality that os
     by both the DCL and QuDev versions of the SHFQA driver.
 
@@ -74,6 +74,8 @@ class SHFQA_core(zibase.ZI_base_instrument):
     USER_REG_WAIT_DLY = 2
     USER_REG_AVG_CNT = 3
     USER_REG_ERR_CNT = 4
+
+    SAMPLING_FREQUENCY = 2e9
 
     def __init__(self,
                  name,
@@ -114,7 +116,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
         # Define parameters that should not be part of the snapshot
         self._params_to_exclude = set(['features_code', 'system_fwlog', 'system_fwlogenable'])
 
-        # Set default waveform length to 20 ns at 1.8 GSa/s
+        # Set default waveform length to 20 ns at 2.0 GSa/s
         self._default_waveform_length = 32
 
         # Our base class includes all the functionality needed to initialize the parameters
@@ -304,8 +306,7 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def clock_freq(self):
-        # TODO(TP): Adapt to SHFQA
-        return 1.8e9
+        return SHFQA_core.SAMPLING_FREQUENCY
 
     ##########################################################################
     # 'public' functions: utility

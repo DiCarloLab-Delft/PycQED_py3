@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     # TODO(TP): Adapt to SHFQA
     """
-    This is the PycQED driver for the 1.8 Gsample/s SHFQA developed
+    This is the PycQED driver for the 2.0 Gsample/s SHFQA developed
     by Zurich Instruments.
 
     Requirements:
@@ -54,6 +54,8 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     AWGS_0_DIO_VALID_POLARITY_HIGH = 1  # "1": "High: VALID bit must be logical high.",
     AWGS_0_DIO_VALID_POLARITY_LOW = 2  # "2": "Low: VALID bit must be logical zero.",
     AWGS_0_DIO_VALID_POLARITY_BOTH = 3  # "3": "Both: VALID bit may be logical high or zero."
+
+    SAMPLING_FREQUENCY = shf.SHFQA_core.SAMPLING_FREQUENCY
 
     ##########################################################################
     # 'public' functions: device control
@@ -177,7 +179,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
                                         weight_function_I=0,
                                         weight_function_Q=1,
                                         rotation_angle=0,
-                                        length=4096 / 1.8e9,
+                                        length=4096 / shf.SHFQA_core.SAMPLING_FREQUENCY,
                                         scaling_factor=1) -> None:
         # TODO(TP): Adapt to SHFQA
 # FIXME: merge conflict 20200918
@@ -189,11 +191,11 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
         load pulses or prepare the UFHQC progarm to do data acquisition
         """
         trace_length = 4096
-        tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
+        tbase = np.arange(0, trace_length / SHFQA.SAMPLING_FREQUENCY, 1 / SHFQA.SAMPLING_FREQUENCY)
         cosI = np.array(np.cos(2 * np.pi * IF * tbase + rotation_angle))
         sinI = np.array(np.sin(2 * np.pi * IF * tbase + rotation_angle))
-        if length < 4096 / 1.8e9:
-            max_sample = int(length * 1.8e9)
+        if length < 4096 / SHFQA.SAMPLING_FREQUENCY:
+            max_sample = int(length * SHFQA.SAMPLING_FREQUENCY)
             # setting the samples beyond the length to 0
             cosI[max_sample:] = 0
             sinI[max_sample:] = 0
@@ -214,7 +216,7 @@ class SHFQA(shf.SHFQA_core, DIO.CalInterface):
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1) -> None:
         # TODO(TP): Adapt to SHFQA
         trace_length = 4096
-        tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
+        tbase = np.arange(0, trace_length/SHFQA.SAMPLING_FREQUENCY, 1/SHFQA.SAMPLING_FREQUENCY)
         cosI = np.array(np.cos(2 * np.pi*IF*tbase))
         sinI = np.array(np.sin(2 * np.pi*IF*tbase))
         self.set('qas_0_integration_weights_{}_real'.format(weight_function_I),
@@ -586,7 +588,7 @@ setUserReg(4, err_cnt);"""
 
         """
         # setting the acquisition delay samples
-        delay_samples = int(acquisition_delay*1.8e9/8)
+        delay_samples = int(acquisition_delay*SHFQA.SAMPLING_FREQUENCY/8)
         self.wait_dly(delay_samples)
 
         # If no cases are defined, then we simply create all possible cases
@@ -653,7 +655,7 @@ setUserReg(4, err_cnt);"""
             dio_out_vect=None, timeout=5):
         # TODO(TP): Adapt to SHFQA
         # setting the acquisition delay samples
-        delay_samples = int(acquisition_delay*1.8e9/8)
+        delay_samples = int(acquisition_delay*SHFQA.SAMPLING_FREQUENCY/8)
         # setting the delay in the instrument
         self.awgs_0_userregs_2(delay_samples)
         sequence = (
@@ -738,7 +740,7 @@ setUserReg(4, err_cnt);"""
 
         # Configure the delay
         self.set('awgs_0_userregs_{}'.format(SHFQA.USER_REG_WAIT_DLY),
-                 int(acquisition_delay*1.8e9/8))
+                 int(acquisition_delay*SHFQA.SAMPLING_FREQUENCY/8))
 
         delay_string = """
     wait(wait_dly);
@@ -821,11 +823,10 @@ setTrigger(0);
     def awg_sequence_acquisition_and_pulse_SSB(
             self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay, dig_trigger=True) -> None:
         # TODO(TP): Adapt to SHFQA
-        f_sampling = 1.8e9
-        samples = RO_pulse_length*f_sampling
+        samples = RO_pulse_length*SHFQA.SAMPLING_FREQUENCY
         array = np.arange(int(samples))
-        sinwave = RO_amp * np.sin(2 * np.pi*array*f_RO_mod/f_sampling)
-        coswave = RO_amp * np.cos(2 * np.pi*array*f_RO_mod/f_sampling)
+        sinwave = RO_amp * np.sin(2 * np.pi*array*f_RO_mod/SHFQA.SAMPLING_FREQUENCY)
+        coswave = RO_amp * np.cos(2 * np.pi*array*f_RO_mod/SHFQA.SAMPLING_FREQUENCY)
         Iwave = (coswave+sinwave) / np.sqrt(2)
         Qwave = (coswave-sinwave) / np.sqrt(2)
         self.awg_sequence_acquisition_and_pulse(
