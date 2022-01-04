@@ -10,6 +10,7 @@ from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon import CCLight_Transmon
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
+from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import Base_LutMan
 
 import pycqed.analysis.analysis_toolbox as a_tools
 from pycqed.measurement import measurement_control
@@ -40,27 +41,40 @@ class Test_Device_obj(unittest.TestCase):
         """
         cls.station = station.Station()
 
+        cls.CC = CC('CC', DummyTransport())
+        cls.UHFQC_0 = UHFQC(name="UHFQC_0", server="emulator", device="dev2109", interface="1GbE")
+        cls.UHFQC_1 = UHFQC(name="UHFQC_1", server="emulator", device="dev2110", interface="1GbE")
+        cls.UHFQC_2 = UHFQC(name="UHFQC_2", server="emulator", device="dev2111", interface="1GbE")
+        cls.AWG_mw_0 = ZI_HDAWG8(
+            name="AWG_mw_0",
+            server="emulator",
+            num_codewords=128,
+            device="dev8026",
+            interface="1GbE",
+        )
+
+        cls.AWG_mw_1 = ZI_HDAWG8(
+            name="AWG_mw_1",
+            server="emulator",
+            num_codewords=128,
+            device="dev8027",
+            interface="1GbE",
+        )
+        cls.AWG_flux_0 = ZI_HDAWG8(
+            name="AWG_flux_0",
+            server="emulator",
+            num_codewords=128,
+            device="dev8028",
+            interface="1GbE",
+        )
+        cls.VSM = Dummy_QuTechVSMModule('VSM')
+
         cls.MW1 = VirtualMWsource("MW1")
         cls.MW2 = VirtualMWsource("MW2")
         cls.MW3 = VirtualMWsource("MW3")
         cls.SH = virtual_SignalHound_USB_SA124B("SH")
-        cls.UHFQC_0 = UHFQC(
-            name="UHFQC_0", server="emulator", device="dev2109", interface="1GbE"
-        )
 
-        cls.UHFQC_1 = UHFQC(
-            name="UHFQC_1", server="emulator", device="dev2110", interface="1GbE"
-        )
-
-        cls.UHFQC_2 = UHFQC(
-            name="UHFQC_2", server="emulator", device="dev2111", interface="1GbE"
-        )
-
-        cls.CC = CC('CC', DummyTransport())
-        cls.VSM = Dummy_QuTechVSMModule('VSM')
-        cls.MC = measurement_control.MeasurementControl(
-            "MC", live_plot_enabled=False, verbose=False
-        )
+        cls.MC = measurement_control.MeasurementControl("MC", live_plot_enabled=False, verbose=False)
         cls.MC.station = cls.station
         cls.station.add_component(cls.MC)
 
@@ -69,28 +83,6 @@ class Test_Device_obj(unittest.TestCase):
         cls.MC.datadir(test_datadir)
         a_tools.datadir = cls.MC.datadir()
 
-        cls.AWG_mw_0 = ZI_HDAWG8(
-            name="AWG_mw_0",
-            server="emulator",
-            num_codewords=32,
-            device="dev8026",
-            interface="1GbE",
-        )
-
-        cls.AWG_mw_1 = ZI_HDAWG8(
-            name="AWG_mw_1",
-            server="emulator",
-            num_codewords=32,
-            device="dev8027",
-            interface="1GbE",
-        )
-        cls.AWG_flux_0 = ZI_HDAWG8(
-            name="AWG_flux_0",
-            server="emulator",
-            num_codewords=32,
-            device="dev8028",
-            interface="1GbE",
-        )
 
         if 0: # FIXME: PR #658: test broken by commit bd19f56
             cls.mw_lutman = mwl.AWG8_VSM_MW_LutMan("MW_LutMan_VSM")
@@ -101,6 +93,7 @@ class Test_Device_obj(unittest.TestCase):
             cls.mw_lutman.channel_DQ(4)
         else: # FIXME: workaround
             cls.mw_lutman = mwl.AWG8_MW_LutMan("MW_LutMan")
+            cls.mw_lutman.AWG(cls.AWG_mw_0.name)
             cls.mw_lutman.channel_I(1)
             cls.mw_lutman.channel_Q(2)
 
@@ -613,21 +606,27 @@ class Test_Device_obj(unittest.TestCase):
     def test_prepare_readout_mixer_settings(self):
         pass
 
+    def test_acq_ch_map_to_IQ_ch_map(self):
+        ch_map = {
+            "UHFQC_0": {"q13": 0, "q16": 2},
+            "UHFQC_1": {"q1": 0, "q4": 4},
+            "UHFQC_2": {"q0": 0, "q3": 2, "q6": 4},
+        }
+
+        IQ_ch_map = do._acq_ch_map_to_IQ_ch_map(ch_map)
+        exp_IQ_ch_map = {
+            "UHFQC_0": {"q13 I": 0, "q13 Q": 1, "q16 I": 2, "q16 Q": 3},
+            "UHFQC_1": {"q1 I": 0, "q1 Q": 1, "q4 I": 4, "q4 Q": 5},
+            "UHFQC_2": {"q0 I": 0, "q0 Q": 1, "q3 I": 2, "q3 Q": 3, "q6 I": 4, "q6 Q": 5},
+        }
+
+        assert IQ_ch_map == exp_IQ_ch_map
+
+    def test_base_lutman_make(self):
+        n1 = Base_LutMan.make()
+        assert n1 == 4
+
+        n2 = Base_LutMan.make()
+        assert n2 == 0
 
 
-def test_acq_ch_map_to_IQ_ch_map():
-
-    ch_map = {
-        "UHFQC_0": {"q13": 0, "q16": 2},
-        "UHFQC_1": {"q1": 0, "q4": 4},
-        "UHFQC_2": {"q0": 0, "q3": 2, "q6": 4},
-    }
-
-    IQ_ch_map = do._acq_ch_map_to_IQ_ch_map(ch_map)
-    exp_IQ_ch_map = {
-        "UHFQC_0": {"q13 I": 0, "q13 Q": 1, "q16 I": 2, "q16 Q": 3},
-        "UHFQC_1": {"q1 I": 0, "q1 Q": 1, "q4 I": 4, "q4 Q": 5},
-        "UHFQC_2": {"q0 I": 0, "q0 Q": 1, "q3 I": 2, "q3 Q": 3, "q6 I": 4, "q6 Q": 5},
-    }
-
-    assert IQ_ch_map == exp_IQ_ch_map

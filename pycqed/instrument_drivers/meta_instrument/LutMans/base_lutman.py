@@ -1,8 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import logging
 import weakref
-from typing import Dict
+import numpy as np
+import matplotlib.pyplot as plt
+from time import time
+from typing import Dict, List
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
@@ -11,6 +12,9 @@ from qcodes.utils import validators as vals
 
 from pycqed.analysis.fit_toolbox.functions import PSD
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+
+
+log = logging.getLogger(__name__)
 
 
 class Base_LutMan(Instrument):
@@ -37,7 +41,7 @@ class Base_LutMan(Instrument):
     _all_lutmans: Dict[str, weakref.ref] = {}
 
     def __init__(self, name, **kw):
-        logging.info(__name__ + " : Initializing instrument")
+        log.info(__name__ + " : Initializing instrument")
         super().__init__(name, **kw)
 
         # FIXME: rename to instr_AWG to be consistent with other instr refs
@@ -272,7 +276,6 @@ class Base_LutMan(Instrument):
         return self.LutMap() != self._current_lutmap or self._wave_dict != self._current_wave_dict
 
     def _make(self) -> None:
-        # FIXME: smart start_stop
         if self.LutMap() != self._current_lutmap:
             self.generate_standard_waveforms()  # NB: updates self._wave_dict
             self._current_lutmap = self.LutMap()
@@ -280,14 +283,6 @@ class Base_LutMan(Instrument):
         if self._wave_dict != self._current_wave_dict:
             self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=False)
             self._current_wave_dict = self._wave_dict
-
-    def _start_awg(self) -> None:
-        AWG = self.AWG.get_instr()
-        AWG.start()
-
-    def _stop_awg(self) -> None:
-        AWG = self.AWG.get_instr()
-        AWG.stop()
 
     ##########################################################################
     # Class methods
@@ -297,7 +292,7 @@ class Base_LutMan(Instrument):
     def _record_instance(cls, instance: 'Base_LutMan') -> None:
         wr = weakref.ref(instance)
         name = instance.name
-        cls._all_lutmans[name] = wr  # NB: we don't check uniqueness since Instrument already does
+        cls._all_lutmans[name] = wr  # NB: we don't check uniqueness of name since Instrument already does
 
     @classmethod
     def _remove_instance(cls, instance: 'Base_LutMan') -> None:
@@ -310,9 +305,36 @@ class Base_LutMan(Instrument):
                 del all_lm[name]
 
     @classmethod
-    def make_all(cls):
+    def make(cls) -> int:
+        t1 = time()
+
+        # collect work per AWG
+        work: Dict[str, List] = {}
+        num_dirty = 0
         for name, ref in list(cls._all_lutmans.items()):
-            ref.make()
+            if ref()._is_dirty():
+                num_dirty += 1
+                awg = ref().AWG.get_instr()  # NB: can be none if not set
+                if not work.get(awg.name):
+                    work[awg.name] = []
+                work[awg.name].append(ref)
+
+        # for each AWG requiring work, update dirty LutMans
+        for awg_name, refs in work.items():
+            # stop AWG
+            awg = Instrument.find_instrument(awg_name)
+            awg.stop()
+
+            # update dirty lutmans
+            for ref in refs:
+               ref()._make()
+
+            # start AWG
+            awg.start()
+
+        t2 = time()
+        log.info(f"updated {num_dirty} dirty LutMans in {t2-t1:.3g} s")
+        return num_dirty
 
 
 # FIXME: this is specific for very early versions of the QWG that only supported a single codeword triggering all 4
