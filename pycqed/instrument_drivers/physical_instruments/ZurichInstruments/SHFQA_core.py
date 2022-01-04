@@ -109,8 +109,34 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def assure_ext_clock(self) -> None:
-        raise NotImplementedError
+        """
+         Make sure the instrument is using an external reference clock
+         """
+         # get source:
+         #   2: zsync
+         #   1: external
+         #   0: internal (commanded so, or because of failure to sync to external clock)
+         source = self.system_clocks_referenceclock_in_source()
+         if source == 1:
+             return
 
+         log.info(f"{self.devname}: Switching to external clock.")
+         while True:
+             self.system_clocks_referenceclock_in_source(1)
+             timeout = 10
+             while timeout > 0:
+                 time.sleep(0.1)
+                 status = self.system_clocks_referenceclock_in_source()
+                 if status == 1:             # synced
+                     break
+                 else:                       # sync failed
+                     timeout -= 0.1
+             if self.system_clocks_referenceclock_in_source() != 1:
+                 log.warning(f"{self.devname}: Switching to external clock failed. Trying again.")
+             else:
+                 break
+         log.info(f"{self.devname}: Switching to external clock done.")
+         
     def clear_errors(self) -> None:
         raise NotImplementedError
 
