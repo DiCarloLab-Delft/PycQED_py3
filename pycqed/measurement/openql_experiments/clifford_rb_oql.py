@@ -114,9 +114,9 @@ def randomized_benchmarking(
                                 576  -> Size of the single qubit like class
                                     contained in the two qubit Cl group
                                 11520 -> Size of the complete two qubit Cl group
-                        FIXME: seems useless, because none of the callers set this, 
+                        FIXME: seems useless, because none of the callers set this,
                                 and rb.randomized_benchmarking_sequence trims it to the group size
-        flux_codeword:  Flux codeword to apply for each two-qubit gate in the 
+        flux_codeword:  Flux codeword to apply for each two-qubit gate in the
                         Clifford decomposition. If it contains 'cz', codeword is applied
                         to qubit indices given in `qubits`. Otherwise codeword is
                         applied to qubit 0, which is needed for flux-dance type codeword
@@ -468,14 +468,13 @@ def randomized_benchmarking(
             elif number_of_qubits > 3:
                 if f_state_cal_pts:
                     combinations = ["0"*number_of_qubits,
-                                    "1"*number_of_qubits, 
+                                    "1"*number_of_qubits,
                                     "2"*number_of_qubits]
                 p.add_multi_q_cal_points(qubits=qubits, combinations=combinations)
 
-    if 1:
-        p.compile()
-    else:
-        p.compile(p, extra_openql_options=[('VQ1Asm.verbose', 'no')])  # reduces output file size
+    p.compile()
+    # FIXME: old
+    # p.compile(p, extra_openql_options=[('VQ1Asm.verbose', 'no')])  # reduces output file size
 
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
