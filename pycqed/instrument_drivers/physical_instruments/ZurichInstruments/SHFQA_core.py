@@ -83,8 +83,9 @@ class SHFQA_core(zibase.ZI_base_instrument):
     ##########################################################################
 
     def _check_devtype(self) -> None:
-        # TODO: implement
-        pass
+        if not self.devtype.startswith('SHFQA'):
+              raise zibase.ziDeviceError(
+                  'Device {} of type {} is not a SHFQA instrument!'.format(self.devname, self.devtype))
 
     def _check_options(self) -> None:
         # TODO: implement
