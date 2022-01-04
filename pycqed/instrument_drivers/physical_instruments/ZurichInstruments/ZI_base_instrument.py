@@ -980,6 +980,7 @@ class ZI_base_instrument(Instrument):
         # Do some name mangling
         for name, node in nodes.items():
             name = name.replace('/' + self.devname.upper() + '/', '')
+            name = name.replace('/' + self.devname.lower() + '/', '')
             node['Node'] = name
             modified_nodes[name] = node
 
