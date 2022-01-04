@@ -6,6 +6,7 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       max-parallel: 4
       matrix:
@@ -48,6 +49,7 @@ jobs:
         py.test pycqed/tests --cov=pycqed --cov-report xml --cov-report html --cov-config=.coveragerc
 # FIXME: codacy upload broken, 20211208
     - name: Upload code coverage report
+      if: matrix.python-version == 3.6
       run: |
         python-codacy-coverage -r coverage.xml
         codecov

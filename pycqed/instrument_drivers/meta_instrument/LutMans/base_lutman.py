@@ -264,12 +264,14 @@ class Base_LutMan(Instrument):
         """
         return int(time * self.sampling_rate())
 
-    def make(self) -> None:
-        """
+    ##########################################################################
+    # Functions: smart update
+    ##########################################################################
 
-        Returns:
+    def _is_dirty(self) -> bool:
+        return self.LutMap() != self._current_lutmap or self._wave_dict != self._current_wave_dict
 
-        """
+    def _make(self) -> None:
         # FIXME: smart start_stop
         if self.LutMap() != self._current_lutmap:
             self.generate_standard_waveforms()  # NB: updates self._wave_dict
@@ -278,6 +280,14 @@ class Base_LutMan(Instrument):
         if self._wave_dict != self._current_wave_dict:
             self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=False)
             self._current_wave_dict = self._wave_dict
+
+    def _start_awg(self) -> None:
+        AWG = self.AWG.get_instr()
+        AWG.start()
+
+    def _stop_awg(self) -> None:
+        AWG = self.AWG.get_instr()
+        AWG.stop()
 
     ##########################################################################
     # Class methods
