@@ -19,6 +19,9 @@ from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
 
 
+log = logging.getLogger(__name__)
+
+
 class Qubit(Instrument):
 
     """
@@ -120,9 +123,7 @@ class Qubit(Instrument):
     def connect_message(self, begin_time=None):
         t = time.time() - (begin_time or self._t0)
 
-        con_msg = ('Connected to: {repr} '
-                   'in {t:.2f} s'.format(repr=self.__repr__(), t=t))
-        print(con_msg)
+        log.info(f"Connected to: {self.__repr__()} in {t:.2f} s")
 
     def get_idn(self):
         return {'driver': str(self.__class__), 'name': self.name}

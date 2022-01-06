@@ -1,5 +1,6 @@
 import logging
 import weakref
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from time import time
@@ -19,7 +20,7 @@ log = logging.getLogger(__name__)
 
 class Base_LutMan(Instrument):
     """
-    The base LutMan is an abstract base class for the individual LutMans.
+    The base LutMan is a (partly) abstract base class for the individual LutMans.
     The idea of the Lookuptable Manager (LutMan) is to provide a convenient
     interface to manage the waveforms loaded on specific lookuptables in
     an AWG.
@@ -27,21 +28,22 @@ class Base_LutMan(Instrument):
     The LutMan provides
         - LutMap
             a dict that relates specific lookuptable indices (or 'codewords') to a 'waveform', which is a dict
-            containing a name ("name") and properties ("type", and depending on that, other properties)
+            containing a name ("name") and properties ("type", and depending on that, other properties). Note that the
+            allowe range of inices/codewords depends on the DIO mode of the connected instrument.
 
         - _wave_dict
-            a dict with generated LutMap waveforms based on parameters specified in the LutMan, and the LutMap properties
+            a dict with generated LutMap waveforms based on parameters specified in the LutMan, and the LutMap
+            properties. The key is identical to the LutMap key (codeword), except for Base_RO_LutMan, which uses a
+            string
 
         - Methods to upload and regenerate these waveforms.
         - Methods to render waves.
-
-    The Base LutMan does not provide a set of FIXME: comment ends
     """
 
     _all_lutmans: Dict[str, weakref.ref] = {}
 
     def __init__(self, name, **kw):
-        log.info(__name__ + " : Initializing instrument")
+        log.info(f"Initializing '{name}'")
         super().__init__(name, **kw)
 
         # FIXME: rename to instr_AWG to be consistent with other instr refs
@@ -93,7 +95,7 @@ class Base_LutMan(Instrument):
 
         # support for make()
         self._record_instance(self)
-        self._current_lutmap = {}
+        self._current_parameters = {}
         self._current_wave_dict = {}
 
     def __del__(self) -> None:
@@ -272,17 +274,64 @@ class Base_LutMan(Instrument):
     # Functions: smart update
     ##########################################################################
 
+    # FIXME: we need deepcopy() to copy self.parameters, but we don't want to look into AWG parameter (and cannot,
+    #  because QCoDes Instrument forbids (see InstrumentBase.__getstate__)
+
+    # FIXME: also handle codeword/waveform relation (HDAWG:upload_codeword_program/QWG:'wave_ch{}_cw{:03}') smartly?
+    #  on HDAWG, its an expensive operation
+
+    def _wave_dict_dirty(self):
+        # exit on empty _wave_dict (initially the case)
+        if not self._wave_dict:
+            return True
+
+        # exit on empty _current_wave_dict
+        if not self._current_wave_dict:
+            return True
+
+        for key,val in self._wave_dict.items():
+            # exit on new key (not present in _current_wave_dict)
+            if self._current_wave_dict[key] is None:
+                return True
+
+            # exit on differences in the waveforms (note that the values are tuples of arrays)
+            for x, y in zip(val, self._current_wave_dict[key]):
+                if np.any(x != y):
+                    return True
+
+        return False
+
+    def _parameters_dirty(self, verbose: bool=False):
+        """ Check whether parameters have changed. NB: LutMap is also a parameter """
+
+        # exit on empty dict
+        if not self._current_parameters:
+            return True
+
+        # exit on differences in parameter values
+        for key in self.parameters:
+            if self.parameters[key].get() != self._current_parameters[key]:
+                if verbose:
+                    log.info(f"{self.name}: parameter {key} changed: new='{self.parameters[key].get()}'', old='{self._current_parameters[key]}'")
+                return True
+
+        return False
+
     def _is_dirty(self) -> bool:
-        return self.LutMap() != self._current_lutmap or self._wave_dict != self._current_wave_dict
+        return self._wave_dict_dirty() or self._parameters_dirty()
 
     def _make(self) -> None:
-        if self.LutMap() != self._current_lutmap:
+        if self._parameters_dirty(verbose=True):  # only here we're verbose, or we'll get double log entries
             self.generate_standard_waveforms()  # NB: updates self._wave_dict
-            self._current_lutmap = self.LutMap()
 
-        if self._wave_dict != self._current_wave_dict:
+            # make a copy of (only the values of) the parameters
+            self._current_parameters = {}
+            for key in self.parameters:
+                self._current_parameters[key] = self.parameters[key].get()
+
+        if self._wave_dict_dirty():
             self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=False)
-            self._current_wave_dict = self._wave_dict
+            self._current_wave_dict = copy.deepcopy(self._wave_dict)
 
     ##########################################################################
     # Class methods

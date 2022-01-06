@@ -623,10 +623,26 @@ class Test_Device_obj(unittest.TestCase):
         assert IQ_ch_map == exp_IQ_ch_map
 
     def test_base_lutman_make(self):
+        # make first time
         n1 = Base_LutMan.make()
         assert n1 == 4
 
+        # make again, should now return 0
         n2 = Base_LutMan.make()
         assert n2 == 0
+
+        # change some LutMan parameter, should rebuild
+        old_val = self.mw_lutman.mw_modulation()
+        self.mw_lutman.mw_modulation(old_val - 1e6)  # change modulation.
+        n3 = Base_LutMan.make()
+        self.mw_lutman.mw_modulation(old_val)  # restore modulation.
+        assert n3 == 1
+
+        # manually change LutMan
+        self.mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+        n4 = Base_LutMan.make()
+        assert n4 == 1
+
+
 
 
