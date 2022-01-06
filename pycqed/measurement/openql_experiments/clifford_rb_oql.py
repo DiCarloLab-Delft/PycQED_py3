@@ -8,7 +8,6 @@ from importlib import reload
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
-from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import (
     SingleQubitClifford,
     TwoQubitClifford,
@@ -73,85 +72,98 @@ def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 4):
 
 
 def randomized_benchmarking(
-    qubits: list,
-    platf_cfg: str,
-    nr_cliffords,
-    nr_seeds: int,
-    net_cliffords: list = [0],
-    max_clifford_idx: int = 11520,
-    flux_codeword: str = "cz",
-    flux_allocated_duration_ns: int = None,
-    simultaneous_single_qubit_RB=False,
-    simultaneous_single_qubit_parking_RB=False,
-    rb_on_parked_qubit_only: bool = False,
-    initialize: bool = True,
-    interleaving_cliffords=[None],
-    program_name: str = "randomized_benchmarking",
-    cal_points: bool = True,
-    f_state_cal_pts: bool = True,
-    sim_cz_qubits: list = None,
-    recompile: bool = True,
-    ) -> OqlProgram:
+        qubits: list,
+        platf_cfg: str,
+        nr_cliffords,
+        nr_seeds: int,
+        net_cliffords: list = [0],
+        max_clifford_idx: int = 11520,
+        flux_codeword: str = "cz",
+        flux_allocated_duration_ns: int = None,
+        simultaneous_single_qubit_RB=False,
+        simultaneous_single_qubit_parking_RB=False,
+        rb_on_parked_qubit_only: bool = False,
+        initialize: bool = True,
+        interleaving_cliffords=[None],
+        program_name: str = "randomized_benchmarking",
+        cal_points: bool = True,
+        f_state_cal_pts: bool = True,
+        sim_cz_qubits: list = None,
+        recompile: bool = True,
+) -> OqlProgram:
+    # FIXME: split into separate functions for different types of RB
     """
     Input pars:
-        qubits:         list of ints specifying qubit indices.
-                        based on the length this function detects if it should
-                        generate a single or two or multi qubit RB sequence.
-        platf_cfg:      filename of the platform config file
-        nr_cliffords:   list nr_cliffords for which to generate RB seqs
-        nr_seeds:       int  nr_seeds for which to generate RB seqs
-        net_cliffords:  list of ints index of net clifford the sequence
-                        should perform. See examples below on how to use this.
-                            Important clifford indices
-                                0 -> Idx
-                                3 -> rx180
-                                3*24+3 -> {rx180 q0 | rx180 q1}
-                                4368 -> CZ
-        max_clifford_idx:   Set's the maximum clifford group index from which
-                        to sample random cliffords.
-                            Important clifford indices
-                                24 -> Size of the single qubit Cl group
-                                576  -> Size of the single qubit like class
-                                    contained in the two qubit Cl group
-                                11520 -> Size of the complete two qubit Cl group
-                        FIXME: seems useless, because none of the callers set this,
-                                and rb.randomized_benchmarking_sequence trims it to the group size
-        flux_codeword:  Flux codeword to apply for each two-qubit gate in the
-                        Clifford decomposition. If it contains 'cz', codeword is applied
-                        to qubit indices given in `qubits`. Otherwise codeword is
-                        applied to qubit 0, which is needed for flux-dance type codeword
-                        that are decomposed in the CC config file.
-        simultaneous_single_qubit_RB: perform single qubit RB on 2 qubits in parallel
-        initialize:     if True initializes qubits to 0, disable for restless
-                        tuning
-        interleaving_cliffords: list of integers which specifies which cliffords
-                        to interleave the sequence with (for interleaved RB)
-        program_name:           some string that can be used as a label.
-        cal_points:     bool whether to replace the last two elements with
-                        calibration points, set to False if you want
-                        to measure a single element (for e.g. optimization)
-        sim_cz_qubits:
-                        A list of qubit indices on which a simultaneous cz
-                        instruction must be applied. This is for characterizing
-                        CZ gates that are intended to be performed in parallel
-                        with other CZ gates.
-        recompile:      True -> compiles the program,
-                        'as needed' -> compares program to timestamp of config
-                            and existence, if required recompile.
-                        False -> compares program to timestamp of config.
-                            if compilation is required raises a ValueError
+        qubits:
+            list of ints specifying qubit indices. based on the length this function detects if it should generate a
+            single or two or multi qubit RB sequence.
 
-                        If the program is more recent than the config
-                        it returns an empty OpenQL program object with
-                        the intended filename that can be used to upload the
-                        previously compiled file.
+        platf_cfg:
+            filename of the platform config file
+
+        nr_cliffords:
+            list nr_cliffords for which to generate RB seqs
+
+        nr_seeds:
+            int  nr_seeds for which to generate RB seqs
+
+        net_cliffords:
+            list of ints index of net clifford the sequence should perform. See examples below on how to use this.
+            Important clifford indices
+                0 -> Idx
+                3 -> rx180
+                3*24+3 -> {rx180 q0 | rx180 q1}
+                4368 -> CZ
+
+        max_clifford_idx:
+            Set's the maximum clifford group index from which to sample random cliffords.
+            Important clifford indices
+                24 -> Size of the single qubit Cl group
+                576  -> Size of the single qubit like class
+                    contained in the two qubit Cl group
+                11520 -> Size of the complete two qubit Cl group
+            FIXME: seems useless, because none of the callers set this,
+                and rb.randomized_benchmarking_sequence trims it to the group size
+
+        flux_codeword:
+            Flux codeword to apply for each two-qubit gate in the Clifford decomposition. If it contains 'cz',
+            codeword is applied to qubit indices given in `qubits`. Otherwise codeword is applied to qubit 0,
+            which is needed for flux-dance type codeword that are decomposed in the CC config file.
+
         flux_allocated_duration_ns:
-                        Used to emulate an idling gate with the duration of the
-                        flux. If not specified will try to grab the duration
-                        from the openql cfg file.
+            Used to emulate an idling gate with the duration of the flux. If not specified will try to grab the duration
+            from the openql cfg file.
+
+        simultaneous_single_qubit_RB:
+            perform single qubit RB on 2 qubits in parallel
+
+        initialize:
+            if True initializes qubits to 0, disable for restless tuning
+
+        interleaving_cliffords:
+            list of integers which specifies which cliffords to interleave the sequence with (for interleaved RB)
+
+        program_name:
+            some string that can be used as a label.
+
+        cal_points:
+            bool whether to replace the last two elements with calibration points, set to False if you want to measure
+            a single element (for e.g. optimization)
+
+        sim_cz_qubits:
+            A list of qubit indices on which a simultaneous cz instruction must be applied. This is for characterizing
+            CZ gates that are intended to be performed in parallel with other CZ gates.
+
+        recompile:
+            True -> compiles the program,
+            'as needed' -> compares program to timestamp of config and existence, if required recompile.
+            False -> compares program to timestamp of config. if compilation is required raises a ValueError
+
+            If the program is more recent than the config it returns an empty OpenQL program object with
+            the intended filename that can be used to upload the previously compiled file.
 
     Returns:
-        p:              OpenQL Program object
+            OpenQL Program object
 
     ***************************************************************************
     Examples:
@@ -192,9 +204,7 @@ def randomized_benchmarking(
     this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
-    recompile_dict = oqh.check_recompilation_needed_hash_based(
-        program_fn=p.filename,
-        platf_cfg=platf_cfg,
+    recompile_dict = p.check_recompilation_needed_hash_based(
         clifford_rb_oql=this_file,
         recompile=recompile,
     )
@@ -243,8 +253,8 @@ def randomized_benchmarking(
         for j, n_cl in enumerate(nr_cliffords):
             for interleaving_cl in interleaving_cliffords:
                 if (
-                    not simultaneous_single_qubit_RB
-                    and not simultaneous_single_qubit_parking_RB
+                        not simultaneous_single_qubit_RB
+                        and not simultaneous_single_qubit_parking_RB
                 ):
                     # ############ 1 qubit, or 2 qubits using TwoQubitClifford
                     # generate sequence
@@ -260,7 +270,7 @@ def randomized_benchmarking(
 
                     # decompose
                     cl_seq_decomposed = [None] * len(cl_seq)
-                    for i,cl in enumerate(cl_seq):
+                    for i, cl in enumerate(cl_seq):
                         # benchmarking only CZ (not as a member of CNOT group)
                         if cl == 104368:  # 104368 = 100_000 + CZ
                             cl_seq_decomposed[i] = [("CZ", ["q0", "q1"])]
@@ -467,9 +477,9 @@ def randomized_benchmarking(
                 )
             elif number_of_qubits > 3:
                 if f_state_cal_pts:
-                    combinations = ["0"*number_of_qubits,
-                                    "1"*number_of_qubits,
-                                    "2"*number_of_qubits]
+                    combinations = ["0" * number_of_qubits,
+                                    "1" * number_of_qubits,
+                                    "2" * number_of_qubits]
                 p.add_multi_q_cal_points(qubits=qubits, combinations=combinations)
 
     p.compile()
@@ -483,16 +493,16 @@ def randomized_benchmarking(
 
 
 def character_benchmarking(
-    qubits: list,
-    platf_cfg: str,
-    nr_cliffords,
-    nr_seeds: int,
-    interleaving_cliffords=[None],
-    program_name: str = "character_benchmarking",
-    cal_points: bool = True,
-    f_state_cal_pts: bool = True,
-    flux_codeword="cz",
-    recompile: bool = True,
+        qubits: list,
+        platf_cfg: str,
+        nr_cliffords,
+        nr_seeds: int,
+        interleaving_cliffords=[None],
+        program_name: str = "character_benchmarking",
+        cal_points: bool = True,
+        f_state_cal_pts: bool = True,
+        flux_codeword="cz",
+        recompile: bool = True,
 ) -> OqlProgram:
     """
     Create OpenQL program to perform two-qubit character benchmarking.
@@ -528,9 +538,7 @@ def character_benchmarking(
     this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
-    recompile_dict = oqh.check_recompilation_needed_hash_based(
-        program_fn=p.filename,
-        platf_cfg=platf_cfg,
+    recompile_dict = p.check_recompilation_needed_hash_based(
         clifford_rb_oql=this_file,
         recompile=recompile,
     )
@@ -583,8 +591,8 @@ def character_benchmarking(
                     # -> the first element in time (cl0) is on the right
                     combined_cl0 = Cl(cl_seq[0]) * cl0
                     char_bench_seq_decomposed = [
-                        combined_cl0.gate_decomposition
-                    ] + cl_seq_decomposed
+                                                    combined_cl0.gate_decomposition
+                                                ] + cl_seq_decomposed
 
                     k = p.create_kernel(
                         "CharBench_P{}_{}Cl_s{}_inter{}".format(

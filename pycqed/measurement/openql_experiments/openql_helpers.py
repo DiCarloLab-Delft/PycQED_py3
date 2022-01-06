@@ -80,6 +80,31 @@ class OqlProgram:
             self.nregisters
         )  # NB: unused if we use compile_cqasm()
 
+        # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
+        eqasm_compiler = ''
+        with open(self._platf_cfg) as f:
+            for line in f:
+                if 'eqasm_compiler' in line:
+                    m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
+                    eqasm_compiler = m.group(1)
+                    break
+        if eqasm_compiler == '':
+            log.error(f"key 'eqasm_compiler' not found in file '{self._platf_cfg}'")
+
+        # determine architecture and extension of generated file
+        if eqasm_compiler == 'cc_light_compiler':
+            # NB: OpenQL no longer has a backend for CC-light
+            self._arch = 'CCL'
+            self._ext = '.qisa'  # CC-light, QCC
+        else:
+            self._arch = 'CC'
+            self._ext = '.vq1asm'  # CC
+
+        # save name of file that OpenQL will generate on compilation to allow uploading
+        # NB: for cQasm, the actual name is determined by 'pragma @ql.name' in the source, not by self.name,
+        # so users must maintain consistency
+        self.filename = join(OqlProgram.output_dir, self.name + self._ext)
+
 
     def add_kernel(self, k: ql.Kernel) -> None:
         self.program.add_kernel(k)
@@ -156,6 +181,96 @@ class OqlProgram:
 
         c = self._configure_compiler(src_filename, extra_pass_options)
         c.compile_with_frontend(self.platform)
+
+
+    # NB: used in clifford_rb_oql.py to skip both generation of RB sequences, and OpenQL compilation if
+    # contents of platf_cfg or clifford_rb_oql (i.e. the Python file that generates the RB sequence) have changed
+    def check_recompilation_needed_hash_based(
+            self,
+            clifford_rb_oql: str,
+            recompile: bool = True,
+    ) -> dict:
+        """
+        Similar functionality to the deprecated `check_recompilation_needed` but
+        based on a file that is generated alongside with the program file
+        containing hashes of the files that are relevant to the generation of the
+        RB sequences and that might be modified somewhat often
+
+        NB: Not intended for stand alone use!
+        The code invoking this function should later invoke:
+            `os.rename(recompile_dict["tmp_file"], recompile_dict["file"])` # FIXME: create member function for that
+
+        The behavior of this function depends on the recompile argument.
+        recompile:
+            True -> True, the program should be compiled
+
+            'as needed' -> compares filename to timestamp of config
+                and checks if the file exists, if required recompile.
+            False -> checks if the file exists, if it doesn't
+                compilation is required and raises a ValueError.
+                Use carefully, only if you know what you are doing!
+                Use 'as needed' to stay safe!
+        """
+
+        hashes_ext = ".hashes"
+        tmp_ext = ".tmp"
+        rb_system_hashes_fn = self.filename + hashes_ext
+        tmp_fn = rb_system_hashes_fn + tmp_ext
+
+        platf_cfg_hash = get_file_sha256_hash(self._platf_cfg, return_hexdigest=True)
+        this_file_hash = get_file_sha256_hash(clifford_rb_oql, return_hexdigest=True)
+        file_hashes = {self._platf_cfg: platf_cfg_hash, clifford_rb_oql: this_file_hash}
+
+        _recompile = False
+        if not isfile(self.filename):
+            if recompile is False:
+                raise ValueError('No file:\n{}'.format(self.filename))
+            else:
+                # Force recompile, there is no program file
+                _recompile |= True  # FIXME: why "|="?
+
+        # Determine if compilation is needed based on the hashed files
+        if not isfile(rb_system_hashes_fn):
+            # There is no file with the hashes, we must compile to be safe
+            _recompile |= True
+        else:
+            # Hashes exist, we use them to determine if recompilations is needed
+            with open(rb_system_hashes_fn) as json_file:
+                hashes_dict = json.load(json_file)
+            # Remove file to signal a compilation in progress
+            remove(rb_system_hashes_fn)
+
+            for fn in file_hashes.keys():
+                # Recompile becomes true if any of the hashed files has a different
+                # hash now
+                _recompile |= hashes_dict.get(fn, "") != file_hashes[fn]
+
+        # Write the updated hashes
+        # We use a temporary file such that for parallel compilations, if the
+        # process is interrupted before the end there will be no hash and
+        # recompilation will be forced
+        pathlib.Path(tmp_fn).parent.mkdir(parents=True, exist_ok=True)
+        pathlib.Path(tmp_fn).write_text(json.dumps(file_hashes))
+
+        res_dict = {
+            "file": rb_system_hashes_fn,
+            "tmp_file": tmp_fn
+        }
+
+        if recompile is False:
+            if _recompile is True:
+                log.warning(
+                    "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
+                    " want to compile?".format(self._platf_cfg, clifford_rb_oql)
+                )
+            res_dict["recompile"] = False
+        elif recompile is True:
+            # Enforce recompilation
+            res_dict["recompile"] = True
+        elif recompile == "as needed":
+            res_dict["recompile"] = _recompile
+
+        return res_dict
 
     #############################################################################
     # Calibration points
@@ -511,31 +626,6 @@ class OqlProgram:
 
         c = self.platform.get_compiler()
 
-        # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
-        eqasm_compiler = ''
-        with open(self._platf_cfg) as f:
-            for line in f:
-                if 'eqasm_compiler' in line:
-                    m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
-                    eqasm_compiler = m.group(1)
-                    break
-        if eqasm_compiler == '':
-            log.error(f"key 'eqasm_compiler' not found in file '{self._platf_cfg}'")
-
-        # determine architecture and extension of generated file
-        if eqasm_compiler == 'cc_light_compiler':
-            # NB: OpenQL no longer has a backend for CC-light, but many test cases still refer to CC-light
-            self._arch = 'CCL'
-            self._ext = '.qisa'  # CC-light, QCC
-        else:
-            self._arch = 'CC'
-            self._ext = '.vq1asm'  # CC
-
-        # save name of file that OpenQL generates to allow uploading
-        # NB: for cQasm, the actual name is determined by 'pragma @ql.name' in the source, not by self.name,
-        # so users must maintain consistency
-        self.filename = join(OqlProgram.output_dir, self.name + self._ext)
-
 
         # remove default pass list (this also removes support for most *global* options as defined in
         # https://openql.readthedocs.io/en/latest/gen/reference_options.html, except for 'log_level')
@@ -543,7 +633,8 @@ class OqlProgram:
         c.clear_passes()
 
         # add the passes we need
-        if cqasm_src_filename != "":  # if we are compiling cQasm source code
+        compiling_cqasm = cqasm_src_filename != ""
+        if compiling_cqasm:
             # cQASM reader as very first step
             c.append_pass(
                 'io.cqasm.Read',
@@ -604,7 +695,7 @@ class OqlProgram:
         if self._arch == 'CC':
             c.set_option('cc_backend.output_prefix', f'{OqlProgram.output_dir}/%N')
         c.set_option('scheduler.scheduler_target', 'alap')
-        if cqasm_src_filename != "":
+        if compiling_cqasm:
             c.set_option('cc_backend.run_once', 'yes')  # if you want to loop, write a cqasm loop
 
         # finally, set user pass options
@@ -734,103 +825,13 @@ def clocks_to_s(time, clock_cycle=20e-9):
 # Recompilation helpers
 #############################################################################
 
-# NB: used in clifford_rb_oql.py to skip both generation of RB sequences, and OpenQL compilation if
-# contents of platf_cfg or clifford_rb_oql (i.e. the Python file that generates the RB sequence) have changed
 def check_recompilation_needed_hash_based(
         program_fn: str,
         platf_cfg: str,
         clifford_rb_oql: str,
         recompile: bool = True,
 ):
-    """
-    Similar functionality to the deprecated `check_recompilation_needed` but
-    based on a file that is generated alongside with the program file
-    containing hashes of the files that are relevant to the generation of the
-    RB sequences and that might be modified somewhat often
-
-    NB: Not intended for stand alone use!
-    The code invoking this function should later invoke:
-        `os.rename(recompile_dict["tmp_file"], recompile_dict["file"])`
-
-    The behavior of this function depends on the recompile argument.
-    recompile:
-        True -> True, the program should be compiled
-
-        'as needed' -> compares filename to timestamp of config
-            and checks if the file exists, if required recompile.
-        False -> checks if the file exists, if it doesn't
-            compilation is required and raises a ValueError.
-            Use carefully, only if you know what you are doing!
-            Use 'as needed' to stay safe!
-    """
-
-    hashes_ext = ".hashes"
-    tmp_ext = ".tmp"
-    rb_system_hashes_fn = program_fn + hashes_ext
-    tmp_fn = rb_system_hashes_fn + tmp_ext
-
-    platf_cfg_hash = get_file_sha256_hash(platf_cfg, return_hexdigest=True)
-    this_file_hash = get_file_sha256_hash(clifford_rb_oql, return_hexdigest=True)
-    file_hashes = {platf_cfg: platf_cfg_hash, clifford_rb_oql: this_file_hash}
-
-    def write_hashes_file():
-        # We use a temporary file such that for parallel compilations, if the
-        # process is interrupted before the end there will be no hash and
-        # recompilation will be forced
-        with open(tmp_fn, "w") as outfile:
-            json.dump(file_hashes, outfile)
-
-    def load_hashes_from_file():
-        with open(rb_system_hashes_fn) as json_file:
-            hashes_dict = json.load(json_file)
-        return hashes_dict
-
-    _recompile = False
-
-    if not isfile(program_fn):
-        if recompile is False:
-            raise ValueError('No file:\n{}'.format(platf_cfg))
-        else:
-            # Force recompile, there is no program file
-            _recompile |= True
-
-    # Determine if compilation is needed based on the hashed files
-    if not isfile(rb_system_hashes_fn):
-        # There is no file with the hashes, we must compile to be safe
-        _recompile |= True
-    else:
-        # Hashes exist we use them to determine if recompilations is needed
-        hashes_dict = load_hashes_from_file()
-        # Remove file to signal a compilation in progress
-        remove(rb_system_hashes_fn)
-
-        for fn in file_hashes.keys():
-            # Recompile becomes true if any of the hashed files has a different
-            # hash now
-            _recompile |= hashes_dict.get(fn, "") != file_hashes[fn]
-
-    # Write the updated hashes
-    write_hashes_file()
-
-    res_dict = {
-        "file": rb_system_hashes_fn,
-        "tmp_file": tmp_fn
-    }
-
-    if recompile is False:
-        if _recompile is True:
-            log.warning(
-                "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
-                " want to compile?".format(platf_cfg, clifford_rb_oql)
-            )
-        res_dict["recompile"] = False
-    elif recompile is True:
-        # Enforce recompilation
-        res_dict["recompile"] = True
-    elif recompile == "as needed":
-        res_dict["recompile"] = _recompile
-
-    return res_dict
+    raise DeprecationWarning("use OqlProgram.check_recompilation_needed_hash_based")
 
 
 @deprecated(reason="Use `check_recompilation_needed_hash_based`!")
