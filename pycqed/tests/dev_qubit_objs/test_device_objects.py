@@ -639,6 +639,8 @@ class Test_Device_obj(unittest.TestCase):
         assert n3 == 1
 
         # manually change LutMan
+        # note that load_ef_rabi_pulses_to_AWG_lookuptable already updates everything, but sidesteps make, which will
+        # the update again. Eventually, everything needs to go through make
         self.mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
         n4 = Base_LutMan.make()
         assert n4 == 1
