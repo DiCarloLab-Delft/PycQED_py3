@@ -1,24 +1,28 @@
 import unittest
 import pytest
+from pytest import approx
 import numpy as np
 import os
 
 import pycqed as pq
-from pytest import approx
 
 import pycqed.analysis.analysis_toolbox as a_tools
 from pycqed.measurement import measurement_control
+from pycqed.measurement.detector_functions import (
+    Multi_Detector_UHF,
+    UHFQC_input_average_detector,
+    UHFQC_integrated_average_detector,
+    UHFQC_integration_logging_det,
+)
 
 import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 
+from pycqed.instrument_drivers.library.Transport import DummyTransport
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
-from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
-from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import dummy_QCC
-from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
-from pycqed.instrument_drivers.library.Transport import DummyTransport
 
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
@@ -28,61 +32,44 @@ import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as c
 from qcodes import station
 
 
-from pycqed.measurement.detector_functions import (
-    Multi_Detector_UHF,
-    UHFQC_input_average_detector,
-    UHFQC_integrated_average_detector,
-    UHFQC_integration_logging_det,
-)
-
-try:
-    import openql
-
-    openql_import_fail = False
-except:
-    openql_import_fail = True
-
-
 class Test_Device_obj(unittest.TestCase):
     @classmethod
-    def setUpClass(self):
+    def setUpClass(cls):
         """
-        This sets up a mock setup using a CCL to control multiple qubits
+        This sets up a mock setup using a CC to control multiple qubits
         """
-        self.station = station.Station()
+        cls.station = station.Station()
 
-        self.MW1 = vmw.VirtualMWsource("MW1")
-        self.MW2 = vmw.VirtualMWsource("MW2")
-        self.MW3 = vmw.VirtualMWsource("MW3")
-        self.SH = sh.virtual_SignalHound_USB_SA124B("SH")
-        self.UHFQC_0 = UHF.UHFQC(
+        cls.MW1 = vmw.VirtualMWsource("MW1")
+        cls.MW2 = vmw.VirtualMWsource("MW2")
+        cls.MW3 = vmw.VirtualMWsource("MW3")
+        cls.SH = sh.virtual_SignalHound_USB_SA124B("SH")
+        cls.UHFQC_0 = UHF.UHFQC(
             name="UHFQC_0", server="emulator", device="dev2109", interface="1GbE"
         )
 
-        self.UHFQC_1 = UHF.UHFQC(
+        cls.UHFQC_1 = UHF.UHFQC(
             name="UHFQC_1", server="emulator", device="dev2110", interface="1GbE"
         )
 
-        self.UHFQC_2 = UHF.UHFQC(
+        cls.UHFQC_2 = UHF.UHFQC(
             name="UHFQC_2", server="emulator", device="dev2111", interface="1GbE"
         )
 
-        self.CCL = dummy_CCL('CCL')
-        self.QCC = dummy_QCC('QCC')
-        self.CC = CC('CC', DummyTransport())
-        self.VSM = Dummy_QuTechVSMModule('VSM')
-        self.MC = measurement_control.MeasurementControl(
+        cls.CC = CC('CC', DummyTransport())
+        cls.VSM = Dummy_QuTechVSMModule('VSM')
+        cls.MC = measurement_control.MeasurementControl(
             "MC", live_plot_enabled=False, verbose=False
         )
-        self.MC.station = self.station
-        self.station.add_component(self.MC)
+        cls.MC.station = cls.station
+        cls.station.add_component(cls.MC)
 
         # Required to set it to the testing datadir
         test_datadir = os.path.join(pq.__path__[0], "tests", "test_output")
-        self.MC.datadir(test_datadir)
-        a_tools.datadir = self.MC.datadir()
+        cls.MC.datadir(test_datadir)
+        a_tools.datadir = cls.MC.datadir()
 
-        self.AWG_mw_0 = HDAWG.ZI_HDAWG8(
+        cls.AWG_mw_0 = HDAWG.ZI_HDAWG8(
             name="AWG_mw_0",
             server="emulator",
             num_codewords=32,
@@ -90,14 +77,14 @@ class Test_Device_obj(unittest.TestCase):
             interface="1GbE",
         )
 
-        self.AWG_mw_1 = HDAWG.ZI_HDAWG8(
+        cls.AWG_mw_1 = HDAWG.ZI_HDAWG8(
             name="AWG_mw_1",
             server="emulator",
             num_codewords=32,
             device="dev8027",
             interface="1GbE",
         )
-        self.AWG_flux_0 = HDAWG.ZI_HDAWG8(
+        cls.AWG_flux_0 = HDAWG.ZI_HDAWG8(
             name="AWG_flux_0",
             server="emulator",
             num_codewords=32,
@@ -106,34 +93,34 @@ class Test_Device_obj(unittest.TestCase):
         )
 
         if 0: # FIXME: PR #658: test broken by commit bd19f56
-            self.mw_lutman = mwl.AWG8_VSM_MW_LutMan("MW_LutMan_VSM")
-            self.mw_lutman.AWG(self.AWG_mw_0.name)
-            self.mw_lutman.channel_GI(1)
-            self.mw_lutman.channel_GQ(2)
-            self.mw_lutman.channel_DI(3)
-            self.mw_lutman.channel_DQ(4)
+            cls.mw_lutman = mwl.AWG8_VSM_MW_LutMan("MW_LutMan_VSM")
+            cls.mw_lutman.AWG(cls.AWG_mw_0.name)
+            cls.mw_lutman.channel_GI(1)
+            cls.mw_lutman.channel_GQ(2)
+            cls.mw_lutman.channel_DI(3)
+            cls.mw_lutman.channel_DQ(4)
         else: # FIXME: workaround
-            self.mw_lutman = mwl.AWG8_MW_LutMan("MW_LutMan")
-            self.mw_lutman.channel_I(1)
-            self.mw_lutman.channel_Q(2)
+            cls.mw_lutman = mwl.AWG8_MW_LutMan("MW_LutMan")
+            cls.mw_lutman.channel_I(1)
+            cls.mw_lutman.channel_Q(2)
 
-        self.mw_lutman.mw_modulation(100e6)
-        self.mw_lutman.sampling_rate(2.4e9)
+        cls.mw_lutman.mw_modulation(100e6)
+        cls.mw_lutman.sampling_rate(2.4e9)
 
-        self.ro_lutman_0 = UHFQC_RO_LutMan(
+        cls.ro_lutman_0 = UHFQC_RO_LutMan(
             "ro_lutman_0", feedline_number=0, feedline_map="S17", num_res=9
         )
-        self.ro_lutman_0.AWG(self.UHFQC_0.name)
+        cls.ro_lutman_0.AWG(cls.UHFQC_0.name)
 
-        self.ro_lutman_1 = UHFQC_RO_LutMan(
+        cls.ro_lutman_1 = UHFQC_RO_LutMan(
             "ro_lutman_1", feedline_number=1, feedline_map="S17", num_res=9
         )
-        self.ro_lutman_1.AWG(self.UHFQC_1.name)
+        cls.ro_lutman_1.AWG(cls.UHFQC_1.name)
 
-        self.ro_lutman_2 = UHFQC_RO_LutMan(
+        cls.ro_lutman_2 = UHFQC_RO_LutMan(
             "ro_lutman_2", feedline_number=2, feedline_map="S17", num_res=9
         )
-        self.ro_lutman_2.AWG(self.UHFQC_2.name)
+        cls.ro_lutman_2.AWG(cls.UHFQC_2.name)
 
         # Assign instruments
         qubits = []
@@ -141,28 +128,28 @@ class Test_Device_obj(unittest.TestCase):
             q = ct.CCLight_Transmon("q{}".format(q_idx))
             qubits.append(q)
 
-            q.instr_LutMan_MW(self.mw_lutman.name)
-            q.instr_LO_ro(self.MW1.name)
-            q.instr_LO_mw(self.MW2.name)
-            q.instr_spec_source(self.MW3.name)
+            q.instr_LutMan_MW(cls.mw_lutman.name)
+            q.instr_LO_ro(cls.MW1.name)
+            q.instr_LO_mw(cls.MW2.name)
+            q.instr_spec_source(cls.MW3.name)
 
             if q_idx in [13, 16]:
-                q.instr_acquisition(self.UHFQC_0.name)
-                q.instr_LutMan_RO(self.ro_lutman_0.name)
+                q.instr_acquisition(cls.UHFQC_0.name)
+                q.instr_LutMan_RO(cls.ro_lutman_0.name)
             elif q_idx in [1, 4, 5, 7, 8, 10, 11, 14, 15]:
-                q.instr_acquisition(self.UHFQC_1.name)
-                q.instr_LutMan_RO(self.ro_lutman_1.name)
+                q.instr_acquisition(cls.UHFQC_1.name)
+                q.instr_LutMan_RO(cls.ro_lutman_1.name)
             elif q_idx in [0, 2, 3, 6, 9, 12]:
-                q.instr_acquisition(self.UHFQC_2.name)
-                q.instr_LutMan_RO(self.ro_lutman_2.name)
+                q.instr_acquisition(cls.UHFQC_2.name)
+                q.instr_LutMan_RO(cls.ro_lutman_2.name)
 
-            q.instr_VSM(self.VSM.name)
-            q.instr_CC(self.CCL.name)
-            q.instr_MC(self.MC.name)
+            q.instr_VSM(cls.VSM.name)
+            q.instr_CC(cls.CC.name)
+            q.instr_MC(cls.MC.name)
 
-            q.instr_SH(self.SH.name)
+            q.instr_SH(cls.SH.name)
 
-            config_fn = os.path.join(pq.__path__[0], "tests", "test_cfg_CCL.json")
+            config_fn = os.path.join(pq.__path__[0], "tests", "test_cfg_cc.json")
             q.cfg_openql_platform_fn(config_fn)
 
             # Setting some "random" initial parameters
@@ -182,34 +169,36 @@ class Test_Device_obj(unittest.TestCase):
             q.mw_mixer_offs_DQ(0.4)
 
         # Set up the device object and set required params
-        self.device = do.DeviceCCL("device")
-        self.device.qubits([q.name for q in qubits])
-        self.device.instr_CC(self.CCL.name)
+        cls.device = do.DeviceCCL("device")
+        cls.device.qubits([q.name for q in qubits])
+        cls.device.instr_CC(cls.CC.name)
 
-        self.device.instr_AWG_mw_0(self.AWG_mw_0.name)
-        self.device.instr_AWG_mw_1(self.AWG_mw_1.name)
-        self.device.instr_AWG_flux_0(self.AWG_flux_0.name)
+        cls.device.instr_AWG_mw_0(cls.AWG_mw_0.name)
+        cls.device.instr_AWG_mw_1(cls.AWG_mw_1.name)
+        cls.device.instr_AWG_flux_0(cls.AWG_flux_0.name)
 
-        self.device.ro_lo_freq(6e9)
+        cls.device.ro_lo_freq(6e9)
 
-        # Fixed by design
-        self.dio_map_CCL = {"ro_0": 1, "ro_1": 2, "flux_0": 3, "mw_0": 4, "mw_1": 5}
-        # Fixed by design
-        self.dio_map_QCC = {
-            "ro_0": 1,
-            "ro_1": 2,
-            "ro_2": 3,
-            "mw_0": 4,
-            "mw_1": 5,
-            "flux_0": 6,
-            "flux_1": 7,
-            "flux_2": 8,
-            "mw_2": 9,
-            "mw_3": 10,
-            "mw_4": 11,
-        }
+        if 0:  # FIXME: CCL/QCC deprecated
+            # Fixed by design
+            cls.dio_map_CCL = {"ro_0": 1, "ro_1": 2, "flux_0": 3, "mw_0": 4, "mw_1": 5}
+            # Fixed by design
+            cls.dio_map_QCC = {
+                "ro_0": 1,
+                "ro_1": 2,
+                "ro_2": 3,
+                "mw_0": 4,
+                "mw_1": 5,
+                "flux_0": 6,
+                "flux_1": 7,
+                "flux_2": 8,
+                "mw_2": 9,
+                "mw_3": 10,
+                "mw_4": 11,
+            }
+
         # Modular, arbitrary example here
-        self.dio_map_CC = {
+        cls.dio_map_CC = {
             "ro_0": 0,
             "ro_1": 1,
             "ro_2": 2,
@@ -220,8 +209,9 @@ class Test_Device_obj(unittest.TestCase):
             "flux_2": 8,
         }
 
-        self.device.dio_map(self.dio_map_CCL)
+        cls.device.dio_map(cls.dio_map_CC)
 
+    @unittest.skip("CCL/QCC is removed")
     def test_get_dio_map(self):
         self.device.instr_CC(self.CCL.name)
         # 2020-03-20
@@ -251,6 +241,7 @@ class Test_Device_obj(unittest.TestCase):
 
         assert dio_map == expected_dio_map
 
+    @unittest.skip("CCL is removed")
     def test_prepare_timing_CCL(self):
         self.device.instr_CC(self.CCL.name)
         self.device.dio_map(self.dio_map_CCL)
@@ -276,6 +267,7 @@ class Test_Device_obj(unittest.TestCase):
         assert self.CCL.dio4_out_delay() == 3
         assert self.CCL.dio5_out_delay() == 2
 
+    @unittest.skip("QCC is removed")
     def test_prepare_timing_QCC(self):
         self.device.instr_CC(self.QCC.name)
         self.device.dio_map(self.dio_map_QCC)
@@ -296,6 +288,7 @@ class Test_Device_obj(unittest.TestCase):
         assert self.QCC.dio6_out_delay() == 0
         assert self.QCC.dio7_out_delay() == 7
 
+    @unittest.skip("QCC is removed")
     def test_prepare_timing_QCC_fine(self):
         self.device.instr_CC(self.QCC.name)
         self.device.dio_map(self.dio_map_QCC)
@@ -326,7 +319,6 @@ class Test_Device_obj(unittest.TestCase):
         assert self.AWG_mw_1.sigouts_7_delay() == approx(0)
         assert self.AWG_mw_1.sigouts_7_delay() == approx(0)
 
-    @unittest.skip("FIXME: PR #658: test broken by commit bd19f56: AttributeError: 'mw_lutman' object and its delegates have no attribute 'channel_I'")
     def test_prepare_timing_CC(self):
         self.device.instr_CC(self.CC.name)
         self.device.dio_map(self.dio_map_CC)

@@ -1,18 +1,16 @@
 import os
 import unittest
-import pytest
 import numpy as np
 
 from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
-from pycqed.measurement.openql_experiments import openql_helpers as oqh
-from openql import openql as ql
+from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
+
 
 class Test_multi_qubit_oql(unittest.TestCase):
     def setUp(self):
         curdir = os.path.dirname(__file__)
-        self.config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
-        output_dir = os.path.join(curdir, 'test_output')
-        ql.set_option('output_dir', output_dir)
+        self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
+        OqlProgram.output_dir = os.path.join(curdir, 'test_output_cc')
 
     def test_single_flux_pulse_seq(self):
         # N.B. edge 0,2 is still illegal...
@@ -23,6 +21,7 @@ class Test_multi_qubit_oql(unittest.TestCase):
         p = mqo.flux_staircase_seq(platf_cfg=self.config_fn)
         self.assertEqual(p.name, 'flux_staircase_seq')
 
+    @unittest.skip("test_multi_qubit_off_on() gives signalconflict (FIXME)")
     def test_multi_qubit_off_on(self):
         p = mqo.multi_qubit_off_on(qubits=[0, 1, 4],
                                    initialize=True,
@@ -108,7 +107,6 @@ class Test_multi_qubit_oql(unittest.TestCase):
                 platf_cfg=self.config_fn)
             self.assertEqual(p.name, 'two_qubit_ramsey')
 
-
     def test_two_qubit_tomo_bell(self):
         for bell_state in [0, 1, 2, 3]:
             p = mqo.two_qubit_tomo_bell(
@@ -117,7 +115,6 @@ class Test_multi_qubit_oql(unittest.TestCase):
                 bell_state=bell_state,
                 platf_cfg=self.config_fn)
             self.assertEqual(p.name, 'two_qubit_tomo_bell_3_0')
-
 
     def test_two_qubit_tomo_bell_by_waiting(self):
         for bell_state in [0, 1, 2, 3]:
@@ -135,12 +132,11 @@ class Test_multi_qubit_oql(unittest.TestCase):
             platf_cfg=self.config_fn)
         self.assertEqual(p.name, 'two_qubit_DJ')
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')
     def test_two_qubit_parity_check(self):
         for initialization_msmt in [False, True]:
             p = mqo.two_qubit_parity_check(
                 qD0=0,
-                qD1=0,  # FIXME: makes no sense, but configuration file lacks proper edges
+                qD1=1,
                 qA=2,
                 initialization_msmt=initialization_msmt,
                 platf_cfg=self.config_fn)
@@ -155,14 +151,12 @@ class Test_multi_qubit_oql(unittest.TestCase):
             platf_cfg=self.config_fn)
         self.assertEqual(p.name, 'conditional_oscillation_seq')
 
-
     def test_grovers_two_qubit_all_inputs(self):
         p = mqo.grovers_two_qubit_all_inputs(
             q0=0,
             q1=2,
             platf_cfg=self.config_fn)
         self.assertEqual(p.name, 'grovers_two_qubit_all_inputs')
-
 
     def test_grovers_tomography(self):
         for omega in range(4):
@@ -209,37 +203,3 @@ class Test_multi_qubit_oql(unittest.TestCase):
             qubits=[0, 2],
             platf_cfg=self.config_fn)
         self.assertEqual(p.name, 'sliding_flux_pulses_seq')
-
-
-##########################################################################
-# repeat same tests for Qutech Central Controller
-# NB: we just hijack the parent class to run the same tests
-# NB: requires OpenQL with CC backend support
-##########################################################################
-
-if oqh.is_compatible_openql_version_cc():
-    class Test_multi_qubit_oql_CC(Test_multi_qubit_oql):
-        def setUp(self):
-            curdir = os.path.dirname(__file__)
-            self.config_fn = os.path.join(curdir, 'test_cfg_cc.json')
-            output_dir = os.path.join(curdir, 'test_output_cc')
-            ql.set_option('output_dir', output_dir)
-
-        def test_multi_qubit_off_on(self):
-            pytest.skip("test_multi_qubit_off_on() gives signalconflict (FIXME)")
-
-        def test_two_qubit_parity_check(self):
-            for initialization_msmt in [False, True]:
-                p = mqo.two_qubit_parity_check(
-                    qD0=0,
-                    qD1=1,
-                    qA=2,
-                    initialization_msmt=initialization_msmt,
-                    platf_cfg=self.config_fn)
-                self.assertEqual(p.name, 'two_qubit_parity_check')
-
-else:
-    class Test_multi_qubit_oql_CC_incompatible_openql_version(unittest.TestCase):
-        @unittest.skip('OpenQL version does not support CC')
-        def test_fail(self):
-            pass

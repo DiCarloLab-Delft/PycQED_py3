@@ -72,7 +72,7 @@ Mind however that the code is continuously under development so if you think som
 ### The init folder
 Contains script that are to be used when setting up an experiment. Used to store configuration info and create instruments.
 
-###The instruments folder
+### The instruments folder
 
 PycQED makes extensive use of instruments. Instruments are children of the qcodes instrument class and can be used as drivers for physical instruments,
 but can also provide a layer of abstraction in the form of meta-instruments, which contain other instruments.
@@ -94,10 +94,10 @@ MC.run()
 ```
 
 A sweep_function determines what parameter is varied, a qcodes parameter that contains a .set method can also be inserted here.
-A deterector_function determines what parameter is measrued, a qcodes parameter that has a .get method can also be inserted here.
+A detector_function determines what parameter is measured, a qcodes parameter that has a .get method can also be inserted here.
 
 #### The qubit object
-The qubit object is a (meta) instrument but it defies the general categorization of the other instruments.
+The qubit object is a (meta) instrument but it defines the general categorization of the other instruments.
 
 It is the object that one is actively manipulating during an experiment and as such contains functions such as qubit.measure_Rabi() and qubit.find_frequency_spec(). It is also used to store the known parameters of the physical qubit object.
 
