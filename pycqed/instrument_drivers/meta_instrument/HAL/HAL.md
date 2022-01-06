@@ -1,18 +1,17 @@
 FIXME: WIP
 
 # Original architecture
+Originally, handling of instrument hardware is performed in the following classes:
+- `CCLight_Transmon`
+- `DeviceCCL` (and file calibration_toolbox.py)
+- `Base_LutMan` and its descendants
+- `MeasurementControl`
+- `Sweep_function` and its descendants
+- `Detector_Function` and its descendants
 
-Classes
-- CCLight_Transmon
-- Base_LutMan and its descendants
-- DeviceCCL (and file calibration_toolbox.py)
-- MeasurementControl
-- Sweep_function and its descendants
-- Detector_Function and its descendants
-
-Problems:
+The architecture/implementation has the following problems:
 - hardware support scattered over many files
-- duplicate functionality in single vs. multi qubit support (CCLight_Transmon vs. DeviceCCL)
+- duplicate functionality in single vs. multi qubit support (`CCLight_Transmon` vs. `DeviceCCL`)
 - LutMans
     - manual control of waveform set used
     - manual control of waveform uploading
@@ -23,20 +22,24 @@ Problems:
 
 # Refactoring
 
+
 ## Qubit
+The qubit handling of `CCLight_Transmon` was split into a part controlling the instrument hardware (`HAL_ShimSQ`) and a 
+part containing routines for qubit calibration, measurement, etc (`HAL_Transmon`):
+
 ### HAL_Transmon
 
 ### HAL_ShimSQ
 
-Class HAL_ShimSQ implements a shim between the HAL_Transmon and the instrument hardware for
+Class `HAL_ShimSQ` implements a shim between the `HAL_Transmon` and the instrument hardware for
 single qubit operations. It contains hardware dependent functions extracted from CCL_Transmon.py, extended with
 functions that abstract the instrument hardware that used to be directly accessed by the end user methods.
 
-FIXME: the latter is Work In Progress, so old style code is still present in HAL_Transmon
+FIXME: the latter is Work In Progress, so old style code is still present in `HAL_Transmon`
 
-QCoDeS parameters referring to instrument hardware are added here, and not in child class HAL_Transmon where they were
+QCoDeS parameters referring to instrument hardware are added here, and not in child class `HAL_Transmon` where they were
 originally added. These parameters should only accessed here (although nothing really stops you from violating this
-design). Note that we try to find a balance between compatibility with exiting code and proper design here.
+design). Note that we try to find a balance between compatibility with existing code and proper design here.
 
 The following hardware related attributes are managed here:
 - physical instruments of the signal chain, and their
@@ -46,11 +49,9 @@ The following hardware related attributes are managed here:
     - signal chain related properties (e.g. modulation, mixer calibration)
     - FIXME: etc
 
-
-A future improvement is to merge this HAL functions for Single Qubits with those for Multi Qubits.
-
-
 ## Device
+Similar to the qubit, the device handling of `DeviceCCL` was split into `HAL_ShimMQ` and `HAL_Device`.
+
 ### HAL_Device
 
 
@@ -64,8 +65,9 @@ Plan
 
 ## MC, SF, DF
 
-# Ideas
-
+# Future steps
+- merge the HAL functions of `HAL_ShimSQ` with those of `HAL_ShimMQ`.
+- automate LutMan management, with gate set information obtained from OpenQL, using the new `Base_LutMan.make()`
 - allow sweeping of LutMan parameters without manually uploading and stop/starting
 
 

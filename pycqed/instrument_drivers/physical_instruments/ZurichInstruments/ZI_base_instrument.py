@@ -1511,7 +1511,7 @@ class ZI_base_instrument(Instrument):
             par(wf)
 
         t1 = time.time()
-        log.info('{self.devname}: Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
+        log.info(f"{self.devname}: Set all waveforms to zeros in {1.0e3 * (t1 - t0):.1f} ms")
 
     def configure_awg_from_string(self, awg_nr: int, program_string: str,
                                   timeout: float=15):

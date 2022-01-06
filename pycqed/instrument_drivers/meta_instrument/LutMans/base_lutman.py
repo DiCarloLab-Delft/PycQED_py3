@@ -73,6 +73,7 @@ class Base_LutMan(Instrument):
             parameter_class=ManualParameter,
         )
 
+        # FIXME: get sampling_rate from AWG
         self.add_parameter(
             "sampling_rate",
             unit="Hz",
@@ -176,8 +177,7 @@ class Base_LutMan(Instrument):
         Render a waveform to a figure.
 
         Args:
-            wave_id: can be either the "name" of a waveform or
-                the integer key in self._wave_dict.
+            wave_id: can be either the "name" of a waveform or the integer key in self._wave_dict.
         """
         if wave_id not in self.LutMap().keys():
             wave_id = get_wf_idx_from_name(wave_id, self.LutMap())
@@ -274,12 +274,8 @@ class Base_LutMan(Instrument):
     # Functions: smart update
     ##########################################################################
 
-    # FIXME: we need deepcopy() to copy self.parameters, but we don't want to look into AWG parameter (and cannot,
-    #  because QCoDes Instrument forbids (see InstrumentBase.__getstate__)
-
     # FIXME: also handle codeword/waveform relation (HDAWG:upload_codeword_program/QWG:'wave_ch{}_cw{:03}') smartly?
     #  on HDAWG, its an expensive operation
-
     def _wave_dict_dirty(self):
         # exit on empty _wave_dict (initially the case)
         if not self._wave_dict:
