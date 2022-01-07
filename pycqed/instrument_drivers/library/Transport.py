@@ -97,6 +97,7 @@ class FileTransport(Transport):
         """
         self._out_file = open(out_file_name, "wb+")
         self._inject_data = '1'  # response to "*OPC?"
+
     def close(self) -> None:
         self._out_file.close()
 

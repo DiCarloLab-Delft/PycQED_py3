@@ -16,7 +16,7 @@ from pycqed.utilities.general import int2base
 import pycqed.measurement.hdf5_data as h5d
 import copy
 import lmfit
-from scipy.optimize import minimize
+from scipy.optimize import minimize, curve_fit
 from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr,\
      gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess, \
      ExpDecayFunc, exp_dec_guess
@@ -1838,6 +1838,154 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
+
+class measurement_dephasing_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 meas_time: float,
+                 exception_qubits: list,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+
+        self.meas_time = meas_time
+        self.exception_qubits = exception_qubits
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+
+        Qubits = [ name.decode().split(' ')[-1] for name in self.raw_data_dict['value_names'] ]
+        self.Qubits = Qubits
+        data = self.raw_data_dict['data']
+        # Sort measured data
+        angles = data[0:-4:6,0]
+        M_data = {}
+        for i, q in enumerate(Qubits):
+            cal_0 = np.mean(data[-4:-2,i+1])
+            cal_1 = np.mean(data[-2:,i+1])
+            if q not in self.exception_qubits:
+                M_data[q] = {'no_meas_0': (data[0:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'no_meas_1': (data[1:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'meas_0' : (data[3:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'meas_1' : (data[5:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'cal_pts' : (data[-4:,i+1]-cal_0)/(cal_1-cal_0)}
+            else:
+                M_data[q] = {'no_meas_0': (data[0:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'no_meas_1': (data[1:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'meas_0' : (data[2:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'meas_1' : (data[4:-4:6,i+1]-cal_0)/(cal_1-cal_0),
+                             'cal_pts' : (data[-4:,i+1]-cal_0)/(cal_1-cal_0)}
+        # Fit measured data
+        def func(x, A, phi, offset):
+            return A*np.cos((x+phi)*np.pi/180) + offset
+        Fit_params = {}
+        Dephasing = {q : {} for q in Qubits}
+        for q in Qubits:
+            Fit_params[q] = {}
+            for key in list(M_data[q].keys())[:-1]:
+                popt, pcov = curve_fit(func, angles, M_data[q][key])
+                Fit_params[q][key] = popt
+            Dephasing[q]['0'] = np.log(abs(Fit_params[q]["no_meas_0"][0])/abs(Fit_params[q]["meas_0"][0]))/self.meas_time
+            Dephasing[q]['1'] = np.log(abs(Fit_params[q]["no_meas_1"][0])/abs(Fit_params[q]["meas_1"][0]))/self.meas_time
+
+        self.proc_data_dict = {}
+        self.proc_data_dict['Measured_data'] = M_data
+        self.proc_data_dict['Fit_params'] = Fit_params
+        self.qoi = {'Dephasing_0': {q:Dephasing[q]['0'] for q in Qubits },
+                    'Dephasing_1': {q:Dephasing[q]['1'] for q in Qubits }}
+
+
+    def prepare_plots(self):
+        for q in self.Qubits[1:]:
+            self.plot_dicts[f'Ramsey_curves_{q}'] = {
+                'plotfn': plot_ramsey_dephasing,
+                'qubit': q,
+                'M_data': self.proc_data_dict['Measured_data'],
+                'Fit_params': self.proc_data_dict['Fit_params'],
+                'timestamp': self.timestamp,
+                'Dephasing_0':self.qoi['Dephasing_0'][q],
+                'Dephasing_1':self.qoi['Dephasing_1'][q]
+            }
+
+class Depletion_AllXY_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 qubit,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qubit = qubit
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        data_0 = self.raw_data_dict['data'][:,1][0::3]
+        data_1 = self.raw_data_dict['data'][:,1][2::3]
+        zero_lvl = np.mean(data_0[:2])
+        one_lvl = np.mean(data_0[-2:])
+        data_0 = (data_0 - zero_lvl)/(one_lvl-zero_lvl)
+        data_1 = (data_1 - zero_lvl)/(one_lvl-zero_lvl)
+        self.proc_data_dict['data_0'] = data_0
+        self.proc_data_dict['data_1'] = data_1
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': plot_depletion_allxy,
+            'qubit': self.qubit,
+            'timestamp': self.timestamp,
+            'data_0': self.proc_data_dict['data_0'],
+            'data_1': self.proc_data_dict['data_1']
+        }
+
 ######################################
 # Helper functions
 ######################################
@@ -2523,3 +2671,62 @@ def plot_QND_metrics(Cal_0, Cal_1, th,
     rect = patches.Rectangle((.89, .125), .225, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
     ax1.add_patch(rect)
     ax1.text(1, .2, '$m_3$', va='center', ha='center', size=6)
+
+def plot_ramsey_dephasing(qubit, timestamp,
+                          M_data, Fit_params,
+                          Dephasing_0, Dephasing_1,
+                          ax, **kw):
+    angles = np.arange(0,360,20)
+    ax.plot(angles, M_data[qubit]['no_meas_0'], 'C0o', label='no_meas_0')
+    ax.plot(angles, M_data[qubit]['no_meas_1'], 'C3o', label='no_meas_1')
+    ax.plot(angles, M_data[qubit]['meas_0'], 'o',
+            color='teal', label='meas_0')
+    ax.plot(angles, M_data[qubit]['meas_1'], 'o',
+            color='palevioletred', label='meas_1')
+    ax.plot([360, 370, 380, 390], M_data[qubit]['cal_pts'], 'C2o-')
+
+    def func(x, A, phi, offset):
+            return A*np.cos((x+phi)*np.pi/180) + offset
+    X = np.linspace(0, 340, 101)
+    ax.plot(X, func(X, *Fit_params[qubit]['no_meas_0']), 'C0--')
+    ax.plot(X, func(X, *Fit_params[qubit]['no_meas_1']), 'C3--')
+    ax.plot(X, func(X, *Fit_params[qubit]['meas_0']), '--', color='teal')
+    ax.plot(X, func(X, *Fit_params[qubit]['meas_1']), '--', color='palevioletred')
+
+    ax.set_title(f'{timestamp} Target qubit {qubit}')
+    ax.set_xlabel('Angle (deg)')
+    ax.set_ylabel(r'P($|1\rangle$)')
+
+    text = 'Without RO pulse: \n'+\
+           f'$\phi_0={Fit_params[qubit]["no_meas_0"][1]:.2f}$\n'+\
+           f'$\phi_1={Fit_params[qubit]["no_meas_1"][1]:.2f}$\n'+\
+           '\nWith RO pulse: \n'+\
+           f'$\phi_0={Fit_params[qubit]["meas_0"][1]:.2f}$\n'+\
+           f'$\phi_1={Fit_params[qubit]["meas_1"][1]:.2f}$\n'+\
+           '\nDephasing: \n'+\
+           f'$\Gamma_0={Dephasing_0*1e-3:.2f}$ KHz\n'+\
+           f'$\Gamma_1={Dephasing_1*1e-3:.2f}$ KHz'
+    props = dict(boxstyle='round', facecolor='white')
+    ax.text(430, .3, text, bbox=props)
+
+    ax.legend(frameon=False)
+
+
+def plot_depletion_allxy(qubit, timestamp,
+                         data_0, data_1,
+                         ax, **kw):
+
+    allXY = ['II', 'XX', 'YY', 'XY', 'YX', 'xI', 'yI',
+             'xy', 'yx', 'xY', 'yX', 'Xy', 'Yx', 'xX',
+             'Xx', 'yY', 'Yy', 'XI', 'YI', 'xx', 'yy']
+
+    ideal = [0 for i in range(10)] + [.5 for i in range(24)] + [1 for i in range(8)]
+
+    ax.set_xticks(np.arange(0, 42, 2)+.5)
+    ax.set_xticklabels(allXY)
+    ax.set_ylabel(r'P($|1\rangle$)')
+    ax.plot(ideal, 'k--', lw=1, label='ideal')
+    ax.plot(data_0, 'C0o-', alpha=1, label='Standard sequence')
+    ax.plot(data_1, 'C1.-', alpha=.75, label='post-measurement')
+    ax.set_title(timestamp+'_Depletion_ALLXY_'+qubit)
+    ax.legend(loc=0)

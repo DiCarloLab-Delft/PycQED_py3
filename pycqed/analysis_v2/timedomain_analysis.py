@@ -1,14 +1,19 @@
+from importlib import reload
 import lmfit
 import numpy as np
 from uncertainties import ufloat
 from scipy.stats import sem
 from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
+reload(fit_mods)
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from pycqed.utilities.general import format_value_string
 from copy import deepcopy
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
+
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 
@@ -1152,6 +1157,50 @@ class ComplexRamseyAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'setlabel': 'Fit phase',
                 'do_legend': True,
                 'legend_pos': 'best'}
+
+            self.plot_dicts['exp_fit_parametric'] = {
+                'ax_id': 'Parametric',
+                'plotfn': self.plot_fit,
+                'output_mod_fn':np.imag,
+                'output_mod_fn_x':np.real,
+                'fit_res': self.fit_dicts['exp_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'exp fit parametric',
+                'do_legend': True,
+                'legend_pos': 'best'}
+
+            fit_res_params = self.fit_dicts['exp_fit']['fit_res'].params
+            scale_frequency, unit_frequency = SI_prefix_and_scale_factor(fit_res_params['frequency'].value,'Hz')
+            plot_frequency = fit_res_params['frequency'].value*scale_frequency
+            scale_amplitude, unit_amplitude = SI_prefix_and_scale_factor(fit_res_params['amplitude'].value)
+            plot_amplitude = fit_res_params['amplitude'].value*scale_amplitude
+            scale_tau, unit_tau = SI_prefix_and_scale_factor(fit_res_params['tau'].value,'s')
+            plot_tau = fit_res_params['tau'].value*scale_tau
+            scale_offset_I, unit_offset_I = SI_prefix_and_scale_factor(fit_res_params['offset_I'].value)
+            plot_offset_I = fit_res_params['offset_I'].value*scale_offset_I
+            scale_offset_Q, unit_offset_Q = SI_prefix_and_scale_factor(fit_res_params['offset_Q'].value)
+            plot_offset_Q = fit_res_params['offset_Q'].value*scale_offset_Q
+            # scale_phase, label_phase = SI_prefix_and_scale_factor(fit_res_params['phase'].value, 'rad')
+            # print(SI_prefix_and_scale_factor(fit_res_params['frequency'].value,'Hz'))
+            self.plot_dicts['Parameters'] = {
+                'ax_id': 'main',
+                'ypos': .5,
+                'xpos': 1.04,
+                'plotfn': self.plot_text,
+                'dpi': 200,
+                'box_props': 'fancy',
+                'horizontalalignment': 'left',
+                # 'text_string': 'Chi = ' + str(self.fit_dicts['ExpGaussDecayCos']['fit_res'].chisqr),
+                'text_string': 'Fit results' + '\n'
+                                + '$\mathrm{\chi}^2$ = %.3f'%(self.fit_dicts['exp_fit']['fit_res'].chisqr)  + '\n'
+                                + 'Detuning = %.2f '%(plot_frequency) + unit_frequency + '\n'
+                                + '$\mathrm{T}_2$ = %.2f '%(plot_tau) + unit_tau + '\n'
+                                + 'A = %.2f '%(plot_amplitude) + unit_amplitude + '\n'
+                                + 'Offset I = %.2f ' %(plot_offset_I) + unit_offset_I + '\n'
+                                + 'Offset Q = %.2f ' %(plot_offset_Q) + unit_offset_Q + '\n'}
+
+
+
 
             self.plot_dicts['exp_fit_parametric'] = {
                 'ax_id': 'Parametric',

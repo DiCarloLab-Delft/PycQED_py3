@@ -1,11 +1,11 @@
 import numpy as np
-import logging
+#import logging
 from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
-from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+#from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+#from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
+#from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sqs2
-from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
+#from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 default_gauss_width = 10  # magic number should be removed,
 # note magic number only used in old mathematica seqs
 

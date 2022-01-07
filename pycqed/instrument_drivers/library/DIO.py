@@ -1,6 +1,6 @@
 import sys
 from abc import ABC, abstractmethod
-from typing import Tuple,List
+from typing import Tuple, List
 
 
 class CalInterface(ABC):
@@ -39,8 +39,8 @@ class CalInterface(ABC):
         pass
 
 
-def calibrate(sender: CalInterface,
-              receiver: CalInterface,
+def calibrate(sender: CalInterface = None,
+              receiver: CalInterface = None,
               sender_dio_mode: str='',
               sender_port: int=0,
               receiver_port: int=0
@@ -56,10 +56,18 @@ def calibrate(sender: CalInterface,
         receiver_port: the port on which to receive the data
     """
     # FIXME: allow list of senders or receivers
-    dio_mask,expected_sequence = sender.output_dio_calibration_data(dio_mode=sender_dio_mode, port=sender_port)
+    if sender:
+        dio_mask,expected_sequence = sender.output_dio_calibration_data(dio_mode=sender_dio_mode, port=sender_port)
+    else:
+        dio_mask = 0
+        expected_sequence = []
+
     # FIXME: disable receiver connector outputs? And other receivers we're not aware of?
-    receiver.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=receiver_port)
-    sender.stop()  # FIXME: not in interface
+    if receiver:
+        receiver.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=receiver_port)
+
+    if sender:
+        sender.stop()  # FIXME: not in interface
 
 _control_modes = {
     # control mode definition, compatible with OpenQL CC backend JSON syntax

@@ -14,104 +14,96 @@ import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as ct
-
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
-from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
-# from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 
+from pycqed.instrument_drivers.library.Transport import DummyTransport
+from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController as UHF
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
-
-from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
-from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
-from pycqed.instrument_drivers.library.Transport import DummyTransport
 
 from qcodes import station
-
-from openql import openql as ql
 
 
 Dummy_VSM_not_fixed = False
 
 @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # too many problems
 class Test_CCL(unittest.TestCase):
-
     @classmethod
-    def setUpClass(self):
-        self.station = station.Station()
-        self.CCL_qubit = ct.CCLight_Transmon('CCL_qubit')
+    def setUpClass(cls):
+        cls.station = station.Station()
+        cls.CCL_qubit = ct.CCLight_Transmon('CCL_qubit')
 
-        self.MW1 = vmw.VirtualMWsource('MW1')
-        self.MW2 = vmw.VirtualMWsource('MW2')
-        self.MW3 = vmw.VirtualMWsource('MW3')
-        self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
-        self.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
-                               device='dev2109', interface='1GbE')
+        cls.MW1 = vmw.VirtualMWsource('MW1')
+        cls.MW2 = vmw.VirtualMWsource('MW2')
+        cls.MW3 = vmw.VirtualMWsource('MW3')
+        cls.SH = sh.virtual_SignalHound_USB_SA124B('SH')
+        cls.UHFQC = UHF.UHFQC(name='UHFQC', server='emulator',
+                              device='dev2109', interface='1GbE')
 
-        self.CCL = dummy_CCL('CCL')
+        cls.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
         # self.VSM = Dummy_Duplexer('VSM')
-        self.VSM = Dummy_QuTechVSMModule('VSM')
+        cls.VSM = Dummy_QuTechVSMModule('VSM')
 
-        self.MC = measurement_control.MeasurementControl(
+        cls.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
-        self.MC.station = self.station
-        self.station.add_component(self.MC)
+        cls.MC.station = cls.station
+        cls.station.add_component(cls.MC)
 
         # Required to set it to the testing datadir
         test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
-        self.MC.datadir(test_datadir)
-        a_tools.datadir = self.MC.datadir()
+        cls.MC.datadir(test_datadir)
+        a_tools.datadir = cls.MC.datadir()
 
-        self.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
-        self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
-        self.AWG8_VSM_MW_LutMan.AWG(self.AWG.name)
-        self.AWG8_VSM_MW_LutMan.channel_GI(1)
-        self.AWG8_VSM_MW_LutMan.channel_GQ(2)
-        self.AWG8_VSM_MW_LutMan.channel_DI(3)
-        self.AWG8_VSM_MW_LutMan.channel_DQ(4)
-        self.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
-        self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
+        cls.AWG = HDAWG.ZI_HDAWG8(name='DummyAWG8', server='emulator', num_codewords=32, device='dev8026', interface='1GbE')
+        cls.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
+        cls.AWG8_VSM_MW_LutMan.AWG(cls.AWG.name)
+        cls.AWG8_VSM_MW_LutMan.channel_GI(1)
+        cls.AWG8_VSM_MW_LutMan.channel_GQ(2)
+        cls.AWG8_VSM_MW_LutMan.channel_DI(3)
+        cls.AWG8_VSM_MW_LutMan.channel_DQ(4)
+        cls.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
+        cls.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
 
-        self.ro_lutman = UHFQC_RO_LutMan(
+        cls.ro_lutman = UHFQC_RO_LutMan(
             'RO_lutman', num_res=5, feedline_number=0)
-        self.ro_lutman.AWG(self.UHFQC.name)
+        cls.ro_lutman.AWG(cls.UHFQC.name)
 
         # Assign instruments
-        self.CCL_qubit.instr_LutMan_MW(self.AWG8_VSM_MW_LutMan.name)
-        self.CCL_qubit.instr_LO_ro(self.MW1.name)
-        self.CCL_qubit.instr_LO_mw(self.MW2.name)
-        self.CCL_qubit.instr_spec_source(self.MW3.name)
+        cls.CCL_qubit.instr_LutMan_MW(cls.AWG8_VSM_MW_LutMan.name)
+        cls.CCL_qubit.instr_LO_ro(cls.MW1.name)
+        cls.CCL_qubit.instr_LO_mw(cls.MW2.name)
+        cls.CCL_qubit.instr_spec_source(cls.MW3.name)
 
-        self.CCL_qubit.instr_acquisition(self.UHFQC.name)
-        self.CCL_qubit.instr_VSM(self.VSM.name)
-        self.CCL_qubit.instr_CC(self.CCL.name)
-        self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
-        self.CCL_qubit.instr_MC(self.MC.name)
+        cls.CCL_qubit.instr_acquisition(cls.UHFQC.name)
+        cls.CCL_qubit.instr_VSM(cls.VSM.name)
+        cls.CCL_qubit.instr_CC(cls.CC.name)
+        cls.CCL_qubit.instr_LutMan_RO(cls.ro_lutman.name)
+        cls.CCL_qubit.instr_MC(cls.MC.name)
 
-        self.CCL_qubit.instr_SH(self.SH.name)
+        cls.CCL_qubit.instr_SH(cls.SH.name)
 
         config_fn = os.path.join(
-            pq.__path__[0], 'tests', 'openql', 'test_cfg_CCL.json')
-        self.CCL_qubit.cfg_openql_platform_fn(config_fn)
+            pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
+        cls.CCL_qubit.cfg_openql_platform_fn(config_fn)
 
         # Setting some "random" initial parameters
-        self.CCL_qubit.ro_freq(5.43e9)
-        self.CCL_qubit.ro_freq_mod(200e6)
+        cls.CCL_qubit.ro_freq(5.43e9)
+        cls.CCL_qubit.ro_freq_mod(200e6)
 
-        self.CCL_qubit.freq_qubit(4.56e9)
-        self.CCL_qubit.freq_max(4.62e9)
+        cls.CCL_qubit.freq_qubit(4.56e9)
+        cls.CCL_qubit.freq_max(4.62e9)
 
-        self.CCL_qubit.mw_freq_mod(-100e6)
-        self.CCL_qubit.mw_awg_ch(1)
-        self.CCL_qubit.cfg_qubit_nr(0)
+        cls.CCL_qubit.mw_freq_mod(-100e6)
+        cls.CCL_qubit.mw_awg_ch(1)
+        cls.CCL_qubit.cfg_qubit_nr(0)
 
-        self.CCL_qubit.mw_vsm_delay(15)
+        cls.CCL_qubit.mw_vsm_delay(15)
 
-        self.CCL_qubit.mw_mixer_offs_GI(.1)
-        self.CCL_qubit.mw_mixer_offs_GQ(.2)
-        self.CCL_qubit.mw_mixer_offs_DI(.3)
-        self.CCL_qubit.mw_mixer_offs_DQ(.4)
+        cls.CCL_qubit.mw_mixer_offs_GI(.1)
+        cls.CCL_qubit.mw_mixer_offs_GQ(.2)
+        cls.CCL_qubit.mw_mixer_offs_DI(.3)
+        cls.CCL_qubit.mw_mixer_offs_DQ(.4)
 
     ##############################################
     # calculate methods
@@ -126,7 +118,6 @@ class Test_CCL(unittest.TestCase):
     # basic prepare methods
     ##############################################
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_prep_for_continuous_wave(self):
         self.CCL_qubit.ro_acq_weight_type('optimal')
         with warnings.catch_warnings(record=True) as w:
@@ -137,7 +128,6 @@ class Test_CCL(unittest.TestCase):
 
     @unittest.skipIf(True, 'Test for use with an old duplexer.')
     def test_prep_cw_config_vsm(self):
-
         self.CCL_qubit.spec_vsm_ch_in(2)
         self.CCL_qubit.spec_vsm_ch_out(1)
         self.CCL_qubit.spec_vsm_amp(0.5)
@@ -160,11 +150,9 @@ class Test_CCL(unittest.TestCase):
     ##############################################
     # Testing prepare for readout
     ##############################################
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_prep_readout(self):
         self.CCL_qubit.prepare_readout()
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_prep_ro_instantiate_detectors(self):
         self.MC.soft_avg(1)
 
@@ -185,7 +173,6 @@ class Test_CCL(unittest.TestCase):
 
         self.assertEqual(self.MC.soft_avg(), 4)
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_prep_ro_MW_sources(self):
         LO = self.CCL_qubit.instr_LO_ro.get_instr()
         LO.off()
@@ -224,7 +211,6 @@ class Test_CCL(unittest.TestCase):
         self.assertEqual(self.UHFQC.sigouts_0_offset(), .01)
         self.assertEqual(self.UHFQC.sigouts_1_offset(), .02)
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_prep_ro_integration_weigths(self):
         IF = 50e6
         self.CCL_qubit.ro_freq_mod(IF)
@@ -272,11 +258,9 @@ class Test_CCL(unittest.TestCase):
     ########################################################
     #          Test prepare for timedomain                 #
     ########################################################
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_prep_for_timedomain(self):
         self.CCL_qubit.prepare_for_timedomain()
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_prep_td_sources(self):
 
         self.MW1.off()
@@ -325,7 +309,6 @@ class Test_CCL(unittest.TestCase):
         self.assertEqual(self.AWG8_VSM_MW_LutMan.mw_ef_amp180(), .34)
         self.assertEqual(self.AWG8_VSM_MW_LutMan.mw_ef_modulation(), -335e6)
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_prep_td_config_vsm(self):
         self.CCL_qubit.mw_vsm_G_amp(0.8)
         self.CCL_qubit.mw_vsm_D_phase(0)
@@ -339,11 +322,9 @@ class Test_CCL(unittest.TestCase):
     ###################################################
     #          Test basic experiments                 #
     ###################################################
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)') # error: "AttributeError: 'str' object has no attribute 'decode'"
     def test_cal_mixer_offsets_drive(self):
         self.CCL_qubit.calibrate_mixer_offsets_drive()
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_resonator_spec(self):
         self.CCL_qubit.ro_acq_weight_type('SSB')
 
@@ -376,7 +357,7 @@ class Test_CCL(unittest.TestCase):
         # self.CCL_qubit.freq_res._save_val(None)
         self.CCL_qubit.measure_resonator_power(freqs=freqs, powers=powers)
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
+    #@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_measure_transients(self):
         self.CCL_qubit.ro_acq_input_average_length(2e-6)
         self.CCL_qubit.measure_transients()
@@ -387,7 +368,7 @@ class Test_CCL(unittest.TestCase):
         # Data cannot be analyzed as dummy data is just random numbers
         self.CCL_qubit.measure_spectroscopy(freqs=freqs, analyze=False)
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
+    #@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_find_qubit_freq(self):
         self.CCL_qubit.cfg_qubit_freq_calc_method('latest')
         try:
@@ -405,18 +386,17 @@ class Test_CCL(unittest.TestCase):
         except TypeError:
             pass
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)') # error: "AttributeError: 'str' object has no attribute 'decode'"
     def test_AllXY(self):
         self.CCL_qubit.measure_allxy()
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
+    #@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_T1(self):
         self.CCL_qubit.measure_T1(
             times=np.arange(0, 1e-6, 20e-9), update=False, analyze=False)
         self.CCL_qubit.T1(20e-6)
         self.CCL_qubit.measure_T1(update=False, analyze=False)
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
+    #@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_Ramsey(self):
         self.CCL_qubit.mw_freq_mod(100e6)
         # Cannot analyze dummy data as analysis will fail on fit
@@ -425,7 +405,7 @@ class Test_CCL(unittest.TestCase):
         self.CCL_qubit.T2_star(20e-6)
         self.CCL_qubit.measure_ramsey(update=False, analyze=False)
 
-    @unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
+    #@unittest.skip('FIXME: disabled, see PR #643 and PR #635 (marked as important)')  # AttributeError: 'UHFQC_RO_LutMan' object and its delegates have no attribute 'LO_freq'
     def test_echo(self):
         self.CCL_qubit.mw_freq_mod(100e6)
         # self.CCL_qubit.measure_echo(times=np.arange(0,2e-6,40e-9))
@@ -453,43 +433,8 @@ class Test_CCL(unittest.TestCase):
                 pass
 
 
-##########################################################################
-# repeat same tests for Qutech Central Controller
-# NB: we just hijack the parent class to run the same tests
-# NB: requires OpenQL with CC backend support
-##########################################################################
-
-if ql.get_version() > '0.8.0':  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
-    class Test_CC(Test_CCL):
-        def setUp(self):
-            self.CC = CC('CC', DummyTransport(), ccio_slots_driving_vsm=[5])
-            self.CCL_qubit.instr_CC(self.CC.name)
-
-            config_fn = os.path.join(
-                pq.__path__[0], 'tests', 'openql', 'test_cfg_cc.json')
-            self.CCL_qubit.cfg_openql_platform_fn(config_fn)
-else:
-    class Test_CC_incompatible_openql_version(unittest.TestCase):
-        @unittest.skip('OpenQL version does not support CC')
-        def test_fail(self):
-            pass
-
-
 class Test_Instantiate(unittest.TestCase):
     def test_instantiate_QuDevTransmon(self):
         QDT = QuDev_transmon('QuDev_transmon',
                              MC=None, heterodyne_instr=None, cw_source=None)
         QDT.close()
-
-    def test_instantiate_TekTransmon(self):
-        TT = Tektronix_driven_transmon('TT')
-        TT.close()
-
-    # FIXME: disabled for PR #620
-    # def test_instantiate_CBoxv3_transmon(self):
-    #     CT = CBox_v3_driven_transmon('CT')
-    #     CT.close()
-    #
-    # def test_instantiate_QWG_transmon(self):
-    #     QT = QWG_driven_transmon('QT')
-    #     QT.close()

@@ -73,8 +73,8 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     assert len(t_meas) == 1, "Multiple timestamps found for this measurement"
     t_meas = t_meas[0]
     # ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
-    # ma.VNA_Analysis(auto=True, label=file_name)
-    ma2.VNA_analysis(t_start=t_meas, auto=True, options_dict=options_dict)
+    # ma.VNA_analysis(auto=True, label=file_name)
+    ma2.VNA_analysis(auto=True, t_start=None, options_dict=options_dict)
 
 
 
