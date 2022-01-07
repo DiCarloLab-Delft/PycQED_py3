@@ -54,4 +54,4 @@ for i in range(num_iter):
         cc.stop()
         err_cnt = cc.get_system_error_count()
         for j in range(err_cnt):
-            print(cc.get_error())
+            print(cc.get_system_error())

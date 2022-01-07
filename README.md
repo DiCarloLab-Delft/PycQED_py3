@@ -55,7 +55,7 @@ If you use this software in any of your publications we would appreciate it if y
 ## Overview of the main modules
 Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things.
 Also take a look at [this recent (March 2020) presentation](docs/200330_Introduction_to_PycQED_v2.pdf) and [this previous presentation](docs/160714_qcodes_meetup.pdf), where the relation to QCoDeS and the core concepts in the package are explained.
-Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Adriaan) on the shoulder or create an issue to discuss it.
+Mind however that the code is continuously under development so if you think something should be in a different location feel free to tap me (Miguel) on the shoulder or create an issue to discuss it.
 
 ### Folder Structure
 + [docs](docs/)
@@ -72,7 +72,7 @@ Mind however that the code is continuously under development so if you think som
 ### The init folder
 Contains script that are to be used when setting up an experiment. Used to store configuration info and create instruments.
 
-###The instruments folder
+### The instruments folder
 
 PycQED makes extensive use of instruments. Instruments are children of the qcodes instrument class and can be used as drivers for physical instruments,
 but can also provide a layer of abstraction in the form of meta-instruments, which contain other instruments.
@@ -94,10 +94,10 @@ MC.run()
 ```
 
 A sweep_function determines what parameter is varied, a qcodes parameter that contains a .set method can also be inserted here.
-A deterector_function determines what parameter is measrued, a qcodes parameter that has a .get method can also be inserted here.
+A detector_function determines what parameter is measured, a qcodes parameter that has a .get method can also be inserted here.
 
 #### The qubit object
-The qubit object is a (meta) instrument but it defies the general categorization of the other instruments.
+The qubit object is a (meta) instrument but it defines the general categorization of the other instruments.
 
 It is the object that one is actively manipulating during an experiment and as such contains functions such as qubit.measure_Rabi() and qubit.find_frequency_spec(). It is also used to store the known parameters of the physical qubit object.
 

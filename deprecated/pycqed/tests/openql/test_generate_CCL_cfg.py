@@ -1,8 +1,8 @@
 from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
     generate_config
 
-from pycqed.measurement.openql_experiments.generate_qi_cfg import  \
-    generate_config as generate_config_qi
+# from pycqed.measurement.openql_experiments.generate_qi_cfg import  \
+#     generate_config as generate_config_qi
 
 
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
