@@ -790,7 +790,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
-            assert vals[0]==vals[4]
+            assert vals[0]==vals[3]
             assert vals[1]==vals[2]==0
 
         # In case of sideband modulation mode 'real-time', amplitudes have to be set

@@ -254,13 +254,13 @@ def add_two_q_cal_points(p, q0: int, q1: int,
 
 
 def add_multi_q_cal_points(
-    p: Program, 
+    p: Program,
     qubits: List[int],
     combinations: List[str] = ["00", "01", "10", "11"],
     reps_per_cal_pnt: int = 1,
     f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
     nr_flux_dance: int = None,
-    flux_cw_list: List[str] = None, 
+    flux_cw_list: List[str] = None,
     return_comb=False
 ):
     """
@@ -292,11 +292,11 @@ def add_multi_q_cal_points(
     for i, comb in enumerate(comb_repetead):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
 
-        # NOTE: for debugging purposes of the effect of fluxing on readout, 
+        # NOTE: for debugging purposes of the effect of fluxing on readout,
         #       prepend flux dance before calibration points
         for q_state, q in zip(comb, qubits):
             k.prepz(q)
-        k.gate("wait", [], 0)  # alignment 
+        k.gate("wait", [], 0)  # alignment
 
         if nr_flux_dance and flux_cw_list:
             for i in range(int(nr_flux_dance)):
@@ -308,8 +308,8 @@ def add_multi_q_cal_points(
         for q_state, q in zip(comb, qubits):
             for gate in state_to_gates[q_state]:
                 k.gate(gate, [q])
-        k.gate("wait", [], 0)  # alignment 
-        # k.gate("wait", [], 20)  # alignment 
+        k.gate("wait", [], 0)  # alignment
+        # k.gate("wait", [], 20)  # alignment
 
 
         # for q_state, q in zip(comb, qubits):
@@ -323,7 +323,7 @@ def add_multi_q_cal_points(
         k.gate('wait', [], 0)  # alignment
         kernel_list.append(k)
         p.add_kernel(k)
-    
+
     if return_comb:
         return comb_repetead
     else:
@@ -419,6 +419,28 @@ def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
         p.add_kernel(k)
 
     return p
+
+
+#############################################################################
+# RamZZ measurement
+#############################################################################
+def measure_ramzz(k, qubit_idx: int, wait_time_ns: int):
+    """
+    Helper function that adds a ramsey readout sequence to the specified qubit
+    on the specified kernel. Assumes that the qubit was already initialised.
+
+    Input pars:
+        k:              Kernel to add ramsey readout sequence to
+        qubit_idx:      Qubit to undergo ramsey sequence
+        wait_time_ns:   Wait time in-between pi/2 pulses
+    Output pars:
+        None
+    """
+
+    k.gate('ry90', [qubit_idx])
+    k.gate('wait', wait_time_ns, [qubit_idx])
+    k.gate('rym90', [qubit_idx])
+    k.measure(qubit_idx)
 
 
 #############################################################################

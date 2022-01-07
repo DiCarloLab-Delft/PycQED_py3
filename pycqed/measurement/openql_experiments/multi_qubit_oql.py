@@ -82,7 +82,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
         # 1. Prepare qubits in 0
         for q in qubits:
             k.prepz(q)
-        k.gate("wait", [], 0) 
+        k.gate("wait", [], 0)
 
         # 2. post-selection extra init readout
         if initialize:
@@ -97,8 +97,8 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-                k.gate("wait", [], 0)  # alignment 
-            k.gate("wait", [], wait_time) 
+                k.gate("wait", [], 0)  # alignment
+            k.gate("wait", [], wait_time)
 
         # 3. prepare desired state
         for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
@@ -541,7 +541,7 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
     Sequence to measure the residual (ZZ) interaction between two qubits.
     Procedure is described in M18TR.
 
-        (q0) --X90----(tau)---Y180-(tau)-Y90--RO
+        (q0) --X90----(tau)---Y180-(tau)-Y90---RO
         (qs) --[X180]-(tau)-[X180]-(tau)-------RO
 
     Input pars:
@@ -562,32 +562,54 @@ def residual_coupling_sequence(times, q0: int, q_spectator_idx: list,
 
     gate_spec = [s.replace('0', 'i').replace('1', 'rx180') for s in spectator_state]
 
-    for i, time in enumerate(times[:-2]):
+    for i, time in enumerate(times[:-4]):
 
+        # Initialise qubits
         k = oqh.create_kernel("residual_coupling_seq_{}".format(i), p)
         k.prepz(q0)
         for q_s in q_spectator_idx:
             k.prepz(q_s)
+
+        # Set ramsey qubit to equator, apply selected gate to spectators
         wait_nanoseconds = int(round(time/1e-9))
         k.gate('rx90', [q0])
-        for i_s, q_s in enumerate(q_spectator_idx):
-            k.gate(gate_spec[i_s], [q_s])
+
+        # wait
         k.gate("wait", all_qubits, wait_nanoseconds)
+
+        # Echo pulse on ramsey qubit, apply selected gate again to cancel effect
         k.gate('rx180', [q0])
         for i_s, q_s in enumerate(q_spectator_idx):
             k.gate(gate_spec[i_s], [q_s])
+
+        # wait
         k.gate("wait", all_qubits, wait_nanoseconds)
-        # k.gate('rxm90', [q0])
+
+        # Transform ramsey qubit state to preferred basis
+        # angle = (i*40) % 360
+        # cw_idx = angle//20 + 9
+        # k.gate('cw_{:02}'.format(cw_idx), [q0])
         k.gate('ry90', [q0])
+        # k.gate('rxm90', [q0])
+        for i_s, q_s in enumerate(q_spectator_idx):
+            k.gate(gate_spec[i_s], [q_s])
+        k.gate('wait', [], 0)
+
+        # Measure qubits
         k.measure(q0)
-        for q_s in q_spectator_idx:
-            k.measure(q_s)
+        # for q_s in q_spectator_idx:
+        #     k.measure(q_s)
+
+        # Alignment hack
         k.gate("wait", all_qubits, 0)
+
         p.add_kernel(k)
 
     # adding the calibration points
-    p = oqh.add_multi_q_cal_points(p, qubits=all_qubits,
-                                   combinations=['0'*n_qubits,'1'*n_qubits])
+    # p = oqh.add_multi_q_cal_points(p, qubits=all_qubits,
+    #                                combinations=['0'*n_qubits,'1'*n_qubits])
+
+    p = oqh.add_single_qubit_cal_points(p, qubit_idx=q0)
 
     p = oqh.compile(p)
     return p
@@ -665,7 +687,7 @@ def Cryoscope(
     k.gate("wait", [], 0)  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
-    k.gate("wait", [], 0) 
+    k.gate("wait", [], 0)
     for q_idx in qubit_idxs:
         k.measure(q_idx)
     p.add_kernel(k)
@@ -681,7 +703,7 @@ def Cryoscope(
     k.gate("wait", [], 0)  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('ry90', [q_idx])
-    k.gate("wait", [], 0) 
+    k.gate("wait", [], 0)
     for q_idx in qubit_idxs:
         k.measure(q_idx)
     p.add_kernel(k)
@@ -698,7 +720,7 @@ def Cryoscope(
         k.gate("wait", [], 0)  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('rxm90', [q_idx])
-        k.gate("wait", [], 0) 
+        k.gate("wait", [], 0)
         for q_idx in qubit_idxs:
             k.measure(q_idx)
         p.add_kernel(k)
@@ -714,7 +736,7 @@ def Cryoscope(
         k.gate("wait", [], 0)  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('rym90', [q_idx])
-        k.gate("wait", [], 0) 
+        k.gate("wait", [], 0)
         for q_idx in qubit_idxs:
             k.measure(q_idx)
         p.add_kernel(k)
@@ -1334,7 +1356,7 @@ def single_qubit_parity_check(qD: int, qA: int, platf_cfg: str,
     p = oqh.compile(p)
     return p
 
-def two_qubit_parity_check(qD0: int, qD1: int, qA: int, 
+def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                             platf_cfg: str,
                             echo: bool=False,
                             number_of_repetitions: int = 10,
@@ -1343,7 +1365,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                             flux_codeword: str = 'cz',
                             flux_codeword_list: List[str] = None,
                             # flux_codeword_D1: str = None,
-                            parity_axes=['ZZ'], 
+                            parity_axes=['ZZ'],
                             tomo=False,
                             tomo_after=False,
                             ro_time=500e-9,
@@ -1394,7 +1416,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                 k.prepz(qD0)
                 k.prepz(qD1)
                 k.prepz(qA)
-                
+
                 #initialization
                 if initialization_msmt:
                     k.gate("wait", [], 0) #alignment workaround
@@ -1405,7 +1427,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                         k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
                     k.gate('wait', [qD0, qD1, qA], int(100)) #adding additional wait time to ensure good initialization
                     k.gate("wait", [], 0) #alignment workaround
-                
+
                 #state preparation
                 for i, initial_state_q in enumerate(initial_state):
                     if initial_state_q == '1':
@@ -1422,7 +1444,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                         pass
                     else:
                         raise ValueError('initial_state_q= '+initial_state_q+' not recognized')
-                
+
                 #parity measurement(s)
                 for i in range(number_of_repetitions):
                     for parity_axis in parity_axes:
@@ -1438,7 +1460,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                         k.gate('rym90', [qA])
                         # k.gate('ry90', [qD0])
                         # k.gate('ry90', [qD1])
-                        
+
                         # fluxing
                         k.gate("wait", [], 0) #alignment workaround
                         # k.gate(flux_codeword, [qA, qD1])
@@ -1452,7 +1474,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                             #     k.gate('ry180', [qA])
                             k.gate(flux_codeword, [qA, qD1])
                         k.gate("wait", [], 0) #alignment workaround
-                        
+
                         k.gate('ry90', [qA])
                         # k.gate('rym90', [qD0])
                         # k.gate('rym90', [qD1])
@@ -1473,7 +1495,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                                 k.gate('ry180', [qD1])
                                 k.gate('wait', [qA, qD0, qD1], int(ro_time*1e9))
                 k.gate("wait", [], 0) #separating parity from tomo
-                
+
                 if idling_rounds!=0:
                     for j in np.arange(idling_rounds):
                         k.gate("wait", [], int(idling_time_echo*1e9)) #alignment workaround
@@ -1481,7 +1503,7 @@ def two_qubit_parity_check(qD0: int, qD1: int, qA: int,
                             k.gate('ry180', [qD0])
                             k.gate('ry180', [qD1])
                         k.gate("wait", [], int((idling_time-idling_time_echo-20e-9)*1e9)) #alignment workaround
-                
+
                 #tomography
                 if tomo:
                     k.gate("wait", [qD1, qD0], 0) #alignment workaround
@@ -1593,7 +1615,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 k.prepz(q2)
             if q3 is not None:
                 k.prepz(q3)
-
             k.gate("wait", [], 0)  # alignment workaround
 
             # #################################################################
@@ -1621,7 +1642,6 @@ def conditional_oscillation_seq(q0: int, q1: int,
                 k.gate("rx90", [q])
                 if disable_parallel_single_q_gates:
                     k.gate("wait", [], 0)
-
             k.gate("wait", [], 0)  # alignment workaround
 
             # #################################################################
@@ -1655,10 +1675,9 @@ def conditional_oscillation_seq(q0: int, q1: int,
                             'flux_codeword_park "{}" not allowed'.format(
                                 flux_codeword_park))
                 else:
-                    k.gate("wait", [], 0) #alignment workaround
-                    # k.gate('wait', [q0,q1], wait_time_between + CZ_duration)
+                    # k.gate("wait", [], 0) #alignment workaround
                     k.gate('wait', [q0,q1], disabled_cz_duration)
-                    k.gate("wait", [], 0) #alignment workaround
+                    # k.gate("wait", [], 0) #alignment workaround
 
                 k.gate("wait", [], 0)
 
@@ -1703,16 +1722,16 @@ def conditional_oscillation_seq(q0: int, q1: int,
             k.gate('wait', [], 0)
             p.add_kernel(k)
 
-    if add_cal_points:
-        if q2 is None:
-            states = ["00", "01", "10", "11"]
-        else:
-            states = ["000", "010", "101", "111"]
-
-        qubits = [q0, q1] if q2 is None else [q0, q1, q2]
-        oqh.add_multi_q_cal_points(
-            p, qubits=qubits, f_state_cal_pt_cw=31,
-            combinations=states, return_comb=False)
+    # if add_cal_points:
+    #     if q2 is None:
+    #         states = ["00", "01", "10", "11"]
+    #     else:
+    #         states = ["000", "010", "101", "111"]
+    #
+    #     qubits = [q0, q1] if q2 is None else [q0, q1, q2]
+    #     oqh.add_multi_q_cal_points(
+    #         p, qubits=qubits, f_state_cal_pt_cw=31,
+    #         combinations=states, return_comb=False)
 
     p = oqh.compile(p)
 
@@ -1750,7 +1769,7 @@ def conditional_oscillation_seq_multi(Q_idxs_target,
 
     Pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-    parking qbs: includes all qubits to be parked. 
+    parking qbs: includes all qubits to be parked.
 
     Timing of the sequence:
     q0:  X90   --  C-Phase  (repet. C-Phase) Rphi90 RO
@@ -1761,7 +1780,7 @@ def conditional_oscillation_seq_multi(Q_idxs_target,
     Args:
          pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-        parking qbs: includes all qubits to be parked. 
+        parking qbs: includes all qubits to be parked.
 
         flux_codeword (str):
             the gate to be applied to the qubit pair q0, q1
@@ -1781,7 +1800,7 @@ def conditional_oscillation_seq_multi(Q_idxs_target,
         for case in cases:
 
             k = oqh.create_kernel("{}_{}".format(case, angle), p)
-            
+
             for q0 in Q_idxs_target:
                 k.prepz(q0)
             for q1 in Q_idxs_control:
@@ -1807,7 +1826,7 @@ def conditional_oscillation_seq_multi(Q_idxs_target,
                 k.gate("rx90", [q0])
 
             # k.gate("rx180",[Q_idxs_parked[0]])
-            
+
 
             if parked_qubit_seq == "ramsey":
                 for qp in Q_idxs_parked:
@@ -1827,8 +1846,8 @@ def conditional_oscillation_seq_multi(Q_idxs_target,
                     if flux_codeword is 'cz':
                         for q0, q1 in zip(Q_idxs_target, Q_idxs_control):
                             k.gate(flux_codeword, [q0, q1])
-                        
-                    else: 
+
+                    else:
                         k.gate(flux_codeword, [0])
 
                 else:
@@ -1868,7 +1887,7 @@ def conditional_oscillation_seq_multi(Q_idxs_target,
             for q0 in Q_idxs_target:
                 k.measure(q0)
             for q1 in Q_idxs_control:
-                k.measure(q1) 
+                k.measure(q1)
             if parked_qubit_seq == "ramsey":
                 for qp in Q_idxs_parked:
                     k.measure(qp)
@@ -1920,7 +1939,7 @@ def parity_check_flux_dance(
 
     Pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-    parking qbs: includes all qubits to be parked. 
+    parking qbs: includes all qubits to be parked.
 
     Timing of the sequence:
     q0:  X90   --  C-Phase  (repet. C-Phase) Rphi90 RO
@@ -1931,7 +1950,7 @@ def parity_check_flux_dance(
     Args:
          pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-        parking qbs: includes all qubits to be parked. 
+        parking qbs: includes all qubits to be parked.
 
         flux_codeword (str):
             the gate to be applied to the qubit pair q0, q1
@@ -1947,10 +1966,10 @@ def parity_check_flux_dance(
     p = oqh.create_program("parity_check_flux_dance", platf_cfg)
 
     for case in control_cases:
-        
+
         for i, angle in enumerate(angles):
             k = oqh.create_kernel("{}_{}".format(case, angle), p)
-            
+
             for q0 in Q_idxs_target:
                 k.prepz(q0)
             for q1 in Q_idxs_control:
@@ -1964,7 +1983,7 @@ def parity_check_flux_dance(
                 for qD in Q_idxs_control:
                     k.measure(qD)
                 for qA in Q_idxs_target:
-                    k.measure(qA) 
+                    k.measure(qA)
             k.gate("wait", [], 0)
 
             for i,indx in enumerate(case):
@@ -1988,7 +2007,7 @@ def parity_check_flux_dance(
             # Flux pulses
             # #################################################################
             k.gate('wait', [], wait_time_before_flux)
-            
+
             for flux_cw in flux_cw_list:
                 k.gate(flux_cw, [0])
             k.gate("wait", [], 0)
@@ -2026,7 +2045,7 @@ def parity_check_flux_dance(
             for q0 in Q_idxs_target:
                 k.measure(q0)
             for q1 in Q_idxs_control:
-                k.measure(q1) 
+                k.measure(q1)
             if Q_idxs_parking:
                 for q2 in Q_idxs_parking:
                     k.measure(q2)
@@ -2045,11 +2064,11 @@ def parity_check_flux_dance(
             cal_states = [state + '0' if i < len(cal_states)/2 else state + '1' for i,state in enumerate(cal_states)]
 
         oqh.add_multi_q_cal_points(
-            p, 
-            qubits=qubits if not Q_idxs_parking else qubits+Q_idxs_parking, 
+            p,
+            qubits=qubits if not Q_idxs_parking else qubits+Q_idxs_parking,
             f_state_cal_pt_cw=31,
-            combinations=cal_states, 
-            return_comb=False, 
+            combinations=cal_states,
+            return_comb=False,
             nr_flux_dance=nr_flux_dance_before_cal_points,
             flux_cw_list=flux_cw_list if nr_flux_dance_before_cal_points else None
             )
@@ -2061,7 +2080,7 @@ def parity_check_flux_dance(
     else:
         cal_pts_idx = []
 
-    p.sweep_points = np.concatenate([np.repeat(np.arange(len(control_cases)), len(angles)), 
+    p.sweep_points = np.concatenate([np.repeat(np.arange(len(control_cases)), len(angles)),
                                     cal_pts_idx])
     p.set_sweep_points(p.sweep_points)
 
@@ -2085,7 +2104,7 @@ def parity_check_fidelity(
 
     Pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-    parking qbs: includes all qubits to be parked. 
+    parking qbs: includes all qubits to be parked.
 
     Timing of the sequence:
     q0:  X90   --  C-Phase  (repet. C-Phase) Rphi90 RO
@@ -2096,7 +2115,7 @@ def parity_check_fidelity(
     Args:
          pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-        parking qbs: includes all qubits to be parked. 
+        parking qbs: includes all qubits to be parked.
 
         flux_codeword (str):
             the gate to be applied to the qubit pair q0, q1
@@ -2110,17 +2129,17 @@ def parity_check_fidelity(
             pulses
     '''
     p = oqh.create_program("parity_check_fidelity", platf_cfg)
-    
+
     for case in control_cases:
         k = oqh.create_kernel("{}".format(case), p)
-        
+
         for qb in Q_idxs_ancilla + Q_idxs_data:
             k.prepz(qb)
         k.gate("wait", [], 0)
 
         if initialization_msmt:
             for qb in Q_idxs_ancilla + Q_idxs_data:
-                k.measure(qb) 
+                k.measure(qb)
             k.gate("wait", [], 0)
 
         for i,indx in enumerate(case):
@@ -2140,7 +2159,7 @@ def parity_check_fidelity(
         # Flux pulses
         # #################################################################
         k.gate('wait', [], wait_time_before_flux)
-        
+
         for flux_cw in flux_cw_list:
             k.gate(flux_cw, [0])
         k.gate("wait", [], 0)
@@ -3414,10 +3433,10 @@ def multi_qubit_T1(times,qubits_idx: list, platf_cfg: str):
   oqh.add_multi_q_cal_points(p,qubits=qubits_idx,combinations=['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits])
 
   p = oqh.compile(p)
-  return p  
+  return p
 
 def multi_qubit_Echo(times,qubits_idx: list, platf_cfg: str):
-  n_qubits = len(qubits_idx) 
+  n_qubits = len(qubits_idx)
   points = len(times[0])
 
   p = oqh.create_program('multi_qubit_echo_',platf_cfg)
@@ -3444,12 +3463,12 @@ def multi_qubit_Echo(times,qubits_idx: list, platf_cfg: str):
   oqh.add_multi_q_cal_points(p,qubits=qubits_idx,combinations=['0'*n_qubits,'0'*n_qubits,'1'*n_qubits,'1'*n_qubits])
 
   p = oqh.compile(p)
-  return p 
+  return p
 
 def multi_qubit_flipping(number_of_flips,qubits_idx: list, platf_cfg: str,
                          equator: bool = False, cal_points: bool = True,
                          ax: str = 'x', angle: str = '180'):
-  n_qubits = len(qubits_idx) 
+  n_qubits = len(qubits_idx)
   if cal_points:
     nf = number_of_flips[:-4]
   else:
@@ -3485,7 +3504,7 @@ def multi_qubit_flipping(number_of_flips,qubits_idx: list, platf_cfg: str,
   oqh.add_multi_q_cal_points(p,qubits=qubits_idx,combinations= combinations)
 
   p = oqh.compile(p)
-  return p  
+  return p
 
 def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
   p = oqh.create_program("Multi_qubit_Motzoi", platf_cfg)
@@ -3517,9 +3536,9 @@ def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
 #     """
 #     Performs single qubit tomography on a qubit in the equator.
 #     """
-    
+
 #     p = oqh.create_program('single_qubit_tomo', platf_cfg)
-    
+
 #     Tomo_bases = ['Z', 'X', 'Y']
 #     Tomo_gates = ['I', 'rym90', 'rx90']
 
@@ -3561,7 +3580,7 @@ def multi_qubit_motzoi(qubits_idx: list,platf_cfg: str = None):
 
 #     p = oqh.compile(p)
 #     return p
-    
+
 def Ramsey_tomo(qR: list,
                 qC: list,
                 exc_specs: list,
@@ -3570,9 +3589,9 @@ def Ramsey_tomo(qR: list,
     """
     Performs single qubit tomography on a qubit in the equator.
     """
-    
+
     p = oqh.create_program('single_qubit_tomo', platf_cfg)
-    
+
     Tomo_bases = ['Z', 'X', 'Y']
     Tomo_gates = ['I', 'rym90', 'rx90']
 

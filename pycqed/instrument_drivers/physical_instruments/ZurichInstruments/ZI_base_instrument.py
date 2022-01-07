@@ -674,7 +674,7 @@ class ZI_base_instrument(Instrument):
         if not self.daq:
             raise(ziDAQError())
 
-        self.daq.setDebugLevel(0)
+        self.daq.setDebugLevel(3)
 
         # Handle absolute path
         self.use_setVector = "setVector" in dir(self.daq)
@@ -800,7 +800,7 @@ class ZI_base_instrument(Instrument):
         raise NotImplementedError('Virtual method with no implementation!')
 
     def _get_waveform_table(self, awg_nr: int) -> list:
-        return dict()    
+        return dict()
 
     def _add_extra_parameters(self) -> None:
         """
@@ -1613,4 +1613,4 @@ class ZI_base_instrument(Instrument):
 
     def asyncEnd(self):
         self.daq.sync()
-        self._async_mode = False 
+        self._async_mode = False

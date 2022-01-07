@@ -3,6 +3,7 @@ import matplotlib.pylab as pl
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from matplotlib.colors import LinearSegmentedColormap
+import matplotlib.patches as patches
 import numpy as np
 from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
@@ -37,10 +38,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
     def __init__(self,
                 nr_qubits: int,
-                t_start: str = None, 
+                t_start: str = None,
                 t_stop: str = None,
                 label: str = '',
-                options_dict: dict = None, 
+                options_dict: dict = None,
                 extract_only: bool = False,
                 extract_combinations: bool = False,
                 post_selection: bool = False,
@@ -238,7 +239,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 F_vs_th = (1-(1-abs(norm_cumsum_0-norm_cumsum_1))/2)
                 opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
                 opt_idx = int(round(np.average(opt_idxs)))
-                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i])) 
+                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i]))
                 self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_raw'] = \
                     F_vs_th[opt_idx]
                 self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'] = \
@@ -1731,6 +1732,128 @@ class RTE_analysis(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
+class measurement_QND_analysis(ba.BaseDataAnalysis):
+    """
+    This analysis extracts measurement QND metrics
+    For details on the procedure see:
+    arXiv:2110.04285
+    """
+    def __init__(self,
+                 qubit:str,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+
+        self.qubit = qubit
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+
+        Cal_0, Cal_1 = (self.raw_data_dict['data'][3::5,1], self.raw_data_dict['data'][3::5,2]), (self.raw_data_dict['data'][4::5,1], self.raw_data_dict['data'][4::5,2])
+        M1, M2, M3 = self.raw_data_dict['data'][0::5,1], self.raw_data_dict['data'][1::5,1], self.raw_data_dict['data'][2::5,1]
+        th = estimate_threshold(Cal_0[0], Cal_1[0])
+        M1_dig = np.array([ 0 if m<th else 1 for m in M1 ])
+        M2_dig = np.array([ 0 if m<th else 1 for m in M2 ])
+        M3_dig = np.array([ 0 if m<th else 1 for m in M3 ])
+        p0 = 1-np.mean(M1_dig)
+        p1 = np.mean(M1_dig)
+        p00 = np.mean(1-np.logical_or(M1_dig, M2_dig))/p0
+        p11 = np.mean(np.logical_and(M1_dig, M2_dig))/p1
+        P_QND = np.mean([p00, p11])
+        p0p = 1-np.mean(M2_dig)
+        p1p = np.mean(M2_dig)
+        p01p = np.mean(1-np.logical_or(np.logical_not(M3_dig), M2_dig))/p0p
+        p10p = np.mean(1-np.logical_or(np.logical_not(M2_dig), M3_dig))/p1p
+        P_QNDp = np.mean([p01p, p10p])
+
+        self.proc_data_dict['Cal_0_points'] = Cal_0
+        self.proc_data_dict['Cal_1_points'] = Cal_1
+        self.proc_data_dict['threshold'] = th
+
+        self.quantities_of_interest = {}
+        self.quantities_of_interest['p00'] = p00
+        self.quantities_of_interest['p11'] = p11
+        self.quantities_of_interest['p01p'] = p01p
+        self.quantities_of_interest['p10p'] = p10p
+        self.quantities_of_interest['P_QND'] = P_QND
+        self.quantities_of_interest['P_QNDp'] = P_QNDp
+
+    def prepare_plots(self):
+
+        self.axs_dict = {}
+        fig, ax = plt.subplots(figsize=(3,3), dpi=200)
+        fig.patch.set_alpha(0)
+        self.axs_dict['main'] = ax
+        self.figs['main'] = fig
+        self.plot_dicts['main'] = {
+            'plotfn': plot_QND_metrics,
+            'qubit': self.qubit,
+            'Cal_0': self.proc_data_dict['Cal_0_points'],
+            'Cal_1': self.proc_data_dict['Cal_1_points'],
+            'th' : self.proc_data_dict['threshold'],
+            'p00': self.quantities_of_interest['p00'],
+            'p11': self.quantities_of_interest['p11'],
+            'p01p': self.quantities_of_interest['p01p'],
+            'p10p': self.quantities_of_interest['p10p'],
+            'P_QND': self.quantities_of_interest['P_QND'],
+            'P_QNDp': self.quantities_of_interest['P_QNDp'],
+            'timestamp': self.timestamp
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+######################################
+# Helper functions
+######################################
+
+def estimate_threshold(P0, P1):
+    bounds = np.min(list(P0)+list(P1)), np.max(list(P0)+list(P1))
+    y0, x0 = np.histogram(P0, range=bounds, bins=200)
+    x0 = (x0[1:]+x0[:-1])/2
+    y1, x1 = np.histogram(P1, range=bounds, bins=200)
+    x1 = (x1[1:]+x1[:-1])/2
+    bounds = np.argmax(y0), np.argmax(y1)
+    intersect0 = y0[bounds[0]:bounds[1]]
+    intersect1 = y1[bounds[0]:bounds[1]]
+    th_idx = np.argmin(np.abs(intersect0-intersect1))
+    th = x0[bounds[0]:bounds[1]][th_idx]
+    return th
 
 ######################################
 # Plotting functions
@@ -2342,3 +2465,61 @@ def plot_RTE_histogram(qubit_label: str,
     fig = ax.get_figure()
     fig.suptitle(mpl_utils.latex_friendly_str('{}'.format(timestamp)), y=1.05)
     fig.tight_layout()
+
+
+def plot_QND_metrics(Cal_0, Cal_1, th,
+                     p00, p11, p01p, p10p,
+                     P_QND, P_QNDp,
+                     timestamp: str,
+                     qubit: str,
+                     ax, **kw):
+
+    fig = ax.get_figure()
+
+    ax.plot(Cal_0[0], Cal_0[1], 'C0.', alpha=.05, markeredgewidth=0)
+    ax.plot(Cal_1[0], Cal_1[1], 'C3.', alpha=.05, markeredgewidth=0)
+    ax.axvline(th, color='k', ls='--', lw=.6)
+    x_lim = 1.1*np.max(list(np.abs(Cal_0[0]))+list(np.abs(Cal_1[0])))
+    y_lim = 1.1*np.max(list(np.abs(Cal_0[1]))+list(np.abs(Cal_1[1])))
+    lim = max(x_lim, y_lim)
+    ax.set_xlim(-x_lim, x_lim)
+    ax.set_ylim(-y_lim, y_lim)
+    ax.set_xlabel('I quadrature (V)')
+    ax.set_ylabel('Q quadrature (V)')
+    text = '\n'.join((f'P$(0_2|0_1)$  = {p00*100:.2f} %',
+                      f'P$(1_2|1_1)$  = {p11*100:.2f} %',
+                      f'P$(1_3|0_2)$  = {p01p*100:.2f} %',
+                      f'P$(0_3|1_2)$  = {p10p*100:.2f} %',
+                      '',
+                      '$P_{QND}$ = '+f'{P_QND*100:.2f} %',
+                      '$P_{QND,X_\pi}$ = '+f'{P_QNDp*100:.2f} %'))
+    props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
+    ax.text(1.05, 1, 'Experiment', transform=ax.transAxes, fontsize=10,
+            verticalalignment='top')
+    ax.text(1.05, 1-.325, 'Results', transform=ax.transAxes, fontsize=10,
+            verticalalignment='top')
+    ax.text(1.05, 0.9-.325, text, transform=ax.transAxes, fontsize=10,
+            verticalalignment='top', bbox=props)
+    ax.set_title(f'{qubit} {timestamp}')
+
+    ax1 = fig.add_subplot(212)
+    ax1.set_position((.91, .66 , .5, .2))
+    ax1.set_xlim(0,  1*1.12)
+    ax1.set_ylim(0, .4*1.12)
+    ax1.axis('off')
+    ax1.plot([.1, 2], [.2, .2], 'k', lw=.5)
+    rect = patches.Rectangle((.05, .125), .15, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.125, .2, '$X_{\pi/2}$', va='center', ha='center', size=6)
+    rect = patches.Rectangle((.22, .125), .225, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.33, .2, '$m_1$', va='center', ha='center', size=6)
+    rect = patches.Rectangle((.47, .125), .225, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.58, .2, '$m_2$', va='center', ha='center', size=6)
+    rect = patches.Rectangle((.72, .125), .15, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.8, .2, '$X_{\pi}$', va='center', ha='center', size=6)
+    rect = patches.Rectangle((.89, .125), .225, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(1, .2, '$m_3$', va='center', ha='center', size=6)

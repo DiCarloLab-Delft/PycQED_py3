@@ -59,11 +59,11 @@ class Base_RO_LutMan(Base_LutMan):
                     'Hardcoded for feedline 0 and 1 of Surface-7')
         elif feedline_map == 'S17':
             if self._feedline_number == 0:
-                self._resonator_codeword_bit_mapping = [6, 11]
+                self._resonator_codeword_bit_mapping = [0, 1, 2]
             elif self._feedline_number == 1:
-                self._resonator_codeword_bit_mapping = [0, 1, 2, 3, 7, 8, 12, 13, 15]
+                self._resonator_codeword_bit_mapping = [3, 4, 5]
             elif self._feedline_number == 2:
-                self._resonator_codeword_bit_mapping = [4, 5, 9, 10, 14, 16]
+                self._resonator_codeword_bit_mapping = [6, 7]
             else:
                 # FIXME: copy/paste error
                 raise NotImplementedError(

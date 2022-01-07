@@ -1,6 +1,6 @@
 import numpy as np
 from pycqed.analysis import measurement_analysis as ma
-# from pycqed.analysis_v2 import measurement_analysis as ma2
+from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
@@ -65,10 +65,16 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     VNA_instr.power(power)
     VNA_instr.timeout(10**4)
 
+    t_start = ma.a_tools.current_timestamp()
     MC_instr.run(name=file_name)
+    t_stop = ma.a_tools.current_timestamp()
+    t_meas = ma.a_tools.get_timestamps_in_range(t_start, t_stop, label=file_name)
+
+    assert len(t_meas) == 1, "Multiple timestamps found for this measurement"
+    t_meas = t_meas[0]
     # ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
     # ma.VNA_Analysis(auto=True, label=file_name)
-    # ma2.VNA_Analysis(auto=True, label=file_name, options_dict=options_dict)
+    ma2.VNA_analysis(t_start=t_meas, auto=True, options_dict=options_dict)
 
 
 

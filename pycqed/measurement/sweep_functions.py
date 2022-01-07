@@ -943,13 +943,14 @@ class RO_freq_sweep(Soft_Sweep):
     def set_parameter(self, val):
         LO_freq = self.ro_lm.LO_freq()
         IF_freq = val - LO_freq
+
         # Parameter 1 will be qubit.ro_freq()
         self.qubit.ro_freq.set(val)
         # Parameter 2 will be qubit.ro_freq_mod()
         self.qubit.ro_freq_mod.set(IF_freq)
 
-        self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
-        self.ro_lm.load_waveforms_onto_AWG_lookuptable()
+        # self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
+        # self.ro_lm.load_waveforms_onto_AWG_lookuptable()
 
 
 class QWG_lutman_par_chunks(Soft_Sweep):
@@ -1279,7 +1280,7 @@ class multi_sweep_function_ranges(Soft_Sweep):
                 raise ValueError('units of the sweepfunctions are not equal')
 
     def set_parameter(self, val):
-        Sweep_points = [ np.linspace(self.sweep_ranges[i][0], 
+        Sweep_points = [ np.linspace(self.sweep_ranges[i][0],
                                      self.sweep_ranges[i][1],
                                      self.n_points) for i in range(len(self.sweep_ranges)) ]
         for i, sweep_function in enumerate(self.sweep_functions):
@@ -1324,11 +1325,11 @@ class FLsweep(Soft_Sweep):
     """
     Special sweep function for AWG8 and QWG flux pulses.
     """
-    def __init__(self, 
-            lm, 
-            par, 
-            waveform_name: str, 
-            amp_for_generation: float = None, 
+    def __init__(self,
+            lm,
+            par,
+            waveform_name: str,
+            amp_for_generation: float = None,
             upload_waveforms_always: bool=True,
             bypass_waveform_upload: bool=False
         ):
@@ -1383,8 +1384,8 @@ class FLsweep(Soft_Sweep):
 
 class flux_t_middle_sweep(Soft_Sweep):
 
-    def __init__(self, 
-            fl_lm_tm: list, 
+    def __init__(self,
+            fl_lm_tm: list,
             fl_lm_park: list,
             which_gate: list,
             t_pulse: list
@@ -1402,12 +1403,12 @@ class flux_t_middle_sweep(Soft_Sweep):
         which_gate = self.which_gate
         t_pulse = np.repeat(self.t_pulse, 2)
         sampling_rate = self.fl_lm_tm[0].sampling_rate()
-        
+
         # Calculate vcz times for each flux pulse
         time_mid = val / sampling_rate
         n_points  = [ np.ceil(tp / 2 * sampling_rate) for tp in t_pulse ]
         time_sq  = [ n / sampling_rate for n in n_points ]
-        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate 
+        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate
         time_pad = np.abs(np.array(time_sq)-np.max(time_sq))
 
         # set flux lutman parameters of CZ qubits
