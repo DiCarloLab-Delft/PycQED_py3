@@ -24,6 +24,14 @@ default_mw_lutmap = {
     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
     14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
     30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
+    52 : {"name" : "phaseCorrPark1" , "type" : "phase"},
+    53 : {"name" : "phaseCorrPark2" , "type" : "phase"},
+    54 : {"name" : "phaseCorrPark3" , "type" : "phase"},
+    55 : {"name" : "phaseCorrPark4" , "type" : "phase"},
+    56 : {"name" : "phaseCorrPark5" , "type" : "phase"},
+    57 : {"name" : "phaseCorrPark6" , "type" : "phase"},
+    58 : {"name" : "phaseCorrPark7" , "type" : "phase"},
+    59 : {"name" : "phaseCorrPark8" , "type" : "phase"},
     60 : {"name" : "phaseCorrNW" , "type" : "phase"},
     61 : {"name" : "phaseCorrNE" , "type" : "phase"},
     62 : {"name" : "phaseCorrSW" , "type" : "phase"},
@@ -415,6 +423,8 @@ class Base_MW_LutMan(Base_LutMan):
                         phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
+            elif waveform['type'] == 'phase':
+                pass
             else:
                 raise ValueError
 
@@ -432,35 +442,36 @@ class Base_MW_LutMan(Base_LutMan):
             wave_dict[key] = np.dot(M, val)
         return wave_dict
 
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
+    def load_waveform_onto_AWG_lookuptable(
+            self, 
+            waveform_idx: int,
+            regenerate_waveforms: bool=False
+            ):
+        if not isinstance(waveform_idx, int) \
+                or waveform_idx < 0 \
+                or waveform_idx > 127:
+            raise ValueError("`waveform_idx` must be a valid LutMap index!")
+
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        # FIXME: type mismatch with function parameter, misleading name
-        if isinstance(waveform_name, int):
-            cw_idx = waveform_name
-        else:
-            raise DeprecationWarning
-
-        waveforms = self._wave_dict[cw_idx]
-        codewords = self.codeword_idx_to_parnames(cw_idx)
+        waveforms = self._wave_dict[waveform_idx]
+        codewords = self.codeword_idx_to_parnames(waveform_idx)
 
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
 
-    def load_phase_pulses_to_AWG_lookuptable(self,
-                                             phases=np.arange(0, 360, 20)):
+    def load_phase_pulses_to_AWG_lookuptable(
+            self,
+            phases=np.arange(0, 360, 20)
+            ):
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
         """
-
-        if (len(phases) > 18):
-            raise ValueError('max 18 amplitude values can be provided')
-        lm = self.LutMap()
+        if len(phases) > 18:
+            raise ValueError('max 18 phase values can be provided')
         for i, (phase) in enumerate(phases):
-            lm[i+9] = {"name": "rPhi90",    "theta": 90,
-                       "phi": phase, "type": "ge"}
+            self.LutMap()[i+9] = {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     def load_x_pulses_to_AWG_lookuptable(self,
@@ -727,16 +738,22 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # there are 8 flux-dance steps for the S17 scheme.
         # NOTE: this correction must not be the same as the above one for the case of a spectator 
         #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates 
-        # for step in np.arange(1,9):
-        #     self.add_parameter(
-        #         name=f'vcz_virtual_q_ph_corr_step_{step}',
-        #         parameter_class=ManualParameter, 
-        #         unit='deg', 
-        #         vals=vals.Numbers(0, 360),
-        #         initial_value=0.0,
-        #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
-        #                     "Will be applied as increment to sine generator phases via command table."
-        #     )
+        for step in np.arange(1,9):
+            self.add_parameter(
+                name=f'vcz_virtual_q_ph_corr_park_step_{step}',
+                parameter_class=ManualParameter, 
+                unit='deg', 
+                vals=vals.Numbers(-360, 360),
+                initial_value=0.0,
+                docstring=f"Virtual phase correction for parking in flux-dance step {step}."
+                            "Will be applied as increment to sine generator phases via command table."
+            )
+
+    def _reset_phase_correction_parameters(self):
+        for gate in ['NW','NE','SW','SE']:
+            self.parameters[f'vcz_virtual_q_ph_corr_{gate}'](0)
+        for step in np.arange(1,9):
+            self.parameters[f'vcz_virtual_q_ph_corr_park_step_{step}'](0)
 
 
     def _set_channel_range(self, val):
@@ -761,6 +778,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         assert awg_nr == (self.channel_Q()-1)//2
         assert self.channel_I() < self.channel_Q()
 
+        AWG = self.AWG.get_instr()
         val = AWG.get('sigouts_{}_range'.format(self.channel_I()-1))
         assert val == AWG.get('sigouts_{}_range'.format(self.channel_Q()-1))
         return val
@@ -1019,17 +1037,25 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                                             }]
 
         # add phase corrections to the end of the codeword space
-        phase_corr_inds = np.arange(60,64,1)
+        # the first 8 positions are for parking related phase corrections,
+        # the last 4 are for phase corrections due to gate in corresponding direction
+        phase_corr_inds = np.arange(52,64,1)
+        for step, cw in enumerate(phase_corr_inds[:8]):
+            phase = self.parameters[f"vcz_virtual_q_ph_corr_park_step_{step+1}"]()
+            commandtable_dict['table'] += [{"index": int(cw), 
+                                            "phase0": {"value": float(phase), "increment": True}, 
+                                            "phase1": {"value": float(phase), "increment": True}
+                                            }]
         for i,d in enumerate(['NW','NE','SW','SE']):
             phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
-            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i]), 
+            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i+8]), 
                                             "phase0": {"value": float(phase), "increment": True}, 
                                             "phase1": {"value": float(phase), "increment": True}
                                             }]
 
-        # Note: Whenever using the command table, the phase offset between I and Q channels on 
-        # the HDAWG for real-time modulation have to be set from an index on the table. Index
-        # 1023 will be used as it is un-used for codeword triggering 
+        # NOTE: Whenever the command table is used, the phase offset between I and Q channels on 
+        # the HDAWG for real-time modulation has to be initialized from the table itself.
+        # Index 1023 will be reserved for this (it should no be used for codeword triggering) 
         commandtable_dict['table'] += [{"index": 1023, 
                                         "phase0": {"value": 90.0, "increment": False}, 
                                         "phase1": {"value":  0.0, "increment": False}

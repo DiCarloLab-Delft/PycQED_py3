@@ -6,7 +6,9 @@ Author: Victor Negirneac
 import matplotlib.pyplot as plt
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.analysis_v2.cryoscope_v2_tools as cv2_tools
+from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis import fitting_models as fit_mods
+from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.measurement.hdf5_data as hd5
 from collections import OrderedDict
@@ -16,6 +18,9 @@ import os
 import lmfit
 import numpy as np
 import logging
+import json
+import multiprocessing as mp
+import cma
 
 log = logging.getLogger(__name__)
 
@@ -702,3 +707,159 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                     "xlabel": xlabel,
                     "xunit": "s",
                 }
+
+class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
+    """
+    Simultaneous cryoscope analysis.
+    """
+
+    def __init__(self,
+                 update_FIRs: bool=False,
+                 t_start: str = None, 
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.update_FIRs = update_FIRs
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+        # Extract extra required quantities
+        self.Qubits = [ s.decode().split(' ')[-2] for s in self.raw_data_dict['value_names'][::2] ]
+        poly_params = { f'polycoeff_{q}': (f'Instrument settings/flux_lm_{q}', 
+                                           'attr:q_polycoeffs_freq_01_det') for q in self.Qubits }
+        filter_params = { f'filter_{q}': (f'Instrument settings/lin_dist_kern_{q}',
+                                           'attr:filter_model_04') for q in self.Qubits }
+        self.Poly_coeffs = hd5.extract_pars_from_datafile(data_fp, poly_params)
+        # Parse strings
+        self.Poly_coeffs = { q : [ float(n) for n in self.Poly_coeffs[f'polycoeff_{q}'][1:-1].split(' ')\
+                                   if n != '' ] for q in self.Qubits }
+        if self.update_FIRs:
+            self.Filters = hd5.extract_pars_from_datafile(data_fp, filter_params)
+            # Parse strings
+            for q, s in self.Filters.items():
+                s = ''.join(s.split('\n')).replace("'", '"')
+                s = s.replace('array', '')
+                s = s.replace('([', '[')
+                s = s.replace('])', ']')
+                s = s.replace('True', '"True"')
+                s = json.loads(s)
+                self.Filters[q] = np.array(s['params']['weights'])
+
+    def process_data(self):
+        self.proc_data_dict = {}
+        ###########################
+        # Perform trace analysis
+        ###########################
+        a_obj = ma2.Basic1DAnalysis(t_start=self.timestamp)
+        self.proc_data_dict['Traces'] = []
+        for n, qubit in enumerate(self.Qubits):
+            data_shape = a_obj.raw_data_dict['measured_values'][0][n*2:n*2+2]
+            cryoscope_no_dist = ma2.Cryoscope_Analysis(t_start=self.timestamp,
+                ch_idx_cos=0, ch_idx_sin=1, derivative_window_length=8e-9, close_figs=True,
+                ch_amp_key='Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude'.format(qubit),
+                waveform_amp_key='Snapshot/instruments/flux_lm_{}/parameters/sq_amp'.format(qubit),
+                ch_range_key='Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_range'.format(qubit),
+                polycoeffs_freq_conv=self.Poly_coeffs[qubit],raw_data=data_shape,
+                qubit_label='for qubit_{}'.format(qubit),
+                extract_only=True)  
+            t = cryoscope_no_dist.ca.time
+            a = cryoscope_no_dist.ca.get_amplitudes()
+            baseline_start = 50
+            baseline_stop = 100
+            norm = np.mean(a[baseline_start:baseline_stop])
+            a /= norm
+            if np.std(a) < 1e-6: # UHF is switching channels
+                    cryoscope_no_dist = ma2.Cryoscope_Analysis(t_start=self.timestamp,
+                        ch_idx_cos=1, ch_idx_sin=0, derivative_window_length=8e-9, close_figs=True,
+                        ch_amp_key='Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude'.format(qubit),
+                        waveform_amp_key='Snapshot/instruments/flux_lm_{}/parameters/sq_amp'.format(qubit),
+                        ch_range_key='Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_range'.format(qubit),
+                        polycoeffs_freq_conv=self.Poly_coeffs[qubit],raw_data=data_shape,
+                        qubit_label='for qubit_{}'.format(qubit),
+                        extract_only=True)  
+                    t = cryoscope_no_dist.ca.time
+                    a = cryoscope_no_dist.ca.get_amplitudes()
+                    baseline_start = 50
+                    baseline_stop = 100
+                    norm = np.mean(a[baseline_start:baseline_stop])
+                    a /= norm
+
+            self.proc_data_dict['Traces'].append(a)
+        self.proc_data_dict['time'] = t
+        ###################################
+        # Run filter optimizer in parallel
+        ###################################
+        if self.update_FIRs:
+            # Parallel optimization crashes terminal
+            # pool_ = mp.pool.ThreadPool(mp.cpu_count()-1)
+            # self.proc_data_dict['opt_filter'] = pool_.map(optimize_fir_software, [t for t in self.proc_data_dict['Traces']] )
+            # pool_.close()
+            self.proc_data_dict['opt_filter'] = [ optimize_fir_software(t) for t in self.proc_data_dict['Traces'] ] 
+            # Convolve new filter with old filter
+            self.proc_data_dict['conv_filters'] = {}
+            for i, qubit in enumerate(self.Qubits):
+                old_filter = cv2_tools.convert_FIR_from_HDAWG(self.Filters[f'filter_{qubit}'])
+                new_filter = self.proc_data_dict['opt_filter'][i]
+                conv_filter = cv2_tools.convolve_FIRs([old_filter, new_filter])
+                conv_filter = cv2_tools.convert_FIR_for_HDAWG(conv_filter)
+                self.proc_data_dict['conv_filters'][qubit] = conv_filter
+
+    def prepare_plots(self):
+        for i, qubit in enumerate(self.Qubits):
+            self.plot_dicts[f'Cryscope_trace_{qubit}'] = {
+                'plotfn': plot_cryoscope_trace,
+                'trace': self.proc_data_dict['Traces'][i],
+                'time': self.proc_data_dict['time'],
+                'qubit': qubit,
+                'timestamp': self.timestamp
+            }
+
+def optimize_fir_software(y, baseline_start=100,
+                          baseline_stop=None, taps=72, start_sample=0, stop_sample=200, cma_target=0.5):
+    step_response = np.concatenate((np.array([0]), y))
+    baseline = np.mean(y[baseline_start:baseline_stop])
+    x0 = [1] + (taps - 1) * [0]    
+    def objective_function_fir(x):
+        y = step_response
+        yc = signal.lfilter(x, 1, y)
+        return np.mean(np.abs(yc[1+start_sample:stop_sample] - baseline))/np.abs(baseline)
+    return cma.fmin2(objective_function_fir, x0, cma_target)[0]
+
+def plot_cryoscope_trace(trace, 
+                         time, 
+                         timestamp,
+                         qubit,
+                         ax=None, **kw):
+    ax.plot(time, trace)
+    set_xlabel(ax, 'Time', 's')
+    set_ylabel(ax, 'Amplitude', 'a.u.')
+    ax.set_ylim(0.95,1.05)
+    ax.set_xlim(0, time[-1])
+    ax.axhline(1, color='grey', ls='-')
+    ax.axhline(1.01, color='grey', ls='--')
+    ax.axhline(0.99, color='grey', ls='--')
+    ax.axhline(1.001, color='grey', ls=':')
+    ax.axhline(0.999, color='grey', ls=':')
+    ax.set_title(timestamp+': Step responses Cryoscope '+qubit)

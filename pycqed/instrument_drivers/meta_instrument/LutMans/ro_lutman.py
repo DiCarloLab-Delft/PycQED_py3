@@ -291,7 +291,7 @@ class Base_RO_LutMan(Base_LutMan):
                                    sampling_rate=sampling_rate)
 
             down1_len = self.get(
-                'M_down_length1_R{}'.format(res))-gauss_length/2
+                'M_down_length1_R{}'.format(res))#-gauss_length/2
             M_down1 = create_pulse(shape=self.pulse_primitive_shape(),
                                    amplitude=self.get(
                                        'M_down_amp1_R{}'.format(res)),
@@ -325,12 +325,13 @@ class Base_RO_LutMan(Base_LutMan):
             # 2. convolve with gaussian (if desired)
             if self.gaussian_convolution():
                 for key, val in res_wave_dict.items():
-                    M_conv0 = np.convolve(val[0], norm_gauss_p)
-                    M_conv1 = np.convolve(val[1], norm_gauss_p)
-                    #M_conv0 = M_conv0[hgsl: -hgsl+1]
-                    #M_conv1 = M_conv1[hgsl: -hgsl+1]
-                    res_wave_dict[key] = (
-                        M_conv0/sampling_rate, M_conv1/sampling_rate)
+                    if 'M_simple_R' in key:
+                        M_conv0 = np.convolve(val[0], norm_gauss_p)
+                        M_conv1 = np.convolve(val[1], norm_gauss_p)
+                        #M_conv0 = M_conv0[hgsl: -hgsl+1]
+                        #M_conv1 = M_conv1[hgsl: -hgsl+1]
+                        res_wave_dict[key] = (
+                            M_conv0/sampling_rate, M_conv1/sampling_rate)
 
             # 3. modulation with base frequency
             for key, val in res_wave_dict.items():

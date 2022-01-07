@@ -55,6 +55,8 @@ reload(pca)
 # reload(fla)
 import pycqed.analysis_v2.multiplexed_readout_analysis as mra
 reload(mra)
+import pycqed.analysis_v2.Parity_benchmark_analysis as pba
+reload(pba)
 import pycqed.analysis_v2.Two_qubit_gate_analysis as tqg
 reload(tqg)
 
@@ -70,12 +72,11 @@ reload(mra)
 import pycqed.analysis_v2.cryoscope_v2_analysis as cv2
 reload(cv2)
 
-# from pycqed.analysis_v2.base_analysis import  # remove me if everything still works*
 from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,
     Basic2DAnalysis, Basic2DInterpolatedAnalysis)
 from pycqed.analysis_v2.timedomain_analysis import (
-    FlippingAnalysis, EFRabiAnalysis, DecoherenceAnalysis, Intersect_Analysis, #CZ_1QPhaseCal_Analysis,
+    FlippingAnalysis, EFRabiAnalysis, DecoherenceAnalysis, Intersect_Analysis,
     Oscillation_Analysis, ComplexRamseyAnalysis, Crossing_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,
     Grovers_TwoQubitAllStates_Analysis)
@@ -87,7 +88,8 @@ from pycqed.analysis_v2.multiplexed_readout_analysis import \
     Multiplexed_Readout_Analysis, Multiplexed_Transient_Analysis,\
     Multiplexed_Weights_Analysis
 
-from pycqed.analysis_v2.parity_check_analysis import Parity_Check_Analysis
+from pycqed.analysis_v2.parity_check_analysis import \
+    Parity_Check_Analysis, Parity_Check_Analysis_OLD, Parity_Check_Fidelity_Analysis, Parity_Model_Optimization_Analysis
 
 from pycqed.analysis_v2.syndrome_analysis import (
     Single_Qubit_RoundsToEvent_Analysis, One_Qubit_Paritycheck_Analysis)
@@ -136,12 +138,6 @@ from pycqed.analysis_v2.cryoscope_v2_analysis import Cryoscope_v2_Analysis
 
 import pycqed.analysis_v2.multi_analysis as mana 
 reload(mana)
-
-## Hiresh fix this there is an error in flipping
-# from pycqed.analysis_v2.multi_analysis import (Multi_AllXY_Analysis, plot_Multi_AllXY,
-#     Multi_Rabi_Analysis, plot_Multi_Rabi, Multi_Ramsey_Analysis, plot_Multi_Ramsey,
-#     Multi_T1_Analysis, plot_Multi_T1, Multi_Echo_Analysis, plot_Multi_Echo,
-#     Multi_Flipping_Analysis,plot_Multi_Flipping, Multi_Motzoi_Analysis)
 
 from pycqed.analysis_v2.multi_analysis import (Multi_AllXY_Analysis, plot_Multi_AllXY,
     Multi_Rabi_Analysis, plot_Multi_Rabi, Multi_Ramsey_Analysis, plot_Multi_Ramsey,

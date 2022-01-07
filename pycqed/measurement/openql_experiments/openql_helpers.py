@@ -309,14 +309,7 @@ def add_multi_q_cal_points(
             for gate in state_to_gates[q_state]:
                 k.gate(gate, [q])
         k.gate("wait", [], 0)  # alignment 
-        # k.gate("wait", [], 20)  # alignment 
-
-
-        # for q_state, q in zip(comb, qubits):
-        #     k.prepz(q)
-        #     for gate in state_to_gates[q_state]:
-        #         k.gate(gate, [q])
-        # k.gate("wait", [], 0)  # alignment
+        # k.gate("wait", [], 20) # prevent overlap of flux with measurement pulse
 
         for q in qubits:
             k.measure(q)

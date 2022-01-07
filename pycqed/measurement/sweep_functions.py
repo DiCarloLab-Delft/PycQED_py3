@@ -94,12 +94,14 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
     varying a heterodyne frequency.
     """
 
-    def __init__(self, RO_pulse_type:str,
-                 LO_source, IF:float,
-                 RF_source=None,
-                 sweep_control:str='soft',
-                 sweep_points=None,
-                 **kw):
+    def __init__(self, 
+            RO_pulse_type:str,
+            LO_source, 
+            IF:float,
+            RF_source=None,
+            sweep_control:str='soft',
+            sweep_points=None,
+            **kw):
         """
         RO_pulse_type (str) : determines wether to only set the LO source
             (in case of a modulated RF pulse) or set both the LO and RF source
@@ -944,7 +946,7 @@ class RO_freq_sweep(Soft_Sweep):
         LO_freq = self.ro_lm.LO_freq()
         IF_freq = val - LO_freq
         # Parameter 1 will be qubit.ro_freq()
-        self.qubit.ro_freq.set(val)
+        # self.qubit.ro_freq.set(val)
         # Parameter 2 will be qubit.ro_freq_mod()
         self.qubit.ro_freq_mod.set(IF_freq)
 

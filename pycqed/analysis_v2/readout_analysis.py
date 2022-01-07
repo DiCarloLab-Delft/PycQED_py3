@@ -9,21 +9,23 @@ Originally written by Adriaan, updated/rewritten by Rene May 2018
 """
 import itertools
 from copy import deepcopy
+from collections import OrderedDict
 
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import lmfit
-from collections import OrderedDict
 import numpy as np
+from scipy.optimize import minimize
+import scipy.constants as spconst
+
 import pycqed.analysis.fitting_models as fit_mods
 from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.analysis_v2.simple_analysis as sa
-from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str, \
     set_xlabel, set_ylabel, set_cbarlabel, flex_colormesh_plot_vs_xy
 from pycqed.analysis_v2.tools.plotting import scatter_pnts_overlay
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.utilities.general import int2base
 from pycqed.utilities.general import format_value_string
@@ -771,14 +773,15 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 fit_text += '\n\n(Single quadrature data)'
 
             fit_text += '\n\nTotal shots: %d+%d' % (*self.proc_data_dict['nr_shots'],)
+            
             if self.predict_qubit_temp:
-                h = 6.62607004e-34
-                kb = 1.38064852e-23
+                h = spconst.value('Planck constant')
+                kb = spconst.value('Boltzmann constant')
                 res_exc = a_sp.value
-                effective_temp = h*6.42e9/(kb*np.log((1-res_exc)/res_exc))
-                fit_text += '\n\nQubit '+'$T_{eff}$'+\
-                    ' = {:.2f} mK\n@{:.0f}'.format(effective_temp*1e3,
-                                                  self.qubit_freq)
+                T_eff = h*self.qubit_freq/(kb*np.log((1-res_exc)/res_exc))
+                fit_text += '\n\nQubit $T_{eff}$' \
+                            + ' = {:.2f} mK\n   @ {:.3f} GHz' \
+                            .format(T_eff*1e3, self.qubit_freq*1e-9)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {

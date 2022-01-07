@@ -1,4 +1,5 @@
 import numpy as np
+from typing import List, Union, Optional
 from pycqed.measurement.randomized_benchmarking import \
     randomized_benchmarking as rb
 
@@ -228,7 +229,13 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
     return p
 
 
-def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
+def AllXY(
+        qubit_idx: int, 
+        platf_cfg: str, 
+        double_points: bool = True,
+        prepend_msmt=False,
+        wait_time_after_prepend_msmt=0
+        ):
     """
     Single qubit AllXY sequence.
     Writes output files to the directory specified in openql.
@@ -271,6 +278,11 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
         for j in range(js):
             k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
             k.prepz(qubit_idx)
+            if prepend_msmt:
+                k.measure(qubit_idx)
+                if wait_time_after_prepend_msmt:
+                    k.gate("wait", [qubit_idx], wait_time_after_prepend_msmt)
+                k.gate("wait", [])
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
             k.measure(qubit_idx)
@@ -279,13 +291,50 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool = True):
     p = oqh.compile(p)
     return p
 
+def depletion_AllXY(qubit_idx: int, platf_cfg: str):
+    """
+    Plays an ALLXY sequence in two settings without and with
+    a pre-measurement meant to assess depletion after the measurement.
+    """
+    p = oqh.create_program("Depletion_AllXY", platf_cfg)
 
-def T1(
-        qubit_idx: int,
+    allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+             ['rx180', 'ry180'], ['ry180', 'rx180'],
+             ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+             ['ry90', 'rx90'], ['rx90', 'ry180'], ['ry90', 'rx180'],
+             ['rx180', 'ry90'], ['ry180', 'rx90'], ['rx90', 'rx180'],
+             ['rx180', 'rx90'], ['ry90', 'ry180'], ['ry180', 'ry90'],
+             ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+             ['ry90', 'ry90']]
+
+    for i, xy in enumerate(allXY):
+        for j in range(2):
+            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
+            k.prepz(qubit_idx)
+            k.gate(xy[0], [qubit_idx])
+            k.gate(xy[1], [qubit_idx])
+            # k.gate('wait', [qubit_idx], 500)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+            k = oqh.create_kernel("AllXY_meas_{}_{}".format(i, j), p)
+            k.prepz(qubit_idx)
+            k.measure(qubit_idx)
+            k.gate(xy[0], [qubit_idx])
+            k.gate(xy[1], [qubit_idx])
+            # k.gate('wait', [qubit_idx], 500)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    p = oqh.compile(p)
+    return p
+
+def T1(qubit_idx: int,
         platf_cfg: str, 
-        times: list, 
-        nr_cz_instead_of_idle_time: list=None,
-        qb_cz_idx: int=None, 
+        times: List[float], 
+        nr_cz_instead_of_idle_time: List[int]=None,
+        qb_cz_idx: int=None,
+        cw_cz_instead_of_idle_time: str='cz',
         nr_flux_dance: float=None, 
         wait_time_after_flux_dance: float=0
         ):
@@ -323,7 +372,10 @@ def T1(
 
         if nr_cz_instead_of_idle_time is not None:
             for n in range(nr_cz_instead_of_idle_time[i]):
-                k.gate("cz", [qubit_idx, qb_cz_idx])
+                if cw_cz_instead_of_idle_time.lower() is 'cz':
+                    k.gate("cz", [qubit_idx, qb_cz_idx])
+                else:
+                    k.gate(cw_cz_instead_of_idle_time, [0])
             k.gate("wait", [], 0)  # alignment 
             k.gate("wait", [], wait_time_after_flux_dance)
         else:
@@ -384,7 +436,14 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
-def Ramsey(times, qubit_idx: int, platf_cfg: str):
+def Ramsey(
+        qubit_idx: int, 
+        platf_cfg: str,
+        times: List[float], 
+        nr_cz_instead_of_idle_time: List[int]=None,
+        qb_cz_idx: str=None,
+        cw_cz_instead_of_idle_time: str='cz'
+    ):
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -403,9 +462,19 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     for i, time in enumerate(times[:-4]):
         k = oqh.create_kernel("Ramsey_{}".format(i), p)
         k.prepz(qubit_idx)
-        wait_nanoseconds = int(round(time/1e-9))
         k.gate('rx90', [qubit_idx])
-        k.gate("wait", [qubit_idx], wait_nanoseconds)
+
+        if nr_cz_instead_of_idle_time is not None:
+            for n in range(nr_cz_instead_of_idle_time[i]):
+                if cw_cz_instead_of_idle_time.lower() is 'cz':
+                    k.gate("cz", [qubit_idx, qb_cz_idx])
+                else:
+                    k.gate(cw_cz_instead_of_idle_time, [0])
+            k.gate("wait", [], 0)  # alignment 
+        else:
+            wait_nanoseconds = int(round(time/1e-9))
+            k.gate("wait", [qubit_idx], wait_nanoseconds)
+
         k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -836,7 +905,16 @@ def single_elt_on(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_flux_dance:float=None,wait_time:float=None):
+def off_on(
+        qubit_idx: int, 
+        pulse_comb: str, 
+        initialize: bool, 
+        platf_cfg: str,
+        nr_flux_after_init: float=None,
+        flux_cw_after_init: Union[str, List[str]]=None,
+        fluxed_qubit_idx: int=None,
+        wait_time_after_flux: float=0
+        ):
     """
     Performs an 'off_on' sequence on the qubit specified.
         off: (RO) - prepz -      - RO
@@ -861,15 +939,16 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
         if initialize:
             k.measure(qubit_idx)
 
-        if nr_flux_dance:
-            for i in range(int(nr_flux_dance)):
-                for step in [1,2,3,4]:
-                    # if refocusing:
-                    #     k.gate(f'flux-dance-{step}-refocus', [0])
-                    # else:
-                    k.gate(f'flux-dance-{step}', [0])
-                k.gate("wait", [], 0)  # alignment 
-            k.gate("wait", [], wait_time)
+        if nr_flux_after_init and flux_cw_after_init:
+            if fluxed_qubit_idx is None:
+                fluxed_qubit_idx = qubit_idx
+            for i in range(int(nr_flux_after_init)):
+                if type(flux_cw_after_init) == list:
+                    for cw in flux_cw_after_init:
+                        k.gate(cw, [fluxed_qubit_idx])
+                else:
+                    k.gate(flux_cw_after_init, [fluxed_qubit_idx]) 
+            k.gate("wait", [], wait_time_after_flux) 
 
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -880,26 +959,59 @@ def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str,nr_
         if initialize:
             k.measure(qubit_idx)
 
-        if nr_flux_dance:
-            for i in range(int(nr_flux_dance)):
-                for step in [1,2,3,4]:
-                    # if refocusing:
-                    #     k.gate(f'flux-dance-{step}-refocus', [0])
-                    # else:
-                    k.gate(f'flux-dance-{step}', [0])
-                k.gate("wait", [], 0)  # alignment 
-            k.gate("wait", [], wait_time) 
+        if nr_flux_after_init and flux_cw_after_init:
+            if fluxed_qubit_idx is None:
+                fluxed_qubit_idx = qubit_idx
+            for i in range(int(nr_flux_after_init)):
+                if type(flux_cw_after_init) == list:
+                    for cw in flux_cw_after_init:
+                        k.gate(cw, [fluxed_qubit_idx])
+                else:
+                    k.gate(flux_cw_after_init, [fluxed_qubit_idx]) 
+            k.gate("wait", [], wait_time_after_flux) 
 
         k.gate('rx180', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
 
     if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
-        raise ValueError()
+        raise ValueError(f"pulse_comb {pulse_comb} has to contain only 'on' and 'off'.")
 
     p = oqh.compile(p)
     return p
 
+def RO_QND_sequence(q_idx,
+                    platf_cfg: str):
+    '''
+    RO QND sequence.
+    '''
+
+    p = oqh.create_program("RO_QND_sequence", platf_cfg)
+
+    k = oqh.create_kernel("Experiment", p)
+    
+    k.prepz(q_idx)
+    k.gate('rx90', [q_idx])
+    k.measure(q_idx)
+    k.measure(q_idx)
+    k.gate('rx180', [q_idx])
+    k.measure(q_idx)
+    p.add_kernel(k)
+
+    k = oqh.create_kernel("Init_0", p)
+    k.prepz(q_idx)
+    k.measure(q_idx)
+    p.add_kernel(k)
+
+    k = oqh.create_kernel("Init_1", p)
+    k.prepz(q_idx)
+    k.gate('rx180', [q_idx])
+    k.measure(q_idx)
+    p.add_kernel(k)
+    
+    p = oqh.compile(p)
+    
+    return p
 
 def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     """

@@ -674,7 +674,7 @@ class ZI_base_instrument(Instrument):
         if not self.daq:
             raise(ziDAQError())
 
-        self.daq.setDebugLevel(4)
+        self.daq.setDebugLevel(7)
 
         # Handle absolute path
         self.use_setVector = "setVector" in dir(self.daq)
