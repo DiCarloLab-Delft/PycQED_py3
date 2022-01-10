@@ -30,16 +30,18 @@ class Test_multi_qubit_oql(unittest.TestCase):
         self.assertEqual(p.name, 'multi_qubit_off_on')
 
     # FIXME: renamed to Msmt_induced_dephasing_ramsey, also changed
-    # def test_Ramsey_msmt_induced_dephasing(self):
-    #     p = mqo.Ramsey_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
-    #                                           platf_cfg=self.config_fn)
-    #     self.assertEqual(p.name, 'Ramsey_msmt_induced_dephasing')
+    @unittest.skip("broken")
+    def test_Ramsey_msmt_induced_dephasing(self):
+        p = mqo.Ramsey_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
+                                              platf_cfg=self.config_fn)
+        self.assertEqual(p.name, 'Ramsey_msmt_induced_dephasing')
 
-    # FIXME: vanished
-    # def test_echo_msmt_induced_dephasing(self):
-    #     p = mqo.echo_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
-    #                                         platf_cfg=self.config_fn)
-    #     self.assertEqual(p.name, 'echo_msmt_induced_dephasing')
+    # FIXME: echo_msmt_induced_dephasing has vanished
+    @unittest.skip("broken")
+    def test_echo_msmt_induced_dephasing(self):
+        p = mqo.echo_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
+                                            platf_cfg=self.config_fn)
+        self.assertEqual(p.name, 'echo_msmt_induced_dephasing')
 
     def test_two_qubit_off_on(self):
         p = mqo.two_qubit_off_on(3, 5, platf_cfg=self.config_fn)
