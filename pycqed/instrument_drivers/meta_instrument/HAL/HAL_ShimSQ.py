@@ -1320,72 +1320,8 @@ class HAL_ShimSQ(Qubit):
             warnings.warn('"cfg_prepare_mw_awg" set to False, not preparing microwave pulses.')
 
         # 5. upload command table for virtual-phase gates
-        MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
-        # 3. Does case-dependent things:
-        #                mixers offset+skewness
-        #                pi-pulse amplitude
-        AWG = MW_LutMan.AWG.get_instr()
-        if self.cfg_with_vsm():
-            # case with VSM (both QWG and AWG8) : e.g. AWG8_VSM_MW_LutMan
-            MW_LutMan.mw_amp180(self.mw_amp180())
-
-            MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
-            MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
-            MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
-            MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
-
-            MW_LutMan.channel_GI(0 + self.mw_awg_ch())
-            MW_LutMan.channel_GQ(1 + self.mw_awg_ch())
-            MW_LutMan.channel_DI(2 + self.mw_awg_ch())
-            MW_LutMan.channel_DQ(3 + self.mw_awg_ch())
-
-            if self._using_QWG():
-                # N.B. This part is QWG specific
-                if hasattr(MW_LutMan, 'channel_GI'):
-                    # 4-channels are used for VSM based AWG's.
-                    AWG.ch1_offset(self.mw_mixer_offs_GI())
-                    AWG.ch2_offset(self.mw_mixer_offs_GQ())
-                    AWG.ch3_offset(self.mw_mixer_offs_DI())
-                    AWG.ch4_offset(self.mw_mixer_offs_DQ())
-            else:  # using_AWG8
-                # N.B. This part is AWG8 specific
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() - 1), self.mw_mixer_offs_GI())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 1), self.mw_mixer_offs_DI())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 2), self.mw_mixer_offs_DQ())
-        else:  # no VSM
-            if self._using_QWG():
-                # case without VSM and with QWG : QWG_MW_LutMan
-                if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
-                        or (self.mw_G_mixer_alpha() != self.mw_D_mixer_alpha())):
-                    logging.warning('HAL_Transmon {}; _prep_mw_pulses: '
-                                    'no VSM detected, using mixer parameters'
-                                    ' from gaussian channel.'.format(self.name))
-                MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
-                MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
-                AWG.set('ch{}_offset'.format(MW_LutMan.channel_I()), self.mw_mixer_offs_GI())
-                AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()), self.mw_mixer_offs_GQ())
-                # FIXME: MW_LutMan.mw_amp180 untouched
-            else:
-                # case without VSM (and with AWG8) : AWG8_MW_LutMan
-                MW_LutMan.mw_amp180(
-                    1)  # AWG8_MW_LutMan uses 'channel_amp' to allow rabi-type experiments without wave reloading.
-                MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
-                MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
-
-                # N.B. This part is AWG8 specific
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() - 1), self.mw_mixer_offs_GI())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch() + 0), self.mw_mixer_offs_GQ())
-
-        # 4. reloads the waveforms
-        if self.cfg_prepare_mw_awg():
-            MW_LutMan.load_waveforms_onto_AWG_lookuptable()
-        else:
-            warnings.warn('"cfg_prepare_mw_awg" set to False, not preparing microwave pulses.')
-
-        # 5. upload command table for virtual-phase gates
-        MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
-        pass
+        if MW_LutMan.cfg_sideband_mode() != 'static':
+            MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
