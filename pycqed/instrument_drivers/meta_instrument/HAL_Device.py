@@ -1410,6 +1410,7 @@ class HAL_Device(HAL_ShimMQ):
             close_fig: bool = True,
             prepare_for_timedomain: bool = True,
             MC: Optional[MeasurementControl] = None,
+            CC=None
     ):
 
         assert q0 in self.qubits()
@@ -1418,7 +1419,8 @@ class HAL_Device(HAL_ShimMQ):
 
         all_qubits = [q0] + q_spectators
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=all_qubits)
+            self.prepare_for_timedomain(qubits=all_qubits, prepare_for_readout=False)
+            self.prepare_readout(qubits=[q0])
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1427,8 +1429,12 @@ class HAL_Device(HAL_ShimMQ):
             self.find_instrument(q_s).cfg_qubit_nr() for q_s in q_spectators
         ]
 
+        dt = times[1] - times[0]
+        cal_points = dt/2 * np.arange(1,5) + times[-1]
+        times_with_cal_points = np.append(times, cal_points)
+
         p = mqo.residual_coupling_sequence(
-            times,
+            times_with_cal_points,
             q0idx,
             q_spec_idx_list,
             spectator_state,
@@ -1436,9 +1442,9 @@ class HAL_Device(HAL_ShimMQ):
         )
 
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
-        d = self.get_int_avg_det()
+        d = self.get_int_avg_det(qubits=[q0])
         MC.set_sweep_function(s)
-        MC.set_sweep_points(times)
+        MC.set_sweep_points(times_with_cal_points)
         MC.set_detector_function(d)
         MC.run('Residual_ZZ_{}_{}_{}{}'.format(q0, q_spectators, spectator_state, self.msmt_suffix),
                exp_metadata={'target_qubit': q0,
