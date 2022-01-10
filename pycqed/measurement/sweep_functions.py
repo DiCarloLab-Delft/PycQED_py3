@@ -129,12 +129,14 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
     varying a heterodyne frequency.
     """
 
-    def __init__(self, RO_pulse_type:str,
-                 LO_source, IF:float,
-                 RF_source=None,
-                 sweep_control:str='soft',
-                 sweep_points=None,
-                 **kw):
+    def __init__(self, 
+            RO_pulse_type:str,
+            LO_source, 
+            IF:float,
+            RF_source=None,
+            sweep_control:str='soft',
+            sweep_points=None,
+            **kw):
         """
         RO_pulse_type (str) : determines wether to only set the LO source
             (in case of a modulated RF pulse) or set both the LO and RF source
@@ -463,13 +465,14 @@ class RO_freq_sweep(Soft_Sweep):
     def set_parameter(self, val):
         LO_freq = self.ro_lm.LO_freq()
         IF_freq = val - LO_freq
+
         # Parameter 1 will be qubit.ro_freq()
-        self.qubit.ro_freq.set(val)
+        # self.qubit.ro_freq.set(val)
         # Parameter 2 will be qubit.ro_freq_mod()
         self.qubit.ro_freq_mod.set(IF_freq)
 
-        self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
-        self.ro_lm.load_waveforms_onto_AWG_lookuptable()
+        # self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
+        # self.ro_lm.load_waveforms_onto_AWG_lookuptable()
 
 
 @deprecated(version='0.4', reason='not used within pyqed')
@@ -907,9 +910,14 @@ class FLsweep(Soft_Sweep):
     """
     Special sweep function for AWG8 and QWG flux pulses.
     """
+<<<<<<< HEAD
     def __init__(
             self,
             lm: Base_Flux_LutMan,
+=======
+    def __init__(self,
+            lm,
+>>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
             par,
             waveform_name: str,
             amp_for_generation: float = None,
@@ -968,12 +976,20 @@ class FLsweep(Soft_Sweep):
 
 class flux_t_middle_sweep(Soft_Sweep):
 
+<<<<<<< HEAD
     def __init__(
             self,
             fl_lm_tm: List[Base_Flux_LutMan],
             fl_lm_park: List[Base_Flux_LutMan],
             which_gate: List[str],
             t_pulse: List[float]
+=======
+    def __init__(self,
+            fl_lm_tm: list,
+            fl_lm_park: list,
+            which_gate: list,
+            t_pulse: list
+>>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
         ):
         super().__init__()
         self.name = 'time_middle'

@@ -26,6 +26,14 @@ default_mw_lutmap = {
     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
     14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
     30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
+    52 : {"name" : "phaseCorrPark1" , "type" : "phase"},
+    53 : {"name" : "phaseCorrPark2" , "type" : "phase"},
+    54 : {"name" : "phaseCorrPark3" , "type" : "phase"},
+    55 : {"name" : "phaseCorrPark4" , "type" : "phase"},
+    56 : {"name" : "phaseCorrPark5" , "type" : "phase"},
+    57 : {"name" : "phaseCorrPark6" , "type" : "phase"},
+    58 : {"name" : "phaseCorrPark7" , "type" : "phase"},
+    59 : {"name" : "phaseCorrPark8" , "type" : "phase"},
     60 : {"name" : "phaseCorrNW" , "type" : "phase"},
     61 : {"name" : "phaseCorrNE" , "type" : "phase"},
     62 : {"name" : "phaseCorrSW" , "type" : "phase"},
@@ -418,6 +426,8 @@ class Base_MW_LutMan(Base_LutMan):
                     )
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
+            elif waveform['type'] == 'phase':
+                pass
             else:
                 raise ValueError
 
@@ -428,26 +438,39 @@ class Base_MW_LutMan(Base_LutMan):
                 self._wave_dict)
         return self._wave_dict
 
+<<<<<<< HEAD
     # FIXME: seems to be overridden in all derived classes: remove
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str, regenerate_waveforms: bool=False):
+=======
+    def load_waveform_onto_AWG_lookuptable(
+            self,
+            waveform_idx: int,
+            regenerate_waveforms: bool=False
+            ):
+        if not isinstance(waveform_idx, int) \
+                or waveform_idx < 0 \
+                or waveform_idx > 127:
+            raise ValueError("`waveform_idx` must be a valid LutMap index!")
+
+>>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        # FIXME: type mismatch with function parameter, misleading name (also in Base_LutMan): called wave_id elsewhere
-        if isinstance(waveform_name, int):
-            cw_idx = waveform_name
-        else:
-            raise DeprecationWarning # FIXME: breaks contract of Base_LutMan
-
-        waveforms = self._wave_dict[cw_idx]
-        codewords = self.codeword_idx_to_parnames(cw_idx)
+        waveforms = self._wave_dict[waveform_idx]
+        codewords = self.codeword_idx_to_parnames(waveform_idx)
 
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
 
+<<<<<<< HEAD
     ##########################################################################
     # Base_MW_LutMan functions (may be overridden in subclass)
     ##########################################################################
+=======
+    ############################################################################
+    # Base_MW_LutMan functions (ma be overridden in subclass)
+    ############################################################################
+>>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
 
     def apply_mixer_predistortion_corrections(self, wave_dict):
         M = wf.mixer_predistortion_matrix(
@@ -498,27 +521,26 @@ class Base_MW_LutMan(Base_LutMan):
             vals=vals.Numbers(1, self._num_channels)
         )
 
-    ##########################################################################
+    ############################################################################
     # Functions
     # FIXME: the load_* functions provide an undesired backdoor, also see issue #626
-    ##########################################################################
+    ############################################################################
 
-    # FIXME: remove, let user use LutMap parameter
-    def set_inspire_lutmap(self):
-        """Set the default lutmap for expanded microwave drive pulses."""
-        self.LutMap(inspire_mw_lutmap.copy())
-
+<<<<<<< HEAD
     def load_phase_pulses_to_AWG_lookuptable(self, phases=np.arange(0, 360, 20)):
+=======
+    def load_phase_pulses_to_AWG_lookuptable(
+            self,
+            phases=np.arange(0, 360, 20)
+            ):
+>>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
         """
-
-        if (len(phases) > 18):
-            raise ValueError('max 18 amplitude values can be provided')
-        lm = self.LutMap()
+        if len(phases) > 18:
+            raise ValueError('max 18 phase values can be provided')
         for i, (phase) in enumerate(phases):
-            lm[i+9] = {"name": "rPhi90",    "theta": 90,
-                       "phi": phase, "type": "ge"}
+            self.LutMap()[i+9] = {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     # FIXME: function is almost identical to load_phase_pulses_to_AWG_lookuptable, except for phi vs. theta
@@ -625,6 +647,7 @@ class QWG_MW_LutMan(Base_MW_LutMan):
 
     # FIXME: the parameter set depends on the subclass, which is awkward to handle in HAL_Transmon
     def _add_channel_params(self):
+<<<<<<< HEAD
         super()._add_channel_params()
         self.add_parameter(
             'channel_amp',
@@ -636,6 +659,17 @@ class QWG_MW_LutMan(Base_MW_LutMan):
                        'parameter to allow rabi-type experiments without'
                        'wave reloading. Should not be using VSM')
         )
+=======
+
+        self.add_parameter('channel_amp',
+                           unit='a.u.',
+                           vals=vals.Numbers(-1.8, 1.8),
+                           set_cmd=self._set_channel_amp,
+                           get_cmd=self._get_channel_amp,
+                           docstring=('using the channel amp as additional'
+                                      'parameter to allow rabi-type experiments without'
+                                      'wave reloading. Should not be using VSM'))
+>>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
         # parameters related to codeword bits
         self.add_parameter(
             'bit_shift',
@@ -760,6 +794,144 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.5)
+
+    def _add_phase_correction_parameters(self):
+        # corrections for phases that the qubit can acquire during one of its CZ gates
+        for gate in ['NW','NE','SW','SE']:
+            self.add_parameter(
+                name=f'vcz_virtual_q_ph_corr_{gate}',
+                parameter_class=ManualParameter,
+                unit='deg',
+                vals=vals.Numbers(-360, 360),
+                initial_value=0.0,
+                docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
+                            "Will be applied as increment to sine generator phases via command table."
+            )
+
+        # corrections for phases that the qubit can acquire during parking as spectator of a CZ gate.
+        # this can happen in general for each of its neighbouring qubits (below: 'direction'),
+        # while it is doing a gate in each possible direction (below: 'gate')
+        # for direction in ['NW','NE','SW','SE']:
+        #     for gate in ['NW','NE','SW','SE']:
+        #         self.add_parameter(
+        #             name=f'vcz_virtual_q_ph_corr_spec_{direction}_gate_{gate}',
+        #             parameter_class=ManualParameter,
+        #             unit='deg',
+        #             vals=vals.Numbers(0, 360),
+        #             initial_value=0.0,
+        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, "
+        #                       f"that is doing a gate in direction {gate}."
+        #                         "Will be applied as increment to sine generator phases via command table."
+        #         )
+
+        # corrections for phases that the qubit can acquire during parking as part of a flux-dance step
+        # there are 8 flux-dance steps for the S17 scheme.
+        # NOTE: this correction must not be the same as the above one for the case of a spectator
+        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
+        for step in np.arange(1,9):
+            self.add_parameter(
+                name=f'vcz_virtual_q_ph_corr_park_step_{step}',
+                parameter_class=ManualParameter,
+                unit='deg',
+                vals=vals.Numbers(-360, 360),
+                initial_value=0.0,
+                docstring=f"Virtual phase correction for parking in flux-dance step {step}."
+                            "Will be applied as increment to sine generator phases via command table."
+            )
+
+    def _reset_phase_correction_parameters(self):
+        for gate in ['NW','NE','SW','SE']:
+            self.parameters[f'vcz_virtual_q_ph_corr_{gate}'](0)
+        for step in np.arange(1,9):
+            self.parameters[f'vcz_virtual_q_ph_corr_park_step_{step}'](0)
+
+
+    def _set_channel_range(self, val):
+        awg_nr = (self.channel_I()-1)//2
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+        AWG = self.AWG.get_instr()
+        if val == 0.8:
+            AWG.set('sigouts_{}_range'.format(self.channel_I()-1), .8)
+            AWG.set('sigouts_{}_direct'.format(self.channel_I()-1), 1)
+            AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), .8)
+            AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 1)
+        else:
+            AWG.set('sigouts_{}_direct'.format(self.channel_I()-1), 0)
+            AWG.set('sigouts_{}_range'.format(self.channel_I()-1), val)
+            AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 0)
+            AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), val)
+
+
+    def _get_channel_range(self):
+        awg_nr = (self.channel_I()-1)//2
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+
+        AWG = self.AWG.get_instr()
+        val = AWG.get('sigouts_{}_range'.format(self.channel_I()-1))
+        assert val == AWG.get('sigouts_{}_range'.format(self.channel_Q()-1))
+        return val
+
+    def _set_channel_amp(self, val):
+        AWG = self.AWG.get_instr()
+        awg_nr = (self.channel_I()-1)//2
+        # Enforce assumption that channel I preceeds channel Q and share AWG
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+        self.channel_amp_value = val
+
+        if self.cfg_sideband_mode() == 'static':
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0), val)
+            AWG.set('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1), 0)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0), 0)
+            AWG.set('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1), val)
+
+        # In case of sideband modulation mode 'real-time', amplitudes have to be set
+        # according to modulation matrix
+        elif self.cfg_sideband_mode() == 'real-time':
+            g0 = np.tan(np.radians(self.mixer_phi()))
+            g1 = self.mixer_alpha()*1/np.cos(np.radians(self.mixer_phi()))
+
+            if np.abs(val*g0) > 1.0 or np.abs(val*g1) > 1.0:
+                raise Exception('Resulting amplitude from mixer parameters '+\
+                                'exceed the maximum channel amplitude')
+                # print('Resulting amplitude from mixer parameters '+\
+                #       'exceed the maximum channel amplitude')
+                # if np.abs(val*g0):
+                #     g0 = 1/val
+                # if np.abs(val*g1):
+                #     g1 = 1/val
+
+            AWG.set('awgs_{}_outputs_0_gains_0'.format(awg_nr), val)
+            AWG.set('awgs_{}_outputs_1_gains_0'.format(awg_nr), 0)
+            AWG.set('awgs_{}_outputs_0_gains_1'.format(awg_nr), val*g0)
+            AWG.set('awgs_{}_outputs_1_gains_1'.format(awg_nr), val*g1)
+        else:
+            raise KeyError('Unexpected value for parameter sideband mode.')
+
+    def _get_channel_amp(self):
+        AWG = self.AWG.get_instr()
+        awg_nr = (self.channel_I()-1)//2
+        # Enforce assumption that channel I precedes channel Q and share AWG
+        assert awg_nr == (self.channel_Q()-1)//2
+        assert self.channel_I() < self.channel_Q()
+
+        vals = []
+        if self.cfg_sideband_mode() == 'static':
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
+            vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
+            assert vals[0]==vals[3]
+            assert vals[1]==vals[2]==0
+
+        # In case of sideband modulation mode 'real-time', amplitudes have to be set
+        # according to modulation matrix
+        elif self.cfg_sideband_mode() == 'real-time':
+            vals.append(self.channel_amp_value)
+
+        return vals[0]
 
     def load_waveform_onto_AWG_lookuptable(
         self, wave_id: str, regenerate_waveforms: bool=False):
@@ -977,20 +1149,28 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                                             }]
 
         # add phase corrections to the end of the codeword space
-        phase_corr_inds = np.arange(60, 64, 1)
-        for i, d in enumerate(['NW', 'NE', 'SW', 'SE']):
+        # the first 8 positions are for parking related phase corrections,
+        # the last 4 are for phase corrections due to gate in corresponding direction
+        phase_corr_inds = np.arange(52,64,1)
+        for step, cw in enumerate(phase_corr_inds[:8]):
+            phase = self.parameters[f"vcz_virtual_q_ph_corr_park_step_{step+1}"]()
+            commandtable_dict['table'] += [{"index": int(cw),
+                                            "phase0": {"value": float(phase), "increment": True},
+                                            "phase1": {"value": float(phase), "increment": True}
+                                            }]
+        for i,d in enumerate(['NW','NE','SW','SE']):
             phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
-            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i]),
+            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i+8]),
                                             "phase0": {"value": float(phase), "increment": True},
                                             "phase1": {"value": float(phase), "increment": True}
                                             }]
 
-        # Note: Whenever using the command table, the phase offset between I and Q channels on
-        # the HDAWG for real-time modulation have to be set from an index on the table. Index
-        # 1023 will be used as it is un-used for codeword triggering
+        # NOTE: Whenever the command table is used, the phase offset between I and Q channels on
+        # the HDAWG for real-time modulation has to be initialized from the table itself.
+        # Index 1023 will be reserved for this (it should no be used for codeword triggering)
         commandtable_dict['table'] += [{"index": 1023,
                                         "phase0": {"value": 90.0, "increment": False},
-                                        "phase1": {"value": 0.0, "increment": False}
+                                        "phase1": {"value":  0.0, "increment": False}
                                         }]
 
         # get internal awg sequencer number (indexed 0,1,2,3)

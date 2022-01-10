@@ -5580,12 +5580,13 @@ class AllXY_Analysis(TD_Analysis):
     '''
 
     def __init__(self, label='AllXY', zero_coord=None, one_coord=None,
-                 make_fig=True, **kw):
+                 make_fig=True, prepend_msmt=False, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'  # Read write mode, file must exist
         self.zero_coord = zero_coord
         self.one_coord = one_coord
         self.make_fig = make_fig
+        self.prepend_msmt = prepend_msmt
 
         super(self.__class__, self).__init__(**kw)
 
@@ -5596,6 +5597,17 @@ class AllXY_Analysis(TD_Analysis):
         self.cal_points = kw.pop('cal_points', None)
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
+
+        if self.prepend_msmt:
+            print(self.measured_values)
+            print(np.array(self.measured_values).shape)
+            self.measured_values = [self.measured_values[0][1::2]]
+            print(self.measured_values)
+            print(np.array(self.measured_values).shape)
+            print(self.sweep_points)
+            print(np.array(self.sweep_points).shape)
+            self.sweep_points = self.sweep_points[1::2]
+
 
         if len(self.measured_values[0]) == 42:
             ideal_data = np.concatenate((0 * np.ones(10), 0.5 * np.ones(24),
@@ -5647,9 +5659,9 @@ class AllXY_Analysis(TD_Analysis):
         ax1.plot(self.sweep_points, ideal_data, label="Ideal")
         labels = [item.get_text() for item in ax1.get_xticklabels()]
         if len(self.measured_values[0]) == 42:
-            locs = np.arange(1, 42, 2)
+            locs = self.sweep_points[1::2] #np.arange(1, 42, 2)
         else:
-            locs = np.arange(0, 21, 1)
+            locs = self.sweep_points #np.arange(0, 21, 1)
         labels = ['II', 'XX', 'YY', 'XY', 'YX',
                   'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
                   'Xy', 'Yx', 'xX', 'Xx', 'yY', 'Yy',

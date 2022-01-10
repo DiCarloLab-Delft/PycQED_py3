@@ -28,8 +28,7 @@ from matplotlib.colors import LogNorm
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabel,
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor)
-datadir = get_default_datadir()
-print('Data directory set to:', datadir)
+
 
 
 ######################################################################
@@ -440,10 +439,11 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                 data[param] = ma.measured_values[special_output[param]]
             elif param in dir(ma):
                 data[param] = getattr(ma, param)
-            elif param in list(
-                    ma.data_file.get('Experimental Data', {}).keys()):
-                data[param] = np.double(
-                    ma.data_file['Experimental Data'][param])
+            elif param in list(ma.data_file.get('Experimental Data', {}).keys()):
+                # if type(ma.data_file['Experimental Data'][param]) is not float:
+                #     data[param] = np.array(ma.data_file['Experimental Data'][param], dtype=object)
+                # else:
+                data[param] = np.double(ma.data_file['Experimental Data'][param])
             elif param in list(ma.data_file.get('Analysis', {}).keys()):
                 data[param] = np.double(ma.data_file['Analysis'][param])
             else:
@@ -1784,6 +1784,35 @@ def current_datemark():
 def current_timemark():
     return time.strftime('%H%M%S', time.localtime())
 
+def get_values_around(center_val, range_frac=0.25, num_points=3, bounds=(0,1)):
+    """
+    Returns a an array of `num_points` equidistant numbers
+    around value `center_val`,
+    which are lie `range_frac` of `center_val` around its value.
+    The special feature of this method is that it wraps the new array
+    around `bounds` (e.g. starting from the beginning if a value would
+    land outside the upper bound), to always be able to return
+    `num_points` equidistant points around `center_val`.
+    """
+    # first generate num_points values by range_frac percent around center_val
+    values = np.linspace(center_val - range_frac*center_val,
+                        center_val + range_frac*center_val,
+                        num_points)
+
+    # if the result goes above the allowed range for values, add as many points
+    # below the original lower end as were above the range
+    # this is done by subtracting the number of points above range times the spacing
+    if values[-1] > bounds[-1]:
+        values = values - np.diff(values).mean()*(values > 1).sum()
+
+    # if after the correction we ended up below zero, it means that the given
+    # range_frac is not compatible with the given center `center_val`
+    if (values < bounds[0]).sum() + (values > bounds[-1]).sum():
+        raise ValueError(f"Given `range_frac` not compatible with center `center_val`"
+                        f" and boundaries {bounds}! values = [{values}]")
+
+    return values
+
 
 ######################################################################
 #    Plotting tools
@@ -2905,16 +2934,15 @@ def solve_quadratic_equation(a, b, c, verbose=False):
         return [x1, x2]
 
 
-"""Chirp z-Transform.
-As described in
-Rabiner, L.R., R.W. Schafer and C.M. Rader.
-The Chirp z-Transform Algorithm.
-IEEE Transactions on Audio and Electroacoustics, AU-17(2):86--92, 1969
-"""
-
-
 def chirpz(x, A, W, M):
     """Compute the chirp z-transform.
+
+    Chirp z-Transform.
+    As described in
+    Rabiner, L.R., R.W. Schafer and C.M. Rader.
+    The Chirp z-Transform Algorithm.
+    IEEE Transactions on Audio and Electroacoustics, AU-17(2):86--92, 1969
+
     The discrete z-transform,
     X(z) = \sum_{n=0}^{N-1} x_n z^{-n}
     is calculated at M points,

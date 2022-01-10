@@ -227,12 +227,11 @@ def parity_check_cost(
 def parity_check_cost_function(
         device,
         MC,
-        flux_lm, # lutman of fluxed qubit that needs to upload new pulses
         target_qubits: List[str],
         control_qubits: List[str], # needs to be given in order of the UHF
         flux_dance_steps: List[int],
         flux_codeword: str='flux-dance',
-        ramsey_qubits: Union[list, bool]=True,
+        ramsey_qubits: Union[List[str], bool]=False,
         refocusing: bool=True,
         phase_offsets: List[float]=None,
         phase_weight_factor: float=1,
@@ -241,7 +240,8 @@ def parity_check_cost_function(
         wait_time_after_flux_ns: int=0,
         prepare_for_timedomain: bool=False,
         disable_metadata: bool=True,
-        plotting: bool=False
+        plotting: bool=False,
+        **kwargs
     ):
 
     counter_param(counter_param()+1)
@@ -260,7 +260,7 @@ def parity_check_cost_function(
     # flux_lm.generate_cz_waveforms()
     # flux_lm.load_waveforms_onto_AWG_lookuptable()
 
-    result_dict = device.measure_parity_check_flux_dance(
+    result = device.measure_parity_check_flux_dance(
         MC=MC,
         target_qubits=target_qubits,
         control_qubits=control_qubits,
@@ -274,18 +274,22 @@ def parity_check_cost_function(
         wait_time_after_flux_ns=wait_time_after_flux_ns,
         label_suffix=counter_param(),
         disable_metadata=disable_metadata,
-        plotting=plotting
+        plotting=plotting,
+        **kwargs
         )
 
-    phi_diff = (result_dict['phi_osc'][result_dict['cases'][0]] \
-                - result_dict['phi_osc'][result_dict['cases'][-1]]) % 360
+    phases = result['quantities_of_interest']['oscillation_phases']
+    cases = result['quantities_of_interest']['control_cases']
+    missing_fractions = result['quantities_of_interest']['mean_missing_fraction_per_qubit']
+
+    phi_diff = (phases[cases[0]] - phases[cases[-1]]) % 360
     
     cost = parity_check_cost(phase_diff=phi_diff, 
-                            missing_fraction=result_dict['missing_frac'][control_qubits[0]] 
+                            missing_fraction=missing_fractions[control_qubits[0]] 
                                             if include_missing_frac_cost else None,
                             phase_weight=phase_weight_factor)
 
-    result_dict[f'missing_frac_{control_qubits[0]}'] = 100 * result_dict['missing_frac'][control_qubits[0]]
+    result_dict[f'missing_frac_{control_qubits[0]}'] = 100 * missing_fractions[control_qubits[0]]
     result_dict['cost_function_val'] = cost
     result_dict['phi_diff'] = phi_diff
 
