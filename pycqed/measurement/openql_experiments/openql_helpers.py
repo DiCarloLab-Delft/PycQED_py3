@@ -773,7 +773,7 @@ def add_two_q_cal_points(
 
 @deprecated(version='0.4', reason="use class OqlProgram")
 def add_multi_q_cal_points(
-    p: Program,
+    p: OqlProgram,
     qubits: List[int],
     combinations: List[str] = ["00", "01", "10", "11"],
     reps_per_cal_pnt: int = 1,
@@ -841,7 +841,7 @@ def add_multi_q_cal_points(
     else:
         return p
 
-
+# FIXME: merge with method in class OqlProgram
 def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
                          q2 = None,
                          reps_per_cal_pt: int =1,
@@ -933,6 +933,7 @@ def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
     return p
 
 
+# FIXME: move?
 #############################################################################
 # RamZZ measurement
 #############################################################################
