@@ -438,10 +438,7 @@ class Base_MW_LutMan(Base_LutMan):
                 self._wave_dict)
         return self._wave_dict
 
-<<<<<<< HEAD
     # FIXME: seems to be overridden in all derived classes: remove
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str, regenerate_waveforms: bool=False):
-=======
     def load_waveform_onto_AWG_lookuptable(
             self,
             waveform_idx: int,
@@ -452,7 +449,6 @@ class Base_MW_LutMan(Base_LutMan):
                 or waveform_idx > 127:
             raise ValueError("`waveform_idx` must be a valid LutMap index!")
 
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
@@ -462,15 +458,9 @@ class Base_MW_LutMan(Base_LutMan):
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
 
-<<<<<<< HEAD
     ##########################################################################
     # Base_MW_LutMan functions (may be overridden in subclass)
     ##########################################################################
-=======
-    ############################################################################
-    # Base_MW_LutMan functions (ma be overridden in subclass)
-    ############################################################################
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
 
     def apply_mixer_predistortion_corrections(self, wave_dict):
         M = wf.mixer_predistortion_matrix(
@@ -526,14 +516,7 @@ class Base_MW_LutMan(Base_LutMan):
     # FIXME: the load_* functions provide an undesired backdoor, also see issue #626
     ############################################################################
 
-<<<<<<< HEAD
     def load_phase_pulses_to_AWG_lookuptable(self, phases=np.arange(0, 360, 20)):
-=======
-    def load_phase_pulses_to_AWG_lookuptable(
-            self,
-            phases=np.arange(0, 360, 20)
-            ):
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
         """
@@ -647,8 +630,7 @@ class QWG_MW_LutMan(Base_MW_LutMan):
 
     # FIXME: the parameter set depends on the subclass, which is awkward to handle in HAL_Transmon
     def _add_channel_params(self):
-<<<<<<< HEAD
-        super()._add_channel_params()
+        # super()._add_channel_params()
         self.add_parameter(
             'channel_amp',
             unit='a.u.',
@@ -659,17 +641,6 @@ class QWG_MW_LutMan(Base_MW_LutMan):
                        'parameter to allow rabi-type experiments without'
                        'wave reloading. Should not be using VSM')
         )
-=======
-
-        self.add_parameter('channel_amp',
-                           unit='a.u.',
-                           vals=vals.Numbers(-1.8, 1.8),
-                           set_cmd=self._set_channel_amp,
-                           get_cmd=self._get_channel_amp,
-                           docstring=('using the channel amp as additional'
-                                      'parameter to allow rabi-type experiments without'
-                                      'wave reloading. Should not be using VSM'))
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
         # parameters related to codeword bits
         self.add_parameter(
             'bit_shift',
@@ -1305,8 +1276,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
-            # FIXME: vals[4]: 'list index out of range'
-            # assert vals[0]==vals[4]
+            assert vals[0]==vals[3]
             assert vals[1]==vals[2]==0
 
         # In case of sideband modulation mode 'real-time', amplitudes have to be set
