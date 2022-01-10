@@ -1,11 +1,6 @@
 import numpy as np
-<<<<<<< HEAD
 from deprecated import deprecated
-=======
-from typing import List, Union, Optional
-from pycqed.measurement.randomized_benchmarking import \
-    randomized_benchmarking as rb
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
+from typing import List, Union
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
@@ -589,16 +584,11 @@ def T1(qubit_idx: int,
 
         if nr_cz_instead_of_idle_time is not None:
             for n in range(nr_cz_instead_of_idle_time[i]):
-<<<<<<< HEAD
-                k.gate("cz", [qubit_idx, qb_cz_idx])
-            k.barrier([])  # alignment
-=======
                 if cw_cz_instead_of_idle_time.lower() is 'cz':
                     k.gate("cz", [qubit_idx, qb_cz_idx])
                 else:
                     k.gate(cw_cz_instead_of_idle_time, [0])
-            k.gate("wait", [], 0)  # alignment
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
+            k.barrier([])  # alignment
             k.gate("wait", [], wait_time_after_flux_dance)
         else:
             wait_nanoseconds = int(round(time/1e-9))
@@ -1350,7 +1340,7 @@ def off_on(
         flux_cw_after_init: Union[str, List[str]]=None,
         fluxed_qubit_idx: int=None,
         wait_time_after_flux: float=0
-        ):
+        ) -> OqlProgram:
 
     """
     Performs an 'off_on' sequence on the qubit specified.
@@ -1376,17 +1366,6 @@ def off_on(
         if initialize:
             k.measure(qubit_idx)
 
-<<<<<<< HEAD
-        if nr_flux_dance:
-            for i in range(int(nr_flux_dance)):
-                for step in [1,2,3,4]:
-                    # if refocusing:
-                    #     k.gate(f'flux-dance-{step}-refocus', [0])
-                    # else:
-                    k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment
-            k.gate("wait", [], wait_time)
-=======
         if nr_flux_after_init and flux_cw_after_init:
             if fluxed_qubit_idx is None:
                 fluxed_qubit_idx = qubit_idx
@@ -1397,7 +1376,6 @@ def off_on(
                 else:
                     k.gate(flux_cw_after_init, [fluxed_qubit_idx])
             k.gate("wait", [], wait_time_after_flux)
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
 
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -1430,10 +1408,15 @@ def off_on(
     return p
 
 
-def off_on_ramzz_measurement(inv_qubit_idx: int, meas_qubit_idx: int,
-                             pulse_comb: str, platf_cfg: str,
-                             ramzz_wait_time_ns: int, nr_flux_dance:float=None,
-                             wait_time_ns_ns:float=None):
+def off_on_ramzz_measurement(
+        inv_qubit_idx: int,
+        meas_qubit_idx: int,
+        pulse_comb: str,
+        platf_cfg: str,
+        ramzz_wait_time_ns: int,
+        nr_flux_dance: float = None,
+        wait_time_ns: float = None
+) -> OqlProgram:
     """
     Performs an 'off_on' sequence on the investigated qubit specified.
         off: (RO) - prepz -      - RO
@@ -1466,11 +1449,7 @@ def off_on_ramzz_measurement(inv_qubit_idx: int, meas_qubit_idx: int,
                     #     k.gate(f'flux-dance-{step}-refocus', [0])
                     # else:
                     k.gate(f'flux-dance-{step}', [0])
-<<<<<<< HEAD
                 k.barrier([])  # alignment
-            k.gate("wait", [], wait_time)
-=======
-                k.gate("wait", [], 0)  # alignment
             k.gate("wait", [], wait_time_ns)
 
         k.gate('wait', [], 0)
@@ -1479,7 +1458,6 @@ def off_on_ramzz_measurement(inv_qubit_idx: int, meas_qubit_idx: int,
         k.gate('rym90', [meas_qubit_idx])
         k.measure(meas_qubit_idx)
         p.add_kernel(k)
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
 
     if 'on' in pulse_comb.lower():
         k = p.create_kernel("on", p)
@@ -1512,7 +1490,7 @@ def off_on_ramzz_measurement(inv_qubit_idx: int, meas_qubit_idx: int,
     return p
 
 def RO_QND_sequence(q_idx,
-                    platf_cfg: str):
+                    platf_cfg: str) -> OqlProgram:
     '''
     RO QND sequence.
     '''
