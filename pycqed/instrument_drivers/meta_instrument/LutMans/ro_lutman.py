@@ -346,7 +346,6 @@ class Base_RO_LutMan(Base_LutMan):
 
             # 3-step RO pulse with ramp-up and double depletion
             up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
-<<<<<<< HEAD
             M_up = create_pulse(
                 shape=self.pulse_primitive_shape(),
                 amplitude=self.get('M_amp_R{}'.format(res)),
@@ -374,35 +373,6 @@ class Base_RO_LutMan(Base_LutMan):
                 phase=self.get('M_down_phi1_R{}'.format(res)),
                 sampling_rate=sampling_rate
             )
-=======
-            M_up = create_pulse(shape=self.pulse_primitive_shape(),
-                                amplitude=self.get('M_amp_R{}'.format(res)),
-                                length=up_len,
-                                delay=0,
-                                phase=self.get('M_phi_R{}'.format(res)),
-                                sampling_rate=sampling_rate)
-
-            M_down0 = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get(
-                                       'M_down_amp0_R{}'.format(res)),
-                                   length=self.get(
-                                       'M_down_length0_R{}'.format(res)),  # ns
-                                   delay=0,
-                                   phase=self.get(
-                                       'M_down_phi0_R{}'.format(res)),
-                                   sampling_rate=sampling_rate)
-
-            down1_len = self.get(
-                'M_down_length1_R{}'.format(res))#-gauss_length/2
-            M_down1 = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get(
-                                       'M_down_amp1_R{}'.format(res)),
-                                   length=down1_len,
-                                   delay=0,
-                                   phase=self.get(
-                                       'M_down_phi1_R{}'.format(res)),
-                                   sampling_rate=sampling_rate)
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
 
             M_up_down_down = (np.concatenate((M_up[0], M_down0[0], M_down1[0])),
                               np.concatenate((M_up[1], M_down0[1], M_down1[1])))
@@ -426,13 +396,6 @@ class Base_RO_LutMan(Base_LutMan):
             # 2. convolve with gaussian (if desired)
             if self.gaussian_convolution():
                 for key, val in res_wave_dict.items():
-<<<<<<< HEAD
-                    M_conv0 = np.convolve(val[0], norm_gauss_p)
-                    M_conv1 = np.convolve(val[1], norm_gauss_p)
-                    #M_conv0 = M_conv0[hgsl: -hgsl+1]
-                    #M_conv1 = M_conv1[hgsl: -hgsl+1]
-                    res_wave_dict[key] = (M_conv0/sampling_rate, M_conv1/sampling_rate)
-=======
                     if 'M_simple_R' in key:
                         M_conv0 = np.convolve(val[0], norm_gauss_p)
                         M_conv1 = np.convolve(val[1], norm_gauss_p)
@@ -440,7 +403,6 @@ class Base_RO_LutMan(Base_LutMan):
                         #M_conv1 = M_conv1[hgsl: -hgsl+1]
                         res_wave_dict[key] = (
                             M_conv0/sampling_rate, M_conv1/sampling_rate)
->>>>>>> 23accccece3ddeb0fcf5811e58e7cb2b9844b240
 
             # 3. modulation with base frequency
             for key, val in res_wave_dict.items():
