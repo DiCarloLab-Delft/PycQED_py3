@@ -188,7 +188,7 @@ def pulsed_spec_seq_marked_ramsey_measurement(td_qubit_idx: int,
                                               cc: str = 'CCL'):
 
     p = OqlProgram("pulsed_spec_seq_marker_ramsey_measurement", platf_cfg)
-    k = p.create_kernel("main", p)
+    k = p.create_kernel("main")
 
     nr_clocks = int(spec_pulse_length/20e-9)
     print('Adding {} [ns] to spec seq'.format(wait_time_ns))
@@ -249,7 +249,7 @@ def ramsey_measurement_wait_time_calibration(td_qubit_idx: int,
 
     for rwt in ramsey_wait_times_ns:
 
-        k = p.create_kernel(f"tau = {rwt}ns", p)
+        k = p.create_kernel(f"tau = {rwt}ns")
 
         # Initialise
         k.prepz(td_qubit_idx)
@@ -271,7 +271,7 @@ def ramsey_measurement_wait_time_calibration(td_qubit_idx: int,
 
         p.add_kernel(k)
 
-    p.add_single_qubit_cal_points(p,  qubit_idx=td_qubit_idx)
+    p.add_single_qubit_cal_points(qubit_idx=td_qubit_idx)
     p.compile()
 
     return p
@@ -317,7 +317,7 @@ def echo_spectroscopy(td_qubit_idx: int,
 
     p = OqlProgram("echo_spectroscopy", platf_cfg)
 
-    k = p.create_kernel("main", p)
+    k = p.create_kernel("main")
     for qubit_idx in qubit_indices:
         k.prepz(qubit_idx)
     k.gate('wait', [], 0)
@@ -359,7 +359,7 @@ def Restless_Ramsey(time, qubit_idx: int, platf_cfg: str, cal_points: bool=True)
     p = OqlProgram("Restless_Ramsey", platf_cfg)
 
 
-    k = p.create_kernel("Restless_Ramsey", p)
+    k = p.create_kernel("Restless_Ramsey")
 
     wait_nanoseconds = int(round(time/1e-9))
     # k.prepz(qubit_idx)
@@ -521,7 +521,7 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
 
     for i, xy in enumerate(allXY):
         for j in range(2):
-            k = p.create_kernel("AllXY_{}_{}".format(i, j), p)
+            k = p.create_kernel("AllXY_{}_{}".format(i, j))
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
@@ -529,7 +529,7 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
             k.measure(qubit_idx)
             p.add_kernel(k)
 
-            k = p.create_kernel("AllXY_meas_{}_{}".format(i, j), p)
+            k = p.create_kernel("AllXY_meas_{}_{}".format(i, j))
             k.prepz(qubit_idx)
             k.measure(qubit_idx)
             k.gate(xy[0], [qubit_idx])
@@ -625,7 +625,7 @@ def T1_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
     p = OqlProgram('T1_ramzz', platf_cfg)
 
     for i, time in enumerate(times):
-        k = p.create_kernel('T1_{}'.format(i), p)
+        k = p.create_kernel('T1_{}'.format(i))
         k.prepz(inv_qubit_idx)
         k.prepz(meas_qubit_idx)
         k.gate('wait', [], 0)
@@ -650,7 +650,7 @@ def T1_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     # adding the calibration points
     for i in np.arange(2):
-        k = p.create_kernel("cal_gr_"+str(i), program=p)
+        k = p.create_kernel("cal_gr_"+str(i))
         k.prepz(inv_qubit_idx)
         k.gate('wait', [], 0)
         k.gate('ry90', [meas_qubit_idx])
@@ -661,7 +661,7 @@ def T1_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
         p.add_kernel(k)
 
     for i in np.arange(2):
-        k = p.create_kernel("cal_ex_"+str(i), program=p)
+        k = p.create_kernel("cal_ex_"+str(i))
         k.prepz(inv_qubit_idx)
         k.gate('rx180', [inv_qubit_idx])
         k.gate('wait', [], 0)
@@ -791,7 +791,7 @@ def Ramsey_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
     p = OqlProgram("Ramsey_ramzz", platf_cfg)
 
     for i, time in enumerate(times[:-4]):
-        k = p.create_kernel("Ramsey_{}".format(i), p)
+        k = p.create_kernel("Ramsey_{}".format(i))
         k.prepz(inv_qubit_idx)
         k.prepz(meas_qubit_idx)
         k.gate('wait', [], 0)
@@ -811,7 +811,7 @@ def Ramsey_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     # adding the calibration points
     for i in np.arange(2):
-        k = p.create_kernel("cal_gr_"+str(i), program=p)
+        k = p.create_kernel("cal_gr_"+str(i))
         k.prepz(inv_qubit_idx)
         k.gate('wait', [], 0)
         k.gate('ry90', [meas_qubit_idx])
@@ -822,7 +822,7 @@ def Ramsey_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
         p.add_kernel(k)
 
     for i in np.arange(2):
-        k = p.create_kernel("cal_ex_"+str(i), program=p)
+        k = p.create_kernel("cal_ex_"+str(i))
         k.prepz(inv_qubit_idx)
         k.gate('rx180', [inv_qubit_idx])
         k.gate('wait', [], 0)
@@ -896,7 +896,7 @@ def echo(times, qubit_idx: int, platf_cfg: str, delta_phase: int = 40) -> OqlPro
         cw_idx = angle//20 + 9
         wait_nanoseconds = int(round(time*1e9 / 2))
 
-        k = p.create_kernel("echo_{}".format(i), p)
+        k = p.create_kernel("echo_{}".format(i))
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
         k.gate("wait", [qubit_idx], wait_nanoseconds)
@@ -937,7 +937,7 @@ def echo_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     for i, time in enumerate(times[:-4]):
 
-        k = p.create_kernel("echo_{}".format(i), p)
+        k = p.create_kernel("echo_{}".format(i))
         k.prepz(inv_qubit_idx)
         k.prepz(meas_qubit_idx)
         k.gate('wait', [], 0)
@@ -963,7 +963,7 @@ def echo_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     # adding the calibration points
     for i in np.arange(2):
-        k = p.create_kernel("cal_gr_"+str(i), program=p)
+        k = p.create_kernel("cal_gr_"+str(i))
         k.prepz(inv_qubit_idx)
         k.gate('wait', [], 0)
         k.gate('ry90', [meas_qubit_idx])
@@ -974,7 +974,7 @@ def echo_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
         p.add_kernel(k)
 
     for i in np.arange(2):
-        k = p.create_kernel("cal_ex_"+str(i), program=p)
+        k = p.create_kernel("cal_ex_"+str(i))
         k.prepz(inv_qubit_idx)
         k.gate('rx180', [inv_qubit_idx])
         k.gate('wait', [], 0)
@@ -1437,7 +1437,7 @@ def off_on_ramzz_measurement(
 
     # # Off
     if 'off' in pulse_comb.lower():
-        k = p.create_kernel("off", p)
+        k = p.create_kernel("off")
         k.prepz(inv_qubit_idx)
         k.prepz(meas_qubit_idx)
         k.gate('wait', [], 0)
@@ -1460,7 +1460,7 @@ def off_on_ramzz_measurement(
         p.add_kernel(k)
 
     if 'on' in pulse_comb.lower():
-        k = p.create_kernel("on", p)
+        k = p.create_kernel("on")
         k.prepz(inv_qubit_idx)
         k.prepz(meas_qubit_idx)
         k.gate('wait', [], 0)
@@ -1497,7 +1497,7 @@ def RO_QND_sequence(q_idx,
 
     p = OqlProgram("RO_QND_sequence", platf_cfg)
 
-    k = p.create_kernel("Experiment", p)
+    k = p.create_kernel("Experiment")
 
     k.prepz(q_idx)
     k.gate('rx90', [q_idx])
@@ -1507,12 +1507,12 @@ def RO_QND_sequence(q_idx,
     k.measure(q_idx)
     p.add_kernel(k)
 
-    k = p.create_kernel("Init_0", p)
+    k = p.create_kernel("Init_0")
     k.prepz(q_idx)
     k.measure(q_idx)
     p.add_kernel(k)
 
-    k = p.create_kernel("Init_1", p)
+    k = p.create_kernel("Init_1")
     k.prepz(q_idx)
     k.gate('rx180', [q_idx])
     k.measure(q_idx)

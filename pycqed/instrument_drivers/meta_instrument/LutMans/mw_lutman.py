@@ -630,7 +630,7 @@ class QWG_MW_LutMan(Base_MW_LutMan):
 
     # FIXME: the parameter set depends on the subclass, which is awkward to handle in HAL_Transmon
     def _add_channel_params(self):
-        # super()._add_channel_params()
+        super()._add_channel_params()
         self.add_parameter(
             'channel_amp',
             unit='a.u.',

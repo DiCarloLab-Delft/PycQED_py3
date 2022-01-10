@@ -245,20 +245,21 @@ def Msmt_induced_dephasing_ramsey(
     meas_time: int,
     platf_cfg: str,
     echo_times: list = None,
-    exception_qubits: list = None):
+    exception_qubits: list = None
+) -> OqlProgram:
     """
     q_target is ramseyed
     q_spec is measured
 
     """
-    p = oqh.create_program("Ramsey_msmt_induced_dephasing", platf_cfg)
+    p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)
 
     angles = np.arange(0,360,20)
     for i, angle in enumerate(angles):
         for meas in [False, True]:
             for state in ['0', '1']:
                 cw_idx = angle//20 + 9
-                k = oqh.create_kernel(f"Ramsey_meas_{meas}_{angle}_{state}", p)
+                k = p.create_kernel(f"Ramsey_meas_{meas}_{angle}_{state}")
 
                 for q in q_rams:
                     k.prepz(q)
@@ -293,12 +294,13 @@ def Msmt_induced_dephasing_ramsey(
 
     # adding the calibration points
     n = len(q_rams)
-    oqh.add_multi_q_cal_points(p,
-                               qubits=q_rams,
-                               combinations=['0'*n, '1'*n],
-                               reps_per_cal_pnt=2)
+    p.add_multi_q_cal_points(
+        qubits=q_rams,
+        combinations=['0' * n, '1' * n],
+        reps_per_cal_pnt=2
+    )
 
-    p = oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -3334,7 +3336,7 @@ def Ramsey_cross(
     q_spec is measured
 
     """
-    p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)
+    p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)  # FIXME: duplicate name, does not match function name
 
     for i, angle in enumerate(angles[:-4]):
         cw_idx = angle // 20 + 9

@@ -29,6 +29,8 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabe
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor)
 
+datadir = get_default_datadir()
+print('Data directory set to:', datadir)
 
 
 ######################################################################

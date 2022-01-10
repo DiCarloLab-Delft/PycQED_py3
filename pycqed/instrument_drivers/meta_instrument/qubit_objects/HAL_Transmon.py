@@ -3294,9 +3294,9 @@ class HAL_Transmon(HAL_ShimSQ):
                          self.mw_freq_mod.get() + artificial_detuning)
 
         p = sqo.Ramsey(
-            times,
             qubit_idx=self.cfg_qubit_nr(),
-            platf_cfg=self.cfg_openql_platform_fn()
+            platf_cfg=self.cfg_openql_platform_fn(),
+            times=times
         )
 
         s = swf.OpenQL_Sweep(
@@ -5178,7 +5178,7 @@ class HAL_Transmon(HAL_ShimSQ):
             else:
                 wait_time = 0
 
-            p = mqo.Ramsey_msmt_induced_dephasing(
+            p = mqo.Ramsey_msmt_induced_dephasing(  # FIXME: renamed to Msmt_induced_dephasing_ramsey and changed
                 qubits=qubits,
                 angles=angles,
                 platf_cfg=platf_cfg,
@@ -5195,7 +5195,7 @@ class HAL_Transmon(HAL_ShimSQ):
             else:
                 wait_time = readout_pulse_length + 40e-9
 
-            p = mqo.echo_msmt_induced_dephasing(
+            p = mqo.echo_msmt_induced_dephasing(  # FIXME: vanished
                 qubits=qubits,
                 angles=angles,
                 platf_cfg=platf_cfg,

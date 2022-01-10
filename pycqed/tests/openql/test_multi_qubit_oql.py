@@ -30,14 +30,18 @@ class Test_multi_qubit_oql(unittest.TestCase):
         self.assertEqual(p.name, 'multi_qubit_off_on')
 
     def test_Ramsey_msmt_induced_dephasing(self):
-        p = mqo.Ramsey_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
+        # FIXME: renamed, also changed
+        # p = mqo.Ramsey_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
+        #                                       platf_cfg=self.config_fn)
+        p = mqo.Msmt_induced_dephasing_ramsey([3, 5], angles=[20, 40, 80],
                                               platf_cfg=self.config_fn)
         self.assertEqual(p.name, 'Ramsey_msmt_induced_dephasing')
 
-    def test_echo_msmt_induced_dephasing(self):
-        p = mqo.echo_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
-                                            platf_cfg=self.config_fn)
-        self.assertEqual(p.name, 'echo_msmt_induced_dephasing')
+    # FIXME: vanished
+    # def test_echo_msmt_induced_dephasing(self):
+    #     p = mqo.echo_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
+    #                                         platf_cfg=self.config_fn)
+    #     self.assertEqual(p.name, 'echo_msmt_induced_dephasing')
 
     def test_two_qubit_off_on(self):
         p = mqo.two_qubit_off_on(3, 5, platf_cfg=self.config_fn)
