@@ -585,14 +585,13 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     def set_up_correlation_weights(self):
         if self.thresholding:
             # correlations mode after threshold
-            # NOTE: thresholds need to be set outside the detctor object.
+            # NOTE: thresholds need to be set outside the detector object.
             self.UHFQC.qas_0_result_source(5)
             log.info('Setting {} result source to 5 (corr threshold)'.format(self.UHFQC.name))
         else:
             # correlations mode before threshold
             self.UHFQC.qas_0_result_source(4)
-            log.info('Setting {} result source to 4 (corr no threshold)'.format(
-                self.UHFQC.name))
+            log.info('Setting {} result source to 4 (corr no threshold)'.format(self.UHFQC.name))
         # Configure correlation mode
         for correlation_channel, corr in zip(self.correlation_channels, self.correlations):
             # Duplicate source channel to the correlation channel and select

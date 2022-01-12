@@ -584,17 +584,104 @@ class HAL_ShimSQ(Qubit):
             get_cmd=self._get_flux_fine_delay)
 
     def _add_ro_parameters(self):
+        ################################
+        # RO stimulus/pulse parameters #
+        ################################
+
+        # FIXME: move to HAL_Transmon?
+        self.add_parameter(
+            'ro_freq',
+            label='Readout frequency',
+            unit='Hz',
+            parameter_class=ManualParameter)
+
+        # NB: shared between qubits on same feedline, and possibly also between feedlines/instruments
+        self.add_parameter(
+            'ro_pow_LO',
+            label='RO power LO',
+            unit='dBm',
+            initial_value=20,
+            parameter_class=ManualParameter)
+
+        # FIXME: note the interdependency with RO_Lutman.LO_freq and LO.frequency
+        self.add_parameter(
+            'ro_freq_mod',
+            label='Readout-modulation frequency',
+            unit='Hz',
+            initial_value=-20e6,
+            parameter_class=ManualParameter)
+
+        # Mixer offsets correction, RO pulse
+        # NB: shared between qubits on same feedline
+        self.add_parameter(
+            'ro_pulse_mixer_offs_I',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'ro_pulse_mixer_offs_Q',
+            unit='V',
+            parameter_class=ManualParameter,
+            initial_value=0)
+        self.add_parameter(
+            'ro_pulse_mixer_alpha',
+            initial_value=1,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_mixer_phi',
+            initial_value=0,
+            parameter_class=ManualParameter)
+
+        #############################
+        # RO acquisition parameters #
+        #############################
+
         self.add_parameter(
             'ro_acq_weight_type',
             initial_value='SSB',
             vals=vals.Enum('SSB', 'DSB', 'optimal', 'optimal IQ'),
             docstring=(
-                'Determines what type of integration weights to use: '
-                '\n\t SSB: Single sideband demodulation\n\t'
-                'DSB: Double sideband demodulation\n\t'
-                'optimal: waveforms specified in "RO_acq_weight_func_I" '
-                '\n\tand "RO_acq_weight_func_Q"'),
+                'Determines what type of integration weights to use:\n'
+                '\tSSB: Single sideband demodulation\n'
+                '\tDSB: Double sideband demodulation\n'
+                '\toptimal: waveforms specified in "RO_acq_weight_func_I" and "RO_acq_weight_func_Q"'),
             parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_acq_weight_chI',
+            initial_value=0,
+            docstring=(
+                'Determines the I-channel for integration. When the'
+                ' ro_acq_weight_type is optimal only this channel will '
+                'affect the result.'),
+            vals=vals.Ints(0, 9),
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_acq_weight_chQ',
+            initial_value=1,
+            docstring=('Determines the Q-channel for integration.'),
+            vals=vals.Ints(0, 9),
+            parameter_class=ManualParameter)
+
+        # Mixer correction parameters
+        # NB: shared between qubits on same feedline
+        self.add_parameter(
+            'ro_acq_mixer_phi',
+            unit='degree',
+            label='Readout mixer phi',
+            vals=vals.Numbers(),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('acquisition mixer phi, used for mixer deskewing in real time'))
+        self.add_parameter(
+            'ro_acq_mixer_alpha',
+            unit='',
+            label='Readout mixer alpha',
+            vals=vals.Numbers(min_value=0.8),
+            initial_value=1,
+            parameter_class=ManualParameter,
+            docstring=('acquisition mixer alpha, used for mixer deskewing in real time'))
+
 
     def _add_prep_parameters(self):
         # FIXME: these are parameters referred to in functions "prepare_*".
@@ -608,37 +695,6 @@ class HAL_ShimSQ(Qubit):
             unit='Hz',
             parameter_class=ManualParameter)
 
-        ################################
-        # RO stimulus/pulse parameters #
-        ################################
-        self.add_parameter(
-            'ro_freq',
-            label='Readout frequency',
-            unit='Hz',
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_freq_mod',
-            label='Readout-modulation frequency',
-            unit='Hz',
-            initial_value=-20e6,
-            parameter_class=ManualParameter)
-
-        # NB: shared between qubits on same feedline
-        self.add_parameter(
-            'ro_pow_LO',
-            label='RO power LO',
-            unit='dBm',
-            initial_value=20,
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'ro_pulse_delay', unit='s',
-            label='Readout pulse delay',
-            vals=vals.Numbers(0, 1e-6),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=('The delay time for the readout pulse'))
-
         #############################
         # RO pulse parameters
         # FIXME: move to HAL_Transmon
@@ -648,6 +704,14 @@ class HAL_ShimSQ(Qubit):
             initial_value='simple',
             vals=vals.Enum('gated', 'simple', 'up_down_down', 'up_down_down_final'),
             parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_pulse_delay', unit='s',
+            label='Readout pulse delay',
+            vals=vals.Numbers(0, 1e-6),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('The delay time for the readout pulse'))
 
         self.add_parameter(
             'ro_pulse_length',
@@ -704,27 +768,6 @@ class HAL_ShimSQ(Qubit):
             initial_value=0,
             parameter_class=ManualParameter)
 
-        # Mixer offsets correction, RO pulse
-        # NB: shared between qubits on same feedline
-        self.add_parameter(
-            'ro_pulse_mixer_offs_I',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'ro_pulse_mixer_offs_Q',
-            unit='V',
-            parameter_class=ManualParameter,
-            initial_value=0)
-        self.add_parameter(
-            'ro_pulse_mixer_alpha',
-            initial_value=1,
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_pulse_mixer_phi',
-            initial_value=0,
-            parameter_class=ManualParameter)
-
         #############################
         # RO acquisition parameters #
         #############################
@@ -757,6 +800,7 @@ class HAL_ShimSQ(Qubit):
             vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
             parameter_class=ManualParameter)
 
+        # NB: passed to RO_LutMan.acquisition_delay
         self.add_parameter(
             'ro_acq_delay',
             unit='s',
@@ -781,40 +825,6 @@ class HAL_ShimSQ(Qubit):
             label='Optimized weights for Q channel',
             parameter_class=ManualParameter)
 
-        self.add_parameter(
-            'ro_acq_weight_chI',
-            initial_value=0,
-            docstring=(
-                'Determines the I-channel for integration. When the'
-                ' ro_acq_weight_type is optimal only this channel will '
-                'affect the result.'),
-            vals=vals.Ints(0, 9),
-            parameter_class=ManualParameter)
-        self.add_parameter(
-            'ro_acq_weight_chQ',
-            initial_value=1,
-            docstring=('Determines the Q-channel for integration.'),
-            vals=vals.Ints(0, 9),
-            parameter_class=ManualParameter)
-
-        # Mixer correction parameters
-        # NB: shared between qubits on same feedline
-        self.add_parameter(
-            'ro_acq_mixer_phi',
-            unit='degree',
-            label='Readout mixer phi',
-            vals=vals.Numbers(),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=('acquisition mixer phi, used for mixer deskewing in real time'))
-        self.add_parameter(
-            'ro_acq_mixer_alpha',
-            unit='',
-            label='Readout mixer alpha',
-            vals=vals.Numbers(min_value=0.8),
-            initial_value=1,
-            parameter_class=ManualParameter,
-            docstring=('acquisition mixer alpha, used for mixer deskewing in real time'))
 
         # FIXME!: Dirty hack because of qusurf issue #63, added 2 hardcoded
         #  delay samples in the optimized weights
@@ -831,32 +841,34 @@ class HAL_ShimSQ(Qubit):
         self.add_parameter(
             'ro_acq_digitized',
             vals=vals.Bool(),
+            docstring='perform hardware thresholding, yielding digitized acquisition results',
             initial_value=False,
             parameter_class=ManualParameter)
         self.add_parameter(
             'ro_acq_threshold',
             unit='dac-value',
+            docstring='threshold used for hardware thresholding',
             initial_value=0,
             parameter_class=ManualParameter)
         self.add_parameter(
             'ro_acq_rotated_SSB_when_optimal',
             vals=vals.Bool(),
-            docstring=('bypasses optimal weights, and uses rotated SSB instead'),
+            docstring='bypasses optimal weights, and uses rotated SSB instead',
             initial_value=False,
             parameter_class=ManualParameter)
         self.add_parameter(
             'ro_acq_rotated_SSB_rotation_angle',
             vals=vals.Numbers(min_value=-np.pi, max_value=np.pi),
-            docstring=('uses this as the rotation angle for rotated SSB'),
+            docstring='uses this as the rotation angle for rotated SSB',
             initial_value=0,
             parameter_class=ManualParameter)
         self.add_parameter(
             'ro_acq_integration_length_weigth_function',
+            unit='s',
             vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
-            docstring=('sets weight function elements to 0 beyond this time'),
+            docstring='sets weight function elements to 0 beyond this time',
             initial_value=4096 / 1.8e9,
             parameter_class=ManualParameter)
-
 
     ##########################################################################
     # Private parameter helpers
@@ -961,7 +973,7 @@ class HAL_ShimSQ(Qubit):
 
     # FIXME: UHFQC specific
     def _prep_ro_instantiate_detectors(self):
-        self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
+        self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())  # FIXME: changes MC state
 
         # determine ro_channels and result_logging_mode (needed for detectors)
         if 'optimal' in self.ro_acq_weight_type():
@@ -975,7 +987,6 @@ class HAL_ShimSQ(Qubit):
                 result_logging_mode = 'digitized'
 
             # Update the RO threshold
-            acq_ch = self.ro_acq_weight_chI()
             # The threshold that is set in the hardware needs to be
             # corrected for the offset as this is only applied in
             # software.
@@ -983,8 +994,11 @@ class HAL_ShimSQ(Qubit):
                 threshold = 32
                 warnings.warn(f'Clipping {self.name}.ro_acq_threshold {self.ro_acq_threshold()}>32')
                 # working around the limitation of threshold in UHFQC which cannot be >abs(32).
+                # FIXME: this limit of 32 seems outdated, see 'examples/uhfqa/example_threshold.py' in Python
+                #  package zhinst, which uses a default value of 500
             else:
                 threshold = self.ro_acq_threshold()
+            acq_ch = self.ro_acq_weight_chI()
             self.instr_acquisition.get_instr().set('qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
         else:
@@ -1042,6 +1056,7 @@ class HAL_ShimSQ(Qubit):
             self.ro_freq_mod(mod_freq)
             log.info("Setting modulation freq of {} to {}".format(self.name, mod_freq))
         else:
+            # NB: the LO is shared between multiple qubits, so conflicts may arise
             LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
 
         LO.on()
@@ -1089,17 +1104,17 @@ class HAL_ShimSQ(Qubit):
         if 'gated' in self.ro_pulse_type().lower():
             UHFQC.awg_sequence_acquisition()
         else:
-            # propagate parameters to readout lutman
             ro_lm = self.instr_LutMan_RO.get_instr()
             ro_lm.AWG(self.instr_acquisition())
-
             idx = self.cfg_qubit_nr()
-            # These parameters affect all resonators
+
+            # propagate parameters affecting all resonators to readout lutman
             ro_lm.set('resonator_combinations', [[idx]])
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
             ro_lm.set('mixer_alpha', self.ro_pulse_mixer_alpha())
             ro_lm.set('mixer_phi', self.ro_pulse_mixer_phi())
 
+            # propagate pulse parameters for this qubit
             ro_lm.set('M_modulation_R{}'.format(idx), self.ro_freq_mod())
             ro_lm.set('M_length_R{}'.format(idx), self.ro_pulse_length())
             if CW:
@@ -1116,6 +1131,7 @@ class HAL_ShimSQ(Qubit):
             ro_lm.set('M_down_amp1_R{}'.format(idx), self.ro_pulse_down_amp1())
             ro_lm.set('M_down_phi1_R{}'.format(idx), self.ro_pulse_down_phi1())
 
+            # propagate acquisition delay (NB: affects all resonators)
             ro_lm.acquisition_delay(self.ro_acq_delay())  # FIXME: better located in _prep_ro_integration_weights?
 
             if upload:
@@ -1132,6 +1148,7 @@ class HAL_ShimSQ(Qubit):
                               'present in resonator_combinations of the readout lutman.')
 
     # FIXME: UHFQC specific
+    # FIXME: align with HAL_ShimMQ::_prep_ro_integration_weights
     def _prep_ro_integration_weights(self):
         """
         Sets the ro acquisition integration weights.
@@ -1149,14 +1166,14 @@ class HAL_ShimSQ(Qubit):
             if self.ro_acq_weight_type() == 'SSB':
                 UHFQC.prepare_SSB_weight_and_rotation(
                     IF=self.ro_freq_mod(),
-                    weight_function_I=self.ro_acq_weight_chI(),  # FIXME: 'weight_function_I' is a misnomer, it specifies a channel
-                    weight_function_Q=self.ro_acq_weight_chQ()
+                    weight_chI=self.ro_acq_weight_chI(),
+                    weight_chQ=self.ro_acq_weight_chQ()
                 )
             elif self.ro_acq_weight_type() == 'DSB':
                 UHFQC.prepare_DSB_weight_and_rotation(
                     IF=self.ro_freq_mod(),
-                    weight_function_I=self.ro_acq_weight_chI(),
-                    weight_function_Q=self.ro_acq_weight_chQ()
+                    weight_chI=self.ro_acq_weight_chI(),
+                    weight_chQ=self.ro_acq_weight_chQ()
                 )
             elif 'optimal' in self.ro_acq_weight_type():
                 if (self.ro_acq_weight_func_I() is None or self.ro_acq_weight_func_Q() is None):
@@ -1164,6 +1181,7 @@ class HAL_ShimSQ(Qubit):
                 elif self.ro_acq_rotated_SSB_when_optimal():
                     # this allows bypassing the optimal weights for poor SNR qubits
                     # working around the limitation of threshold in UHFQC which cannot be >abs(32)
+                    # FIXME: limit of 32 seems outdated, see comment in _prep_ro_instantiate_detectors
                     if self.ro_acq_digitized() and abs(self.ro_acq_threshold()) > 32:
                         scaling_factor = 32 / self.ro_acq_threshold()
                     else:
@@ -1171,8 +1189,8 @@ class HAL_ShimSQ(Qubit):
 
                     UHFQC.prepare_SSB_weight_and_rotation(
                         IF=self.ro_freq_mod(),
-                        weight_function_I=self.ro_acq_weight_chI(),
-                        weight_function_Q=None,
+                        weight_chI=self.ro_acq_weight_chI(),
+                        weight_chQ=None,
                         rotation_angle=self.ro_acq_rotated_SSB_rotation_angle(),
                         length=self.ro_acq_integration_length_weigth_function(),
                         scaling_factor=scaling_factor

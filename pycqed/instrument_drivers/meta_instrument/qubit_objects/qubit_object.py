@@ -1165,7 +1165,7 @@ class Qubit(Instrument):
                 the last recorded frequency, with 100 kHz step
         """
 
-        # This snippet exists to be backwards compatible 9/2017.
+        # This snippet exists to be backwards compatible 9/2017. FIXME: cleanup
         try:
             freq_res_par = self.freq_res
             freq_RO_par = self.ro_freq

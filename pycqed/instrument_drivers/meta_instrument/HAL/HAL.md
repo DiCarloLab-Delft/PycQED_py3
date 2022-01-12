@@ -12,6 +12,7 @@ Originally, handling of instrument hardware is performed in the following classe
 The architecture/implementation has the following problems:
 - hardware support scattered over many files
 - duplicate functionality in single vs. multi qubit support (`CCLight_Transmon` vs. `DeviceCCL`)
+    - some parameters are also duplicated
 - LutMans
     - manual control of waveform set used
     - manual control of waveform uploading

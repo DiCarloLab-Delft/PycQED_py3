@@ -18,7 +18,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.measurement.measurement_control import MeasurementControl
-from pycqed.measurement.detector_functions import Detector_Function
+from pycqed.measurement.detector_functions import Detector_Function, Multi_Detector
 
 from qcodes import Instrument
 from qcodes.utils import validators as vals
@@ -65,38 +65,23 @@ class HAL_ShimMQ(Instrument):
 
         # 2. Setting the latencies
         cc = self.instr_CC.get_instr()
-        if cc.IDN()['model']=='CCL':  # FIXME: CCL is deprecated
-            latencies = OrderedDict(
-                [
-                    ("ro_0", self.tim_ro_latency_0()),
-                    ("ro_1", self.tim_ro_latency_1()),
-                    # ('ro_2', self.tim_ro_latency_2()),
-                    ("mw_0", self.tim_mw_latency_0()),
-                    ("mw_1", self.tim_mw_latency_1()),
-                    ("flux_0", self.tim_flux_latency_0())
-                    # ('flux_1', self.tim_flux_latency_1()),
-                    # ('flux_2', self.tim_flux_latency_2()),
-                    # ('mw_2', self.tim_mw_latency_2()),
-                    # ('mw_3', self.tim_mw_latency_3()),
-                    # ('mw_4', self.tim_mw_latency_4())]
-                ]
-            )
-        else:
-            latencies = OrderedDict(
-                [
-                    ("ro_0", self.tim_ro_latency_0()),
-                    ("ro_1", self.tim_ro_latency_1()),
-                    ("ro_2", self.tim_ro_latency_2()),
-                    ("flux_0", self.tim_flux_latency_0()),
-                    ("flux_1", self.tim_flux_latency_1()),
-                    ("flux_2", self.tim_flux_latency_2()),
-                    ("mw_0", self.tim_mw_latency_0()),
-                    ("mw_1", self.tim_mw_latency_1()),
-                    ("mw_2", self.tim_mw_latency_2()),
-                    ("mw_3", self.tim_mw_latency_3()),
-                    ("mw_4", self.tim_mw_latency_4()),
-                ]
-            )
+
+        # FIXME: keys hardcoded, must match those set in dio_map
+        latencies = OrderedDict(
+            [
+                ("ro_0", self.tim_ro_latency_0()),
+                ("ro_1", self.tim_ro_latency_1()),
+                ("ro_2", self.tim_ro_latency_2()),
+                ("flux_0", self.tim_flux_latency_0()),
+                ("flux_1", self.tim_flux_latency_1()),
+                ("flux_2", self.tim_flux_latency_2()),
+                ("mw_0", self.tim_mw_latency_0()),
+                ("mw_1", self.tim_mw_latency_1()),
+                ("mw_2", self.tim_mw_latency_2()),
+                ("mw_3", self.tim_mw_latency_3()),
+                ("mw_4", self.tim_mw_latency_4()),
+            ]
+        )
 
         # NB: Mind that here number precision matters a lot!
         # Triple check everything if any changes are to be made
@@ -293,6 +278,7 @@ class HAL_ShimMQ(Instrument):
 
     ##########################################################################
     # public functions: get_*_detector
+    # FIXME: align with HAL_ShimSQ::_prep_ro_instantiate_detectors
     ##########################################################################
 
     def get_correlation_detector(
@@ -305,11 +291,9 @@ class HAL_ShimMQ(Instrument):
         if self.ro_acq_digitized():
             log.warning('Digitized mode gives bad results')
         if len(qubits) != 2:
-            raise ValueError("Not possible to define correlation "
-                             "detector for more than two qubits")
+            raise ValueError("Not possible to define correlation detector for more than two qubits")
         if self.ro_acq_weight_type() != 'optimal':
-            raise ValueError('Correlation detector only works '
-                             'with optimal weights')
+            raise ValueError('Correlation detector only works with optimal weights')
         q0 = self.find_instrument(qubits[0])
         q1 = self.find_instrument(qubits[1])
 
@@ -344,7 +328,7 @@ class HAL_ShimMQ(Instrument):
             self,
             qubits=None,
             result_logging_mode='raw'
-    ) -> Detector_Function:
+    ) -> Multi_Detector:
         # FIXME: qubits passed to but not used in function
 
         if self.ro_acq_weight_type() == 'SSB':
@@ -390,7 +374,7 @@ class HAL_ShimMQ(Instrument):
         return int_log_det
 
 
-    def get_input_avg_det(self, **kw) -> Detector_Function:
+    def get_input_avg_det(self, **kw) -> Multi_Detector:
         """
         Create an multi detector based input average detector.
 
@@ -425,7 +409,7 @@ class HAL_ShimMQ(Instrument):
         return input_average_detector
 
 
-    def get_int_avg_det(self, **kw) -> Detector_Function:
+    def get_int_avg_det(self, **kw) -> Multi_Detector:
         """
         Create an multi detector based integration average detector.
 
@@ -551,6 +535,7 @@ class HAL_ShimMQ(Instrument):
         # actually, it should be possible to build the integration
         # weights obeying different settings for different
         # qubits, but for now we use a fixed common value.
+        # NB: duplicate of HAL_ShimSQ
         self.add_parameter(
             "ro_acq_integration_length",
             initial_value=500e-9,
@@ -558,6 +543,7 @@ class HAL_ShimMQ(Instrument):
             parameter_class=ManualParameter,
         )
 
+        # NB: duplicate of HAL_ShimSQ
         self.add_parameter(
             "ro_pow_LO",
             label="RO power LO",
@@ -566,6 +552,7 @@ class HAL_ShimMQ(Instrument):
             parameter_class=ManualParameter,
         )
 
+        # NB: duplicate of HAL_ShimSQ
         self.add_parameter(
             "ro_acq_averages",
             initial_value=1024,
@@ -573,6 +560,7 @@ class HAL_ShimMQ(Instrument):
             parameter_class=ManualParameter,
         )
 
+        # NB: duplicate of HAL_ShimSQ
         self.add_parameter(
             "ro_acq_delay",
             unit="s",
@@ -588,21 +576,21 @@ class HAL_ShimMQ(Instrument):
             ),
         )
 
-        ro_acq_docstr = (
-            "Determines what type of integration weights to use: "
-            "\n\t SSB: Single sideband demodulation\n\t"
-            'optimal: waveforms specified in "RO_acq_weight_func_I" '
-            '\n\tand "RO_acq_weight_func_Q"'
-        )
-
+        # NB: duplicate of HAL_ShimSQ
         self.add_parameter(
             "ro_acq_weight_type",
             initial_value="SSB",
-            vals=vals.Enum("SSB", "optimal","optimal IQ"),
-            docstring=ro_acq_docstr,
+            vals=vals.Enum("SSB", "optimal", "optimal IQ"),  # FIXME: does not match HAL_ShimSQ
+            docstring=(
+                "Determines what type of integration weights to use: "
+                "\n\t SSB: Single sideband demodulation\n\t"
+                'optimal: waveforms specified in "RO_acq_weight_func_I" '
+                '\n\tand "RO_acq_weight_func_Q"'
+            ),
             parameter_class=ManualParameter,
         )
 
+        # NB: duplicate of HAL_ShimSQ
         self.add_parameter(
             "ro_acq_digitized",
             vals=vals.Bool(),
@@ -623,6 +611,7 @@ class HAL_ShimMQ(Instrument):
         self._add_tim_parameters()
         self._add_ro_parameters()
 
+        # NB: duplicate of HAL_Transmon
         self.add_parameter(
             "cfg_openql_platform_fn",
             label="OpenQL platform configuration filename",
@@ -645,6 +634,7 @@ class HAL_ShimMQ(Instrument):
             vals=vals.Lists(elt_validator=vals.Lists(elt_validator=vals.Strings()))
         )
 
+        # FIXME: unused
         self.add_parameter(
             'qubits_by_feedline',
             parameter_class=ManualParameter,
@@ -656,6 +646,7 @@ class HAL_ShimMQ(Instrument):
         self.add_parameter(
             "dio_map",
             docstring="The map between DIO channel number and functionality (ro_x, mw_x, flux_x). "
+            "FIXME: Keys must match those hardcoded in prepare_timing()"
             "Tip: run `device.dio_map?` to print the docstring of this parameter",
             initial_value=None,
             set_cmd=self._set_dio_map,
@@ -666,6 +657,7 @@ class HAL_ShimMQ(Instrument):
     # private functions: parameter helpers
     ##########################################################################
 
+    # FIXME: the keys must actually fully match those hardcoded in prepare_timing()
     def _set_dio_map(self, dio_map_dict):
         allowed_keys = {"ro_", "mw_", "flux_"}
         for key in dio_map_dict:
@@ -785,6 +777,7 @@ class HAL_ShimMQ(Instrument):
 
         return acq_ch_map
 
+    # FIXME: align with HAL_ShimSQ::_prep_ro_integration_weights
     def _prep_ro_integration_weights(self, qubits):
         """
         Set the acquisition integration weights on each channel.
@@ -803,8 +796,8 @@ class HAL_ShimMQ(Instrument):
 
                 acq_instr.prepare_SSB_weight_and_rotation(
                     IF=qb.ro_freq_mod(),
-                    weight_function_I=qb.ro_acq_weight_chI(),
-                    weight_function_Q=qb.ro_acq_weight_chQ(),
+                    weight_chI=qb.ro_acq_weight_chI(),
+                    weight_chQ=qb.ro_acq_weight_chQ(),
                 )
 
         elif 'optimal' in self.ro_acq_weight_type():
@@ -818,8 +811,7 @@ class HAL_ShimMQ(Instrument):
                 if opt_WI is None or opt_WQ is None:
                     # do not raise an exception as it should be possible to
                     # run input avg experiments to calibrate the optimal weights.
-                    log.warning("No optimal weights defined for"
-                                " {}, not updating weights".format(qb_name))
+                    log.warning("No optimal weights defined for {}, not updating weights".format(qb_name))
                 else:
                     acq_instr.set("qas_0_integration_weights_{}_real".format(qb.ro_acq_weight_chI()), opt_WI,)
                     acq_instr.set("qas_0_integration_weights_{}_imag".format(qb.ro_acq_weight_chI()), opt_WQ,)
@@ -840,20 +832,18 @@ class HAL_ShimMQ(Instrument):
                         # working around the limitation of threshold in UHFQC
                         # which cannot be >abs(32).
                         # See also self._prep_ro_integration_weights scaling the weights
+                        # FIXME: this limit of 32 seems outdated, see 'examples/uhfqa/example_threshold.py' in Python
+                        #  package zhinst, which uses a default value of 500. Also see comments in HAL_Shim_SQ
                     else:
                         threshold = qb.ro_acq_threshold()
 
-                    qb.instr_acquisition.get_instr().set(
-                        "qas_0_thresholds_{}_level".format(qb.ro_acq_weight_chI()),
-                        threshold,
-                    )
+                    qb.instr_acquisition.get_instr().set(f"qas_0_thresholds_{qb.ro_acq_weight_chI()}_level", threshold)
                     log.info("Setting threshold of {} to {}".format(qb.name, threshold))
 
             # Note, no support for optimal IQ in mux RO
             # Note, no support for ro_cq_rotated_SSB_when_optimal
         else:
-            raise NotImplementedError('ro_acq_weight_type "{}" not supported'.format(
-                self.ro_acq_weight_type()))
+            raise NotImplementedError('ro_acq_weight_type "{}" not supported'.format(self.ro_acq_weight_type()))
 
     # FIXME: align with HAL_ShimSQ::_prep_ro_pulses
     def _prep_ro_pulses(self, qubits):
@@ -968,4 +958,3 @@ class HAL_ShimMQ(Instrument):
             # self.instr_CC.get_instr().set(
             #     'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
             #     qb.mw_vsm_delay())
-

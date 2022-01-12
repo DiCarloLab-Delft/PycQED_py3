@@ -46,8 +46,6 @@ class Base_RO_LutMan(Base_LutMan):
             feedline_map='S7',
             **kw
     ):
-        if num_res > 10:  # FIXME: this is UHFQA limit
-            raise ValueError('At most 10 resonators can be read out.')
         self._num_res = num_res
         self._feedline_number = feedline_number
 
@@ -120,7 +118,7 @@ class Base_RO_LutMan(Base_LutMan):
             unit='s'
         )
 
-        # mixer corrections are done globally, can be specified per resonator
+        # mixer corrections are done globally
         self.add_parameter(
             'mixer_apply_predistortion_matrix',
             vals=vals.Bool(),
@@ -153,6 +151,7 @@ class Base_RO_LutMan(Base_LutMan):
             initial_value=0
         )
 
+        # pulse attributes
         self.add_parameter(
             'resonator_combinations',
             vals=vals.Lists(),
@@ -166,7 +165,6 @@ class Base_RO_LutMan(Base_LutMan):
             get_cmd=self._get_resonator_combinations
         )
 
-        # pulse attributes
         self.add_parameter(
             'pulse_type',
             vals=vals.Enum('M_up_down_down', 'M_simple', 'M_up_down_down_final'),
@@ -459,6 +457,9 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             feedline_map='S7',
             **kw
     ):
+        if num_res > 10:
+            raise ValueError('At most 10 resonators can be read out.')
+
         super().__init__(
             name,
             num_res=num_res,
@@ -467,6 +468,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             **kw
         )
 
+        # acquisition delay added in ZI Seqc program, see HAL_ShimSQ.ro_acq_delay
         self.add_parameter(
             'acquisition_delay',
             vals=vals.Numbers(min_value=0),
@@ -481,7 +483,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             parameter_class=ManualParameter,
             initial_value=5
         )
-        # Parameter that stores LO frequency
+        # Parameter that stores LO frequency.
+        # NB: this appears to be the primary place where this information is stored, it is not set from code within PycQED
         self.add_parameter(
             'LO_freq',
             vals=vals.Numbers(),
