@@ -1744,7 +1744,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         sim_control_CZ_par_name = "instr_sim_control_CZ_{}".format(which_gate)
         sim_control_CZ_name = self.get(sim_control_CZ_par_name)
         found_name = sim_control_CZ_name is not None
-        found_instr = self._all_instruments.get(sim_control_CZ_name) is not None
+        found_instr = self._all_lutmans.get(sim_control_CZ_name) is not None
         if found_name and found_instr:
             sim_control_CZ = self.find_instrument(sim_control_CZ_name)
             assert which_gate == sim_control_CZ.which_gate()

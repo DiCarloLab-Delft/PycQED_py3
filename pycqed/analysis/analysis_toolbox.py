@@ -8,8 +8,8 @@ import logging
 import pandas as pd
 import colorsys as colors
 # FIXME: was commented out, breaks code below
-#import qutip as qp
-#import qutip.metrics as qpmetrics
+import qutip as qtp
+import qutip.metrics as qpmetrics
 
 from copy import deepcopy
 from collections import OrderedDict as od
@@ -29,6 +29,8 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabe
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor)
 
+datadir = get_default_datadir()
+print('Data directory set to:', datadir)
 
 
 ######################################################################
@@ -2223,19 +2225,19 @@ def calculate_transmon_and_resonator_transitions(Ec, Ej, f_bus, gs, ng=0):
                                                       no_transitions=2,
                                                       ng=ng, dim=10,
                                                       return_injs=True)
-    H_q = qp.Qobj(np.diag((0, f01, f01+f12)))
-    H_q = qp.tensor(H_q, *[qp.qeye(max_ph+1)]*n_bus)
-    a_q = qp.Qobj(np.diag((1, np.abs(injs[2, 1]/injs[1, 0])), k=1))
-    a_q = qp.tensor(a_q, *[qp.qeye(max_ph+1)]*n_bus)
+    H_q = qtp.Qobj(np.diag((0, f01, f01 + f12)))
+    H_q = qtp.tensor(H_q, *[qtp.qeye(max_ph + 1)] * n_bus)
+    a_q = qtp.Qobj(np.diag((1, np.abs(injs[2, 1] / injs[1, 0])), k=1))
+    a_q = qtp.tensor(a_q, *[qtp.qeye(max_ph + 1)] * n_bus)
 
     # bus operators
     n_r_list = []
     a_r_list = []
 
-    a_r_generating_list = [qp.destroy(
-        max_ph+1)] + [qp.qeye(max_ph+1)]*(n_bus-1)
+    a_r_generating_list = [qtp.destroy(
+        max_ph+1)] + [qtp.qeye(max_ph + 1)] * (n_bus - 1)
     for fb, g in zip(f_bus, gs):
-        a_r = qp.tensor(qp.qeye(3), *a_r_generating_list)
+        a_r = qtp.tensor(qtp.qeye(3), *a_r_generating_list)
         a_r_list.append(a_r)
         n_r_list.append(a_r.dag() * a_r)
         a_r_generating_list = a_r_generating_list[-1:]+a_r_generating_list[:-1]
@@ -2250,19 +2252,19 @@ def calculate_transmon_and_resonator_transitions(Ec, Ej, f_bus, gs, ng=0):
     ees, ess = H.eigenstates()
 
     # define bare qubit states
-    qubit_g = qp.tensor(qp.fock(3, 0), *[qp.fock(max_ph+1, 0)]*n_bus)
-    qubit_e = qp.tensor(qp.fock(3, 1), *[qp.fock(max_ph+1, 0)]*n_bus)
-    qubit_f = qp.tensor(qp.fock(3, 2), *[qp.fock(max_ph+1, 0)]*n_bus)
+    qubit_g = qtp.tensor(qtp.fock(3, 0), *[qtp.fock(max_ph + 1, 0)] * n_bus)
+    qubit_e = qtp.tensor(qtp.fock(3, 1), *[qtp.fock(max_ph + 1, 0)] * n_bus)
+    qubit_f = qtp.tensor(qtp.fock(3, 2), *[qtp.fock(max_ph + 1, 0)] * n_bus)
 
     # define bare bus states
     bus_e_list = []
     bus_e_qubit_e_list = []
     bus_e_generating_list = [
-        qp.fock(max_ph+1, 1)] + [qp.fock(max_ph+1, 0)]*(n_bus-1)
+        qtp.fock(max_ph + 1, 1)] + [qtp.fock(max_ph + 1, 0)] * (n_bus - 1)
     for fb, g in zip(f_bus, gs):
-        bus_e = qp.tensor(qp.fock(3, 0), *bus_e_generating_list)
+        bus_e = qtp.tensor(qtp.fock(3, 0), *bus_e_generating_list)
         bus_e_list.append(bus_e)
-        bus_e_qubit_e = qp.tensor(qp.fock(3, 1), *bus_e_generating_list)
+        bus_e_qubit_e = qtp.tensor(qtp.fock(3, 1), *bus_e_generating_list)
         bus_e_qubit_e_list.append(bus_e_qubit_e)
         bus_e_generating_list = bus_e_generating_list[-1:] + \
             bus_e_generating_list[:-1]
@@ -2950,14 +2952,14 @@ def chirpz(x, A, W, M):
     for A and W complex, which gives
     X(z_k) = \sum_{n=0}^{N-1} x_n z_k^{-n}
     """
-    A = np.complex(A)
-    W = np.complex(W)
-    if np.issubdtype(np.complex, x.dtype) or np.issubdtype(np.float, x.dtype):
+    A = complex(A)
+    W = complex(W)
+    if np.issubdtype(complex, x.dtype) or np.issubdtype(float, x.dtype):
         dtype = x.dtype
     else:
         dtype = float
 
-    x = np.asarray(x, dtype=np.complex)
+    x = np.asarray(x, dtype=complex)
 
     N = x.size
     L = int(2**np.ceil(np.log2(M+N-1)))
@@ -2966,7 +2968,7 @@ def chirpz(x, A, W, M):
     y = np.power(A, -n) * np.power(W, n**2 / 2.) * x
     Y = np.fft.fft(y, L)
 
-    v = np.zeros(L, dtype=np.complex)
+    v = np.zeros(L, dtype=complex)
     v[:M] = np.power(W, -n[:M]**2/2.)
     v[L-N+1:] = np.power(W, -n[N-1:0:-1]**2/2.)
     V = np.fft.fft(v)

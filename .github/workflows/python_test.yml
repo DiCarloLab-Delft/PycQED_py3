@@ -6,12 +6,11 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       max-parallel: 4
       matrix:
-        #python-version: [3.6, 3.7]
-        # disabled 3.7 because of 'AttributeError: 'str' object has no attribute 'decode''
-        python-version: [3.6]
+        python-version: [3.6, 3.7]
 
     steps:
     - uses: actions/checkout@v1
@@ -48,11 +47,9 @@ jobs:
     - name: Test with pytest
       run: |
         py.test pycqed/tests --cov=pycqed --cov-report xml --cov-report html --cov-config=.coveragerc
-# FIXME: codacy upload broken, 20211208
-#    - name: Upload code coverage report
-#      run: |
-#        python-codacy-coverage -r coverage.xml
-#        codecov
-#      env: # set secrets as environmental variables
-#        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
-#        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    - name: Upload code coverage report
+      run: |
+        bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage.xml
+        codecov
+      env: # set secrets as environmental variables
+        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}

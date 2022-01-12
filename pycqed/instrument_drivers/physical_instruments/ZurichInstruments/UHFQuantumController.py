@@ -130,7 +130,7 @@ class UHFQC(uhf.UHFQA_core, DIO.CalInterface):
             server:         (str) the host where the ziDataServer is running (if not '' then used instead of address)
         """
         t0 = time.time()
-        
+
         self._use_dio = use_dio
 
         # Used for extra DIO output to CC for debugging
@@ -215,16 +215,15 @@ class UHFQC(uhf.UHFQA_core, DIO.CalInterface):
     # 'public' functions: weight & matrix function helpers
     ##########################################################################
 
-    def prepare_SSB_weight_and_rotation(self, IF,
-                                        weight_function_I=0,
-                                        weight_function_Q=1,
-                                        rotation_angle=0,
-                                        length=4096 / 1.8e9,
-                                        scaling_factor=1) -> None:
-# FIXME: merge conflict 20200918
-#=======
-#    def check_errors(self, errors_to_ignore=None) -> None:
-#>>>>>>> ee1ccf208faf635329ea2c979da5757ce4ce8e14
+    def prepare_SSB_weight_and_rotation(
+            self,
+            IF,
+            weight_chI=0,
+            weight_chQ=1,
+            rotation_angle=0,
+            length=4096 / 1.8e9,
+            scaling_factor=1
+    ) -> None:
         """
         Sets default integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
@@ -238,32 +237,29 @@ class UHFQC(uhf.UHFQA_core, DIO.CalInterface):
             # setting the samples beyond the length to 0
             cosI[max_sample:] = 0
             sinI[max_sample:] = 0
-        self.set('qas_0_integration_weights_{}_real'.format(weight_function_I),
-                 np.array(cosI))
-        self.set('qas_0_integration_weights_{}_imag'.format(weight_function_I),
-                 np.array(sinI))
-        self.set('qas_0_rotations_{}'.format(
-            weight_function_I), scaling_factor*(1.0 + 1.0j))
-        if weight_function_Q != None:
-            self.set('qas_0_integration_weights_{}_real'.format(weight_function_Q),
-                     np.array(sinI))
-            self.set('qas_0_integration_weights_{}_imag'.format(weight_function_Q),
-                     np.array(cosI))
-            self.set('qas_0_rotations_{}'.format(
-                weight_function_Q), scaling_factor*(1.0 - 1.0j))
+        self.set(f'qas_0_integration_weights_{weight_chI}_real', np.array(cosI))
+        self.set(f'qas_0_integration_weights_{weight_chI}_imag', np.array(sinI))
+        self.set(f'qas_0_rotations_{weight_chI}', scaling_factor * (1.0 + 1.0j))
+        if weight_chQ != None:
+            self.set(f'qas_0_integration_weights_{weight_chQ}_real', np.array(sinI))
+            self.set(f'qas_0_integration_weights_{weight_chQ}_imag', np.array(cosI))
+            self.set(f'qas_0_rotations_{weight_chQ}', scaling_factor * (1.0 - 1.0j))
 
-    def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1) -> None:
+    def prepare_DSB_weight_and_rotation(
+            self,
+            IF,
+            weight_chI=0,
+            weight_chQ=1
+    ) -> None:
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2 * np.pi*IF*tbase))
         sinI = np.array(np.sin(2 * np.pi*IF*tbase))
-        self.set('qas_0_integration_weights_{}_real'.format(weight_function_I),
-                 np.array(cosI))
-        self.set('qas_0_integration_weights_{}_real'.format(weight_function_Q),
-                 np.array(sinI))
+        self.set(f'qas_0_integration_weights_{weight_chI}_real', np.array(cosI))
+        self.set(f'qas_0_integration_weights_{weight_chQ}_real', np.array(sinI))
         # the factor 2 is needed so that scaling matches SSB downconversion
-        self.set('qas_0_rotations_{}'.format(weight_function_I), 2.0 + 0.0j)
-        self.set('qas_0_rotations_{}'.format(weight_function_Q), 2.0 + 0.0j)
+        self.set(f'qas_0_rotations_{weight_chI}', 2.0 + 0.0j)
+        self.set(f'qas_0_rotations_{weight_chQ}', 2.0 + 0.0j)
 
     ##########################################################################
     # Overriding private ZI_base_instrument methods
@@ -1114,7 +1110,7 @@ setTrigger(0);
           self.set('qas_0_result_enable', 0)
           self.set('qas_0_monitor_enable', 0)
           self.set('awgs_0_enable', 0)
-          
+
           for awg in [0]:
               if not self._ensure_activity(awg, mask_value=dio_mask):
                   raise uhf.ziUHFQCDIOActivityError('No or insufficient activity found on the DIO bits associated with AWG {}'.format(awg))
@@ -1142,7 +1138,7 @@ setTrigger(0);
 
           # Clear all detected errors (caused by DIO timing calibration)
           self.check_errors(errors_to_ignore=['AWGDIOTIMING'])
-        
+
         finally:
           # Restore settings either in case of an exception or if the DIO
           # routine finishes correctly

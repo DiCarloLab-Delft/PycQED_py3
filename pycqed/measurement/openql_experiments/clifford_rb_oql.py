@@ -499,10 +499,9 @@ def randomized_benchmarking(
                                     "2" * number_of_qubits]
                 p.add_multi_q_cal_points(qubits=qubits, combinations=combinations)
 
-    if 1:
-        p.compile()
-    else:
-        p.compile(p, extra_openql_options=[('VQ1Asm.verbose', 'no')])  # reduces output file size
+    p.compile()
+    # FIXME: old
+    # p.compile(p, extra_openql_options=[('VQ1Asm.verbose', 'no')])  # reduces output file size
 
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
