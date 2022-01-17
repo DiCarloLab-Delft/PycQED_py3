@@ -783,7 +783,7 @@ class HAL_Transmon(HAL_ShimSQ):
             print('Enter loop')
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+            self.int_avg_det_single._set_real_imag(False)
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Bus_spectroscopy_' + self.msmt_suffix + label)
         spec_source_bus.off()
@@ -985,7 +985,7 @@ class HAL_Transmon(HAL_ShimSQ):
             # Open the VSM channel
             VSM = self.instr_VSM.get_instr()
             ch_in = self.mw_vsm_ch_in()
-            # module 8 is hardcoded for use mixer calls (signal hound)
+            # FIXME: module 8 is hardcoded for use mixer calls (signal hound)
             VSM.set('mod8_marker_source'.format(ch_in), 'int')
             VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
             VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 1.0)
@@ -2451,7 +2451,7 @@ class HAL_Transmon(HAL_ShimSQ):
             IF=self.ro_freq_mod()))
         MC.set_sweep_points(freqs)
 
-        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_scan' + self.msmt_suffix + label)
 
@@ -2503,7 +2503,7 @@ class HAL_Transmon(HAL_ShimSQ):
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)
-        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_power_scan' + self.msmt_suffix + label, mode='2D')
 
@@ -2893,7 +2893,9 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         #  real_imag is acutally not polar and as such works for opt weights
-        self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state...
+        # FIXME: Hmmm, well, not really: the detectors are instantiated by prepare_for_timedomain() in
+        #  _prep_ro_instantiate_detectors(), and thus tend to get refreshed between calls (unless you skip the prepare)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_' + self.msmt_suffix)
         ma.Rabi_Analysis(label='rabi_')
@@ -2936,7 +2938,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         # real_imag is actually not polar and as such works for opt weights
-        self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_' + self.msmt_suffix)
 
@@ -4003,7 +4005,7 @@ class HAL_Transmon(HAL_ShimSQ):
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)
-        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         label = 'Photon_number_splitting'
         MC.run(name=label + self.msmt_suffix, mode='2D')
@@ -4083,7 +4085,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
-        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_dac_scan' + self.msmt_suffix + label, mode='2D')
 
@@ -4205,7 +4207,7 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
-        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(False)
         self.int_avg_det_single.always_prepare = True
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
@@ -4267,7 +4269,7 @@ class HAL_Transmon(HAL_ShimSQ):
             print('Enter loop')
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+            self.int_avg_det_single._set_real_imag(False)
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
 
@@ -4326,7 +4328,7 @@ class HAL_Transmon(HAL_ShimSQ):
         if self.cfg_spec_mode():
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+            self.int_avg_det_single._set_real_imag(False)
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='pulsed_marker_spectroscopy' + self.msmt_suffix + label)
 
@@ -4401,7 +4403,7 @@ class HAL_Transmon(HAL_ShimSQ):
             print('Enter loop')
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+            self.int_avg_det_single._set_real_imag(False)
             MC.set_detector_function(self.int_avg_det_single)
 
         # d = self.int_avg_det
@@ -4494,7 +4496,7 @@ class HAL_Transmon(HAL_ShimSQ):
             MC = self.instr_MC.get_instr()
 
         self.prepare_for_continuous_wave()
-        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(False)
 
         spec_source = self.hal_spec_source_on(f_01_power, mode == 'pulsed_marked')
 
@@ -4592,7 +4594,7 @@ class HAL_Transmon(HAL_ShimSQ):
         old_spec_pow = self.spec_pow()  # FIXME: changed by prepare_for_continuous_wave
 
         self.prepare_for_continuous_wave()
-        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(False)
 
         spec_source = self.hal_spec_source_on(f_01_power, mode == 'pulsed_marked')
 
@@ -4681,7 +4683,7 @@ class HAL_Transmon(HAL_ShimSQ):
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
-        self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        self.int_avg_det_single._set_real_imag(False)
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
@@ -4735,7 +4737,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
         self.ro_acq_digitized(False)  # FIXME: changes state
-        self.cfg_prepare_ro_awg(False)  # FIXME: changes state (old_ro_prepare_state above is unused)
+        self.cfg_prepare_ro_awg(False)  # FIXME: changes state (old_ro_prepare_state above is unused). # FIXME: seems useless as parameter is used by prepare_for_timedomain()
 
         sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
             LutMan=RO_lutman,
@@ -4783,7 +4785,7 @@ class HAL_Transmon(HAL_ShimSQ):
         RO_lutman = self.instr_LutMan_RO.get_instr()
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
         self.ro_acq_digitized(False)
-        self.cfg_prepare_ro_awg(False)
+        self.cfg_prepare_ro_awg(False)  # FIXME: this seems to make little sense, since this parameter is used by prepare_for_timedomain()
 
         d = det.Function_Detector(
             self.measure_ssro,
@@ -5029,7 +5031,7 @@ class HAL_Transmon(HAL_ShimSQ):
                 IF=self.ro_freq_mod()))
             MC.set_sweep_points(freqs)
 
-            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+            self.int_avg_det_single._set_real_imag(False)
             MC.set_detector_function(self.int_avg_det_single)
             MC.run(name='Resonator_scan_' + pulse_comb + self.msmt_suffix)
 
@@ -6127,7 +6129,7 @@ class HAL_Transmon(HAL_ShimSQ):
         RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()), self.ro_pulse_amp())
 
         # save and change parameters
-        waveform_name = 'up_down_down_final'  # FIXME: misnomer
+        waveform_name = 'up_down_down_final'  # FIXME: misnomer waveform_name
         old_waveform_name = self.ro_pulse_type()
         self.ro_pulse_type(waveform_name)
         old_delay = self.ro_acq_delay()
@@ -6140,7 +6142,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # save and change some more parameters
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
-        self.cfg_prepare_ro_awg(False)
+        self.cfg_prepare_ro_awg(False)  # FIXME: seems useless as parameter is used by prepare_for_timedomain()
 
         sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
             LutMan=RO_lutman,
@@ -6211,7 +6213,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # save and change parameters
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
-        self.cfg_prepare_ro_awg(False)
+        self.cfg_prepare_ro_awg(False)  # FIXME: seems useless as parameter is used by prepare_for_timedomain()
 
         sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
             LutMan=RO_lutman,
@@ -6256,7 +6258,7 @@ class HAL_Transmon(HAL_ShimSQ):
         # to the measurement and depletion time + 60 ns buffer
         # it requires an optimized depletion pulse
         amps_rel = np.linspace(0, 0.5, 11) if amps_rel is None else amps_rel
-        self.cfg_prepare_ro_awg(True)
+        self.cfg_prepare_ro_awg(True)  # FIXME: changes state
 
         start_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -6407,7 +6409,7 @@ class HAL_Transmon(HAL_ShimSQ):
             print('Enter loop')
             MC.set_detector_function(self.UHFQC_spec_det)
         else:
-            self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+            self.int_avg_det_single._set_real_imag(False)
             MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Bus_flux_sweep_' + self.msmt_suffix + label, mode='2D')
 
@@ -6678,6 +6680,7 @@ class HAL_Transmon(HAL_ShimSQ):
         # FIXME: move LutMan support here from HAL_ShimSQ
         super()._prep_ro_pulse(upload, CW)
 
-    def _prep_ro_integration_weights(self):
-        # FIXME: move LutMan support here from HAL_ShimSQ
-        super()._prep_ro_integration_weights()
+    # def _prep_ro_integration_weights(self):
+    #     # FIXME: move LutMan support here from HAL_ShimSQ
+    #     # FIXME: there is no LutMan support for integration weights, these are calculated inside the UHF driver
+    #     super()._prep_ro_integration_weights()

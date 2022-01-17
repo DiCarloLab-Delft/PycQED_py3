@@ -20,7 +20,6 @@ from pycqed.measurement import detector_functions as det
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 
-from qcodes import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 
@@ -351,7 +350,7 @@ class HAL_ShimSQ(Qubit):
             docstring='The qubit number is used in the OpenQL compiler.')
 
         self.add_parameter(
-            'cfg_prepare_ro_awg',
+            'cfg_prepare_ro_awg',  # FIXME: controlled by HAL_Transmon
             vals=vals.Bool(),
             docstring=('If False, disables uploading pulses to UHFQC'),
             initial_value=True,
@@ -380,7 +379,8 @@ class HAL_ShimSQ(Qubit):
 
     def _add_mw_parameters(self):
         self.add_parameter(
-            'mw_awg_ch', parameter_class=ManualParameter,
+            'mw_awg_ch',
+            parameter_class=ManualParameter,
             initial_value=1,
             vals=vals.Ints())
 
@@ -401,7 +401,7 @@ class HAL_ShimSQ(Qubit):
 
         self.add_parameter(
             'mw_pow_td_source',
-            label='Time-domain power',
+            label='power for instr_LO_mw (when in time-domain mode)',
             unit='dBm',
             initial_value=20,
             parameter_class=ManualParameter)
@@ -637,7 +637,7 @@ class HAL_ShimSQ(Qubit):
         #############################
 
         self.add_parameter(
-            'ro_acq_weight_type',
+            'ro_acq_weight_type',  # FIXME: controlled by HAL_Transmon
             initial_value='SSB',
             vals=vals.Enum('SSB', 'DSB', 'optimal', 'optimal IQ'),
             docstring=(
@@ -700,7 +700,7 @@ class HAL_ShimSQ(Qubit):
         # FIXME: move to HAL_Transmon
         #############################
         self.add_parameter(
-            'ro_pulse_type',
+            'ro_pulse_type',  # FIXME: controlled by HAL_transmon
             initial_value='simple',
             vals=vals.Enum('gated', 'simple', 'up_down_down', 'up_down_down_final'),
             parameter_class=ManualParameter)
@@ -839,7 +839,7 @@ class HAL_ShimSQ(Qubit):
         # Single shot readout specific parameters
         #############################
         self.add_parameter(
-            'ro_acq_digitized',
+            'ro_acq_digitized',  # FIXME: controlled by HAL_Transmon
             vals=vals.Bool(),
             docstring='perform hardware thresholding, yielding digitized acquisition results',
             initial_value=False,
@@ -954,8 +954,12 @@ class HAL_ShimSQ(Qubit):
     ##########################################################################
 
     # FIXME: UHFQC specific
-    # FIXME: deskewing matrix is shared between all connected qubits
-    def _prep_deskewing_matrix(self):
+    def _prep_deskewing_matrix(self) -> None:
+        """
+        Update the UHFQC (input) deskewing matrix from parameters ro_acq_mixer_*. Note that the deskewing matrix is
+        shared between all connected qubits.
+        Note that the output matrix is applied in software by the RO_LutMan.
+        """
         UHFQC = self.instr_acquisition.get_instr()
 
         alpha = self.ro_acq_mixer_alpha()
@@ -969,11 +973,10 @@ class HAL_ShimSQ(Qubit):
         UHFQC.qas_0_deskew_rows_0_cols_1(predistortion_matrix[0, 1])
         UHFQC.qas_0_deskew_rows_1_cols_0(predistortion_matrix[1, 0])
         UHFQC.qas_0_deskew_rows_1_cols_1(predistortion_matrix[1, 1])
-        return predistortion_matrix
 
     # FIXME: UHFQC specific
     def _prep_ro_instantiate_detectors(self):
-        self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())  # FIXME: changes MC state
+        self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())  # FIXME: changes MC state (change 'soft_avg' into parameter of MC.run() )
 
         # determine ro_channels and result_logging_mode (needed for detectors)
         if 'optimal' in self.ro_acq_weight_type():
@@ -998,6 +1001,8 @@ class HAL_ShimSQ(Qubit):
                 #  package zhinst, which uses a default value of 500
             else:
                 threshold = self.ro_acq_threshold()
+
+            # Apply threshold to hardware
             acq_ch = self.ro_acq_weight_chI()
             self.instr_acquisition.get_instr().set('qas_0_thresholds_{}_level'.format(acq_ch), threshold)
 
@@ -1091,14 +1096,13 @@ class HAL_ShimSQ(Qubit):
 
         Note that the local parameters exist for each individual qubit, but qubits on the same feedline share a single
         RO_LutMan (and hardware channel, because of the multiplexed nature of the UHFQC; this situation is different
-        for MW_LutMan and Flux_LutMan, ).
+        for MW_LutMan and Flux_LutMan).
         To sort of cope with that, LutMan parameters starting with "M_" exist per 'channel', but clashes on other
         parameters are not explicitly managed.
         """
 
         if 'UHFQC' not in self.instr_acquisition():  # FIXME: checks name, not type
             raise NotImplementedError()
-
         UHFQC = self.instr_acquisition.get_instr()
 
         if 'gated' in self.ro_pulse_type().lower():
@@ -1232,33 +1236,6 @@ class HAL_ShimSQ(Qubit):
     # Private prepare functions: MW
     ##########################################################################
 
-    def _prep_td_sources(self):
-        # turn off spec_source
-        if self.instr_spec_source() is not None:
-            self.instr_spec_source.get_instr().off()
-
-        # configure LO_mw
-        self.instr_LO_mw.get_instr().on()
-        self.instr_LO_mw.get_instr().pulsemod_state('Off')
-
-        MW_LutMan = self.instr_LutMan_MW.get_instr()
-        if MW_LutMan.cfg_sideband_mode() == 'static':
-            # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
-            self.instr_LO_mw.get_instr().frequency.set(self.freq_qubit.get() - self.mw_freq_mod.get())
-        elif MW_LutMan.cfg_sideband_mode() == 'real-time':
-            # For historic reasons, will maintain the change qubit frequency here in
-            # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
-            # FIXME: HDAWG specific, does not support QWG
-            if ((MW_LutMan.channel_I() - 1) // 2 != (MW_LutMan.channel_Q() - 1) // 2):
-                raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
-            self.mw_freq_mod(self.freq_qubit.get() - self.instr_LO_mw.get_instr().frequency.get())
-            MW_LutMan.AWG.get_instr().set('oscs_{}_freq'.format((MW_LutMan.channel_I() - 1) // 2),
-                                          self.mw_freq_mod.get())
-        else:
-            raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
-
-        self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
-
     def _prep_mw_pulses(self):
         # FIXME: hardware handling moved here from HAL_Transmon, cleanup
 
@@ -1340,6 +1317,34 @@ class HAL_ShimSQ(Qubit):
         # 5. upload command table for virtual-phase gates
         if MW_LutMan.cfg_sideband_mode() != 'static':
             MW_LutMan.upload_single_qubit_phase_corrections()  # FIXME: assumes AWG8_MW_LutMan
+
+    def _prep_td_sources(self):
+        # turn off spec_source
+        if self.instr_spec_source() is not None:
+            self.instr_spec_source.get_instr().off()
+
+        # configure LO_mw
+        self.instr_LO_mw.get_instr().on()
+        self.instr_LO_mw.get_instr().pulsemod_state('Off')
+
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+        if MW_LutMan.cfg_sideband_mode() == 'static':
+            # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
+            self.instr_LO_mw.get_instr().frequency.set(self.freq_qubit.get() - self.mw_freq_mod.get())
+        elif MW_LutMan.cfg_sideband_mode() == 'real-time':
+            # For historic reasons, will maintain the change qubit frequency here in
+            # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
+            # FIXME: HDAWG specific, does not support QWG
+            if ((MW_LutMan.channel_I() - 1) // 2 != (MW_LutMan.channel_Q() - 1) // 2):
+                raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
+
+            self.mw_freq_mod(self.freq_qubit.get() - self.instr_LO_mw.get_instr().frequency.get())
+            ch = (MW_LutMan.channel_I() - 1) // 2
+            MW_LutMan.AWG.get_instr().set(f'oscs_{ch}_freq', self.mw_freq_mod.get())
+        else:
+            raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
+
+        self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
 
     def _prep_td_configure_VSM(self):
         # Configure VSM

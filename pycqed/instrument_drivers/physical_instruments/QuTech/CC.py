@@ -202,6 +202,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             # based on ElecPrj_CC:src/q1asm/qwg_staircase.q1asm
             # FIXME: tests 5 of 8 bits only
             cc_prog = """
+            # program: output_dio_calibration_data for mode 'awg8-mw-vsm'
             ### DIO protocol definition:
             # DIO           QWG             AWG8        note
             # ------------- --------------- ----------- ------------------
@@ -237,6 +238,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
             cc_prog = """
+            # program: output_dio_calibration_data for mode 'awg8-mw-direct-iq'
             ### DIO protocol definition:
             # DIO           QWG             AWG8        note
             # ------------- --------------- ----------- ------------------
@@ -283,6 +285,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
         elif dio_mode == "awg8-flux" or dio_mode == "flux":
             cc_prog = """
+            # program: output_dio_calibration_data for mode 'awg8-flux'
             mainLoop:
                         seq_out         0x00000000,20           # 00000000000000000000000000000000
                         seq_out         0x82498249,2            # 10000010010010011000001001001001
@@ -307,6 +310,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
         elif dio_mode == "uhfqa":  # FIXME: no official mode yet
             cc_prog = inspect.cleandoc("""
+            # program: output_dio_calibration_data for mode 'uhfqa'
             mainLoop:   seq_out         0x03FF0000,1        # TRIG=0x00010000, CW[8:0]=0x03FE0000
                         seq_out         0x00000000,10
                         jmp             @mainLoop

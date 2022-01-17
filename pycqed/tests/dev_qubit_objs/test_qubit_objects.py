@@ -58,13 +58,28 @@ def _setup_hw(cls, qubit_obj):
         cls.MW_LutMan.sampling_rate(2.4e9)
 
         qubit_obj.cfg_with_vsm(False)
-        qubit_obj.cfg_prepare_mw_awg(True)  # FIXME: load_waveform_onto_AWG_lookuptable fails
+        qubit_obj.cfg_prepare_mw_awg(True)
+
     cls.MW_LutMan.AWG(cls.AWG.name)
     cls.MW_LutMan.mw_modulation(100e6)
     cls.MW_LutMan.sampling_rate(2.4e9)
 
     cls.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5, feedline_number=0)
     cls.ro_lutman.AWG(cls.UHFQC.name)
+
+    ##############################################
+    # setup MC. FIXME: move out of class HAL_ShimSQ (only used in 1 spot)
+    ##############################################
+    cls.station = station.Station()
+
+    cls.MC = MeasurementControl('MC', live_plot_enabled=False, verbose=False)
+    cls.MC.station = cls.station
+    cls.station.add_component(cls.MC)
+
+    # Required to set it to the testing datadir
+    test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
+    cls.MC.datadir(test_datadir)
+    a_tools.datadir = cls.MC.datadir()
 
     ##############################################
     # Assign instruments
@@ -80,20 +95,6 @@ def _setup_hw(cls, qubit_obj):
     qubit_obj.instr_LutMan_RO(cls.ro_lutman.name)
 
     qubit_obj.instr_SH(cls.SH.name)
-
-    ##############################################
-    # setup MC. FIXME: move out of class HAL_ShimSQ
-    ##############################################
-    cls.station = station.Station()
-
-    cls.MC = MeasurementControl('MC', live_plot_enabled=False, verbose=False)
-    cls.MC.station = cls.station
-    cls.station.add_component(cls.MC)
-
-    # Required to set it to the testing datadir
-    test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
-    cls.MC.datadir(test_datadir)
-    a_tools.datadir = cls.MC.datadir()
 
     qubit_obj.instr_MC(cls.MC.name)
 

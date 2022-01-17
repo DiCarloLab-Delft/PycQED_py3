@@ -462,26 +462,29 @@ class HAL_ShimMQ(Instrument):
         self.add_parameter(
             "instr_MC",
             label="MeasurementControl",
-            parameter_class=InstrumentRefParameter, )
+            parameter_class=InstrumentRefParameter
+        )
 
         self.add_parameter(
             'instr_nested_MC',
             label='Nested MeasurementControl',
-            parameter_class=InstrumentRefParameter)
+            parameter_class=InstrumentRefParameter
+        )
 
         self.add_parameter(
             "instr_VSM",
             label="Vector Switch Matrix",
-            parameter_class=InstrumentRefParameter,
+            parameter_class=InstrumentRefParameter
         )
 
         self.add_parameter(
             "instr_CC",
             label="Central Controller",
             docstring="Device responsible for controlling the experiment.",
-            parameter_class=InstrumentRefParameter,
+            parameter_class=InstrumentRefParameter
         )
 
+        # FIXME: the 3 'arrays' of instruments below are actually unused
         for i in range(self._NUM_INSTR_ACQ):
             self.add_parameter(f"instr_acq_{i}", parameter_class=InstrumentRefParameter)
 
@@ -500,7 +503,7 @@ class HAL_ShimMQ(Instrument):
                 label=f"Readout latency {i}",
                 parameter_class=ManualParameter,
                 initial_value=0,
-                vals=vals.Numbers(),
+                vals=vals.Numbers()
             )
 
         for i in range(self._NUM_INSTR_AWG_FLUX):
@@ -510,7 +513,7 @@ class HAL_ShimMQ(Instrument):
                 label="Flux latency 0",
                 parameter_class=ManualParameter,
                 initial_value=0,
-                vals=vals.Numbers(),
+                vals=vals.Numbers()
             )
 
         for i in range(self._NUM_INSTR_AWG_MW):
@@ -520,7 +523,7 @@ class HAL_ShimMQ(Instrument):
                 label=f"Microwave latency {i}",
                 parameter_class=ManualParameter,
                 initial_value=0,
-                vals=vals.Numbers(),
+                vals=vals.Numbers()
             )
 
     def _add_ro_parameters(self):
@@ -540,7 +543,7 @@ class HAL_ShimMQ(Instrument):
             "ro_acq_integration_length",
             initial_value=500e-9,
             vals=vals.Numbers(min_value=0, max_value=20e6),
-            parameter_class=ManualParameter,
+            parameter_class=ManualParameter
         )
 
         # NB: duplicate of HAL_ShimSQ
@@ -549,7 +552,7 @@ class HAL_ShimMQ(Instrument):
             label="RO power LO",
             unit="dBm",
             initial_value=20,
-            parameter_class=ManualParameter,
+            parameter_class=ManualParameter
         )
 
         # NB: duplicate of HAL_ShimSQ
@@ -557,7 +560,7 @@ class HAL_ShimMQ(Instrument):
             "ro_acq_averages",
             initial_value=1024,
             vals=vals.Numbers(min_value=0, max_value=1e6),
-            parameter_class=ManualParameter,
+            parameter_class=ManualParameter
         )
 
         # NB: duplicate of HAL_ShimSQ
@@ -573,7 +576,7 @@ class HAL_ShimMQ(Instrument):
                 " readout pulse and the instruction that triggers the "
                 "acquisition. The positive number means that the "
                 "acquisition is started after the pulse is send."
-            ),
+            )
         )
 
         # NB: duplicate of HAL_ShimSQ
@@ -587,7 +590,7 @@ class HAL_ShimMQ(Instrument):
                 'optimal: waveforms specified in "RO_acq_weight_func_I" '
                 '\n\tand "RO_acq_weight_func_Q"'
             ),
-            parameter_class=ManualParameter,
+            parameter_class=ManualParameter
         )
 
         # NB: duplicate of HAL_ShimSQ
@@ -595,7 +598,7 @@ class HAL_ShimMQ(Instrument):
             "ro_acq_digitized",
             vals=vals.Bool(),
             initial_value=False,
-            parameter_class=ManualParameter,
+            parameter_class=ManualParameter
         )
 
         self.add_parameter(
@@ -603,7 +606,7 @@ class HAL_ShimMQ(Instrument):
             docstring="If true, configures the UHFQC to RO all qubits "
                       "independent of codeword received.",
             parameter_class=ManualParameter,
-            vals=vals.Bool(),
+            vals=vals.Bool()
         )
 
     def _add_parameters(self):
@@ -616,7 +619,7 @@ class HAL_ShimMQ(Instrument):
             "cfg_openql_platform_fn",
             label="OpenQL platform configuration filename",
             parameter_class=ManualParameter,
-            vals=vals.Strings(),
+            vals=vals.Strings()
         )
 
         self.add_parameter(
@@ -650,7 +653,7 @@ class HAL_ShimMQ(Instrument):
             "Tip: run `device.dio_map?` to print the docstring of this parameter",
             initial_value=None,
             set_cmd=self._set_dio_map,
-            vals=vals.Dict(),
+            vals=vals.Dict()
         )
 
     ##########################################################################
@@ -815,8 +818,7 @@ class HAL_ShimMQ(Instrument):
                 else:
                     acq_instr.set("qas_0_integration_weights_{}_real".format(qb.ro_acq_weight_chI()), opt_WI,)
                     acq_instr.set("qas_0_integration_weights_{}_imag".format(qb.ro_acq_weight_chI()), opt_WQ,)
-                    acq_instr.set("qas_0_rotations_{}".format(
-                                qb.ro_acq_weight_chI()), 1.0 - 1.0j)
+                    acq_instr.set("qas_0_rotations_{}".format(qb.ro_acq_weight_chI()), 1.0 - 1.0j)
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         acq_instr.set('qas_0_integration_weights_{}_real'.format(qb.ro_acq_weight_chQ()), opt_WQ)

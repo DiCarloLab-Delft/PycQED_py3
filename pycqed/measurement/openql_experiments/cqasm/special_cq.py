@@ -1,6 +1,9 @@
 """
 A collection of cQasm routines that do not fit 'single_qubit_cq.py' and 'multi_qubit_cq.py'
 FIXME: these files mentioned do not exist yet
+
+NB: please take note of the subtle difference between `wait q[...], <int>` and `wait <int>, ...` as described in
+https://openql.readthedocs.io/en/latest/gen/reference_passes.html#cqasm-reader
 """
 
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
@@ -76,7 +79,7 @@ def nested_rus(
 
                 rphi180 qData
                 measure_fb qAncilla1
-                wait qAncilla2, {echo_delay_inner_rus}  # FIXME: parameter order normally reversed
+                wait qAncilla2, {echo_delay_inner_rus}
                 rphi180 qAncilla2
                 wait qAncilla2, {echo_period - echo_delay_inner_rus}
                 wait qData, {echo_delay_inner_rus_data}
