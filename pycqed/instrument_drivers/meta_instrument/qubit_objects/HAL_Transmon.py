@@ -4785,13 +4785,14 @@ class HAL_Transmon(HAL_ShimSQ):
         RO_lutman = self.instr_LutMan_RO.get_instr()
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
         self.ro_acq_digitized(False)
-        self.cfg_prepare_ro_awg(False)  # FIXME: this seems to make little sense, since this parameter is used by prepare_for_timedomain()
+        self.cfg_prepare_ro_awg(False)  # disable for measure_ssro below
 
         d = det.Function_Detector(
             self.measure_ssro,
             msmt_kw={
                 'nr_shots': nr_shots,
-                'analyze': True, 'SNR_detector': True,
+                'analyze': True,
+                'SNR_detector': True,
                 'cal_residual_excitation': True,
                 'prepare': False,
                 'disable_metadata': True
@@ -6142,7 +6143,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # save and change some more parameters
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
-        self.cfg_prepare_ro_awg(False)  # FIXME: seems useless as parameter is used by prepare_for_timedomain()
+        self.cfg_prepare_ro_awg(False)  # disable for measure_msmt_induced_dephasing below
 
         sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
             LutMan=RO_lutman,
@@ -6213,7 +6214,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # save and change parameters
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
-        self.cfg_prepare_ro_awg(False)  # FIXME: seems useless as parameter is used by prepare_for_timedomain()
+        self.cfg_prepare_ro_awg(False)  # disable for measure_ssro below
 
         sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
             LutMan=RO_lutman,

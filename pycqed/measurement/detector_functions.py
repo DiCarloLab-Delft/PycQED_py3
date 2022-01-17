@@ -235,12 +235,19 @@ class Function_Detector(Soft_Detector):
     values to be plotted and stored by PycQED
     """
 
-    def __init__(self, get_function, value_names=None,
-                 detector_control: str = 'soft',
-                 value_units: list = None, msmt_kw: dict = {},
-                 result_keys: list = None,
-                 prepare_function=None, prepare_function_kwargs: dict = {},
-                 always_prepare: bool = False, **kw):
+    def __init__(
+            self,
+            get_function,
+            value_names=None,
+            detector_control: str = 'soft',
+            value_units: list = None,
+            msmt_kw: dict = {},
+            result_keys: list = None,
+            prepare_function=None,
+            prepare_function_kwargs: dict = {},
+            always_prepare: bool = False,
+            **kw
+    ):
         super().__init__()
         self.get_function = get_function
         self.result_keys = result_keys
