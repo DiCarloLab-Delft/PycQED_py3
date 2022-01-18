@@ -321,7 +321,7 @@
 	"instructions": {
 #include "common_instructions.json.in"
 
-//        ,
+        ,
 
         //****************************************************************
         // decompositions, new style, require OpenQL > 0.10.0
@@ -355,6 +355,18 @@
 //                "into": "_cz_sw_ne_park q8,q10,q11"
 //            }
 //        }
+		//CZ decompositions
+	       "fluxdance_1": {
+	           "prototype": ["Z:qubit", "Z:qubit"],
+	           "duration": @FLUX_DURATION@,
+	           "cc": { // FIXME: key is required
+	               "ref_signal": "single-qubit-mw",
+	               "static_codeword_override": [31]
+	           },
+	           "decomposition": {
+	               "into": ["cz q8,q10","cz q9,q11"]
+	           }
+	       }
 
 
 	},	// instructions
