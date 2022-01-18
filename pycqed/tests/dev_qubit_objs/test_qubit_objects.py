@@ -1,6 +1,6 @@
 import unittest
 import os
-import time
+# import time
 import warnings
 import numpy as np
 import pycqed as pq
@@ -470,33 +470,25 @@ class Test_HAL_Transmon(unittest.TestCase):
     def test_resonator_spec(self):
         self.transmon.ro_acq_weight_type('SSB')
 
-        # set to not set to bypass validator
-        # [2020-07-23 Victor] commented out, it is already None by default
-        # `_save_val` is not available anymore
-        # self.transmon.freq_res._save_val(None)
         try:
             self.transmon.find_resonator_frequency()
         except ValueError:
             pass  # Fit can fail because testing against random data
+
         self.transmon.freq_res(5.4e9)
         try:
             self.transmon.find_resonator_frequency()
         except ValueError:
             pass  # Fit can fail because testing against random data
-        freqs = np.linspace(6e9, 6.5e9, 31)
 
-        self.transmon.measure_heterodyne_spectroscopy(freqs=freqs,
-                                                       analyze=False)
+        freqs = np.linspace(6e9, 6.5e9, 31)
+        self.transmon.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
 
     def test_resonator_power(self):
         self.transmon.ro_acq_weight_type('SSB')
         freqs = np.linspace(6e9, 6.5e9, 31)
         powers = np.arange(-30, -10, 5)
 
-        # set to not set to bypass validator
-        # [2020-07-23 Victor] commented out, it is already None by default
-        # `_save_val` is not available anymore
-        # self.transmon.freq_res._save_val(None)
         self.transmon.measure_resonator_power(freqs=freqs, powers=powers)
 
     def test_measure_transients(self):
@@ -529,26 +521,28 @@ class Test_HAL_Transmon(unittest.TestCase):
         self.transmon.measure_allxy()
 
     def test_T1(self):
-        self.transmon.measure_T1(
-            times=np.arange(0, 1e-6, 20e-9), update=False, analyze=False)
+        self.transmon.measure_T1(times=np.arange(0, 1e-6, 20e-9), update=False, analyze=False)
+
         self.transmon.T1(20e-6)
         self.transmon.measure_T1(update=False, analyze=False)
 
     def test_Ramsey(self):
         self.transmon.mw_freq_mod(100e6)
         # Cannot analyze dummy data as analysis will fail on fit
-        self.transmon.measure_ramsey(times=np.arange(0, 1e-6, 20e-9),
-                                      update=False, analyze=False)
+        self.transmon.measure_ramsey(times=np.arange(0, 1e-6, 20e-9), update=False, analyze=False)
+
         self.transmon.T2_star(20e-6)
         self.transmon.measure_ramsey(update=False, analyze=False)
 
     def test_echo(self):
         self.transmon.mw_freq_mod(100e6)
-        # self.transmon.measure_echo(times=np.arange(0,2e-6,40e-9))
-        time.sleep(1)
+        self.transmon.measure_echo(times=np.arange(0,2e-6,40e-9))
+        # time.sleep(1)
+
         self.transmon.T2_echo(40e-6)
         self.transmon.measure_echo(analyze=False, update=False)
-        time.sleep(1)
+        # time.sleep(1)
+
         with self.assertRaises(ValueError):
             invalid_times = [0.1e-9, 0.2e-9, 0.3e-9, 0.4e-9]
             self.transmon.measure_echo(times=invalid_times)

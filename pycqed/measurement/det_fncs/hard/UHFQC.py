@@ -61,7 +61,7 @@ class Multi_Detector_UHF(Multi_Detector):
 class UHFQC_input_average_detector(Hard_Detector):
 
     '''
-    Detector used for acquiring averaged input traces withe the UHFQC
+    Detector used for acquiring averaged input traces with the UHFQC
     '''
 
     def __init__(
@@ -220,15 +220,21 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     ):
         """
         Args:
-        UHFQC (instrument) : data acquisition device
-        AWG   (instrument) : device responsible for starting and stopping
-                the experiment, can also be a central controller
+        UHFQC (instrument)
+            data acquisition device
 
-        integration_length (float): integration length in seconds
-        nr_averages (int)         : nr of averages per data point
+        AWG   (instrument)
+            device responsible for starting and stopping the experiment, can also be a central controller
+
+        integration_length (float)
+            integration length in seconds
+
+        nr_averages (int)
+            nr of averages per data point
             IMPORTANT: this must be a power of 2
 
-        result_logging_mode (str) :  options are
+        result_logging_mode (str)
+            options are
             - raw        -> returns raw data in V
             - lin_trans  -> applies the linear transformation matrix and
                             subtracts the offsets defined in the UFHQC.
@@ -237,32 +243,38 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
 
-        real_imag (bool)     : if False returns data in polar coordinates
-                                useful for e.g., spectroscopy
-                                #FIXME -> should be named "polar"
-        single_int_avg (bool): if True makes this a soft detector
+        real_imag (bool)
+            if True, return data in real+imag format
+            if False, returns data in polar coordinates useful for e.g., spectroscopy
 
-        Args relating to changing the amoung of points being detected:
+        single_int_avg (bool
+            if True makes this a soft detector
 
-        seg_per_point (int)  : number of segments per sweep point,
-                does not do any renaming or reshaping.
-                Here for deprecation reasons.
-        chunk_size    (int)  : used in single shot readout experiments.
-        values_per_point (int): number of values to measure per sweep point.
-                creates extra column/value_names in the dataset for each channel.
-        values_per_point_suffex (list): suffex to add to channel names for
-                each value. should be a list of strings with lenght equal to
-                values per point.
-        always_prepare (bool) : when True the acquire/get_values method will
-            first call the prepare statement. This is particularly important
-            when it is both a single_int_avg detector and acquires multiple
-            segments per point.
+        Args relating to changing the amount of points being detected:
+
+        seg_per_point (int)
+            number of segments per sweep point, does not do any renaming or reshaping.
+            Here for deprecation reasons.
+
+        chunk_size (int)
+            used in single shot readout experiments.
+
+        values_per_point (int)
+            number of values to measure per sweep point. creates extra column/value_names in the dataset for each
+            channel.
+
+        values_per_point_suffex (list)
+            suffix to add to channel names for each value. should be a list of strings with length equal to values per
+            point.
+
+        always_prepare (bool)
+            when True the acquire/get_values method will first call the prepare statement. This is particularly important
+            when it is both a single_int_avg detector and acquires multiple segments per point.
         """
         super().__init__()
         self.UHFQC = UHFQC
-        # if nr_averages # is not a powe of 2:
 
-        #    raise ValueError('Some descriptive message {}'.format(nr_averages))
+        # FIXME: add check
         # if integration_length > some value:
         #     raise ValueError
 
@@ -271,35 +283,37 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             if value_names is None:
-                self.value_names[i] = '{} w{}'.format(result_logging_mode,
-                                                      channel)
+                self.value_names[i] = '{} w{}'.format(result_logging_mode, channel)
             else:
-                self.value_names[i] = 'w{} {}'.format(channel,
-                                                      value_names[i])
+                self.value_names[i] = 'w{} {}'.format(channel, value_names[i])
+
         if result_logging_mode == 'raw':
             # Units are only valid when using SSB or DSB demodulation.
-            # value corrsponds to the peak voltage of a cosine with the
+            # value corresponds to the peak voltage of a cosine with the
             # demodulation frequency.
             self.value_units = ['Vpeak']*len(self.channels)
             self.scaling_factor = 1/(1.8e9*integration_length)
         elif result_logging_mode == 'lin_trans':
             self.value_units = ['a.u.']*len(self.channels)
             self.scaling_factor = 1
-
         elif result_logging_mode == 'digitized':
             self.value_units = ['frac']*len(self.channels)
             self.scaling_factor = 1
 
         self.value_names, self.value_units = self._add_value_name_suffex(
-            value_names=self.value_names, value_units=self.value_units,
+            value_names=self.value_names,
+            value_units=self.value_units,
             values_per_point=values_per_point,
-            values_per_point_suffex=values_per_point_suffex)
+            values_per_point_suffex=values_per_point_suffex
+        )
 
         self.single_int_avg = single_int_avg
         if self.single_int_avg:
             self.detector_control = 'soft'
+
         # useful in combination with single int_avg
         self.always_prepare = always_prepare
+
         # Directly specifying seg_per_point is deprecated. values_per_point
         # replaces this functionality -MAR Dec 2017
         self.seg_per_point = max(seg_per_point, values_per_point)
@@ -323,9 +337,13 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.prepare_function_kwargs = prepare_function_kwargs
         self._set_real_imag(real_imag)
 
-    def _add_value_name_suffex(self, value_names: list, value_units: list,
-                               values_per_point: int,
-                               values_per_point_suffex: list):
+    def _add_value_name_suffex(
+            self,
+            value_names: list,
+            value_units: list,
+            values_per_point: int,
+            values_per_point_suffex: list
+    ):
         """
         For use with multiple values_per_point. Adds
         """
@@ -352,8 +370,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         if not self.real_imag:
             if len(self.channels) % 2 != 0:
-                raise ValueError('Length of "{}" is not even'.format(
-                                 self.channels))
+                raise ValueError('Length of "{}" is not even'.format(self.channels))
+
             for i in range(len(self.channels)//2):
                 self.value_names[2*i] = 'Magn'
                 self.value_names[2*i+1] = 'Phase'
@@ -397,8 +415,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
-                data[i] = data[i]-self.UHFQC.get(
-                    'qas_0_trans_offset_weightfunction_{}'.format(channel))
+                data[i] = data[i]-self.UHFQC.get('qas_0_trans_offset_weightfunction_{}'.format(channel))
         if not self.real_imag:
             data = self.convert_to_polar(data)
 

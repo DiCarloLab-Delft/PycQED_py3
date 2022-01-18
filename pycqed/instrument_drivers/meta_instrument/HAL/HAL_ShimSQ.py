@@ -50,8 +50,7 @@ class HAL_ShimSQ(Qubit):
         if self.ro_acq_weight_type() not in {'DSB', 'SSB'}:
             # this is because the CW acquisition detects using angle and phase
             # and this requires two channels to rotate the signal properly.
-            raise ValueError('Readout "{}" '.format(self.ro_acq_weight_type())
-                             + 'weight type must be "SSB" or "DSB"')
+            raise ValueError('Readout "{}" '.format(self.ro_acq_weight_type()) + 'weight type must be "SSB" or "DSB"')
 
         if self.cfg_with_vsm():
             self._prep_cw_configure_VSM()
@@ -206,45 +205,6 @@ class HAL_ShimSQ(Qubit):
                 dac_par = fluxcontrol.parameters[(flux_chan)]
 
         return dac_par
-
-    ##########################################################################
-    # Other functions
-    ##########################################################################
-
-    # FIXME: compare against self.int_avg_det_single provided by _prep_ro_instantiate_detectors, and why is this detector
-    #  created on demand
-
-    def get_int_avg_det(self, **kw):
-        """
-        Instantiates an integration average detector using parameters from
-        the qubit object. **kw get passed on to the class when instantiating
-        the detector function.
-        """
-
-        if self.ro_acq_weight_type() == 'optimal':
-            ro_channels = [self.ro_acq_weight_chI()]
-
-            if self.ro_acq_digitized():
-                result_logging_mode = 'digitized'
-            else:
-                result_logging_mode = 'lin_trans'
-        else:
-            ro_channels = [self.ro_acq_weight_chI(),
-                           self.ro_acq_weight_chQ()]
-            result_logging_mode = 'raw'
-
-        int_avg_det = det.UHFQC_integrated_average_detector(
-            UHFQC=self.instr_acquisition.get_instr(),
-            AWG=self.instr_CC.get_instr(),
-            channels=ro_channels,
-            result_logging_mode=result_logging_mode,
-            nr_averages=self.ro_acq_averages(),
-            integration_length=self.ro_acq_integration_length(),
-            **kw
-        )
-
-        return int_avg_det
-
 
     ##########################################################################
     # Private _add_*_parameters
@@ -636,8 +596,45 @@ class HAL_ShimSQ(Qubit):
         # RO acquisition parameters #
         #############################
 
+        # NB: passed to RO_LutMan.acquisition_delay
         self.add_parameter(
-            'ro_acq_weight_type',  # FIXME: controlled by HAL_Transmon
+            'ro_acq_delay',
+            unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(min_value=0),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=(
+                'The time between the instruction that trigger the'
+                ' readout pulse and the instruction that triggers the '
+                'acquisition. The positive number means that the '
+                'acquisition is started after the pulse is sent.'))
+
+        # Mixer correction parameters
+        # NB: shared between qubits on same feedline
+        self.add_parameter(
+            'ro_acq_mixer_phi',
+            unit='degree',
+            label='Readout mixer phi',
+            vals=vals.Numbers(),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('acquisition mixer phi, used for mixer deskewing in real time'))
+        self.add_parameter(
+            'ro_acq_mixer_alpha',
+            unit='',
+            label='Readout mixer alpha',
+            vals=vals.Numbers(min_value=0.8),
+            initial_value=1,
+            parameter_class=ManualParameter,
+            docstring=('acquisition mixer alpha, used for mixer deskewing in real time'))
+
+        #############################
+        # RO acquisition parameters used to configure detectors
+        #############################
+
+        self.add_parameter(
+            'ro_acq_weight_type',  # FIXME: controlled by HAL_Transmon (also partly by user?)
             initial_value='SSB',
             vals=vals.Enum('SSB', 'DSB', 'optimal', 'optimal IQ'),
             docstring=(
@@ -663,24 +660,28 @@ class HAL_ShimSQ(Qubit):
             vals=vals.Ints(0, 9),
             parameter_class=ManualParameter)
 
-        # Mixer correction parameters
-        # NB: shared between qubits on same feedline
         self.add_parameter(
-            'ro_acq_mixer_phi',
-            unit='degree',
-            label='Readout mixer phi',
-            vals=vals.Numbers(),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=('acquisition mixer phi, used for mixer deskewing in real time'))
+            'ro_acq_averages',  # FIXME: controlled by HAL_Transmon, used as parameter for UHFQC detector functions
+            initial_value=1024,
+            vals=vals.Numbers(min_value=0, max_value=1e6),
+            parameter_class=ManualParameter)
+
         self.add_parameter(
-            'ro_acq_mixer_alpha',
-            unit='',
-            label='Readout mixer alpha',
-            vals=vals.Numbers(min_value=0.8),
-            initial_value=1,
+            'ro_acq_input_average_length',
+            unit='s',
+            label='Readout input averaging time',
+            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
+            initial_value=4096 / 1.8e9,
             parameter_class=ManualParameter,
-            docstring=('acquisition mixer alpha, used for mixer deskewing in real time'))
+            docstring=('The measurement time in input averaging.'))
+
+        self.add_parameter(
+            'ro_acq_integration_length',
+            initial_value=500e-9,
+            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
+            parameter_class=ManualParameter)
+
+
 
 
     def _add_prep_parameters(self):
@@ -773,47 +774,13 @@ class HAL_ShimSQ(Qubit):
         #############################
 
         self.add_parameter(
-            'ro_soft_avg',
+            'ro_soft_avg',  # FIXME: controlled by HAL_Transmon, sets MC.soft_avg()
             initial_value=1,
             docstring=('Number of soft averages to be performed using the MC.'),
             vals=vals.Ints(min_value=1),
             parameter_class=ManualParameter)
 
-        self.add_parameter(
-            'ro_acq_averages',
-            initial_value=1024,
-            vals=vals.Numbers(min_value=0, max_value=1e6),
-            parameter_class=ManualParameter)
-
-        self.add_parameter(
-            'ro_acq_input_average_length',
-            unit='s',
-            label='Readout input averaging time',
-            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
-            initial_value=4096 / 1.8e9,
-            parameter_class=ManualParameter,
-            docstring=('The measurement time in input averaging.'))
-
-        self.add_parameter(
-            'ro_acq_integration_length',
-            initial_value=500e-9,
-            vals=vals.Numbers(min_value=0, max_value=4096 / 1.8e9),
-            parameter_class=ManualParameter)
-
-        # NB: passed to RO_LutMan.acquisition_delay
-        self.add_parameter(
-            'ro_acq_delay',
-            unit='s',
-            label='Readout acquisition delay',
-            vals=vals.Numbers(min_value=0),
-            initial_value=0,
-            parameter_class=ManualParameter,
-            docstring=(
-                'The time between the instruction that trigger the'
-                ' readout pulse and the instruction that triggers the '
-                'acquisition. The positive number means that the '
-                'acquisition is started after the pulse is sent.'))
-
+        # FIXME: move to HAL_Transmon
         self.add_parameter(
             'ro_acq_weight_func_I',
             vals=vals.Arrays(),
@@ -828,12 +795,13 @@ class HAL_ShimSQ(Qubit):
 
         # FIXME!: Dirty hack because of qusurf issue #63, added 2 hardcoded
         #  delay samples in the optimized weights
-        self.add_parameter(
-            'ro_acq_weight_func_delay_samples_hack',
-            vals=vals.Ints(),
-            initial_value=0,
-            label='weight function delay samples',
-            parameter_class=ManualParameter)
+        if 0:  # FIXME: remove
+            self.add_parameter(
+                'ro_acq_weight_func_delay_samples_hack',
+                vals=vals.Ints(),
+                initial_value=0,
+                label='weight function delay samples',
+                parameter_class=ManualParameter)
 
         #############################
         # Single shot readout specific parameters
@@ -953,103 +921,6 @@ class HAL_ShimSQ(Qubit):
     # Private prepare functions: ro
     ##########################################################################
 
-    # FIXME: UHFQC specific
-    def _prep_deskewing_matrix(self) -> None:
-        """
-        Update the UHFQC (input) deskewing matrix from parameters ro_acq_mixer_*. Note that the deskewing matrix is
-        shared between all connected qubits.
-        Note that the output matrix is applied in software by the RO_LutMan.
-        """
-        UHFQC = self.instr_acquisition.get_instr()
-
-        alpha = self.ro_acq_mixer_alpha()
-        phi = self.ro_acq_mixer_phi()
-        predistortion_matrix = np.array(
-            ((1, -alpha * np.sin(phi * 2 * np.pi / 360)),
-             (0, alpha * np.cos(phi * 2 * np.pi / 360)))
-        )
-
-        UHFQC.qas_0_deskew_rows_0_cols_0(predistortion_matrix[0, 0])
-        UHFQC.qas_0_deskew_rows_0_cols_1(predistortion_matrix[0, 1])
-        UHFQC.qas_0_deskew_rows_1_cols_0(predistortion_matrix[1, 0])
-        UHFQC.qas_0_deskew_rows_1_cols_1(predistortion_matrix[1, 1])
-
-    # FIXME: UHFQC specific
-    def _prep_ro_instantiate_detectors(self):
-        self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())  # FIXME: changes MC state (change 'soft_avg' into parameter of MC.run() )
-
-        # determine ro_channels and result_logging_mode (needed for detectors)
-        if 'optimal' in self.ro_acq_weight_type():
-            if self.ro_acq_weight_type() == 'optimal':
-                ro_channels = [self.ro_acq_weight_chI()]
-            elif self.ro_acq_weight_type() == 'optimal IQ':
-                ro_channels = [self.ro_acq_weight_chI(), self.ro_acq_weight_chQ()]
-
-            result_logging_mode = 'lin_trans'
-            if self.ro_acq_digitized():
-                result_logging_mode = 'digitized'
-
-            # Update the RO threshold
-            # The threshold that is set in the hardware needs to be
-            # corrected for the offset as this is only applied in
-            # software.
-            if abs(self.ro_acq_threshold()) > 32:
-                threshold = 32
-                warnings.warn(f'Clipping {self.name}.ro_acq_threshold {self.ro_acq_threshold()}>32')
-                # working around the limitation of threshold in UHFQC which cannot be >abs(32).
-                # FIXME: this limit of 32 seems outdated, see 'examples/uhfqa/example_threshold.py' in Python
-                #  package zhinst, which uses a default value of 500
-            else:
-                threshold = self.ro_acq_threshold()
-
-            # Apply threshold to hardware
-            acq_ch = self.ro_acq_weight_chI()
-            self.instr_acquisition.get_instr().set('qas_0_thresholds_{}_level'.format(acq_ch), threshold)
-
-        else:
-            ro_channels = [self.ro_acq_weight_chI(),
-                           self.ro_acq_weight_chQ()]
-            result_logging_mode = 'raw'
-
-        # instantiate detectors
-        if 'UHFQC' in self.instr_acquisition():  # FIXME: checks name, not type
-            UHFQC = self.instr_acquisition.get_instr()
-
-            self.input_average_detector = det.UHFQC_input_average_detector(
-                UHFQC=UHFQC,
-                AWG=self.instr_CC.get_instr(),
-                nr_averages=self.ro_acq_averages(),
-                nr_samples=int(self.ro_acq_input_average_length() * 1.8e9))
-
-            self.int_avg_det = self.get_int_avg_det()
-
-            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC,
-                AWG=self.instr_CC.get_instr(),
-                channels=ro_channels,
-                result_logging_mode=result_logging_mode,
-                nr_averages=self.ro_acq_averages(),
-                real_imag=True,
-                single_int_avg=True,
-                integration_length=self.ro_acq_integration_length())
-
-            self.UHFQC_spec_det = det.UHFQC_spectroscopy_detector(
-                UHFQC=UHFQC,
-                ro_freq_mod=self.ro_freq_mod(),
-                AWG=self.instr_CC.get_instr(),  # FIXME: parameters from here now ignored by callee
-                channels=ro_channels,
-                nr_averages=self.ro_acq_averages(),
-                integration_length=self.ro_acq_integration_length())
-
-            self.int_log_det = det.UHFQC_integration_logging_det(
-                UHFQC=UHFQC,
-                AWG=self.instr_CC.get_instr(),
-                channels=ro_channels,
-                result_logging_mode=result_logging_mode,
-                integration_length=self.ro_acq_integration_length())
-        else:
-            raise NotImplementedError()
-
     def _prep_ro_sources(self):
         LO = self.instr_LO_ro.get_instr()
         RO_lutman = self.instr_LutMan_RO.get_instr()
@@ -1066,6 +937,10 @@ class HAL_ShimSQ(Qubit):
 
         LO.on()
         LO.power(self.ro_pow_LO())
+
+    ####
+    # ro: output path
+    ####
 
     # FIXME: UHFQC specific
     # FIXME: align with HAL_ShimMQ::_prep_ro_pulses
@@ -1151,8 +1026,34 @@ class HAL_ShimSQ(Qubit):
                 warnings.warn('Qubit number of {} is not '.format(self.name) +
                               'present in resonator_combinations of the readout lutman.')
 
+    ####
+    # ro: input path
+    ####
+
+    # FIXME: UHFQC specific
+    def _prep_deskewing_matrix(self) -> None:
+        """
+        Update the UHFQC (input) deskewing matrix from parameters ro_acq_mixer_*. Note that the deskewing matrix is
+        shared between all connected qubits.
+        Note that the output matrix is applied in software by the RO_LutMan.
+        """
+        UHFQC = self.instr_acquisition.get_instr()
+
+        alpha = self.ro_acq_mixer_alpha()
+        phi = self.ro_acq_mixer_phi()
+        predistortion_matrix = np.array(
+            ((1, -alpha * np.sin(phi * 2 * np.pi / 360)),
+             (0, alpha * np.cos(phi * 2 * np.pi / 360)))
+        )
+
+        UHFQC.qas_0_deskew_rows_0_cols_0(predistortion_matrix[0, 0])
+        UHFQC.qas_0_deskew_rows_0_cols_1(predistortion_matrix[0, 1])
+        UHFQC.qas_0_deskew_rows_1_cols_0(predistortion_matrix[1, 0])
+        UHFQC.qas_0_deskew_rows_1_cols_1(predistortion_matrix[1, 1])
+
     # FIXME: UHFQC specific
     # FIXME: align with HAL_ShimMQ::_prep_ro_integration_weights
+    # FIXME: some detectors don't use the integration weights, but we currently have no way to tell (and thus optimize)
     def _prep_ro_integration_weights(self):
         """
         Sets the ro acquisition integration weights.
@@ -1231,6 +1132,122 @@ class HAL_ShimSQ(Qubit):
 
         else:
             raise NotImplementedError('CBox, DDM or other are currently not supported')
+
+    # FIXME: UHFQC specific
+    def _prep_ro_instantiate_detectors(self):
+        self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())  # FIXME: changes MC state (change 'soft_avg' into parameter of MC.run() )
+
+        # determine ro_channels and result_logging_mode (needed for detectors)
+        if 'optimal' in self.ro_acq_weight_type():
+            if self.ro_acq_weight_type() == 'optimal':
+                ro_channels = [self.ro_acq_weight_chI()]
+            elif self.ro_acq_weight_type() == 'optimal IQ':
+                ro_channels = [self.ro_acq_weight_chI(), self.ro_acq_weight_chQ()]
+
+            result_logging_mode = 'lin_trans'
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
+
+            # Update the RO threshold
+            # The threshold that is set in the hardware needs to be
+            # corrected for the offset as this is only applied in
+            # software.
+            if abs(self.ro_acq_threshold()) > 32:
+                threshold = 32
+                warnings.warn(f'Clipping {self.name}.ro_acq_threshold {self.ro_acq_threshold()}>32')
+                # working around the limitation of threshold in UHFQC which cannot be >abs(32).
+                # FIXME: this limit of 32 seems outdated, see 'examples/uhfqa/example_threshold.py' in Python
+                #  package zhinst, which uses a default value of 500
+            else:
+                threshold = self.ro_acq_threshold()
+
+            # Apply threshold to hardware
+            acq_ch = self.ro_acq_weight_chI()
+            self.instr_acquisition.get_instr().set('qas_0_thresholds_{}_level'.format(acq_ch), threshold)
+
+        else:
+            ro_channels = [self.ro_acq_weight_chI(),
+                           self.ro_acq_weight_chQ()]
+            result_logging_mode = 'raw'
+
+        # instantiate detectors
+        if 'UHFQC' in self.instr_acquisition():  # FIXME: checks name, not type
+            UHFQC = self.instr_acquisition.get_instr()
+
+            self.input_average_detector = det.UHFQC_input_average_detector(
+                UHFQC=UHFQC,
+                AWG=self.instr_CC.get_instr(),
+                nr_averages=self.ro_acq_averages(),
+                nr_samples=int(self.ro_acq_input_average_length() * 1.8e9))
+
+            self.int_avg_det = self.get_int_avg_det()
+
+            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
+                UHFQC=UHFQC,
+                AWG=self.instr_CC.get_instr(),
+                channels=ro_channels,
+                result_logging_mode=result_logging_mode,
+                nr_averages=self.ro_acq_averages(),
+                real_imag=True,  # NB: True is the default
+                single_int_avg=True,
+                integration_length=self.ro_acq_integration_length())
+
+            self.UHFQC_spec_det = det.UHFQC_spectroscopy_detector(
+                UHFQC=UHFQC,
+                ro_freq_mod=self.ro_freq_mod(),
+                AWG=self.instr_CC.get_instr(),  # FIXME: parameters from here now ignored by callee
+                channels=ro_channels,
+                nr_averages=self.ro_acq_averages(),
+                integration_length=self.ro_acq_integration_length())
+
+            self.int_log_det = det.UHFQC_integration_logging_det(
+                UHFQC=UHFQC,
+                AWG=self.instr_CC.get_instr(),
+                channels=ro_channels,
+                result_logging_mode=result_logging_mode,
+                integration_length=self.ro_acq_integration_length())
+        else:
+            raise NotImplementedError()
+
+    ##########################################################################
+    # Other functions
+    ##########################################################################
+
+    # FIXME: compare against self.int_avg_det_single provided by _prep_ro_instantiate_detectors, and why is this detector
+    #  created on demand
+
+    def get_int_avg_det(self, **kw):
+        """
+        Instantiates an integration average detector using parameters from
+        the qubit object. **kw get passed on to the class when instantiating
+        the detector function.
+        """
+
+        # determine ro_channels and result_logging_mode
+        # FIXME: differs from algorithm in _prep_ro_instantiate_detectors
+        if self.ro_acq_weight_type() == 'optimal':
+            ro_channels = [self.ro_acq_weight_chI()]
+
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
+            else:
+                result_logging_mode = 'lin_trans'
+        else:
+            ro_channels = [self.ro_acq_weight_chI(),
+                           self.ro_acq_weight_chQ()]
+            result_logging_mode = 'raw'
+
+        int_avg_det = det.UHFQC_integrated_average_detector(
+            UHFQC=self.instr_acquisition.get_instr(),
+            AWG=self.instr_CC.get_instr(),
+            channels=ro_channels,
+            result_logging_mode=result_logging_mode,
+            nr_averages=self.ro_acq_averages(),
+            integration_length=self.ro_acq_integration_length(),
+            **kw
+        )
+
+        return int_avg_det
 
     ##########################################################################
     # Private prepare functions: MW

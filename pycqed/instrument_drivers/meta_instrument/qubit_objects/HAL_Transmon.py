@@ -1627,8 +1627,10 @@ class HAL_Transmon(HAL_ShimSQ):
             parameter_list: list = ['G_amp', 'D_amp', 'freq'],
             initial_values: list = None,
             initial_steps: list = [0.05, 0.05, 1e6],
-            nr_cliffords: int = 80, nr_seeds: int = 200,
-            verbose: bool = True, update: bool = True,
+            nr_cliffords: int = 80,
+            nr_seeds: int = 200,
+            verbose: bool = True,
+            update: bool = True,
             prepare_for_timedomain: bool = True
     ):
         """
@@ -1652,8 +1654,10 @@ class HAL_Transmon(HAL_ShimSQ):
             parameter_list: list = ['G_amp', 'D_amp', 'freq'],
             initial_values: list = None,
             initial_steps: list = [0.05, 0.05, 1e6],
-            nr_cliffords: int = 80, nr_seeds: int = 200,
-            verbose: bool = True, update: bool = True,
+            nr_cliffords: int = 80,
+            nr_seeds: int = 200,
+            verbose: bool = True,
+            update: bool = True,
             prepare_for_timedomain: bool = True,
             method: bool = None,
             optimizer: str = 'NM'
@@ -1851,7 +1855,8 @@ class HAL_Transmon(HAL_ShimSQ):
             self,
             nested_MC: Optional[MeasurementControl] = None,
             start_values=None,
-            initial_steps=None, f_termination=0.01
+            initial_steps=None,
+            f_termination=0.01
     ):
         '''
         FIXME! Merge both calibrate allxy methods.
@@ -1914,6 +1919,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
         a2 = ma.OptimizationAnalysis(label='gate_tuneup_allxy')
         self.ro_acq_averages(old_avg)
+
         # Open all vsm channels
         for module in modules:
             VSM.set('mod{}_marker_source'.format(module + 1), 'int')
@@ -2148,7 +2154,13 @@ class HAL_Transmon(HAL_ShimSQ):
     # calibrate_ functions (overrides for class Qubit)
     ##########################################################################
 
-    def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, motzois=None):
+    def calibrate_motzoi(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            verbose=True,
+            update=True,
+            motzois=None
+    ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         """
@@ -2211,6 +2223,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
 
+        # FIXME: move hardware handling to HAK_ShimSQ
         if using_VSM:
             if AWG.__class__.__name__ == 'QuTech_AWG_Module':
                 chGI_par = AWG.parameters['ch1_offset']
@@ -2353,16 +2366,22 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
-
         self.ro_acq_averages(averages)
+
         if measure_transients_CCL_switched:
-            transients = self.measure_transients_CCL_switched(MC=MC,
-                                                              analyze=analyze,
-                                                              depletion_analysis=False)
+            transients = self.measure_transients_CCL_switched(
+                MC=MC,
+                analyze=analyze,
+                depletion_analysis=False
+            )
         else:
-            transients = self.measure_transients(MC=MC, analyze=analyze,
-                                                 depletion_analysis=False,
-                                                 disable_metadata=disable_metadata)
+            transients = self.measure_transients(
+                MC=MC,
+                analyze=analyze,
+                depletion_analysis=False,
+                disable_metadata=disable_metadata
+            )
+
         if analyze:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
@@ -2409,7 +2428,8 @@ class HAL_Transmon(HAL_ShimSQ):
 
     def measure_heterodyne_spectroscopy(
             self,
-            freqs, MC: Optional[MeasurementControl] = None,
+            freqs,
+            MC: Optional[MeasurementControl] = None,
             analyze=True,
             close_fig=True,
             label=''
@@ -2493,14 +2513,13 @@ class HAL_Transmon(HAL_ShimSQ):
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
             MW_LO_source=self.instr_LO_ro.get_instr(),
-            IF=self.ro_freq_mod()))
+            IF=self.ro_freq_mod())
+        )
         MC.set_sweep_points(freqs)
 
         ro_lm = self.instr_LutMan_RO.get_instr()
-        m_amp_par = ro_lm.parameters[
-            'M_amp_R{}'.format(self.cfg_qubit_nr())]
-        s2 = swf.lutman_par_dB_attenuation_UHFQC_dig_trig(
-            LutMan=ro_lm, LutMan_parameter=m_amp_par)
+        m_amp_par = ro_lm.parameters['M_amp_R{}'.format(self.cfg_qubit_nr())]
+        s2 = swf.lutman_par_dB_attenuation_UHFQC_dig_trig(LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)
         self.int_avg_det_single._set_real_imag(False)
@@ -2784,6 +2803,62 @@ class HAL_Transmon(HAL_ShimSQ):
                 optimization_window=depletion_optimization_window,
                 plot=depletion_analysis_plot,
                 plot_max_time=plot_max_time)
+            return a
+        else:
+            return [np.array(t, dtype=np.float64) for t in transients]
+
+    def measure_transients_CCL_switched(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            analyze: bool = True,
+            cases=('off', 'on'),
+            prepare: bool = True,
+            depletion_analysis: bool = True,
+            depletion_analysis_plot: bool = True,
+            depletion_optimization_window=None
+    ):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        self.prepare_for_timedomain()
+        # off/on switching is achieved by turning the MW source on and
+        # off as this is much faster than recompiling/uploading
+
+        transients = []
+        for i, pulse_comb in enumerate(cases):
+            p = sqo.off_on(
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
+                initialize=False,
+                platf_cfg=self.cfg_openql_platform_fn()
+            )
+            self.instr_CC.get_instr().eqasm_program(p.filename)
+
+            s = swf.OpenQL_Sweep(
+                openql_program=p,
+                CCL=self.instr_CC.get_instr(),
+                parameter_name='Transient time', unit='s',
+                upload=prepare
+            )
+            MC.set_sweep_function(s)
+
+            if 'UHFQC' in self.instr_acquisition():
+                sampling_rate = 1.8e9
+            else:
+                raise NotImplementedError()
+
+            MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) / sampling_rate)
+            MC.set_detector_function(self.input_average_detector)
+            data = MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i))
+            dset = data['dset']
+            transients.append(dset.T[1:])
+            if analyze:
+                ma.MeasurementAnalysis()
+        if depletion_analysis:
+            a = ma.Input_average_analysis(
+                IF=self.ro_freq_mod(),
+                optimization_window=depletion_optimization_window,
+                plot=depletion_analysis_plot
+            )
             return a
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
@@ -3347,19 +3422,23 @@ class HAL_Transmon(HAL_ShimSQ):
                 }
                 return res
 
-    def measure_ramsey_ramzz(self, meas_qubit, ramzz_wait_time,
-                             times=None, MC=None,
-                             artificial_detuning: float = None,
-                             freq_qubit: float = None,
-                             label: str = '',
-                             prepare_for_timedomain=True,
-                             analyze=True, close_fig=True, update=True,
-                             detector=False,
-                             double_fit=False,
-                             test_beating=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
+    def measure_ramsey_ramzz(
+            self,
+            meas_qubit,
+            ramzz_wait_time,
+            times=None,
+            MC=None,
+            artificial_detuning: float = None,
+            freq_qubit: float = None,
+            label: str = '',
+            prepare_for_timedomain=True,
+            analyze=True,
+            close_fig=True,
+            update=True,
+            detector=False,
+            double_fit=False,
+            test_beating=True
+    ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -3621,14 +3700,20 @@ class HAL_Transmon(HAL_ShimSQ):
                 self.T2_echo(a.fit_res.params['tau'].value)
             return a
 
-    # FIXME: parameter measure_qubit is accessed as meas_qubit: unresolved reference
-    def measure_echo_ramzz(self, measure_qubit, ramzz_wait_time,
-                           times=None, MC=None,
-                           analyze=True, close_fig=True, update=True,
-                           label: str = '', prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
+    def measure_echo_ramzz(
+            self,
+            measure_qubit,
+            ramzz_wait_time,
+            times=None,
+            MC=None,
+            analyze=True,
+            close_fig=True,
+            update=True,
+            label: str = '',
+            prepare_for_timedomain=True
+    ):
+        # FIXME: the body of this function used a mix of parameter 'measure_qubit' and non-existing 'meas_qubit' and
+        #  as such couldn't work, so consider this function untested
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -3649,25 +3734,23 @@ class HAL_Transmon(HAL_ShimSQ):
                                     times[-1]+4*dt)])
 
         mw_lutman = self.instr_LutMan_MW.get_instr()
-        # # Checking if pulses are on 20 ns grid
-        if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for
-                    t in times]):
+        # Checking if pulses are on 20 ns grid
+        if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for t in times]):
             raise ValueError('timesteps must be multiples of 40e-9')
 
         # # Checking if pulses are locked to the pulse modulation
         if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9) == 0 for t in times]) and\
          mw_lutman.cfg_sideband_mode() != 'real-time':
-            raise ValueError(
-                'timesteps must be multiples of 2 modulation periods')
+            raise ValueError('timesteps must be multiples of 2 modulation periods')
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-            meas_qubit.prepare_for_timedomain()
+            measure_qubit.prepare_for_timedomain()
 
         mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         p = sqo.echo_ramzz(times,
                            inv_qubit_idx=self.cfg_qubit_nr(),
-                           meas_qubit_idx=meas_qubit.cfg_qubit_nr(),
+                           meas_qubit_idx=measure_qubit.cfg_qubit_nr(),
                            ramzz_wait_time_ns=ramzz_wait_time*1e9,
                            platf_cfg=self.cfg_openql_platform_fn())
 
@@ -3678,7 +3761,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('echo_'+label+self.name+'_ramzz_'+meas_qubit.name)
+        MC.run('echo_'+label+self.name+'_ramzz_'+measure_qubit.name)
         if analyze:
             # N.B. v1.5 analysis
             a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
@@ -3687,13 +3770,14 @@ class HAL_Transmon(HAL_ShimSQ):
             return a
 
 
-    def measure_restless_ramsey(self, amount_of_repetitions=None, time=None,
-                                amount_of_shots=2**20, MC=None,
-                                prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
-
+    def measure_restless_ramsey(
+            self,
+            amount_of_repetitions=None,
+            time=None,
+            amount_of_shots=2 ** 20,
+            MC=None,
+            prepare_for_timedomain=True
+    ):
         label = f"Restless_Ramsey_N={amount_of_repetitions}_tau={time}"
 
         if MC is None:
@@ -3944,8 +4028,7 @@ class HAL_Transmon(HAL_ShimSQ):
                     normalized_probability=True)
             else:
                 # if statement required if 2 channels readout
-                logging.warning(
-                    'It is recommended to do this with optimal weights')
+                logging.warning('It is recommended to do this with optimal weights')
                 a = ma2.Intersect_Analysis(
                     options_dict={'ch_idx_A': 0,
                                   'ch_idx_B': 1},
@@ -4862,62 +4945,6 @@ class HAL_Transmon(HAL_ShimSQ):
 
         if analyze:
             ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
-
-    def measure_transients_CCL_switched(
-            self,
-            MC: Optional[MeasurementControl] = None,
-            analyze: bool = True,
-            cases=('off', 'on'),
-            prepare: bool = True,
-            depletion_analysis: bool = True,
-            depletion_analysis_plot: bool = True,
-            depletion_optimization_window=None
-    ):
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        self.prepare_for_timedomain()
-        # off/on switching is achieved by turning the MW source on and
-        # off as this is much faster than recompiling/uploading
-
-        transients = []
-        for i, pulse_comb in enumerate(cases):
-            p = sqo.off_on(
-                qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
-                initialize=False,
-                platf_cfg=self.cfg_openql_platform_fn()
-            )
-            self.instr_CC.get_instr().eqasm_program(p.filename)
-
-            s = swf.OpenQL_Sweep(
-                openql_program=p,
-                CCL=self.instr_CC.get_instr(),
-                parameter_name='Transient time', unit='s',
-                upload=prepare
-            )
-            MC.set_sweep_function(s)
-
-            if 'UHFQC' in self.instr_acquisition():
-                sampling_rate = 1.8e9
-            else:
-                raise NotImplementedError()
-
-            MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) / sampling_rate)
-            MC.set_detector_function(self.input_average_detector)
-            data = MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i))
-            dset = data['dset']
-            transients.append(dset.T[1:])
-            if analyze:
-                ma.MeasurementAnalysis()
-        if depletion_analysis:
-            a = ma.Input_average_analysis(
-                IF=self.ro_freq_mod(),
-                optimization_window=depletion_optimization_window,
-                plot=depletion_analysis_plot
-            )
-            return a
-        else:
-            return [np.array(t, dtype=np.float64) for t in transients]
 
     def measure_RO_QND(
             self,
@@ -6228,7 +6255,8 @@ class HAL_Transmon(HAL_ShimSQ):
             self.measure_ssro,
             msmt_kw={
                 'nr_shots': nr_shots,
-                'analyze': True, 'SNR_detector': True,
+                'analyze': True,
+                'SNR_detector': True,
                 'cal_residual_excitation': False,
             },
             result_keys=['SNR', 'F_d', 'F_a']
