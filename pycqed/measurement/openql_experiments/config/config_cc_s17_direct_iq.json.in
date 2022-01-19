@@ -377,8 +377,12 @@
                "ref_signal": "single-qubit-mw"
            },
            "decomposition": {
-               "into": [
-                    "rx90 op(0)"  // FIXME: makes no real sense
+               "into": [  // FIXME: makes no real sense
+                    "if (op(1) < 45) {",
+                    "   rx90 op(0)",
+                    "} else {",
+                    "   rx90 op(0)",
+                    "}"
                 ]
            }
        }
