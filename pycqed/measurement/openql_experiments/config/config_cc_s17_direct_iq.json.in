@@ -355,21 +355,35 @@
 //                "into": "_cz_sw_ne_park q8,q10,q11"
 //            }
 //        }
-		//CZ decompositions
-	       "fluxdance_1": {
-	           "prototype": ["Z:qubit", "Z:qubit"],
-	           "duration": @FLUX_DURATION@,
-	           "cc": { // FIXME: key is required
-	               "ref_signal": "single-qubit-mw",
-	               "static_codeword_override": [31]
-	           },
-	           "decomposition": {
-	               "into": ["cz q8,q10","cz q9,q11"]
-	           }
-	       }
 
+		// Flux dance decompositions
+//       "fluxdance_1": {
+//           "prototype": ["Z:qubit", "Z:qubit"],
+//           "duration": @FLUX_DURATION@,
+//           "cc": { // FIXME: key is required
+//               "ref_signal": "single-qubit-mw",
+//               "static_codeword_override": [31]
+//           },
+//           "decomposition": {
+//               "into": ["cz q8,q10","cz q9,q11"]
+//           }
+//       },
 
-	},	// instructions
+       // Parameterized gate decompositions (test)
+       "_test_rotate": {
+           "prototype": ["Z:qubit", "L:int"],
+           "duration": @MW_DURATION@,
+           "cc": { // FIXME: key is required
+               "ref_signal": "single-qubit-mw"
+           },
+           "decomposition": {
+               "into": [
+                    "rx90 op(0)"  // FIXME: makes no real sense
+                ]
+           }
+       }
+
+           },	// instructions
 
 #include "common_keys.json.in"
 
