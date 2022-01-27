@@ -656,8 +656,14 @@
         //**************************************************************************************************************
 
         // helpers for CZ gate decomposition, flux_lutman compatible
+        //
+        // NB: the '*_park' instructions now use prototype "I:qubit" for the park parameter, which makes the scheduler
+        // *ignore* that parameter. This allows for parallel scheduling of multiple instructions that perform the same
+        // park, but can also arise in conflicts (signal conflict in the CC backend) if a qubit is both used for parking
+        // and another fluxing operation.
+
         "_cz_sw_ne_park": {
-            "prototype": ["Z:qubit", "Z:qubit", "Z:qubit"],
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
             "duration": @FLUX_DURATION@,
             "cc": {
                 "signal": [
@@ -700,7 +706,7 @@
             }
         },
         "_cz_se_nw_park": {
-            "prototype": ["Z:qubit", "Z:qubit", "Z:qubit"],
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
             "duration": @FLUX_DURATION@,
             "cc": {
                 "signal": [
@@ -740,6 +746,20 @@
                     }
                 ],
                 "static_codeword_override": [2,4]
+            }
+        },
+        "_cz_park": {  // NB: fka 'sf_park'
+            "prototype": ["Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "park" }
+                    }
+                ],
+                "static_codeword_override": [5]
             }
         },
 

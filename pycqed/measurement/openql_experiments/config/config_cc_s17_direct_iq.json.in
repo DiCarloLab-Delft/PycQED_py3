@@ -478,16 +478,23 @@
         // Hierarchical gate decompositions (test)
 
 		// Flux dance decompositions (test)
-       "_fluxdance_1": {
-           "prototype": [],
-           "duration": @FLUX_DURATION@,
-           "decomposition": {
-               "into": "{ cz q[8],q[10] | cz q[9],q[11] }" // FIXME: instructions don't run in parallel, because both use q[11]
-           }
-       },
+        "_fluxdance_conflict": {
+            "prototype": [],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "{ cz q[8],q[10] | cz q[9],q[11] }" // FIXME: in custom instruction '_cz_sw_ne_park <Z:qubit> q[8], <Z:qubit> q[10], <I:qubit> q[11]': Signal conflict on instrument='flux_0', group=3, between '{type:idle_z,which:NE}' and '{type:park}'
+            }
+        },
+        "_fluxdance_1": {
+            "prototype": [],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "{ cz q[10],q[8] | cz q[9],q[12] }"  // NB: both CZs park q[11]
+            }
+        },
 
-       // Parameterized gate decompositions (test)
-       "_test_rotate": {
+        // Parameterized gate decompositions (test)
+        "_test_rotate": {
            "prototype": ["X:qubit", "L:int"],
            "duration": @MW_DURATION@,
            "decomposition": {
@@ -499,9 +506,40 @@
                     "}"
                 ]
            }
-       }
+        },
 
-           },	// instructions
+        // CZ with park and refocus
+        "__cz_sw_ne_park_refocus": {
+            "prototype": ["Z:qubit", "Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SW" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NE" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 2,
+                        "value": { "type": "park" }
+                    },
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_27"}  // FIXME
+                    }
+                ],
+                "static_codeword_override": [3,1,5,27]
+            }
+        }
+
+        },	// instructions
 
 #include "common_keys.json.in"
 
