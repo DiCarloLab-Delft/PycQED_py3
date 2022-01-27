@@ -1,5 +1,5 @@
 // File:    config_cc_s17_direct_iq.json.in
-// notes:   requires OpenQL > 0.10.0
+// notes:   requires OpenQL >= 0.10.2
 //          see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
 // author: 	Wouter Vlothuizen e.a.
 
@@ -186,25 +186,32 @@
 
     "gate_decomposition": {
 #include "common_gate_decomposition.json.in"
-        ,
+
+        // NB: is is not possible to decompose 'new style' decompositions into these 'legacy'
+        // decompositions. Trying so will result in: "the duration of the schedule of the decomposition
+        // (18446744073709551615) cannot be longer than the duration of the to-be-decomposed instruction (2)"
+        // Since this is not easily solved and the bew system is far better anyway (although slightly more verbose)
+        // we won't solve that.
+
+//        ,
 
         // gate decompositions for S17, using new CZ helpers
-        "cz q8,q10":   ["_cz_sw_ne_park q8,q10,q11"],
-        "cz q10,q8":   ["_cz_sw_ne_park q8,q10,q11"],
-        "cz q8,q11":   ["_cz_se_nw_park q8,q11,q10"],
-        "cz q11,q8":   ["_cz_se_nw_park q8,q11,q10"],
-        "cz q11,q14":  ["_cz_sw_ne_park q11,q14,q15"],
-        "cz q14,q11":  ["_cz_sw_ne_park q11,q14,q15"],
-        "cz q10,q14":  ["_cz_se_nw q10,q14"],
-        "cz q14,q10":  ["_cz_se_nw q10,q14"],
-        "cz q9,q11":   ["_cz_sw_ne_park q9,q11,q12"],
-        "cz q11,q9":   ["_cz_sw_ne_park q9,q11,q12"],
-        "cz q9,q12":   ["_cz_se_nw_park q9,q12,q11"],
-        "cz q12,q9":   ["_cz_se_nw_park q9,q12,q11"],
-        "cz q11,q15":  ["_cz_se_nw_park q11,q15,q14"],
-        "cz q15,q11":  ["_cz_se_nw_park q11,q15,q14"],
-        "cz q12,q15":  ["_cz_sw_ne q12,q15"],
-        "cz q15,q12":  ["_cz_sw_ne q12,q15"]
+//        "cz q8,q10":   ["_cz_sw_ne_park q8,q10,q11"],
+//        "cz q10,q8":   ["_cz_sw_ne_park q8,q10,q11"],
+//        "cz q8,q11":   ["_cz_se_nw_park q8,q11,q10"],
+//        "cz q11,q8":   ["_cz_se_nw_park q8,q11,q10"],
+//        "cz q11,q14":  ["_cz_sw_ne_park q11,q14,q15"],
+//        "cz q14,q11":  ["_cz_sw_ne_park q11,q14,q15"],
+//        "cz q10,q14":  ["_cz_se_nw q10,q14"],
+//        "cz q14,q10":  ["_cz_se_nw q10,q14"],
+//        "cz q9,q11":   ["_cz_sw_ne_park q9,q11,q12"],
+//        "cz q11,q9":   ["_cz_sw_ne_park q9,q11,q12"],
+//        "cz q9,q12":   ["_cz_se_nw_park q9,q12,q11"],
+//        "cz q12,q9":   ["_cz_se_nw_park q9,q12,q11"],
+//        "cz q11,q15":  ["_cz_se_nw_park q11,q15,q14"],
+//        "cz q15,q11":  ["_cz_se_nw_park q11,q15,q14"],
+//        "cz q12,q15":  ["_cz_sw_ne q12,q15"],
+//        "cz q15,q12":  ["_cz_sw_ne q12,q15"]
 
 
         // FIXME: "flux_dance_*" ripped from config_cc_s17_direct_iq.json.in:
@@ -324,9 +331,12 @@
         ,
 
         //****************************************************************
-        // decompositions, new style, require OpenQL > 0.10.0
+        // decompositions, new style, require OpenQL >= 0.10.2
         // see https://openql.readthedocs.io/en/latest/gen/reference_configuration.html#instructions-section
         // Should be compatible with API, and cQASM1.2
+        //
+        // Note that for hystorical reasons, qubits referred to in the instruction name don't use "[]" (e.g. "q8"),
+        // whereas the decomposition/into key requires them (e.g. "q[8]"), because it uses cQasm syntax
         //****************************************************************
 
 
@@ -343,41 +353,145 @@
 //            }
 //        }
 //,
-        // CZ decompositions
-//        "cz q8,q10": {
-//            "prototype": ["Z:qubit", "Z:qubit"],
-//            "duration": @FLUX_DURATION@,
-//            "cc": { // FIXME: key is required
-//                "ref_signal": "single-qubit-mw",
-//                "static_codeword_override": [31]
-//            },
-//            "decomposition": {
-//                "into": "_cz_sw_ne_park q8,q10,q11"
-//            }
-//        }
+        // CZ decompositions for S17, using new CZ helpers
+        // Note the use of 'hierarchical gate decomposition' for every 2nd entry
+        "cz q8,q10": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "_cz_sw_ne_park q[8],q[10],q[11]"
+            }
+        },
+        "cz q10,q8": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "cz q[8],q[10]"
+            }
+        },
 
-		// Flux dance decompositions
-//       "fluxdance_1": {
-//           "prototype": ["Z:qubit", "Z:qubit"],
-//           "duration": @FLUX_DURATION@,
-//           "cc": { // FIXME: key is required
-//               "ref_signal": "single-qubit-mw",
-//               "static_codeword_override": [31]
-//           },
-//           "decomposition": {
-//               "into": ["cz q8,q10","cz q9,q11"]
-//           }
-//       },
+        "cz q8,q11": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "_cz_se_nw_park q[8],q[11],q[10]"
+            }
+        },
+        "cz q11,q8": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "cz q[8],q[11]"
+            }
+        },
+
+        "cz q11,q14": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "_cz_sw_ne_park q[11],q[14],q[15]"
+            }
+        },
+        "cz q14,q11": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "cz q[11],q[14]"
+            }
+        },
+
+        "cz q10,q14": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "_cz_se_nw q[10],q[14]"
+            }
+        },
+        "cz q14,q10": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "cz q[10],q[14]"
+            }
+        },
+
+        "cz q9,q11": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "_cz_sw_ne_park q[9],q[11],q[12]"
+            }
+        },
+        "cz q11,q9": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "cz q[9],q[11]"
+            }
+        },
+
+        "cz q9,q12": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "_cz_se_nw_park q[9],q[12],q[11]"
+            }
+        },
+        "cz q12,q9": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "cz q[9],q[12]"
+            }
+        },
+
+        "cz q11,q15": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "_cz_se_nw_park q[11],q[15],q[14]"
+            }
+        },
+        "cz q15,q11": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "cz q[11],q[15]"
+            }
+        },
+
+        "cz q12,q15": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "_cz_sw_ne q[12],q[15]"
+            }
+        },
+        "cz q15,q12": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "decomposition": {
+                "into": "cz q[12],q[15]"
+            }
+        },
+
+        // Hierarchical gate decompositions (test)
+
+		// Flux dance decompositions (test)
+       "_fluxdance_1": {
+           "prototype": [],
+           "duration": @FLUX_DURATION@,
+           "decomposition": {
+               "into": "{ cz q[8],q[10] | cz q[9],q[11] }" // FIXME: instructions don't run in parallel, because both use q[11]
+           }
+       },
 
        // Parameterized gate decompositions (test)
        "_test_rotate": {
-           "prototype": ["Z:qubit", "L:int"],
+           "prototype": ["X:qubit", "L:int"],
            "duration": @MW_DURATION@,
-           "cc": { // FIXME: key is required
-               "ref_signal": "single-qubit-mw"
-           },
            "decomposition": {
-               "into": [  // FIXME: makes no real sense, and fails in backend
+               "into": [  // FIXME: makes no real sense, and currently fails in backend
                     "if (op(1) < 45) {",
                     "   rx45 op(0)",
                     "} else {",
