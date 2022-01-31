@@ -335,7 +335,7 @@
         // see https://openql.readthedocs.io/en/latest/gen/reference_configuration.html#instructions-section
         // Should be compatible with API, and cQASM1.2
         //
-        // Note that for hystorical reasons, qubits referred to in the instruction name don't use "[]" (e.g. "q8"),
+        // Note that for historical reasons, qubits referred to in the instruction name don't use "[]" (e.g. "q8"),
         // whereas the decomposition/into key requires them (e.g. "q[8]"), because it uses cQasm syntax
         //****************************************************************
 
@@ -510,7 +510,7 @@
 
         // CZ with park and refocus
         "__cz_sw_ne_park_refocus": {
-            "prototype": ["Z:qubit", "Z:qubit", "Z:qubit"],
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
             "duration": @FLUX_DURATION@,
             "cc": {
                 "signal": [
