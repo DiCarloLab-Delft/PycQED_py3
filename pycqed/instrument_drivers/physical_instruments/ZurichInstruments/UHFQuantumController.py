@@ -320,14 +320,6 @@ class UHFQC(uhf.UHFQA_core, DIO.CalInterface):
             'of the codewords. The valid range is 0 to 15.',
             vals=validators.Ints())
 
-        self.add_parameter(
-            'minimum_holdoff',
-            get_cmd=self._get_minimum_holdoff,
-            unit='s',
-            label='Minimum hold-off',
-            docstring='Returns the minimum allowed hold-off between two readout operations.',
-            vals=validators.Numbers())
-
     def _codeword_table_preamble(self, awg_nr) -> str:
         """
         Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
@@ -446,14 +438,6 @@ class UHFQC(uhf.UHFQA_core, DIO.CalInterface):
 
     def _get_dio_calibration_delay(self):
         return self._dio_calibration_delay
-
-    def _get_minimum_holdoff(self):
-        if self.qas_0_result_averages() == 1:
-            holdoff = np.max((800, self.qas_0_integration_length(), self.qas_0_delay()+16))/self.clock_freq()
-        else:
-            holdoff = np.max((2560, self.qas_0_integration_length(), self.qas_0_delay()+16))/self.clock_freq()
-
-        return holdoff
 
     def _set_wait_dly(self, value) -> None:
         self.set('awgs_0_userregs_{}'.format(UHFQC.USER_REG_WAIT_DLY), value)
