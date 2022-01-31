@@ -200,6 +200,14 @@ class UHFQA_core(zibase.ZI_base_instrument):
             'actual readout.',
             vals=validators.Ints())
 
+        self.add_parameter(
+            'minimum_holdoff',
+            get_cmd=self._get_minimum_holdoff,
+            unit='s',
+            label='Minimum hold-off',
+            docstring='Returns the minimum allowed hold-off between two readout operations.',
+            vals=validators.Numbers())
+
     ##########################################################################
     # 'public' overrides for ZI_base_instrument
     ##########################################################################
@@ -655,6 +663,14 @@ class UHFQA_core(zibase.ZI_base_instrument):
             'waves': False,
             'cases': False,
             'diocws': False}
+
+    def _get_minimum_holdoff(self):
+        if self.qas_0_result_averages() == 1:
+            holdoff = np.max((800, self.qas_0_integration_length(), self.qas_0_delay()+16))/self.clock_freq()
+        else:
+            holdoff = np.max((2560, self.qas_0_integration_length(), self.qas_0_delay()+16))/self.clock_freq()
+
+        return holdoff
 
     def _set_wait_dly(self, value) -> None:
         self.set('awgs_0_userregs_{}'.format(UHFQA_core.USER_REG_WAIT_DLY), value)
