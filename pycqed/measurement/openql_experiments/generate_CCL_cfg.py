@@ -140,7 +140,7 @@ def generate_config(filename: str,
             "my90 %0": ["rym90 %0"],
             "mx90 %0": ["rxm90 %0"],
 
-            # Clifford decomposition per Eptstein et al. Phys. Rev. A 89, 062321
+            # Clifford decomposition per Epstein et al. Phys. Rev. A 89, 062321
             # (2014)
             "cl_0 %0": ['i %0'],
             "cl_1 %0": ['ry90 %0', 'rx90 %0'],

@@ -1,13 +1,10 @@
 import logging
 import numpy as np
-from pycqed.measurement.randomized_benchmarking.clifford_group import (
-    clifford_lookuptable,
-)
-import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
+from deprecated import deprecated
 
-from pycqed.measurement.randomized_benchmarking.clifford_decompositions import (
-    gate_decomposition,
-)
+from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_lookuptable
+from pycqed.measurement.randomized_benchmarking.clifford_decompositions import gate_decomposition
+import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 
 
 def calculate_net_clifford(rb_clifford_indices, Clifford=tqc.SingleQubitClifford):
@@ -78,6 +75,7 @@ def decompose_clifford_seq(clifford_sequence, gate_decomposition=gate_decomposit
     return decomposed_seq
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def convert_clifford_sequence_to_tape(
     clifford_sequence, lutmapping, gate_decomposition=gate_decomposition
 ):
@@ -99,6 +97,7 @@ def convert_clifford_sequence_to_tape(
     return tape
 
 
+# FIXME: deprecate, also including calculate_recovery_clifford() and clifford_lookuptable
 def randomized_benchmarking_sequence_old(
     n_cl: int, desired_net_cl: int = 0, seed: int = None
 ):
@@ -118,7 +117,7 @@ def randomized_benchmarking_sequence_old(
     the desired_net_cl to "3" (corresponds to Pauli X).
     """
     logging.warning(
-        "deprecation warning, only exists for testing " "equivalence to new function."
+        "deprecation warning, only exists for testing equivalence to new function."
     )
 
     if seed is None:

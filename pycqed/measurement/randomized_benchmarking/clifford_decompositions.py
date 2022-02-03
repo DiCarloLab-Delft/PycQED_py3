@@ -43,7 +43,7 @@ Five_primitives_decomposition[23] = ['X90', 'Y90', 'X90', 'mX180']
 
 '''
 Gate decomposition decomposition of the clifford group as per
-Eptstein et al. Phys. Rev. A 89, 062321 (2014)
+Epstein et al. Phys. Rev. A 89, 062321 (2014)
 '''
 epstein_efficient_decomposition = [[]]*(24)
 # explicitly reversing order because order of operators is order in time
