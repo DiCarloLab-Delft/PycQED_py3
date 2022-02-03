@@ -244,7 +244,6 @@ class TestCliffordCalculus(unittest.TestCase):
         np.testing.assert_array_equal(Cliff_prod.pauli_transfer_matrix,
                                       dot_prod)
 
-
     def test_inverse_single_qubit_clifford(self):
         for i in range(24):
             Cl = tqc.SingleQubitClifford(i)
@@ -325,7 +324,6 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
             new_cliff[1::2] = 0
             assert_array_equal(intl_cliffords, new_cliff)
 
-
     def test_interleaved_randomized_benchmarking_sequence_2Q(self):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
@@ -342,7 +340,6 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
             np.testing.assert_array_equal(intl_cliffords,
                                           new_cliff)
 
-
     def test_two_qubit_randomized_benchmarking_sequence(self):
         """
         """
@@ -358,5 +355,3 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
             # no test for correctness here. Corectness depend on the fact
             # that it implements code very similar to the Single qubit version
             # and has components that are all tested.
-
-

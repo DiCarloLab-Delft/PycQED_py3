@@ -92,10 +92,10 @@ class Test_cQASM(unittest.TestCase):
                 pragma @ql.name("{name}")  # set the name of generated files
 
                 map i = creg(0)
-                map b = breg(1024) # FIXME: assign on PL state, not DSM
+                map b = breg(0) # FIXME: assign on PL state, not DSM
 
                 # op(0)
-                # set i = rnd_seed(0)                
+                set i = rnd_seed(0)                
                 set b = rnd(0.5)  # on all CCIO              
             """
 

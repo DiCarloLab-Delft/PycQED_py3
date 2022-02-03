@@ -53,6 +53,7 @@ def calculate_net_clifford(rb_clifford_indices, Clifford=tqc.SingleQubitClifford
         # 11520 elements of the Two-qubit Clifford group C2
         # corresponding clifford
         cliff = Clifford(idx % 100_000)
+
         # order of operators applied in is right to left, therefore
         # the new operator is applied on the left side.
         net_clifford = cliff * net_clifford

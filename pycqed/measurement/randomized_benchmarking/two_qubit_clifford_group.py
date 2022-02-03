@@ -2,8 +2,7 @@ import numpy as np
 from zlib import crc32
 from os.path import join, dirname, abspath
 from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_group_single_qubit as C1, CZ, S1
-from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
-    import(epstein_efficient_decomposition)
+from pycqed.measurement.randomized_benchmarking.clifford_decompositions import epstein_efficient_decomposition
 
 hash_dir = join(abspath(dirname(__file__)), 'clifford_hash_tables')
 
@@ -152,6 +151,9 @@ class SingleQubitClifford(Clifford):
 
 class TwoQubitClifford(Clifford):
 
+    # FIXME: pauli_transfer_matrix is only used when Cliffords are multiplied or inverted, so
+    #  it would be faster to compute it on demand
+    # FIXME: define constants at class level, and use these instead of all magic constants
     def __init__(self, idx: int):
         assert(idx < 11520)
         self.idx = idx
@@ -170,7 +172,7 @@ class TwoQubitClifford(Clifford):
         """
         Returns the gate decomposition of the two qubit Clifford group.
 
-        Single qubit Cliffords are decompesed according to Epstein et al.
+        Single qubit Cliffords are decomposed according to Epstein et al.
 
         Using the method to get this avoids expensive function calls
         whenever the Clifford is instantiated
@@ -181,15 +183,13 @@ class TwoQubitClifford(Clifford):
             elif self.idx < 576 + 5184:
                 self._gate_decomposition = CNOT_like_gates(self.idx-576)
             elif self.idx < 576 + 2*5184:
-                self._gate_decomposition = iSWAP_like_gates(
-                    self.idx-(576+5184))
+                self._gate_decomposition = iSWAP_like_gates(self.idx-(576+5184))
             elif self.idx < 11520:
-                self._gate_decomposition = SWAP_like_gates(
-                    self.idx-(576+2*5184))
+                self._gate_decomposition = SWAP_like_gates(self.idx-(576+2*5184))
 
         return self._gate_decomposition
 
-
+# FIXME: turn into private @staticmethod
 def single_qubit_like_PTM(idx):
     """
     Returns the pauli transfer matrix for gates of the single qubit like class
@@ -234,7 +234,7 @@ def CNOT_like_PTM(idx):
 
     C1_q0 = np.kron(np.eye(4), C1[idx_0])
     C1_q1 = np.kron(C1[idx_1], np.eye(4))
-    CZ
+    CZ  # FIXME: no effect
     S1_q0 = np.kron(np.eye(4), S1[idx_2])
     S1y_q1 = np.kron(np.dot(C1[idx_3], Y90), np.eye(4))
     return np.linalg.multi_dot(list(reversed([C1_q0, C1_q1, CZ, S1_q0, S1y_q1])))
@@ -259,6 +259,7 @@ def CNOT_like_gates(idx):
 
     idx_2s = get_clifford_id(S1[idx_2])
     S1_q0 = [(g, 'q0') for g in gate_decomposition[idx_2s]]
+    # FIXME: precomputation of these 3 entries is a more efficient (more similar occurrences in this file):
     idx_3s = get_clifford_id(np.dot(C1[idx_3], Y90))
     S1_yq1 = [(g, 'q1') for g in gate_decomposition[idx_3s]]
 
@@ -281,7 +282,7 @@ def iSWAP_like_PTM(idx):
 
     C1_q0 = np.kron(np.eye(4), C1[idx_0])
     C1_q1 = np.kron(C1[idx_1], np.eye(4))
-    CZ
+    CZ  # FIXME: no effect
     sq_swap_gates = np.kron(mY90, Y90)
     CZ
     S1_q0 = np.kron(np.eye(4), np.dot(S1[idx_2], Y90))

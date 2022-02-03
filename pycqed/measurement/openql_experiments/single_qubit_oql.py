@@ -1646,12 +1646,12 @@ def randomized_benchmarking(
                             0 -> Idx
                             3 -> rx180
         restless:       bool, does not initialize if restless is True
-        program_name:           some string that can be used as a label.
+        program_name:   some string that can be used as a label.
         cal_points:     bool whether to replace the last two elements with
                         calibration points, set to False if you want
                         to measure a single element (for e.g. optimization)
 
-        double_curves: Alternates between net clifford 0 and 3
+        double_curves:  Alternates between net clifford 0 and 3
 
     Returns:
         p:              OpenQL Program object
