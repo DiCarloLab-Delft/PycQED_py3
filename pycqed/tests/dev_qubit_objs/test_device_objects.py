@@ -673,7 +673,9 @@ class Test_Device_obj(unittest.TestCase):
     ##############################################
 
     def test_measure_two_qubit_randomized_benchmarking(self):
-        self.device.measure_two_qubit_randomized_benchmarking(
-            qubits=["q8", "q10"],
-            # compile_only=True
-        )
+        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
+
+    def test_measure_two_qubit_allxy(self):
+        self.device.measure_two_qubit_allxy("q8", "q10", detector="int_avg")
+
+    # FIXME: add more tests, above just some random routines were added
