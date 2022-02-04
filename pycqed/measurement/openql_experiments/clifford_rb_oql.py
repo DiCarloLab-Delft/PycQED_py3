@@ -299,6 +299,7 @@ def randomized_benchmarking(
                         elif cl == 100_000:
                             cl_seq_decomposed[i] = [("I", ["q0", "q1"])]
                         else:
+                            # FIXME: inefficient: creates new object instance per clifford. More occurrences below
                             cl_seq_decomposed[i] = Cl(cl).gate_decomposition
 
                     # generate OpenQL kernel for every net_clifford
