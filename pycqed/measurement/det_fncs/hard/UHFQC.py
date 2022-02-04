@@ -762,7 +762,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                 data[i] = data[i] - self.UHFQC.get('qas_0_trans_offset_weightfunction_{}'.format(channel))
         return data
 
-    def prepare(self):
+    def prepare(self, sweep_points=None):
         if self.AWG is not None:
             self.AWG.stop()
 

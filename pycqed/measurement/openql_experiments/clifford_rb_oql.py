@@ -37,12 +37,6 @@ def parallel_friendly_rb(rb_kw_dict):
     """
     p = randomized_benchmarking(**rb_kw_dict)
 
-    # [2020-07-04]
-    # Before parallelizing RB sequences compilation this line was in the
-    # the measure RB methods of the device object
-    # It seemed to not be necessary, left it out
-    # p.sweep_points = sweep_points
-
     return p.filename
 
 def parallel_friendly_rb_2(rb_kw_dict):
@@ -53,12 +47,6 @@ def parallel_friendly_rb_2(rb_kw_dict):
     multiprocessing capabilities.
     """
     p = two_qubit_randomized_benchmarking(**rb_kw_dict)
-
-    # [2020-07-04]
-    # Before parallelizing RB sequences compilation this line was in the
-    # the measure RB methods of the device object
-    # It seemed to not be necessary, left it out
-    # p.sweep_points = sweep_points
 
     return p.filename
 
@@ -81,7 +69,7 @@ def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 4):
             end="\r",
         )
 
-        # check for keyboard interrupt q because generating can be slow
+        # check for keyboard interrupt because generating can be slow
         check_keyboard_interrupt()
         time.sleep(refresh_rate)
 
@@ -127,7 +115,7 @@ def randomized_benchmarking(
         net_cliffords:
             list of ints index of net clifford the sequence should perform. See examples below on how to use this.
             Important clifford indices
-                0 -> Idx
+                0 -> I
                 3 -> rx180
                 3*24+3 -> {rx180 q0 | rx180 q1}
                 4368 -> CZ
@@ -537,14 +525,12 @@ def two_qubit_randomized_benchmarking(
     if single_qubits != None:
         single_qubit_map = {f'q{i}' : qb for i, qb in enumerate(single_qubits)}
 
-    p = oqh.create_program(program_name, platf_cfg)
+    p = OqlProgram(program_name, platf_cfg)
 
     this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
-    recompile_dict = oqh.check_recompilation_needed_hash_based(
-        program_fn=p.filename,
-        platf_cfg=platf_cfg,
+    recompile_dict = p.check_recompilation_needed_hash_based(
         clifford_rb_oql=this_file,
         recompile=recompile,
     )
@@ -626,11 +612,10 @@ def two_qubit_randomized_benchmarking(
                                 single_recovery_clifford.gate_decomposition
                             ]
 
-                    k = oqh.create_kernel(
+                    k = p.create_kernel(
                         "RB_{}Cl_s{}_net{}_inter{}".format(
                             int(n_cl), seed, net_clifford_2q, interleaving_cl
-                        ),
-                        p,
+                        )
                     )
                     for qubit_idx in two_qubit_map.values():
                         k.prepz(qubit_idx)
@@ -677,11 +662,11 @@ def two_qubit_randomized_benchmarking(
                 combinations = ["00", "01", "10", "11", "02", "20", "22"]
             else:
                 combinations = ["00", "01", "10", "11"]
-            p = oqh.add_multi_q_cal_points(
-                p, qubits=two_qubit_pair, combinations=combinations
+            p = p.add_multi_q_cal_points(
+                qubits=two_qubit_pair, combinations=combinations
             )
 
-    p = oqh.compile(p)
+    p.compile()
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
     os.rename(recompile_dict["tmp_file"], recompile_dict["file"])

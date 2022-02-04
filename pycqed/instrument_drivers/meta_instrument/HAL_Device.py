@@ -3174,7 +3174,7 @@ class HAL_Device(HAL_ShimMQ):
                 Duration in ns of the flux pulse used when interleaved gate is
                 [100_000], i.e. idle identity
 
-            compilation_only (bool):
+            compile_only (bool):
                 Compile only the RB sequences without measuring, intended for
                 parallelizing iRB sequences compilation with measurements
 
@@ -3222,7 +3222,7 @@ class HAL_Device(HAL_ShimMQ):
         else:
             sim_cz_qubits_idxs = None
 
-        net_cliffords = [0, 3 * 24 + 3]
+        net_cliffords = [0, 3 * 24 + 3]  # see two_qubit_clifford_group::common_cliffords
 
         def send_rb_tasks(pool_):
             tasks_inputs = []
@@ -3255,7 +3255,7 @@ class HAL_Device(HAL_ShimMQ):
             return rb_tasks
 
         if compile_only:
-            assert pool is not None
+            assert pool is not None  # FIXME: add proper message
             rb_tasks = send_rb_tasks(pool)
             return rb_tasks
 

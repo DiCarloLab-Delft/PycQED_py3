@@ -182,7 +182,6 @@ class SingleQubitClifford(Clifford):
 
 class TwoQubitClifford(Clifford):
     # class constants
-
     GRP_SIZE_CLIFFORD = SingleQubitClifford.GRP_SIZE
     GRP_SIZE_SINGLE_QUBIT = GRP_SIZE_CLIFFORD**2
     GRP_SIZE_S1 = 3  # the S1 subgroup of SingleQubitClifford
@@ -191,11 +190,11 @@ class TwoQubitClifford(Clifford):
     GRP_SIZE_SWAP = GRP_SIZE_SINGLE_QUBIT
     GRP_SIZE = GRP_SIZE_SINGLE_QUBIT + GRP_SIZE_CNOT + GRP_SIZE_ISWAP + GRP_SIZE_SWAP
 
-    # FIXME: fix remaining magic constants below, and handle common code blocks as such
-
     assert(GRP_SIZE_SINGLE_QUBIT == 576)
     assert(GRP_SIZE_CNOT == 5184)
     assert(GRP_SIZE == 11520)
+
+    # FIXME: fix remaining magic constants below, and handle common code blocks as such
 
     # class variables
     _gate_decompositions = [None] * GRP_SIZE

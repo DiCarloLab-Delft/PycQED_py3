@@ -52,7 +52,6 @@ def calculate_net_clifford(
         # clifford + 100000, this is to keep it readable and bigger than the
         # 11520 elements of the Two-qubit Clifford group C2
         # corresponding clifford
-        # FIXME: inefficient: creates new object instance per clifford
         cliff = Cliff(idx % 100_000)
 
         # order of operators applied in is right to left, therefore
@@ -146,7 +145,6 @@ def randomized_benchmarking_sequence_old(
 # with Clifford object.
 # More advanced sequences are available using this method.
 ##############################################################################
-
 
 def randomized_benchmarking_sequence(
     n_cl: int,

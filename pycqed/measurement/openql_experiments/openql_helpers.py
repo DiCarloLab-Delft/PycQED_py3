@@ -654,6 +654,14 @@ class OqlProgram:
                 # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#predicate-key
                 'legacy',
             )
+        else:  # FIXME: experimental. Also decompose API input to allow use of new style decompositions
+            c.append_pass(
+                'dec.Instructions',
+                # NB: don't change the name 'legacy', see:
+                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
+                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#predicate-key
+                'legacy',
+            )
 
         # report the initial qasm
         c.append_pass(
