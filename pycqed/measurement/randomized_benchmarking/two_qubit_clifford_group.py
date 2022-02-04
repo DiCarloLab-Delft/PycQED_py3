@@ -106,8 +106,6 @@ common_cliffords = {'I':  0, 'X':  3, 'Y':  6, 'Z':  9,
 class Clifford(object):
     # class variables
     _hash_table = None
-    _gate_decompositions = None
-    _pauli_transfer_matrices = None
 
     def __mul__(self, other):
         """
@@ -146,14 +144,13 @@ class SingleQubitClifford(Clifford):
 
     # class variables
     _gate_decompositions = [None] * GRP_SIZE
-    _pauli_transfer_matrices = [None] * GRP_SIZE
 
     def __init__(self, idx: int):
-        assert(idx < 24)
+        assert(idx < self.GRP_SIZE)
         self.idx = idx
         self.pauli_transfer_matrix = C1[idx]
 
-    @property
+    @property  # FIXME: remove
     def gate_decomposition(self):
         """
         Returns the gate decomposition of the single qubit Clifford group
@@ -185,20 +182,30 @@ class SingleQubitClifford(Clifford):
 
 class TwoQubitClifford(Clifford):
     # class constants
-    GRP_SIZE = 11520
-    # FIXME: define more constants at class level, and use these instead of all magic constants
+
+    GRP_SIZE_CLIFFORD = SingleQubitClifford.GRP_SIZE
+    GRP_SIZE_SINGLE_QUBIT = GRP_SIZE_CLIFFORD**2
+    GRP_SIZE_S1 = 3  # the S1 subgroup of SingleQubitClifford
+    GRP_SIZE_CNOT = GRP_SIZE_SINGLE_QUBIT * GRP_SIZE_S1**2
+    GRP_SIZE_ISWAP = GRP_SIZE_CNOT
+    GRP_SIZE_SWAP = GRP_SIZE_SINGLE_QUBIT
+    GRP_SIZE = GRP_SIZE_SINGLE_QUBIT + GRP_SIZE_CNOT + GRP_SIZE_ISWAP + GRP_SIZE_SWAP
+
+    # FIXME: fix remaining magic constants below, and handle common code blocks as such
+
+    assert(GRP_SIZE_SINGLE_QUBIT == 576)
+    assert(GRP_SIZE_CNOT == 5184)
+    assert(GRP_SIZE == 11520)
 
     # class variables
     _gate_decompositions = [None] * GRP_SIZE
     _pauli_transfer_matrices = [None] * GRP_SIZE
 
-    # FIXME: pauli_transfer_matrix is only used when Cliffords are multiplied or inverted, so
-    #  it would be faster to compute it on demand
     def __init__(self, idx: int):
         assert(idx < self.GRP_SIZE)
         self.idx = idx
 
-    @property
+    @property  # FIXME: remove
     def pauli_transfer_matrix(self):
         # check cache
         if self._pauli_transfer_matrices[self.idx] is None:
@@ -217,7 +224,7 @@ class TwoQubitClifford(Clifford):
 
         return self._pauli_transfer_matrices[self.idx]
 
-    @property
+    @property  # FIXME: remove
     def gate_decomposition(self):
         """
         Returns the gate decomposition of the two qubit Clifford group.
@@ -266,7 +273,7 @@ class TwoQubitClifford(Clifford):
             (q0)  -- C1 --
             (q1)  -- C1 --
         """
-        assert(idx < 24**2)
+        assert(idx < cls.GRP_SIZE_SINGLE_QUBIT)
         idx_q0 = idx % 24
         idx_q1 = idx//24
         pauli_transfer_matrix = np.kron(C1[idx_q1], C1[idx_q0])
@@ -279,7 +286,7 @@ class TwoQubitClifford(Clifford):
             (q0)  -- C1 --
             (q1)  -- C1 --
         """
-        assert(idx < 24**2)
+        assert(idx < cls.GRP_SIZE_SINGLE_QUBIT)
         idx_q0 = idx % 24
         idx_q1 = idx//24
 
@@ -296,7 +303,7 @@ class TwoQubitClifford(Clifford):
                         |        ->        |
             (q1)  --C1--⊕--S1--      --C1--•--S1^Y90--
         """
-        assert(idx < 5184)
+        assert(idx < cls.GRP_SIZE_CNOT)
         idx_0 = idx % 24
         idx_1 = (idx // 24) % 24
         idx_2 = (idx // 576) % 3
@@ -317,7 +324,7 @@ class TwoQubitClifford(Clifford):
                         |        ->        |
             (q1)  --C1--⊕--S1--      --C1--•--S1^Y90--
         """
-        assert(idx < 5184)
+        assert(idx < cls.GRP_SIZE_CNOT)
         idx_0 = idx % 24
         idx_1 = (idx // 24) % 24
         idx_2 = (idx // 576) % 3
@@ -329,7 +336,7 @@ class TwoQubitClifford(Clifford):
 
         idx_2s = SingleQubitClifford._get_clifford_id(S1[idx_2])
         S1_q0 = [(g, 'q0') for g in gate_decomposition[idx_2s]]
-        # FIXME: precomputation of these 3 entries is a more efficient (more similar occurrences in this file):
+        # FIXME: precomputation of these 3 entries would be more efficient (more similar occurrences in this file):
         idx_3s = SingleQubitClifford._get_clifford_id(np.dot(C1[idx_3], Y90))
         S1_yq1 = [(g, 'q1') for g in gate_decomposition[idx_3s]]
 
@@ -344,7 +351,7 @@ class TwoQubitClifford(Clifford):
                         |       ->        |        |
             (q1)  --C1--*--S1--     --C1--•--mY90--•--S1^X90--
         """
-        assert(idx < 5184)
+        assert(idx < cls.GRP_SIZE_ISWAP)
         idx_0 = idx % 24
         idx_1 = (idx // 24) % 24
         idx_2 = (idx // 576) % 3
@@ -370,7 +377,7 @@ class TwoQubitClifford(Clifford):
                         |       ->        |        |
             (q1)  --C1--*--S1--     --C1--•--mY90--•--S1^X90--
         """
-        assert(idx < 5184)
+        assert(idx < cls.GRP_SIZE_ISWAP)
         idx_0 = idx % 24
         idx_1 = (idx // 24) % 24
         idx_2 = (idx // 576) % 3
@@ -407,7 +414,7 @@ class TwoQubitClifford(Clifford):
                     |   ->        |       |       |
         (q1)  --C1--x--     --C1--•--Y90--•-mY90--•--Y90--
         """
-        assert(idx < 24**2)
+        assert(idx < cls.GRP_SIZE_SWAP)
         idx_q0 = idx % 24
         idx_q1 = idx//24
         sq_like_cliff = np.kron(C1[idx_q1], C1[idx_q0])
@@ -429,7 +436,7 @@ class TwoQubitClifford(Clifford):
                     |   ->        |       |       |
         (q1)  --C1--x--     --C1--•--Y90--•-mY90--•--Y90--
         """
-        assert(idx < 24**2)
+        assert(idx < cls.GRP_SIZE_SWAP)
         idx_q0 = idx % 24
         idx_q1 = idx//24
         C1_q0 = [(g, 'q0') for g in gate_decomposition[idx_q0]]

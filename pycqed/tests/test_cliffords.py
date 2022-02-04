@@ -302,6 +302,7 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
     def test_single_qubit_randomized_benchmarking_sequence(self):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
+        # FIXME: seed and net_cl ignored
         for seed, net_cl in zip(seeds, net_cliffs):
             cliffords_single_qubit_class = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0,  number_of_qubits=1, seed=0)
@@ -312,6 +313,7 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
     def test_interleaved_randomized_benchmarking_sequence_1Q(self):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
+        # FIXME: seed and net_cl ignored
         for seed, net_cl in zip(seeds, net_cliffs):
             intl_cliffords = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0, number_of_qubits=1, seed=0,
@@ -327,6 +329,7 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
     def test_interleaved_randomized_benchmarking_sequence_2Q(self):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
+        # FIXME: seed and net_cl ignored
         for seed, net_cl in zip(seeds, net_cliffs):
             intl_cliffords = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0, number_of_qubits=2, seed=0,
