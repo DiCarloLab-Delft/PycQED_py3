@@ -76,7 +76,7 @@ def nested_rus(
 
                 rphi180 qData
                 measure_fb qAncilla1
-                wait qAncilla2, {echo_delay_inner_rus}  # FIXME: parameter order normally reversed
+                wait qAncilla2, {echo_delay_inner_rus}
                 rphi180 qAncilla2
                 wait qAncilla2, {echo_period - echo_delay_inner_rus}
                 wait qData, {echo_delay_inner_rus_data}
