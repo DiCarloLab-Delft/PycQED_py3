@@ -861,18 +861,16 @@
                 "signal": []
             }
         },
-        // NB: starting from OpenQl 0.10.3, signal should be empty
-        // FIXME: but without signal, we don't process the gate!
         "_dist_dsm": {
             "prototype": ["U:qubit"],
 			"duration": 20,
 			"cc": {
-			    "readout_mode": "feedback",
-//                "signal": []
+			    "readout_mode": "feedback",  // trigger special treatment to read and distribute measuremmt results
+                // although we don't output anything, we still need to associate with the correct measurement instrument & group
 				"signal": [
 					{	"type": "measure",
 						"operand_idx": 0,
-						"value": []
+						"value": []  // don't generate output signal
 					}
                 ]
 			}
