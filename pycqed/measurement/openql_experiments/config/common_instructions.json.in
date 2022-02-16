@@ -658,19 +658,17 @@
                 "into": "_do_measure op(0)"
             }
         },
-        // FIXME: experiment for Jorge
-        "measure q6": {
-            "prototype": ["M:qubit"],
-            "duration": 820,
-            "decomposition": {
-                "into": [
+        // FIXME: experiment to prefix some measurements with rx12
+//        "measure q6": {
+//            "prototype": ["M:qubit"],
+//            "duration": 820,
+//            "decomposition": {
+//                "into": [
 //                    "rx12 q[6];",
 //                    "_do_measure q[6]"
-                    "_do_measure q[6]",  // FIXME: reverse
-                    "rx12 q[6];"
-                ]
-            }
-        },
+//                ]
+//            }
+//        },
 
         //**************************************************************************************************************
         // flux
@@ -865,12 +863,12 @@
             "prototype": ["U:qubit"],
 			"duration": 20,
 			"cc": {
-			    "readout_mode": "feedback",  // trigger special treatment to read and distribute measuremmt results
                 // although we don't output anything, we still need to associate with the correct measurement instrument & group
 				"signal": [
-					{	"type": "measure",
+					{
+    	                "type": "measure",
 						"operand_idx": 0,
-						"value": []  // don't generate output signal
+						"value": []    // don't generate output signal. This also triggers special behaviour to retrieve measurements in real-time (from OpenQL 0.10.3)
 					}
                 ]
 			}
