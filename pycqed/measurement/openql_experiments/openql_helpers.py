@@ -93,7 +93,7 @@ class OqlProgram:
 
         # determine architecture and extension of generated file
         if eqasm_compiler == 'cc_light_compiler':
-            # NB: OpenQL no longer has a backend for CC-light
+            # NB: OpenQL>=0.9.0 no longer has a backend for CC-light
             self._arch = 'CCL'
             self._ext = '.qisa'  # CC-light, QCC
         else:
@@ -104,6 +104,9 @@ class OqlProgram:
         # NB: for cQasm, the actual name is determined by 'pragma @ql.name' in the source, not by self.name,
         # so users must maintain consistency
         self.filename = join(OqlProgram.output_dir, self.name + self._ext)
+
+        # map file for OpenQL>=0.10.3
+        self._map_filename = join(OqlProgram.output_dir, self.name + ".map")
 
 
     def add_kernel(self, k: ql.Kernel) -> None:
@@ -181,6 +184,23 @@ class OqlProgram:
 
         c = self._configure_compiler(src_filename, extra_pass_options)
         c.compile_with_frontend(self.platform)
+
+
+    def get_map(self) -> dict:
+        """
+        get map data produced by OpenQL>=0.10.3
+        """
+
+        return json.load(self._map_filename)
+
+
+    def get_measurement_map(self) -> dict:
+        """
+        get map data produced by OpenQL>=0.10.3
+        """
+
+        data = self.get_map()
+        return data["measurements"]
 
 
     # NB: used in clifford_rb_oql.py to skip both generation of RB sequences, and OpenQL compilation if
