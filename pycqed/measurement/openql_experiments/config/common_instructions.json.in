@@ -855,9 +855,6 @@
 		"_wait_uhfqa": {
             "prototype": ["U:qubit"],
             "duration": 720,
-            "cc": {
-                "signal": []
-            }
         },
         "_dist_dsm": {
             "prototype": ["U:qubit"],
@@ -875,10 +872,7 @@
 		},
         "_wait_dsm": {
             "prototype": ["U:qubit"],
-            "duration": 280,
-            "cc": {
-                "signal": []
-            }
+            "duration": 280
         },
 
         // additions for pragma/break
