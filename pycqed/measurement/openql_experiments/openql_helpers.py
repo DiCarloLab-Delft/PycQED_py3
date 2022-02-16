@@ -196,7 +196,7 @@ class OqlProgram:
 
     def get_measurement_map(self) -> dict:
         """
-        get map data produced by OpenQL>=0.10.3
+        get measurements from map data produced by OpenQL>=0.10.3
         """
 
         data = self.get_map()
