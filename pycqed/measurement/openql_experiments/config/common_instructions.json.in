@@ -653,22 +653,22 @@
         },
         "measure": {
             "prototype": ["M:qubit"],
-            "duration": @RO_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_do_measure op(0)"
             }
         },
         // FIXME: experiment to prefix some measurements with rx12
-//        "measure q6": {
-//            "prototype": ["M:qubit"],
-//            "duration": 820,
-//            "decomposition": {
-//                "into": [
-//                    "rx12 q[6];",
-//                    "_do_measure q[6]"
-//                ]
-//            }
-//        },
+        "measure q6": {
+            "prototype": ["M:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": [
+                    "rx12 q[6];",
+                    "_do_measure q[6]"
+                ]
+            }
+        },
 
         //**************************************************************************************************************
         // flux
@@ -854,7 +854,7 @@
         // additions for measurements using real time feedback
 		"_wait_uhfqa": {
             "prototype": ["U:qubit"],
-            "duration": 720,
+            "duration": 720
         },
         "_dist_dsm": {
             "prototype": ["U:qubit"],

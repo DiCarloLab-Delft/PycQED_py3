@@ -331,40 +331,39 @@
         ,
 
         //****************************************************************
-        // decompositions, new style, require OpenQL >= 0.10.2
+        // decompositions, new style, require OpenQL>=0.10.2
         // see https://openql.readthedocs.io/en/latest/gen/reference_configuration.html#instructions-section
         // Should be compatible with API, and cQASM1.2
         //
         // Note that for historical reasons, qubits referred to in the instruction name don't use "[]" (e.g. "q8"),
         // whereas the decomposition/into key requires them (e.g. "q[8]"), because it uses cQasm syntax
+        //
+        // OpenQL>=0.10.3 allows automatic calculation of decomposition duration if duration=0 is specified
         //****************************************************************
 
 
         // was:         "measure_fb %0": ["measure %0", "_wait_uhfqa %0", "_dist_dsm %0", "_wait_dsm %0"],
 //        "measure_fb": {
 //            "prototype": ["U:qubit", "U:bit"],
-//            "duration_cycles": 100, // FIXME: note the *_cycles*, should match duration of "into", "duration" is also allowed
-//            "cc": { // FIXME: key is required
-//                "ref_signal": "single-qubit-mw",
-//                "static_codeword_override": [31]
-//            },
+//            "duration": 0,
 //            "decomposition": {
 //                "into": "measure op(0),op(1); _wait_uhfqa op(0); _dist_dsm op(0); _wait_dsm op(0)"
 //            }
 //        }
 //,
+
         // CZ decompositions for S17, using new CZ helpers
         // Note the use of 'hierarchical gate decomposition' for every 2nd entry
         "cz q8,q10": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_cz_sw_ne_park q[8],q[10],q[11]"
             }
         },
         "cz q10,q8": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "cz q[8],q[10]"
             }
@@ -372,14 +371,14 @@
 
         "cz q8,q11": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_cz_se_nw_park q[8],q[11],q[10]"
             }
         },
         "cz q11,q8": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "cz q[8],q[11]"
             }
@@ -387,14 +386,14 @@
 
         "cz q11,q14": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_cz_sw_ne_park q[11],q[14],q[15]"
             }
         },
         "cz q14,q11": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "cz q[11],q[14]"
             }
@@ -402,14 +401,14 @@
 
         "cz q10,q14": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_cz_se_nw q[10],q[14]"
             }
         },
         "cz q14,q10": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "cz q[10],q[14]"
             }
@@ -417,14 +416,14 @@
 
         "cz q9,q11": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_cz_sw_ne_park q[9],q[11],q[12]"
             }
         },
         "cz q11,q9": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "cz q[9],q[11]"
             }
@@ -432,14 +431,14 @@
 
         "cz q9,q12": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_cz_se_nw_park q[9],q[12],q[11]"
             }
         },
         "cz q12,q9": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "cz q[9],q[12]"
             }
@@ -447,14 +446,14 @@
 
         "cz q11,q15": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_cz_se_nw_park q[11],q[15],q[14]"
             }
         },
         "cz q15,q11": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "cz q[11],q[15]"
             }
@@ -462,14 +461,14 @@
 
         "cz q12,q15": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "_cz_sw_ne q[12],q[15]"
             }
         },
         "cz q15,q12": {
             "prototype": ["Z:qubit", "Z:qubit"],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "cz q[12],q[15]"
             }
@@ -480,14 +479,14 @@
 		// Flux dance decompositions (test)
         "_fluxdance_conflict": {
             "prototype": [],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "{ cz q[8],q[10] | cz q[9],q[11] }" // FIXME: in custom instruction '_cz_sw_ne_park <Z:qubit> q[8], <Z:qubit> q[10], <I:qubit> q[11]': Signal conflict on instrument='flux_0', group=3, between '{type:idle_z,which:NE}' and '{type:park}'
             }
         },
         "_fluxdance_1": {
             "prototype": [],
-            "duration": @FLUX_DURATION@,
+            "duration": 0,
             "decomposition": {
                 "into": "{ cz q[10],q[8] | cz q[9],q[12] }"  // NB: both CZs park q[11]
             }
