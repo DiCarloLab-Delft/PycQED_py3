@@ -1134,6 +1134,9 @@ class DeviceCCL(Instrument):
             options_dict=options_dict,
             extract_only=extract_only)
 
+        result_dict = {'cond_osc': a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value, 
+                       'leakage': a.proc_data_dict['quantities_of_interest']['missing_fraction'].nominal_value}
+
         return a
 
     def measure_two_qubit_grovers_repeated(
@@ -1853,21 +1856,17 @@ class DeviceCCL(Instrument):
 
         if analyze:
             if initialize:
-                thresholds = [
-                    self.find_instrument(qubit).ro_acq_threshold()
-                    for qubit in qubits]
+                thresholds = [self.find_instrument(qubit).ro_acq_threshold() for qubit in qubits]
                 a = ma2.Multiplexed_Readout_Analysis(
                     label=label,
                     nr_qubits=len(qubits),
                     post_selection=True,
                     post_selec_thresholds=thresholds)
-                # Print fraction of discarded shots
-                # Dict = a.proc_data_dict['Post_selected_shots']
-                # key = next(iter(Dict))
-                # fraction=0
-                # for comb in Dict[key].keys():
-                #    fraction += len(Dict[key][comb])/(2**12 * 4)
-                # print('Fraction of discarded results was {:.2f}'.format(1-fraction))
+                for qubit in qubits:
+                    for key in a.proc_data_dict['quantities_of_interest'].keys():
+                        if f' {qubit}' in str(key):
+                            self.find_instrument(qubit).F_ssro(a.proc_data_dict['quantities_of_interest'][key]['Post_F_a'])
+                            self.find_instrument(qubit).F_init(1-a.proc_data_dict['quantities_of_interest'][key]['Post_residual_excitation'])
             else:
                 a = ma2.Multiplexed_Readout_Analysis(
                     label=label,
@@ -1877,7 +1876,7 @@ class DeviceCCL(Instrument):
                 label = a.Channels[i]
                 threshold = a.qoi[label]['threshold_raw']
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
-        return
+        return True
 
     def measure_ssro_single_qubit(
             self,
@@ -3648,6 +3647,7 @@ class DeviceCCL(Instrument):
         measure_idle_flux: bool = True,
         rb_tasks_start: list = None,
         pool=None,
+        cardinal: dict = None,
         start_next_round_compilation: bool = False
     ):
         """
@@ -3856,10 +3856,15 @@ class DeviceCCL(Instrument):
                 sim_cz_qubits=sim_cz_qubits,
             )
 
-            ma2.InterleavedRandomizedBenchmarkingAnalysis(
+            a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
                 label_base="icl[None]",
                 label_int="icl[104368]",
             )
+
+            if cardinal:
+                opposite_cardinal = {'NW':'SE', 'NE':'SW', 'SW':'NE', 'SE':'NW'}
+                self.find_instrument(qubits[0]).parameters[f'F_2QRB_{cardinal}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
+                self.find_instrument(qubits[1]).parameters[f'F_2QRB_{opposite_cardinal[cardinal]}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
 
             if measure_idle_flux:
                 # Perform two-qubit iRB with idle identity of same duration as CZ
@@ -3880,6 +3885,7 @@ class DeviceCCL(Instrument):
                     label_int_idle="icl[100000]"
 
                 )
+        return True
 
     def measure_single_qubit_interleaved_randomized_benchmarking_parking(
         self,
@@ -5080,17 +5086,22 @@ class DeviceCCL(Instrument):
                 print("Exception encountered during measure_device_performance")
 
 
-    def calibrate_phases(self, phase_offset_park: float = 0.003,
+    def calibrate_phases(self, phase_offset_park: float = 0.003, skip_reverse: bool = False,
             phase_offset_sq: float = 0.05, do_park_cal: bool = True, do_sq_cal: bool = True,
             operation_pairs: list = [(['QNW','QC'],'SE'), (['QNE','QC'],'SW'),
                                     (['QC','QSW','QSE'],'SW'), (['QC','QSE','QSW'],'SE')]):    
-        
+
         # First, fix parking phases
         # Set 'qubits': [q0.name, q1.name, q2.name] and 'parked_qubit_seq': 'ramsey'
         if do_park_cal:
             for operation_tuple in operation_pairs:
                 pair, gate = operation_tuple
                 if len(pair) != 3: continue
+            
+                check = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1], q2=pair[2], parked_qubit_seq='ramsey')
+                cur_val = check.proc_data_dict['quantities_of_interest']['park_phase_off'].nominal_value
+                if abs(cur_val) < 3 or abs(360-cur_val) < 3:
+                    continue
     
                 q0 = self.find_instrument(pair[0]) # ramsey qubit (we make this be the fluxed one)
                 q1 = self.find_instrument(pair[1]) # control qubit
@@ -5133,9 +5144,7 @@ class DeviceCCL(Instrument):
                 result = nested_mc.run(label)
     
                 # Use ch_to_analyze as 5 for parking phase
-                a_obj = ma2.Crossing_Analysis(label=label,
-                                            ch_idx='Park Phase OFF',
-                                            target_crossing=0)
+                a_obj = ma2.Crossing_Analysis(label=label, ch_idx='Park Phase OFF', target_crossing=0)
                 crossed_value = a_obj.proc_data_dict['root']
                 park_flux_lm.park_amp(crossed_value)
                 park_flux_lm.park_amp_minus(-crossed_value)
@@ -5146,13 +5155,24 @@ class DeviceCCL(Instrument):
             for operation_tuple in operation_pairs:
                 # For each qubit pair, calibrate both individually (requires inversion of arguments)
                 for reverse in [False, True]:
+                    if reverse and skip_reverse:
+                        continue
+
                     pair, gate = operation_tuple
                     parked_seq = 'ground'
-    
+
+                    if reverse:
+                        check = self.measure_conditional_oscillation(q0=pair[1], q1=pair[0])
+                    else:
+                        check = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+                    cur_val = check.proc_data_dict['quantities_of_interest']['phi_0'].nominal_value
+                    if abs(cur_val) < 3 or abs(360-cur_val) < 3:
+                        continue
+
                     if reverse:
                         q0 = self.find_instrument(pair[1]) # ramsey qubit (we make this be the fluxed one)
                         q1 = self.find_instrument(pair[0]) # control qubit
-                        if gate=='NE': gate='SW' 
+                        if gate=='NE': gate='SW'
                         elif gate=='NW': gate = 'SE'
                         elif gate=='SW': gate = 'NE'
                         elif gate=='SE': gate = 'NW'
@@ -5197,6 +5217,7 @@ class DeviceCCL(Instrument):
                                                 target_crossing=0)
                     crossed_value = a_obj.proc_data_dict['root']
                     getattr(flux_lm, 'cz_phase_corr_amp_' + gate )(crossed_value)
+        return True
 
 
     def calibrate_cz_thetas(self, phase_offset: float = 1,
@@ -5207,6 +5228,10 @@ class DeviceCCL(Instrument):
         for operation_tuple in operation_pairs:
             pair, gate = operation_tuple
             parked_seq = 'ground'
+
+            check = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+            if abs(180-check.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value)<2:
+                continue
     
             q0 = self.find_instrument(pair[0]) # ramsey qubit (we make this be the fluxed one)
             q1 = self.find_instrument(pair[1]) # control qubit
@@ -5247,6 +5272,8 @@ class DeviceCCL(Instrument):
                                           target_crossing=180)
             crossed_value = a_obj.proc_data_dict['root']
             getattr(flux_lm, 'cz_theta_f_' + gate )(crossed_value)
+
+        return True
 
     def prepare_for_inspire(self):
         for lutman in ['mw_lutman_QNW','mw_lutman_QNE','mw_lutman_QC','mw_lutman_QSW','mw_lutman_QSE']:

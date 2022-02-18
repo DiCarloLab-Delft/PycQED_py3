@@ -1,0 +1,429 @@
+$date today $end
+$timescale 1 ns $end
+$scope module kernel $end
+$var string 20 0 kernel $end
+$upscope $end
+$scope module qubits $end
+$var string 20 1 q0 $end
+$var string 20 2 q1 $end
+$var string 20 3 q2 $end
+$var string 20 4 q3 $end
+$var string 20 5 q4 $end
+$upscope $end
+$scope module signals $end
+$var string 20 6 ro_1-0 $end
+$var string 20 7 ro_1-1 $end
+$var string 20 8 ro_1-2 $end
+$var string 20 9 ro_1-3 $end
+$var string 20 10 ro_1-4 $end
+$var string 20 11 ro_1-5 $end
+$var string 20 12 ro_1-6 $end
+$var string 20 13 ro_1-7 $end
+$var string 20 14 ro_1-8 $end
+$var string 20 15 ro_2-0 $end
+$var string 20 16 ro_2-1 $end
+$var string 20 17 ro_2-2 $end
+$var string 20 18 ro_2-3 $end
+$var string 20 19 ro_2-4 $end
+$var string 20 20 ro_2-5 $end
+$var string 20 21 ro_2-6 $end
+$var string 20 22 ro_2-7 $end
+$var string 20 23 ro_2-8 $end
+$var string 20 24 mw_0-0 $end
+$var string 20 25 mw_0-1 $end
+$var string 20 26 mw_0-2 $end
+$var string 20 27 mw_0-3 $end
+$var string 20 28 mw_1-0 $end
+$var string 20 29 mw_1-1 $end
+$var string 20 30 mw_1-2 $end
+$var string 20 31 mw_1-3 $end
+$var string 20 32 flux_0-0 $end
+$var string 20 33 flux_0-1 $end
+$var string 20 34 flux_0-2 $end
+$var string 20 35 flux_0-3 $end
+$var string 20 36 flux_0-4 $end
+$var string 20 37 flux_0-5 $end
+$var string 20 38 flux_0-6 $end
+$var string 20 39 flux_0-7 $end
+$upscope $end
+$scope module codewords $end
+$var string 20 40 ro_1 $end
+$var string 20 41 ro_2 $end
+$var string 20 42 mw_0 $end
+$var string 20 43 mw_1 $end
+$var string 20 44 flux_0 $end
+$upscope $end
+$enddefinitions $end
+#0
+spost_select_block_2 0
+#20
+sprepz 1
+sprepz 2
+sprepz 3
+sprepz 4
+sprepz 5
+s 40
+s 41
+s 42
+s 43
+s 44
+#150020
+smeasure 1
+smeasure 2
+smeasure 3
+smeasure 4
+smeasure 5
+s131072=[dummy] 6
+s262144=[dummy] 7
+s524288=[dummy] 8
+s1048576=[dummy] 9
+s131072=[dummy] 15
+s0x001f0000 40
+s0x00030000 41
+s 42
+s 43
+s 44
+#153020
+send_post_select_block_3 0
+s 1
+s 2
+s 3
+s 4
+s 5
+s 6
+s 7
+s 8
+s 9
+s 15
+s 40
+s 41
+#153040
+si 3
+s 40
+s 41
+s 42
+s 43
+s 44
+#153060
+srx12 3
+s589824=[rx12-mw_0:2-i,rx12-mw_0:2-q] 26
+s 40
+s 41
+s0x80090000 42
+s 43
+s 44
+#153080
+srx12 3
+s589824=[rx12-mw_0:2-i,rx12-mw_0:2-q] 26
+s 40
+s 41
+s0x80090000 42
+s 43
+s 44
+#153100
+srx12 3
+s589824=[rx12-mw_0:2-i,rx12-mw_0:2-q] 26
+s 40
+s 41
+s0x80090000 42
+s 43
+s 44
+#153120
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153140
+srx12 3
+s589824=[rx12-mw_0:2-i,rx12-mw_0:2-q] 26
+s 40
+s 41
+s0x80090000 42
+s 43
+s 44
+#153160
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153180
+srx12 3
+s589824=[rx12-mw_0:2-i,rx12-mw_0:2-q] 26
+s 40
+s 41
+s0x80090000 42
+s 43
+s 44
+#153200
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153220
+si 3
+s 26
+s 40
+s 41
+s 42
+s 43
+s 44
+#153240
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153260
+si 3
+s 26
+s 40
+s 41
+s 42
+s 43
+s 44
+#153280
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153300
+si 3
+s 26
+s 40
+s 41
+s 42
+s 43
+s 44
+#153320
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153340
+si 3
+s 26
+s 40
+s 41
+s 42
+s 43
+s 44
+#153360
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153380
+si 3
+s 26
+s 40
+s 41
+s 42
+s 43
+s 44
+#153400
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153420
+si 3
+s 26
+s 40
+s 41
+s 42
+s 43
+s 44
+#153440
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153460
+si 3
+s 26
+s 40
+s 41
+s 42
+s 43
+s 44
+#153480
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153500
+si 3
+s 26
+s 40
+s 41
+s 42
+s 43
+s 44
+#153520
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153540
+srx12 3
+s589824=[rx12-mw_0:2-i,rx12-mw_0:2-q] 26
+s 40
+s 41
+s0x80090000 42
+s 43
+s 44
+#153560
+sry90 q2 3
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040000 42
+s 43
+s 44
+#153580
+si 1
+srx12 3
+s589824=[rx12-mw_0:2-i,rx12-mw_0:2-q] 26
+s 40
+s 41
+s0x80090000 42
+s 43
+s 44
+#153600
+sry90 q0 1
+sry90 q2 3
+s4=[ry90 q0-mw_0:0-i,ry90 q0-mw_0:0-q] 24
+s262144=[ry90 q2-mw_0:2-i,ry90 q2-mw_0:2-q] 26
+s 40
+s 41
+s0x80040004 42
+s 43
+s 44
+#153620
+ssf_cz_se q0 1
+ssf_cz_nw q2 3
+s 24
+s 26
+s2=[flux-0-0] 32
+s256=[flux-0-2] 34
+s 40
+s 41
+s 42
+s 43
+s0x80000102 44
+#153660
+si 2
+s 40
+s 41
+s 42
+s 43
+s 44
+#153680
+s 1
+sry90 q1 2
+srx180 3
+s512=[ry90 q1-mw_0:1-i,ry90 q1-mw_0:1-q] 25
+s65536=[rx180-mw_0:2-i,rx180-mw_0:2-q] 26
+s 32
+s 34
+s 40
+s 41
+s0x80010200 42
+s 43
+s 44
+#153700
+ssf_cz_sw q1 2
+ssf_cz_ne q2 3
+s 25
+s 26
+s24=[flux-0-1] 33
+s64=[flux-0-2] 34
+s 40
+s 41
+s 42
+s 43
+s0x80000058 44
+#153760
+sry270 q0 1
+sry270 q1 2
+s 3
+si 4
+s6=[ry270 q0-mw_0:0-i,ry270 q0-mw_0:0-q] 24
+s768=[ry270 q1-mw_0:1-i,ry270 q1-mw_0:1-q] 25
+s 33
+s 34
+s 40
+s 41
+s0x80000306 42
+s 43
+s 44
+#153780
+sesc_meas_block_4 0
+s 1
+s 2
+s 4
+s 24
+s 25
+s 42
+#153800
+smeasure 1
+smeasure 2
+smeasure 3
+smeasure 4
+smeasure 5
+s131072=[dummy] 6
+s262144=[dummy] 7
+s524288=[dummy] 8
+s1048576=[dummy] 9
+s131072=[dummy] 15
+s0x001f0000 40
+s0x00030000 41
+s 42
+s 43
+s 44
+#156800
+s 0
+s 1
+s 2
+s 3
+s 4
+s 5
+s 6
+s 7
+s 8
+s 9
+s 15
+s 40
+s 41

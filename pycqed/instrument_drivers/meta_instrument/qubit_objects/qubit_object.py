@@ -1226,7 +1226,7 @@ class Qubit(Instrument):
         return True
 
     def calibrate_frequency_ramsey(self,
-                                   steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   steps=[1, 3, 10, 30, 100, 300, 1000],
                                    artificial_periods = 2.5,
                                    stepsize:float =20e-9,
                                    verbose: bool=True, update: bool=True,
@@ -1804,7 +1804,7 @@ class Transmon(Qubit):
         """
         raise NotImplementedError()
 
-    def calibrate_frequency_ramsey(self, steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+    def calibrate_frequency_ramsey(self, steps=[1, 3, 10, 30, 100, 300, 1000],
                                    artificial_periods=2.5,
                                    stepsize=None, verbose=True, update=True,
                                    close_fig=True):
