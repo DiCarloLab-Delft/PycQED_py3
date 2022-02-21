@@ -1389,7 +1389,7 @@ class Qubit(Instrument):
 
     def calibrate_frequency_ramsey(
             self,
-            steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+            steps=[1, 3, 10, 30, 100, 300, 1000],
             artificial_periods=2.5,
             stepsize: float = 20e-9,
             verbose: bool = True,

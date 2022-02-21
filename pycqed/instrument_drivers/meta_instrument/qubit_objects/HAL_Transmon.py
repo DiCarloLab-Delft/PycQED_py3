@@ -387,6 +387,11 @@ class HAL_Transmon(HAL_ShimSQ):
             label='Single shot readout assignment fidelity',
             vals=vals.Numbers(0.0, 1.0),
             parameter_class=ManualParameter)
+        self.add_parameter('F_init',
+            initial_value=0,
+            label='Single shot readout initialization fidelity',
+            vals=vals.Numbers(0.0, 1.0),
+            parameter_class=ManualParameter)
         self.add_parameter(
             'F_discr',
             initial_value=0,
@@ -406,12 +411,17 @@ class HAL_Transmon(HAL_ShimSQ):
             label='residual excitation errors from ssro fit',
             vals=vals.Numbers(0.0, 1.0),
             parameter_class=ManualParameter)
-        self.add_parameter(
-            'F_RB',
+        self.add_parameter('F_RB',
             initial_value=0,
-            label='RB single qubit Clifford fidelity',
+            label='RB single-qubit Clifford fidelity',
             vals=vals.Numbers(0, 1.0),
             parameter_class=ManualParameter)
+        for cardinal in ['NW','NE','SW','SE']:
+            self.add_parameter(f'F_2QRB_{cardinal}',
+                initial_value=0,
+                label=f'RB two-qubit Clifford fidelity for edge {cardinal}',
+                vals=vals.Numbers(0, 1.0),
+                parameter_class=ManualParameter)
 
     ##########################################################################
     # find_ functions (HAL_Transmon specific)
@@ -1483,7 +1493,8 @@ class HAL_Transmon(HAL_ShimSQ):
             start_amp=None,
             start_freq_step=None,
             start_amp_step=None,
-            threshold: float = .99,
+            optimize_threshold: float = .99,
+            check_threshold: float = .90,
             analyze: bool = True,
             update: bool = True
     ):
@@ -1511,6 +1522,11 @@ class HAL_Transmon(HAL_ShimSQ):
             threshold (float):
                 Fidelity threshold after which the optimizer stops iterating.
         '''
+
+        ## check single-qubit ssro first, if assignment fidelity below 92.5%, run optimizer
+        self.measure_ssro(post_select=True)
+        if self.F_ssro() > check_threshold:
+            return True
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1551,7 +1567,7 @@ class HAL_Transmon(HAL_ShimSQ):
                         'no_improv_break': 10,
                         'minimize': False,
                         'maxiter': 20,
-                        'f_termination': threshold}
+                        'f_termination': optimize_threshold}
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
 
         nested_MC.set_optimization_method('nelder_mead')
@@ -3813,8 +3829,8 @@ class HAL_Transmon(HAL_ShimSQ):
             else:
                 scale_factor = a._get_scale_factor_line()
 
-            if abs(scale_factor - 1) < 1e-3:
-                print('Pulse amplitude accurate within 0.1%. Amplitude not updated.')
+            if abs(scale_factor - 1) < 0.2e-3:
+                print('Pulse amplitude accurate within 0.02%. Amplitude not updated.')
                 return a
 
             if angle == '180':
@@ -3833,7 +3849,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         return a
 
-    def flipping_GBT(self, nr_sequence: int = 2):  # FIXME: prefix with "measure_"
+    def flipping_GBT(self, nr_sequence: int = 7):  # FIXME: prefix with "measure_"
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -3846,7 +3862,7 @@ class HAL_Transmon(HAL_ShimSQ):
         for i in range(nr_sequence):
             a = self.measure_flipping(update=True)
             scale_factor = a._get_scale_factor_line()
-            if abs(1 - scale_factor) < 0.0005:
+            if abs(1 - scale_factor) <= 0.0005:
                 return True
         else:
             return False
@@ -5712,7 +5728,12 @@ class HAL_Transmon(HAL_ShimSQ):
             rates_I_quad_ch_idx=0,
             cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
         )
-        return a
+        
+        for key in a.proc_data_dict['quantities_of_interest'].keys():
+            if 'eps_simple_lin_trans' in key:
+                self.F_RB((1-a.proc_data_dict['quantities_of_interest'][key].n)**(1/1.875))
+        
+        return True
 
 
     def measure_randomized_benchmarking_old(

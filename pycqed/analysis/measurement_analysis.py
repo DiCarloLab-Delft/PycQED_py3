@@ -4465,7 +4465,7 @@ class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
         kw['h5mode'] = 'r+'
         super(self.__class__, self).__init__(**kw)
 
-    def run_default_analysis(self, print_fit_results=False, **kw):
+    def run_default_analysis(self, show=False, print_fit_results=False, **kw):
         self.add_analysis_datagroup_to_file()
 
         # plotting histograms of the raw shots on I and Q axis
@@ -4488,7 +4488,8 @@ class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
         # plt.hist(SS_Q_data, bins=40,label = '0 Q')
         plt.legend()
         self.save_fig(fig, figname='raw-histograms', **kw)
-        plt.show()
+        if show:
+            plt.show()
 
         self.finish(**kw)
 
