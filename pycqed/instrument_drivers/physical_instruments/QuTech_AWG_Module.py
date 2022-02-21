@@ -1,3 +1,6 @@
+# This file is deprecated, use:
+# from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG
+
 """
 File:       QuTech_AWG_Module.py
 Author:     Wouter Vlothuizen, TNO/QuTech,
@@ -236,8 +239,7 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=triglev_cmd + '?',
                                set_cmd=triglev_cmd + ' {}',
                                vals=self.device_descriptor.mvals_trigger_level,
-                               get_parser=float,
-                               snapshot_exclude=True)
+                               get_parser=float) # FIXME: snapshot_exclude=True)
 
             # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
             self._params_exclude_snapshot.append(triglev_name)
@@ -481,8 +483,7 @@ class QuTech_AWG_Module(SCPI):
                 self.add_parameter(cw_param,
                                    get_cmd=cw_cmd+'?',
                                    set_cmd=cw_cmd+' "{:s}"',
-                                   vals=vals.Strings(),
-                                   snapshot_exclude=True)
+                                   vals=vals.Strings()) # FIXME: snapshot_exclude=True)
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(cw_param)
 
@@ -491,15 +492,13 @@ class QuTech_AWG_Module(SCPI):
                            label='Waveform list size',
                            unit='#',
                            get_cmd='wlist:size?',
-                           get_parser=int,
-                           snapshot_exclude=True)
+                           get_parser=int) # FIXME: snapshot_exclude=True)
         # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         self._params_exclude_snapshot.append('WlistSize')
 
         self.add_parameter('Wlist',
                            label='Waveform list',
-                           get_cmd=self._getWlist,
-                           snapshot_exclude=True)
+                           get_cmd=self._getWlist) # FIXME: snapshot_exclude=True)
         # TODO: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
         self._params_exclude_snapshot.append('Wlist')
 
@@ -565,7 +564,7 @@ class QuTech_AWG_Module(SCPI):
                         self._set_cw_waveform, ch, cw),
                     get_cmd=self._gen_ch_cw_get_func(
                         self._get_cw_waveform, ch, cw),
-                    snapshot_exclude=True,
+#                    snapshot_exclude=True,
                     docstring=docst)
                 # FIXME: Remove when QCodes PR #1653 is merged, see PycQED_py3 issue #566
                 self._params_exclude_snapshot.append(parname)
@@ -1088,10 +1087,14 @@ class QWGMultiDevices:
     QWG helper class to execute parameters/functions on multiple devices. E.g.: DIO calibration
     Usually all methods are static
     """
+    def __init__(self, qwgs: List[QuTech_AWG_Module]) -> None:
+        self.qwgs = qwgs
 
     @staticmethod
-    def dio_calibration(cc, qwgs: List[QuTech_AWG_Module],
-            verbose: bool = False):
+    def dio_calibration(cc, qwgs: List[QuTech_AWG_Module], verbose: bool = False):
+        raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")
+
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
         """
         Calibrate multiple QWG using a CCLight, QCC or other CC-like devices
         First QWG will be used als base DIO calibration for all other QWGs. First QWG in the list needs to be a DIO
@@ -1108,46 +1111,12 @@ class QWGMultiDevices:
         :return: None
         """
 
-        # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
-        for qwg in qwgs:
-            qwg.stop()
-
-        if not cc:
-            raise ValueError("Cannot calibrate QWGs; No CC provided")
-
-        if cc.ask("QUTech:RUN?") == '1':
-            cc.stop()
-
-        _qwg_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), '_QWG'))
-
-        # [2020-07-08] the "model" can be sometimes "Model"...
-        # this assumes there are no duplicate entries (e.g. upper/lower case)
-        case_insensitive_IDN_keys = {k.lower(): k for k in cc.IDN().keys()}
-
-        if "CCL" in cc.IDN()[case_insensitive_IDN_keys['model']]:
-            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'cs.txt')
-            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qisa_opcodes.qmap')
-            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QWG_DIO_Calibration.qisa')
-        elif "QCC" in cc.IDN()[case_insensitive_IDN_keys['model']]:
-            cs_qwg_dio_calibrate = os.path.join(_qwg_path, 'qcc_cs.txt')
-            qisa_opcode_qwg_dio_calibrate = os.path.join(_qwg_path,'qcc_qisa_opcodes.qmap')
-            qisa_qwg_dio_calibrate = os.path.join(_qwg_path,'QCC_DIO_Calibration.qisa')
-        else:
-            raise TypeError("CC model not recognized!")
-
-        old_cs = cc.control_store()
-        old_qisa_opcode = cc.qisa_opcode()
-
-        cc.control_store(cs_qwg_dio_calibrate)
-        cc.qisa_opcode(qisa_opcode_qwg_dio_calibrate)
-
-        cc.eqasm_program(qisa_qwg_dio_calibrate)
-        cc.start()
-        cc.getOperationComplete()
-
-        if not qwgs:
+        if not self.qwgs:
             raise ValueError("Can not calibrate QWGs; No QWGs provided")
+
+        # The CCL will start sending codewords to calibrate. To make sure the QWGs will not play waves a stop is send
+        for qwg in self.qwgs:
+            qwg.stop()
 
         def try_errors(qwg):
             try:
@@ -1155,7 +1124,7 @@ class QWGMultiDevices:
             except Exception as e:
                 raise type(e)(f'{qwg.name}: {e}')
 
-        main_qwg = qwgs[0]
+        main_qwg = self.qwgs[0]
         if main_qwg.dio_mode() is not 'MASTER':
             raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefor it is not save the use it "
                              f"as base QWG for calibration of multiple QWGs.")
@@ -1163,17 +1132,12 @@ class QWGMultiDevices:
         try_errors(main_qwg)
         active_index = main_qwg.dio_active_index()
 
-        for qwg in qwgs[1:]:
+        for qwg in self.qwgs[1:]:
             qwg.dio_calibrate(active_index)
             try_errors(qwg)
-        if verbose:
-            for qwg in qwgs:
-                print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
-        cc.stop()
 
-        #Set the control store
-        cc.control_store(old_cs)
-        cc.qisa_opcode(old_qisa_opcode)
+        for qwg in self.qwgs:
+            print(f'QWG ({qwg.name}) calibration rapport\n{qwg.dio_calibration_rapport()}\n')
 
 
 class Mock_QWG(QuTech_AWG_Module):

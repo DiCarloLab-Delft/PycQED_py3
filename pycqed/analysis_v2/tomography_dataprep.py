@@ -1,19 +1,15 @@
-
-import os
-import time
-from imp import reload
 from matplotlib import pyplot as plt
 import numpy as np
-from pycqed.analysis import measurement_analysis as MA 
-from pycqed.analysis import ramiro_analysis as RA
 from pycqed.analysis import fitting_models as fit_mods
-import lmfit
 import scipy as scipy
-try:
-	import qutip as qt
-except ImportError as e:
-	logging.warning('Could not import qutip, tomo code will not work')
-import itertools
+# try:
+# 	import qutip as qt
+# except ImportError as e:
+# 	import logging
+# 	logging.warning('Could not import qutip, tomo code will not work')
+import qutip as qtp
+
+
 #Written By MALAY SINGH and RAMA SAGASTIZABAL
 #To prepare relevant inputs for tomography_V2
 class TomoPrep():
@@ -22,26 +18,26 @@ class TomoPrep():
 	Does thresholding and coincidence counting on measured voltages
 	to convert them into counts.
 	Constructs measurement operators based on callibration counts.
-	Counts and callibrated measurement operators 
+	Counts and callibrated measurement operators
 	Following is how it relates to tomograpy
-	1. The user calls tomography_execute with the data stamps and type_tomography 
+	1. The user calls tomography_execute with the data stamps and type_tomography
 	   (options:MLE, SDPA, Linear Pseudo inverse).
 	   "shots" Data from time_stamps is extracted by tomography_execute using mav1.
-	2. Shots are thresholded and coincidence counting is done 
+	2. Shots are thresholded and coincidence counting is done
 
-	3. (This class) tomography_dataprep is then called, it thresholds counts and 
+	3. (This class) tomography_dataprep is then called, it thresholds counts and
 	bins them into 00,01,10,11 bins using coincidence counting. The counts in bin 00,01,10,11
-	for callibration points which are shots of 00,01,10,11 states are used to 
-	callibrate measurement operators. These measurement operators along with   
+	for callibration points which are shots of 00,01,10,11 states are used to
+	callibrate measurement operators. These measurement operators along with
 
-	""" 
+	"""
 	#TODO: Improve init, give user more options to print out plots.
 
-	def __init__(self, 
+	def __init__(self,
 				 shots_q0,
 				 shots_q1,
 				 start_calliration_index =36,
-				 no_of_tomographic_rotations=36, 
+				 no_of_tomographic_rotations=36,
 				 no_of_repetitions_callibration =7,
 				 make_figures_flag = False):
 
@@ -57,7 +53,7 @@ class TomoPrep():
 		# 0.7 bin widht is a sensible default for plotting
 		centers = (bins[:-1] + bins[1:]) / 2
 		return hist, bins, centers
-	
+
 	def fit_data(self, hist, centers):
 		model = fit_mods.DoubleGaussModel
 		params = model.guess(model, hist, centers)
@@ -66,11 +62,11 @@ class TomoPrep():
 
 	def make_figures(self, hist, centers, show_guess = False, make_figures_flag = False):
 		fit_res = self.fit_data(hist,centers)
-			
+
 		if self.make_figures_flag==True:
 			fig, ax = plt.subplots(figsize=(5, 3))
 			width = .7 * (centers[1]-centers[0])
-		  
+
 
 			x_fine = np.linspace(min(centers),
 								 max(centers), 1000)
@@ -91,19 +87,19 @@ class TomoPrep():
 		return fit_res
 	def make_s_curve(self, N, sigma, mu,start,stop):
 		#numerically normalize the gaussian so that the area under the curve is 1
-	
+
 		#use analytical formula for s-curve
 		x = np.linspace(start,stop,100)
-		z = np.divide(x - mu,np.sqrt(2)**sigma) 
+		z = np.divide(x - mu,np.sqrt(2)**sigma)
 		erf1 = N**sigma**scipy.special.erf(z)
 		return erf1
-	
+
 	def get_thresholds(self, make_figures_flag):
 
-		#For q0 Fit Two gaussians 
+		#For q0 Fit Two gaussians
 		hist1, bins1, centers1 = self.histogram_shots(self.shots_q0.flatten())
 		fit_res1 = self.fit_data(hist1, centers1)
-		
+
 		fr1 = self.make_figures(hist1,centers1,make_figures_flag)
 		#make two s-curves
 		erf1_q0 = self.make_s_curve(fr1.best_values['A_amplitude'],
@@ -124,18 +120,18 @@ class TomoPrep():
 			plt.figure(1)
 			plt.subplot(211)
 			plt.plot(x1,erf1_q0)
-			plt.xlim([np.min(shots_q0),np.amax(shots_q0)])
+			plt.xlim([np.min(self.shots_q0),np.amax(self.shots_q0)])
 			plt.plot(x1,erf2_q0)
-			plt.xlim([np.min(shots_q0),np.amax(shots_q0)])
-			
+			plt.xlim([np.min(self.shots_q0),np.amax(self.shots_q0)])
+
 
 			plt.axvline(th0, color='r')
-			plt.show()               
-						
-		#For q1 Fit Two gaussians 
+			plt.show()
+
+		#For q1 Fit Two gaussians
 		hist2, bins2, centers2 = self.histogram_shots(self.shots_q1.flatten())
 		fit_res2 = self.fit_data(hist2, centers2)
-		
+
 		fr2 = self.make_figures(hist2,centers2)
 		#make two s-curves
 		erf1_q1 = self.make_s_curve(fr2.best_values['A_amplitude'],
@@ -154,19 +150,19 @@ class TomoPrep():
 		if self.make_figures_flag == True:
 			plt.subplot(212)
 			plt.plot(x2,erf1_q1)
-			plt.xlim([np.min(shots_q1),np.amax(shots_q1)])
+			plt.xlim([np.min(self.shots_q1),np.amax(self.shots_q1)])
 			plt.plot(x2,erf2_q1)
-			plt.xlim([np.min(shots_q1),np.amax(shots_q1)])
+			plt.xlim([np.min(self.shots_q1),np.amax(self.shots_q1)])
 			#extract_threshold
-			
+
 
 			plt.axvline(th1, color='r')
-			plt.show()               
+			plt.show()
 
 		return th0, th1
 
 	def coincidence_counting_tomo(self, th0, th1):
-	
+
 		"""
 		Takes as an input the thresholds and All shots for both qubits
 		Extracts callibration counts and Tomo counts
@@ -177,11 +173,11 @@ class TomoPrep():
 		#determine which one is zero which one is one
 		side_0_q0 = np.where(np.mean(self.shots_q0[self.start_calliration_index:(self.start_calliration_index+self.no_of_repetitions_callibration),:])<th0,1,-1)
 		side_0_q1 = np.where(np.mean(self.shots_q1[self.start_calliration_index:(self.start_calliration_index+self.no_of_repetitions_callibration),:])<th1,1,-1)
-		
+
 		#use only tomo data
 		shots_q0_tomo = self.shots_q0[:self.start_calliration_index,:]
 		shots_q1_tomo = self.shots_q1[:self.start_calliration_index,:]
-		
+
 		#threshold all data
 		counts_q0 = np.where(shots_q0_tomo<th0*side_0_q0,0,1).astype('int')
 		counts_q1 = np.where(shots_q1_tomo<th1*side_0_q1,0,1).astype('int')
@@ -194,7 +190,7 @@ class TomoPrep():
 
 		return np.transpose(np.array([counts_00, counts_01, counts_10, counts_11]))
 	def coincidence_counting_calibration(self, th0, th1):
-	
+
 		"""
 		Takes as an input the thresholds and all shots(convert it to all ) for both qubits
 		Counts the incidents of qubits ending in 00, 01, 10, 11
@@ -223,15 +219,15 @@ class TomoPrep():
 		count_stack_reshaped = np.sum(np.vsplit(count_stack,4),axis =1)
 		# print(count_stack_reshaped)
 
-		return count_stack_reshaped  
+		return count_stack_reshaped
 
 
 	def construct_measurement_operators(self, count_array):
 		c_total = np.sum(count_array)
 		normalized_counts = (count_array/(c_total/4))
 		M_bins_coeff = normalized_counts
-		M_bins = [qt.Qobj(np.diag(M_bins_coeff[i,:]), dims=[[2,2],[2,2]]) for i in range(0,4)]
-	
+		M_bins = [qtp.Qobj(np.diag(M_bins_coeff[i, :]), dims=[[2, 2], [2, 2]]) for i in range(0, 4)]
+
 		return M_bins
 
 
@@ -249,6 +245,5 @@ class TomoPrep():
 
 		counts_tomo= self.coincidence_counting_tomo(th0,th1)
 		# print(counts_tomo)
-		
+
 		return comp_projectors,counts_tomo
-	

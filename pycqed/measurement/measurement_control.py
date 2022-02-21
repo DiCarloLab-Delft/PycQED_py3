@@ -1,34 +1,11 @@
 import types
 import logging
 import time
+from deprecated import deprecated
 import numpy as np
 from collections.abc import Iterable
 import operator
 from scipy.optimize import fmin_powell
-from pycqed.measurement import hdf5_data as h5d
-from pycqed.utilities.general import (
-    dict_to_ordered_tuples,
-    delete_keys_from_dict,
-    check_keyboard_interrupt,
-    KeyboardFinish,
-    flatten,
-    get_git_revision_hash,
-)
-from pycqed.utilities.get_default_datadir import get_default_datadir
-from pycqed.utilities.general import get_module_name
-
-# Used for auto qcodes parameter wrapping
-from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
-from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
-from pycqed.analysis.tools.data_manipulation import get_generation_means
-
-from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
-
-from qcodes.instrument.base import Instrument
-from qcodes.instrument.parameter import ManualParameter
-from qcodes.utils import validators as vals
-from qcodes.plots.colors import color_cycle
 
 # Used for adaptive sampling
 from adaptive import runner
@@ -45,10 +22,41 @@ from adaptive.learner import BaseLearner, Learner1D, Learner2D, LearnerND
 # some wise choices for your particular case
 from adaptive.learner import SKOptLearner
 
+from pycqed.measurement import hdf5_data as h5d
+from pycqed.utilities.general import (
+    dict_to_ordered_tuples,
+    delete_keys_from_dict,
+    check_keyboard_interrupt,
+    KeyboardFinish,
+    flatten,
+    get_git_revision_hash,
+)
+from pycqed.utilities.general import get_module_name
+from pycqed.utilities.get_default_datadir import get_default_datadir
+
 # Optimizer based on adaptive sampling
 from pycqed.utilities.learner1D_minimizer import Learner1D_Minimizer
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer
 import pycqed.utilities.learner_utils as lu
+
+# Used for auto qcodes parameter wrapping
+from pycqed.measurement import sweep_functions as swf
+from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
+from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
+
+from pycqed.analysis.tools.data_manipulation import get_generation_means
+from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
+
+# imports for type annotations
+from pycqed.measurement.det_fncs.Base import Detector_Function
+from pycqed.measurement.sweep_functions import Sweep_function
+
+from qcodes.instrument.base import Instrument
+from qcodes.instrument.parameter import ManualParameter
+from qcodes.utils import validators as vals
+from qcodes.plots.colors import color_cycle
+
+
 from . import measurement_control_helpers as mch
 
 from skopt import Optimizer  # imported for checking types
@@ -80,6 +88,7 @@ except Exception:
     )
     print("When instantiating an MC object," " be sure to set live_plot_enabled=False")
 
+
 log = logging.getLogger(__name__)
 
 
@@ -98,6 +107,10 @@ class MeasurementControl(Instrument):
     New version of Measurement Control that allows for adaptively determining
     data points.
     """
+
+    # type annotations for instance variables
+    detector_function: Detector_Function
+    sweep_function: Sweep_function
 
     def __init__(
         self,
@@ -182,9 +195,17 @@ class MeasurementControl(Instrument):
             vals=vals.Strings(),
         )
 
+        self.add_parameter(
+            "run_history",
+            vals=vals.Lists(),
+            docstring="History of experiments executed by MC.run(), saved as MC metadata.",
+            parameter_class=ManualParameter,
+            initial_value=[],
+        )
+
         # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
-            self.create_plot_monitor()
+            self._create_plot_monitor()
         self.plotting_interval(plotting_interval)
 
         self.soft_iteration = 0  # used as a counter for soft_avg
@@ -195,7 +216,7 @@ class MeasurementControl(Instrument):
         # plotmon_2D colorbar color mapping and ranges
         # Change this to your preferences when using the plotmon_2D
         # This could be a parameter but it doesn't seem to be worth saving
-        # See `choose_MC_cmap_zrange` in this file to know how this is used
+        # See `_choose_MC_cmap_zrange` in this file to know how this is used
         # e.g. self.plotmon_2D_cmaps = {"Phase": "anglemap45"}
         # see pycqed.measurment.qcodes_QtPlot_colors_override for more cmaps
         self.plotmon_2D_cmaps = {}
@@ -252,6 +273,30 @@ class MeasurementControl(Instrument):
                     should always be explicitly diabled in order to prevent
                     accidentally leaving it off.
 
+        This function calls the following main control functions:
+        soft:
+            _measure
+                sweep_function.prepare
+                detector_function.prepare
+                _measurement_function(sweep_point)
+                    sweep_function.set_parameter
+                    self.detector_function.acquire_data_point
+            sweep_function.finish
+            detector_function.finish
+            finish
+
+        hard:
+            _measure
+                sweep_function.prepare
+                sweep_function.set_parameter()
+                detector_function.prepare
+                _measure_hard
+                    detector_function.get_values
+                sweep_function.finish
+                detector_function.finish
+            finish
+
+
         """
         # Setting to zero at the start of every run, used in soft avg
         self.soft_iteration = 0
@@ -259,10 +304,10 @@ class MeasurementControl(Instrument):
         if mode != "adaptive":
             # Certain adaptive visualization features leave undesired effects
             # on the plots of non-adaptive plots
-            self.clean_previous_adaptive_run()
+            self._clean_previous_adaptive_run()
 
-        self.set_measurement_name(name)
-        self.print_measurement_start_msg()
+        self._set_measurement_name(name)
+        self._print_measurement_start_msg()
 
         self.mode = mode
         # used in determining data writing indices (deprecated?)
@@ -276,15 +321,14 @@ class MeasurementControl(Instrument):
         self.last_sweep_pts = None  # used to prevent resetting same value
 
         with h5d.Data(
-            name=self.get_measurement_name(), datadir=self.datadir()
+            name=self._get_measurement_name(), datadir=self.datadir()
         ) as self.data_object:
             try:
-
                 check_keyboard_interrupt()
-                self.get_measurement_begintime()
+                self._get_measurement_begintime()
                 if not disable_snapshot_metadata:
-                    self.save_instrument_settings(self.data_object)
-                self.create_experimentaldata_dataset()
+                    self._save_instrument_settings(self.data_object)
+                self._create_experimentaldata_dataset()
 
                 self.plotting_bins = None
                 if exp_metadata is not None:
@@ -294,34 +338,44 @@ class MeasurementControl(Instrument):
 
                 if mode != "adaptive":
                     try:
-                        # required for 2D plotting and data storing.
+                        # FIXME: required for 2D plotting and data storing.
                         # try except because some swf get the sweep points in the
                         # prepare statement. This needs a proper fix
                         self.xlen = len(self.get_sweep_points())
                     except Exception:
                         self.xlen = 1
+
+                # perform the measurement
                 if self.mode == "1D":
-                    self.measure()
+                    self._measure()
                 elif self.mode == "2D":
-                    self.measure_2D()
+                    self._measure_2D()
                 elif self.mode == "adaptive":
-                    self.measure_soft_adaptive()
+                    self._measure_soft_adaptive()
                 else:
                     raise ValueError('Mode "{}" not recognized.'.format(self.mode))
             except KeyboardFinish as e:
                 print(e)
             result = self.dset[()]
-            self.get_measurement_endtime()
-            self.save_MC_metadata(self.data_object)  # timing labels etc
+            self._get_measurement_endtime()
+            self._save_MC_metadata(self.data_object)  # timing labels etc
 
-            return_dict = self.create_experiment_result_dict()
+            return_dict = self._create_experiment_result_dict()
 
+        run_history_entry = {'measurement_name': self.measurement_name,
+                            'mode': self.mode,
+                            'begintime': time.strftime("%Y%m%d_%H%M%S", time.localtime(self.begintime)),
+                            'preparetime': time.strftime("%Y%m%d_%H%M%S", time.localtime(self.preparetime)),
+                            'endtime': time.strftime("%Y%m%d_%H%M%S", time.localtime(self.endtime)),
+                            }
+        self.run_history().append(run_history_entry)
         self.finish(result)
         return return_dict
 
-    def measure(self, *kw):
+    # NB: called both from run() and _measure_2D()
+    def _measure(self, *kw):
         if self.live_plot_enabled():
-            self.initialize_plot_monitor()
+            self._initialize_plot_monitor()
 
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
@@ -331,21 +385,23 @@ class MeasurementControl(Instrument):
             and self.detector_function.detector_control == "soft"
         ):
             self.detector_function.prepare()
-            self.get_measurement_preparetime()
-            self.measure_soft_static()
+            self._get_measurement_preparetime()
+            for self.soft_iteration in range(self.soft_avg()):
+                for i, sweep_point in enumerate(self.sweep_points):
+                    self._measurement_function(sweep_point)
 
         elif self.detector_function.detector_control == "hard":
-            self.get_measurement_preparetime()
+            self._get_measurement_preparetime()
             sweep_points = self.get_sweep_points()
 
-            while self.get_percdone() < 100:
-                start_idx = self.get_datawriting_start_idx()
+            while self._get_percdone() < 100:
+                start_idx = self._get_datawriting_start_idx()
                 if len(self.sweep_functions) == 1:
                     self.sweep_functions[0].set_parameter(sweep_points[start_idx])
                     self.detector_function.prepare(
                         sweep_points=self.get_sweep_points().astype(np.float64)
                     )
-                    self.measure_hard()
+                    self._measure_hard()
                 else:  # If mode is 2D
                     for i, sweep_function in enumerate(self.sweep_functions):
                         swf_sweep_points = sweep_points[:, i]
@@ -356,39 +412,32 @@ class MeasurementControl(Instrument):
                             start_idx : start_idx + self.xlen, 0
                         ].astype(np.float64)
                     )
-                    self.measure_hard()
+                    self._measure_hard()
         else:
             raise Exception(
-                "Sweep and Detector functions not "
-                + "of the same type. \nAborting measurement"
+                "Unsupported combination of Sweep and Detector function types: " +
+                f"sweep={self.sweep_function.sweep_control}, det={self.detector_function.detector_control}"
             )
-            print(self.sweep_function.sweep_control)
-            print(self.detector_function.detector_control)
 
         check_keyboard_interrupt()
-        self.update_instrument_monitor()
-        self.update_plotmon(force_update=True)
+        self._update_instrument_monitor()
+        self._update_plotmon(force_update=True)
         if self.mode == "2D":
-            self.update_plotmon_2D(force_update=True)
-        elif self.mode == "adaptive":
-            self.update_plotmon_adaptive(force_update=True)
+            self._update_plotmon_2D(force_update=True)
+        elif self.mode == "adaptive":  # FIXME: seems always false, handled by _measure_soft_adaptive
+            self._update_plotmon_adaptive(force_update=True)
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
 
         return
 
-    def measure_soft_static(self):
-        for self.soft_iteration in range(self.soft_avg()):
-            for i, sweep_point in enumerate(self.sweep_points):
-                self.measurement_function(sweep_point)
-
-    def measure_soft_adaptive(self, method=None):
+    def _measure_soft_adaptive(self, method=None):
         """
         Uses the adaptive function and keywords for that function as
         specified in self.af_pars()
         """
-        self.save_optimization_settings()
+        self._save_optimization_settings()
 
         # This allows to use adaptive samplers with distinct setting and
         # keep the data in the same dataset. E.g. sample a segment of the
@@ -404,7 +453,7 @@ class MeasurementControl(Instrument):
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
         self.detector_function.prepare()
-        self.get_measurement_preparetime()
+        self._get_measurement_preparetime()
 
         # ######################################################################
         # BEGIN loop of points in extra dims
@@ -450,7 +499,7 @@ class MeasurementControl(Instrument):
                 self.adaptive_besteval_indxs = [0]
 
                 if self.live_plot_enabled() and i_af_pars > last_i_af_pars:
-                    self.initialize_plot_monitor_adaptive()
+                    self._initialize_plot_monitor_adaptive()
                 last_i_af_pars = i_af_pars
 
                 self.adaptive_function = af_pars.get("adaptive_function")
@@ -459,40 +508,40 @@ class MeasurementControl(Instrument):
                     self.adaptive_function = fmin_powell
 
                 if len(Xs) > 1 and X is not None:
-                    opt_func = lambda x: self.mk_optimization_function()(
+                    opt_func = lambda x: self._mk_optimization_function()(
                         flatten([x, X])
                     )
                 else:
-                    opt_func = self.mk_optimization_function()
+                    opt_func = self._mk_optimization_function()
 
                 if is_subclass(self.adaptive_function, BaseLearner):
-                    Learner = self.adaptive_function
+                    learner = self.adaptive_function
                     mch.scale_bounds(af_pars=af_pars, x_scale=self.x_scale)
 
                     # Pass the right parameters two each type of learner
-                    if issubclass(Learner, Learner1D):
-                        self.learner = Learner(
+                    if issubclass(learner, Learner1D):
+                        self.learner = learner(
                             opt_func,
                             bounds=af_pars["bounds"],
                             loss_per_interval=af_pars.get("loss_per_interval", None),
                         )
-                    elif issubclass(Learner, Learner2D):
-                        self.learner = Learner(
+                    elif issubclass(learner, Learner2D):
+                        self.learner = learner(
                             opt_func,
                             bounds=af_pars["bounds"],
                             loss_per_triangle=af_pars.get("loss_per_triangle", None),
                         )
-                    elif issubclass(Learner, LearnerND):
-                        self.learner = Learner(
+                    elif issubclass(learner, LearnerND):
+                        self.learner = learner(
                             opt_func,
                             bounds=af_pars["bounds"],
                             loss_per_simplex=af_pars.get("loss_per_simplex", None),
                         )
-                    elif issubclass(Learner, SKOptLearner):
+                    elif issubclass(learner, SKOptLearner):
                         # NB: This learner expects the `optimization_function`
                         # to be scalar
                         # See https://scikit-optimize.github.io/modules/generated/skopt.optimizer.gp_minimize.html#skopt.optimizer.gp_minimize
-                        self.learner = Learner(
+                        self.learner = learner(
                             opt_func,
                             dimensions=af_pars["dimensions"],
                             base_estimator=af_pars.get("base_estimator", "gp"),
@@ -554,7 +603,7 @@ class MeasurementControl(Instrument):
                             # now there are many checks for this case
                             # Because this is also an optimizer we save the result
                             # Pass the learner because it contains all the points
-                            self.save_optimization_results(
+                            self._save_optimization_results(
                                 self.adaptive_function, self.learner
                             )
                         elif (
@@ -563,7 +612,7 @@ class MeasurementControl(Instrument):
                         ):
                             # Because this is also an optimizer we save the result
                             # Pass the learner because it contains all the points
-                            self.save_optimization_results(
+                            self._save_optimization_results(
                                 self.adaptive_function, self.learner
                             )
 
@@ -582,7 +631,7 @@ class MeasurementControl(Instrument):
                         for non_used_par in non_used_pars:
                             af_pars_copy.pop(non_used_par, None)
                         self.adaptive_result = self.adaptive_function(
-                            self.mk_optimization_function(), **af_pars_copy
+                            self._mk_optimization_function(), **af_pars_copy
                         )
                     except StopIteration:
                         print("Reached f_termination: %s" % (self.f_termination))
@@ -592,7 +641,7 @@ class MeasurementControl(Instrument):
                         and Xs[0] is None
                         and hasattr(self, "adaptive_result")
                     ):
-                        self.save_optimization_results(
+                        self._save_optimization_results(
                             self.adaptive_function, result=self.adaptive_result
                         )
                 else:
@@ -612,12 +661,12 @@ class MeasurementControl(Instrument):
             sweep_function.finish()
         self.detector_function.finish()
         check_keyboard_interrupt()
-        self.update_instrument_monitor()
-        self.update_plotmon(force_update=True)
-        self.update_plotmon_adaptive(force_update=True)
+        self._update_instrument_monitor()
+        self._update_plotmon(force_update=True)
+        self._update_plotmon_adaptive(force_update=True)
         return
 
-    def measure_hard(self):
+    def _measure_hard(self):
         new_data = np.array(self.detector_function.get_values()).astype(np.float64).T
 
         ###########################
@@ -625,7 +674,7 @@ class MeasurementControl(Instrument):
         ###########################
 
         datasetshape = self.dset.shape
-        start_idx, stop_idx = self.get_datawriting_indices_update_ctr(new_data)
+        start_idx, stop_idx = self._get_datawriting_indices_update_ctr(new_data)
 
         new_datasetshape = (np.max([datasetshape[0], stop_idx]), datasetshape[1])
         self.dset.resize(new_datasetshape)
@@ -636,8 +685,7 @@ class MeasurementControl(Instrument):
                 1 + self.soft_iteration
             )
 
-            self.dset[start_idx:stop_idx, len(self.sweep_functions)] = new_vals.astype(
-                np.float64
+            self.dset[start_idx:stop_idx, len(self.sweep_functions)] = new_vals.astype(np.float64
             )
         else:
             old_vals = self.dset[start_idx:stop_idx, len(self.sweep_functions) :]
@@ -674,15 +722,15 @@ class MeasurementControl(Instrument):
                 pass
 
         check_keyboard_interrupt()
-        self.update_instrument_monitor()
-        self.update_plotmon()
+        self._update_instrument_monitor()
+        self._update_plotmon()
         if self.mode == "2D":
-            self.update_plotmon_2D_hard()
+            self._update_plotmon_2D_hard()
         self.iteration += 1
-        self.print_progress(stop_idx)
+        self._print_progress(stop_idx)
         return new_data
 
-    def measurement_function(self, x):
+    def _measurement_function(self, x):
         """
         Core measurement function used for soft sweeps
         """
@@ -735,7 +783,7 @@ class MeasurementControl(Instrument):
         datasetshape = self.dset.shape
 
         vals = self.detector_function.acquire_data_point()
-        start_idx, stop_idx = self.get_datawriting_indices_update_ctr(vals)
+        start_idx, stop_idx = self._get_datawriting_indices_update_ctr(vals)
         # Resizing dataset and saving
         new_datasetshape = (np.max([datasetshape[0], stop_idx]), datasetshape[1])
         self.dset.resize(new_datasetshape)
@@ -749,20 +797,20 @@ class MeasurementControl(Instrument):
         self.dset[start_idx:stop_idx, :] = new_vals.astype(np.float64)
         # update plotmon
         check_keyboard_interrupt()
-        self.update_instrument_monitor()
-        self.update_plotmon()
+        self._update_instrument_monitor()
+        self._update_plotmon()
         if self.mode == "2D":
-            self.update_plotmon_2D()
+            self._update_plotmon_2D()
         elif self.mode == "adaptive":
-            self.update_plotmon_adaptive()
+            self._update_plotmon_adaptive()
         self.iteration += 1
         if self.mode != "adaptive":
-            self.print_progress(stop_idx)
+            self._print_progress(stop_idx)
         else:
-            self.print_progress_adaptive()
+            self._print_progress_adaptive()
         return vals
 
-    def mk_optimization_function(self):
+    def _mk_optimization_function(self):
         """
         Returns a wrapper around the measurement function
         This construction is necessary to be able to run several adaptive
@@ -789,7 +837,7 @@ class MeasurementControl(Instrument):
                 # that involve integer values in `x`
                 x = type(x)(x_ / scale_)
 
-            vals = self.measurement_function(x)
+            vals = self._measurement_function(x)
             # This takes care of data that comes from a "single" segment of a
             # detector for a larger shape such as the UFHQC single int avg detector
             # that gives back data in the shape [[I_val_seg0, Q_val_seg0]]
@@ -856,7 +904,7 @@ class MeasurementControl(Instrument):
     def run_2D(self, name=None, **kw):
         self.run(name=name, mode="2D", **kw)
 
-    def tile_sweep_pts_for_2D(self):
+    def _tile_sweep_pts_for_2D(self):
         self.xlen = len(self.get_sweep_points())
         self.ylen = len(self.sweep_points_2D)
         if np.size(self.get_sweep_points()[0]) == 1:
@@ -872,15 +920,15 @@ class MeasurementControl(Instrument):
                 type(self.sweep_points_2D[0]), np.integer
             ):
                 c = np.column_stack(
-                    (x_tiled.astype(np.object), y_rep)
+                    (x_tiled.astype(object), y_rep)
                 )  # this preserves types
             else:
                 c = np.column_stack((x_tiled, y_rep))
             self.set_sweep_points(c)
-            self.initialize_plot_monitor_2D()
+            self._initialize_plot_monitor_2D()
         return
 
-    def measure_2D(self, **kw):
+    def _measure_2D(self, **kw):
         """
         Sweeps over two parameters set by sweep_function and sweep_function_2D.
         The outer loop is set by sweep_function_2D, the inner loop by the
@@ -890,13 +938,13 @@ class MeasurementControl(Instrument):
         Hard(ware) controlled sweep functions require hard detectors.
         """
 
-        self.tile_sweep_pts_for_2D()
-        self.measure(**kw)
+        self._tile_sweep_pts_for_2D()
+        self._measure(**kw)
         return
 
     def set_sweep_function_2D(self, sweep_function):
         # If it is not a sweep function, assume it is a qc.parameter
-        # and try to auto convert it it
+        # and try to auto convert it
         if not isinstance(sweep_function, swf.Sweep_function):
             sweep_function = wrap_par_to_swf(sweep_function)
 
@@ -920,7 +968,7 @@ class MeasurementControl(Instrument):
     the 2D plotmon (which does a heatmap) and the adaptive plotmon.
     """
 
-    def create_plot_monitor(self):
+    def _create_plot_monitor(self):
         """
         Creates new PyQtGraph plotting monitor.
         Can also be used to recreate these when plotting has crashed.
@@ -937,7 +985,7 @@ class MeasurementControl(Instrument):
             window_title="Secondary plotmon of {}".format(self.name), figsize=(600, 400)
         )
 
-    def initialize_plot_monitor(self):
+    def _initialize_plot_monitor(self):
         if self.main_QtPlot.traces != []:
             self.main_QtPlot.clear()
         self.curves = []
@@ -1007,7 +1055,7 @@ class MeasurementControl(Instrument):
                 j += 1
             self.main_QtPlot.win.nextRow()
 
-    def update_plotmon(self, force_update=False):
+    def _update_plotmon(self, force_update=False):
         # Note: plotting_max_pts takes precendence over force update
         if self.live_plot_enabled() and (
             self.dset.shape[0] < self.plotting_max_pts()
@@ -1088,9 +1136,9 @@ class MeasurementControl(Instrument):
             except Exception as e:
                 log.warning(e)
 
-    def initialize_plot_monitor_2D(self):
+    def _initialize_plot_monitor_2D(self):
         """
-        Preallocates a data array to be used for the update_plotmon_2D command.
+        Preallocates a data array to be used for the _update_plotmon_2D command.
 
         Made to work with at most 2 2D arrays (as this is how the labview code
         works). It should be easy to extend this function for more vals.
@@ -1108,7 +1156,7 @@ class MeasurementControl(Instrument):
             zunits = self.detector_function.value_units
 
             for j in range(len(self.detector_function.value_names)):
-                cmap, zrange = self.choose_MC_cmap_zrange(zlabels[j], zunits[j])
+                cmap, zrange = self._choose_MC_cmap_zrange(zlabels[j], zunits[j])
                 config_dict = {
                     "x": self.sweep_pts_x,
                     "y": self.sweep_pts_y,
@@ -1126,7 +1174,7 @@ class MeasurementControl(Instrument):
                     config_dict["zrange"] = zrange
                 self.secondary_QtPlot.add(**config_dict)
 
-    def update_plotmon_2D(self, force_update=False):
+    def _update_plotmon_2D(self, force_update=False):
         """
         Adds latest measured value to the TwoD_array and sends it
         to the QC_QtPlot.
@@ -1153,7 +1201,7 @@ class MeasurementControl(Instrument):
             except Exception as e:
                 log.warning(e)
 
-    def initialize_plot_monitor_2D_interp(self, ld=0):
+    def _initialize_plot_monitor_2D_interp(self, ld=0):
         """
         Initialize a 2D plot monitor for interpolated (adaptive) plots
         """
@@ -1172,7 +1220,7 @@ class MeasurementControl(Instrument):
             self.im_plot_scatters_last_one = []
 
             for j in range(len(self.detector_function.value_names)):
-                cmap, zrange = self.choose_MC_cmap_zrange(
+                cmap, zrange = self._choose_MC_cmap_zrange(
                     # force the choice of clipped cmap because we are likely
                     # running an optimization
                     "cost" if self.mode == "adaptive" and j == 0 else zlabels[j],
@@ -1232,7 +1280,7 @@ class MeasurementControl(Instrument):
                 )
                 self.im_plot_scatters_last_one.append(self.secondary_QtPlot.traces[-1])
 
-    def update_plotmon_2D_interp(self, force_update=False):
+    def _update_plotmon_2D_interp(self, force_update=False):
         """
         Updates the interpolated 2D heatmap
         """
@@ -1286,19 +1334,19 @@ class MeasurementControl(Instrument):
             except Exception as e:
                 log.warning(e)
 
-    def initialize_plot_monitor_adaptive(self):
+    def _initialize_plot_monitor_adaptive(self):
         """
         Uses the Qcodes plotting windows for plotting adaptive plot updates
         """
         if self.CMA_detected:
-            self.initialize_plot_monitor_adaptive_cma()
-            self.initialize_plot_monitor_2D_interp()
+            self._initialize_plot_monitor_adaptive_cma()
+            self._initialize_plot_monitor_2D_interp()
 
         else:
-            self.initialize_plot_monitor()
+            self._initialize_plot_monitor()
             self.time_last_ad_plot_update = time.time()
             self.secondary_QtPlot.clear()
-            self.initialize_plot_monitor_2D_interp()
+            self._initialize_plot_monitor_2D_interp()
 
             value_names = self.detector_function.value_names
             xlabels = self.sweep_par_names
@@ -1426,11 +1474,11 @@ class MeasurementControl(Instrument):
                     )
                     self.iter_mv_threshold = iter_plotmon.traces[-1]
 
-    def update_plotmon_adaptive(self, force_update=False):
+    def _update_plotmon_adaptive(self, force_update=False):
         if self.CMA_detected:
-            return self.update_plotmon_adaptive_cma(force_update=force_update)
+            return self._update_plotmon_adaptive_cma(force_update=force_update)
         else:
-            self.update_plotmon(force_update=force_update)
+            self._update_plotmon(force_update=force_update)
         if self.live_plot_enabled():
             try:
                 if (
@@ -1494,9 +1542,9 @@ class MeasurementControl(Instrument):
                     self.secondary_QtPlot.update_plot()
             except Exception as e:
                 log.warning(e)
-        self.update_plotmon_2D_interp(force_update=force_update)
+        self._update_plotmon_2D_interp(force_update=force_update)
 
-    def initialize_plot_monitor_adaptive_cma(self):
+    def _initialize_plot_monitor_adaptive_cma(self):
         """
         Uses the Qcodes plotting windows for plotting adaptive plot updates
         """
@@ -1715,7 +1763,7 @@ class MeasurementControl(Instrument):
         # required for the first update call to work
         self.time_last_ad_plot_update = time.time()
 
-    def update_plotmon_adaptive_cma(self, force_update=False):
+    def _update_plotmon_adaptive_cma(self, force_update=False):
         """
         Special adaptive plotmon for
         """
@@ -1801,14 +1849,14 @@ class MeasurementControl(Instrument):
 
                     self.main_QtPlot.update_plot()
                     self.secondary_QtPlot.update_plot()
-                    self.update_plotmon_2D_interp(force_update=True)
+                    self._update_plotmon_2D_interp(force_update=True)
 
                     self.time_last_ad_plot_update = time.time()
 
             except Exception as e:
                 log.warning(e)
 
-    def update_plotmon_2D_hard(self):
+    def _update_plotmon_2D_hard(self):
         """
         Adds latest datarow to the TwoD_array and send it
         to the QC_QtPlot.
@@ -1851,7 +1899,7 @@ class MeasurementControl(Instrument):
         self._persist_xlabs = None
         self._persist_ylabs = None
 
-    def update_instrument_monitor(self):
+    def _update_instrument_monitor(self):
         if self.instrument_monitor() is not None:
             inst_mon = self.find_instrument(self.instrument_monitor())
             inst_mon.update()
@@ -1860,6 +1908,7 @@ class MeasurementControl(Instrument):
     # Small helper/utility functions #
     ##################################
 
+    @deprecated(version='0.4', reason="hack")
     def get_data_object(self):
         """
         Used for external functions to write to a datafile.
@@ -1868,7 +1917,7 @@ class MeasurementControl(Instrument):
         """
         return self.data_object
 
-    def get_column_names(self):
+    def _get_column_names(self):
         self.column_names = []
         self.sweep_par_names = []
         self.sweep_par_units = []
@@ -1887,7 +1936,7 @@ class MeasurementControl(Instrument):
             )
         return self.column_names
 
-    def create_experimentaldata_dataset(self):
+    def _create_experimentaldata_dataset(self):
         data_group = self.data_object.create_group("Experimental Data")
         self.dset = data_group.create_dataset(
             "Data",
@@ -1898,7 +1947,7 @@ class MeasurementControl(Instrument):
             ),
             dtype="float64",
         )
-        self.get_column_names()
+        self._get_column_names()
         self.dset.attrs["column_names"] = h5d.encode_to_utf8(self.column_names)
         # Added to tell analysis how to extract the data
         data_group.attrs["datasaving_format"] = h5d.encode_to_utf8("Version 2")
@@ -1916,7 +1965,7 @@ class MeasurementControl(Instrument):
             self.detector_function.value_units
         )
 
-    def create_experiment_result_dict(self):
+    def _create_experiment_result_dict(self):
         try:
             # only exists as an open dataset when running an
             # optimization
@@ -1938,7 +1987,7 @@ class MeasurementControl(Instrument):
         }
         return result_dict
 
-    def save_optimization_settings(self):
+    def _save_optimization_settings(self):
         """
         Saves the parameters used for optimization
         """
@@ -1947,7 +1996,7 @@ class MeasurementControl(Instrument):
         for (param, val) in param_list:
             opt_sets_grp.attrs[param] = str(val)
 
-    def save_cma_optimization_results(self, es):
+    def _save_cma_optimization_results(self, es):
         """
         This function is to be used as the callback when running cma.fmin.
         It get's handed an instance of an EvolutionaryStrategy (es).
@@ -1994,7 +2043,7 @@ class MeasurementControl(Instrument):
         self.opt_res_dset.resize(new_shape)
         self.opt_res_dset[-1, :] = results_array
 
-    def save_optimization_results(self, adaptive_function, result):
+    def _save_optimization_results(self, adaptive_function, result):
         """
         Saves the result of an adaptive measurement (optimization) to
         the hdf5 file and adds it to self as well.
@@ -2052,7 +2101,7 @@ class MeasurementControl(Instrument):
         self.opt_res = res_dict
         h5d.write_dict_to_hdf5(res_dict, entry_point=opt_res_grp)
 
-    def save_instrument_settings(self, data_object=None, *args):
+    def _save_instrument_settings(self, data_object=None, *args):
         """
         Store the last known value of all parameters in the datafile.
 
@@ -2110,7 +2159,7 @@ class MeasurementControl(Instrument):
                             val = ""
                         instrument_grp.attrs[p_name] = str(val)
 
-    def save_MC_metadata(self, data_object=None, *args):
+    def _save_MC_metadata(self, data_object=None, *args):
         """
         Save metadata on the MC (such as timings)
         """
@@ -2152,7 +2201,7 @@ class MeasurementControl(Instrument):
 
         h5d.write_dict_to_hdf5(metadata, entry_point=metadata_group)
 
-    def get_percdone(self):
+    def _get_percdone(self):
         percdone = (
             (self.total_nr_acquired_values)
             / (np.shape(self.get_sweep_points())[0] * self.soft_avg())
@@ -2160,9 +2209,9 @@ class MeasurementControl(Instrument):
         )
         return percdone
 
-    def print_progress(self, stop_idx=None):
+    def _print_progress(self, stop_idx=None):
         if self.verbose():
-            percdone = self.get_percdone()
+            percdone = self._get_percdone()
             elapsed_time = time.time() - self.begintime
             progress_message = (
                 "\r {percdone}% completed \telapsed time: "
@@ -2182,7 +2231,7 @@ class MeasurementControl(Instrument):
                 end_char = "\n"
             print("\r", progress_message, end=end_char)
 
-    def print_progress_adaptive(self):
+    def _print_progress_adaptive(self):
         if self.verbose():
             acquired_points = self.dset.shape[0]
 
@@ -2196,7 +2245,7 @@ class MeasurementControl(Instrument):
             end_char = ""
             print("\r", progress_message, end=end_char)
 
-    def is_complete(self):
+    def _is_complete(self):  # FIXME: unused
         """
         Returns True if enough data has been acquired.
         """
@@ -2210,22 +2259,22 @@ class MeasurementControl(Instrument):
             else:
                 return True
 
-    def print_measurement_start_msg(self):
+    def _print_measurement_start_msg(self):
         if self.verbose():
             if len(self.sweep_functions) == 1:
-                print("Starting measurement: %s" % self.get_measurement_name())
+                print("Starting measurement: %s" % self._get_measurement_name())
                 print("Sweep function: %s" % self.get_sweep_function_names()[0])
                 print("Detector function: %s" % self.get_detector_function_name())
             else:
-                print("Starting measurement: %s" % self.get_measurement_name())
+                print("Starting measurement: %s" % self._get_measurement_name())
                 for i, sweep_function in enumerate(self.sweep_functions):
                     print("Sweep function %d: %s" % (i, self.sweep_function_names[i]))
                 print("Detector function: %s" % self.get_detector_function_name())
 
-    def get_datetimestamp(self):
+    def _get_datetimestamp(self):  # FIXME: unused
         return time.strftime("%Y%m%d_%H%M%S", time.localtime())
 
-    def get_datawriting_start_idx(self):
+    def _get_datawriting_start_idx(self):
         if self.mode == "adaptive":
             max_sweep_points = np.inf
         else:
@@ -2237,7 +2286,7 @@ class MeasurementControl(Instrument):
 
         return start_idx
 
-    def get_datawriting_indices_update_ctr(self, new_data, update: bool = True):
+    def _get_datawriting_indices_update_ctr(self, new_data, update: bool = True):
         """
         Calculates the start and stop indices required for
         storing a hard measurement.
@@ -2263,7 +2312,7 @@ class MeasurementControl(Instrument):
                 # in case of an N-D Hard detector dataset
                 xlen = np.shape(new_data)[0]
 
-        start_idx = self.get_datawriting_start_idx()
+        start_idx = self._get_datawriting_start_idx()
         stop_idx = start_idx + xlen
 
         if update:
@@ -2341,15 +2390,15 @@ class MeasurementControl(Instrument):
         self.git_hash = get_git_revision_hash()
         return self.git_hash
 
-    def get_measurement_begintime(self):
+    def _get_measurement_begintime(self):
         self.begintime = time.time()
         return time.strftime("%Y-%m-%d %H:%M:%S")
 
-    def get_measurement_endtime(self):
+    def _get_measurement_endtime(self):
         self.endtime = time.time()
         return time.strftime("%Y-%m-%d %H:%M:%S")
 
-    def get_measurement_preparetime(self):
+    def _get_measurement_preparetime(self):
         self.preparetime = time.time()
         return time.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -2412,18 +2461,18 @@ class MeasurementControl(Instrument):
 
         # ensures the cma optimization results are saved during the experiment
         if self.CMA_detected and "callback" not in self.af_pars:
-            self.af_pars["callback"] = self.save_cma_optimization_results
+            self.af_pars["callback"] = self._save_cma_optimization_results
 
     def get_adaptive_function_parameters(self):
         return self.af_pars
 
-    def set_measurement_name(self, measurement_name):
+    def _set_measurement_name(self, measurement_name):
         if measurement_name is None:
             self.measurement_name = "Measurement"
         else:
             self.measurement_name = measurement_name
 
-    def get_measurement_name(self):
+    def _get_measurement_name(self):
         return self.measurement_name
 
     def set_optimization_method(self, optimization_method):
@@ -2432,7 +2481,7 @@ class MeasurementControl(Instrument):
     def get_optimization_method(self):
         return self.optimization_method
 
-    def clean_previous_adaptive_run(self):
+    def _clean_previous_adaptive_run(self):
         """
         Performs a reset of variables and parameters used in the previous run
         that are not relevant or even conflicting with the current one.
@@ -2442,7 +2491,7 @@ class MeasurementControl(Instrument):
         self.CMA_detected = False
         self.af_pars = dict()
 
-    def choose_MC_cmap_zrange(self, zlabel: str, zunit: str):
+    def _choose_MC_cmap_zrange(self, zlabel: str, zunit: str):
         cost_func_names = ["cost", "cost func", "cost function"]
         cmap = None
         zrange = None

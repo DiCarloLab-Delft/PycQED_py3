@@ -44,7 +44,7 @@ class IPTransport(Transport):
 
     def __init__(self, host: str,
                  port: int = 5025,
-                 timeout = 10.0,
+                 timeout = 40.0,
                  snd_buf_size: int = 512 * 1024) -> None:
         """
         establish connection, e.g. IPTransport('192.168.0.16', 4000)
@@ -97,6 +97,7 @@ class FileTransport(Transport):
         """
         self._out_file = open(out_file_name, "wb+")
         self._inject_data = '1'  # response to "*OPC?"
+
     def close(self) -> None:
         self._out_file.close()
 

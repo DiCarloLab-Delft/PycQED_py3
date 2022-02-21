@@ -10255,5 +10255,61 @@
         "Properties": "Read, Stream",
         "Type": "ZITriggerSample",
         "Unit": "None"
+    },
+    "AWGS/0/COMMANDTABLE/DATA": {
+        "Description": "Commandtable JSON string.",
+        "Node": "AWGS/0/COMMANDTABLE/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "AWGS/1/COMMANDTABLE/DATA": {
+        "Description": "Commandtable JSON string.",
+        "Node": "AWGS/1/COMMANDTABLE/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "AWGS/2/COMMANDTABLE/DATA": {
+        "Description": "Commandtable JSON string.",
+        "Node": "AWGS/2/COMMANDTABLE/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "AWGS/3/COMMANDTABLE/DATA": {
+        "Description": "Commandtable JSON string.",
+        "Node": "AWGS/3/COMMANDTABLE/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "AWGS/0/COMMANDTABLE/STATUS": {
+        "Description": "Commandtable status.",
+        "Node": "AWGS/0/COMMANDTABLE/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "AWGS/1/COMMANDTABLE/STATUS": {
+        "Description": "Commandtable status.",
+        "Node": "AWGS/1/COMMANDTABLE/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "AWGS/2/COMMANDTABLE/STATUS": {
+        "Description": "Commandtable status.",
+        "Node": "AWGS/2/COMMANDTABLE/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "AWGS/3/COMMANDTABLE/STATUS": {
+        "Description": "Commandtable status.",
+        "Node": "AWGS/3/COMMANDTABLE/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
     }
 }

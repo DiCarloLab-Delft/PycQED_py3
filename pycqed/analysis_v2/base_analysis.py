@@ -462,15 +462,15 @@ class BaseDataAnalysis(object):
             if self.presentation_mode:
                 savename = os.path.join(
                     savedir, key + tstag + 'presentation' + '.' + fmt)
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
+                self.figs[key].savefig(savename, bbox_inches='tight', format=fmt)
                 savename = os.path.join(
                     savedir, key + tstag + 'presentation' + '.svg')
                 self.figs[key].savefig(
-                    savename, bbox_inches='tight', fmt='svg')
+                    savename, bbox_inches='tight', format='svg')
             else:
                 savename = os.path.join(
                     savedir, key + tstag + '.' + fmt)
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
+                self.figs[key].savefig(savename, bbox_inches='tight', format=fmt)
             if close_figs:
                 plt.close(self.figs[key])
 
@@ -772,10 +772,11 @@ class BaseDataAnalysis(object):
         for param_name in model.params:
             dic['params'][param_name] = {}
             param = model.params[param_name]
+            dic['params'][param_name]['value'] = getattr(param, 'value')
             for k in param.__dict__:
                 if not k.startswith('_') and k not in ['from_internal', ]:
                     dic['params'][param_name][k] = getattr(param, k)
-            dic['params'][param_name]['value'] = getattr(param, 'value')
+            
 
         return dic
 
@@ -953,6 +954,8 @@ class BaseDataAnalysis(object):
 
         # if a y or xerr is specified, used the errorbar-function
         plot_linekws = pdict.get('line_kws', {})
+        legend_kws = pdict.get('legend_kws', {})
+
         xerr = pdict.get('xerr', None)
         yerr = pdict.get('yerr', None)
         if xerr is not None or yerr is not None:
@@ -963,6 +966,7 @@ class BaseDataAnalysis(object):
                 plot_linekws['xerr'] = plot_linekws.get('xerr', xerr)
 
         pdict['line_kws'] = plot_linekws
+        pdict['legend_kws'] = legend_kws
 
         axs.set_aspect(pdict.get('aspect', 'auto'))
         pfunc = getattr(axs, pdict.get('func', 'plot'))
@@ -1046,7 +1050,7 @@ class BaseDataAnalysis(object):
             legend_ncol = pdict.get('legend_ncol', 1)
             legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol,**legend_kws)
 
         if self.tight_fig:
             axs.figure.tight_layout()

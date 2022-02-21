@@ -1,20 +1,19 @@
 import time
 import numpy as np
-from pycqed.analysis import measurement_analysis as MA
-from pycqed.analysis import ramiro_analysis as RA
-from pycqed.analysis import fitting_models as fit_mods
 import scipy as scipy
-try:
-    import qutip as qt
-except ImportError as e:
-    logging.warning('Could not import qutip, tomo code will not work')
-import itertools
+# try:
+#     import qutip as qt
+# except ImportError as e:
+#     import logging
+#     logging.warning('Could not import qutip, tomo code will not work')
+import qutip as qtp
+
 from pycqed.analysis_v2 import pytomo as csdp_tomo
 
-comp_projectors = [qt.ket2dm(qt.tensor(qt.basis(2,0), qt.basis(2,0))),
-                  qt.ket2dm(qt.tensor(qt.basis(2,0), qt.basis(2,1))),
-                  qt.ket2dm(qt.tensor(qt.basis(2,1), qt.basis(2,0))),
-                  qt.ket2dm(qt.tensor(qt.basis(2,1), qt.basis(2,1)))]
+comp_projectors = [qtp.ket2dm(qtp.tensor(qtp.basis(2, 0), qtp.basis(2, 0))),
+                   qtp.ket2dm(qtp.tensor(qtp.basis(2, 0), qtp.basis(2, 1))),
+                   qtp.ket2dm(qtp.tensor(qtp.basis(2, 1), qtp.basis(2, 0))),
+                   qtp.ket2dm(qtp.tensor(qtp.basis(2, 1), qtp.basis(2, 1)))]
 
 class TomoAnalysis():
 
@@ -33,19 +32,19 @@ class TomoAnalysis():
 
     # The set of single qubit rotation matrices used in the tomography
     # measurement (will be assumed to be used on all qubits)
-    rotation_matrices = [qt.identity(2), qt.sigmax(),
-                         qt.rotation(
-                             qt.sigmay(), np.pi / 2), qt.rotation(qt.sigmay(), -1*np.pi / 2),
-                         qt.rotation(qt.sigmax(), np.pi / 2), qt.rotation(qt.sigmax(), -np.pi / 2)]
+    rotation_matrices = [qtp.identity(2), qtp.sigmax(),
+                         qtp.rotation(
+                             qtp.sigmay(), np.pi / 2), qtp.rotation(qtp.sigmay(), -1 * np.pi / 2),
+                         qtp.rotation(qtp.sigmax(), np.pi / 2), qtp.rotation(qtp.sigmax(), -np.pi / 2)]
     measurement_operator_labels = ['I', 'X', 'y', '-y', 'x','-x']
     #MAKE SURE THE LABELS CORRESPOND TO THE ROTATION MATRICES DEFINED ABOVE
 
     # The set of single qubit basis operators and labels (normalized)
     measurement_basis = [
-        qt.identity(2) , qt.sigmaz() , qt.sigmax() , qt.sigmay() ]
+        qtp.identity(2) , qtp.sigmaz() , qtp.sigmax() , qtp.sigmay() ]
     measurement_basis_labels = ['I', 'Z', 'X', 'Y']
     # The operators used in the readout basis on each qubit
-    readout_basis = [qt.identity(2) , qt.sigmaz() ]
+    readout_basis = [qtp.identity(2) , qtp.sigmaz()]
 
     def __init__(self, n_qubits=2, check_labels=False):
         """
@@ -96,7 +95,7 @@ class TomoAnalysis():
         TE_correction_matrix: a matrix multiplying the calibration points to correct for estimated mixture due to Thermal excitation.
         """
         #some argument parsing to we allow more general input
-        meas_operators = [meas_operators] if type(meas_operators) == qt.Qobj else meas_operators
+        meas_operators = [meas_operators] if type(meas_operators) == qtp.Qobj else meas_operators
 
 
         #for each independent set of measurements(with their own measurement operator, calculate the coeff matrix)
@@ -114,8 +113,8 @@ class TomoAnalysis():
             rho = self.trans_pauli_to_comp(basis_decomposition)
         else:
             basis_decomposition = np.conj(np.linalg.pinv(coefficient_matrix)).dot(meas_tomo)
-            rho = qt.Qobj(np.reshape(basis_decomposition, [self.n_states, self.n_states]),
-                     dims=self.qt_dims)
+            rho = qtp.Qobj(np.reshape(basis_decomposition, [self.n_states, self.n_states]),
+                           dims=self.qt_dims)
         return (basis_decomposition, rho)
 
 
@@ -138,7 +137,7 @@ class TomoAnalysis():
         # first we calculate the measurement matrices
         tstart = time.time()
 
-        measurement_operators = [measurement_operators] if type(measurement_operators) == qt.Qobj else measurement_operators
+        measurement_operators = [measurement_operators] if type(measurement_operators) == qtp.Qobj else measurement_operators
 
         measurement_vectors = []
         for measurement_operator in measurement_operators:
@@ -171,7 +170,7 @@ class TomoAnalysis():
             print(" Time to do linear tomo %.2f " % (tcholesky-tlinear))
             print(" Time to build T %.2f " % (topt-tcholesky))
             print(" Time to optimize %.2f" % (time.time()-topt))
-        return qt.Qobj(self.build_rho_from_triangular_params(t_optimal), dims=self.qt_dims)
+        return qtp.Qobj(self.build_rho_from_triangular_params(t_optimal), dims=self.qt_dims)
 
 
     def execute_SDPA_2qubit_tomo(self, measurement_operators, counts_tomo, N_total=1, used_bins=[0,3],
@@ -221,7 +220,7 @@ class TomoAnalysis():
         # print(rho_nathan)
         n_estimate = rho_nathan.trace()
         # print(n_estimate)
-        rho = qt.Qobj(rho_nathan / n_estimate,dims=self.qt_dims)
+        rho = qtp.Qobj(rho_nathan / n_estimate, dims=self.qt_dims)
 
         # if((np.abs(N_total - n_estimate) / N_total > 0.03)):
             # print('WARNING estimated N(%d) is not close to provided N(%d) '% (n_estimate,N_total))
@@ -328,24 +327,24 @@ class TomoAnalysis():
         Converts a rho in the pauli basis, or pauli basis vector or Qobj of rho in pauli basis to comp basis.
         """
         if(rho_pauli.shape[0] == self.n_states):
-            basis_decomposition = np.ravel(rho_pauli.full()) if (type(rho_pauli) ==  qt.Qobj) else np.ravel(rho_pauli)
+            basis_decomposition = np.ravel(rho_pauli.full()) if (type(rho_pauli) == qtp.Qobj) else np.ravel(rho_pauli)
         else:
             basis_decomposition = rho_pauli
 
-        return qt.Qobj(np.reshape(self.basis_pauli_to_comp_trafo_matrix.dot(basis_decomposition), [self.n_states, self.n_states]),
-                     dims=self.qt_dims)
+        return qtp.Qobj(np.reshape(self.basis_pauli_to_comp_trafo_matrix.dot(basis_decomposition), [self.n_states, self.n_states]),
+                        dims=self.qt_dims)
 
     def trans_comp_to_pauli(self, rho_comp):
         """
         Converts a rho in the computational basis, or comp basis vector or Qobj of rho in computational basis to Pauli basis.
         """
         if(rho_comp.shape[0] == self.n_states):
-            basis_decomposition = np.ravel(rho_comp.full()) if (type(rho_comp) ==  qt.Qobj) else np.ravel(rho_comp)
+            basis_decomposition = np.ravel(rho_comp.full()) if (type(rho_comp) == qtp.Qobj) else np.ravel(rho_comp)
         else:
             basis_decomposition = rho_comp
 
-        return qt.Qobj(np.reshape(self.basis_comp_to_pauli_trafo_matrix.dot(basis_decomposition), [self.n_states, self.n_states]),
-                     dims=self.qt_dims)
+        return qtp.Qobj(np.reshape(self.basis_comp_to_pauli_trafo_matrix.dot(basis_decomposition), [self.n_states, self.n_states]),
+                        dims=self.qt_dims)
 
 
     def _calculate_matrix_set(self, starting_set, n_qubits):
@@ -356,7 +355,7 @@ class TomoAnalysis():
         So for 2 qubits assuming your basis set is {I, X, Y, Z} you get II IX IY IZ XI XX XY XZ ...
         """
         if(n_qubits > 1):
-            return [qt.tensor(x, y) for x in self._calculate_matrix_set(starting_set, n_qubits - 1)
+            return [qtp.tensor(x, y) for x in self._calculate_matrix_set(starting_set, n_qubits - 1)
                     for y in starting_set]
         else:
             return starting_set
@@ -475,13 +474,13 @@ def generate_tomo_data(rho, M, R, N, M_bins = None):
     probs = []
     for state in eigenstates:
         #calculate probability of ending up in this state
-        probs.append(((R.dag() * (qt.ket2dm(state) * R)) * rho).tr().real)
+        probs.append(((R.dag() * (qtp.ket2dm(state) * R)) * rho).tr().real)
     #run a multinomial distribution to determine the "experimental" measurement outcomes
     counts = np.random.multinomial(N, probs)
     # use the simulated percentages of states found to calc voltages
     expectations =  sum((counts / float(N)) * eigenvals)
     #calcultate bin counts via the projections of original eigenstates onto bin measurement operator.
-    bin_counts = [sum([counts[j] * (M_bins[i] * qt.ket2dm(eigenstates[j])).tr().real
+    bin_counts = [sum([counts[j] * (M_bins[i] * qtp.ket2dm(eigenstates[j])).tr().real
                   for j in range(len(eigenstates))])
                   for i in range(len(M_bins))]
 
@@ -494,10 +493,10 @@ def get_TE_calibration_points(e_01, e_10, get_coefficient_matrix=False):
     If it is set to false, just return the mixed calibration points.
     """
     P = comp_projectors
-    R = [   qt.tensor(qt.qeye(2), qt.qeye(2)),
-            qt.tensor(qt.qeye(2), qt.sigmax()),
-            qt.tensor(qt.sigmax(), qt.qeye(2)),
-            qt.tensor(qt.sigmax(), qt.sigmax())]
+    R = [qtp.tensor(qtp.qeye(2), qtp.qeye(2)),
+         qtp.tensor(qtp.qeye(2), qtp.sigmax()),
+         qtp.tensor(qtp.sigmax(), qtp.qeye(2)),
+         qtp.tensor(qtp.sigmax(), qtp.sigmax())]
     #calculate the effect TE on the 00 state using probabilities to be excited(or not)
     c_00 = (1-e_01) * (1-e_10) * P[0] + e_01 * (1-e_10) * P[1] + e_10 * (1-e_01) * P[2] + e_01 * e_10 * P[3]
     #find the other points via bit flip rotations

@@ -1,250 +1,786 @@
 import re
 import logging
+import json
+import pathlib
+import inspect
 import numpy as np
 from os import remove
 from os.path import join, dirname, isfile
+from typing import List, Tuple
+from deprecated import deprecated
+
+import openql as ql
+
 from pycqed.utilities.general import suppress_stdout
-import matplotlib.pyplot as plt
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
-from matplotlib.ticker import MaxNLocator
-import matplotlib.patches as mpatches
-from pycqed.utilities.general import is_more_rencent
-import openql.openql as ql
-from openql.openql import Program, Kernel, Platform, CReg, Operation
+from pycqed.utilities.general import is_more_recent
 from pycqed.utilities.general import get_file_sha256_hash
-import json
+
 
 log = logging.getLogger(__name__)
 
-output_dir = join(dirname(__file__), 'output')
-ql.set_option('output_dir', output_dir)
-ql.set_option('scheduler', 'ALAP')
+"""
+FIXME:
+concept should support:
+- programs with 'runtime' parameters
+- retrieval of return (measurement) data
+- running a set of programs
+- make-like 'update only if needed'
+- multiple HW-platforms
+- other compilers than OpenQL
+
+"""
+
+class OqlProgram:
+    # we use a class global variable 'output_dir' to replace the former OpenQL option of the same name. Since that is a
+    # global OpenQL option, it no longer has direct effect now we no longer use the OpenQL generated list of passes (see
+    # self._configure_compiler). Additionally, OpenQL options are reset upon ql.initialize, so the value does not persist.
+    output_dir = join(dirname(__file__), 'output')
+
+    def __init__(
+            self,
+            name: str,
+            platf_cfg: str,
+            nregisters: int = 32
+    ):
+        """
+        create OpenQL Program (and Platform)
+
+        Args:
+            name:
+                name of the program
+
+            platf_cfg:
+                path of the platform configuration file used by OpenQL
+
+            nregisters:
+                the number of classical registers required in the program
+        """
 
 
-def create_program(pname: str, platf_cfg: str, nregisters: int = 32):
-    """
-    Wrapper around the constructor of openQL "Program" class.
+        # setup OpenQL
+        ql.initialize()  # reset options, may initialize more functionality in the future
 
-    Args:
-        pname       (str) : Name of the program
-        platf_cfg   (str) : location of the platform configuration used to
-            construct the OpenQL Platform used.
-        nregisters  (int) : the number of classical registers required in
-            the program.
-
-    In addition to instantiating the Program, this function
-        - creates a Platform based on the "platf_cfg" filename.
-        - Adds the platform as an attribute  "p.platf"
-        - Adds the output_dir as an attribute "p.output_dir"
-
-    """
-
-    # create OpenQL Program object see https://openql.readthedocs.io/en/latest/api/Program.html
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    nqubits = platf.get_qubit_number()
-    p = Program(pname,
-                platf,
-                nqubits,
-                nregisters)
-
-    # add information to the Program object (FIXME: better create new type, seems to duplicate qubit_count and creg_count)
-    p.platf = platf
-    p.output_dir = ql.get_option('output_dir')
-    p.nqubits = platf.get_qubit_number()
-    p.nregisters = nregisters
-
-    # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
-    p.eqasm_compiler = ''
-    with open(platf_cfg) as f:
-        for line in f:
-            if 'eqasm_compiler' in line:
-                m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
-                p.eqasm_compiler = m.group(1)
-                break
-    if p.eqasm_compiler == '':
-        logging.error(f"key 'eqasm_compiler' not found in file '{platf_cfg}'")
-
-    # determine extension of generated file
-    if p.eqasm_compiler == 'eqasm_backend_cc':
-        ext = '.vq1asm'  # CC
-    else:
-        ext = '.qisa'  # CC-light, QCC
-
-    # add filename to help finding the output files. NB: file is created by calling compile()
-    p.filename = join(p.output_dir, p.name + ext)
-    return p
-
-
-def create_kernel(kname: str, program):
-    """
-    Wrapper around constructor of openQL "Kernel" class.
-    """
-    kname = kname.translate(
-        {ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
-
-    k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
-    return k
-
-
-def compile(p, quiet: bool = True):
-    """
-    Wrapper around OpenQL Program.compile() method.
-    """
-    if quiet:
-        with suppress_stdout():
-            p.compile()
-    else:  # show warnings
+        # set OpenQL log level before anything else
         ql.set_option('log_level', 'LOG_WARNING')
-        p.compile()
 
-    return p  # FIXME: returned unchanged, kept for compatibility for now  (PR #638)
+        # store/initialize some parameters
+        self.name = name
+        self._platf_cfg = platf_cfg
+        self.nregisters = nregisters  # NB: not available via platform
+        self.filename = ""
+        self.sweep_points = None
+
+        # create Platform and Program
+        self.platform = ql.Platform('OpenQL_Platform', platf_cfg)
+        self.nqubits = self.platform.get_qubit_number()
+        self.program = ql.Program(
+            name,
+            self.platform,
+            self.nqubits,
+            self.nregisters
+        )  # NB: unused if we use compile_cqasm()
+
+        # detect OpenQL backend ('eqasm_compiler') used by inspecting platf_cfg
+        eqasm_compiler = ''
+        with open(self._platf_cfg) as f:
+            for line in f:
+                if 'eqasm_compiler' in line:
+                    m = re.search('"eqasm_compiler" *: *"(.*?)"', line)
+                    eqasm_compiler = m.group(1)
+                    break
+        if eqasm_compiler == '':
+            log.error(f"key 'eqasm_compiler' not found in file '{self._platf_cfg}'")
+
+        # determine architecture and extension of generated file
+        if eqasm_compiler == 'cc_light_compiler':
+            # NB: OpenQL no longer has a backend for CC-light
+            self._arch = 'CCL'
+            self._ext = '.qisa'  # CC-light, QCC
+        else:
+            self._arch = 'CC'
+            self._ext = '.vq1asm'  # CC
+
+        # save name of file that OpenQL will generate on compilation to allow uploading
+        # NB: for cQasm, the actual name is determined by 'pragma @ql.name' in the source, not by self.name,
+        # so users must maintain consistency
+        self.filename = join(OqlProgram.output_dir, self.name + self._ext)
 
 
-def is_compatible_openql_version_cc() -> bool:
+    def add_kernel(self, k: ql.Kernel) -> None:
+        self.program.add_kernel(k)
+
+
+    def create_kernel(
+            self,
+            kname: str
+    ) -> ql.Kernel:
+        """
+        Wrapper around constructor of openQL "Kernel" class.
+        """
+        kname = kname.translate(
+            {ord(c): "_" for c in "!@#$%^&*()[]{};:,./<>?\|`~-=_+ "})
+
+        k = ql.Kernel(kname, self.platform, self.nqubits, self.nregisters)
+        return k
+
+
+    def compile(
+            self,
+            quiet: bool = False,
+            extra_pass_options: List[Tuple[str, str]] = None
+    ) -> None:
+        """
+        Compile an OpenQL Program created using the legacy Program/Kernel API.
+
+        Args:
+            quiet:
+                suppress all output (not recommended, because warnings are hidden)
+
+            extra_pass_options:
+                extra pass options for OpenQL. These consist of a tuple 'path, value' where path is structured as
+                "<passName>.<passOption>" and value is the option value, see
+                https://openql.readthedocs.io/en/latest/reference/python.html#openql.Compiler.set_option
+
+                See https://openql.readthedocs.io/en/latest/gen/reference_passes.html for passes and their options
+        """
+
+        if quiet:
+            with suppress_stdout():
+                self.program.compile()
+        else:  # show warnings
+            c = self._configure_compiler("", extra_pass_options)
+            c.compile(self.program)
+
+
+    def compile_cqasm(
+            self,
+            src: str,
+            extra_pass_options: List[Tuple[str, str]] = None
+    ) -> None:
+        """
+        Compile a string with cQasm source code.
+
+        Note that, contrary to the behaviour of compile(), the program runs just once by default, since looping can be
+        easily and more subtly performed in cQasm if desired.
+
+        Args:
+            src:
+                the cQasm source code string
+
+            extra_pass_options:
+                extra pass options for OpenQL. These consist of a tuple 'path, value' where path is structured as
+                "<passName>.<passOption>" and value is the option value, see
+                https://openql.readthedocs.io/en/latest/reference/python.html#openql.Compiler.set_option
+
+                See https://openql.readthedocs.io/en/latest/gen/reference_passes.html for passes and their options
+        """
+
+        # save src to file (as needed by pass 'io.cqasm.Read')
+        src_filename = OqlProgram.output_dir+"/"+self.name+".cq"
+        pathlib.Path(src_filename).write_text(inspect.cleandoc(src))
+
+        c = self._configure_compiler(src_filename, extra_pass_options)
+        c.compile_with_frontend(self.platform)
+
+
+    # NB: used in clifford_rb_oql.py to skip both generation of RB sequences, and OpenQL compilation if
+    # contents of platf_cfg or clifford_rb_oql (i.e. the Python file that generates the RB sequence) have changed
+    def check_recompilation_needed_hash_based(
+            self,
+            clifford_rb_oql: str,
+            recompile: bool = True,
+    ) -> dict:
+        """
+        Similar functionality to the deprecated `check_recompilation_needed` but
+        based on a file that is generated alongside with the program file
+        containing hashes of the files that are relevant to the generation of the
+        RB sequences and that might be modified somewhat often
+
+        NB: Not intended for stand alone use!
+        The code invoking this function should later invoke:
+            `os.rename(recompile_dict["tmp_file"], recompile_dict["file"])` # FIXME: create member function for that
+
+        The behavior of this function depends on the recompile argument.
+        recompile:
+            True -> True, the program should be compiled
+
+            'as needed' -> compares filename to timestamp of config
+                and checks if the file exists, if required recompile.
+            False -> checks if the file exists, if it doesn't
+                compilation is required and raises a ValueError.
+                Use carefully, only if you know what you are doing!
+                Use 'as needed' to stay safe!
+        """
+
+        hashes_ext = ".hashes"
+        tmp_ext = ".tmp"
+        rb_system_hashes_fn = self.filename + hashes_ext
+        tmp_fn = rb_system_hashes_fn + tmp_ext
+
+        platf_cfg_hash = get_file_sha256_hash(self._platf_cfg, return_hexdigest=True)
+        this_file_hash = get_file_sha256_hash(clifford_rb_oql, return_hexdigest=True)
+        file_hashes = {self._platf_cfg: platf_cfg_hash, clifford_rb_oql: this_file_hash}
+
+        _recompile = False
+        if not isfile(self.filename):
+            if recompile is False:
+                raise ValueError('No file:\n{}'.format(self.filename))
+            else:
+                # Force recompile, there is no program file
+                _recompile |= True  # FIXME: why "|="?
+
+        # Determine if compilation is needed based on the hashed files
+        if not isfile(rb_system_hashes_fn):
+            # There is no file with the hashes, we must compile to be safe
+            _recompile |= True
+        else:
+            # Hashes exist, we use them to determine if recompilations is needed
+            with open(rb_system_hashes_fn) as json_file:
+                hashes_dict = json.load(json_file)
+            # Remove file to signal a compilation in progress
+            remove(rb_system_hashes_fn)
+
+            for fn in file_hashes.keys():
+                # Recompile becomes true if any of the hashed files has a different
+                # hash now
+                _recompile |= hashes_dict.get(fn, "") != file_hashes[fn]
+
+        # Write the updated hashes
+        # We use a temporary file such that for parallel compilations, if the
+        # process is interrupted before the end there will be no hash and
+        # recompilation will be forced
+        pathlib.Path(tmp_fn).parent.mkdir(parents=True, exist_ok=True)
+        pathlib.Path(tmp_fn).write_text(json.dumps(file_hashes))
+
+        res_dict = {
+            "file": rb_system_hashes_fn,
+            "tmp_file": tmp_fn
+        }
+
+        if recompile is False:
+            if _recompile is True:
+                log.warning(
+                    "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
+                    " want to compile?".format(self._platf_cfg, clifford_rb_oql)
+                )
+            res_dict["recompile"] = False
+        elif recompile is True:
+            # Enforce recompilation
+            res_dict["recompile"] = True
+        elif recompile == "as needed":
+            res_dict["recompile"] = _recompile
+
+        return res_dict
+
+    #############################################################################
+    # Calibration points
+    #############################################################################
+
     """
-    test whether OpenQL version is compatible with Central Controller
+    FIXME: while refactoring these from separate functions to class methods, it
+     was found that most functions returned the program (that was provided as a
+     parameter, which makes no sense), and that the return parameter was mostly
+     ignored (which makes no difference). The function documentation was
+     inconsistent with the actual code in this respect, probably as a result of
+     earlier refactoring.
+     Function 'add_multi_q_cal_points' would return different types dependent
+     on a boolean parameter 'return_comb', but no cases were found where this
+     parameter was set to True, so this behaviour was removed
     """
-    return ql.get_version() > '0.8.0'  # we must be beyond "0.8.0" because of changes to the configuration file, e.g "0.8.0.dev1"
 
-#############################################################################
-# Calibration points
-#############################################################################
+    def add_single_qubit_cal_points(
+            self,
+            qubit_idx: int,
+            f_state_cal_pts: bool = False,
+            measured_qubits=None
+    ) -> None:
+        """
+        Adds single qubit calibration points to an OpenQL program
 
+        Args:
+            qubit_idx:
+                index of qubit
 
-def add_single_qubit_cal_points(p, qubit_idx,
-                                f_state_cal_pts: bool = False,
-                                measured_qubits=None):
-    """
-    Adds single qubit calibration points to an OpenQL program
+            f_state_cal_pts:
+                if True, add calibration points for the 2nd exc. state
 
-    Args:
-        p
-        platf
-        qubit_idx
-        measured_qubits : selects which qubits to perform readout on
-            if measured_qubits == None, it will default to measuring the
-            qubit for which there are cal points.
-    """
-    if measured_qubits == None:
-        measured_qubits = [qubit_idx]
+            measured_qubits:
+                selects which qubits to perform readout on. If measured_qubits == None, it will default
+                to measuring the qubit for which there are cal points.
 
-    for i in np.arange(2):
-        k = create_kernel("cal_gr_"+str(i), program=p)
-        k.prepz(qubit_idx)
-        k.gate('wait', measured_qubits, 0)
-        for measured_qubit in measured_qubits:
-            k.measure(measured_qubit)
-        k.gate('wait', measured_qubits, 0)
-        p.add_kernel(k)
+        Returns:
 
-    for i in np.arange(2):
-        k = create_kernel("cal_ex_"+str(i), program=p)
-        k.prepz(qubit_idx)
-        k.gate('rx180', [qubit_idx])
-        k.gate('wait', measured_qubits, 0)
-        for measured_qubit in measured_qubits:
-            k.measure(measured_qubit)
-        k.gate('wait', measured_qubits, 0)
-        p.add_kernel(k)
-    if f_state_cal_pts:
+        """
+
+        if measured_qubits == None:
+            measured_qubits = [qubit_idx]
+
         for i in np.arange(2):
-            k = create_kernel("cal_f_"+str(i), program=p)
+            k = self.create_kernel("cal_gr_" + str(i))
             k.prepz(qubit_idx)
-            k.gate('rx180', [qubit_idx])
-            k.gate('rx12', [qubit_idx])
             k.gate('wait', measured_qubits, 0)
             for measured_qubit in measured_qubits:
                 k.measure(measured_qubit)
             k.gate('wait', measured_qubits, 0)
-            p.add_kernel(k)
-    return p
+            self.add_kernel(k)
+
+        for i in np.arange(2):
+            k = self.create_kernel("cal_ex_" + str(i))
+            k.prepz(qubit_idx)
+            k.gate('rx180', [qubit_idx])
+            k.gate('wait', measured_qubits, 0)
+            for measured_qubit in measured_qubits:
+                k.measure(measured_qubit)
+            k.gate('wait', measured_qubits, 0)
+            self.add_kernel(k)
+        if f_state_cal_pts:
+            for i in np.arange(2):
+                k = self.create_kernel("cal_f_" + str(i))
+                k.prepz(qubit_idx)
+                k.gate('rx180', [qubit_idx])
+                k.gate('rx12', [qubit_idx])
+                k.gate('wait', measured_qubits, 0)
+                for measured_qubit in measured_qubits:
+                    k.measure(measured_qubit)
+                k.gate('wait', measured_qubits, 0)
+                self.add_kernel(k)
 
 
-def add_two_q_cal_points(p, q0: int, q1: int,
-                         reps_per_cal_pt: int = 1,
-                         f_state_cal_pts: bool = False,
-                         f_state_cal_pt_cw: int = 31,
-                         measured_qubits=None,
-                         interleaved_measured_qubits=None,
-                         interleaved_delay=None,
-                         nr_of_interleaves=1):
-    """
-    Returns a list of kernels containing calibration points for two qubits
+    def add_two_q_cal_points(
+            self,
+            q0: int,
+            q1: int,
+            reps_per_cal_pt: int = 1,
+            f_state_cal_pts: bool = False,
+            #        f_state_cal_pt_cw: int = 31,
+            measured_qubits=None,
+            interleaved_measured_qubits=None,
+            interleaved_delay=None,
+            nr_of_interleaves=1
+    ) -> None:
+        """
+        Adds two qubit calibration points to an OpenQL program
 
-    Args:
-        p               : OpenQL  program to add calibration points to
-        q0, q1          : ints of two qubits
-        reps_per_cal_pt : number of times to repeat each cal point
-        f_state_cal_pts : if True, add calibration points for the 2nd exc. state
-        f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
-        measured_qubits : selects which qubits to perform readout on
-            if measured_qubits == None, it will default to measuring the
-            qubits for which there are cal points.
-    Returns:
-        kernel_list     : list containing kernels for the calibration points
-    """
-    kernel_list = []
-    combinations = (["00"]*reps_per_cal_pt +
-                    ["01"]*reps_per_cal_pt +
-                    ["10"]*reps_per_cal_pt +
-                    ["11"]*reps_per_cal_pt)
-    if f_state_cal_pts:
-        extra_combs = (['02']*reps_per_cal_pt + ['20']*reps_per_cal_pt +
-                       ['22']*reps_per_cal_pt)
-        combinations += extra_combs
+        Args:
+            q0:
+                index of first qubit
 
-    if measured_qubits == None:
-        measured_qubits = [q0, q1]
+            q1:
+                index of second qubit
 
-    for i, comb in enumerate(combinations):
-        k = create_kernel('cal{}_{}'.format(i, comb), p)
-        k.prepz(q0)
-        k.prepz(q1)
-        if interleaved_measured_qubits:
-            for j in range(nr_of_interleaves):
-                for q in interleaved_measured_qubits:
-                    k.measure(q)
-                k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
-                if interleaved_delay:
-                    k.gate('wait', [0, 1, 2, 3, 4, 5, 6],
-                           int(interleaved_delay*1e9))
+            reps_per_cal_pt:
+                number of times to repeat each cal point
 
-        if comb[0] == '0':
-            k.gate('i', [q0])
-        elif comb[0] == '1':
-            k.gate('rx180', [q0])
-        elif comb[0] == '2':
-            k.gate('rx180', [q0])
-            # FIXME: this is a workaround
-            #k.gate('rx12', [q0])
-            k.gate('cw_31', [q0])
+            f_state_cal_pts:
+                if True, add calibration points for the 2nd exc. state
 
-        if comb[1] == '0':
-            k.gate('i', [q1])
-        elif comb[1] == '1':
-            k.gate('rx180', [q1])
-        elif comb[1] == '2':
-            k.gate('rx180', [q1])
-            # FIXME: this is a workaround
-            #k.gate('rx12', [q1])
-            k.gate('cw_31', [q1])
+            measured_qubits:
+                selects which qubits to perform readout on. If measured_qubits == None, it will default
+                to measuring the qubit for which there are cal points
 
-        # Used to ensure timing is aligned
-        k.gate('wait', measured_qubits, 0)
-        for q in measured_qubits:
-            k.measure(q)
-        k.gate('wait', measured_qubits, 0)
-        kernel_list.append(k)
-        p.add_kernel(k)
+            interleaved_measured_qubits:
+            interleaved_delay:
+            nr_of_interleaves:
 
-    return p
+        """
+
+        kernel_list = [] # FIXME: not really used (anymore?)
+        combinations = (["00"] * reps_per_cal_pt +
+                        ["01"] * reps_per_cal_pt +
+                        ["10"] * reps_per_cal_pt +
+                        ["11"] * reps_per_cal_pt)
+        if f_state_cal_pts:
+            extra_combs = (['02'] * reps_per_cal_pt + ['20'] * reps_per_cal_pt +
+                           ['22'] * reps_per_cal_pt)
+            combinations += extra_combs
+
+        if measured_qubits == None:
+            measured_qubits = [q0, q1]
+
+        for i, comb in enumerate(combinations):
+            k = self.create_kernel('cal{}_{}'.format(i, comb))
+            k.prepz(q0)
+            k.prepz(q1)
+            if interleaved_measured_qubits:
+                for j in range(nr_of_interleaves):
+                    for q in interleaved_measured_qubits:
+                        k.measure(q)
+                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
+                    if interleaved_delay:
+                        k.gate('wait', [0, 1, 2, 3, 4, 5, 6],
+                               int(interleaved_delay * 1e9))
+
+            if comb[0] == '0':
+                k.gate('i', [q0])
+            elif comb[0] == '1':
+                k.gate('rx180', [q0])
+            elif comb[0] == '2':
+                k.gate('rx180', [q0])
+                # FIXME: this is a workaround
+                # k.gate('rx12', [q0])
+                k.gate('cw_31', [q0])
+
+            if comb[1] == '0':
+                k.gate('i', [q1])
+            elif comb[1] == '1':
+                k.gate('rx180', [q1])
+            elif comb[1] == '2':
+                k.gate('rx180', [q1])
+                # FIXME: this is a workaround
+                # k.gate('rx12', [q1])
+                k.gate('cw_31', [q1])
+
+            # Used to ensure timing is aligned
+            k.gate('wait', measured_qubits, 0)
+            for q in measured_qubits:
+                k.measure(q)
+            k.gate('wait', measured_qubits, 0)
+            kernel_list.append(k)
+            self.add_kernel(k)
 
 
+    def add_multi_q_cal_points(
+            self,
+            qubits: List[int],
+            combinations: List[str] = ["00", "01", "10", "11"],
+            reps_per_cal_pnt: int = 1,
+            f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+            nr_flux_dance: int = None,
+            flux_cw_list: List[str] = None
+    ) -> None:
+        """
+
+        Args:
+            qubits:
+                list of qubit indices
+
+            combinations:
+                list with the target multi-qubit state
+                e.g. ["00", "01", "10", "11"] or
+                ["00", "01", "10", "11", "02", "20", "22"] or
+                ["000", "010", "101", "111"]
+
+            reps_per_cal_pnt:
+                number of times to repeat each cal point
+
+            f_state_cal_pt_cw:
+                the cw_idx for the pulse to the ef transition.
+
+            nr_flux_dance:
+            flux_cw_list:
+        """
+
+        comb_repeated = []
+        for state in combinations:
+            comb_repeated += [state] * reps_per_cal_pnt
+
+        state_to_gates = {
+            "0": ["i"],
+            "1": ["rx180"],
+            "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
+        }
+
+        for i, comb in enumerate(comb_repeated):
+            k = self.create_kernel('cal{}_{}'.format(i, comb))
+
+            # NOTE: for debugging purposes of the effect of fluxing on readout,
+            #       prepend flux dance before calibration points
+            for q_state, q in zip(comb, qubits):
+                k.prepz(q)
+            k.gate("wait", [], 0)  # alignment
+
+            if nr_flux_dance and flux_cw_list:
+                for i in range(int(nr_flux_dance)):
+                    for flux_cw in flux_cw_list:
+                        k.gate(flux_cw, [0])
+                    k.gate("wait", [], 0)
+                # k.gate("wait", [], 20) # prevent overlap of flux with mw gates
+
+            for q_state, q in zip(comb, qubits):
+                for gate in state_to_gates[q_state]:
+                    k.gate(gate, [q])
+            k.gate("wait", [], 0)  # alignment
+            # k.gate("wait", [], 20)  # alignment
+
+            # for q_state, q in zip(comb, qubits):
+            #     k.prepz(q)
+            #     for gate in state_to_gates[q_state]:
+            #         k.gate(gate, [q])
+            # k.gate("wait", [], 0)  # alignment
+
+            for q in qubits:
+                k.measure(q)
+            k.gate('wait', [], 0)  # alignment
+            self.add_kernel(k)
+
+
+    def add_two_q_cal_points_special_cond_osc(
+            self,
+            q0: int,
+            q1: int,
+            q2=None,
+            reps_per_cal_pt: int = 1,
+            f_state_cal_pts: bool = False,
+            #        f_state_cal_pt_cw: int = 31,
+            measured_qubits=None,
+            interleaved_measured_qubits=None,
+            interleaved_delay=None,
+            nr_of_interleaves=1
+    ) -> None:
+        """
+
+        Args:
+            q0:
+            q1:
+            q2:
+            reps_per_cal_pt:
+                number of times to repeat each cal point
+
+            f_state_cal_pts:
+                 if True, add calibration points for the 2nd exc. state
+
+            measured_qubits:
+                selects which qubits to perform readout on. If measured_qubits == None, it will default
+                to measuring the qubit for which there are cal points.
+
+            interleaved_measured_qubits:
+            interleaved_delay:
+            nr_of_interleaves:
+
+        Returns:
+
+        """
+
+        combinations = (["00"] * reps_per_cal_pt +
+                        ["01"] * reps_per_cal_pt +
+                        ["10"] * reps_per_cal_pt +
+                        ["11"] * reps_per_cal_pt)
+        if f_state_cal_pts:
+            extra_combs = (['02'] * reps_per_cal_pt + ['20'] * reps_per_cal_pt +
+                           ['22'] * reps_per_cal_pt)
+            combinations += extra_combs
+        if q2 is not None:
+            combinations += ["Park_0", "Park_1"]
+
+        if (measured_qubits == None) and (q2 is None):
+            measured_qubits = [q0, q1]
+        elif (measured_qubits == None):
+            measured_qubits = [q0, q1, q2]
+
+        for i, comb in enumerate(combinations):
+            k = self.create_kernel('cal{}_{}'.format(i, comb))
+            k.prepz(q0)
+            k.prepz(q1)
+            if q2 is not None:
+                k.prepz(q2)
+            if interleaved_measured_qubits:
+                for j in range(nr_of_interleaves):
+                    for q in interleaved_measured_qubits:
+                        k.measure(q)
+                    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
+                    if interleaved_delay:
+                        k.gate('wait', [0, 1, 2, 3, 4, 5, 6], int(interleaved_delay * 1e9))
+
+            if comb[0] == '0':
+                k.gate('i', [q0])
+            elif comb[0] == '1':
+                k.gate('rx180', [q0])
+            elif comb[0] == '2':
+                k.gate('rx180', [q0])
+                # FIXME: this is a workaround
+                # k.gate('rx12', [q0])
+                k.gate('cw_31', [q0])
+
+            if comb[1] == '0':
+                k.gate('i', [q1])
+            elif comb[1] == '1':
+                k.gate('rx180', [q1])
+            elif comb[1] == '2':
+                k.gate('rx180', [q1])
+                # FIXME: this is a workaround
+                # k.gate('rx12', [q1])
+                k.gate('cw_31', [q1])
+            if comb[0] == 'P' and comb[-1] == '0':
+                k.gate('i', [q2])
+            elif comb[0] == 'P' and comb[-1] == '1':
+                k.gate('rx180', [q2])
+
+            # Used to ensure timing is aligned
+            k.gate('wait', measured_qubits, 0)
+            for q in measured_qubits:
+                k.measure(q)
+            k.gate('wait', measured_qubits, 0)
+            self.add_kernel(k)
+
+
+#############################################################################
+    # Private functions
+    #############################################################################
+
+    def _configure_compiler(
+            self,
+            cqasm_src_filename: str,
+            extra_pass_options: List[Tuple[str, str]] = None
+    ) -> ql.Compiler:
+        # NB: for alternative ways to configure the compiler, see
+        # https://openql.readthedocs.io/en/latest/gen/reference_configuration.html#compiler-configuration
+
+        c = self.platform.get_compiler()
+
+
+        # remove default pass list (this also removes support for most *global* options as defined in
+        # https://openql.readthedocs.io/en/latest/gen/reference_options.html, except for 'log_level')
+        # NB: this defeats automatic backend selection by OpenQL based on key "eqasm_compiler"
+        c.clear_passes()
+
+        # add the passes we need
+        compiling_cqasm = cqasm_src_filename != ""
+        if compiling_cqasm:
+            # cQASM reader as very first step
+            c.append_pass(
+                'io.cqasm.Read',
+                'reader',
+                {
+                    'cqasm_file': cqasm_src_filename
+                }
+            )
+
+            # decomposer for legacy decompositions (those defined in the "gate_decomposition" section)
+            # see https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
+            c.append_pass(
+                'dec.Instructions',
+                # NB: don't change the name 'legacy', see:
+                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
+                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#predicate-key
+                'legacy',
+            )
+
+        # report the initial qasm
+        c.append_pass(
+            'io.cqasm.Report',
+            'initial',
+            {
+                'output_suffix': '.cq',
+                'with_timing': 'no'
+            }
+        )
+
+        # schedule
+        c.append_pass(
+            'sch.ListSchedule',
+            'scheduler',
+            {
+                'resource_constraints': 'yes'
+            }
+        )
+
+        # report scheduled qasm
+        c.append_pass(
+            'io.cqasm.Report',
+            'scheduled',
+            {
+                'output_suffix': '.cq',
+            }
+        )
+
+        if self._arch == 'CC':
+            # generate code using CC backend
+            # NB: OpenQL >= 0.10 no longer has a CC-light backend
+            c.append_pass(
+                'arch.cc.gen.VQ1Asm',
+                'cc_backend'
+            )
+
+        # set compiler pass options
+        c.set_option('*.output_prefix', f'{OqlProgram.output_dir}/%N.%P')
+        if self._arch == 'CC':
+            c.set_option('cc_backend.output_prefix', f'{OqlProgram.output_dir}/%N')
+        c.set_option('scheduler.scheduler_target', 'alap')
+        if compiling_cqasm:
+            c.set_option('cc_backend.run_once', 'yes')  # if you want to loop, write a cqasm loop
+
+        # finally, set user pass options
+        if extra_pass_options is not None:
+            for opt, val in extra_pass_options:
+                c.set_option(opt, val)
+
+        log.debug("\n" + c.dump_strategy())
+        return c
+
+
+##########################################################################
+# compatibility functions
+# FIXME: these are deprecated, but note that many scripts use these.
+#  In many functions we return the program object for legacy
+#  compatibility, although we specify a return type of " -> None" for
+#  those that use PyCharm or an other tool aware of type inconsistencies
+#  (which is highly recommended)
+##########################################################################
+
+@deprecated(version='0.4', reason="use class OqlProgram")
+def create_program(
+        name: str,
+        platf_cfg: str,
+        nregisters: int = 32
+) -> OqlProgram:
+    return OqlProgram(name, platf_cfg, nregisters)
+
+
+@deprecated(version='0.4', reason="use class OqlProgram")
+def create_kernel(
+        kname: str,
+        program: OqlProgram
+) -> ql.Kernel:
+    return program.create_kernel(kname)
+
+
+@deprecated(version='0.4', reason="use class OqlProgram")
+def compile(
+        p: OqlProgram,
+        quiet: bool = False,
+        extra_openql_options: List[Tuple[str,str]] = None
+) -> None:
+    p.compile(quiet, extra_openql_options)
+    return p # legacy compatibility
+
+
+@deprecated(version='0.4', reason="use class OqlProgram")
+def add_single_qubit_cal_points(
+        p: OqlProgram,
+        qubit_idx: int,
+        f_state_cal_pts: bool = False,
+        measured_qubits=None
+) -> None:
+    p.add_single_qubit_cal_points(qubit_idx, f_state_cal_pts, measured_qubits)
+    return p # legacy compatibility
+
+
+@deprecated(version='0.4', reason="use class OqlProgram")
+def add_two_q_cal_points(
+        p: OqlProgram,
+        q0: int,
+        q1: int,
+        reps_per_cal_pt: int = 1,
+        f_state_cal_pts: bool = False,
+#        f_state_cal_pt_cw: int = 31, # FIXME: iold, unused parameter
+        measured_qubits=None,
+        interleaved_measured_qubits=None,
+        interleaved_delay=None,
+        nr_of_interleaves=1
+) -> None:
+    p.add_two_q_cal_points(q0, q1, reps_per_cal_pt, f_state_cal_pts, measured_qubits, interleaved_measured_qubits, interleaved_delay, nr_of_interleaves)
+    return p # legacy compatibility
+
+
+@deprecated(version='0.4', reason="use class OqlProgram")
 def add_multi_q_cal_points(
-    p, qubits: list,
-    combinations: list = ["00", "01", "10", "11"],
+    p: OqlProgram,
+    qubits: List[int],
+    combinations: List[str] = ["00", "01", "10", "11"],
     reps_per_cal_pnt: int = 1,
     f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+    nr_flux_dance: int = None,
+    flux_cw_list: List[str] = None,
     return_comb=False
 ):
     """
@@ -273,120 +809,97 @@ def add_multi_q_cal_points(
         "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
     }
 
-    for i, comb in enumerate(combinations):
+    for i, comb in enumerate(comb_repetead):
         k = create_kernel('cal{}_{}'.format(i, comb), p)
 
+        # NOTE: for debugging purposes of the effect of fluxing on readout,
+        #       prepend flux dance before calibration points
         for q_state, q in zip(comb, qubits):
             k.prepz(q)
+        k.gate("wait", [], 0)  # alignment
+
+        if nr_flux_dance and flux_cw_list:
+            for i in range(int(nr_flux_dance)):
+                for flux_cw in flux_cw_list:
+                    k.gate(flux_cw, [0])
+                k.gate("wait", [], 0)
+            # k.gate("wait", [], 20) # prevent overlap of flux with mw gates
+
+        for q_state, q in zip(comb, qubits):
             for gate in state_to_gates[q_state]:
                 k.gate(gate, [q])
         k.gate("wait", [], 0)  # alignment
+        # k.gate("wait", [], 20) # prevent overlap of flux with measurement pulse
 
         for q in qubits:
             k.measure(q)
         k.gate('wait', [], 0)  # alignment
         kernel_list.append(k)
         p.add_kernel(k)
+
     if return_comb:
         return comb_repetead
     else:
         return p
 
+@deprecated(version='0.4', reason="use class OqlProgram")
+def add_two_q_cal_points_special_cond_osc(
+        p, q0: int, q1: int,
+        q2=None,
+        reps_per_cal_pt: int = 1,
+        f_state_cal_pts: bool = False,
+        # f_state_cal_pt_cw: int = 31,
+        measured_qubits=None,
+        interleaved_measured_qubits=None,
+        interleaved_delay=None,
+        nr_of_interleaves=1
+) -> None:
+    p.add_two_q_cal_points_special_cond_osc(
+        q0, q1, q2,
+        reps_per_cal_pt,
+        f_state_cal_pts,
+        measured_qubits,
+        interleaved_measured_qubits,
+        interleaved_delay,
+        nr_of_interleaves
+    )
+    return p # legacy compatibility
 
-def add_two_q_cal_points_special_cond_osc(p, q0: int, q1: int,
-                         q2 = None,
-                         reps_per_cal_pt: int =1,
-                         f_state_cal_pts: bool=False,
-                         f_state_cal_pt_cw: int = 31,
-                         measured_qubits=None,
-                         interleaved_measured_qubits=None,
-                         interleaved_delay=None,
-                         nr_of_interleaves=1):
+
+# FIXME: move?
+#############################################################################
+# RamZZ measurement
+#############################################################################
+def measure_ramzz(k, qubit_idx: int, wait_time_ns: int):
     """
-    Returns a list of kernels containing calibration points for two qubits
+    Helper function that adds a ramsey readout sequence to the specified qubit
+    on the specified kernel. Assumes that the qubit was already initialised.
 
-    Args:
-        p               : OpenQL  program to add calibration points to
-        q0, q1          : ints of two qubits
-        reps_per_cal_pt : number of times to repeat each cal point
-        f_state_cal_pts : if True, add calibration points for the 2nd exc. state
-        f_state_cal_pt_cw: the cw_idx for the pulse to the ef transition.
-        measured_qubits : selects which qubits to perform readout on
-            if measured_qubits == None, it will default to measuring the
-            qubits for which there are cal points.
-    Returns:
-        kernel_list     : list containing kernels for the calibration points
+    Input pars:
+        k:              Kernel to add ramsey readout sequence to
+        qubit_idx:      Qubit to undergo ramsey sequence
+        wait_time_ns:   Wait time in-between pi/2 pulses
+    Output pars:
+        None
     """
-    kernel_list = []
-    combinations = (["00"]*reps_per_cal_pt +
-                    ["01"]*reps_per_cal_pt +
-                    ["10"]*reps_per_cal_pt +
-                    ["11"]*reps_per_cal_pt)
-    if f_state_cal_pts:
-        extra_combs = (['02']*reps_per_cal_pt + ['20']*reps_per_cal_pt +
-                       ['22']*reps_per_cal_pt)
-        combinations += extra_combs
-    if q2 is not None:
-        combinations += ["Park_0", "Park_1"]
 
-    if (measured_qubits == None) and (q2 is None):
-        measured_qubits = [q0, q1]
-    elif (measured_qubits == None):
-        measured_qubits = [q0, q1, q2]
-
-
-    for i, comb in enumerate(combinations):
-        k = create_kernel('cal{}_{}'.format(i, comb), p)
-        k.prepz(q0)
-        k.prepz(q1)
-        if q2 is not None:
-            k.prepz(q2)
-        if interleaved_measured_qubits:
-            for j in range(nr_of_interleaves):
-                for q in interleaved_measured_qubits:
-                    k.measure(q)
-                k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
-                if interleaved_delay:
-                    k.gate('wait', [0, 1, 2, 3, 4, 5, 6], int(interleaved_delay*1e9))
-
-        if comb[0] =='0':
-            k.gate('i', [q0])
-        elif comb[0] == '1':
-            k.gate('rx180', [q0])
-        elif comb[0] =='2':
-            k.gate('rx180', [q0])
-            # FIXME: this is a workaround
-            #k.gate('rx12', [q0])
-            k.gate('cw_31', [q0])
-
-        if comb[1] =='0':
-            k.gate('i', [q1])
-        elif comb[1] == '1':
-            k.gate('rx180', [q1])
-        elif comb[1] =='2':
-            k.gate('rx180', [q1])
-            # FIXME: this is a workaround
-            #k.gate('rx12', [q1])
-            k.gate('cw_31', [q1])
-        if comb[0] == 'P' and comb[-1] == '0':
-            k.gate('i', [q2])
-        elif comb[0] == 'P' and comb[-1] == '1':
-            k.gate('rx180', [q2])
-
-        # Used to ensure timing is aligned
-        k.gate('wait', measured_qubits, 0)
-        for q in measured_qubits:
-            k.measure(q)
-        k.gate('wait', measured_qubits, 0)
-        kernel_list.append(k)
-        p.add_kernel(k)
-
-    return p
+    k.gate('ry90', [qubit_idx])
+    k.gate('wait', wait_time_ns, [qubit_idx])
+    k.gate('rym90', [qubit_idx])
+    k.measure(qubit_idx)
 
 
 #############################################################################
 # File modifications
 #############################################################################
+
+def is_compatible_openql_version_cc() -> bool:
+    """
+    test whether OpenQL version is compatible with Central Controller
+    """
+    return ql.get_version() > '0.10.0'  # NB: 0.10.0 does not contain new CC backend yet
+
+
 def clocks_to_s(time, clock_cycle=20e-9):
     """
     Converts a time in clocks to a time in s
@@ -394,386 +907,25 @@ def clocks_to_s(time, clock_cycle=20e-9):
     return time * clock_cycle
 
 
-def infer_tqisa_filename(qisa_fn: str):
-    """
-    Get's the expected tqisa filename based on the qisa filename.
-    """
-    return qisa_fn[:-4]+'tqisa'
-
-
-def get_start_time(line: str):
-    """
-    Takes in a line of a tqisa file and returns the starting time.
-    This corrects for the timing in the "bs" instruction.
-
-    Time is in units of clocks.
-
-    Example tqsia line:
-        "   76014:    bs 4    cw_03 s0 | cw_05 s2"
-        -> would return 76018
-    """
-
-    start_time = int(line.split(':')[0])
-    if 'bs' in line:
-        # Takes the second character after "bs"
-        pre_interval = int(line.split('bs')[1][1])
-        start_time += pre_interval
-
-    return start_time
-
-
-def get_register_map(qisa_fn: str):
-    """
-    Extracts the map for the smis and smit qubit registers from a qisa file
-    """
-    reg_map = {}
-    with open(qisa_fn, 'r') as q_file:
-        linenum = 0
-        for line in q_file:
-            if 'start' in line:
-                break
-            if 'smis' in line or 'smit' in line:
-                reg_key = line[5:line.find(',')]
-                start_reg_idx = line.find('{')
-                reg_val = (line[start_reg_idx:].strip())
-                reg_map[reg_key] = eval(reg_val)
-    return reg_map
-
-
-def split_instr_to_op_targ(instr: str, reg_map: dict):
-    """
-    Takes part of an instruction and splits it into a tuple of
-    codeword, target
-
-    e.g.:
-        "cw_03 s2" -> "cw_03", {2}
-    """
-    cw, sreg = instr.split(' ')
-    target_qubits = reg_map[sreg]
-    return (cw, target_qubits)
-
-
-def get_timetuples(qisa_fn: str):
-    """
-    Returns time tuples of the form
-        (start_time, operation, target_qubits, line_nr)
-    """
-    reg_map = get_register_map(qisa_fn)
-
-    tqisa_fn = infer_tqisa_filename(qisa_fn)
-    time_tuples = []
-    with open(tqisa_fn, 'r') as tq_file:
-        for i, line in enumerate(tq_file):
-            # Get instruction line
-            if re.search(r"bs", line):
-                # Get the timing number
-                start_time = get_start_time(line)
-                # Get the instr
-                instr = re.split(r'bs ', line)[1][1:]
-                # We now parse whether there is a | character
-                if '|' in line:
-                    multi_instr = re.split(r'\s\|\s', instr)
-                else:
-                    multi_instr = [instr]
-                for instr in multi_instr:
-                    instr = instr.strip()
-                    op, targ = split_instr_to_op_targ(instr, reg_map)
-                    result = (start_time, op, targ, i)
-                    time_tuples.append(result)
-
-    return time_tuples
-
-
-def find_operation_idx_in_time_tuples(time_tuples, target_op: str):
-    target_indices = []
-    for i, tt in enumerate(time_tuples):
-        t_start, cw, targets, linenum = tt
-        if target_op in cw:
-            target_indices.append(i)
-    return (target_indices)
-
-
-def get_operation_tuples(time_tuples: list, target_op: str):
-    """
-    Returns a list of tuples that perform a specific operation
-
-    args:
-        time_tuples             : list of time tuples
-        target_op               : operation to searc for
-    returns
-        time_tuples_op          : time_tuples containing target_op
-    """
-    op_indices = find_operation_idx_in_time_tuples(time_tuples,
-                                                   target_op=target_op)
-
-    time_tuples_op = []
-    for op_idx in op_indices:
-        time_tuples_op.append(time_tuples[op_idx])
-    return time_tuples_op
-
-
-def split_time_tuples_on_operation(time_tuples, split_op: str):
-    indices = find_operation_idx_in_time_tuples(time_tuples, split_op)
-
-    start_indices = [0]+indices[:-1]
-    stop_indices = indices
-
-    split_tt = [time_tuples[start_indices[i]+1:stop_indices[i]+1] for
-                i in range(len(start_indices))]
-    return split_tt
-
-
-def substract_time_offset(time_tuples, op_str: str = 'cw'):
-    """
-    """
-    for tt in time_tuples:
-        t_start, cw, targets, linenum = tt
-        if op_str in cw:
-            t_ref = t_start
-            break
-    corr_time_tuples = []
-    for tt in time_tuples:
-        t_start, cw, targets, linenum = tt
-        corr_time_tuples.append((t_start-t_ref, cw, targets, linenum))
-    return corr_time_tuples
-
-
 #############################################################################
-# Plotting
+# Recompilation helpers
 #############################################################################
-
-def plot_time_tuples(time_tuples, ax=None, time_unit='s',
-                     mw_duration=20e-9, fl_duration=240e-9,
-                     ro_duration=1e-6, ypos=None):
-    if ax is None:
-        f, ax = plt.subplots()
-
-    mw_patch = mpatches.Patch(color='C0', label='Microwave')
-    fl_patch = mpatches.Patch(color='C1', label='Flux')
-    ro_patch = mpatches.Patch(color='C4', label='Measurement')
-
-    if time_unit == 's':
-        clock_cycle = 20e-9
-    elif time_unit == 'clocks':
-        clock_cycle = 1
-    else:
-        raise ValueError()
-
-    for i, tt in enumerate(time_tuples):
-        t_start, cw, targets, linenum = tt
-
-        if 'meas' in cw:
-            c = 'C4'
-            width = ro_duration
-        elif isinstance((list(targets)[0]), tuple):
-            # Flux pulses
-            c = 'C1'
-            width = fl_duration
-
-        else:
-            # Microwave pulses
-            c = 'C0'
-            width = mw_duration
-
-        if 'prepz' not in cw:
-            for q in targets:
-                if isinstance(q, tuple):
-                    for qi in q:
-                        ypos_i = qi if ypos is None else ypos
-                        ax.barh(ypos_i, width=width, left=t_start*clock_cycle,
-                                height=0.6, align='center', color=c, alpha=.8)
-                else:
-                    # N.B. alpha is not 1 so that overlapping operations are easily
-                    # spotted.
-                    ypos_i = q if ypos is None else ypos
-                    ax.barh(ypos_i, width=width, left=t_start*clock_cycle,
-                            height=0.6, align='center', color=c, alpha=.8)
-
-    ax.legend(handles=[mw_patch, fl_patch, ro_patch], loc=(1.05, 0.5))
-    set_xlabel(ax, 'Time', time_unit)
-    set_ylabel(ax, 'Qubit', '#')
-    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-
-    return ax
-
-
-def plot_time_tuples_split(time_tuples, ax=None, time_unit='s',
-                           mw_duration=20e-9, fl_duration=240e-9,
-                           ro_duration=1e-6, split_op: str = 'meas',
-                           align_op: str = 'cw'):
-    ttuple_groups = split_time_tuples_on_operation(time_tuples,
-                                                   split_op=split_op)
-    corr_ttuple_groups = [substract_time_offset(tt, op_str=align_op) for
-                          tt in ttuple_groups]
-
-    for i, corr_tt in enumerate(corr_ttuple_groups):
-        if ax is None:
-            f, ax = plt.subplots()
-        plot_time_tuples(corr_tt, ax=ax, time_unit=time_unit,
-                         mw_duration=mw_duration, fl_duration=fl_duration,
-                         ro_duration=ro_duration, ypos=i)
-    ax.invert_yaxis()
-    set_ylabel(ax, "Kernel idx", "#")
-
-    return ax
-
-
-#############################################################################
-# File modifications
-#############################################################################
-
-# FIXME: platform dependent (CC-light)
-def flux_pulse_replacement(qisa_fn: str):
-    """
-    args:
-        qisa_fn : file in which to replace flux pulses
-
-    returns:
-        mod_qisa_fn : filename of the modified qisa file
-        grouped_flux_tuples: : time tuples of the flux pulses grouped
-
-    ---------------------------------------------------------------------------
-    Modifies a file for use with non-codeword based flux pulses.
-    Does this in the following steps
-
-        1. create a copy of the file
-        2. extract locations of pulses from source file
-        3. replace content of files
-        4. return filename of modified qisa file and time tuples
-            grouped per kernel.
-
-    """
-
-    ttuple = get_timetuples(qisa_fn)
-    grouped_timetuples = split_time_tuples_on_operation(ttuple, 'meas')
-
-    grouped_fl_tuples = []
-    for i, tt in enumerate(grouped_timetuples):
-        fl_time_tuples = substract_time_offset(get_operation_tuples(tt, 'fl'))
-        grouped_fl_tuples.append(fl_time_tuples)
-
-    with open(qisa_fn, 'r') as source_qisa_file:
-        lines = source_qisa_file.readlines()
-
-    for k_idx, fl_time_tuples in enumerate(grouped_fl_tuples):
-        for i, time_tuple in enumerate(fl_time_tuples):
-            time, cw, target, line_nr = time_tuple
-
-            l = lines[line_nr]
-            if i == 0:
-                new_l = l.replace(cw, 'fl_cw_{:02d}'.format(k_idx+1))
-            else:
-                # cw 00 is a dummy pulse that should not trigger the AWG8
-                new_l = l.replace(cw, 'fl_cw_00')
-            lines[line_nr] = new_l
-
-    mod_qisa_fn = qisa_fn[:-5]+'_mod.qisa'
-    with open(mod_qisa_fn, 'w') as mod_qisa_file:
-        for l in lines:
-            mod_qisa_file.write(l)
-
-    return mod_qisa_fn, grouped_fl_tuples
-
 
 def check_recompilation_needed_hash_based(
-    program_fn: str,
-    platf_cfg: str,
-    clifford_rb_oql: str,
-    recompile: bool = True,
+        program_fn: str,
+        platf_cfg: str,
+        clifford_rb_oql: str,
+        recompile: bool = True,
 ):
-    """
-    Similar functionality to the deprecated `check_recompilation_needed` but
-    based on a file that is generated alongside with the program file
-    containing hashes of the files that are relevant to the generation of the
-    RB sequences and that might be modified somewhat often
-
-    NB: Not intended for stand alone use!
-    The code invoking this function should later invoke:
-        `os.rename(recompile_dict["tmp_file"], recompile_dict["file"])`
-
-    The behavior of this function depends on the recompile argument.
-    recompile:
-        True -> True, the program should be compiled
-
-        'as needed' -> compares filename to timestamp of config
-            and checks if the file exists, if required recompile.
-        False -> checks if the file exists, if it doesn't
-            compilation is required and raises a ValueError.
-            Use carefully, only if you know what you are doing!
-            Use 'as needed' to stay safe!
-    """
-
-    hashes_ext = ".hashes"
-    tmp_ext = ".tmp"
-    rb_system_hashes_fn = program_fn + hashes_ext
-    tmp_fn = rb_system_hashes_fn + tmp_ext
-
-    platf_cfg_hash = get_file_sha256_hash(platf_cfg, return_hexdigest=True)
-    this_file_hash = get_file_sha256_hash(clifford_rb_oql, return_hexdigest=True)
-    file_hashes = {platf_cfg: platf_cfg_hash, clifford_rb_oql: this_file_hash}
-
-    def write_hashes_file():
-        # We use a temporary file such that for parallel compilations, if the
-        # process is interrupted before the end there will be no hash and
-        # recompilation will be forced
-        with open(tmp_fn, "w") as outfile:
-            json.dump(file_hashes, outfile)
-
-    def load_hashes_from_file():
-        with open(rb_system_hashes_fn) as json_file:
-            hashes_dict = json.load(json_file)
-        return hashes_dict
-
-    _recompile = False
-
-    if not isfile(program_fn):
-        if recompile is False:
-            raise ValueError('No file:\n{}'.format(platf_cfg))
-        else:
-            # Force recompile, there is no program file
-            _recompile |= True
-
-    # Determine if compilation is needed based on the hashed files
-    if not isfile(rb_system_hashes_fn):
-        # There is no file with the hashes, we must compile to be safe
-        _recompile |= True
-    else:
-        # Hashes exist we use them to determine if recompilations is needed
-        hashes_dict = load_hashes_from_file()
-        # Remove file to signal a compilation in progress
-        remove(rb_system_hashes_fn)
-
-        for fn in file_hashes.keys():
-            # Recompile becomes true if any of the hashed files has a different
-            # hash now
-            _recompile |= hashes_dict.get(fn, "") != file_hashes[fn]
-
-    # Write the updated hashes
-    write_hashes_file()
-
-    res_dict = {
-        "file": rb_system_hashes_fn,
-        "tmp_file": tmp_fn
-    }
-
-    if recompile is False:
-        if _recompile is True:
-            log.warning(
-                "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
-                " want to compile?".format(platf_cfg, clifford_rb_oql)
-            )
-        res_dict["recompile"] = False
-    elif recompile is True:
-        # Enforce recompilation
-        res_dict["recompile"] = True
-    elif recompile == "as needed":
-        res_dict["recompile"] = _recompile
-
-    return res_dict
+    raise DeprecationWarning("use OqlProgram.check_recompilation_needed_hash_based")
 
 
-def check_recompilation_needed(program_fn: str, platf_cfg: str,
-                               recompile=True):
+@deprecated(reason="Use `check_recompilation_needed_hash_based`!")
+def check_recompilation_needed(
+        program_fn: str,
+        platf_cfg: str,
+        recompile=True
+) -> bool:
     """
     determines if compilation of a file is needed based on it's timestamp
     and an optional recompile option
@@ -790,21 +942,19 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
             Use carefully, only if you know what you are doing!
             Use 'as needed' to stay safe!
     """
-    log.error("Deprecated! Use `check_recompilation_needed_hash_based`!")
-
     if recompile is True:
         return True  # compilation is enforced
     elif recompile == 'as needed':
         # In case you ever think of a hash-based check mind that this
         # function is called in parallel multiprocessing sometime!!!
-        if isfile(program_fn) and is_more_rencent(program_fn, platf_cfg):
+        if isfile(program_fn) and is_more_recent(program_fn, platf_cfg):
             return False  # program file is good for using
         else:
             return True  # compilation is required
     elif recompile is False:
         if isfile(program_fn):
-            if is_more_rencent(platf_cfg, program_fn):
-                log.warnings("File {}\n is more recent"
+            if is_more_recent(platf_cfg, program_fn):
+                log.warning("File {}\n is more recent"
                     "than program, use `recompile='as needed'` if you"
                     " don't know what this means!".format(platf_cfg))
             return False
@@ -814,8 +964,15 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
         raise NotImplementedError(
             'recompile should be True, False or "as needed"')
 
+#############################################################################
+# Multiple program loading helpers
+#############################################################################
 
-def load_range_of_oql_programs(programs, counter_param, CC):
+def load_range_of_oql_programs(
+        programs,
+        counter_param,
+        CC
+) -> None:
     """
     This is a helper function for running an experiment that is spread over
     multiple OpenQL programs such as RB.
@@ -826,8 +983,10 @@ def load_range_of_oql_programs(programs, counter_param, CC):
 
 
 def load_range_of_oql_programs_from_filenames(
-    programs_filenames: list, counter_param, CC
-):
+        programs_filenames: list,
+        counter_param,
+        CC
+) -> None:
     """
     This is a helper function for running an experiment that is spread over
     multiple OpenQL programs such as RB.
@@ -843,8 +1002,12 @@ def load_range_of_oql_programs_from_filenames(
     CC.eqasm_program(fn)
 
 
-def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
-                                                detector):
+def load_range_of_oql_programs_varying_nr_shots(
+        programs,
+        counter_param,
+        CC,
+        detector
+) -> None:
     """
     This is a helper function for running an experiment that is spread over
     multiple OpenQL programs of varying length such as GST.

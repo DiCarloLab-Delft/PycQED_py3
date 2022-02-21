@@ -26,6 +26,9 @@ class octobox_dep_graph(AutoDepGraph_DAG):
         ########################################################
         # GRAPH NODES
         ########################################################
+        self.add_node(self.device.name + ' Multi ALLXY',
+                          calibrate_function=self.device.name +
+                            '.measure_multi_AllXY')
         self.add_node('All Qubits at Sweetspot')
 
         for Qubit in Qubit_list:
@@ -39,9 +42,9 @@ class octobox_dep_graph(AutoDepGraph_DAG):
                           # tolerance=0.01)+
             self.add_node(Qubit.name + ' Frequency Fine',
                           calibrate_function=Qubit.name +
-                            '.calibrate_frequency_ramsey',
-                          check_function=Qubit.name + '.check_ramsey',
-                          tolerance=0.1e-3)
+                            '.calibrate_frequency_ramsey')
+                          # check_function=Qubit.name + '.check_ramsey',
+                          # tolerance=0.1e-3)
             self.add_node(Qubit.name + ' f_12 estimate',
                           calibrate_function=Qubit.name +
                             '.find_anharmonicity_estimate')
@@ -100,8 +103,11 @@ class octobox_dep_graph(AutoDepGraph_DAG):
             ###################################################################
             # DEPENDENCIES
             ###################################################################
+            
+            self.add_edge(self.device.name + ' Multi ALLXY'
+                          ,'All Qubits at Sweetspot')
             self.add_edge(Qubit.name + ' Rabi',
-                          'All Qubits at Sweetspot')
+                          self.device.name + ' Multi ALLXY')
             self.add_edge(Qubit.name + ' Frequency Fine',
                           Qubit.name + ' Rabi')
 

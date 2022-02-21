@@ -165,6 +165,22 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 # The vcz pulse itself has all parameters necessary for the correction
                 self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
 
+    def generate_cz_waveforms(self):
+        """
+        Generate CZ waveforms and populates self._wave_dict
+        """
+        self._wave_dict = {}
+        
+        for _, waveform in self.LutMap().items():
+            wave_name = waveform["name"]
+            if waveform["type"] == "cz" or waveform["type"] == "idle_z":
+                which_gate = waveform["which"]
+            if waveform["type"] == "cz":
+                self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
+            elif waveform["type"] == "idle_z":
+                # The vcz pulse itself has all parameters necessary for the correction
+                self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
+
     def _gen_i(self):
         return np.zeros(int(self.idle_pulse_length() * self.sampling_rate()))
 
@@ -179,8 +195,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     def _gen_park(self):
         if self.park_double_sided():
             ones = np.ones(int(self.park_length() * self.sampling_rate() / 2))
+            zeros = np.zeros(int(self.park_pad_length() * self.sampling_rate()))
             pulse_pos = self.park_amp() * ones
-            return np.concatenate((pulse_pos, - pulse_pos))
+            return np.concatenate((zeros, pulse_pos, - pulse_pos, zeros))
         else:
             return self.park_amp() * np.ones(
                 int(self.park_length() * self.sampling_rate())
@@ -274,7 +291,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         for this_cz in ["NE", "NW", "SW", "SE"]:
             self.add_parameter(
                 "cz_wf_generator_%s" % this_cz,
-                initial_value="vcz_dev_waveform",
+                initial_value="vcz_waveform",
+                # initial_value=None,
                 vals=vals.Strings(),
                 parameter_class=ManualParameter,
             )
@@ -285,9 +303,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         self.add_parameter(
             "park_length",
             unit="s",
-            label="Parking pulse duration",
+            label="Parking pulse duration (total)",
             initial_value=40e-9,
             vals=vals.Numbers(0, 100e-6),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "park_pad_length",
+            unit="s",
+            label="Parking pulse padding duration (single-sided)",
+            initial_value=0,
+            vals=vals.Numbers(0, 20e-9),
             parameter_class=ManualParameter,
         )
         self.add_parameter(
@@ -1251,4 +1277,4 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
 
 
 def roundup1024(n):
-    return int(np.ceil(n / 1024) * 1024)
+    return int(np.ceil(n / 96) * 96)

@@ -1,2 +1,5 @@
-import openql.openql as ql
+import openql as ql
+
 print(ql.get_version())
+
+

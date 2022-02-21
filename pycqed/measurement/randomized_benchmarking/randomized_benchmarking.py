@@ -162,6 +162,7 @@ def randomized_benchmarking_sequence(
         max_clifford_idx (int): used to set the index of the highest random
             clifford generated. Useful to generate e.g., simultaneous two
             qubit RB sequences.
+            FIXME: seems useless, because none of the callers set this for real, and we trim it to the group size
         interleaving_cl (int): interleaves the sequence with a specific
             clifford if desired
         seed           (int) : seed used to initialize the random number

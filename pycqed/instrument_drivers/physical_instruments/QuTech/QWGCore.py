@@ -38,6 +38,12 @@ cw_protocols_dio = {
         [0, 1, 2, 3, 4, 5, 6, 7],  # Ch3
         [0, 1, 2, 3, 4, 5, 6, 7]],  # Ch4
 
+    'awg8-mw-direct-iq': [
+        [0, 1, 2, 3, 4, 5, 6],  # Ch1
+        [0, 1, 2, 3, 4, 5, 6],  # Ch2
+        [7, 8, 9, 10, 11, 12, 13],  # Ch3
+        [7, 8, 9, 10, 11, 12, 13]],  # Ch4
+
     'MICROWAVE_NO_VSM': [
         [0, 1, 2, 3, 4, 5, 6],  # Ch1
         [0, 1, 2, 3, 4, 5, 6],  # Ch2
@@ -90,7 +96,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         super().__init__(name, transport)
 
         # AWG properties
-        self._dev_desc = lambda:0  # create empty device descriptor
+        self._dev_desc = lambda: 0  # create empty device descriptor
         self._dev_desc.model = 'QWG'
         self._dev_desc.numChannels = 4
 #        self._dev_desc.numDacBits = 12
@@ -98,10 +104,11 @@ class QWGCore(SCPIBase, DIO.CalInterface):
 #        self._dev_desc.numMarkers = 8 # FIXME
         self._dev_desc.numTriggers = 8  # FIXME: depends on IORear type
 
-        # Check for driver / QWG compatibility
-        version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
 
-        if 0:  # FIXME: get_idn
+        if 0:  # FIXME: configuration based on get_idn
+            # Check for driver / QWG compatibility
+            version_min = (1, 5, 0)  # driver supported software version: Major, minor, patch
+
             idn_firmware = self.get_idn()["firmware"]  # NB: called 'version' in QWG source code
             # FIXME: above will make usage of DummyTransport more difficult
             regex = r"swVersion=(\d).(\d).(\d)"
@@ -117,65 +124,77 @@ class QWGCore(SCPIBase, DIO.CalInterface):
                 # FIXME: we could be less rude and only disable the new parameters
                 # FIXME: let parameters depend on SW version, and on IORear type
                 log.warning(f"Incompatible driver version of QWG ({self.name}); The version ({version_cur[0]}."
-                                f"{version_cur[1]}.{version_cur[2]}) "
-                                f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
-                                f"parameters will not operate and timeout. Please update the QWG software to "
-                                f"{version_min[0]}.{version_min[1]}.{version_min[2]} or later")
+                            f"{version_cur[1]}.{version_cur[2]}) "
+                            f"of the QWG software is too old and not supported by this driver anymore. Some instrument "
+                            f"parameters will not operate and timeout. Please update the QWG software to "
+                            f"{version_min[0]}.{version_min[1]}.{version_min[2]} or later")
                 self._dev_desc.numMaxCwBits = 7
                 self._dev_desc.numSelectCwInputs = 7
             self._dev_desc.numCodewords = pow(2, self._dev_desc.numSelectCwInputs)
-        else:  # FIXME: hack
-            self._dev_desc.numMaxCwBits = 7
-            self._dev_desc.numSelectCwInputs = 7
+            if self._dev_desc.numMaxCwBits <= 7:  # FIXME: random constant
+                self._codeword_protocol = cw_protocols_mt
+            else:
+                self._codeword_protocol = cw_protocols_dio
+        else:  # FIXME: hardcoded configuraion
+            self._dev_desc.numMaxCwBits = 14
+            self._dev_desc.numSelectCwInputs = 10
             self._dev_desc.numCodewords = pow(2, self._dev_desc.numSelectCwInputs)
-
-        if self._dev_desc.numMaxCwBits <= 7:    # FIXME: random constant
-            self.codeword_protocols = cw_protocols_mt
-        else:
-            self.codeword_protocols = cw_protocols_dio
+            self._codeword_protocol = cw_protocols_dio
 
     ##########################################################################
     #  AWG control functions (AWG5014 compatible)
     ##########################################################################
 
-    def start(self):
-        """
-        Activates output on channels with the current settings. When started this function will check for
-        possible warnings
-        """
-        # run_mode = self.run_mode()
-        # if run_mode == 'NONE':
-        #     raise RuntimeError('No run mode is specified')
+    def start(self, block: bool = True) -> None:
         self._transport.write('awgcontrol:run:immediate')
+        if block:
+            self.get_operation_complete()
 
-        #self._get_errors()
-
-        # status = self.get_system_status()
-        # warn_msg = self._detect_underdrive(status)
-        # if(len(warn_msg) > 0):
-        #     warnings.warn(', '.join(warn_msg))
-
-    def stop(self):
-        """
-        Shutdown output on channels. When stopped will check for errors or overflow (FIXME: does it)
-        """
+    def stop(self, block: bool = True) -> None:
         self._transport.write('awgcontrol:stop:immediate')
+        if block:
+            self.get_operation_complete()
 
-        #self._get_errors()
-
-    def _get_errors(self):
+    def set_run_mode(self, run_mode: str) -> None:
         """
-        The SCPI protocol by default does not return errors. Therefore the user needs
-        to ask for errors. This function retrieves all errors and will raise them.
+        Set run mode, one of: 'NONE', 'CONt', 'SEQ', 'CODeword'
         """
-        errNr = self.get_system_error_count()
+        self._transport.write(f'AWGC:RMO {run_mode}')
 
-        if errNr > 0:
-            errMgs = []
-            for _ in range(errNr):
-                errMgs.append(self.get_error())
-            raise RuntimeError(f'{repr(self)}: ' + ', '.join(errMgs))
-            # FIXME: is raising a potentially very long string useful?
+    def get_run_mode(self) -> str:
+        return self._ask('AWGC:RMO?')
+
+    ##########################################################################
+    #  Output functions (AWG5014 compatible)
+    ##########################################################################
+
+    def set_output_state(self, ch: int, state: int) -> None:
+        self._transport.write(f'OUTPUT{ch}:STATE {state}')
+
+    def get_output_state(self, ch: int) -> float:
+        return self._ask_float(f'OUTPUT{ch}:STATE?')
+
+    ##########################################################################
+    #  Source functions (AWG5014 compatible)
+    ##########################################################################
+
+    def set_amplitude(self, ch: int, amp: float) -> None:
+        self._transport.write(f'SOUR{ch}:VOLT:LEV:IMM:AMPL {amp:.6f}')  # FIXME
+
+    def get_amplitude(self, ch: int) -> float:
+        return self._ask_float(f'SOUR{ch}:VOLT:LEV:IMM:AMPL?')
+
+    def set_offset(self, ch: int, offset: float) -> None:
+        self._transport.write(f'SOUR{ch}:VOLT:LEV:IMM:OFFS {offset:.3f}')
+
+    def get_offset(self, ch: int) -> float:
+        return self._ask_float(f'SOUR{ch}:VOLT:LEV:IMM:OFFS?')
+
+    def set_waveform(self, ch: int, waveform: str) -> None:
+        self._transport.write(f'SOUR{ch}:WAV "{waveform}"')
+
+    def get_waveform(self, ch: int) -> str:
+        return self._ask(f'SOUR{ch}:WAV?')
 
     ##########################################################################
     #  WLIST (Waveform list) functions (AWG5014 compatible)
@@ -192,9 +211,6 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         return self._ask(f'wlist:name? {idx:d}')
 
     def get_wlist(self) -> List:
-        """
-        NB: takes a few seconds on 5014: our fault or Tek's?
-        """
         size = self.get_wlist_size()
         wlist = []                                  # empty list
         for k in range(size):                       # build list of names
@@ -319,12 +335,23 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     # QWG specific
     ##########################################################################
 
+    def set_sideband_frequency(self, ch_pair: int, freq: float) -> None:
+        self._transport.write(f'qutech:output{ch_pair}:frequency {freq}')
+
+    def get_sideband_frequency(self, ch_pair: int) -> float:
+        return self._ask_float(f'qutech:output{ch_pair}:frequency?')
+
+    def set_sideband_phase(self, ch_pair: int, phase: float) -> None:
+        self._transport.write(f'qutech:output{ch_pair}:phase {phase}')
+
+    def get_sideband_phase(self, ch_pair: int) -> float:
+        return self._ask_float(f'qutech:output{ch_pair}:phase?')
+
     def sync_sideband_generators(self) -> None:
         """
-        Synchronize both sideband generators, i.e. restart them with phase=0
+        Synchronize both sideband generators, i.e. restart them with initial phase
         """
         self._transport.write('QUTEch:OUTPut:SYNCsideband')
-
 
     ##########################################################################
     # DIO support
@@ -333,15 +360,15 @@ class QWGCore(SCPIBase, DIO.CalInterface):
     def dio_calibrate(self, target_index: int = ''):
         # FIXME: cleanup docstring
         """
-        Calibrate the DIO input signals.\n
+        Calibrate the DIO input signals.
 
         The QWG will analyze the input signals for each DIO input (used to transfer codeword bits), secondly,
-        the most preferable index (active index) is set.\n\n
+        the most preferable index (active index) is set.
 
         Each signal is sampled and divided into sections. These sections are analyzed to find a stable
-        signal. These stable sections are addressed by there index.\n\n
+        signal. These stable sections are addressed by there index.
 
-        After calibration the suitable indexes list (see dio_suitable_indexes()) contains all indexes which are stable.
+        After calibration the suitable indexes list (see get_dio_suitable_indexes()) contains all indexes which are stable.
 
         Parameters:
         :param target_index: unsigned int, optional: When provided the calibration will select an active index based
@@ -352,29 +379,47 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         \t- Expects a DIO calibration signal on the inputs where all codewords bits show activity (e.g. high followed \
         by all codeword bits low in a continuous repetition. This results in a square wave of 25 MHz on the DIO inputs \
         of the DIO connection).
-        \t- Individual DIO inputs where no signal is detected will not be calibrated (See dio_calibrated_inputs())\n
+        \t- Individual DIO inputs where no signal is detected will not be calibrated (See dio_calibrated_inputs())
         \t- The QWG will continuously validate if the active index is still stable.\n
-        \t- If no suitable indexes are found FIXME is empty and an error is pushed onto the error stack\n
+        \t- If no suitable indexes are found FIXME is empty and an error is pushed onto the error stack
         """
         self._transport.write(f'DIO:CALibrate {target_index}')
 
         # FIXME: define relation with mode and #codewords in use
         # FIXME: provide high level function that performs the calibration
 
-    def dio_suitable_indexes(self):
+    def get_dio_calibrate(self) -> int:
+        return self._ask_int('DIO:CALibrate?')
+
+    def get_dio_active_index(self) -> int:
+        return self._ask_int('DIO:INDexes:ACTive?')
+
+    def set_dio_active_index(self, idx: int):
+        self._transport.write(f'DIO:INDexes:ACTive {idx}')
+
+    def get_dio_mode(self) -> str:
+        """
+        returns "MASter" or "SLAve"
+        FIXME: abstract protocol details
+        """
+        return self._ask('DIO:MODE?')
+
+    def set_dio_mode(self, mode:str):
+        self._transport.write(f'DIO:MODE {mode}')
+
+    def get_dio_suitable_indexes(self):
         """
         Get DIO all suitable indexes. The array is ordered by most preferable index first
         """
-        return _int_to_array(self._ask('DIO:INDexes?'))
+        return self._int_to_array(self._ask('DIO:INDexes?'))
 
-
-    def dio_calibrated_inputs(self) -> int:
+    def get_dio_calibrated_inputs(self) -> int:
         """
-        'Get all DIO inputs which are calibrated\n'
+        Get all DIO inputs which are calibrated
         """
         return self._ask_int('DIO:INPutscalibrated?')
 
-    def dio_lvds(self) -> bool:
+    def get_dio_lvds(self) -> bool:
         """
         Get the DIO LVDS connection status. Result:
              True: Cable detected
@@ -382,7 +427,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return bool(self._ask_int('DIO:LVDS?'))
 
-    def dio_interboard(self):
+    def get_dio_interboard(self):
         """
         Get the DIO interboard status. Result:
              True:  To master interboard connection detected
@@ -390,23 +435,23 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         """
         return bool(self._ask_int('DIO:IB?'))
 
-    def dio_calibration_report(self, extended: bool=False) -> str:
+    def dio_calibration_report(self, extended: bool = False) -> str:
         """
         Return a string containing the latest DIO calibration report (successful and failed calibrations). Includes:
         selected index, dio mode, valid indexes, calibrated DIO bits and the DIO bitDiff table.
         :param extended: Adds more information about DIO: interboard and LVDS
         :return: String of DIO calibration rapport
         """
-        info = f'- Calibrated:          {self.dio_is_calibrated()}\n' \
-               f'- Mode:                {self.dio_mode()}\n' \
-               f'- Selected index:      {self.dio_active_index()}\n' \
-               f'- Suitable indexes:    {self.dio_suitable_indexes()}\n' \
-               f'- Calibrated DIO bits: {bin(self.dio_calibrated_inputs())}\n' \
+        info = f'- Calibrated:          {self.get_dio_calibrate()}\n' \
+               f'- Mode:                {self.get_dio_mode()}\n' \
+               f'- Selected index:      {self.get_dio_active_index()}\n' \
+               f'- Suitable indexes:    {self.get_dio_suitable_indexes()}\n' \
+               f'- Calibrated DIO bits: {bin(self.get_dio_calibrated_inputs())}\n' \
                f'- DIO bit diff table:\n{self._dio_bit_diff_table()}'
 
         if extended:
-            info += f'- LVDS detected:       {self.dio_lvds()}\n' \
-                    f'- Interboard detected: {self.dio_interboard()}'
+            info += f'- LVDS detected:       {self.get_dio_lvds()}\n' \
+                    f'- Interboard detected: {self.get_dio_interboard()}'
 
         return info
 
@@ -429,32 +474,32 @@ class QWGCore(SCPIBase, DIO.CalInterface):
 
             Note: To convert the return value to a readable binary output use: `print(\"{0:#010b}\".format(qwg.'
             'triggers_logic_input()))`')
+        FIXME: rewrite
         """
         return self._ask_int(f'QUTEch:TRIGgers{ch}:LOGIcinput?')
 
-
-    def set_bitmap(self, ch: int) -> None:
-        """
-        Codeword bit map for a channel, 14 bits available of which 10 are selectable.
-        The codeword bit map specifies which bits of the codeword (coming from a
-        central controller) are used for the codeword of a channel. This allows to
-        split up the codeword into sections for each channel
-        FIXME: rewrite
-        """
-        self._transport.write(f'DAC{ch}:BITmap')
+    # FIXME: use QWG.py::_set_bit_map
+    # def set_bitmap(self, ch: int) -> None:
+    #     """
+    #     Codeword bit map for a channel, 14 bits available of which 10 are selectable.
+    #     The codeword bit map specifies which bits of the codeword (coming from a
+    #     central controller) are used for the codeword of a channel. This allows to
+    #     split up the codeword into sections for each channel
+    #     FIXME: rewrite
+    #     """
+    #     self._transport.write(f'DAC{ch}:BITmap')
 
     def get_bitmap(self, ch: int) -> List:
-        return _int_to_array(self._ask(f'DAC{ch}:BITmap?'))
-
+        return self._int_to_array(self._ask(f'DAC{ch}:BITmap?'))
 
     ##########################################################################
     # overrides for CalInterface interface
     ##########################################################################
 
-    def output_dio_calibration_data(self, dio_mode: str, port: int=0) -> Tuple[int, List]:
+    def output_dio_calibration_data(self, dio_mode: str, port: int = 0) -> Tuple[int, List]:
         raise RuntimeError("QWG cannot output calibration data")
 
-    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
+    def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int = 0) -> None:
         self.dio_calibrate()    # FIXME: integrate
 
     ##########################################################################

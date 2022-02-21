@@ -10,7 +10,7 @@ Changes proposed in this pull request:
 @mention the name of someone you want to review this pull request. 
 
 In order for the pull request to be merged, the following conditions must be met:
-- travis test suite passes
+- test suite (Github actions) passes
 - all reasonable issues raised by codacy must be resolved 
 - a positive review is required
 

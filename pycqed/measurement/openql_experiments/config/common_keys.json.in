@@ -1,0 +1,14 @@
+// File:    common_keys.json.in
+// notes:   this file specifies commonalities between different setups for key "hardware_settings"
+//          see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
+// author: 	Wouter Vlothuizen e.a.
+
+//{
+    // NB: the "topology" is optional since OpenQl 0.9, a warning is issued if it does not exist
+    "topology": {
+    },
+
+    // NB: the "resources" is optional since OpenQl 0.9, a warning is issued if it does not exist
+    "resources": {
+    }
+//}

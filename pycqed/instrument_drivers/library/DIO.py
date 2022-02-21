@@ -1,6 +1,6 @@
 import sys
 from abc import ABC, abstractmethod
-from typing import Tuple,List
+from typing import Tuple, List
 
 
 class CalInterface(ABC):
@@ -39,8 +39,8 @@ class CalInterface(ABC):
         pass
 
 
-def calibrate(sender: CalInterface,
-              receiver: CalInterface,
+def calibrate(sender: CalInterface = None,
+              receiver: CalInterface = None,
               sender_dio_mode: str='',
               sender_port: int=0,
               receiver_port: int=0
@@ -56,22 +56,31 @@ def calibrate(sender: CalInterface,
         receiver_port: the port on which to receive the data
     """
     # FIXME: allow list of senders or receivers
-    dio_mask,expected_sequence = sender.output_dio_calibration_data(dio_mode=sender_dio_mode, port=sender_port)
-    # FIXME: disable receiver connector outputs? And other receivers we're not aware of?
-    receiver.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=receiver_port)
-    sender.stop()  # FIXME: not in interface
+    if sender:
+        dio_mask,expected_sequence = sender.output_dio_calibration_data(dio_mode=sender_dio_mode, port=sender_port)
+    else:
+        dio_mask = 0
+        expected_sequence = []
 
+    # FIXME: disable receiver connector outputs? And other receivers we're not aware of?
+    if receiver:
+        receiver.calibrate_dio_protocol(dio_mask=dio_mask, expected_sequence=expected_sequence, port=receiver_port)
+
+    if sender:
+        sender.stop()  # FIXME: not in interface
 
 _control_modes = {
     # control mode definition, compatible with OpenQL CC backend JSON syntax
 
     # preferred names
+    # NB: modes 'awg8*' are compatible with ZI HDAWG and dual QWG
+    # trigger 15 is only used by dual QWG, requires OpenQL >= 20201218
     "awg8-mw-vsm": {
         "control_bits": [
             [7,6,5,4,3,2,1,0],
             [23,22,21,20,19,18,17,16]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [15,31]
     },
     "awg8-mw-direct-iq": {
         "control_bits": [
@@ -80,7 +89,7 @@ _control_modes = {
             [22,21,20,19,18,17,16],
             [29,28,27,26,25,24,23]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [15,31]
     },
     "awg8-flux": {
         # NB: please note that internally one HDQWG AWG unit handles 2 channels, which requires special handling of the waveforms
@@ -94,7 +103,7 @@ _control_modes = {
             [24,23,22],
             [27,26,25]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [15,31]
     },
 
     ########################################
@@ -128,7 +137,7 @@ _control_modes = {
             [24, 23, 22],
             [27, 26, 25]
         ],
-        "trigger_bits": [31]
+        "trigger_bits": [31,15]
     }
 }
 

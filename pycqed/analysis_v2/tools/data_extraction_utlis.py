@@ -41,7 +41,7 @@ def get_MC_settings(timestamp):
 def extract_qois_and_msmt_times(
     t_start: str,
     t_stop: str,
-    label="",
+    label: str = "",
     exact_label_match: bool = False,
     folder: str = None,
 ):

@@ -2,12 +2,14 @@ import logging
 import numpy as np
 import time
 import warnings
+from deprecated import deprecated
+
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
-from pycqed.measurement import detector_functions as det
 from qcodes.instrument.parameter import ManualParameter
 
+from pycqed.measurement import detector_functions as det
 from pycqed.utilities.general import gen_sweep_pts
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
@@ -15,6 +17,9 @@ from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
 from pycqed.instrument_drivers.meta_instrument.Resonator import resonator
+
+
+log = logging.getLogger(__name__)
 
 
 class Qubit(Instrument):
@@ -111,39 +116,21 @@ class Qubit(Instrument):
                            docstring='a list of all operations available on the qubit',
                            get_cmd=self._get_operations)
 
+    ##########################################################################
+    # Overrides for class Instrument
+    ##########################################################################
+
     def connect_message(self, begin_time=None):
         t = time.time() - (begin_time or self._t0)
 
-        con_msg = ('Connected to: {repr} '
-                   'in {t:.2f} s'.format(repr=self.__repr__(), t=t))
-        print(con_msg)
+        log.info(f"Connected to: {self.__repr__()} in {t:.2f} s")
 
-    def add_parameters(self):
-        """
-        Add parameters to the qubit object grouped according to the
-        naming conventions described above
+    def get_idn(self):
+        return {'driver': str(self.__class__), 'name': self.name}
 
-        Prefixes are listed here:
-            instr_  : references to other instruments
-            ro_     : parameters relating to RO both CW and TD readout.
-            mw_     : parameters of single qubit MW control
-            spec_   : parameters relating to spectroscopy (single qubit CW)
-            fl_     : parameters relating to flux control, this includes both
-                      flux pulsing as well as flux offset (DC).
-            cfg_    : configuration, this can be info relevant for compilers
-                      or configurations that determine how the qubit operates.
-                      examples are cfg_qasm and cfg_f_qubit_calc_method.
-
-            ""      : properties of the qubit do not have a prefix, examples
-                      are T1, T2, etc., F_ssro, F_RB, etc., f_qubit, E_C, etc.
-        """
-        self.add_instrument_ref_parameters()
-        self.add_ro_parameters()
-        self.add_mw_parameters()
-        self.add_spec_parameters()
-        self.add_flux_parameters()
-        self.add_config_parameters()
-        self.add_generic_qubit_parameters()
+    ##########################################################################
+    # Abstract functions: add_*_parameters
+    ##########################################################################
 
     def add_instrument_ref_parameters(self):
         pass
@@ -166,11 +153,10 @@ class Qubit(Instrument):
     def add_generic_qubit_parameters(self):
         pass
 
-    def get_idn(self):
-        return {'driver': str(self.__class__), 'name': self.name}
-
-    def _get_operations(self):
-        return self._operations
+    ##########################################################################
+    # Abstract functions
+    # FIXME: do these make a lot of sense: CCLight_Transmon does not seem to care too much
+    ##########################################################################
 
     def measure_T1(self, times=None, MC=None,
                    close_fig: bool=True, update: bool=True,
@@ -202,7 +188,6 @@ class Qubit(Instrument):
 
     def measure_rabi(self):
         raise NotImplementedError()
-
 
     def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
                          MC=None, analyze=True, close_fig=True, update=True,
@@ -288,6 +273,14 @@ class Qubit(Instrument):
                                 close_fig: bool=True):
         raise NotImplementedError()
 
+    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
+                                        analyze=True, close_fig=True):
+        raise NotImplementedError()
+
+    def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),
+                       MC=None, analyze=True, close_fig=True):
+        raise NotImplementedError()
+
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
                            prepare: bool=True, depletion_analysis: bool=True,
@@ -309,16 +302,260 @@ class Qubit(Instrument):
             specified.
         """
         if prepare:
-            self.prepare_for_timedomain()
+            self.prepare_for_timedomain()  # FIXME: does no seem to make sense given the raise below
         raise NotImplementedError()
 
-    def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),
-                       MC=None, analyze=True, close_fig=True):
+    def calibrate_mixer_offsets_drive(self, update: bool=True)-> bool:
+        """
+        Calibrates the mixer skewness and updates the I and Q offsets in
+        the qubit object.
+        """
         raise NotImplementedError()
 
-    def find_resonators(self, start_freq=6.9e9, stop_freq=8e9, VNA_power=-40,
-                        bandwidth=200, timeout=200, f_step=1e6, with_VNA=None,
-                        verbose=True):
+    def calibrate_optimal_weights(self, MC=None, verify: bool=True,
+                                  analyze: bool=True, update: bool=True,
+                                  no_figs: bool=False)->bool:
+        raise NotImplementedError()
+
+    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
+        """
+        Calibrates parameters:
+            "latency_MW"
+            "RO_acq_delay"
+
+
+        Used to calibrate the delay of the MW pulse with respect to the
+        RO pulse and the RO acquisition delay.
+
+
+        The MW_pulse_latency is calibrated by setting the frequency of
+        the LO to the qubit frequency such that both the MW and the RO pulse
+        will show up in the RO.
+        Measuring the transients will  show what the optimal latency is.
+
+        Note that a lot of averages may be required when using dedicated drive
+        lines.
+
+        This function does NOT overwrite the values that were set in the qubit
+        object and as such can be used to verify the succes of the calibration.
+
+        Currently (28/6/2017) the experiment has to be analysed by hand.
+
+        """
+        raise NotImplementedError()
+
+    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
+        """
+        Calibrates parameter: "latency_Flux"
+
+        Used to calibrate the timing between the MW and Flux pulses.
+
+        Flux pulse latency is calibrated using a Ram-Z experiment.
+        The experiment works as follows:
+        - x90 | square_flux  # defines t = 0
+        - wait (should be slightly longer than the pulse duration)
+        - x90
+        - wait
+        - RO
+
+        The position of the square flux pulse is varied to find the
+        optimal latency.
+        """
+        raise NotImplementedError
+
+    ##########################################################################
+    # Normal functions: parameters & operations
+    ##########################################################################
+
+    def add_parameters(self):
+        """
+        Add parameters to the qubit object grouped according to the
+        naming conventions described above
+
+        Prefixes are listed here:
+            instr_  : references to other instruments
+            ro_     : parameters relating to RO both CW and TD readout.
+            mw_     : parameters of single qubit MW control
+            spec_   : parameters relating to spectroscopy (single qubit CW)
+            fl_     : parameters relating to flux control, this includes both
+                      flux pulsing as well as flux offset (DC).
+            cfg_    : configuration, this can be info relevant for compilers
+                      or configurations that determine how the qubit operates.
+                      examples are cfg_qasm and cfg_f_qubit_calc_method.
+
+            ""      : properties of the qubit do not have a prefix, examples
+                      are T1, T2, etc., F_ssro, F_RB, etc., f_qubit, E_C, etc.
+        """
+        self.add_instrument_ref_parameters()
+        self.add_ro_parameters()
+        self.add_mw_parameters()
+        self.add_spec_parameters()
+        self.add_flux_parameters()
+        self.add_config_parameters()
+        self.add_generic_qubit_parameters()
+
+    def add_operation(self, operation_name):
+        self._operations[operation_name] = {}
+
+    @deprecated(version='0.4', reason="not used anywhere")
+    def link_param_to_operation(self, operation_name, parameter_name,
+                                argument_name):
+        """
+        Links an existing param to an operation for use in the operation dict.
+
+        An example of where to use this would be the flux_channel.
+        Only one parameter is specified but it is relevant for multiple flux
+        pulses. You don't want a different parameter that specifies the channel
+        for the iSWAP and the CZ gate. This can be solved by linking them to
+        your operation.
+
+        Args:
+            operation_name (str): The operation of which this parameter is an
+                argument. e.g. mw_control or CZ
+            parameter_name (str): Name of the parameter
+            argument_name  (str): Name of the arugment as used in the sequencer
+            **kwargs get passed to the add_parameter function
+        """
+        if parameter_name not in self.parameters:
+            raise KeyError('Parameter {} needs to be added first'.format(
+                parameter_name))
+
+        if operation_name in self.operations().keys():
+            self._operations[operation_name][argument_name] = parameter_name
+        else:
+            raise KeyError('Unknown operation {}, add '.format(operation_name) +
+                           'first using add operation')
+
+    def add_pulse_parameter(self,
+                            operation_name,
+                            parameter_name,
+                            argument_name,
+                            initial_value=None,
+                            vals=vals.Numbers(),
+                            **kwargs):
+        """
+        Add a pulse parameter to the qubit.
+
+        Args:
+            operation_name (str): The operation of which this parameter is an
+                argument. e.g. mw_control or CZ
+            parameter_name (str): Name of the parameter
+            argument_name  (str): Name of the arugment as used in the sequencer
+            **kwargs get passed to the add_parameter function
+        Raises:
+            KeyError: if this instrument already has a parameter with this
+                name.
+        """
+        if parameter_name in self.parameters:
+            raise KeyError(
+                'Duplicate parameter name {}'.format(parameter_name))
+
+        if operation_name in self.operations().keys():
+            self._operations[operation_name][argument_name] = parameter_name
+        else:
+            raise KeyError('Unknown operation {}, add '.format(operation_name) +
+                           'first using add operation')
+
+        self.add_parameter(parameter_name,
+                           initial_value=initial_value,
+                           vals=vals,
+                           parameter_class=ManualParameter, **kwargs)
+
+        # for use in RemoteInstruments to add parameters to the server
+        # we return the info they need to construct their proxy
+        return
+
+    def get_operation_dict(self, operation_dict={}):
+        for op_name, op in self.operations().items():
+            operation_dict[op_name + ' ' + self.name] = {'target_qubit':
+                                                         self.name}
+            for argument_name, parameter_name in op.items():
+                operation_dict[op_name + ' ' + self.name][argument_name] = \
+                    self.get(parameter_name)
+        return operation_dict
+
+    def _get_operations(self):
+        return self._operations
+
+    ##########################################################################
+    # Normal functions: resonators
+    ##########################################################################
+
+    def measure_individual_resonators(self, with_VNA=False, use_min=True):
+        # USED_BY: find_resonator_frequency_initial()
+        """
+        Specifically designed for use in automation, not recommended to use by
+        hand!
+        Finds which peaks were wrongly assigend as a resonator in the resonator
+        wide search
+        """
+        device = self.instr_device.get_instr()
+        found_resonators = device.found_resonators
+
+        new_resonators = []
+        for i, res in enumerate(found_resonators):
+            freq = res.freq
+            str_freq, unit = plt_tools.SI_val_to_msg_str(freq, 'Hz', float)
+            if with_VNA:
+                raise NotImplementedError
+            else:
+                old_avger=self.ro_acq_averages()
+                self.ro_acq_averages(2**14)
+                freqs = np.arange(freq - 5e6, freq + 5e6, 50e3)
+                label = '_{:.3f}_{}'.format(str_freq, unit)
+                name = 'Resonator_scan' + self.msmt_suffix + label
+                self.measure_heterodyne_spectroscopy(freqs=freqs,
+                                                     analyze=False,
+                                                     label=label)
+
+            a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
+            self.ro_acq_averages(old_avger)
+
+            dip = np.amin(a.data_y)
+            offset = a.fit_results.params['A'].value
+
+            if ((np.abs(dip/offset) > 0.7) or getattr(a.fit_results.params['f0'],'stderr', None) is None):
+
+                print('Removed candidate {} ({:.3f} {}): Not a resonator'
+                      .format(res.identifier, str_freq, unit))
+
+            else:
+                if use_min:
+                    f_res = a.min_frequency
+                else:
+                    f_res = a.fit_results.params['f0'].value*1e9
+
+                # Check if not a duplicate
+                if i > 0:
+                    prev_freq = found_resonators[i-1].freq
+                    if np.abs(prev_freq - f_res) < 10e6:
+                        print('Removed candidate: {} ({:.3f} {}): Duplicate'
+                              .format(res.identifier, str_freq, unit))
+                    else:
+                        found_resonators[i].freq = f_res
+                        print("Added resonator {} ({:.3f} {})"
+                              .format(res.identifier, str_freq, unit))
+                        new_resonators.append(res)
+
+                else:
+                    found_resonators[i].freq = f_res
+                    print("Added resonator {} ({:.3f} {})"
+                          .format(res.identifier, str_freq, unit))
+                    new_resonators.append(res)
+        return new_resonators
+
+    def find_resonators(
+            self,
+            start_freq=6.8e9,
+            stop_freq=8e9,
+            VNA_power=-40,
+            bandwidth=200,
+            timeout=200,
+            f_step=1e6,
+            with_VNA=None,
+            verbose=True
+    ):
+        # USED_BY: device_dependency_graphs.py,
         """
         Performs a wide range scan to find all resonator dips. Will use VNA if
         one is connected and linked to the qubit object, or if specified via
@@ -427,13 +664,22 @@ class Qubit(Instrument):
 
         return True
 
-    def find_resonator_frequency_initial(self, start_freq=6.9e9, stop_freq=8.1e9,
-                                         npts=50001, use_min=True, MC=None,
-                                         update=True, with_VNA=None,
-                                         resonators=None, look_for_missing=True):
+    def find_resonator_frequency_initial(
+            self,
+            start_freq=6.9e9,
+            stop_freq=8.1e9,
+            npts=50001,
+            use_min=True,
+            MC=None,
+            update=True,
+            with_VNA=None,
+            resonators=None,
+            look_for_missing=True
+    ):
+        # USED_BY: device_dependency_graphs.py,
         """
         DISCLAIMER: designed for automation routines, seperate usage not
-        adviced.
+        advised.
 
         First checks whether the number of found resonators from a wide scan
         matches the number of expected resonators as specified in the device
@@ -558,69 +804,8 @@ class Qubit(Instrument):
         #                         res.freq = a.fit_results.params['f0'].value*1e9
         # return True
 
-    def measure_individual_resonators(self, with_VNA=False, use_min=True):
-        """
-        Specifically designed for use in automation, not recommended to use by
-        hand!
-        Finds which peaks were wrongly assigend as a resonator in the resonator
-        wide search
-        """
-        device = self.instr_device.get_instr()
-        found_resonators = device.found_resonators
-
-        new_resonators = []
-        for i, res in enumerate(found_resonators):
-            freq = res.freq
-            str_freq, unit = plt_tools.SI_val_to_msg_str(freq, 'Hz', float)
-            if with_VNA:
-                raise NotImplementedError
-            else:
-                old_avger=self.ro_acq_averages()
-                self.ro_acq_averages(2**14)
-                freqs = np.arange(freq - 5e6, freq + 5e6, 50e3)
-                label = '_{:.3f}_{}'.format(str_freq, unit)
-                name = 'Resonator_scan' + self.msmt_suffix + label
-                self.measure_heterodyne_spectroscopy(freqs=freqs,
-                                                     analyze=False,
-                                                     label=label)
-
-            a = ma.Homodyne_Analysis(label=name, qb_name=self.name)
-            self.ro_acq_averages(old_avger)
-
-            dip = np.amin(a.data_y)
-            offset = a.fit_results.params['A'].value
-
-            if ((np.abs(dip/offset) > 0.7) or getattr(a.fit_results.params['f0'],'stderr', None) is None):
-
-                print('Removed candidate {} ({:.3f} {}): Not a resonator'
-                      .format(res.identifier, str_freq, unit))
-
-            else:
-                if use_min:
-                    f_res = a.min_frequency
-                else:
-                    f_res = a.fit_results.params['f0'].value*1e9
-
-                # Check if not a duplicate
-                if i > 0:
-                    prev_freq = found_resonators[i-1].freq
-                    if np.abs(prev_freq - f_res) < 10e6:
-                        print('Removed candidate: {} ({:.3f} {}): Duplicate'
-                              .format(res.identifier, str_freq, unit))
-                    else:
-                        found_resonators[i].freq = f_res
-                        print("Added resonator {} ({:.3f} {})"
-                              .format(res.identifier, str_freq, unit))
-                        new_resonators.append(res)
-
-                else:
-                    found_resonators[i].freq = f_res
-                    print("Added resonator {} ({:.3f} {})"
-                          .format(res.identifier, str_freq, unit))
-                    new_resonators.append(res)
-        return new_resonators
-
     def find_test_resonators(self, with_VNA=None, resonators=None):
+        # USED_BY: device_dependency_graphs.py,
         """
         Does a power sweep over the resonators to see if they have a qubit
         attached or not, and changes the state in the resonator object
@@ -651,7 +836,7 @@ class Qubit(Instrument):
                 powers = np.linspace(-20, 0.1, 3)
                 f_step = 100e3
             else:
-                powers = np.arange(-40, 0.1, 10)
+                powers = np.arange(-60, 0.1, 5)
                 f_step = 100e3
 
             if with_VNA:
@@ -703,6 +888,7 @@ class Qubit(Instrument):
 
         return True
 
+    @deprecated(version='0.4', reason="not used anywhere")
     def find_test_resonators_test(self, with_VNA=None, resonators=None):
         """
         Does a power sweep over the resonators to see if they have a qubit
@@ -796,6 +982,7 @@ class Qubit(Instrument):
 
     def find_qubit_resonator_fluxline(self, with_VNA=None, dac_values=None,
                                       verbose=True, resonators=None):
+        # USED_BY: device_dependency_graphs.py,
         """
         --- WARNING: UPDATING PARAMETERS ONLY WORKS WITH DEVICE OBJECT! ---
 
@@ -813,7 +1000,7 @@ class Qubit(Instrument):
         if resonators is None:
             try:
                 device = self.instr_device.get_instr()
-            except AttributeuxError:
+            except AttributeError:
                 logging.warning('Could not find device resonators: '
                                 'No device found for {}.'.format(self.name))
                 return False
@@ -906,6 +1093,7 @@ class Qubit(Instrument):
                                          np.abs((70e6)**2/(res.shift)))
         return True
 
+    @deprecated(version='0.4', reason="not used anywhere")
     def find_resonator_sweetspot(self, freqs=None, dac_values=None,
                                  fluxChan=None, update=True):
         """
@@ -948,12 +1136,17 @@ class Qubit(Instrument):
 
         return True
 
-    def find_resonator_frequency(self, use_min=True,
-                                 update=True,
-                                 freqs=None,
-                                 MC=None, close_fig=True):
+    def find_resonator_frequency(
+            self,
+            use_min=True,
+            update=True,
+            freqs=None,
+            MC=None,
+            close_fig=True
+    ):
+        # USED_BY: device_dependency_graphs.py,
         """
-        Performs heterodyne spectroscopy to identify the frequecy of the (readout)
+        Performs heterodyne spectroscopy to identify the frequency of the (readout)
         resonator frequency.
 
         Args:
@@ -972,7 +1165,7 @@ class Qubit(Instrument):
                 the last recorded frequency, with 100 kHz step
         """
 
-        # This snippet exists to be backwards compatible 9/2017.
+        # This snippet exists to be backwards compatible 9/2017. FIXME: cleanup
         try:
             freq_res_par = self.freq_res
             freq_RO_par = self.ro_freq
@@ -1001,18 +1194,27 @@ class Qubit(Instrument):
             freq_RO_par(f_res)
         return f_res
 
-    def find_frequency(self, method='spectroscopy', spec_mode='pulsed_marked',
-                       steps=[1, 3, 10, 30, 100, 300, 1000],
-                       artificial_periods=4,
-                       freqs=None,
-                       f_span=100e6,
-                       use_max=False,
-                       f_step=1e6,
-                       verbose=True,
-                       update=True,
-                       close_fig=True,
-                       MC=None,
-                       label = ''):
+    ##########################################################################
+    # Normal functions:
+    ##########################################################################
+
+    def find_frequency(
+            self,
+            method='spectroscopy',
+            spec_mode='pulsed_marked',
+            steps=[1, 3, 10, 30, 100],
+            artificial_periods=4,
+            freqs=None,
+            f_span=100e6,
+            use_max=False,
+            f_step=1e6,
+            verbose=True,
+            update=True,
+            close_fig=True,
+            MC=None,
+            label=''
+    ):
+        # USED_BY: device_dependency_graphs.py
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
         method.
@@ -1105,8 +1307,15 @@ class Qubit(Instrument):
                 close_fig=close_fig)
         return analysis_spec.fitted_freq
 
-    def calibrate_spec_pow(self, freqs=None, start_power=-35, power_step = 5,
-                           threshold=0.5, verbose=True):
+    def calibrate_spec_pow(
+            self,
+            freqs=None,
+            start_power=-55,
+            power_step=5,
+            threshold=0.5,
+            verbose=True
+    ):
+        # USED_BY: device_dependency_graphs.py
         """
         Finds the optimal spectroscopy power for qubit spectroscopy (not pulsed)
         by varying it in steps of 5 dBm, and ending when the peak has power
@@ -1145,8 +1354,14 @@ class Qubit(Instrument):
         self.spec_pow(power-power_step)
         return True
 
+    def calibrate_motzoi(
+            self,
+            MC=None,
+            verbose=True,
+            update=True
+    ):
+        # USED_BY: device_dependency_graphs.py
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         motzois = gen_sweep_pts(center=0, span=1, num=31)
 
         # large range
@@ -1172,66 +1387,19 @@ class Qubit(Instrument):
             self.motzoi(opt_motzoi)
         return opt_motzoi
 
-    def calibrate_optimal_weights(self, MC=None, verify: bool=True,
-                                  analyze: bool=True, update: bool=True,
-                                  no_figs: bool=False)->bool:
-        raise NotImplementedError()
-
-    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
-        """
-        Calibrates parameters:
-            "latency_MW"
-            "RO_acq_delay"
-
-
-        Used to calibrate the delay of the MW pulse with respect to the
-        RO pulse and the RO acquisition delay.
-
-
-        The MW_pulse_latency is calibrated by setting the frequency of
-        the LO to the qubit frequency such that both the MW and the RO pulse
-        will show up in the RO.
-        Measuring the transients will  show what the optimal latency is.
-
-        Note that a lot of averages may be required when using dedicated drive
-        lines.
-
-        This function does NOT overwrite the values that were set in the qubit
-        object and as such can be used to verify the succes of the calibration.
-
-        Currently (28/6/2017) the experiment has to be analysed by hand.
-
-        """
-        raise NotImplementedError()
-        return True
-
-    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
-        """
-        Calibrates parameter: "latency_Flux"
-
-        Used to calibrate the timing between the MW and Flux pulses.
-
-        Flux pulse latency is calibrated using a Ram-Z experiment.
-        The experiment works as follows:
-        - x90 | square_flux  # defines t = 0
-        - wait (should be slightly longer than the pulse duration)
-        - x90
-        - wait
-        - RO
-
-        The position of the square flux pulse is varied to find the
-        optimal latency.
-        """
-        raise NotImplementedError
-        return True
-
-    def calibrate_frequency_ramsey(self,
-                                   steps=[1, 3, 10, 30, 100, 300, 1000],
-                                   artificial_periods = 2.5,
-                                   stepsize:float =20e-9,
-                                   verbose: bool=True, update: bool=True,
-                                   close_fig: bool=True,
-                                   test_beating: bool=True):
+    def calibrate_frequency_ramsey(
+            self,
+            steps=[1, 3, 10, 30, 100, 300, 1000],
+            artificial_periods=2.5,
+            stepsize: float = 20e-9,
+            verbose: bool = True,
+            update: bool = True,
+            close_fig: bool = True,
+            test_beating: bool = True
+    ):
+        # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs.py
         """
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
@@ -1248,11 +1416,9 @@ class Qubit(Instrument):
             stepsize (float):
                 smalles stepsize in ns for which to run ramsey experiments.
         """
-
-        self.ro_acq_averages(2**10)
         cur_freq = self.freq_qubit()
         # Steps don't double to be more robust against aliasing
-        for n in steps:
+        for i,n in enumerate(steps):
             times = np.arange(self.mw_gauss_width()*4,
                               50*n*stepsize, n*stepsize)
             artificial_detuning = artificial_periods/times[-1]
@@ -1260,7 +1426,8 @@ class Qubit(Instrument):
                                 artificial_detuning=artificial_detuning,
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
-                                analyze=False)
+                                analyze=False,
+                                prepare_for_timedomain=True if 0 == i else False)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,
@@ -1298,6 +1465,7 @@ class Qubit(Instrument):
         return cur_freq
 
     def calculate_frequency(self, calc_method=None, I_per_phi0=None, I=None):
+        # USED_BY: find_frequency()
         """
         Calculates an estimate for the qubit frequency.
         Arguments are optional and parameters of the object are used if not
@@ -1328,6 +1496,7 @@ class Qubit(Instrument):
         Flux can be specified both in terms of dac voltage or flux but not
         both.
         """
+        # FIXME: parameter cfg_qubit_freq_calc_method is added in derived class
         if self.cfg_qubit_freq_calc_method() == 'latest':
             qubit_freq_est = self.freq_qubit()
 
@@ -1348,17 +1517,7 @@ class Qubit(Instrument):
 
         return qubit_freq_est
 
-    def calibrate_mixer_offsets_drive(self, update: bool=True)-> bool:
-        """
-        Calibrates the mixer skewness and updates the I and Q offsets in
-        the qubit object.
-        """
-        raise NotImplementedError()
-
-        return True
-
-
-
+    @deprecated(version='0.4', reason="not used anywhere")
     def tune_freq_to_sweetspot(self, freqs=None, dac_values=None, verbose=True,
                                fit_phase=False, use_dips=False):
         """
@@ -1454,6 +1613,7 @@ class Qubit(Instrument):
         self.fl_dc_I(dac_sweetspot)
         self.fl_dc_I0(dac_sweetspot)
 
+    @deprecated(version='0.4', reason="not used anywhere")
     def tune_freq_to(self,
                      target_frequency,
                      MC=None,
@@ -1549,588 +1709,3 @@ class Qubit(Instrument):
         MC.set_detector_function(qubit_freq_det)
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.run('Tune_to_freq', mode='adaptive')
-
-    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=True):
-        raise NotImplementedError()
-
-    def add_operation(self, operation_name):
-        self._operations[operation_name] = {}
-
-    def link_param_to_operation(self, operation_name, parameter_name,
-                                argument_name):
-        """
-        Links an existing param to an operation for use in the operation dict.
-
-        An example of where to use this would be the flux_channel.
-        Only one parameter is specified but it is relevant for multiple flux
-        pulses. You don't want a different parameter that specifies the channel
-        for the iSWAP and the CZ gate. This can be solved by linking them to
-        your operation.
-
-        Args:
-            operation_name (str): The operation of which this parameter is an
-                argument. e.g. mw_control or CZ
-            parameter_name (str): Name of the parameter
-            argument_name  (str): Name of the arugment as used in the sequencer
-            **kwargs get passed to the add_parameter function
-        """
-        if parameter_name not in self.parameters:
-            raise KeyError('Parameter {} needs to be added first'.format(
-                parameter_name))
-
-        if operation_name in self.operations().keys():
-            self._operations[operation_name][argument_name] = parameter_name
-        else:
-            raise KeyError('Unknown operation {}, add '.format(operation_name) +
-                           'first using add operation')
-
-    def add_pulse_parameter(self,
-                            operation_name,
-                            parameter_name,
-                            argument_name,
-                            initial_value=None,
-                            vals=vals.Numbers(),
-                            **kwargs):
-        """
-        Add a pulse parameter to the qubit.
-
-        Args:
-            operation_name (str): The operation of which this parameter is an
-                argument. e.g. mw_control or CZ
-            parameter_name (str): Name of the parameter
-            argument_name  (str): Name of the arugment as used in the sequencer
-            **kwargs get passed to the add_parameter function
-        Raises:
-            KeyError: if this instrument already has a parameter with this
-                name.
-        """
-        if parameter_name in self.parameters:
-            raise KeyError(
-                'Duplicate parameter name {}'.format(parameter_name))
-
-        if operation_name in self.operations().keys():
-            self._operations[operation_name][argument_name] = parameter_name
-        else:
-            raise KeyError('Unknown operation {}, add '.format(operation_name) +
-                           'first using add operation')
-
-        self.add_parameter(parameter_name,
-                           initial_value=initial_value,
-                           vals=vals,
-                           parameter_class=ManualParameter, **kwargs)
-
-        # for use in RemoteInstruments to add parameters to the server
-        # we return the info they need to construct their proxy
-        return
-
-    def get_operation_dict(self, operation_dict={}):
-        for op_name, op in self.operations().items():
-            operation_dict[op_name + ' ' + self.name] = {'target_qubit':
-                                                         self.name}
-            for argument_name, parameter_name in op.items():
-                operation_dict[op_name + ' ' + self.name][argument_name] = \
-                    self.get(parameter_name)
-        return operation_dict
-
-
-class Transmon(Qubit):
-
-    """
-    circuit-QED Transmon as used in DiCarlo Lab.
-    Adds transmon specific parameters as well
-    """
-
-    def __init__(self, name, **kw):
-        super().__init__(name, **kw)
-        self.add_parameter('E_c', unit='Hz',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers())
-        self.add_parameter('E_j', unit='Hz',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers())
-        self.add_parameter('anharmonicity', unit='Hz',
-                           label='Anharmonicity',
-                           docstring='Anharmonicity, negative by convention',
-                           parameter_class=ManualParameter,
-                           # typical target value
-                           initial_value=-300e6,
-                           vals=vals.Numbers())
-        self.add_parameter('T1', unit='s',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(0, 200e-6))
-        self.add_parameter('T2_echo', unit='s',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers())
-        self.add_parameter('T2_star', unit='s',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers())
-
-        self.add_parameter('dac_voltage', unit='mV',
-                           parameter_class=ManualParameter)
-        self.add_parameter('dac_sweet_spot', unit='mV',
-                           parameter_class=ManualParameter)
-        self.add_parameter('dac_flux_coefficient', unit='',
-                           parameter_class=ManualParameter)
-        self.add_parameter('asymmetry', unit='',
-                           initial_value=0,
-                           parameter_class=ManualParameter)
-        self.add_parameter('dac_channel', vals=vals.Ints(),
-                           parameter_class=ManualParameter)
-
-        self.add_parameter('f_qubit', label='qubit frequency', unit='Hz',
-                           parameter_class=ManualParameter)
-        self.add_parameter('f_max', label='qubit frequency', unit='Hz',
-                           parameter_class=ManualParameter)
-        self.add_parameter('f_res', label='resonator frequency', unit='Hz',
-                           parameter_class=ManualParameter)
-        self.add_parameter('f_RO', label='readout frequency', unit='Hz',
-                           parameter_class=ManualParameter)
-
-        # Sequence/pulse parameters
-        self.add_parameter('RO_pulse_delay', unit='s',
-                           parameter_class=ManualParameter)
-        self.add_parameter('RO_pulse_length', unit='s',
-                           parameter_class=ManualParameter)
-        self.add_parameter('RO_acq_marker_delay', unit='s',
-                           parameter_class=ManualParameter)
-        self.add_parameter('RO_acq_marker_channel',
-                           parameter_class=ManualParameter,
-                           vals=vals.Strings())
-        self.add_parameter('RO_amp', unit='V',
-                           parameter_class=ManualParameter)
-        # Time between start of pulses
-        self.add_parameter('pulse_delay', unit='s',
-                           initial_value=0,
-                           vals=vals.Numbers(0, 1e-6),
-                           parameter_class=ManualParameter)
-
-        self.add_parameter('f_qubit_calc_method',
-                           vals=vals.Enum('latest', 'dac', 'flux'),
-                           # in the future add 'tracked_dac', 'tracked_flux',
-                           initial_value='latest',
-                           parameter_class=ManualParameter)
-        self.add_parameter('F_ssro',
-                           initial_value=0,
-                           label='RO assignment fidelity',
-                           vals=vals.Numbers(0.0, 1.0),
-                           parameter_class=ManualParameter)
-        self.add_parameter('F_discr',
-                           initial_value=0,
-                           label='RO discrimination fidelity',
-                           vals=vals.Numbers(0.0, 1.0),
-                           parameter_class=ManualParameter)
-        self.add_parameter('F_RB',
-                           initial_value=0,
-                           label='RB single qubit Clifford fidelity',
-                           vals=vals.Numbers(0, 1.0),
-                           parameter_class=ManualParameter)
-        self.add_parameter('I_per_phi0',
-                           initial_value=1,
-                           label='V per phi0',
-                           vals=vals.Numbers(),
-                           docstring='Conversion between flux and voltage. '
-                                     'How many volts need to be applied to '
-                                     'have a flux of 1 phi0 (pulsed).',
-                           parameter_class=ManualParameter)
-        self.add_parameter('V_offset',
-                           initial_value=0,
-                           label='V offset',
-                           vals=vals.Numbers(),
-                           docstring='AWG voltage at which the sweet spot is '
-                                     'found (pulsed).',
-                           parameter_class=ManualParameter)
-
-    def calculate_frequency(self,
-                            dac_voltage=None,
-                            flux=None):
-        """
-        Calculates the f01 transition frequency from the cosine arc model.
-        (function available in fit_mods. Qubit_dac_to_freq)
-
-        Parameters of the qubit object are used unless specified.
-        Flux can be specified both in terms of dac voltage or flux but not
-        both.
-        """
-
-        if dac_voltage is not None and flux is not None:
-            raise ValueError('Specify either dac voltage or flux but not both')
-
-        if self.f_qubit_calc_method() == 'latest':
-            f_qubit_estimate = self.f_qubit()
-
-        elif self.f_qubit_calc_method() == 'dac':
-            if dac_voltage is None:
-                dac_voltage = self.IVVI.get_instr().get(
-                    'dac{}'.format(self.dac_channel()))
-
-            f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
-                dac_voltage=dac_voltage,
-                f_max=self.f_max(),
-                E_c=self.E_c(),
-                dac_sweet_spot=self.dac_sweet_spot(),
-                dac_flux_coefficient=self.dac_flux_coefficient(),
-                asymmetry=self.asymmetry())
-
-        elif self.f_qubit_calc_method() == 'flux':
-            if flux is None:
-                flux = self.FluxCtrl.get_instr().get(
-                    'flux{}'.format(self.dac_channel()))
-            f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
-                dac_voltage=flux,
-                f_max=self.f_max(),
-                E_c=self.E_c(),
-                dac_sweet_spot=0,
-                dac_flux_coefficient=1,
-                asymmetry=self.asymmetry())
-        return f_qubit_estimate
-
-    def calculate_flux(self, frequency):
-        raise NotImplementedError()
-
-    def prepare_for_timedomain(self):
-        raise NotImplementedError()
-
-    def prepare_for_continuous_wave(self):
-        raise NotImplementedError()
-
-    def prepare_readout(self):
-        """
-        Configures the readout. Consists of the following steps
-        - instantiate the relevant detector functions
-        - set the microwave frequencies and sources
-        - generate the RO pulse
-        - set the integration weights
-        """
-        raise NotImplementedError()
-
-    def calibrate_frequency_ramsey(self, steps=[1, 3, 10, 30, 100, 300, 1000],
-                                   artificial_periods=2.5,
-                                   stepsize=None, verbose=True, update=True,
-                                   close_fig=True):
-        if stepsize is None:
-            stepsize = abs(1/self.f_pulse_mod.get())
-        cur_freq = self.f_qubit.get()
-        # Steps don't double to be more robust against aliasing
-        for n in steps:
-            times = np.arange(self.pulse_delay.get(),
-                              50*n*stepsize, n*stepsize)
-            artificial_detuning = artificial_periods/times[-1]
-            self.measure_ramsey(times,
-                                artificial_detuning=artificial_detuning,
-                                f_qubit=cur_freq,
-                                label='_{}pulse_sep'.format(n),
-                                analyze=False)
-            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name,
-                                   artificial_detuning=artificial_detuning,
-                                   close_file=False)
-            fitted_freq = a.fit_res.params['frequency'].value
-            measured_detuning = fitted_freq-artificial_detuning
-            cur_freq -= measured_detuning
-
-            qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
-            qubit_ana_grp.attrs['artificial_detuning'] = \
-                str(artificial_detuning)
-            qubit_ana_grp.attrs['measured_detuning'] = \
-                str(measured_detuning)
-            qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
-            a.finish()  # make sure I close the file
-            if verbose:
-                print('Measured detuning:{:.2e}'.format(measured_detuning))
-                print('Setting freq to: {:.9e}, \n'.format(cur_freq))
-
-            if times[-1] > 2.*a.T2_star['T2_star']:
-                # If the last step is > T2* then the next will be for sure
-                if verbose:
-                    print('Breaking of measurement because of T2*')
-                break
-        if verbose:
-            print('Converged to: {:.9e}'.format(cur_freq))
-        if update:
-            self.f_qubit.set(cur_freq)
-        return cur_freq
-
-    def find_frequency(self, method='spectroscopy', pulsed=False,
-                       steps=[1, 3, 10, 30, 100, 300, 1000],
-                       artificial_periods = 2.5,
-                       freqs=None,
-                       f_span=100e6,
-                       use_max=False,
-                       f_step=1e6,
-                       verbose=True,
-                       update=True,
-                       close_fig=True):
-        """
-        Finds the qubit frequency using either the spectroscopy or the Ramsey
-        method.
-        Frequency prediction is done using
-        """
-
-        if method.lower() == 'spectroscopy':
-            if freqs is None:
-                f_qubit_estimate = self.calculate_frequency()
-                freqs = np.arange(f_qubit_estimate - f_span/2,
-                                  f_qubit_estimate + f_span/2,
-                                  f_step)
-            # args here should be handed down from the top.
-            self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
-                                      analyze=True, close_fig=close_fig)
-            if pulsed:
-                label = 'pulsed-spec'
-            else:
-                label = 'spectroscopy'
-            analysis_spec = ma.Qubit_Spectroscopy_Analysis(
-                label=label, close_fig=True, qb_name=self.name)
-
-            if update:
-                if use_max:
-                    self.f_qubit(analysis_spec.peaks['peak'])
-                else:
-                    self.f_qubit(analysis_spec.fitted_freq)
-                # TODO: add updating and fitting
-        elif method.lower() == 'ramsey':
-            return self.calibrate_frequency_ramsey(
-                steps=steps, artificial_periods=artificial_periods,
-                verbose=verbose, update=update, close_fig=close_fig)
-        return self.f_qubit()
-
-    def find_frequency_pulsed(self):
-        raise NotImplementedError()
-
-    def find_frequency_cw_spec(self):
-        raise NotImplementedError()
-
-
-    def calibrate_pulse_amplitude_coarse(self,
-                                         amps=np.linspace(-.5, .5, 31),
-                                         close_fig=True, verbose=False,
-                                         MC=None, update=True,
-                                         take_fit_I=False):
-        """
-        Calibrates the pulse amplitude using a single rabi oscillation
-        """
-
-        self.measure_rabi(amps, n=1, MC=MC, analyze=False)
-        a = ma.Rabi_Analysis(close_fig=close_fig)
-        # Decide which quadrature to take by comparing the contrast
-        if take_fit_I or len(a.measured_values) == 1:
-            ampl = abs(a.fit_res[0].params['period'].value)/2.
-        elif (np.abs(max(a.measured_values[0]) -
-                     min(a.measured_values[0]))) > (
-                np.abs(max(a.measured_values[1]) -
-                       min(a.measured_values[1]))):
-            ampl = a.fit_res[0].params['period'].value/2.
-        else:
-            ampl = a.fit_res[1].params['period'].value/2.
-
-        if update:
-            self.amp180.set(ampl)
-        return ampl
-
-    def calibrate_pulse_amplitude_flipping(self,
-                                           MC=None, update: bool=True,
-                                           fine_accuracy: float=0.005,
-                                           desired_accuracy: float=0.00005,
-                                           max_iterations: int=10,
-                                           verbose: bool=True):
-        """
-        Calibrates the pulse amplitude using a flipping sequence.
-        The flipping sequence itself should be implemented using the
-        "measure_flipping" method.
-        It converges to the optimal amplitude using first a coarse and then
-        a finer scan with more pulses.
-
-        Args:
-            MC                    : The measurement control used, if None
-                                   uses the one specified in the qubit object.
-            updates       (bool)  : if True updates the Q_amp180 parameter
-            fine_accuracy (float) : the accuracy to switch to the fine scan
-            desired_accuracy (float): the accuracy after which to terminate
-                                      the optimization
-            max_iterations  (int) : always terminate after this number of
-                                     optimizations.
-            verbose         (bool): if true adds additional print statements.
-        returns:
-            success         (bool): True if optimization converged.
-        """
-        success = False
-        fine = False
-        for k in range(max_iterations):
-            old_Q_amp180 = self.Q_amp180()
-            if not fine:
-                number_of_flips = 2*np.arange(60)
-            if fine:
-                number_of_flips = 8*np.arange(60)
-            a = self.measure_flipping(MC=MC, number_of_flips=number_of_flips)
-            Q_amp180_scale_factor = a.get_scale_factor()
-
-            # Check if Q_amp180_scale_factor is within boundaries
-            if Q_amp180_scale_factor > 1.1:
-                Q_amp180_scale_factor = 1.1
-                if verbose:
-                    print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
-                          + 'is too high, capping at 1.1')
-            elif Q_amp180_scale_factor < 0.9:
-                Q_amp180_scale_factor = 0.9
-                if verbose:
-                    print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
-                          + 'is too low, capping at 0.9')
-
-            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 7))
-
-            if verbose:
-                print('Q_amp180_scale_factor: {:.4f}, new Q_amp180: {}'.format(
-                      Q_amp180_scale_factor, self.Q_amp180()))
-
-            if (abs(Q_amp180_scale_factor-1) < fine_accuracy) and (not fine):
-                if verbose:
-                    print('Getting close to optimum, increasing sensitivity')
-                fine = True
-
-            if abs(Q_amp180_scale_factor-1) < desired_accuracy:
-                if verbose:
-                    print('within threshold')
-                success = True
-                break
-
-        # If converged?
-        if success and verbose:
-            print('Drive calibration set to {}'.format(self.Q_amp180()))
-        if not update or not success:
-            self.Q_amp180(old_Q_amp180)
-        return success
-
-    def find_pulse_amplitude(self, amps=np.linspace(-.5, .5, 31),
-                             N_steps=[3, 7, 13, 17], max_n=18,
-                             close_fig=True, verbose=False,
-                             MC=None, update=True, take_fit_I=False):
-        """
-        Finds the pulse-amplitude using a Rabi experiment.
-        Fine tunes by doing a Rabi around the optimum with an odd
-        multiple of pulses.
-
-        Args:
-            amps (array or float):
-                amplitudes of the first Rabi if an array,
-                if a float is specified it will be treated as an estimate
-                for the amplitude to be found.
-
-            N_steps (list of int):
-                number of pulses used in the fine tuning
-
-            max_n (int):
-                break of if N> max_n
-        """
-        if MC is None:
-            MC = self.MC.get_instr()
-        if np.size(amps) != 1:
-            ampl = self.calibrate_pulse_amplitude_coarse(
-                amps=amps, close_fig=close_fig, verbose=verbose,
-                MC=MC, update=update,
-                take_fit_I=take_fit_I)
-        else:
-            ampl = amps
-        if verbose:
-            print('Initial Amplitude:', ampl, '\n')
-
-        for n in N_steps:
-            if n > max_n:
-                break
-            else:
-
-                old_amp = ampl
-                ampl_span = 0.5*ampl/n
-                amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
-                self.measure_rabi(amps, n=n, MC=MC, analyze=False)
-                a = ma.Rabi_parabola_analysis(close_fig=close_fig)
-                # Decide which quadrature to take by comparing the contrast
-                if take_fit_I:
-                    ampl = a.fit_res[0].params['x0'].value
-                elif min(amps)<a.fit_res[0].params['x0'].value<max(amps)\
-                        and min(amps)<a.fit_res[1].params['x0'].value<max(amps):
-                    if (np.abs(max(a.fit_res[0].data)-min(a.fit_res[0].data)))>\
-                        (np.abs(max(a.fit_res[1].data)-min(a.fit_res[1].data))):
-                        ampl = a.fit_res[0].params['x0'].value
-                    else:
-                        ampl = a.fit_res[1].params['x0'].value
-                elif min(amps)<a.fit_res[0].params['x0'].value<max(amps):
-                    ampl = a.fit_res[0].params['x0'].value
-                elif min(amps)<a.fit_res[1].params['x0'].value<max(amps):
-                    ampl = a.fit_res[1].params['x0'].value
-                else:
-                    ampl_span*=1.5
-                    amps = np.linspace(old_amp-ampl_span, old_amp+ampl_span, 15)
-                    self.measure_rabi(amps, n=n, MC=MC, analyze=False)
-                    a = ma.Rabi_parabola_analysis(close_fig=close_fig)
-                    # Decide which quadrature to take by comparing the contrast
-                    if take_fit_I:
-                        ampl = a.fit_res[0].params['x0'].value
-                    elif (np.abs(max(a.measured_values[0]) -
-                                 min(a.measured_values[0]))) > (
-                        np.abs(max(a.measured_values[1]) -
-                               min(a.measured_values[1]))):
-                        ampl = a.fit_res[0].params['x0'].value
-                    else:
-                        ampl = a.fit_res[1].params['x0'].value
-                if verbose:
-                    print('Found amplitude', ampl, '\n')
-        if update:
-            self.amp180.set(np.abs(ampl))
-
-
-
-    def find_amp90_scaling(self, scales=0.5,
-                           N_steps=[5, 9], max_n=100,
-                           close_fig=True, verbose=False,
-                           MC=None, update=True, take_fit_I=False):
-        """
-        Finds the scaling factor of pi/2 pulses w.r.t pi pulses using a rabi
-        type with each pi pulse replaced by 2 pi/2 pulses.
-
-        If scales is an array it starts by fitting a cos to a Rabi experiment
-        to get an initial guess for the amplitude.
-
-        This experiment is only useful after carefully calibrating the pi pulse
-        using flipping sequences.
-        """
-        if MC is None:
-            MC = self.MC
-        if np.size(scales) != 1:
-            self.measure_rabi_amp90(scales=scales, n=1, MC=MC, analyze=False)
-            a = ma.Rabi_Analysis(close_fig=close_fig)
-            if take_fit_I:
-                scale = abs(a.fit_res[0].params['period'].value)/2
-            else:
-                if (a.fit_res[0].params['period'].stderr <=
-                        a.fit_res[1].params['period'].stderr):
-                    scale = abs(a.fit_res[0].params['period'].value)/2
-                else:
-                    scale = abs(a.fit_res[1].params['period'].value)/2
-        else:
-            scale = scales
-        if verbose:
-            print('Initial scaling factor:', scale, '\n')
-
-        for n in N_steps:
-            if n > max_n:
-                break
-            else:
-                scale_span = 0.3*scale/n
-                scales = np.linspace(scale-scale_span, scale+scale_span, 15)
-                self.measure_rabi_amp90(scales, n=n, MC=MC, analyze=False)
-                a = ma.Rabi_parabola_analysis(close_fig=close_fig)
-                if take_fit_I:
-                    scale = a.fit_res[0].params['x0'].value
-                else:
-                    if (a.fit_res[0].params['x0'].stderr <=
-                            a.fit_res[1].params['x0'].stderr):
-                        scale = a.fit_res[0].params['x0'].value
-                    else:
-                        scale = a.fit_res[1].params['x0'].value
-                if verbose:
-                    print('Founcaleitude', scale, '\n')
-        if update:
-            self.amp90_scale(scale)
-            print("should be updated")
-            print(scale)

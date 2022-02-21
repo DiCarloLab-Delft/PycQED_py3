@@ -393,9 +393,6 @@ class VNA_analysis(complex_spectroscopy):
 
             self.proc_data_dict['complex_fit_msg'] = msg
 
-
-
-
     def prepare_plots(self):
         super(VNA_analysis, self).prepare_plots()
         if self.do_fitting:
@@ -1073,7 +1070,7 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
 
       peak_freqs, peak_heights, data = a_tools.peak_finder_v3(freqs,
                                                           data,
-                                                          perc=99, factor=-1,
+                                                          perc=96, factor=-1,
                                                           window_len=11)
 
       if len(peak_freqs) == 0:
@@ -1118,10 +1115,15 @@ class Initial_Resonator_Scan_Analysis(ba.BaseDataAnalysis):
 
       # Remove duplicates:
       final_peaks = []
-      for peak in self.peaks:
+      final_hights = []
+      for i, peak in enumerate(self.peaks):
           if peak not in final_peaks:
               final_peaks.append(peak)
+              final_hights.append(self.peak_height[i])
       self.peaks = final_peaks
+      self.peak_height = final_hights
+
+
 
     def plot_fit_result(self, normalize=False,
                         save_fig=True, figsize=None, **kw):

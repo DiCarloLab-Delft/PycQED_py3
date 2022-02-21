@@ -107,6 +107,15 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         label="Time between squares",
     )
     this_flux_lm.add_parameter(
+        "vcz_time_pad_%s" % which_gate,
+        docstring="Time used to align different cz pulses.",
+        parameter_class=ManualParameter,
+        vals=vals.Numbers(0., 500e-9),
+        initial_value=0,
+        unit="s",
+        label="Time padding before and after main pulse",
+    )
+    this_flux_lm.add_parameter(
         "vcz_time_before_q_ph_corr_%s" % which_gate,
         docstring="Time after main pulse before single qubit phase "
         "correction.",
@@ -115,6 +124,34 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         initial_value=0.,
         unit="s",
         label="Time before correction",
+    )
+    this_flux_lm.add_parameter(
+        "vcz_use_asymmetric_amp_%s" % which_gate,
+        docstring="Flag to turn on asymmetric amplitudes of the SNZ pulse",
+        parameter_class=ManualParameter,
+        vals=vals.Bool(),
+        initial_value=False,
+        label="Use asymmetric SNZ pulse amplitudes",
+    )
+    this_flux_lm.add_parameter(
+        "vcz_amp_pos_%s" % which_gate,
+        docstring="Amplitude of positive part of SNZ pulse, "
+        "used only if vcz_use_asymmetric_amp is true.",
+        parameter_class=ManualParameter,
+        vals=vals.Numbers(0.0, 10.0),
+        initial_value=1.0,
+        unit="a.u.",
+        label="Positive SNZ amplitude, if asymmetric is used.",
+    )
+    this_flux_lm.add_parameter(
+        "vcz_amp_neg_%s" % which_gate,
+        docstring="Amplitude of negative part of SNZ pulse, "
+        "used only if vcz_use_asymmetric_amp is true.",
+        parameter_class=ManualParameter,
+        vals=vals.Numbers(0.0, 10.0),
+        initial_value=1.0,
+        unit="a.u.",
+        label="Negative SNZ amplitude, if asymmetric is used.",
     )
 
     for specificity in ["coarse", "fine"]:
@@ -143,6 +180,7 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
             parameter_class=ManualParameter,
             vals=vals.Arrays(),
         )
+
 
 
 def align_vcz_q_phase_corr_with(
@@ -227,35 +265,41 @@ def vcz_waveform(
     sim_ctrl_cz=None,
     return_dict=False
 ):
-
     amp_at_sweetspot = 0.0
     if which_gate is None and sim_ctrl_cz is not None:
         which_gate = sim_ctrl_cz.which_gate()
 
-    amp_at_int_11_02 = fluxlutman.get("vcz_amp_dac_at_11_02_{}".format(which_gate))
-
     sampling_rate = fluxlutman.sampling_rate()
+    dt = 1
+
+    amp_at_int_11_02 = fluxlutman.get("vcz_amp_dac_at_11_02_{}".format(which_gate))
+    # In case we might want to play only with the pulse length and/or the
+    # time in the middle (fine adjustment of middle time via slope)
+    use_amp_fine = fluxlutman.get("vcz_use_amp_fine_{}".format(which_gate))
+    # we might need to use asymmetric pulse amplitudes for the NZ pulse
+    # if the qubit is operated off-sweetspot and interaction points are at different distances
+    use_asymmetric_NZ = fluxlutman.get("vcz_use_asymmetric_amp_{}".format(which_gate))
+
+    # single qubit phase correction parameters
+    correct_q_phase = fluxlutman.get("vcz_correct_q_phase_{}".format(which_gate))
+    time_q_ph_corr = fluxlutman.get("vcz_time_q_ph_corr_{}".format(which_gate))
+    time_q_ph_corr = time_q_ph_corr * sampling_rate  # avoid numerical issues
+    time_before_q_ph_corr = fluxlutman.get("vcz_time_before_q_ph_corr_{}".format(which_gate))
+    time_before_q_ph_corr = time_before_q_ph_corr * sampling_rate  # avoid numerical issues
 
     time_sqr = fluxlutman.get("vcz_time_single_sq_{}".format(which_gate))
     time_sqr = time_sqr * sampling_rate  # avoid numerical issues
-    time_before_q_ph_corr = fluxlutman.get("vcz_time_before_q_ph_corr_{}".format(which_gate))
-    time_before_q_ph_corr = time_before_q_ph_corr * sampling_rate  # avoid numerical issues
+
     time_middle = fluxlutman.get("vcz_time_middle_{}".format(which_gate))
     time_middle = time_middle * sampling_rate  # avoid numerical issues
-    time_q_ph_corr = fluxlutman.get("vcz_time_q_ph_corr_{}".format(which_gate))
-    time_q_ph_corr = time_q_ph_corr * sampling_rate  # avoid numerical issues
 
-    dt = 1
+    # padding time at each side of the pulse, to fill to the cycle length
+    time_pad = fluxlutman.get("vcz_time_pad_{}".format(which_gate))
+    time_pad = time_pad * sampling_rate
 
-    # Normalized to the amplitude at the CZ interaction point
+    # normalized to the amplitude at the CZ interaction point
     norm_amp_sq = fluxlutman.get("vcz_amp_sq_{}".format(which_gate))
     norm_amp_fine = fluxlutman.get("vcz_amp_fine_{}".format(which_gate))
-    amp_q_ph_corr = fluxlutman.get("vcz_amp_q_ph_corr_{}".format(which_gate))
-
-    correct_q_phase = fluxlutman.get("vcz_correct_q_phase_{}".format(which_gate))
-    # In case we might want to play only with the pulse length and/or the
-    # time in the middle
-    use_amp_fine = fluxlutman.get("vcz_use_amp_fine_{}".format(which_gate))
 
     # This is to avoid numerical issues when the user would run sweeps with
     # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
@@ -264,38 +308,76 @@ def vcz_waveform(
     time_middle = np.round(time_middle / dt) * dt
     time_sqr = np.round(time_sqr / dt) * dt
     half_time_q_ph_corr = np.round(time_q_ph_corr / 2 / dt) * dt
+    time_pad = np.round(time_pad / dt) * dt
 
-    if use_amp_fine:
-        # such that this amp is in the range [0, 1]
-        slope_amp = np.array([norm_amp_fine * norm_amp_sq])
-    else:
-        slope_amp = np.array([])
-
+    pad_amps = np.full(int(time_pad / dt), 0)
     sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
     amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)
-    buffer_before_corr = np.full(int(time_before_q_ph_corr / dt), amp_at_sweetspot)
-    pos_q_ph_corr = np.full(int(half_time_q_ph_corr / dt), amp_q_ph_corr)
 
-    half_NZ_amps = np.concatenate((sq_amps, slope_amp))
+    if use_asymmetric_NZ:
+        # build asymmetric SNZ amplitudes
+        norm_amp_pos = fluxlutman.get("vcz_amp_pos_{}".format(which_gate))
+        norm_amp_neg = fluxlutman.get("vcz_amp_neg_{}".format(which_gate))
+        pos_sq_amps = np.full(int(time_sqr / dt), norm_amp_pos)
+        neg_sq_amps = np.full(int(time_sqr / dt), norm_amp_neg)
 
-    amp = np.concatenate((
-        [amp_at_sweetspot],
-        half_NZ_amps,
-        amps_middle,
-        -half_NZ_amps[::-1],
-        [amp_at_sweetspot])
-    )
+        if use_amp_fine:
+            # slope amp will be using the same scaling factor as in the symmetric case, 
+            # but relative to pos and neg amplitudes 
+            # such that this amp is in the range [0, 1]
+            slope_amp_pos = np.array([norm_amp_fine * norm_amp_pos])
+            slope_amp_neg = np.array([norm_amp_fine * norm_amp_neg])
+        else: # sdfsdfsd
+            slope_amp_pos = slope_amp_neg = np.array([])
+
+        pos_NZ_amps = np.concatenate((pos_sq_amps, slope_amp_pos))
+        neg_NZ_amps = np.concatenate((slope_amp_neg, neg_sq_amps))
+
+        amp = np.concatenate(
+            ([amp_at_sweetspot],
+            pad_amps,
+            pos_NZ_amps,
+            amps_middle,
+            -neg_NZ_amps,
+            pad_amps,
+            [amp_at_sweetspot])
+        )
+    else:
+        if use_amp_fine:
+            # such that this amp is in the range [0, 1]
+            slope_amp = np.array([norm_amp_fine * norm_amp_sq])
+        else:
+            slope_amp = np.array([])
+
+        half_NZ_amps = np.concatenate((sq_amps, slope_amp))
+
+        amp = np.concatenate(
+            ([amp_at_sweetspot],
+            pad_amps,
+            half_NZ_amps,
+            amps_middle,
+            -half_NZ_amps[::-1],
+            pad_amps,
+            [amp_at_sweetspot])
+        )
 
     if correct_q_phase:
-        amps_corr = np.concatenate((
-            buffer_before_corr,
+        amp_q_ph_corr = fluxlutman.get("vcz_amp_q_ph_corr_{}".format(which_gate))
+        buffer_before_corr = np.full(int(time_before_q_ph_corr / dt), amp_at_sweetspot)
+        pos_q_ph_corr = np.full(int(half_time_q_ph_corr / dt), amp_q_ph_corr)
+
+        amps_corr = np.concatenate(
+            (buffer_before_corr,
             pos_q_ph_corr,
-            -pos_q_ph_corr))
+            -pos_q_ph_corr)
+        )
+
         if len(amps_corr):
-            amp = np.concatenate((
-                amp,
+            amp = np.concatenate(
+                (amp,
                 amps_corr,
-                [amp_at_sweetspot]))
+                [amp_at_sweetspot])
+            )
 
     amp = amp_at_int_11_02 * amp
 

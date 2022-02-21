@@ -89,6 +89,7 @@ class Test_HDF5(unittest.TestCase):
         self.assertEqual(test_dict.keys(), new_dict.keys())
         self.assertEqual(test_dict[0], new_dict[0])
 
+    @unittest.skip('FIXME: disabled, see PR #643')
     def test_writing_and_reading_dicts_to_hdf5(self):
         """
         Tests dumping some random dictionary to hdf5 and reading back the
@@ -116,7 +117,7 @@ class Test_HDF5(unittest.TestCase):
             'some_int': 3,
             'some_float': 3.5,
             'some_np_int': np.int(3),
-            'some_np_float': np.float(3.5)
+            'some_np_float': float(3.5)
         }
 
         data_object = h5d.Data(name='test_object', datadir=self.datadir)
