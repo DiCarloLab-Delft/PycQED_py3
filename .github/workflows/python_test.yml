@@ -26,12 +26,19 @@ jobs:
         sleep 3
     - name: Upgrade pip
       run: python -m pip install --upgrade pip
-    - name: Install OpenQL
-      run: pip install --verbose -f https://github.com/DiCarloLab-Delft/OpenQL/releases qutechopenql
-    - name: Install dependencies
+
+    - name: Debug 'pip install -f <path>' failing below
       run: |
-        sudo apt-get install python3-pyqt5
-        #pip install --verbose -f https://github.com/DiCarloLab-Delft/OpenQL/releases "qutechopenql >= 0.10.3"
+        sudo apt-get install wget
+        wget https://github.com/DiCarloLab-Delft/OpenQL/releases
+        grep openql releases
+    - name: Install development release of OpenQL
+      run: pip install qutechopenql --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases
+
+    - name: Install dependencies
+      run: sudo apt-get install python3-pyqt5
+    - name: Install Python dependencies
+      run: |
         pip install -r requirements.txt
         pip install qutip  # ensure all dependencies installed before qutip
         pip install -e .   # installs pycqed itself
