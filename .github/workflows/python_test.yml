@@ -33,7 +33,7 @@ jobs:
 #        wget https://github.com/DiCarloLab-Delft/OpenQL/releases
 #        grep openql releases
     - name: Install development release of OpenQL
-      run: pip install qutechopenql --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases --trusted-host=github.com
+      run: pip install qutechopenql --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases --trusted-host=github.com --isolated
 
     - name: Install dependencies
       run: sudo apt-get install python3-pyqt5
