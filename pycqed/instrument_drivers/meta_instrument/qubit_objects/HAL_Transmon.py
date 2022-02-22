@@ -3635,7 +3635,7 @@ class HAL_Transmon(HAL_ShimSQ):
                 self.T2_echo(a.fit_res.params['tau'].value)
             return a
 
-    # FIXME: parameter measure_qubit is accessed as meas_qubit: unresolved reference
+    @deprecated(version='0.4', reason="broken")
     def measure_echo_ramzz(self, measure_qubit, ramzz_wait_time,
                            times=None, MC=None,
                            analyze=True, close_fig=True, update=True,
@@ -3646,68 +3646,72 @@ class HAL_Transmon(HAL_ShimSQ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # default timing
-        if times is None:
-            # funny default is because there is no real time sideband
-            # modulation
-            stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time()))
-                           * abs(self.cfg_cycle_time()), 20e-9)
-            times = np.arange(0, self.T2_echo()*4, stepsize*2)
+        if 1:
+            raise NotImplementedError("FIXME: code is broken, parameter measure_qubit is accessed as meas_qubit: unresolved reference")
+        else:  # by disabling we no longer get errors from PyCharm
+            # default timing
+            if times is None:
+                # funny default is because there is no real time sideband
+                # modulation
+                stepsize = max((self.T2_echo()*2/61)//(abs(self.cfg_cycle_time()))
+                               * abs(self.cfg_cycle_time()), 20e-9)
+                times = np.arange(0, self.T2_echo()*4, stepsize*2)
 
-        # append the calibration points, times are for location in plot
-        dt = times[1] - times[0]
-        times = np.concatenate([times,
-                                (times[-1]+1*dt,
-                                 times[-1]+2*dt,
-                                    times[-1]+3*dt,
-                                    times[-1]+4*dt)])
+            # append the calibration points, times are for location in plot
+            dt = times[1] - times[0]
+            times = np.concatenate([times,
+                                    (times[-1]+1*dt,
+                                     times[-1]+2*dt,
+                                        times[-1]+3*dt,
+                                        times[-1]+4*dt)])
 
-        mw_lutman = self.instr_LutMan_MW.get_instr()
-        # # Checking if pulses are on 20 ns grid
-        if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for
-                    t in times]):
-            raise ValueError('timesteps must be multiples of 40e-9')
+            mw_lutman = self.instr_LutMan_MW.get_instr()
+            # # Checking if pulses are on 20 ns grid
+            if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for
+                        t in times]):
+                raise ValueError('timesteps must be multiples of 40e-9')
 
-        # # Checking if pulses are locked to the pulse modulation
-        if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9) == 0 for t in times]) and\
-         mw_lutman.cfg_sideband_mode() != 'real-time':
-            raise ValueError(
-                'timesteps must be multiples of 2 modulation periods')
+            # # Checking if pulses are locked to the pulse modulation
+            if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9) == 0 for t in times]) and\
+             mw_lutman.cfg_sideband_mode() != 'real-time':
+                raise ValueError(
+                    'timesteps must be multiples of 2 modulation periods')
 
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain()
-            meas_qubit.prepare_for_timedomain()
+            if prepare_for_timedomain:
+                self.prepare_for_timedomain()
+                meas_qubit.prepare_for_timedomain()
 
-        mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-        p = sqo.echo_ramzz(times,
-                           inv_qubit_idx=self.cfg_qubit_nr(),
-                           meas_qubit_idx=meas_qubit.cfg_qubit_nr(),
-                           ramzz_wait_time_ns=ramzz_wait_time*1e9,
-                           platf_cfg=self.cfg_openql_platform_fn())
+            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+            p = sqo.echo_ramzz(times,
+                               inv_qubit_idx=self.cfg_qubit_nr(),
+                               meas_qubit_idx=meas_qubit.cfg_qubit_nr(),
+                               ramzz_wait_time_ns=ramzz_wait_time*1e9,
+                               platf_cfg=self.cfg_openql_platform_fn())
 
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name="Time", unit="s")
-        d = measure_qubit.int_avg_det
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(times)
-        MC.set_detector_function(d)
-        MC.run('echo_'+label+self.name+'_ramzz_'+meas_qubit.name)
-        if analyze:
-            # N.B. v1.5 analysis
-            a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
-            if update:
-                self.T2_echo(a.fit_res.params['tau'].value)
-            return a
+            s = swf.OpenQL_Sweep(openql_program=p,
+                                 CCL=self.instr_CC.get_instr(),
+                                 parameter_name="Time", unit="s")
+            d = measure_qubit.int_avg_det
+            MC.set_sweep_function(s)
+            MC.set_sweep_points(times)
+            MC.set_detector_function(d)
+            MC.run('echo_'+label+self.name+'_ramzz_'+meas_qubit.name)
+            if analyze:
+                # N.B. v1.5 analysis
+                a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
+                if update:
+                    self.T2_echo(a.fit_res.params['tau'].value)
+                return a
 
 
-    def measure_restless_ramsey(self, amount_of_repetitions=None, time=None,
-                                amount_of_shots=2**20, MC=None,
-                                prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
-
+    def measure_restless_ramsey(
+            self,
+            amount_of_repetitions=None,
+            time=None,
+            amount_of_shots=2**20,
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain=True
+    ):
         label = f"Restless_Ramsey_N={amount_of_repetitions}_tau={time}"
 
         if MC is None:
@@ -3724,11 +3728,12 @@ class HAL_Transmon(HAL_ShimSQ):
             self.prepare_readout()
         MC.soft_avg(1)
 
-        p = sqo.Restless_Ramsey(time=time,
-                                qubit_idx=self.cfg_qubit_nr(),
-                                platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
+        p = sqo.Restless_Ramsey(
+            time=time,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(amount_of_repetitions * amount_of_shots))
 
@@ -5728,11 +5733,11 @@ class HAL_Transmon(HAL_ShimSQ):
             rates_I_quad_ch_idx=0,
             cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
         )
-        
+
         for key in a.proc_data_dict['quantities_of_interest'].keys():
             if 'eps_simple_lin_trans' in key:
                 self.F_RB((1-a.proc_data_dict['quantities_of_interest'][key].n)**(1/1.875))
-        
+
         return True
 
 

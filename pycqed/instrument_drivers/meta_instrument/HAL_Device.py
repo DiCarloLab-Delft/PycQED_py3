@@ -14,6 +14,7 @@ import datetime
 import multiprocessing
 from importlib import reload
 from typing import List, Union, Optional
+from deprecated import deprecated
 
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import HAL_ShimMQ
 
@@ -235,7 +236,7 @@ class HAL_Device(HAL_ShimMQ):
             options_dict=options_dict,
             extract_only=extract_only)
 
-        result_dict = {'cond_osc': a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value, 
+        result_dict = {'cond_osc': a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value,
                        'leakage': a.proc_data_dict['quantities_of_interest']['missing_fraction'].nominal_value}
 
         return a
@@ -936,6 +937,7 @@ class HAL_Device(HAL_ShimMQ):
     #     return self
 
 
+    @deprecated(version='0.4', reason="broken")
     def measure_two_qubit_grovers_repeated(
             self,
             qubits: list,
@@ -5758,7 +5760,7 @@ class HAL_Device(HAL_ShimMQ):
             getattr(flux_lm, 'cz_theta_f_' + gate )(crossed_value)
 
         return True
-        
+
 
     def calibrate_multi_frequency_fine(
             self,
