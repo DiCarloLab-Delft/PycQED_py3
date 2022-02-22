@@ -28,11 +28,7 @@ jobs:
       run: python -m pip install --upgrade pip
 
     - name: Debug 'pip install -f <path>' failing below
-      run: |
-#        sudo apt-get install wget
-#        wget https://github.com/DiCarloLab-Delft/OpenQL/releases
-#        grep openql releases
-         pip config list
+      run: pip config list
     - name: Install development release of OpenQL
       run: pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases
       # --trusted-host=github.com --isolated
