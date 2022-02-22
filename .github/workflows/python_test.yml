@@ -27,13 +27,13 @@ jobs:
     - name: Upgrade pip
       run: python -m pip install --upgrade pip
 
-    - name: Debug 'pip install -f <path>' failing below
-      run: |
-        sudo apt-get install wget
-        wget https://github.com/DiCarloLab-Delft/OpenQL/releases
-        grep openql releases
+#    - name: Debug 'pip install -f <path>' failing below
+#      run: |
+#        sudo apt-get install wget
+#        wget https://github.com/DiCarloLab-Delft/OpenQL/releases
+#        grep openql releases
     - name: Install development release of OpenQL
-      run: pip install qutechopenql --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases
+      run: pip install qutechopenql --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases --trusted-host=github.com
 
     - name: Install dependencies
       run: sudo apt-get install python3-pyqt5
