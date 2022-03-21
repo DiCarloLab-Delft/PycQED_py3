@@ -1062,7 +1062,10 @@ setTrigger(0);
             time.sleep(0.5)
             valid_sequence = True
             for awg in [0]:
-                error_timing = self.geti('raw/dios/0/error/timing')
+                try:
+                    error_timing = self.geti('raw/dios/0/error/timing')
+                except RuntimeError:  # LabOne 22.02 and higher
+                    error_timing = self.geti('raw/dios/0/error/timingsticky')
                 if error_timing & combined_mask != 0:
                     valid_sequence = False
 
