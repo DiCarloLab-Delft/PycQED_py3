@@ -40,8 +40,11 @@ platf_cfg_path = output_path / 'config_cc_s17_direct_iq_openql_0_10.json'
 
 
 class Test_Device_obj(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
+    # FIXME: using setUpClass is more efficient, but failing tests tend to influence each other, making debugging difficult
+    #  If we stick with setUp, 'cls' should be renamed to 'self'
+    # @classmethod
+    # def setUpClass(cls):
+    def setUp(cls):
         """
         This sets up a mock setup using a CC to control multiple qubits
         """
@@ -228,8 +231,10 @@ class Test_Device_obj(unittest.TestCase):
 
         cls.device.dio_map(cls.dio_map_CC)
 
-    @classmethod
-    def tearDownClass(cls):
+    # FIXME
+    # @classmethod
+    # def tearDownClass(cls):
+    def tearDown(cls):
         Instrument.close_all()
 
     ##############################################
@@ -486,7 +491,8 @@ class Test_Device_obj(unittest.TestCase):
 
         # Combinations are based on qubit number
         res_combs0 = self.ro_lutman_0.resonator_combinations()
-        exp_res_combs0 = [[11]]
+        # exp_res_combs0 = [[11]]
+        exp_res_combs0 = [[6]]
         assert res_combs0 == exp_res_combs0
 
         res_combs1 = self.ro_lutman_1.resonator_combinations()
@@ -672,7 +678,7 @@ class Test_Device_obj(unittest.TestCase):
     # FIXME: split into separate test class, like in test_qubit_objects.py
     ##############################################
 
-    @unittest.skip("FIXME: disabled")
+    # @unittest.skip("FIXME: disabled")
     def test_measure_two_qubit_randomized_benchmarking(self):
         self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
 

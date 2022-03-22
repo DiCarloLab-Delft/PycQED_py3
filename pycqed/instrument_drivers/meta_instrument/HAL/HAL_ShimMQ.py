@@ -167,8 +167,7 @@ class HAL_ShimMQ(Instrument):
                 fl_lutman = qb.instr_LutMan_Flux.get_instr()
                 fl_lutman.load_waveforms_onto_AWG_lookuptable()
             except Exception as e:
-                warnings.warn("Could not load flux pulses for {}".format(qb))
-                warnings.warn("Exception {}".format(e))
+                warnings.warn(f"Could not load flux pulses for {qb}, exception '{e}'")
 
     def prepare_readout(self, qubits, reduced: bool = False):
         """
