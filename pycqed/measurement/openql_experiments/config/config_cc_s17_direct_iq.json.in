@@ -190,7 +190,7 @@
         // NB: is is not possible to decompose 'new style' decompositions into these 'legacy'
         // decompositions. Trying so will result in: "the duration of the schedule of the decomposition
         // (18446744073709551615) cannot be longer than the duration of the to-be-decomposed instruction (2)"
-        // Since this is not easily solved and the bew system is far better anyway (although slightly more verbose)
+        // Since this is not easily solved and the new system is far better anyway (although slightly more verbose)
         // we won't solve that.
 
 //        ,
@@ -221,6 +221,13 @@
 
         // 2. flux-dance with hard-coded CZ gates in parallel.
         // Qubits are ordered in sf_cz target, control.
+
+          // FIXME: test for Hani
+//        "flux_dance_1 q0": ["barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6",
+//                            "sf_cz_ne q3", "sf_cz_sw q5", "sf_cz_sw q16", "sf_cz_ne q8", "sf_cz_ne q11", "sf_cz_sw q2",
+//                            "sf_park q1", "sf_park q10", "sf_park q14","sf_park q6",
+//                            "barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6"]
+
 //        "flux_dance_1 q0": ["barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6",
 //                            "sf_cz_ne q3", "sf_cz_sw q5", "sf_cz_sw q16", "sf_cz_ne q8", "sf_cz_ne q11", "sf_cz_sw q2",
 //                            "sf_park q1", "sf_park q10", "sf_park q14","sf_park q6",
@@ -336,7 +343,7 @@
         // Should be compatible with API, and cQASM1.2
         //
         // Note that for historical reasons, qubits referred to in the instruction name don't use "[]" (e.g. "q8"),
-        // whereas the decomposition/into key requires them (e.g. "q[8]"), because it uses cQasm syntax
+        // whereas the decomposition/into key requires them (e.g. "q[8]"), because it uses cQASM syntax
         //
         // OpenQL>=0.10.3 allows automatic calculation of decomposition duration if duration=0 is specified
         //****************************************************************
@@ -507,6 +514,7 @@
            }
         },
 
+        // Randomized banchmarking (test)
         // based on TwoQubitClifford::gate_decomposition
         "_test_decompose_2q_clifford": {
            "prototype": ["X:qubit", "X:qubit", "L:int"],
@@ -540,6 +548,7 @@
            }
         },
 
+        // Refocussing (test)
         // CZ with park and refocus
         "__cz_sw_ne_park_refocus": {
             "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],

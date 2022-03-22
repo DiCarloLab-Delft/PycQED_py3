@@ -666,6 +666,7 @@ class OqlProgram:
             )
 
             # decomposer for legacy decompositions (those defined in the "gate_decomposition" section)
+            # FIXME: comment incorrect, also decomposes new-style definitions
             # see https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
             c.append_pass(
                 'dec.Instructions',

@@ -123,12 +123,20 @@ class Test_cQASM(unittest.TestCase):
 
         # FIXME: not cqasm, move
         def test_decompose_measure_specialized_api(self):
-            # NB: OpenQL < 0.10.3 reverses order of decompositions
             p = OqlProgram("test_decompose_measure_specialized_api", str(platf_cfg_path))
 
             k = p.create_kernel("kernel")
             k.measure(0)
             k.measure(6)
+            p.add_kernel(k)
+            p.compile()
+
+        # FIXME: not cqasm, move
+        def test_decompose_fluxdance_api(self):
+            p = OqlProgram("test_decompose_fluxdance_api", str(platf_cfg_path))
+
+            k = p.create_kernel("kernel")
+            k.gate("flux_dance_1", 0)
             p.add_kernel(k)
             p.compile()
 
@@ -145,6 +153,8 @@ class Test_cQASM(unittest.TestCase):
 
                 measure q[0:16]  
                 measure q[6]
+                barrier
+                measure q[0:8]
             """
 
             p = OqlProgram(name, str(platf_cfg_path))  # NB: name must be identical to name set by "pragma @ql.name" above
