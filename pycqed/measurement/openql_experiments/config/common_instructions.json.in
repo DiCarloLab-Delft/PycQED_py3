@@ -658,8 +658,8 @@
                 "into": "_do_measure op(0)"
             }
         },
-        // FIXME: experiment to prefix some measurements with rx12
-        "measure q6": {
+        // FIXME: test to prefix some measurements with rx12
+        "_measure q6": {
             "prototype": ["M:qubit"],
             "duration": 0,
             "decomposition": {

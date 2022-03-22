@@ -234,7 +234,7 @@ class Test_Device_obj(unittest.TestCase):
     # FIXME
     # @classmethod
     # def tearDownClass(cls):
-    def tearDown(cls):
+    def tearDown(self):
         Instrument.close_all()
 
     ##############################################
