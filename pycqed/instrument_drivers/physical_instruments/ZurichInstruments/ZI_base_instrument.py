@@ -898,8 +898,7 @@ class ZI_base_instrument(Instrument):
             elif par['Type'] == 'Integer (enumerated)':
                 par_kw['set_cmd'] = _gen_set_cmd(self.seti, parpath)
                 par_kw['get_cmd'] = _gen_get_cmd(self.geti, parpath)
-                par_kw['vals'] = validators.Ints(min_value=0,
-                                                 max_value=len(par["Options"]))
+                par_kw['vals'] = validators.Ints()
 
             elif par['Type'] == 'Double':
                 par_kw['set_cmd'] = _gen_set_cmd(self.setd, parpath)
