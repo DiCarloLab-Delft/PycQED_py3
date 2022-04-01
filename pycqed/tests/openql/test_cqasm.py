@@ -95,9 +95,11 @@ class Test_cQASM(unittest.TestCase):
                 map i = creg(0)
                 map b = breg(0) # FIXME: assign on PL state, not DSM
 
-                # op(0)
-                set i = rnd_seed(0)                
-                set b = rnd(0.5)  # on all CCIO              
+                # NB: on all CCIO:  
+                set i = rnd_seed(0, 12345678)                
+                set i = rnd_threshold(0, 0.5)                
+                # set b = rnd(0)
+                cond (rnd(0)) rx180 q[0]              
             """
 
             p = OqlProgram(name, str(platf_cfg_path))  # NB: name must be identical to name set by "pragma @ql.name" above
