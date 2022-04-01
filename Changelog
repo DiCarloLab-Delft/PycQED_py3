@@ -9,7 +9,8 @@ Legend:
 . Generic bullet
 
 v0.4 - Work In Progress
-# removed support for CCL and QCC
+. removed support for CCL and then reinstated it (commit d410e85)
+# removed support for QCC
 . openql_helpers:
     + created class OqlProgram to separate the OpenQl 'Program' from our additional data
     + added support for cqasm compilation

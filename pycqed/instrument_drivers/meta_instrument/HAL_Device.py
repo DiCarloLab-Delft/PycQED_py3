@@ -14,6 +14,7 @@ import datetime
 import multiprocessing
 from importlib import reload
 from typing import List, Union, Optional
+from deprecated import deprecated
 
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import HAL_ShimMQ
 
@@ -235,7 +236,7 @@ class HAL_Device(HAL_ShimMQ):
             options_dict=options_dict,
             extract_only=extract_only)
 
-        result_dict = {'cond_osc': a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value, 
+        result_dict = {'cond_osc': a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value,
                        'leakage': a.proc_data_dict['quantities_of_interest']['missing_fraction'].nominal_value}
 
         return a
@@ -936,6 +937,7 @@ class HAL_Device(HAL_ShimMQ):
     #     return self
 
 
+    @deprecated(version='0.4', reason="broken")
     def measure_two_qubit_grovers_repeated(
             self,
             qubits: list,
@@ -3173,7 +3175,7 @@ class HAL_Device(HAL_ShimMQ):
                 Duration in ns of the flux pulse used when interleaved gate is
                 [100_000], i.e. idle identity
 
-            compilation_only (bool):
+            compile_only (bool):
                 Compile only the RB sequences without measuring, intended for
                 parallelizing iRB sequences compilation with measurements
 
@@ -3221,7 +3223,7 @@ class HAL_Device(HAL_ShimMQ):
         else:
             sim_cz_qubits_idxs = None
 
-        net_cliffords = [0, 3 * 24 + 3]
+        net_cliffords = [0, 3 * 24 + 3]  # see two_qubit_clifford_group::common_cliffords
 
         def send_rb_tasks(pool_):
             tasks_inputs = []
@@ -3254,7 +3256,7 @@ class HAL_Device(HAL_ShimMQ):
             return rb_tasks
 
         if compile_only:
-            assert pool is not None
+            assert pool is not None  # FIXME: add proper message
             rb_tasks = send_rb_tasks(pool)
             return rb_tasks
 
@@ -5758,7 +5760,7 @@ class HAL_Device(HAL_ShimMQ):
             getattr(flux_lm, 'cz_theta_f_' + gate )(crossed_value)
 
         return True
-        
+
 
     def calibrate_multi_frequency_fine(
             self,

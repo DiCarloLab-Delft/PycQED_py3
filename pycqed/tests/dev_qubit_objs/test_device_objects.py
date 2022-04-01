@@ -3,9 +3,11 @@ import pytest
 from pytest import approx
 import numpy as np
 import os
+import pathlib
 
 import pycqed as pq
 
+import pycqed.measurement.openql_experiments.generate_CC_cfg_modular as gen
 from pycqed.instrument_drivers.meta_instrument import device_object_CCL as do
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon import CCLight_Transmon
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
@@ -32,13 +34,24 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dum
 
 from qcodes import station, Instrument
 
+this_path = pathlib.Path(__file__).parent
+output_path = pathlib.Path(this_path) / 'test_output_cc'
+platf_cfg_path = output_path / 'config_cc_s17_direct_iq_openql_0_10.json'
+
 
 class Test_Device_obj(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
+    # FIXME: using setUpClass is more efficient, but failing tests tend to influence each other, making debugging difficult
+    #  If we stick with setUp, 'cls' should be renamed to 'self'
+    # @classmethod
+    # def setUpClass(cls):
+    def setUp(cls):
         """
         This sets up a mock setup using a CC to control multiple qubits
         """
+        # generate OpenQL configuration
+        gen.generate_config_modular(platf_cfg_path)
+
+
         cls.station = station.Station()
 
         cls.CC = CC('CC', DummyTransport())
@@ -142,14 +155,14 @@ class Test_Device_obj(unittest.TestCase):
                     q.instr_acquisition(cls.UHFQC_2.name)
                     q.instr_LutMan_RO(cls.ro_lutman_2.name)
 
-            q.instr_VSM(cls.VSM.name)
+            # q.instr_VSM(cls.VSM.name)
+            q.cfg_with_vsm(False)
             q.instr_CC(cls.CC.name)
             q.instr_MC(cls.MC.name)
 
             q.instr_SH(cls.SH.name)
 
-            config_fn = os.path.join(pq.__path__[0], "tests", "test_cfg_cc.json")
-            q.cfg_openql_platform_fn(config_fn)
+            q.cfg_openql_platform_fn(str(platf_cfg_path))
 
             # Setting some "random" initial parameters
             q.ro_freq(5.43e9 + q_idx * 50e6)
@@ -171,6 +184,8 @@ class Test_Device_obj(unittest.TestCase):
         cls.device = do.DeviceCCL("device")
         cls.device.qubits([q.name for q in qubits])
         cls.device.instr_CC(cls.CC.name)
+        cls.device.instr_MC(cls.MC.name)
+        cls.device.cfg_openql_platform_fn(str(platf_cfg_path))
 
         cls.device.instr_AWG_mw_0(cls.AWG_mw_0.name)
         cls.device.instr_AWG_mw_1(cls.AWG_mw_1.name)
@@ -216,9 +231,16 @@ class Test_Device_obj(unittest.TestCase):
 
         cls.device.dio_map(cls.dio_map_CC)
 
-    @classmethod
-    def tearDownClass(cls):
+    # FIXME
+    # @classmethod
+    # def tearDownClass(cls):
+    def tearDown(self):
         Instrument.close_all()
+
+    ##############################################
+    # HAL_Shim_MQ
+    # FIXME: split into separate test class, like in test_qubit_objects.py
+    ##############################################
 
     @unittest.skip("CCL/QCC is removed")
     def test_get_dio_map(self):
@@ -469,7 +491,8 @@ class Test_Device_obj(unittest.TestCase):
 
         # Combinations are based on qubit number
         res_combs0 = self.ro_lutman_0.resonator_combinations()
-        exp_res_combs0 = [[11]]
+        # exp_res_combs0 = [[11]]
+        exp_res_combs0 = [[6]]
         assert res_combs0 == exp_res_combs0
 
         res_combs1 = self.ro_lutman_1.resonator_combinations()
@@ -622,6 +645,11 @@ class Test_Device_obj(unittest.TestCase):
 
         assert IQ_ch_map == exp_IQ_ch_map
 
+    ##############################################
+    # LutMan
+    # FIXME: move
+    ##############################################
+
     def test_base_lutman_make(self):
         # make first time
         n1 = Base_LutMan.make()
@@ -645,6 +673,15 @@ class Test_Device_obj(unittest.TestCase):
         n4 = Base_LutMan.make()
         assert n4 == 1
 
+    ##############################################
+    # HAL_Device
+    # FIXME: split into separate test class, like in test_qubit_objects.py
+    ##############################################
 
+    def test_measure_two_qubit_randomized_benchmarking(self):
+        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
 
+    def test_measure_two_qubit_allxy(self):
+        self.device.measure_two_qubit_allxy("q8", "q10", detector="int_avg")
 
+    # FIXME: add more tests, above just some random routines were added

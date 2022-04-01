@@ -37,12 +37,6 @@ def parallel_friendly_rb(rb_kw_dict):
     """
     p = randomized_benchmarking(**rb_kw_dict)
 
-    # [2020-07-04]
-    # Before parallelizing RB sequences compilation this line was in the
-    # the measure RB methods of the device object
-    # It seemed to not be necessary, left it out
-    # p.sweep_points = sweep_points
-
     return p.filename
 
 def parallel_friendly_rb_2(rb_kw_dict):
@@ -53,12 +47,6 @@ def parallel_friendly_rb_2(rb_kw_dict):
     multiprocessing capabilities.
     """
     p = two_qubit_randomized_benchmarking(**rb_kw_dict)
-
-    # [2020-07-04]
-    # Before parallelizing RB sequences compilation this line was in the
-    # the measure RB methods of the device object
-    # It seemed to not be necessary, left it out
-    # p.sweep_points = sweep_points
 
     return p.filename
 
@@ -81,7 +69,7 @@ def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 4):
             end="\r",
         )
 
-        # check for keyboard interrupt q because generating can be slow
+        # check for keyboard interrupt because generating can be slow
         check_keyboard_interrupt()
         time.sleep(refresh_rate)
 
@@ -127,7 +115,7 @@ def randomized_benchmarking(
         net_cliffords:
             list of ints index of net clifford the sequence should perform. See examples below on how to use this.
             Important clifford indices
-                0 -> Idx
+                0 -> I
                 3 -> rx180
                 3*24+3 -> {rx180 q0 | rx180 q1}
                 4368 -> CZ
@@ -257,6 +245,7 @@ def randomized_benchmarking(
     else:
         raise NotImplementedError()
 
+    # NB: for the meaning of 100_000, see the comment in calculate_net_clifford()
     if 100_000 in interleaving_cliffords and flux_allocated_duration_ns is None:
         # Try to get the flux duration from the cfg file
         with open(platf_cfg) as json_file:
@@ -283,6 +272,8 @@ def randomized_benchmarking(
                             max_clifford_idx=max_clifford_idx,
                             interleaving_cl=interleaving_cl,
                         )
+                        # FIXME: only last iteration is used
+
                     net_cl_seq = rb.calculate_net_clifford(cl_seq, Cl)
 
                     # decompose
@@ -296,6 +287,7 @@ def randomized_benchmarking(
                         elif cl == 100_000:
                             cl_seq_decomposed[i] = [("I", ["q0", "q1"])]
                         else:
+                            # FIXME: inefficient: creates new object instance per clifford. More occurrences below
                             cl_seq_decomposed[i] = Cl(cl).gate_decomposition
 
                     # generate OpenQL kernel for every net_clifford
@@ -358,7 +350,7 @@ def randomized_benchmarking(
                         k.barrier([])
                         p.add_kernel(k)
 
-                elif simultaneous_single_qubit_RB:  # FIXME: condition boils down to just 'else'
+                elif simultaneous_single_qubit_RB:
                     # ############ 2 qubits using SingleQubitClifford
                     for net_clifford in net_cliffords:
                         k = p.create_kernel(
@@ -389,19 +381,18 @@ def randomized_benchmarking(
                                 # FIXME: OpenQL issue #157 (OpenQL version 0.3 not scheduling properly) was closed in 2018 (OpenQL version 0.5.1)
 
                                 gate_seqs[gsi] += gates
+
                         # OpenQL #157 HACK
                         max_len = max([len(gate_seqs[0]), len(gate_seqs[1])])
-
                         for gi in range(max_len):
                             for gj, q_idx in enumerate(qubits):
-                                # gj = 0
-                                # q_idx = 0
                                 try:  # for possible different lengths in gate_seqs
                                     g = gate_seqs[gj][gi]
                                     k.gate(g[0], [q_idx])
                                 except IndexError:
                                     pass
                         # end of #157 HACK
+
                         k.barrier([])
                         for qubit_idx in qubit_map.values():
                             k.measure(qubit_idx)
@@ -433,6 +424,7 @@ def randomized_benchmarking(
                                 interleaving_cl=interleaving_cl,
                             )
                             cl_rb_seq_all_q.append(cl_seq)
+
                         # Iterate over all the Cliffords "in parallel" for all qubits
                         # and detect the interleaving one such that it can be converted
                         # into a CZ with parking
@@ -526,21 +518,19 @@ def two_qubit_randomized_benchmarking(
     f_state_cal_pts: bool = True,
     recompile: bool = True,
 ):
-    
+
     assert len(two_qubit_net_cliffords) == len(single_qubit_net_cliffords)
 
     two_qubit_map = {f'q{i}' : qb for i, qb in enumerate(two_qubit_pair)}
     if single_qubits != None:
         single_qubit_map = {f'q{i}' : qb for i, qb in enumerate(single_qubits)}
-    
-    p = oqh.create_program(program_name, platf_cfg)
+
+    p = OqlProgram(program_name, platf_cfg)
 
     this_file = inspect.getfile(inspect.currentframe())
 
     # Ensure that programs are recompiled when changing the code as well
-    recompile_dict = oqh.check_recompilation_needed_hash_based(
-        program_fn=p.filename,
-        platf_cfg=platf_cfg,
+    recompile_dict = p.check_recompilation_needed_hash_based(
         clifford_rb_oql=this_file,
         recompile=recompile,
     )
@@ -574,6 +564,7 @@ def two_qubit_randomized_benchmarking(
                         interleaving_cl=interleaving_cl,
                     )
                     net_two_cl_seq = rb.calculate_net_clifford(two_cl_seq, TwoQubitClifford)
+
                     # decompose
                     two_cl_seq_decomposed = []
                     for cl in two_cl_seq:
@@ -621,11 +612,10 @@ def two_qubit_randomized_benchmarking(
                                 single_recovery_clifford.gate_decomposition
                             ]
 
-                    k = oqh.create_kernel(
+                    k = p.create_kernel(
                         "RB_{}Cl_s{}_net{}_inter{}".format(
                             int(n_cl), seed, net_clifford_2q, interleaving_cl
-                        ),
-                        p,
+                        )
                     )
                     for qubit_idx in two_qubit_map.values():
                         k.prepz(qubit_idx)
@@ -639,7 +629,7 @@ def two_qubit_randomized_benchmarking(
                     # print(len(two_cl_seq_decomposed_with_net), len(single_cl_seq_decomposed_with_net))
 
                     for i, gates in enumerate(two_cl_seq_decomposed_with_net):
-                        
+
                         if i%2 == 0 and single_qubit != None:
                             for g1, q1 in single_cl_seq_decomposed_with_net[i//2]:
                                 k.gate(g1, [single_qubit_map[q1]])
@@ -659,6 +649,7 @@ def two_qubit_randomized_benchmarking(
                                         flux_codeword, list(two_qubit_map.values())
                                     )  # fix for QCC
                                     k.gate("wait", [], 0)
+
                     # Measurement
                     k.gate("wait", [], 0)
                     for qubit_idx in two_qubit_map.values():
@@ -671,11 +662,11 @@ def two_qubit_randomized_benchmarking(
                 combinations = ["00", "01", "10", "11", "02", "20", "22"]
             else:
                 combinations = ["00", "01", "10", "11"]
-            p = oqh.add_multi_q_cal_points(
-                p, qubits=two_qubit_pair, combinations=combinations
+            p = p.add_multi_q_cal_points(
+                qubits=two_qubit_pair, combinations=combinations
             )
 
-    p = oqh.compile(p)
+    p.compile()
     # Just before returning we rename the hashes file as an indication of the
     # integrity of the RB code
     os.rename(recompile_dict["tmp_file"], recompile_dict["file"])

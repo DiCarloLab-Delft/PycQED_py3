@@ -122,7 +122,7 @@
             }
         },
 
-        // 2nd excited state
+        // pi pulse 2nd excited state
         "rx12": {
             "duration": @MW_DURATION@,
             "cc": {
@@ -637,8 +637,9 @@
         // measure
         //**************************************************************************************************************
 
-        "measure": {
-//            "prototype": ["M:qubit"],  // FIXME: debugging test_qi_example, otherwise we get "while converting kernel 0 ('kernel_0'): while converting gate measure: unknown gate 'measure' with type CUSTOM"
+        // allow decompositions that prepend measurement with microwave gate
+        "_do_measure": {
+            "prototype": ["M:qubit"],
             "duration": @RO_DURATION@,
             "cc": {
                 "signal": [
@@ -650,14 +651,38 @@
                 "static_codeword_override": [0]   // FIXME
             }
         },
+        "measure": {
+            "prototype": ["M:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_do_measure op(0)"
+            }
+        },
+        // FIXME: test to prefix some measurements with rx12
+        "_measure q6": {
+            "prototype": ["M:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": [
+                    "rx12 q[6];",
+                    "_do_measure q[6]"
+                ]
+            }
+        },
 
         //**************************************************************************************************************
         // flux
         //**************************************************************************************************************
 
         // helpers for CZ gate decomposition, flux_lutman compatible
+        //
+        // NB: the '*_park' instructions now use prototype "I:qubit" for the park parameter, which makes the scheduler
+        // *ignore* that parameter. This allows for parallel scheduling of multiple instructions that perform the same
+        // park, but can also arise in conflicts (signal conflict in the CC backend) if a qubit is both used for parking
+        // and another fluxing operation.
+
         "_cz_sw_ne_park": {
-            "prototype": ["Z:qubit", "Z:qubit", "Z:qubit"],
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
             "duration": @FLUX_DURATION@,
             "cc": {
                 "signal": [
@@ -700,7 +725,7 @@
             }
         },
         "_cz_se_nw_park": {
-            "prototype": ["Z:qubit", "Z:qubit", "Z:qubit"],
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
             "duration": @FLUX_DURATION@,
             "cc": {
                 "signal": [
@@ -740,6 +765,20 @@
                     }
                 ],
                 "static_codeword_override": [2,4]
+            }
+        },
+        "_cz_park": {  // NB: fka 'sf_park'
+            "prototype": ["Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "park" }
+                    }
+                ],
+                "static_codeword_override": [5]
             }
         },
 
@@ -815,38 +854,31 @@
         // additions for measurements using real time feedback
 		"_wait_uhfqa": {
             "prototype": ["U:qubit"],
-            "duration": 720,
-            "cc": {
-                "signal": []
-            }
+            "duration": 720
         },
         "_dist_dsm": {
             "prototype": ["U:qubit"],
 			"duration": 20,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
 			"cc": {
-			    "readout_mode": "feedback",
+                // although we don't output anything, we still need to associate with the correct measurement instrument & group
 				"signal": [
-					{	"type": "measure",
+					{
+    	                "type": "measure",
 						"operand_idx": 0,
-						"value": []
+						"value": []    // don't generate output signal. This also triggers special behaviour to retrieve measurements in real-time (from OpenQL 0.10.3)
 					}
                 ]
 			}
 		},
         "_wait_dsm": {
             "prototype": ["U:qubit"],
-            "duration": 280,
-            "cc": {
-                "signal": []
-            }
+            "duration": 280
         },
 
         // additions for pragma/break
         // Require OpenQL < 0.10.1 (use cQASM afterwards)
         "if_1_break": {
 			"duration": 60,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
 			"cc": {
 				"signal": [],
 				"pragma": {
@@ -856,7 +888,6 @@
 		},
 		"if_0_break": {
 			"duration": 60,
-			"matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
 			"cc": {
 				"signal": [],
 				"pragma": {

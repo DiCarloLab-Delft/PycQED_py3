@@ -9,8 +9,9 @@ jobs:
     continue-on-error: true
     strategy:
       max-parallel: 4
+      fail-fast: false
       matrix:
-        python-version: ['3.6', '3.7']
+        python-version: ['3.6', '3.7', '3.8']
 
     steps:
     - uses: actions/checkout@v1
@@ -24,10 +25,18 @@ jobs:
         sudo apt-get install xvfb
         sudo Xvfb :99 -screen 0 1024x768x24 </dev/null &
         sleep 3
+    - name: Upgrade pip
+      run: python -m pip install --upgrade pip
+
+    # NB: 'asset' creation for OpenQL is currently a bit flaky, because uploads tend to fail.
+    # As a result, the file needed may not be present, or an older version may be found
+    - name: Install development release of OpenQL
+      run: pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases
+
     - name: Install dependencies
+      run: sudo apt-get install python3-pyqt5
+    - name: Install Python dependencies
       run: |
-        python -m pip install --upgrade pip
-        sudo apt-get install python3-pyqt5
         pip install -r requirements.txt
         pip install qutip  # ensure all dependencies installed before qutip
         pip install -e .   # installs pycqed itself
