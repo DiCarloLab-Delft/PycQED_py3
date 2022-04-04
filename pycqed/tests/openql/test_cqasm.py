@@ -171,7 +171,8 @@ class Test_cQASM(unittest.TestCase):
                 # File:         {name}.cq
                 # Purpose:      test qi barrier
 
-                version 1.2
+                version 1.0
+                qubits 5
 
                 pragma @ql.name("{name}")  # set the name of generated files
 
@@ -190,7 +191,8 @@ class Test_cQASM(unittest.TestCase):
                 # File:         {name}.cq
                 # Purpose:      test qi curly brackets
 
-                version 1.2
+                version 1.0
+                qubits 5
 
                 pragma @ql.name("{name}")  # set the name of generated files
 
@@ -207,7 +209,8 @@ class Test_cQASM(unittest.TestCase):
                 # File:         {name}.cq
                 # Purpose:      test qi wait
 
-                version 1.2
+                version 1.0
+                qubits 5
 
                 pragma @ql.name("{name}")  # set the name of generated files
 

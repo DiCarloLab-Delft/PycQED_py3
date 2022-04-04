@@ -500,7 +500,7 @@
         },
 
         // Parameterized gate decompositions (test)
-        "_test_rotate": {
+        "_rx": {
            "prototype": ["X:qubit", "L:int"],
            "duration": @MW_DURATION@,
            "decomposition": {
