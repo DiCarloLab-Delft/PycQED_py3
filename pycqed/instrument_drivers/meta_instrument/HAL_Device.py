@@ -3362,9 +3362,7 @@ class HAL_Device(HAL_ShimMQ):
                 iRB_kw["start_next_round_compilation"] = (i < last_run)
                 round_successful = False
                 try:
-                    rb_tasks_start = measurement_func(
-                        **iRB_kw
-                    )
+                    rb_tasks_start = measurement_func(**iRB_kw)
                     round_successful = True
                 except Exception:
                     print_exception()
