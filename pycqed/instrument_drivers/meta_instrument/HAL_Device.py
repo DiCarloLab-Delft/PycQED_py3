@@ -3035,7 +3035,7 @@ class HAL_Device(HAL_ShimMQ):
         counter_par,
         gate_separation_par,
         qubits: list,
-        nested_MC,
+        nested_MC: MeasurementControl,
         flux_cw="fl_cw_01",
     ):
         """
@@ -3106,21 +3106,20 @@ class HAL_Device(HAL_ShimMQ):
     def measure_two_qubit_randomized_benchmarking(
         self,
         qubits,
-        nr_cliffords=np.array(
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
-        ),
+        nr_cliffords=np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]),
         nr_seeds=100,
         interleaving_cliffords=[None],
         label="TwoQubit_RB_{}seeds_recompile={}_icl{}_{}_{}_{}",
-        recompile: bool = "as needed",
         cal_points=True,
         flux_codeword="cz",
         flux_allocated_duration_ns: int = None,
         sim_cz_qubits: list = None,
+
+        MC: Optional[MeasurementControl] = None,
+        recompile: bool = "as needed",
         compile_only: bool = False,
         pool=None,  # a multiprocessing.Pool()
         rb_tasks=None,  # used after called with `compile_only=True`
-        MC=None
     ):
         """
         Measures two qubit randomized benchmarking, including
@@ -3152,12 +3151,6 @@ class HAL_Device(HAL_ShimMQ):
             label (str):
                 string for formatting the measurement name
 
-            recompile (bool, str {'as needed'}):
-                indicate whether to regenerate the sequences of clifford gates.
-                By default it checks whether the needed sequences were already
-                generated since the most recent change of OpenQL file
-                specified in self.cfg_openql_platform_fn
-
             cal_points (bool):
                 should calibration point (qubits in 0 and 1 states)
                 be included in the measurement
@@ -3174,6 +3167,12 @@ class HAL_Device(HAL_ShimMQ):
             flux_allocated_duration_ns (list):
                 Duration in ns of the flux pulse used when interleaved gate is
                 [100_000], i.e. idle identity
+
+            recompile (bool, str {'as needed'}):
+                indicate whether to regenerate the sequences of clifford gates.
+                By default it checks whether the needed sequences were already
+                generated since the most recent change of OpenQL file
+                specified in self.cfg_openql_platform_fn
 
             compile_only (bool):
                 Compile only the RB sequences without measuring, intended for
@@ -3380,21 +3379,20 @@ class HAL_Device(HAL_ShimMQ):
     def measure_two_qubit_interleaved_randomized_benchmarking(
             self,
             qubits: list,
-            nr_cliffords=np.array(
-                [1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50., 70., 90., 120.]
-            ),
+            nr_cliffords=np.array([1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50., 70., 90., 120.]),
             nr_seeds=100,
-            recompile: bool = "as needed",
             flux_codeword="cz",
             flux_allocated_duration_ns: int = None,
             sim_cz_qubits: list = None,
             measure_idle_flux: bool = True,
-            rb_tasks_start: list = None,
-            pool=None,
             cardinal: dict = None,
+
+            MC: Optional[MeasurementControl] = None,
+            recompile: bool = "as needed",
+            pool=None,
+            rb_tasks_start: list = None,
             start_next_round_compilation: bool = False,
             maxtasksperchild=None,
-            MC = None,
         ):
         # USED_BY: inspire_dependency_graph.py,
         """
@@ -3644,11 +3642,12 @@ class HAL_Device(HAL_ShimMQ):
         MC: MeasurementControl,
         nr_cliffords=2**np.arange(12),
         nr_seeds: int = 100,
-        recompile: bool = 'as needed',
         flux_codeword: str = "cz",
         rb_on_parked_qubit_only: bool = False,
-        rb_tasks_start: list = None,
+
         pool=None,
+        recompile: bool = 'as needed',
+        rb_tasks_start: list = None,
         start_next_round_compilation: bool = False
     ):
         """
@@ -3806,13 +3805,14 @@ class HAL_Device(HAL_ShimMQ):
             nr_cliffords=2**np.arange(10),
             nr_seeds: int = 100,
             MC: Optional[MeasurementControl] = None,
-            recompile: bool = 'as needed',
-            prepare_for_timedomain: bool = True,
+            # prepare_for_timedomain: bool = True,
             cal_points: bool = True,
             ro_acq_weight_type: str = "optimal IQ",
             flux_codeword: str = "cz",
             rb_on_parked_qubit_only: bool = False,
             interleaving_cliffords: list = [None],
+
+            recompile: bool = 'as needed',
             compile_only: bool = False,
             pool=None,  # a multiprocessing.Pool()
             rb_tasks=None  # used after called with `compile_only=True`
@@ -3856,7 +3856,8 @@ class HAL_Device(HAL_ShimMQ):
                 3rd qubit (parked qubit)
                 `False`: there will be a single qubit RB applied to all 3
                 qubits
-            other args: behave same way as for 1Q RB r 2Q RB
+
+            other args: behave same way as for 1Q RB or 2Q RB
         """
 
         # because only 1 seed is uploaded each time
@@ -3899,12 +3900,12 @@ class HAL_Device(HAL_ShimMQ):
                     program_name='RB_s{}_ncl{}_net{}_icl{}_{}_{}_park_{}_rb_on_parkonly{}'.format(
                         i, nr_cliffords, net_cliffords, interleaving_cliffords, *qubits,
                         rb_on_parked_qubit_only),
-                    recompile=recompile,
                     simultaneous_single_qubit_parking_RB=True,
                     rb_on_parked_qubit_only=rb_on_parked_qubit_only,
                     cal_points=cal_points,
                     flux_codeword=flux_codeword,
-                    interleaving_cliffords=interleaving_cliffords
+                    interleaving_cliffords=interleaving_cliffords,
+                    recompile = recompile
                 )
                 tasks_inputs.append(task_dict)
             # pool.starmap_async can be used for positional arguments
@@ -3992,16 +3993,14 @@ class HAL_Device(HAL_ShimMQ):
             self,
             qubits,
             MC,
-            nr_cliffords=np.array(
-                [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0]
-            ),
+            nr_cliffords=np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0]),
             nr_seeds=100,
             interleaving_cliffords=[None],
             label="TwoQubit_purityB_{}seeds_{}_{}",
-            recompile: bool = "as needed",
             cal_points: bool = True,
             flux_codeword: str = "cz",
-        ):
+            recompile: bool = "as needed"
+    ):
         """
         Measures two qubit purity (aka unitarity) benchmarking.
         It is a modified RB routine which measures the length of
@@ -4033,15 +4032,15 @@ class HAL_Device(HAL_ShimMQ):
             label (str):
                 string for formatting the measurement name
 
+            cal_points (bool):
+                should calibration point (qubits in 0 and 1 states)
+                be included in the measurement
+
             recompile (bool, str {'as needed'}):
                 indicate whether to regenerate the sequences of clifford gates.
                 By default it checks whether the needed sequences were already
                 generated since the most recent change of OpenQL file
                 specified in self.cfg_openql_platform_fn
-
-            cal_points (bool):
-                should calibration point (qubits in 0 and 1 states)
-                be included in the measurement
         """
 
         # Settings that have to be preserved, change is required for
@@ -4196,8 +4195,8 @@ class HAL_Device(HAL_ShimMQ):
         interleaving_cliffords=[None, -4368],
         label="TwoQubit_CharBench_{}seeds_icl{}_{}_{}",
         flux_codeword="fl_cw_01",
-        recompile: bool = "as needed",
         ch_idxs=np.array([1, 2]),
+        recompile: bool = "as needed"
     ):
         # Refs:
         # Helsen arXiv:1806.02048v1
@@ -4310,9 +4309,10 @@ class HAL_Device(HAL_ShimMQ):
             nr_seeds=100,
             interleaving_cliffords=[None],
             label="TwoQubit_sim_RB_{}seeds_recompile={}_{}_{}",
-            recompile: bool = "as needed",
             cal_points: bool = True,
             ro_acq_weight_type: str = "optimal IQ",
+
+            recompile: bool = "as needed",
             compile_only: bool = False,
             pool=None,  # a multiprocessing.Pool()
             rb_tasks=None  # used after called with `compile_only=True`
@@ -4341,15 +4341,15 @@ class HAL_Device(HAL_ShimMQ):
             label (str):
                 string for formatting the measurement name
 
+            cal_points (bool):
+                should calibration point (qubits in 0, 1 and 2 states)
+                be included in the measurement
+
             recompile (bool, str {'as needed'}):
                 indicate whether to regenerate the sequences of clifford gates.
                 By default it checks whether the needed sequences were already
                 generated since the most recent change of OpenQL file
                 specified in self.cfg_openql_platform_fn
-
-            cal_points (bool):
-                should calibration point (qubits in 0, 1 and 2 states)
-                be included in the measurement
         """
 
         # Settings that have to be preserved, change is required for
@@ -4492,14 +4492,15 @@ class HAL_Device(HAL_ShimMQ):
             MC: Optional[MeasurementControl] = None,
             nr_cliffords=2 ** np.arange(11),
             nr_seeds=100,
-            recompile: bool = "as needed",
             cal_points: bool = True,
             ro_acq_weight_type: str = "optimal IQ",
+            label_name=None,
+            prepare_for_timedomain=True,
+
+            recompile: bool = "as needed",
             compile_only: bool = False,
             pool=None,  # a multiprocessing.Pool()
-            rb_tasks=None,  # used after called with `compile_only=True
-            label_name=None,
-            prepare_for_timedomain=True
+            rb_tasks=None  # used after called with `compile_only=True
         ):
         """
         Performs simultaneous single qubit RB on multiple qubits.
@@ -4516,15 +4517,15 @@ class HAL_Device(HAL_ShimMQ):
             nr_seeds (int):
                 number of different clifford sequences of each length
 
+            cal_points (bool):
+                should calibration point (qubits in 0, 1 and 2 states)
+                be included in the measurement
+
             recompile (bool, str {'as needed'}):
                 indicate whether to regenerate the sequences of clifford gates.
                 By default it checks whether the needed sequences were already
                 generated since the most recent change of OpenQL file
                 specified in self.cfg_openql_platform_fn
-
-            cal_points (bool):
-                should calibration point (qubits in 0, 1 and 2 states)
-                be included in the measurement
         """
 
         # Settings that have to be preserved, change is required for
