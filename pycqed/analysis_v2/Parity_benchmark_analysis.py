@@ -1,15 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
-import time
-import cvxpy
+# import time
+# import cvxpy
 import copy
 import pycqed.analysis_v2.disturbancecalc as pb
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.measurement.hdf5_data as h5d
 import os
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 plt.rcdefaults()
 
 ####################################
@@ -64,19 +64,19 @@ class ProbabilityDistribution(np.ndarray):
         self.bs = ["".join(x) for x in itertools.product(*([('0', '1')] * n_bits))]
         self.bi = {s: i for i,s in enumerate(self.bs)}
         return self
-  
+
     def __getitem__(self, key):
         if isinstance(key, str):
             return super().__getitem__(self.bi[key])
         else:
             return super().__getitem__(key)
-    
+
     def __setitem__(self, key, val):
         if isinstance(key, str):
             return super().__setitem__(self.bi[key], val)
         else:
             return super().__setitem__(key, val)
-    
+
     def __str__(self):
         return '\n'.join(["%s: %g" % (s, v) for s,v in zip(self.bs, self)]) + '\n'
 
@@ -85,7 +85,7 @@ def calculate_TVD(p, q):
     for s in p.keys():
         D_tvd += np.abs(p[s]-q[s])/2
     return D_tvd
-    
+
 def calculate_OVD(p, q, p_ideal):
     D_ovd = 0
     for s in p.keys():
@@ -107,9 +107,9 @@ def compute_metrics(p, e1, e2, n_data_points):
     disturbances_single = pb.compute_disturbances(n_bits, data_ref, data_single, solver=SOLVER)
     data_double = np.array(p_double * n_data_points, dtype='int')  # no finite sample error
     disturbances_double = pb.compute_disturbances(n_bits, data_ref, data_double, solver=SOLVER)
-    
+
     p_ideal = { s : 0.5 if s in ['0000', '1111'] else 0 for s in p.keys() }
-    
+
     D_tvd_single = calculate_TVD(p, e1)
     D_ovd_single = calculate_OVD(p, e1, p_ideal)
     r_single = D_ovd_single/D_tvd_single
@@ -141,10 +141,10 @@ class Sandia_parity_benchmark(ba.BaseDataAnalysis):
                  ancilla_qubit:str,
                  data_qubits:list,
                  exception_qubits:list=[],
-                 t_start: str = None, 
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -277,10 +277,10 @@ def get_expected_value(operator, state):
         if operator[i] == 'Z' and state[i] == '1':
             m *= -1
     return m
-    
+
 def gen_M_matrix():
-    Operators = [op1+op2+op3+op4 for op1 in ['I', 'Z'] 
-                                 for op2 in ['I', 'Z'] 
+    Operators = [op1+op2+op3+op4 for op1 in ['I', 'Z']
+                                 for op2 in ['I', 'Z']
                                  for op3 in ['I', 'Z']
                                  for op4 in ['I', 'Z']]
     Cal_points = [s1+s2+s3+s4 for s1 in ['0', '1']
@@ -297,8 +297,8 @@ def gen_M_matrix():
     return M
 
 def get_Beta_matrix(Cal_D1_dig, Cal_D2_dig, Cal_D3_dig, Cal_D4_dig):
-    Operators = [op1+op2+op3+op4 for op1 in ['I', 'Z'] 
-                                 for op2 in ['I', 'Z'] 
+    Operators = [op1+op2+op3+op4 for op1 in ['I', 'Z']
+                                 for op2 in ['I', 'Z']
                                  for op3 in ['I', 'Z']
                                  for op4 in ['I', 'Z']]
     H = {}
@@ -355,7 +355,7 @@ def gen_4Q_pauli():
                     op = p1+p2+p3+p4
                     Pauli_terms_4[op]=np.kron(np.kron(np.kron(Pauli_terms[p1],Pauli_terms[p2]),
                                                       Pauli_terms[p3]),Pauli_terms[p4])
-    return Pauli_terms_4    
+    return Pauli_terms_4
 
 def get_Pauli_expectation_values(Beta_matrix, Gate_order, Mask, Tomo_meas_D1_dig,
                                                                 Tomo_meas_D2_dig,
@@ -370,11 +370,11 @@ def get_Pauli_expectation_values(Beta_matrix, Gate_order, Mask, Tomo_meas_D1_dig
     B_matrix = np.array([Beta_matrix[key][1:] for key in Beta_matrix.keys()])
     B_0 = np.array([Beta_matrix[key][0] for key in Beta_matrix.keys()])
     iB_matrix = np.linalg.inv(B_matrix)
-    P_values = {op1+op2+op3+op4: [] for op1 in ['I', 'X', 'Y', 'Z'] 
-                                    for op2 in ['I', 'X', 'Y', 'Z'] 
+    P_values = {op1+op2+op3+op4: [] for op1 in ['I', 'X', 'Y', 'Z']
+                                    for op2 in ['I', 'X', 'Y', 'Z']
                                     for op3 in ['I', 'X', 'Y', 'Z']
                                     for op4 in ['I', 'X', 'Y', 'Z']}
-    
+
     P_frac = copy.deepcopy(P_values)
     for i, pre_rotation in enumerate(Gate_order[:]):
         P_vector = { p1+p2+p3+p4 : 1 for p1 in ['I', pre_rotation[0]]
@@ -431,10 +431,10 @@ def fidelity(rho_1, rho_2, trace_conserved = False):
 class Weight_4_parity_tomography(ba.BaseDataAnalysis):
     def __init__(self,
                  sim_measurement: bool,
-                 t_start: str = None, 
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -479,10 +479,10 @@ class Weight_4_parity_tomography(ba.BaseDataAnalysis):
         ############################
         Cal_shots = {q : {} for q in Qubits}
         Cal_shots_dig = {q : {} for q in Data_qubits}
-        combinations = [s1+s2+s3+s4+s5 for s1 in ['0', '1'] 
-                                       for s2 in ['0', '1'] 
-                                       for s3 in ['0', '1'] 
-                                       for s4 in ['0', '1'] 
+        combinations = [s1+s2+s3+s4+s5 for s1 in ['0', '1']
+                                       for s2 in ['0', '1']
+                                       for s3 in ['0', '1']
+                                       for s4 in ['0', '1']
                                        for s5 in ['0', '1']]
         if self.sim_measurement:
             cycle = 81
@@ -508,9 +508,9 @@ class Weight_4_parity_tomography(ba.BaseDataAnalysis):
                 dig_shots = [ +1 if s<threshold else -1 for s in shots ]
                 return np.array(dig_shots)
             if qubit in Data_qubits:
-                combs = [s1+s2+s3+s4 for s1 in ['0', '1'] 
-                                     for s2 in ['0', '1'] 
-                                     for s3 in ['0', '1'] 
+                combs = [s1+s2+s3+s4 for s1 in ['0', '1']
+                                     for s2 in ['0', '1']
+                                     for s3 in ['0', '1']
                                      for s4 in ['0', '1']]
                 for comb in combs:
                     tot_shots = np.concatenate((Cal_shots[qubit]['0'+comb], Cal_shots[qubit]['1'+comb]))
@@ -519,7 +519,7 @@ class Weight_4_parity_tomography(ba.BaseDataAnalysis):
         # Get RO Beta matrix
         B = get_Beta_matrix(Cal_shots_dig[Data_qubits[0]],
                             Cal_shots_dig[Data_qubits[1]],
-                            Cal_shots_dig[Data_qubits[2]], 
+                            Cal_shots_dig[Data_qubits[2]],
                             Cal_shots_dig[Data_qubits[3]])
         self.proc_data_dict['Beta_matrix'] = B
         ############################
@@ -557,15 +557,15 @@ class Weight_4_parity_tomography(ba.BaseDataAnalysis):
         #####################################
         # Calculate Pauli expectation values
         #####################################
-        Pauli_terms_0, rho_0, P_frac_0 = get_Pauli_expectation_values(B, gen_gate_order(), ps_mask_0, 
-                                                              Tomo_meas_D1_dig=Tomo_shots_dig[Data_qubits[0]], 
-                                                              Tomo_meas_D2_dig=Tomo_shots_dig[Data_qubits[1]], 
-                                                              Tomo_meas_D3_dig=Tomo_shots_dig[Data_qubits[2]], 
+        Pauli_terms_0, rho_0, P_frac_0 = get_Pauli_expectation_values(B, gen_gate_order(), ps_mask_0,
+                                                              Tomo_meas_D1_dig=Tomo_shots_dig[Data_qubits[0]],
+                                                              Tomo_meas_D2_dig=Tomo_shots_dig[Data_qubits[1]],
+                                                              Tomo_meas_D3_dig=Tomo_shots_dig[Data_qubits[2]],
                                                               Tomo_meas_D4_dig=Tomo_shots_dig[Data_qubits[3]])
-        Pauli_terms_1, rho_1, P_frac_1 = get_Pauli_expectation_values(B, gen_gate_order(), ps_mask_1, 
-                                                              Tomo_meas_D1_dig=Tomo_shots_dig[Data_qubits[0]], 
-                                                              Tomo_meas_D2_dig=Tomo_shots_dig[Data_qubits[1]], 
-                                                              Tomo_meas_D3_dig=Tomo_shots_dig[Data_qubits[2]], 
+        Pauli_terms_1, rho_1, P_frac_1 = get_Pauli_expectation_values(B, gen_gate_order(), ps_mask_1,
+                                                              Tomo_meas_D1_dig=Tomo_shots_dig[Data_qubits[0]],
+                                                              Tomo_meas_D2_dig=Tomo_shots_dig[Data_qubits[1]],
+                                                              Tomo_meas_D3_dig=Tomo_shots_dig[Data_qubits[2]],
                                                               Tomo_meas_D4_dig=Tomo_shots_dig[Data_qubits[3]])
         R_0 = np.zeros((16, 16))
         R_0[0,0] = .5
@@ -798,7 +798,7 @@ def plot_function(P0, P1, P, E1, E2, M1, M2,
                           '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[1][0], Disturbances_ovd_single[1][1]),
                           '$\Delta^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[2][0]+Disturbances_ovd_single[3][0], Disturbances_ovd_single[2][1]+Disturbances_ovd_single[3][1]),
                           '$r$  =  %f' % (r_single)))
-    
+
     textstr2 = '\n'.join(('Repeatability  =  %.1f%%' % (M2*100),
                           '$D_1^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[0][0], Disturbances_ovd_double[0][1]),
                           '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[1][0], Disturbances_ovd_double[1][1]),

@@ -393,9 +393,6 @@ class VNA_analysis(complex_spectroscopy):
 
             self.proc_data_dict['complex_fit_msg'] = msg
 
-
-
-
     def prepare_plots(self):
         super(VNA_analysis, self).prepare_plots()
         if self.do_fitting:

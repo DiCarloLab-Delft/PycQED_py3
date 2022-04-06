@@ -1,17 +1,10 @@
-import logging
 import numpy as np
-from copy import deepcopy, copy
 
 import qcodes as qc
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
-# from pycqed.analysis.analysis_toolbox import calculate_transmon_transitions
-# from pycqed.analysis import analysis_toolbox as a_tools
-# from pycqed.measurement import detector_functions as det
-# from pycqed.measurement import composite_detector_functions as cdet
-# from pycqed.measurement import mc_parameter_wrapper as pw
 
 
 class Flux_Control(Instrument):

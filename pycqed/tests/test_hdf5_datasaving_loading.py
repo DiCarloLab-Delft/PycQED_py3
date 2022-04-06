@@ -117,7 +117,7 @@ class Test_HDF5(unittest.TestCase):
             'some_int': 3,
             'some_float': 3.5,
             'some_np_int': np.int(3),
-            'some_np_float': np.float(3.5)
+            'some_np_float': float(3.5)
         }
 
         data_object = h5d.Data(name='test_object', datadir=self.datadir)

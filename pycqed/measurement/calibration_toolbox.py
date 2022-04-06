@@ -1,10 +1,17 @@
 import cma
+from deprecated import deprecated
+
 from qcodes.instrument.parameter import ManualParameter
+
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement.optimization import nelder_mead
 
 from pycqed.analysis import measurement_analysis as ma
+
+# Imported for type annotations
+from pycqed.measurement.measurement_control import MeasurementControl
+from pycqed.instrument_drivers.physical_instruments.USB_SA124B import SignalHound_USB_SA124B
 
 
 '''
@@ -16,22 +23,29 @@ raise a NotImplementedError.
 '''
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def measure_E_c(**kw):
     raise NotImplementedError('see archived calibration toolbox')
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def mixer_carrier_cancellation_duplexer(**kw):
     raise NotImplementedError('see archived calibration toolbox')
 
 
-def mixer_carrier_cancellation(SH, source, MC,
-                               chI_par, chQ_par,
-                               frequency: float=None,
-                               SH_ref_level: float=-40,
-                               init_stepsize: float=0.1,
-                               x0=(0.0, 0.0),
-                               label: str='Offset_calibration',
-                               ftarget=-110, maxiter=300):
+def mixer_carrier_cancellation(
+        SH: SignalHound_USB_SA124B,
+        source,
+        MC: MeasurementControl,
+        chI_par, chQ_par,
+        frequency: float = None,
+        SH_ref_level: float = -40,
+        init_stepsize: float = 0.1,
+        x0=(0.0, 0.0),
+        label: str = 'Offset_calibration',
+        ftarget=-110,
+        maxiter=300
+):
     """
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is a generic version.
@@ -60,8 +74,12 @@ def mixer_carrier_cancellation(SH, source, MC,
     '''
     SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
-        SH, frequency=(source.frequency()),
-        Navg=5, delay=0.0, prepare_for_each_point=False)
+        SH,
+        frequency=(source.frequency()),
+        Navg=5,
+        delay=0.0,
+        prepare_for_each_point=False
+    )
 
     ad_func_pars = {'adaptive_function': cma.fmin,
                     'x0': x0,
@@ -85,6 +103,7 @@ def mixer_carrier_cancellation(SH, source, MC,
     return ch_1_min, ch_2_min
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def multi_channel_mixer_carrier_cancellation(SH, source, MC,
                                channel_pars,
                                frequency: float=None,
@@ -138,6 +157,7 @@ def multi_channel_mixer_carrier_cancellation(SH, source, MC,
     return a.optimization_result[0]
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def mixer_skewness_calibration_QWG(SH, source, QWG,
                                    alpha, phi,
                                    MC,
@@ -200,6 +220,7 @@ def mixer_skewness_calibration_QWG(SH, source, QWG,
     return phi, alpha
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def mixer_skewness_calibration_5014(SH, source, station,
                                     MC=None,
                                     QI_amp_ratio=None, IQ_phase=None,
@@ -268,10 +289,12 @@ def mixer_skewness_calibration_5014(SH, source, station,
     return phi, alpha
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def mixer_skewness_calibration_adaptive(**kw):
     raise NotImplementedError('see archived calibration toolbox')
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                     frequency=None,
                                     AWG_channel1=1,
@@ -328,6 +351,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     return ch_1_min, ch_2_min
 
 
+@deprecated(version='0.4', reason='not used within pyqed')
 def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
                                      frequency=None,
                                      SH_ref_level: float=-40,

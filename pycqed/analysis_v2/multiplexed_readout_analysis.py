@@ -38,10 +38,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
     def __init__(self,
                 nr_qubits: int,
-                t_start: str = None, 
+                t_start: str = None,
                 t_stop: str = None,
                 label: str = '',
-                options_dict: dict = None, 
+                options_dict: dict = None,
                 extract_only: bool = False,
                 extract_combinations: bool = False,
                 post_selection: bool = False,
@@ -239,7 +239,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 F_vs_th = (1-(1-abs(norm_cumsum_0-norm_cumsum_1))/2)
                 opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
                 opt_idx = int(round(np.average(opt_idxs)))
-                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i])) 
+                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i]))
                 self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_raw'] = \
                     F_vs_th[opt_idx]
                 self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'] = \
@@ -1734,16 +1734,16 @@ class RTE_analysis(ba.BaseDataAnalysis):
 
 class measurement_QND_analysis(ba.BaseDataAnalysis):
     """
-    This analysis extracts measurement QND metrics 
+    This analysis extracts measurement QND metrics
     For details on the procedure see:
     arXiv:2110.04285
     """
     def __init__(self,
                  qubit:str,
-                 t_start: str = None, 
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -1845,10 +1845,10 @@ class measurement_dephasing_analysis(ba.BaseDataAnalysis):
     def __init__(self,
                  meas_time: float,
                  exception_qubits: list,
-                 t_start: str = None, 
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -1922,7 +1922,7 @@ class measurement_dephasing_analysis(ba.BaseDataAnalysis):
         self.qoi = {'Dephasing_0': {q:Dephasing[q]['0'] for q in Qubits },
                     'Dephasing_1': {q:Dephasing[q]['1'] for q in Qubits }}
 
-        
+
     def prepare_plots(self):
         for q in self.Qubits[1:]:
             self.plot_dicts[f'Ramsey_curves_{q}'] = {
@@ -1940,10 +1940,10 @@ class Depletion_AllXY_analysis(ba.BaseDataAnalysis):
     """
     def __init__(self,
                  qubit,
-                 t_start: str = None, 
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -1976,7 +1976,7 @@ class Depletion_AllXY_analysis(ba.BaseDataAnalysis):
         data_1 = (data_1 - zero_lvl)/(one_lvl-zero_lvl)
         self.proc_data_dict['data_0'] = data_0
         self.proc_data_dict['data_1'] = data_1
-        
+
     def prepare_plots(self):
         self.plot_dicts['main'] = {
             'plotfn': plot_depletion_allxy,
@@ -2621,7 +2621,7 @@ def plot_QND_metrics(Cal_0, Cal_1, th,
                      timestamp: str,
                      qubit: str,
                      ax, **kw):
-    
+
     fig = ax.get_figure()
 
     ax.plot(Cal_0[0], Cal_0[1], 'C0.', alpha=.05, markeredgewidth=0)
@@ -2679,12 +2679,12 @@ def plot_ramsey_dephasing(qubit, timestamp,
     angles = np.arange(0,360,20)
     ax.plot(angles, M_data[qubit]['no_meas_0'], 'C0o', label='no_meas_0')
     ax.plot(angles, M_data[qubit]['no_meas_1'], 'C3o', label='no_meas_1')
-    ax.plot(angles, M_data[qubit]['meas_0'], 'o', 
+    ax.plot(angles, M_data[qubit]['meas_0'], 'o',
             color='teal', label='meas_0')
-    ax.plot(angles, M_data[qubit]['meas_1'], 'o', 
+    ax.plot(angles, M_data[qubit]['meas_1'], 'o',
             color='palevioletred', label='meas_1')
     ax.plot([360, 370, 380, 390], M_data[qubit]['cal_pts'], 'C2o-')
-    
+
     def func(x, A, phi, offset):
             return A*np.cos((x+phi)*np.pi/180) + offset
     X = np.linspace(0, 340, 101)
@@ -2692,11 +2692,11 @@ def plot_ramsey_dephasing(qubit, timestamp,
     ax.plot(X, func(X, *Fit_params[qubit]['no_meas_1']), 'C3--')
     ax.plot(X, func(X, *Fit_params[qubit]['meas_0']), '--', color='teal')
     ax.plot(X, func(X, *Fit_params[qubit]['meas_1']), '--', color='palevioletred')
-    
+
     ax.set_title(f'{timestamp} Target qubit {qubit}')
     ax.set_xlabel('Angle (deg)')
     ax.set_ylabel(r'P($|1\rangle$)')
-    
+
     text = 'Without RO pulse: \n'+\
            f'$\phi_0={Fit_params[qubit]["no_meas_0"][1]:.2f}$\n'+\
            f'$\phi_1={Fit_params[qubit]["no_meas_1"][1]:.2f}$\n'+\

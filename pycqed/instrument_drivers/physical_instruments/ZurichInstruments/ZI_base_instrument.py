@@ -265,7 +265,7 @@ class MockDAQServer():
         return MockAwgModule(self)
 
     def setDebugLevel(self, debuglevel: int):
-        print('Setting debug level to {}'.format(debuglevel))
+        log.info(f'MockDAQServer: Setting debug level to {debuglevel}')
 
     def connectDevice(self, device, interface):
         if self.device is not None:
@@ -329,7 +329,7 @@ class MockDAQServer():
             self.nodes[f'/{self.device}/raw/error/blinkforever'] = {'type': 'Integer', 'value': 0}
             self.nodes[f'/{self.device}/dios/0/extclk'] = {'type': 'Integer', 'value': 0}
             for awg_nr in range(4):
-                for i in range(32):
+                for i in range(128):
                     self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
                     self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
@@ -338,6 +338,8 @@ class MockDAQServer():
                         'type': 'ZIVectorData', 'value': np.array([])}
                     self.nodes[f'/{self.device}/awgs/{awg_nr}/waveform/waves/{i}'] = {
                         'type': 'ZIVectorData', 'value': np.array([])}
+                self.nodes[f'/{self.device}/awgs/{awg_nr}/commandtable/data'] = {
+                    'type': 'ZIVectorData', 'value': np.array([])}
             for sigout_nr in range(8):
                 self.nodes[f'/{self.device}/sigouts/{sigout_nr}/precompensation/fir/coefficients'] = {
                     'type': 'ZIVectorData', 'value': np.array([])}
@@ -665,10 +667,10 @@ class ZI_base_instrument(Instrument):
 
         # Decide which server to use based on name
         if server == 'emulator':
-            log.info('Connecting to mock DAQ server')
+            log.info(f'{device}: Connecting to mock DAQ server')
             self.daq = MockDAQServer(server, port, apilevel)
         else:
-            log.info('Connecting to DAQ server')
+            log.info(f'{device}: Connecting to DAQ server')
             self.daq = zi.ziDAQServer(server, port, apilevel)
 
         if not self.daq:
@@ -681,7 +683,7 @@ class ZI_base_instrument(Instrument):
 
         # Connect a device
         if not self._is_device_connected(device):
-            log.info(f'Connecting to device {device}')
+            log.info(f'{device}: Connecting to device')
             self.daq.connectDevice(device, interface)
         self.devname = device
         self.devtype = self.gets('features/devtype')
@@ -800,7 +802,7 @@ class ZI_base_instrument(Instrument):
         raise NotImplementedError('Virtual method with no implementation!')
 
     def _get_waveform_table(self, awg_nr: int) -> list:
-        return dict()    
+        return dict()
 
     def _add_extra_parameters(self) -> None:
         """
@@ -1133,7 +1135,7 @@ class ZI_base_instrument(Instrument):
         Adjust the length of a codeword waveform such that each individual
         waveform of the pair has the same length
         """
-        log.info('Length matching waveforms for dynamic waveform upload.')
+        log.info(f'{self.devname}: Length matching waveforms for dynamic waveform upload.')
         wf_table = self._get_waveform_table(awg_nr)
 
         matching_updated = False
@@ -1144,7 +1146,7 @@ class ZI_base_instrument(Instrument):
             iter_id += 1
             if iter_id > 10:
                 raise StopIteration
-            log.info('Length matching iteration {}.'.format(iter_id))
+            log.info(f'{self.devname}: Length matching iteration {iter_id}.')
             matching_updated = False
 
             for wf_name, other_wf_name in wf_table:
@@ -1254,8 +1256,8 @@ class ZI_base_instrument(Instrument):
         """
         Configures an AWG with the program stored in the object in the self._awg_program[awg_nr] member.
         """
-        log.info(f"{self.devname}: Configuring AWG {awg_nr} with predefined codeword program")
         if self._awg_program[awg_nr] is not None:
+            log.info(f"{self.devname}: Configuring AWG {awg_nr} with predefined codeword program")
             full_program = \
                 '// Start of automatically generated codeword table\n' + \
                 self._codeword_table_preamble(awg_nr) + \
@@ -1413,7 +1415,7 @@ class ZI_base_instrument(Instrument):
         log.info(f"{self.devname}: Started '{self.name}'")
 
     def stop(self):
-        log.info('Stopping {}'.format(self.name))
+        log.info(f"{self.devname}: Stopping '{self.name}'")
         # Stop all AWG's
         for awg_nr in range(self._num_channels()//2):
             self.set('awgs_{}_enable'.format(awg_nr), 0)
@@ -1509,7 +1511,7 @@ class ZI_base_instrument(Instrument):
             par(wf)
 
         t1 = time.time()
-        log.info('Set all waveforms to zeros in {:.1f} ms'.format(1.0e3*(t1-t0)))
+        log.info(f"{self.devname}: Set all waveforms to zeros in {1.0e3 * (t1 - t0):.1f} ms")
 
     def configure_awg_from_string(self, awg_nr: int, program_string: str,
                                   timeout: float=15):
@@ -1613,4 +1615,4 @@ class ZI_base_instrument(Instrument):
 
     def asyncEnd(self):
         self.daq.sync()
-        self._async_mode = False 
+        self._async_mode = False
