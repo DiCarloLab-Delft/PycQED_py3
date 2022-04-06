@@ -3179,11 +3179,11 @@ class HAL_Device(HAL_ShimMQ):
                 parallelizing iRB sequences compilation with measurements
 
             pool (multiprocessing.Pool):
-                Only relevant for `compilation_only=True`
+                Only relevant for `compile_only=True`
                 Pool to which the compilation tasks will be assigned
 
             rb_tasks (list):
-                Only relevant when running `compilation_only=True` previously,
+                Only relevant when running `compile_only=True` previously,
                 saving the rb_tasks, waiting for them to finish then running
                 this method again and providing the `rb_tasks`.
                 See the interleaved RB for use case.
@@ -3260,13 +3260,15 @@ class HAL_Device(HAL_ShimMQ):
             return rb_tasks
 
         if rb_tasks is None:
-            # Using `with ...:` makes sure the other processes will be terminated
-            # avoid starting too mane processes,
+            # avoid starting too many processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
+
+            # Using `with ...:` makes sure that proper cleanup is performed
+            # See: # see: https://docs.python.org/3/library/multiprocessing.html#multiprocessing.pool.Pool
             with multiprocessing.Pool(
                 nr_processes,
-                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+                maxtasksperchild=cl_oql.maxtasksperchild
             ) as pool:
                 rb_tasks = send_rb_tasks(pool)
                 cl_oql.wait_for_rb_tasks(rb_tasks)
@@ -3317,7 +3319,7 @@ class HAL_Device(HAL_ShimMQ):
             qubits[1],
             flux_codeword)
         MC.run(label, exp_metadata={"bins": sweep_points})
-        # N.B. if interleaving cliffords are used, this won't work
+        # FIXME: if interleaving cliffords are used, this won't work
         ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
 
 
@@ -3351,6 +3353,7 @@ class HAL_Device(HAL_ShimMQ):
 
         rounds_success = np.zeros(nr_iRB_runs)
         t0 = time.time()
+
         # `maxtasksperchild` avoid RAM issues
         with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
             rb_tasks_start = None
@@ -3408,7 +3411,9 @@ class HAL_Device(HAL_ShimMQ):
             MC = self.instr_MC.get_instr()
 
         def run_parallel_iRB(
-                recompile, pool, rb_tasks_start: list = None,
+                recompile,
+                pool,
+                rb_tasks_start: list = None,
                 start_next_round_compilation: bool = False
             ):
             """
@@ -3429,10 +3434,10 @@ class HAL_Device(HAL_ShimMQ):
                     MC=MC,
                     nr_cliffords=nr_cliffords,
                     interleaving_cliffords=[None],
-                    recompile=recompile,
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    recompile=recompile,
                     compile_only=True,
                     pool=pool
                 )
@@ -3446,10 +3451,10 @@ class HAL_Device(HAL_ShimMQ):
                 MC=MC,
                 nr_cliffords=nr_cliffords,
                 interleaving_cliffords=[104368],
-                recompile=recompile,
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                recompile=recompile,
                 compile_only=True,
                 pool=pool
             )
@@ -3460,10 +3465,10 @@ class HAL_Device(HAL_ShimMQ):
                 MC=MC,
                 nr_cliffords=nr_cliffords,
                 interleaving_cliffords=[None],
-                recompile=False,  # This of course needs to be False
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                recompile=False,  # This of course needs to be False
                 rb_tasks=rb_tasks_start,
             )
 
@@ -3477,11 +3482,11 @@ class HAL_Device(HAL_ShimMQ):
                     MC=MC,
                     nr_cliffords=nr_cliffords,
                     interleaving_cliffords=[100_000],
-                    recompile=recompile,
                     flux_codeword=flux_codeword,
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    recompile=recompile,
                     compile_only=True,
                     pool=pool,
                 )
@@ -3493,10 +3498,10 @@ class HAL_Device(HAL_ShimMQ):
                     MC=MC,
                     nr_cliffords=nr_cliffords,
                     interleaving_cliffords=[None],
-                    recompile=recompile,
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    recompile=recompile,
                     compile_only=True,
                     pool=pool
                 )
@@ -3506,10 +3511,10 @@ class HAL_Device(HAL_ShimMQ):
                 MC=MC,
                 nr_cliffords=nr_cliffords,
                 interleaving_cliffords=[104368],
-                recompile=False,
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                recompile=False,
                 rb_tasks=rb_tasks_CZ,
             )
             ma2.InterleavedRandomizedBenchmarkingAnalysis(
@@ -3529,10 +3534,10 @@ class HAL_Device(HAL_ShimMQ):
                         MC=MC,
                         nr_cliffords=nr_cliffords,
                         interleaving_cliffords=[None],
-                        recompile=recompile,
                         flux_codeword=flux_codeword,
                         nr_seeds=nr_seeds,
                         sim_cz_qubits=sim_cz_qubits,
+                        recompile=recompile,
                         compile_only=True,
                         pool=pool
                     )
@@ -3543,11 +3548,11 @@ class HAL_Device(HAL_ShimMQ):
                     MC=MC,
                     nr_cliffords=nr_cliffords,
                     interleaving_cliffords=[100_000],
-                    recompile=False,
                     flux_codeword=flux_codeword,
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    recompile=False,
                     rb_tasks=rb_tasks_I
                 )
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
@@ -3563,14 +3568,17 @@ class HAL_Device(HAL_ShimMQ):
             # sequences for the next measurement while measuring the previous
             # one
             if pool is None:
-                # Using `with ...:` makes sure the other processes will be terminated
                 # `maxtasksperchild` avoid RAM issues
                 if not maxtasksperchild:
                     maxtasksperchild = cl_oql.maxtasksperchild
+
+                # Using `with ...:` makes sure the other processes will be terminated
                 with multiprocessing.Pool(maxtasksperchild=maxtasksperchild) as pool:
-                    run_parallel_iRB(recompile=recompile,
-                                    pool=pool,
-                                    rb_tasks_start=rb_tasks_start)
+                    run_parallel_iRB(
+                        recompile=recompile,
+                        pool=pool,
+                        rb_tasks_start=rb_tasks_start
+                    )
             else:
                 # In this case the `pool` to execute the RB compilation tasks
                 # is provided, `rb_tasks_start` is expected to be as well
@@ -3578,7 +3586,8 @@ class HAL_Device(HAL_ShimMQ):
                     recompile=recompile,
                     pool=pool,
                     rb_tasks_start=rb_tasks_start,
-                    start_next_round_compilation=start_next_round_compilation)
+                    start_next_round_compilation=start_next_round_compilation
+                )
                 return rb_tasks_next
         else:
             # recompile=False no need to parallelize compilation with measurement
@@ -3612,8 +3621,9 @@ class HAL_Device(HAL_ShimMQ):
             )
             if cardinal:
                 opposite_cardinal = {'NW':'SE', 'NE':'SW', 'SW':'NE', 'SE':'NW'}
-                self.find_instrument(qubits[0]).parameters[f'F_2QRB_{cardinal}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
-                self.find_instrument(qubits[1]).parameters[f'F_2QRB_{opposite_cardinal[cardinal]}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
+                val = 1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n
+                self.find_instrument(qubits[0]).parameters[f'F_2QRB_{cardinal}'].set(val)
+                self.find_instrument(qubits[1]).parameters[f'F_2QRB_{opposite_cardinal[cardinal]}'].set(val)
 
             if measure_idle_flux:
                 # Perform two-qubit iRB with idle identity of same duration as CZ
@@ -3632,7 +3642,6 @@ class HAL_Device(HAL_ShimMQ):
                     label_base="icl[None]",
                     label_int="icl[104368]",
                     label_int_idle="icl[100000]"
-
                 )
         return True
 
@@ -3920,10 +3929,11 @@ class HAL_Device(HAL_ShimMQ):
             return rb_tasks
 
         if rb_tasks is None:
-            # Using `with ...:` makes sure the other processes will be terminated
-            # avoid starting too mane processes,
+            # avoid starting too many processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
+
+            # Using `with ...:` makes sure the other processes will be terminated
             with multiprocessing.Pool(
                 nr_processes,
                 maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
@@ -4412,10 +4422,11 @@ class HAL_Device(HAL_ShimMQ):
             return rb_tasks
 
         if rb_tasks is None:
-            # Using `with ...:` makes sure the other processes will be terminated
             # avoid starting too mane processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
+
+            # Using `with ...:` makes sure the other processes will be terminated
             with multiprocessing.Pool(
                 nr_processes,
                 maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
@@ -4586,10 +4597,11 @@ class HAL_Device(HAL_ShimMQ):
             return rb_tasks
 
         if rb_tasks is None:
-            # Using `with ...:` makes sure the other processes will be terminated
-            # avoid starting too mane processes,
+            # avoid starting too many processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
+
+            # Using `with ...:` makes sure the other processes will be terminated
             with multiprocessing.Pool(
                 nr_processes,
                 maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues

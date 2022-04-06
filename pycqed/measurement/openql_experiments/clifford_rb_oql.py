@@ -51,7 +51,7 @@ def parallel_friendly_rb_2(rb_kw_dict):
     return p.filename
 
 
-def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 4):
+def wait_for_rb_tasks(rb_tasks, refresh_interval: float = 4):
     """
     Blocks the main process till all tasks in `rb_tasks` are done
     """
@@ -71,7 +71,7 @@ def wait_for_rb_tasks(rb_tasks, refresh_rate: float = 4):
 
         # check for keyboard interrupt because generating can be slow
         check_keyboard_interrupt()
-        time.sleep(refresh_rate)
+        time.sleep(refresh_interval)
 
     print("\nDone compiling RB sequences!")
 

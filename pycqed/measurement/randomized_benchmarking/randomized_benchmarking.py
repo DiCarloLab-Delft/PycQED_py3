@@ -15,13 +15,17 @@ def calculate_net_clifford(
     Calculate the net-clifford from a list of cliffords indices.
 
     Args:
-        rb_clifford_indices: list or array of integers specifying the cliffords.
-        Cliff : Clifford object used to determine what
+        rb_clifford_indices:
+            list or array of integers specifying the cliffords.
+
+        Cliff:
+            Clifford object used to determine what
             inversion technique to use and what indices are valid.
             Valid choices are `SingleQubitClifford` and `TwoQubitClifford`
 
     Returns:
-        net_clifford: a `Clifford` object containing the net-clifford.
+        net_clifford:
+            a `Clifford` object containing the net-clifford.
             the Clifford index is contained in the Clifford.idx attribute.
 
     Note: the order corresponds to the order in a pulse sequence but is
@@ -35,7 +39,7 @@ def calculate_net_clifford(
         # used to treat CZ as CZ and not the member of CNOT-like set of gates
         # Using negative sign convention (i.e. `-4368` for the interleaved CZ)
         # was a bad choice because there is no such thing as negative zero and
-        # the clifford numer 0 is the identity that is necessary for
+        # the clifford number 0 is the identity that is necessary for
         # benchmarking an idling identity with the same duration as the time
         # allocated to the flux pulses, for example
         # cliff = Clifford(abs(idx))  # Deprecated!
