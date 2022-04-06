@@ -13,7 +13,7 @@ import cma
 import datetime
 import multiprocessing
 from deprecated import deprecated
-from typing import Optional
+from typing import List, Union, Optional
 
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimSQ import HAL_ShimSQ
 

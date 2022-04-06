@@ -13,7 +13,7 @@ import networkx as nx
 import datetime
 import multiprocessing
 from importlib import reload
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Tuple
 from deprecated import deprecated
 
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import HAL_ShimMQ
