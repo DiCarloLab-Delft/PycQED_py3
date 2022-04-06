@@ -773,7 +773,7 @@ def add_two_q_cal_points(
 
 @deprecated(version='0.4', reason="use class OqlProgram")
 def add_multi_q_cal_points(
-    p: Program, 
+    p: OqlProgram, 
     qubits: List[int],
     combinations: List[str] = ["00", "01", "10", "11"],
     reps_per_cal_pnt: int = 1,

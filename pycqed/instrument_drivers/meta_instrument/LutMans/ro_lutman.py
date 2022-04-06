@@ -263,39 +263,39 @@ class Base_RO_LutMan(Base_LutMan):
                              sampling_rate=sampling_rate)
             res_wave_dict['M_simple_R{}'.format(res)] = M
 
-            # 3-step RO pulse with ramp-up and double depletion
-            up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
-            M_up = create_pulse(shape=self.pulse_primitive_shape(),
-                                amplitude=self.get('M_amp_R{}'.format(res)),
-                                length=up_len,
-                                delay=0,
-                                phase=self.get('M_phi_R{}'.format(res)),
-                                sampling_rate=sampling_rate)
+            # # 3-step RO pulse with ramp-up and double depletion
+            # up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
+            # M_up = create_pulse(shape=self.pulse_primitive_shape(),
+            #                     amplitude=self.get('M_amp_R{}'.format(res)),
+            #                     length=up_len,
+            #                     delay=0,
+            #                     phase=self.get('M_phi_R{}'.format(res)),
+            #                     sampling_rate=sampling_rate)
 
-            M_down0 = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get(
-                                       'M_down_amp0_R{}'.format(res)),
-                                   length=self.get(
-                                       'M_down_length0_R{}'.format(res)),  # ns
-                                   delay=0,
-                                   phase=self.get(
-                                       'M_down_phi0_R{}'.format(res)),
-                                   sampling_rate=sampling_rate)
+            # M_down0 = create_pulse(shape=self.pulse_primitive_shape(),
+            #                        amplitude=self.get(
+            #                            'M_down_amp0_R{}'.format(res)),
+            #                        length=self.get(
+            #                            'M_down_length0_R{}'.format(res)),  # ns
+            #                        delay=0,
+            #                        phase=self.get(
+            #                            'M_down_phi0_R{}'.format(res)),
+            #                        sampling_rate=sampling_rate)
 
-            down1_len = self.get(
-                'M_down_length1_R{}'.format(res))#-gauss_length/2
-            M_down1 = create_pulse(shape=self.pulse_primitive_shape(),
-                                   amplitude=self.get(
-                                       'M_down_amp1_R{}'.format(res)),
-                                   length=down1_len,
-                                   delay=0,
-                                   phase=self.get(
-                                       'M_down_phi1_R{}'.format(res)),
-                                   sampling_rate=sampling_rate)
+            # down1_len = self.get(
+            #     'M_down_length1_R{}'.format(res))#-gauss_length/2
+            # M_down1 = create_pulse(shape=self.pulse_primitive_shape(),
+            #                        amplitude=self.get(
+            #                            'M_down_amp1_R{}'.format(res)),
+            #                        length=down1_len,
+            #                        delay=0,
+            #                        phase=self.get(
+            #                            'M_down_phi1_R{}'.format(res)),
+            #                        sampling_rate=sampling_rate)
 
-            M_up_down_down = (np.concatenate((M_up[0], M_down0[0], M_down1[0])),
-                              np.concatenate((M_up[1], M_down0[1], M_down1[1])))
-            res_wave_dict['M_up_down_down_R{}'.format(res)] = M_up_down_down
+            # M_up_down_down = (np.concatenate((M_up[0], M_down0[0], M_down1[0])),
+            #                   np.concatenate((M_up[1], M_down0[1], M_down1[1])))
+            # res_wave_dict['M_up_down_down_R{}'.format(res)] = M_up_down_down
 
             # pulse with up, down, down depletion with an additional final
             # strong measurement at some delay
@@ -309,10 +309,10 @@ class Base_RO_LutMan(Base_LutMan):
                                    phase=self.get('M_phi_R{}'.format(res)),
                                    sampling_rate=sampling_rate)
 
-            M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
-                                    np.concatenate((M_up_down_down[1], M_final[1])))
-            res_wave_dict['M_up_down_down_final_R{}'.format(
-                res)] = M_up_down_down_final
+            # M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
+            #                         np.concatenate((M_up_down_down[1], M_final[1])))
+            # res_wave_dict['M_up_down_down_final_R{}'.format(
+            #     res)] = M_up_down_down_final
 
             # 2. convolve with gaussian (if desired)
             if self.gaussian_convolution():

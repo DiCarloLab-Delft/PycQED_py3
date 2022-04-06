@@ -133,10 +133,11 @@ class Clifford(object):
 
 class SingleQubitClifford(Clifford):
 
-    def __init__(self, idx: int):
+    def __init__(self, idx: int, i: int=0):
         assert(idx < 24)
         self.idx = idx
         self.pauli_transfer_matrix = C1[idx]
+        self.i = i
 
     @property
     def gate_decomposition(self):
@@ -145,7 +146,7 @@ class SingleQubitClifford(Clifford):
         according to the decomposition by Epstein et al.
         """
         if not hasattr(self, '_gate_decomposition'):
-            self._gate_decomposition = [(g, 'q0') for g in
+            self._gate_decomposition = [(g, f'q{self.i}') for g in
                                         gate_decomposition[self.idx]]
         return self._gate_decomposition
 

@@ -251,25 +251,25 @@ def Msmt_induced_dephasing_ramsey(
     q_spec is measured
 
     """
-    p = oqh.create_program("Ramsey_msmt_induced_dephasing", platf_cfg)
+    p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)
 
     angles = np.arange(0,360,20)
     for i, angle in enumerate(angles):
         for meas in [False, True]:
             for state in ['0', '1']:
                 cw_idx = angle//20 + 9
-                k = oqh.create_kernel(f"Ramsey_meas_{meas}_{angle}_{state}", p)
+                k = p.create_kernel(f"Ramsey_meas_{meas}_{angle}_{state}")
 
                 for q in q_rams:
                     k.prepz(q)
                 k.prepz(q_meas)
-                k.gate("wait", [], 0)
+                k.barrier([])
 
                 if state == '1':
                     k.gate('rx180',[q_meas])
                 for q in q_rams: 
                     k.gate('rx90', [q])
-                k.gate("wait", [], 0)
+                k.barrier([])
 
                 if meas == True:
                     k.measure(q_meas)
@@ -279,13 +279,13 @@ def Msmt_induced_dephasing_ramsey(
                     for q, t in zip(q_rams, echo_times):
                         k.gate('cw_30', [q])
                         k.gate('wait', [q], t)
-                k.gate("wait", [], 0) 
+                k.barrier([]) 
                 
                 for q in q_rams: 
                     k.gate('cw_{:02}'.format(cw_idx), [q])
-                    k.gate("wait", [q], 500) # To prevent UHF from missing shots
+                    k.gate("wait", [q], 600) # To prevent UHF from missing shots
                     k.measure(q)
-                k.gate("wait", [], 0)
+                k.barrier([])
                 if meas == True and exception_qubits != None:
                     for q in exception_qubits:
                         k.measure(q)
@@ -293,12 +293,11 @@ def Msmt_induced_dephasing_ramsey(
 
     # adding the calibration points
     n = len(q_rams)
-    oqh.add_multi_q_cal_points(p, 
-                               qubits=q_rams, 
-                               combinations=['0'*n, '1'*n], 
-                               reps_per_cal_pnt=2)
+    p.add_multi_q_cal_points(qubits=q_rams, 
+                             combinations=['0'*n, '1'*n], 
+                             reps_per_cal_pnt=2)
 
-    p = oqh.compile(p)
+    p.compile()
     return p
 
 
@@ -1572,7 +1571,7 @@ def conditional_oscillation_seq(
         wait_time_after_flux   (int): wait time in ns after triggering all flux
             pulses
     '''
-    assert parked_qubit_seq in {"ground", "ramsey"}
+    assert parked_qubit_seq in {"ground", "ramsey", "excited"}
 
     p = OqlProgram("conditional_oscillation_seq", platf_cfg)
 
@@ -1600,9 +1599,19 @@ def conditional_oscillation_seq(
                 control_qubits.append(q3)
 
             ramsey_qubits = [q0]
-            if q2 is not None and parked_qubit_seq == "ramsey":
-                # For parking and parallel cz
-                ramsey_qubits.append(q2)
+            if q2 is not None:
+                if parked_qubit_seq == "ramsey":
+                    # For parking and parallel cz
+                    ramsey_qubits.append(q2)
+                elif parked_qubit_seq == "excited":
+                    k.gate("rx180", [q2])
+
+            if q3 is not None:
+                if parked_qubit_seq == "ramsey":
+                    # For parking and parallel cz
+                    ramsey_qubits.append(q3)
+                elif parked_qubit_seq == "excited":
+                    k.gate("rx180", [q3])
 
             if case == "excitation":
                 # implicit identities otherwise
@@ -1629,10 +1638,16 @@ def conditional_oscillation_seq(
                     # Parallel flux pulses below
                     if 'dance' in flux_codeword:
                         k.gate(flux_codeword, [0])
+
+                    elif 'parity_check' in flux_codeword:
+                        k.gate(f'flux_dance_refocus_1', [0])
+                        k.gate(f'flux_dance_refocus_2', [0])
+                        k.gate(f'flux_dance_refocus_3', [0])
+                        k.gate(f'flux_dance_refocus_4', [0])
                     else:
                         k.gate(flux_codeword, [q0, q1])
-                    # k.gate('sf_cz_nw', [q0], 60)
-                    # k.gate('sf_cz_se', [q1], 60)
+                    
+
                     k.barrier([q0, q1])
 
                     # in case of parking and parallel cz
@@ -1683,6 +1698,11 @@ def conditional_oscillation_seq(
                 if disable_parallel_single_q_gates:
                     k.barrier([])
 
+            if q2 is not None and parked_qubit_seq == "excited":
+                k.gate("rx180", [q2])
+            if q3 is not None and parked_qubit_seq == "excited":
+                k.gate("rx180", [q3])
+
             k.barrier([])
 
             # #################################################################
@@ -1714,7 +1734,7 @@ def conditional_oscillation_seq(
     # [2020-06-24] parallel cz not supported (yet)
 
     if add_cal_points:
-        cal_pts_idx = [361, 362, 363, 364]
+        cal_pts_idx = np.arange(0,len(states))+361
     else:
         cal_pts_idx = []
 
@@ -1827,6 +1847,17 @@ def conditional_oscillation_seq_multi(
                             k.gate(flux_codeword, [q0, q1])
                     else:
                         k.gate(flux_codeword, [0])
+                        # k.gate('sf_cz_ne', [3])
+                        # k.gate('sf_cz_ne', [8])
+                        # k.gate('sf_cz_ne', [11])
+                        # k.gate('sf_cz_sw', [5])
+                        # k.gate('sf_cz_sw', [16])
+                        # k.gate('sf_cz_sw', [2])
+                        # k.gate('sf_park', [1])
+                        # k.gate('sf_park', [6])
+                        # k.gate('sf_park', [10])
+                        # k.gate('sf_park', [14])
+
                 else:
                     for q0, q1 in zip(Q_idxs_target, Q_idxs_control):
                         k.gate('wait', [q0, q1], disabled_cz_duration)
@@ -1985,13 +2016,13 @@ def parity_check_flux_dance(
             # #################################################################
             # Flux pulses
             # #################################################################
-            k.gate('wait', [], wait_time_before_flux)
+            # k.gate('wait', [], wait_time_before_flux)
 
             for flux_cw in flux_cw_list:
                 k.gate(flux_cw, [0])
             k.barrier([])
 
-            k.gate('wait', [], wait_time_after_flux)
+            # k.gate('wait', [], wait_time_after_flux)
             # #################################################################
             # Single qubit gates post flux pulses
             # #################################################################
@@ -2108,7 +2139,8 @@ def parity_check_fidelity(
     p = OqlProgram("parity_check_fidelity", platf_cfg)
 
     for case in control_cases:
-        k = oqh.create_kernel("{}".format(case), p)
+        # k = p.create_kernel("{}".format(case), p)
+        k = p.create_kernel("{}".format(case))
         
         # #################################################################
         # State preparation
@@ -2182,7 +2214,7 @@ def Weight_4_parity_tomography(
         platf_cfg: str,
         simultaneous_measurement: bool=True
         ):
-    p = oqh.create_program("Weight_4_parity_tomography", platf_cfg)
+    p = OqlProgram("Weight_4_parity_tomography", platf_cfg)
     all_Q_idxs = [Q_anc, Q_D1, Q_D2, Q_D3, Q_D4]
     tomo_gates = {'Z': 'i', 'X': 'rym90', 'Y': 'rx90'}
 
@@ -2252,16 +2284,19 @@ def Parity_Sandia_benchmark(
       Sandia's weight-4 parity check benchmark protocol.
       '''
       delays = {}
-      p = oqh.create_program("Sandia_parity_benchmark", platf_cfg)
+      p = OqlProgram("Sandia_parity_benchmark", platf_cfg)
 
-      k = oqh.create_kernel("P_0000", p)
+      # lb = ["P_0000","P_1111","Single_parity_check","Double_parity_check"]
+      # for i,ks in enumerate(lb):
+
+      k = p.create_kernel("P_0000")
       all_q_idxs = QDs+[qA]
       for q_idx in all_q_idxs:
             k.prepz(q_idx)
             k.measure(q_idx)
       p.add_kernel(k)
       
-      k = oqh.create_kernel("P_1111", p)
+      k = p.create_kernel("P_1111")
       all_q_idxs = QDs+[qA]
       for q_idx in all_q_idxs:
             k.prepz(q_idx)
@@ -2269,64 +2304,64 @@ def Parity_Sandia_benchmark(
             k.measure(q_idx)
       p.add_kernel(k)
       
-      k = oqh.create_kernel("Single_parity_check", p)
+      k = p.create_kernel("Single_parity_check")
       all_q_idxs = QDs+[qA]
       for q_idx in all_q_idxs:
             k.prepz(q_idx)
             k.gate("ry90", [q_idx])
-      k.gate("wait", [], 0)
-      k.gate("flux-dance-1-refocus", [0])
-      k.gate("flux-dance-2-refocus", [0])
-      k.gate("flux-dance-3-refocus", [0])
-      k.gate("flux-dance-4-refocus", [0])
-      k.gate("wait", [], 0)
+      k.barrier([])
+      k.gate("flux_dance_refocus_1", [0])
+      k.gate("flux_dance_refocus_2", [0])
+      k.gate("flux_dance_refocus_3", [0])
+      k.gate("flux_dance_refocus_4", [0])
+      k.barrier([])
       for q_idx in all_q_idxs:
             k.gate("rym90", [q_idx])
             k.measure(q_idx)
       p.add_kernel(k)
 
 
-      k = oqh.create_kernel("Double_parity_check", p)
+      k = p.create_kernel("Double_parity_check")
       all_q_idxs = QDs+[qA]
       for q_idx in all_q_idxs:
             k.prepz(q_idx)
             k.gate("ry90", [q_idx])
-      k.gate("wait", [], 0)
-      k.gate("flux-dance-1-refocus", [0])
-      k.gate("flux-dance-2-refocus", [0])
-      k.gate("flux-dance-3-refocus", [0])
-      k.gate("flux-dance-4-refocus", [0])
-      k.gate("wait", [], 0)
+      k.barrier([])
+      k.gate("flux_dance_refocus_1", [0])
+      k.gate("flux_dance_refocus_2", [0])
+      k.gate("flux_dance_refocus_3", [0])
+      k.gate("flux_dance_refocus_4", [0])
+      k.barrier([])
       for q_idx in all_q_idxs:
             k.gate("rym90", [q_idx])
-      k.gate("wait", [], 0)
+      k.barrier([])
       k.measure(qA)
 
       # correct for msmt induced phaseshift on data qubits using phi-echo pulses
-      k.gate("cw_30", [2])
-      k.gate('wait', [2], 360)
-      k.gate("cw_30", [0])
-      k.gate('wait', [0], 380)
-      k.gate("cw_30", [13])
-      k.gate('wait', [13], 280)
-      k.gate("cw_30", [16])
-      k.gate('wait', [16], 320)
-      k.gate("wait", [], 0)
+      # k.gate("cw_30", [2])
+      # k.gate('wait', [2], 360)
+      # k.gate("cw_30", [0])
+      # k.gate('wait', [0], 380)
+      # k.gate("cw_30", [13])
+      # k.gate('wait', [13], 280)
+      # k.gate("cw_30", [16])
+      # k.gate('wait', [16], 320)
+      k.barrier([])
       
       for q_idx in all_q_idxs:
             k.gate("ry90", [q_idx])
-      k.gate("wait", [], 0)
-      k.gate("flux-dance-1-refocus", [0])
-      k.gate("flux-dance-2-refocus", [0])
-      k.gate("flux-dance-3-refocus", [0])
-      k.gate("flux-dance-4-refocus", [0])
-      k.gate("wait", [], 0)
+      k.barrier([])
+      k.gate("flux_dance_refocus_1", [0])
+      k.gate("flux_dance_refocus_2", [0])
+      k.gate("flux_dance_refocus_3", [0])
+      k.gate("flux_dance_refocus_4", [0])
+      k.barrier([])
       for q_idx in all_q_idxs:
             k.gate("rym90", [q_idx])
             k.measure(q_idx)
       p.add_kernel(k)
 
-      p = oqh.compile(p)
+      p.compile()
 
       return p
 

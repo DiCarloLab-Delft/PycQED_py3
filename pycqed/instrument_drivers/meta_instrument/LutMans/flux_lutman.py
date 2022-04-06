@@ -3380,8 +3380,8 @@ def phase_corr_sine_series_half(a_i, nr_samples):
     return s
 
 
-def roundup1024(n):
-    return int(np.ceil(n/1024)*1024)
+def roundup96(n):
+    return int(np.ceil(n/96)*96)
 
 
 def sim_pars_sanity_check(station, flm, flm_static, which_gate):

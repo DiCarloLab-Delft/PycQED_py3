@@ -879,7 +879,7 @@ class multi_sweep_function(Soft_Sweep):
     cascades several sweep functions into a single joint sweep functions.
     '''
     def __init__(self, sweep_functions: list, sweep_point_ratios: list=None,
-                 parameter_name=None, name=None,**kw):
+                 parameter_name=None, name=None, **kw):
         self.set_kw()
         self.sweep_functions = sweep_functions
         self.sweep_control = 'soft'
@@ -923,7 +923,7 @@ class multi_sweep_function_ranges(Soft_Sweep):
                                      self.sweep_ranges[i][1],
                                      self.n_points) for i in range(len(self.sweep_ranges)) ]
         for i, sweep_function in enumerate(self.sweep_functions):
-            sweep_function.set_parameter(Sweep_points[i][val])
+            sweep_function.set(Sweep_points[i][val])
 
 
 class two_par_joint_sweep(Soft_Sweep):
@@ -1027,7 +1027,8 @@ class flux_t_middle_sweep(Soft_Sweep):
             fl_lm_tm: list, 
             fl_lm_park: list,
             which_gate: list,
-            t_pulse: list
+            t_pulse: list,
+            duration: float = 40e-9
         ):
         super().__init__()
         self.name = 'time_middle'
@@ -1037,38 +1038,43 @@ class flux_t_middle_sweep(Soft_Sweep):
         self.fl_lm_park = fl_lm_park
         self.which_gate = which_gate
         self.t_pulse = t_pulse
+        self.duration = duration
 
     def set_parameter(self, val):
         which_gate = self.which_gate
         t_pulse = np.repeat(self.t_pulse, 2)
         sampling_rate = self.fl_lm_tm[0].sampling_rate()
+        total_points = self.duration*sampling_rate
         
         # Calculate vcz times for each flux pulse
         time_mid = val / sampling_rate
-        n_points  = [ np.ceil(tp / 2 * sampling_rate) for tp in t_pulse ]
+        n_points = [ np.ceil(tp / 2 * sampling_rate) for tp in t_pulse ]
         time_sq  = [ n / sampling_rate for n in n_points ]
-        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate 
-        time_pad = np.abs(np.array(time_sq)-np.max(time_sq))
+        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate
+        time_park_pad = np.ceil((self.duration-time_park)/2*sampling_rate)/sampling_rate
+        time_pad = np.abs(np.array(time_sq)-np.max(time_sq))+time_park_pad
 
+        # update parameters and upload waveforms
+        Lutmans = self.fl_lm_tm + self.fl_lm_park
+        AWGs = np.unique([lm.AWG() for lm in Lutmans])
+        for AWG in AWGs:
+            Lutmans[0].find_instrument(AWG).stop()
         # set flux lutman parameters of CZ qubits
         for i, fl_lm in enumerate(self.fl_lm_tm):
             fl_lm.set('vcz_time_single_sq_{}'.format(which_gate[i]), time_sq[i])
             fl_lm.set('vcz_time_middle_{}'.format(which_gate[i]), time_mid)
             fl_lm.set('vcz_time_pad_{}'.format(which_gate[i]), time_pad[i])
             fl_lm.set('vcz_amp_fine_{}'.format(which_gate[i]), .5)
-
+            fl_lm.load_waveform_onto_AWG_lookuptable(
+                wave_id=f'cz_{which_gate[i]}', regenerate_waveforms=True)
         # set flux lutman parameters of Park qubits
         for fl_lm in self.fl_lm_park:
+            fl_lm.park_pad_length(time_park_pad)
             fl_lm.park_length(time_park)
-
-        Lutmans = self.fl_lm_tm + self.fl_lm_park
-        AWGs = np.unique([lm.AWG() for lm in Lutmans])
+            fl_lm.load_waveform_onto_AWG_lookuptable(
+                wave_id='park', regenerate_waveforms=True)
         for AWG in AWGs:
-            Lutmans[0].find_instrument(AWG).stop()
-        for Lutman in Lutmans:
-            Lutman.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
-        for AWG in AWGs:
-            Lutmans[0].find_instrument(AWG).stop()
+            Lutmans[0].find_instrument(AWG).start()
 
         return val
 

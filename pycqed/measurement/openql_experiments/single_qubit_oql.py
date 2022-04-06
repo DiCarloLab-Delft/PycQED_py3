@@ -183,6 +183,7 @@ def flipping(
         platf_cfg: str,
         equator: bool = False, 
         cal_points: bool = True,
+        flip_ef: bool = False,
         ax: str = 'x', 
         angle: str = '180'
 ) -> OqlProgram:
@@ -221,13 +222,19 @@ def flipping(
                              i == (len(number_of_flips)-1)):
             if ax == 'y':
                 k.y(qubit_idx)
+            elif flip_ef:
+                k.gate('rX12',[qubit_idx])
             else:
                 k.x(qubit_idx)
+
             k.measure(qubit_idx)
         else:
             if equator:
                 if ax == 'y':
                     k.gate('ry90', [qubit_idx])
+                elif flip_ef:
+                    k.gate('rx180', [qubit_idx])
+                    k.gate('cw_15', [qubit_idx])
                 else:
                     k.gate('rx90', [qubit_idx])
             for j in range(n):
@@ -239,8 +246,13 @@ def flipping(
                 elif angle == '90':
                     k.gate('rx90', [qubit_idx])
                     k.gate('rx90', [qubit_idx])
+                elif flip_ef:
+                    k.gate('rX12',[qubit_idx])
                 else:
                     k.x(qubit_idx)
+
+            if flip_ef:
+                k.gate('rx180',[qubit_idx])
             k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -927,14 +939,15 @@ def single_elt_on(qubit_idx: int, platf_cfg: str) -> OqlProgram:
 
 
 def off_on(
-        qubit_idx: int, 
+        qubit_idx: int,
         pulse_comb: str, 
         initialize: bool, 
         platf_cfg: str,
         nr_flux_after_init: float=None,
         flux_cw_after_init: Union[str, List[str]]=None,
         fluxed_qubit_idx: int=None,
-        wait_time_after_flux: float=0
+        wait_time_after_flux: float=0,
+        cross_driving_qubit: int=None,
         ):
 
     """
@@ -992,11 +1005,31 @@ def off_on(
                     k.gate(flux_cw_after_init, [fluxed_qubit_idx]) 
             k.gate("wait", [], wait_time_after_flux) 
 
-        k.gate('rx180', [qubit_idx])
+        
+        # k.gate('rx180', [qubit_idx])
+        if cross_driving_qubit is not None:
+            k.gate('rx180', [cross_driving_qubit])
+            k.gate("i", [qubit_idx])
+            k.gate("wait", [])
+        else: 
+            k.gate('rx180', [qubit_idx])
+
+        k.gate("wait", [])
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
+    if 'two' in pulse_comb.lower():
+        k = p.create_kernel("two")
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
+        k.gate('rx12', [qubit_idx])
+        k.gate("wait", [])
+
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()) and ('two' not in pulse_comb.lower()):
         raise ValueError(f"pulse_comb {pulse_comb} has to contain only 'on' and 'off'.")
 
     p.compile()
@@ -1008,9 +1041,9 @@ def RO_QND_sequence(q_idx,
     RO QND sequence.
     '''
 
-    p = oqh.create_program("RO_QND_sequence", platf_cfg)
+    p = OqlProgram("RO_QND_sequence", platf_cfg)
 
-    k = oqh.create_kernel("Experiment", p)
+    k = p.create_kernel("Experiment")
     
     k.prepz(q_idx)
     k.gate('rx90', [q_idx])
@@ -1020,18 +1053,18 @@ def RO_QND_sequence(q_idx,
     k.measure(q_idx)
     p.add_kernel(k)
 
-    k = oqh.create_kernel("Init_0", p)
+    k = p.create_kernel("Init_0")
     k.prepz(q_idx)
     k.measure(q_idx)
     p.add_kernel(k)
 
-    k = oqh.create_kernel("Init_1", p)
+    k = p.create_kernel("Init_1")
     k.prepz(q_idx)
     k.gate('rx180', [q_idx])
     k.measure(q_idx)
     p.add_kernel(k)
     
-    p = oqh.compile(p)
+    p.compile()
     
     return p
 

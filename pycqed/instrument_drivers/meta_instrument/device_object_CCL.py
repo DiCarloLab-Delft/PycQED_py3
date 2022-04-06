@@ -35,8 +35,8 @@ from pycqed.utilities.general import check_keyboard_interrupt, print_exception
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
     QuTech_AWG_Module,
 )
-#from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
-from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
+# from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
+# from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
 
@@ -1117,8 +1117,10 @@ class DeviceCCL(Instrument):
             list_qubits_used.append(q3)
 
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=list_qubits_used)
+            self.prepare_readout(qubits=list_qubits_used)
+            self.prepare_fluxing(qubits=list_qubits_used)
             for q in list_qubits_used:  #only on the CZ qubits we add the ef pulses
+                self.find_instrument(q)._prep_td_sources()
                 mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
                 lm = mw_lutman.LutMap()
                 # we hardcode the X on the ef transition to CW 31 here.
@@ -1197,13 +1199,14 @@ class DeviceCCL(Instrument):
 
         return a
 
+ 
 
     def measure_conditional_oscillation_multi(
             self,
-            pairs: List[str], 
-            flux_codeword: str="cz",
-            phase_offsets: List[float]=None,
-            parked_qbs: List[str]=None,
+            pairs: list, 
+            parked_qbs: list,
+            flux_codeword="cz",
+            phase_offsets:list = None,
             parked_qubit_seq=None,
             downsample_swp_points=1,  # x2 and x3 available
             prepare_for_timedomain=True,
@@ -1272,6 +1275,7 @@ class DeviceCCL(Instrument):
                 the final afterrotations
 
         """
+
         if self.ro_acq_weight_type() != 'optimal':
             # this occurs because the detector groups qubits per feedline.
             # If you do not pay attention, this will mess up the analysis of
@@ -1281,17 +1285,14 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        if parked_qubit_seq is not None and parked_qbs is None:
-            raise ValueError("If special sequence should be applied to parked qubits," 
-                            + "they need to be given in `parked_qbs`!")
-
         Q_idxs_target = []
         Q_idxs_control = []
+        Q_idxs_parked = []
         list_qubits_used = []
         ramsey_qubits = []
 
         for i,pair in enumerate(pairs):
-            print ( 'Pair (target,control) {} : ({},{})'. format(i+1,pair[0],pair[1]))
+            # print ( 'Pair (target,control) {} : ({},{})'. format(i+1,pair[0],pair[1]))
             assert pair[0] in self.qubits()
             assert pair[1] in self.qubits()
             Q_idxs_target += [self.find_instrument(pair[0]).cfg_qubit_nr()]
@@ -1299,9 +1300,9 @@ class DeviceCCL(Instrument):
             list_qubits_used += [pair[0], pair[1]]
             ramsey_qubits += [pair[0]]
 
-        print('Q_idxs_target : {}'.format(Q_idxs_target))
-        print('Q_idxs_control : {}'.format(Q_idxs_control))
-        print('list_qubits_used : {}'.format(list_qubits_used))
+        # print('Q_idxs_target : {}'.format(Q_idxs_target))
+        # print('Q_idxs_control : {}'.format(Q_idxs_control))
+        # print('list_qubits_used : {}'.format(list_qubits_used))
 
         if parked_qbs is not None:
             Q_idxs_parked = [self.find_instrument(Q).cfg_qubit_nr() for Q in parked_qbs]
@@ -1309,21 +1310,21 @@ class DeviceCCL(Instrument):
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=list_qubits_used)
 
-        for i, q in enumerate(np.concatenate([ramsey_qubits])): 
-        # only on the CZ qubits we add the ef pulses 
-            mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+            for i, q in enumerate(np.concatenate([ramsey_qubits])): 
+            # only on the CZ qubits we add the ef pulses 
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
 
-            lm = mw_lutman.LutMap()
-            # we hardcode the X on the ef transition to CW 31 here.
-            lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
-            # load_phase_pulses will also upload other waveforms
-            if phase_offsets == None:
-                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-            else:
-                mw_lutman.load_phase_pulses_to_AWG_lookuptable(
-                    phases=np.arange(0,360,20)+phase_offsets[i])
-            mw_lutman.load_waveforms_onto_AWG_lookuptable(
-                regenerate_waveforms=True)
+                lm = mw_lutman.LutMap()
+                # we hardcode the X on the ef transition to CW 31 here.
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                # load_phase_pulses will also upload other waveforms
+                if phase_offsets == None:
+                    mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+                else:
+                    mw_lutman.load_phase_pulses_to_AWG_lookuptable(
+                        phases=np.arange(0,360,20)+phase_offsets[i])
+                mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                    regenerate_waveforms=True)
 
         # These are hardcoded angles in the mw_lutman for the AWG8
         # only x2 and x3 downsample_swp_points available
@@ -1332,7 +1333,7 @@ class DeviceCCL(Instrument):
         p = mqo.conditional_oscillation_seq_multi(
             Q_idxs_target,
             Q_idxs_control,
-            Q_idxs_parked=Q_idxs_parked if parked_qbs else None,
+            Q_idxs_parked,
             platf_cfg=self.cfg_openql_platform_fn(),
             disable_cz=disable_cz,
             disabled_cz_duration=disabled_cz_duration_ns,
@@ -1365,7 +1366,6 @@ class DeviceCCL(Instrument):
             disable_snapshot_metadata=disable_metadata,
         )
 
-        # Analysis needs qubit order
         if len(pairs) > 1:
             # qb_ro_order = np.sum([ list(self._acq_ch_map[key].keys()) for key in self._acq_ch_map.keys()])
             # qubits_by_feedline = [['D1','X1'],  
@@ -1407,14 +1407,13 @@ class DeviceCCL(Instrument):
             (a.proc_data_dict['quantities_of_interest']['phi_1'].n+180) % 360 - 180
 
         return result_dict
-
-
+    
     def measure_parity_check_flux_dance(
             self,
             target_qubits: List[str],
             control_qubits: List[str],
             flux_dance_steps: List[int] = [1,2,3,4],
-            flux_codeword: str = 'flux-dance',
+            flux_codeword: str = 'flux_dance',
             refocusing: bool = False,
             ramsey_qubits: Union[List[str], bool] = None,
             parking_qubits: List[str] = None,
@@ -1425,7 +1424,7 @@ class DeviceCCL(Instrument):
             initialization_msmt: bool = False,
             wait_time_before_flux_ns: int = 0,
             wait_time_after_flux_ns: int = 0,
-            analyze_parity_model: bool = True,
+            analyze_parity_model: bool = False,
             plotting=True,
             prepare_for_timedomain=True,
             label_suffix="",
@@ -1669,8 +1668,12 @@ class DeviceCCL(Instrument):
 
         # prepare flux codeword list according to given step numbers
         # will be programmed in order of the list, but scheduled in parallel (if possible)
-        flux_cw_list = [flux_codeword + f'-{step}' for step in flux_dance_steps]
+        
+        if refocusing:
+            flux_cw_list = [flux_codeword + '_refocus' + f'_{step}' for step in flux_dance_steps]
 
+        else:
+            flux_cw_list = [flux_codeword + f'_{step}' for step in flux_dance_steps]
         p = mqo.parity_check_flux_dance(
             Q_idxs_target=Q_idxs_target,
             Q_idxs_control=Q_idxs_control,
@@ -1704,28 +1707,38 @@ class DeviceCCL(Instrument):
         self.ro_acq_digitized(old_digitized)
         self.ro_acq_weight_type(old_weight_type)
 
-        a = ma2.Parity_Check_Analysis(
-            label=label, 
-            target_qubit=target_qubits[0],
-            extract_only=not plotting,
-            analyze_parity_model=analyze_parity_model
-            )
+        a = ma2.Parity_Check_Analysis_OLD(
+            label=label,
+            ancilla_qubits=target_qubits,
+            data_qubits=control_qubits_by_case,
+            parking_qubits=parking_qubits,
+            cases=cases,
+            plotting=plotting
+        )
 
-        result = a.proc_data_dict
+        return a.result
+        # a = ma2.Parity_Check_Analysis(
+        #     label=label, 
+        #     target_qubit=target_qubits[0],
+        #     extract_only=not plotting,
+        #     analyze_parity_model=analyze_parity_model
+        #     )
 
-        if analyze_parity_model:
-            model_errors = a.proc_data_dict['quantities_of_interest']['parity_model']['model_errors']
-            model_terms = a.proc_data_dict['quantities_of_interest']['parity_model']['model_terms']
-            # this return structure is necessary to use this as a detector function 
-            # for higher level calibration routines
-            result = {**result,
-                        'model_errors': model_errors,
-                        'model_terms': model_terms,
-                        # must extract the nominal value here because MC/HDF5 cannot deal with ufloats in the data array
-                        **{f'model_error_{term}': x.n for term, x in zip(model_terms, model_errors)}
-                        }
+        # result = a.proc_data_dict
 
-        return result
+        # if analyze_parity_model:
+        #     model_errors = a.proc_data_dict['quantities_of_interest']['parity_model']['model_errors']
+        #     model_terms = a.proc_data_dict['quantities_of_interest']['parity_model']['model_terms']
+        #     # this return structure is necessary to use this as a detector function 
+        #     # for higher level calibration routines
+        #     result = {**result,
+        #                 'model_errors': model_errors,
+        #                 'model_terms': model_terms,
+        #                 # must extract the nominal value here because MC/HDF5 cannot deal with ufloats in the data array
+        #                 **{f'model_error_{term}': x.n for term, x in zip(model_terms, model_errors)}
+        #                 }
+
+        # return result
 
 
     def measure_parity_check_fidelity(
@@ -1733,7 +1746,7 @@ class DeviceCCL(Instrument):
             target_qubits: List[str],
             control_qubits: List[str], # have to be given in readout (feedline) order
             flux_dance_steps: List[int] = [1,2,3,4],
-            flux_codeword: str = 'flux-dance',
+            flux_codeword: str = 'flux_dance',
             ramsey_qubits: List[str] = None,
             refocusing: bool = False,
             phase_offsets: List[float] = None,
@@ -1793,6 +1806,8 @@ class DeviceCCL(Instrument):
             MC = self.instr_MC.get_instr()
 
         cases = ['{:0{}b}'.format(i, len(control_qubits)) for i in range(2**len(control_qubits))]
+        # prepare list of all used qubits
+        all_qubits = target_qubits + control_qubits
 
         # MW preparation
         Q_idxs_control = []   
@@ -1851,7 +1866,12 @@ class DeviceCCL(Instrument):
 
         # prepare flux codeword list according to given step numbers
         # will be programmed in order of the list, but scheduled in parallel (if possible)
-        flux_cw_list = [flux_codeword + f'-{step}' for step in flux_dance_steps]
+        # flux_cw_list = [flux_codeword + f'_{step}' for step in flux_dance_steps]
+        if refocusing:
+            flux_cw_list = [flux_codeword + '_refocus' + f'_{step}' for step in flux_dance_steps]
+
+        else:
+            flux_cw_list = [flux_codeword + f'_{step}' for step in flux_dance_steps]
 
         p = mqo.parity_check_fidelity(
             Q_idxs_target=Q_idxs_target,
@@ -1892,8 +1912,8 @@ class DeviceCCL(Instrument):
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
 
-        a = ma2.Parity_Check_Fidelity_Analysis(label=label)
-        return a.result
+        # a = ma2.Parity_Check_Fidelity_Analysis(label=label)
+        # return a.result
 
     def measure_sandia_parity_benchmark(self,
                                         ancilla_qubit: str,
@@ -3089,7 +3109,7 @@ class DeviceCCL(Instrument):
             exception_idxs = [self.find_instrument(q).cfg_qubit_nr()
                              for q in exception_qubits]
         else:
-            exception_qubits = None
+            exception_idxs = None
 
         p = mqo.Msmt_induced_dephasing_ramsey(
             q_rams = target_idxs,
@@ -4232,6 +4252,219 @@ class DeviceCCL(Instrument):
 
         return (phi, phi_stderr)
 
+    # def measure_two_qubit_randomized_benchmarking(
+    #     self,
+    #     qubits,
+    #     nr_cliffords=np.array(
+    #         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
+    #     ),
+    #     nr_seeds=100,
+    #     interleaving_cliffords=[None],
+    #     label="TwoQubit_RB_{}seeds_recompile={}_icl{}_{}_{}_{}",
+    #     recompile: bool = "as needed",
+    #     cal_points=True,
+    #     flux_codeword="cz",
+    #     flux_allocated_duration_ns: int = None,
+    #     sim_cz_qubits: list = None,
+    #     compile_only: bool = False,
+    #     pool=None,  # a multiprocessing.Pool()
+    #     rb_tasks=None,  # used after called with `compile_only=True`
+    #     MC=None
+    # ):
+    #     """
+    #     Measures two qubit randomized benchmarking, including
+    #     the leakage estimate.
+
+    #     [2020-07-04 Victor] this method was updated to allow for parallel
+    #     compilation using all the cores of the measurement computer
+
+    #     Refs:
+    #     Knill PRA 77, 012307 (2008)
+    #     Wood PRA 97, 032306 (2018)
+
+    #     Args:
+    #         qubits (list):
+    #             pair of the qubit names on which to perform RB
+
+    #         nr_cliffords (array):
+    #             lengths of the clifford sequences to perform
+
+    #         nr_seeds (int):
+    #             number of different clifford sequences of each length
+
+    #         interleaving_cliffords (list):
+    #             list of integers (or None) which specifies which cliffords
+    #             to interleave the sequence with (for interleaved RB)
+    #             For indices of Clifford group elements go to
+    #             two_qubit_clifford_group.py
+
+    #         label (str):
+    #             string for formatting the measurement name
+
+    #         recompile (bool, str {'as needed'}):
+    #             indicate whether to regenerate the sequences of clifford gates.
+    #             By default it checks whether the needed sequences were already
+    #             generated since the most recent change of OpenQL file
+    #             specified in self.cfg_openql_platform_fn
+
+    #         cal_points (bool):
+    #             should calibration point (qubits in 0 and 1 states)
+    #             be included in the measurement
+
+    #         flux_codeword (str):
+    #             flux codeword corresponding to the Cphase gate
+    #         sim_cz_qubits (list):
+    #             A list of qubit names on which a simultaneous cz
+    #             instruction must be applied. This is for characterizing
+    #             CZ gates that are intended to be performed in parallel
+    #             with other CZ gates.
+    #         flux_allocated_duration_ns (list):
+    #             Duration in ns of the flux pulse used when interleaved gate is
+    #             [100_000], i.e. idle identity
+    #         compilation_only (bool):
+    #             Compile only the RB sequences without measuring, intended for
+    #             parallelizing iRB sequences compilation with measurements
+    #         pool (multiprocessing.Pool):
+    #             Only relevant for `compilation_only=True`
+    #             Pool to which the compilation tasks will be assigned
+    #         rb_tasks (list):
+    #             Only relevant when running `compilation_only=True` previously,
+    #             saving the rb_tasks, waiting for them to finish then running
+    #             this method again and providing the `rb_tasks`.
+    #             See the interleaved RB for use case.
+    #     """
+    #     if MC is None:
+    #         MC = self.instr_MC.get_instr()
+
+    #     # Settings that have to be preserved, change is required for
+    #     # 2-state readout and postprocessing
+    #     old_weight_type = self.ro_acq_weight_type()
+    #     old_digitized = self.ro_acq_digitized()
+    #     old_avg = self.ro_acq_averages()
+    #     self.ro_acq_weight_type("optimal IQ")
+    #     self.ro_acq_digitized(False)
+
+    #     self.prepare_for_timedomain(qubits=qubits)
+    #     MC.soft_avg(1)
+    #     # The detector needs to be defined before setting back parameters
+    #     d = self.get_int_logging_detector(qubits=qubits)
+    #     # set back the settings
+    #     self.ro_acq_weight_type(old_weight_type)
+    #     self.ro_acq_digitized(old_digitized)
+
+    #     for q in qubits:
+    #         q_instr = self.find_instrument(q)
+    #         mw_lutman = q_instr.instr_LutMan_MW.get_instr()
+    #         mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+    #     MC.soft_avg(1)
+
+    #     qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+    #     if sim_cz_qubits is not None:
+    #         sim_cz_qubits_idxs = [
+    #             self.find_instrument(q).cfg_qubit_nr() for q in sim_cz_qubits
+    #         ]
+    #     else:
+    #         sim_cz_qubits_idxs = None
+
+    #     net_cliffords = [0, 3 * 24 + 3]
+
+    #     def send_rb_tasks(pool_):
+    #         tasks_inputs = []
+    #         for i in range(nr_seeds):
+    #             task_dict = dict(
+    #                 qubits=qubit_idxs,
+    #                 nr_cliffords=nr_cliffords,
+    #                 nr_seeds=1,
+    #                 flux_codeword=flux_codeword,
+    #                 flux_allocated_duration_ns=flux_allocated_duration_ns,
+    #                 platf_cfg=self.cfg_openql_platform_fn(),
+    #                 program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
+    #                     int(i),
+    #                     list(map(int, nr_cliffords)),
+    #                     interleaving_cliffords,
+    #                     qubits[0],
+    #                     qubits[1],
+    #                 ),
+    #                 interleaving_cliffords=interleaving_cliffords,
+    #                 cal_points=cal_points,
+    #                 net_cliffords=net_cliffords,  # measures with and without inverting
+    #                 f_state_cal_pts=True,
+    #                 recompile=recompile,
+    #                 sim_cz_qubits=sim_cz_qubits_idxs,
+    #             )
+    #             tasks_inputs.append(task_dict)
+
+    #         rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+
+    #         return rb_tasks
+
+    #     if compile_only:
+    #         assert pool is not None
+    #         rb_tasks = send_rb_tasks(pool)
+    #         return rb_tasks
+
+    #     if rb_tasks is None:
+    #         # Using `with ...:` makes sure the other processes will be terminated
+    #         # avoid starting too mane processes,
+    #         # nr_processes = None will start as many as the PC can handle
+    #         nr_processes = None if recompile else 1
+    #         with multiprocessing.Pool(
+    #             nr_processes,
+    #             maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+    #         ) as pool:
+    #             rb_tasks = send_rb_tasks(pool)
+    #             cl_oql.wait_for_rb_tasks(rb_tasks)
+
+    #     programs_filenames = rb_tasks.get()
+
+    #     # to include calibration points
+    #     if cal_points:
+    #         sweep_points = np.append(
+    #             np.repeat(nr_cliffords, 2),
+    #             [nr_cliffords[-1] + 0.5] * 2
+    #             + [nr_cliffords[-1] + 1.5] * 2
+    #             + [nr_cliffords[-1] + 2.5] * 3,
+    #         )
+    #     else:
+    #         sweep_points = np.repeat(nr_cliffords, 2)
+
+    #     counter_param = ManualParameter("name_ctr", initial_value=0)
+    #     prepare_function_kwargs = {
+    #         "counter_param": counter_param,
+    #         "programs_filenames": programs_filenames,
+    #         "CC": self.instr_CC.get_instr(),
+    #     }
+
+    #     # Using the first detector of the multi-detector as this is
+    #     # in charge of controlling the CC (see self.get_int_logging_detector)
+    #     d.set_prepare_function(
+    #         oqh.load_range_of_oql_programs_from_filenames,
+    #         prepare_function_kwargs, detectors="first"
+    #     )
+    #     # d.nr_averages = 128
+
+    #     reps_per_seed = 4094 // len(sweep_points)
+    #     nr_shots = reps_per_seed * len(sweep_points)
+    #     d.set_child_attr("nr_shots", nr_shots)
+
+    #     s = swf.None_Sweep(parameter_name="Number of Cliffords", unit="#")
+
+    #     MC.set_sweep_function(s)
+    #     MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
+
+    #     MC.set_detector_function(d)
+    #     label = label.format(
+    #         nr_seeds,
+    #         recompile,
+    #         interleaving_cliffords,
+    #         qubits[0],
+    #         qubits[1],
+    #         flux_codeword)
+    #     MC.run(label, exp_metadata={"bins": sweep_points})
+    #     # N.B. if interleaving cliffords are used, this won't work
+    #     ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
+
     def measure_two_qubit_randomized_benchmarking(
         self,
         qubits,
@@ -4246,6 +4479,7 @@ class DeviceCCL(Instrument):
         flux_codeword="cz",
         flux_allocated_duration_ns: int = None,
         sim_cz_qubits: list = None,
+        sim_single_qubits: list = None,
         compile_only: bool = False,
         pool=None,  # a multiprocessing.Pool()
         rb_tasks=None,  # used after called with `compile_only=True`
@@ -4336,6 +4570,13 @@ class DeviceCCL(Instrument):
             q_instr = self.find_instrument(q)
             mw_lutman = q_instr.instr_LutMan_MW.get_instr()
             mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+        if sim_single_qubits:
+            for q in sim_single_qubits:
+                q_instr = self.find_instrument(q)
+                mw_lutman = q_instr.instr_LutMan_MW.get_instr()
+                mw_lutman.set_default_lutmap()
+                mw_lutman.load_waveforms_onto_AWG_lookuptable()
+
 
         MC.soft_avg(1)
 
@@ -4347,56 +4588,67 @@ class DeviceCCL(Instrument):
         else:
             sim_cz_qubits_idxs = None
 
+        if sim_single_qubits is not None:
+            sim_single_qubits_idxs = [
+                self.find_instrument(q).cfg_qubit_nr() for q in sim_single_qubits
+            ]
+        else:
+            sim_single_qubits_idxs = None
+
         net_cliffords = [0, 3 * 24 + 3]
 
-        def send_rb_tasks(pool_):
-            tasks_inputs = []
-            for i in range(nr_seeds):
-                task_dict = dict(
-                    qubits=qubit_idxs,
-                    nr_cliffords=nr_cliffords,
-                    nr_seeds=1,
-                    flux_codeword=flux_codeword,
-                    flux_allocated_duration_ns=flux_allocated_duration_ns,
-                    platf_cfg=self.cfg_openql_platform_fn(),
-                    program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
-                        int(i),
-                        list(map(int, nr_cliffords)),
-                        interleaving_cliffords,
-                        qubits[0],
-                        qubits[1],
+        programs = []
+        
+        print('Generating {} RB programs'.format(nr_seeds))
+        t0 = time.time()
+        for i in range(nr_seeds):
+            check_keyboard_interrupt()
+            # p = cl_oql.randomized_benchmarking(
+            #     qubits=qubit_idxs,
+            #     nr_cliffords=nr_cliffords,
+            #     nr_seeds=1,
+            #     flux_codeword=flux_codeword,
+            #     flux_allocated_duration_ns=flux_allocated_duration_ns,
+            #     platf_cfg=self.cfg_openql_platform_fn(),
+            #     program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
+            #         int(i),
+            #         list(map(int, nr_cliffords)),
+            #         interleaving_cliffords,
+            #         qubits[0],
+            #         qubits[1],
+            #         ),
+            #     interleaving_cliffords=interleaving_cliffords,
+            #     cal_points=cal_points,
+            #     net_cliffords=net_cliffords,  # measures with and without inverting
+            #     f_state_cal_pts=True,
+            #     recompile=recompile,
+            #     sim_cz_qubits=sim_cz_qubits_idxs,
+            #     )
+            p = cl_oql.two_qubit_randomized_benchmarking(
+                two_qubit_pair= qubit_idxs,
+                single_qubits=sim_single_qubits_idxs,
+                nr_cliffords=nr_cliffords,
+                nr_seeds= 1,
+                flux_codeword=flux_codeword,
+                flux_allocated_duration_ns=flux_allocated_duration_ns,
+                platf_cfg=self.cfg_openql_platform_fn(),
+                program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
+                    int(i),
+                    list(map(int, nr_cliffords)),
+                    interleaving_cliffords,
+                    qubits[0],
+                    qubits[1],
                     ),
-                    interleaving_cliffords=interleaving_cliffords,
-                    cal_points=cal_points,
-                    net_cliffords=net_cliffords,  # measures with and without inverting
-                    f_state_cal_pts=True,
-                    recompile=recompile,
-                    sim_cz_qubits=sim_cz_qubits_idxs,
+                interleaving_cliffords=interleaving_cliffords,
+                cal_points=cal_points,
+                two_qubit_net_cliffords=net_cliffords,
+                single_qubit_net_cliffords=net_cliffords,
+                f_state_cal_pts=True,
+                recompile=recompile
                 )
-                tasks_inputs.append(task_dict)
+            print(f'compiled_program {i+1}')
+            programs.append(p)
 
-            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
-
-            return rb_tasks
-
-        if compile_only:
-            assert pool is not None
-            rb_tasks = send_rb_tasks(pool)
-            return rb_tasks
-
-        if rb_tasks is None:
-            # Using `with ...:` makes sure the other processes will be terminated
-            # avoid starting too mane processes,
-            # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
-            with multiprocessing.Pool(
-                nr_processes,
-                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
-            ) as pool:
-                rb_tasks = send_rb_tasks(pool)
-                cl_oql.wait_for_rb_tasks(rb_tasks)
-
-        programs_filenames = rb_tasks.get()
 
         # to include calibration points
         if cal_points:
@@ -4412,14 +4664,14 @@ class DeviceCCL(Instrument):
         counter_param = ManualParameter("name_ctr", initial_value=0)
         prepare_function_kwargs = {
             "counter_param": counter_param,
-            "programs_filenames": programs_filenames,
+            "programs": programs,
             "CC": self.instr_CC.get_instr(),
         }
 
         # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
         d.set_prepare_function(
-            oqh.load_range_of_oql_programs_from_filenames,
+            oqh.load_range_of_oql_programs,
             prepare_function_kwargs, detectors="first"
         )
         # d.nr_averages = 128
@@ -4441,151 +4693,8 @@ class DeviceCCL(Instrument):
             qubits[0],
             qubits[1],
             flux_codeword)
-        MC.run(label, exp_metadata={"bins": sweep_points})
-        # N.B. if interleaving cliffords are used, this won't work
-        ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
-
-
-    def measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-        self,
-        two_qubit_pair: list,
-        single_qubits: list,
-        nr_cliffords=np.array(
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
-        ),
-        nr_seeds=100,
-        interleaving_cliffords=[None],
-        label="TwoQubit_RB_{}seeds_recompile={}_icl{}_{}_{}_{}",
-        recompile: bool = "as needed",
-        cal_points=True,
-        flux_codeword="cz",
-        flux_allocated_duration_ns: int = None,
-        sim_cz_qubits: list = None,
-        compile_only: bool = False,
-        pool=None,  # a multiprocessing.Pool()
-        rb_tasks=None,  # used after called with `compile_only=True`
-        MC=None
-    ):
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        # Settings that have to be preserved, change is required for
-        # 2-state readout and postprocessing
-        old_weight_type = self.ro_acq_weight_type()
-        old_digitized = self.ro_acq_digitized()
-        old_avg = self.ro_acq_averages()
-        self.ro_acq_weight_type("optimal IQ")
-        self.ro_acq_digitized(False)
-
-        self.prepare_for_timedomain(qubits=two_qubit_pair)
-        MC.soft_avg(1)
-        # The detector needs to be defined before setting back parameters
-        d = self.get_int_logging_detector(qubits=two_qubit_pair)
-        # set back the settings
-        self.ro_acq_weight_type(old_weight_type)
-        self.ro_acq_digitized(old_digitized)
-
-        for q in two_qubit_pair:
-            q_instr = self.find_instrument(q)
-            mw_lutman = q_instr.instr_LutMan_MW.get_instr()
-            mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
-
-        MC.soft_avg(1)
-
-        pair_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in two_qubit_pair]
-        if single_qubits is not None:
-            sq_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in single_qubits]
-        else:
-            sq_idxs = None
-        if sim_cz_qubits is not None:
-            sim_cz_qubits_idxs = [
-                self.find_instrument(q).cfg_qubit_nr() for q in sim_cz_qubits
-            ]
-        else:
-            sim_cz_qubits_idxs = None
-
-        net_cliffords = [0, 3 * 24 + 3]
-
-        def send_rb_tasks(pool_):
-            task_inputs = []
-            for i in range(nr_seeds):
-                task_dict = dict(
-                    two_qubit_pair=pair_idxs,
-                    single_qubits=sq_idxs,
-                    nr_cliffords=nr_cliffords,
-                    nr_seeds=nr_seeds,
-                    platf_cfg=self.cfg_openql_platform_fn(),
-                    two_qubit_net_cliffords=net_cliffords,
-                    single_qubit_net_cliffords=[0, 1],
-                    flux_codeword=flux_codeword,
-                    flux_allocated_duration_ns=flux_allocated_duration_ns,
-                    interleaving_cliffords=interleaving_cliffords,
-                    program_name="sTwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
-                        int(i),
-                        list(map(int, nr_cliffords)),
-                        interleaving_cliffords,
-                        two_qubit_pair[0],
-                        two_qubit_pair[1],
-                    ),
-                    cal_points=cal_points,
-                    f_state_cal_pts=True,
-                    recompile=recompile,
-                )
-                task_inputs.append(task_dict)
-
-            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb_2, task_inputs)
-            return rb_tasks
-
-        programs_filenames = rb_tasks
-
-        if compile_only:
-            assert pool is not None
-            rb_tasks = send_rb_tasks(pool)
-            return rb_tasks
-
-        # to include calibration points
-        if cal_points:
-            sweep_points = np.append(
-                np.repeat(nr_cliffords, 2),
-                [nr_cliffords[-1] + 0.5] * 2
-                + [nr_cliffords[-1] + 1.5] * 2
-                + [nr_cliffords[-1] + 2.5] * 3,
-            )
-        else:
-            sweep_points = np.repeat(nr_cliffords, 2)
-
-        counter_param = ManualParameter("name_ctr", initial_value=0)
-        prepare_function_kwargs = {
-            "counter_param": counter_param,
-            "programs_filenames": programs_filenames,
-            "CC": self.instr_CC.get_instr(),
-        }
-
-        # Using the first detector of the multi-detector as this is
-        # in charge of controlling the CC (see self.get_int_logging_detector)
-        d.set_prepare_function(
-            oqh.load_range_of_oql_programs_from_filenames,
-            prepare_function_kwargs, detectors="first"
-        )
-        # d.nr_averages = 128
-
-        reps_per_seed = 4094 // len(sweep_points)
-        nr_shots = reps_per_seed * len(sweep_points)
-        d.set_child_attr("nr_shots", nr_shots)
-
-        s = swf.None_Sweep(parameter_name="Number of Cliffords", unit="#")
-
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
-
-        MC.set_detector_function(d)
-        label = label.format(
-            nr_seeds,
-            recompile,
-            interleaving_cliffords,
-            two_qubit_pair[0],
-            two_qubit_pair[1],
-            flux_codeword)
+        if sim_single_qubits:
+            label += f'_sim_{sim_single_qubits}'
         MC.run(label, exp_metadata={"bins": sweep_points})
         # N.B. if interleaving cliffords are used, this won't work
         ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
@@ -4658,6 +4767,7 @@ class DeviceCCL(Instrument):
             flux_codeword="cz",
             flux_allocated_duration_ns: int = None,
             sim_cz_qubits: list = None,
+            sim_single_qubits: list = None,
             measure_idle_flux: bool = True,
             rb_tasks_start: list = None,
             pool=None,
@@ -4703,12 +4813,13 @@ class DeviceCCL(Instrument):
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    sim_single_qubits=sim_single_qubits,
                     compile_only=True,
                     pool=pool
                 )
 
             # 2. Wait for [None] compilation to finish
-            cl_oql.wait_for_rb_tasks(rb_tasks_start)
+            # cl_oql.wait_for_rb_tasks(rb_tasks_start)
 
             # 3. Start (non-blocking) compilation for [104368]
             rb_tasks_CZ = self.measure_two_qubit_randomized_benchmarking(
@@ -4720,25 +4831,26 @@ class DeviceCCL(Instrument):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                sim_single_qubits=sim_single_qubits,
                 compile_only=True,
                 pool=pool
             )
 
             # 4. Start the measurement and run the analysis for [None]
-            self.measure_two_qubit_randomized_benchmarking(
-                qubits=qubits,
-                MC=MC,
-                nr_cliffords=nr_cliffords,
-                interleaving_cliffords=[None],
-                recompile=False,  # This of course needs to be False
-                flux_codeword=flux_codeword,
-                nr_seeds=nr_seeds,
-                sim_cz_qubits=sim_cz_qubits,
-                rb_tasks=rb_tasks_start,
-            )
+            # self.measure_two_qubit_randomized_benchmarking(
+            #     qubits=qubits,
+            #     MC=MC,
+            #     nr_cliffords=nr_cliffords,
+            #     interleaving_cliffords=[None],
+            #     recompile=False,  # This of course needs to be False
+            #     flux_codeword=flux_codeword,
+            #     nr_seeds=nr_seeds,
+            #     sim_cz_qubits=sim_cz_qubits,
+            #     rb_tasks=rb_tasks_start,
+            # )
 
             # 5. Wait for [104368] compilation to finish
-            cl_oql.wait_for_rb_tasks(rb_tasks_CZ)
+            # cl_oql.wait_for_rb_tasks(rb_tasks_CZ)
 
             # 6. Start (non-blocking) compilation for [100_000]
             if measure_idle_flux:
@@ -4752,6 +4864,7 @@ class DeviceCCL(Instrument):
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    sim_single_qubits=sim_single_qubits,
                     compile_only=True,
                     pool=pool,
                 )
@@ -4767,6 +4880,7 @@ class DeviceCCL(Instrument):
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    sim_single_qubits=sim_single_qubits,
                     compile_only=True,
                     pool=pool
                 )
@@ -4780,6 +4894,7 @@ class DeviceCCL(Instrument):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                sim_single_qubits=sim_single_qubits,
                 rb_tasks=rb_tasks_CZ,
             )
             ma2.InterleavedRandomizedBenchmarkingAnalysis(
@@ -4789,7 +4904,7 @@ class DeviceCCL(Instrument):
 
             if measure_idle_flux:
                 # 8. Wait for [100_000] compilation to finish
-                cl_oql.wait_for_rb_tasks(rb_tasks_I)
+                # cl_oql.wait_for_rb_tasks(rb_tasks_I)
 
                 # 8.a. Optionally send to the `pool` the tasks of RB compilation to be
                 # used on the next round of calling the iRB method
@@ -4803,6 +4918,7 @@ class DeviceCCL(Instrument):
                         flux_codeword=flux_codeword,
                         nr_seeds=nr_seeds,
                         sim_cz_qubits=sim_cz_qubits,
+                        sim_single_qubits=sim_single_qubits,
                         compile_only=True,
                         pool=pool
                     )
@@ -4818,6 +4934,7 @@ class DeviceCCL(Instrument):
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    sim_single_qubits=sim_single_qubits,
                     rb_tasks=rb_tasks_I
                 )
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
@@ -4862,6 +4979,7 @@ class DeviceCCL(Instrument):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                sim_single_qubits=sim_single_qubits,
             )
 
             # Perform two-qubit RB with CZ interleaved
@@ -4874,6 +4992,7 @@ class DeviceCCL(Instrument):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                sim_single_qubits=sim_single_qubits,
             )
 
             ma2.InterleavedRandomizedBenchmarkingAnalysis(
@@ -4893,6 +5012,7 @@ class DeviceCCL(Instrument):
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
+                    sim_single_qubits=sim_single_qubits,
                 )
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
                     label_base="icl[None]",
@@ -4900,273 +5020,6 @@ class DeviceCCL(Instrument):
                     label_int_idle="icl[100000]"
 
                 )
-
-
-    def measure_two_qubit_interleaved_randomized_benchmarking_simultaneous_single_qubit(
-                self,
-                two_qubit_pair: list,
-                single_qubits: list,
-                nr_cliffords=np.array(
-                    [1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50., 70., 90., 120.]
-                ),
-                nr_seeds=100,
-                recompile: bool = "as needed",
-                flux_codeword="cz",
-                flux_allocated_duration_ns: int = None,
-                sim_cz_qubits: list = None,
-                measure_idle_flux: bool = True,
-                rb_tasks_start: list = None,
-                pool=None,
-                start_next_round_compilation: bool = False,
-                maxtasksperchild=None,
-                MC = None,
-            ):
-            """
-            Perform two qubit interleaved randomized benchmarking with an
-            interleaved CZ gate, and optionally an interleaved idle identity with
-            the duration of the CZ.
-
-            If recompile is `True` or `as needed` it will parallelize RB sequence
-            compilation with measurement (beside the parallelization of the RB
-            sequences which will always happen in parallel).
-            """
-            if MC is None:
-                MC = self.instr_MC.get_instr()
-
-            def run_parallel_iRB(
-                    recompile, pool, rb_tasks_start: list = None,
-                    start_next_round_compilation: bool = False
-                ):
-                """
-                We define the full parallel iRB procedure here as function such
-                that we can control the flow of the parallel RB sequences
-                compilations from the outside of this method, and allow for
-                chaining RB compilations for sequential measurements intended for
-                taking statistics of the RB performance
-                """
-                rb_tasks_next = None
-
-                # 1. Start (non-blocking) compilation for [None]
-                # We make it non-blocking such that the non-blocking feature
-                # is used for the interleaved cases
-                if rb_tasks_start is None:
-                    rb_tasks_start = self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                        two_qubit_pair=two_qubit_pair,
-                        single_qubits=single_qubits,
-                        MC=MC,
-                        nr_cliffords=nr_cliffords,
-                        interleaving_cliffords=[None],
-                        recompile=recompile,
-                        flux_codeword=flux_codeword,
-                        nr_seeds=nr_seeds,
-                        sim_cz_qubits=sim_cz_qubits,
-                        compile_only=True,
-                        pool=pool
-                    )
-
-                # 2. Wait for [None] compilation to finish
-                cl_oql.wait_for_rb_tasks(rb_tasks_start)
-
-                # 3. Start (non-blocking) compilation for [104368]
-                rb_tasks_CZ = self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                    two_qubit_pair=two_qubit_pair,
-                    single_qubits=single_qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[104368],
-                    recompile=recompile,
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                    compile_only=True,
-                    pool=pool
-                )
-
-                # 4. Start the measurement and run the analysis for [None]
-                self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                    two_qubit_pair=two_qubit_pair,
-                    single_qubits=single_qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[None],
-                    recompile=False,  # This of course needs to be False
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                    rb_tasks=rb_tasks_start,
-                )
-
-                # 5. Wait for [104368] compilation to finish
-                cl_oql.wait_for_rb_tasks(rb_tasks_CZ)
-
-                # 6. Start (non-blocking) compilation for [100_000]
-                if measure_idle_flux:
-                    rb_tasks_I = self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                        two_qubit_pair=two_qubit_pair,
-                        single_qubits=single_qubits,
-                        MC=MC,
-                        nr_cliffords=nr_cliffords,
-                        interleaving_cliffords=[100_000],
-                        recompile=recompile,
-                        flux_codeword=flux_codeword,
-                        flux_allocated_duration_ns=flux_allocated_duration_ns,
-                        nr_seeds=nr_seeds,
-                        sim_cz_qubits=sim_cz_qubits,
-                        compile_only=True,
-                        pool=pool,
-                    )
-                elif start_next_round_compilation:
-                    # Optionally send to the `pool` the tasks of RB compilation to be
-                    # used on the next round of calling the iRB method
-                    rb_tasks_next = self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                        two_qubit_pair=two_qubit_pair,
-                        single_qubits=single_qubits,
-                        MC=MC,
-                        nr_cliffords=nr_cliffords,
-                        interleaving_cliffords=[None],
-                        recompile=recompile,
-                        flux_codeword=flux_codeword,
-                        nr_seeds=nr_seeds,
-                        sim_cz_qubits=sim_cz_qubits,
-                        compile_only=True,
-                        pool=pool
-                    )
-                # 7. Start the measurement and run the analysis for [104368]
-                self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                    two_qubit_pair=two_qubit_pair,
-                    single_qubits=single_qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[104368],
-                    recompile=False,
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                    rb_tasks=rb_tasks_CZ,
-                )
-                ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                    label_base="icl[None]",
-                    label_int="icl[104368]"
-                )
-
-                if measure_idle_flux:
-                    # 8. Wait for [100_000] compilation to finish
-                    cl_oql.wait_for_rb_tasks(rb_tasks_I)
-
-                    # 8.a. Optionally send to the `pool` the tasks of RB compilation to be
-                    # used on the next round of calling the iRB method
-                    if start_next_round_compilation:
-                        rb_tasks_next = self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                            two_qubit_pair=two_qubit_pair,
-                            single_qubits=single_qubits,
-                            MC=MC,
-                            nr_cliffords=nr_cliffords,
-                            interleaving_cliffords=[None],
-                            recompile=recompile,
-                            flux_codeword=flux_codeword,
-                            nr_seeds=nr_seeds,
-                            sim_cz_qubits=sim_cz_qubits,
-                            compile_only=True,
-                            pool=pool
-                        )
-
-                    # 9. Start the measurement and run the analysis for [100_000]
-                    self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                        two_qubit_pair=two_qubit_pair,
-                        single_qubits=single_qubits,
-                        MC=MC,
-                        nr_cliffords=nr_cliffords,
-                        interleaving_cliffords=[100_000],
-                        recompile=False,
-                        flux_codeword=flux_codeword,
-                        flux_allocated_duration_ns=flux_allocated_duration_ns,
-                        nr_seeds=nr_seeds,
-                        sim_cz_qubits=sim_cz_qubits,
-                        rb_tasks=rb_tasks_I
-                    )
-                    ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                        label_base="icl[None]",
-                        label_int="icl[104368]",
-                        label_int_idle="icl[100000]"
-                    )
-
-                return rb_tasks_next
-
-            if recompile or recompile == "as needed":
-                # This is an optimization that compiles the interleaved RB
-                # sequences for the next measurement while measuring the previous
-                # one
-                if pool is None:
-                    # Using `with ...:` makes sure the other processes will be terminated
-                    # `maxtasksperchild` avoid RAM issues
-                    if not maxtasksperchild:
-                        maxtasksperchild = cl_oql.maxtasksperchild
-                    with multiprocessing.Pool(maxtasksperchild=maxtasksperchild) as pool:
-                        run_parallel_iRB(recompile=recompile,
-                                        pool=pool,
-                                        rb_tasks_start=rb_tasks_start)
-                else:
-                    # In this case the `pool` to execute the RB compilation tasks
-                    # is provided, `rb_tasks_start` is expected to be as well
-                    rb_tasks_next = run_parallel_iRB(
-                        recompile=recompile,
-                        pool=pool,
-                        rb_tasks_start=rb_tasks_start,
-                        start_next_round_compilation=start_next_round_compilation)
-                    return rb_tasks_next
-            else:
-                # recompile=False no need to parallelize compilation with measurement
-                # Perform two-qubit RB (no interleaved gate)
-                self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                    two_qubit_pair=two_qubit_pair,
-                    single_qubits=single_qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[None],
-                    recompile=recompile,
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                )
-
-                # Perform two-qubit RB with CZ interleaved
-                self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                    two_qubit_pair=two_qubit_pair,
-                    single_qubits=single_qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[104368],
-                    recompile=recompile,
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                )
-
-                ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                    label_base="icl[None]",
-                    label_int="icl[104368]",
-                )
-
-                if measure_idle_flux:
-                    # Perform two-qubit iRB with idle identity of same duration as CZ
-                    self.measure_two_qubit_randomized_benchmarking_simultaneous_single_qubit(
-                        two_qubit_pair=two_qubit_pair,
-                        single_qubits=single_qubits,
-                        MC=MC,
-                        nr_cliffords=nr_cliffords,
-                        interleaving_cliffords=[100_000],
-                        recompile=recompile,
-                        flux_codeword=flux_codeword,
-                        flux_allocated_duration_ns=flux_allocated_duration_ns,
-                        nr_seeds=nr_seeds,
-                        sim_cz_qubits=sim_cz_qubits,
-                    )
-                    ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                        label_base="icl[None]",
-                        label_int="icl[104368]",
-                        label_int_idle="icl[100000]"
-
-                    )
 
 
     def measure_single_qubit_interleaved_randomized_benchmarking_parking(
@@ -6528,6 +6381,7 @@ class DeviceCCL(Instrument):
             pair: List[str],
             gate_direction: str,
             ramsey_qubits: Union[bool, List[str]] = False,
+            parked_qubits: List[str]=None,
             horizontal_calibration: bool = False,
             flux_codeword: str = 'flux-dance',
             flux_dance_steps: List[int] = [1],
@@ -6595,15 +6449,15 @@ class DeviceCCL(Instrument):
                 value_units=['a.u.', 'deg', '%']
                 )
         else:
-            self.prepare_for_timedomain(qubits=asarray(pair).flatten().tolist())
+            self.prepare_for_timedomain(qubits=np.asarray(pair).flatten().tolist())
             cost_det = det.Function_Detector(
                 get_function=cf.conventional_CZ_cost_func2,
                 msmt_kw={'device': self,
                        'MC': self.instr_nested_MC.get_instr(),
                        'pairs': [pair],
-                       # 'parked_qbs': parked_qubits,
+                       'parked_qbs': parked_qubits,
                        'flux_codeword': flux_codeword + '_' + str(flux_dance_steps[0]),
-                       # 'parked_qubit_seq': 'ground',
+                       'parked_qubit_seq': 'ground',
                        'include_single_qubit_phase_in_cost': False,
                        'target_single_qubit_phase': 360,
                        'include_leakage_in_cost': True,
@@ -6742,6 +6596,21 @@ class DeviceCCL(Instrument):
                         f"B = {flux_lm.parameters[f'vcz_amp_fine_{gate_direction}']()}.")
                 flux_lm.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
+            if measure_result:
+                # measure optimized parity check for reference
+                self.measure_parity_check_flux_dance(
+                    target_qubits=[pair[0]],
+                    control_qubits=[pair[1]],
+                    ramsey_qubits=ramsey_qubits, 
+                    flux_dance_steps=flux_dance_steps,
+                    flux_codeword=flux_codeword,
+                    prepare_for_timedomain=True,
+                    plotting=True,
+                    analyze_parity_model=False
+                    )
+
+            return result
+
         except Exception as e:
             log.warning(f"Measurement for {pair} interrupted! Resetting old values.")
             flux_lm.parameters[f'vcz_amp_sq_{gate_direction}'](old_A)
@@ -6749,21 +6618,6 @@ class DeviceCCL(Instrument):
             print(repr(e))
             print(e.__traceback__)
             log.error(logging.traceback.format_exc())
-
-        if measure_result:
-            # measure optimized parity check for reference
-            self.measure_parity_check_flux_dance(
-                target_qubits=[pair[0]],
-                control_qubits=[pair[1]],
-                ramsey_qubits=ramsey_qubits, 
-                flux_dance_steps=flux_dance_steps,
-                flux_codeword=flux_codeword,
-                prepare_for_timedomain=True,
-                plotting=True,
-                analyze_parity_model=False
-                )
-
-        return result
 
 
     def create_dep_graph(self):
@@ -7548,66 +7402,6 @@ class DeviceCCL(Instrument):
                 qub.mw_motzoi(opt_motzoi)
             return True
 
-
-    # def measure_ramsey_tomo(self, 
-    #                         qubit_ramsey: list,
-    #                         qubit_control: list,
-    #                         excited_spectators: list = [],
-    #                         nr_shots_per_case: int = 2**10,
-    #                         MC=None):
-    #     '''
-    #     Doc string
-
-    #     '''
-
-    #     qubitR = self.find_instrument(qubit_ramsey)
-    #     qubitR_idx = qubitR.cfg_qubit_nr()
-    #     if type(qubit_control) == list:
-    #         qubitC = [self.find_instrument(q) for q in qubit_control]
-    #         qubitC_idx = [q.cfg_qubit_nr() for q in qubitC]
-    #     else:
-    #         qubitC = self.find_instrument(qubit_control)
-    #         qubitC_idx = qubitC.cfg_qubit_nr()
-        
-    #     # Get indices for spectator qubits
-    #     qubitS = [self.find_instrument(q) for q in excited_spectators]
-    #     qubitS_indcs = [q.cfg_qubit_nr() for q in qubitS]
-
-    #     # Assert we have IQ readout
-    #     assert self.ro_acq_weight_type() == 'optimal IQ', 'device not in "optimal IQ" mode'
-    #     assert self.ro_acq_digitized() == False, 'RO should not be digitized'
-
-    #     mw_lutman = qubitR.instr_LutMan_MW.get_instr()
-    #     mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
-    #     self.prepare_for_timedomain(qubits=[qubit_ramsey, qubit_control, *excited_spectators])
-        
-    #     p = mqo.Ramsey_tomo(qR= qubitR_idx,
-    #                         qC= qubitC_idx,
-    #                         exc_specs= qubitS_indcs,
-    #                         platf_cfg=self.cfg_openql_platform_fn())
-
-    #     s = swf.OpenQL_Sweep(openql_program=p,
-    #                          CCL=self.instr_CC.get_instr())
-        
-    #     # d = self.get_int_log_det(qubits=[qubit_ramsey, qubit_control])
-    #     d = self.get_int_logging_detector([qubit_ramsey, qubit_control], 
-    #                                       result_logging_mode='raw')
-    #     d.detectors[0].nr_shots = 4096
-    #     try:
-    #         d.detectors[1].nr_shots = 4096
-    #     except:
-    #         pass
-
-    #     nr_shots = int(16*256*2**4)
-    #     if MC is None:
-    #         MC = self.instr_MC.get_instr()
-    #     MC.set_sweep_function(s)
-    #     MC.set_sweep_points(np.arange(nr_shots))
-    #     MC.set_detector_function(d)
-    #     MC.run('Ramsey_tomo_R_{}_C_{}_S_{}'.format(qubit_ramsey, qubit_control, excited_spectators))
-    #     # Analysis
-    #     ma2.tqg.Two_qubit_gate_tomo_Analysis(label='Ramsey')
-
     def measure_ramsey_tomo(self, 
                             qubit_ramsey: list,
                             qubit_control: list,
@@ -7676,3 +7470,275 @@ class DeviceCCL(Instrument):
         a = ma2.tqg.Two_qubit_gate_tomo_Analysis(label='Ramsey', n_pairs=len(qubit_ramsey))
         
         return a.qoi
+
+    #######################################
+    # Two qubit gate calibration functions
+    #######################################
+
+    def measure_vcz_A_B_landscape(
+        self, 
+        Q0,
+        Q1,
+        A_ranges,
+        A_points: int,
+        B_amps: list,
+        Q_parks: list = None,
+        flux_codeword: str = 'cz'):
+        """
+        Perform 2D sweep of amplitude and wave parameter while measuring 
+        conditional phase and missing fraction via the "conditional 
+        oscillation" experiment.
+
+        Q0 : High frequency qubit(s). Can be given as single qubit or list.
+        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
+        T_mids : list of vcz "T_mid" values to sweep.
+        A_ranges : list of tuples containing ranges of amplitude sweep.
+        A_points : Number of points to sweep for amplitude range.
+        Q_parks : list of qubits parked during operation.
+        """
+        if isinstance(Q0, str):
+            Q0 = [Q0]
+        if isinstance(Q1, str):
+            Q1 = [Q1]
+        assert len(Q0) == len(Q1)
+
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        # get gate directions
+        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+        
+        # Time-domain preparation
+        # Prepare for time domain
+        self.prepare_for_timedomain(
+            qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+            bypass_flux=True)
+        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
+        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
+        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
+        for i, lm in enumerate(Flux_lm_0):
+            print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
+            print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
+            lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
+            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
+        for i, lm in enumerate(Flux_lm_1):
+            print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+
+        # Wrapper function for conditional oscillation detector function.
+        def wrapper(Q0, Q1,
+                    prepare_for_timedomain,
+                    downsample_swp_points,
+                    extract_only,
+                    disable_metadata):
+            a = self.measure_conditional_oscillation_multi(
+                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+                    parked_qbs=Q_parks,
+                    flux_codeword=flux_codeword,
+                    prepare_for_timedomain=prepare_for_timedomain,
+                    downsample_swp_points=downsample_swp_points,
+                    extract_only=extract_only,
+                    disable_metadata=disable_metadata,
+                    verbose=False)
+            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
+                  for i in range(len(Q0)) }
+            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
+                  for i in range(len(Q0)) }
+            return { **cp, **mf} 
+            
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
+                     'prepare_for_timedomain' : False,
+                     'downsample_swp_points': 3,
+                     'extract_only': True,
+                     'disable_metadata': True},
+            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_units=list(np.array([['deg', '%']\
+                                   for i in range(len(Q0))]).flatten()))
+        nested_MC.set_detector_function(d)
+
+        swf1 = swf.multi_sweep_function_ranges(
+            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude
+                             for i in range(len(Q0))],
+            sweep_ranges= A_ranges,
+            n_points=A_points)
+        swfs = [swf.FLsweep(lm = lm,
+                            par = lm.parameters[f'vcz_amp_fine_{directions[i][0]}'],
+                            waveform_name = f'cz_{directions[i][0]}')
+                for i, lm in enumerate(Flux_lm_0) ]
+        swf2 = swf.multi_sweep_function(sweep_functions=swfs)
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(np.arange(A_points))
+        nested_MC.set_sweep_function_2D(swf2)
+        nested_MC.set_sweep_points_2D(B_amps)
+
+        MC.live_plot_enabled(False)
+        nested_MC.run(f'VCZ_Amp_vs_B_{Q0}_{Q1}_{Q_parks}',
+                      mode='2D')
+        MC.live_plot_enabled(True)
+
+
+    def measure_vcz_A_tmid_landscape(
+        self, 
+        Q0,
+        Q1,
+        T_mids,
+        A_ranges,
+        A_points: int,
+        Q_parks: list = None,
+        Tp : float = None,
+        flux_codeword: str = 'cz'):
+        """
+        Perform 2D sweep of amplitude and wave parameter while measuring 
+        conditional phase and missing fraction via the "conditional 
+        oscillation" experiment.
+
+        Q0 : High frequency qubit(s). Can be given as single qubit or list.
+        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
+        T_mids : list of vcz "T_mid" values to sweep.
+        A_ranges : list of tuples containing ranges of amplitude sweep.
+        A_points : Number of points to sweep for amplitude range.
+        Q_parks : list of qubits parked during operation.
+        """
+        if isinstance(Q0, str):
+            Q0 = [Q0]
+        if isinstance(Q1, str):
+            Q1 = [Q1]
+        assert len(Q0) == len(Q1)
+
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        # get gate directions
+        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+        # Prepare for time domain
+        self.prepare_for_timedomain(
+            qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+            bypass_flux=True)
+        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
+        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
+        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
+        for i, lm in enumerate(Flux_lm_0):
+            print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
+            print(f'Setting {Q0[i]} vcz_amp_fine_{directions[i][0]} to 0.5')
+            print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
+            lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
+            lm.set(f'vcz_amp_fine_{directions[i][0]}', .5)
+            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
+        for i, lm in enumerate(Flux_lm_1):
+            print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+        # Look for Tp values
+        if Tp:
+            if isinstance(Tp, str):
+                Tp = [Tp]
+        else:
+            Tp = [lm.get(f'vcz_time_single_sq_{directions[0]}')*2 for lm in Flux_lm_0]
+        assert len(Q0) == len(Tp)
+
+        # Wrapper function for conditional oscillation detector function.
+        def wrapper(Q0, Q1,
+                    prepare_for_timedomain,
+                    downsample_swp_points,
+                    extract_only,
+                    disable_metadata):
+            a = self.measure_conditional_oscillation_multi(
+                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+                    parked_qbs=Q_parks,
+                    flux_codeword=flux_codeword,
+                    prepare_for_timedomain=prepare_for_timedomain,
+                    downsample_swp_points=downsample_swp_points,
+                    extract_only=extract_only,
+                    disable_metadata=disable_metadata,
+                    verbose=False)
+            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
+                  for i in range(len(Q0)) }
+            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
+                  for i in range(len(Q0)) }
+            return { **cp, **mf} 
+
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
+                     'prepare_for_timedomain' : False,
+                     'downsample_swp_points': 3,
+                     'extract_only': True,
+                     'disable_metadata': True},
+            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_units=list(np.array([['deg', '%']\
+                                   for i in range(len(Q0))]).flatten()))
+        nested_MC.set_detector_function(d)
+
+        swf1 = swf.multi_sweep_function_ranges(
+            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude\
+                             for i in range(len(Q0))],
+            sweep_ranges= A_ranges,
+            n_points=A_points)
+        swf2 = swf.flux_t_middle_sweep(
+            fl_lm_tm =  list(np.array([[Flux_lm_0[i], Flux_lm_1[i] ]\
+                             for i in range(len(Q0))]).flatten()), 
+            fl_lm_park = Flux_lms_park,
+            which_gate = list(np.array(directions).flatten()),
+            t_pulse = Tp)
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(np.arange(A_points))
+        nested_MC.set_sweep_function_2D(swf2)
+        nested_MC.set_sweep_points_2D(T_mids)
+
+        MC.live_plot_enabled(False)
+        nested_MC.run(f'VCZ_Amp_vs_Tmid_{Q0}_{Q1}_{Q_parks}',
+                      mode='2D')
+        MC.live_plot_enabled(True)
+
+
+
+
+
+def get_gate_directions(q0, q1,
+                        map_qubits=None):
+    """
+    Helper function to determine two-qubit gate directions.
+    q0 and q1 should be given as high-freq and low-freq qubit, respectively.
+    Default map is surface-17, however other maps are supported.
+    """
+    if map_qubits == None:
+        # Surface-17 layout
+        map_qubits = {'Z3' : [-2,-1],
+                      'D9' : [ 0, 2],
+                      'X4' : [-1, 2],
+                      'D8' : [-1, 1],
+                      'Z4' : [ 0, 1],
+                      'D6' : [ 1, 1],
+                      'D7' : [-2, 0],
+                      'X3' : [-1, 0],
+                      'D5' : [ 0, 0],
+                      'X2' : [ 1, 0],
+                      'D3' : [ 2, 0],
+                      'D4' : [-1,-1],
+                      'Z1' : [ 0,-1],
+                      'D2' : [ 1,-1],
+                      'X1' : [ 1,-2],
+                      'Z2' : [ 2, 1],
+                      'D1' : [ 0,-2]
+                     }
+    V0 = np.array(map_qubits[q0])
+    V1 = np.array(map_qubits[q1])
+    diff = V1-V0
+    dist = np.sqrt(np.sum((diff)**2))
+    if dist > 1:
+        raise ValueError('Qubits are not nearest neighbors')
+    if diff[0] == 0.:
+        if diff[1] > 0:
+            return ('NE', 'SW')
+        else:
+            return ('SW', 'NE')
+    elif diff[1] == 0.:
+        if diff[0] > 0:
+            return ('SE', 'NW')
+        else:
+            return ('NW', 'SE')

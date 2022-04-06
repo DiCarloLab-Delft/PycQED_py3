@@ -720,12 +720,14 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                  label: str = '',
                  options_dict: dict = None, 
                  extract_only: bool = False,
-                 auto=True
+                 auto=True,
+                 poly_params: dict = None,
                 ):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
                          extract_only=extract_only)
+        self.poly_params = poly_params
         self.update_FIRs = update_FIRs
         if auto:
             self.run_analysis()
@@ -751,10 +753,13 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                                            'attr:q_polycoeffs_freq_01_det') for q in self.Qubits }
         filter_params = { f'filter_{q}': (f'Instrument settings/lin_dist_kern_{q}',
                                            'attr:filter_model_04') for q in self.Qubits }
-        self.Poly_coeffs = hd5.extract_pars_from_datafile(data_fp, poly_params)
-        # Parse strings
-        self.Poly_coeffs = { q : [ float(n) for n in self.Poly_coeffs[f'polycoeff_{q}'][1:-1].split(' ')\
-                                   if n != '' ] for q in self.Qubits }
+        if self.poly_params:
+            self.Poly_coeffs = self.poly_params
+        else:
+            self.Poly_coeffs = hd5.extract_pars_from_datafile(data_fp, poly_params)
+            # Parse strings
+            self.Poly_coeffs = { q : [ float(n) for n in self.Poly_coeffs[f'polycoeff_{q}'][1:-1].split(' ')\
+                                       if n != '' ] for q in self.Qubits }
         if self.update_FIRs:
             self.Filters = hd5.extract_pars_from_datafile(data_fp, filter_params)
             # Parse strings
@@ -765,7 +770,13 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                 s = s.replace('])', ']')
                 s = s.replace('True', '"True"')
                 s = json.loads(s)
-                self.Filters[q] = np.array(s['params']['weights'])
+                try:
+                    self.Filters[q] = np.array(s['params']['weights'])
+                except:
+                    print(f'No filter in {q} distortion kernel.')
+                    filter_array = np.zeros(40)
+                    filter_array[0] = 1
+                    self.Filters[q] = filter_array
 
     def process_data(self):
         self.proc_data_dict = {}
@@ -819,6 +830,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['opt_filter'] = [ optimize_fir_software(t) for t in self.proc_data_dict['Traces'] ] 
             # Convolve new filter with old filter
             self.proc_data_dict['conv_filters'] = {}
+            print(self.Filters)
             for i, qubit in enumerate(self.Qubits):
                 old_filter = cv2_tools.convert_FIR_from_HDAWG(self.Filters[f'filter_{qubit}'])
                 new_filter = self.proc_data_dict['opt_filter'][i]

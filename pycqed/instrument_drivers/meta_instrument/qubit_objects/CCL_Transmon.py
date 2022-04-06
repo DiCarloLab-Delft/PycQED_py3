@@ -977,8 +977,8 @@ class CCLight_Transmon(Qubit):
         if self.instr_LutMan_RO.get_instr().LO_freq is not None:
             log.info('Warning: This qubit is using a fixed RO LO frequency.')
             LO = self.instr_LO_ro.get_instr()
-            Lo_Lutman = self.instr_LutMan_RO.get_instr()
-            LO_freq = Lo_Lutman.LO_freq()
+            ro_Lutman = self.instr_LutMan_RO.get_instr()
+            LO_freq = ro_Lutman.LO_freq()
             LO.frequency.set(LO_freq)
             mod_freq = self.ro_freq() - LO_freq
             self.ro_freq_mod(mod_freq)
@@ -2363,7 +2363,7 @@ class CCLight_Transmon(Qubit):
     def calibrate_ssro_pulse_duration(self, MC=None,
                                       nested_MC=None,
                                       amps=None,
-                                     amp_lim=None,
+                                      amp_lim=None,
                                       times= None,
                                       use_adaptive: bool = True,
                                       n_points: int = 80,
@@ -2409,12 +2409,12 @@ class CCLight_Transmon(Qubit):
             nested_MC = self.instr_nested_MC.get_instr()
 
         if times is None:
-            times = np.arange(50e-9, 401e-9, 10e-9)
+            times = np.arange(50e-9, 801e-9, 10e-9)
 
         if amps is None:
             amps = np.linspace(.01,.25,11)
         if amp_lim is None:
-           amp_lim = (0.01, 0.2)
+           amp_lim = (0.01, 0.25)
         ######################
         # Experiment
         ######################
@@ -2435,7 +2435,7 @@ class CCLight_Transmon(Qubit):
                 {'adaptive_function': LearnerND_Minimizer,
                  'goal': lambda l: goal(l) or l.npoints > n_points,
                  'loss_per_simplex': loss_per_simplex,
-                 'bounds': [(50e-9, 401e-9), amp_lim],
+                 'bounds': [(50e-9, 801e-9), amp_lim],
                  'minimize': False
                  })
             nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
@@ -2670,12 +2670,24 @@ class CCLight_Transmon(Qubit):
         # fixme: dividing the weight functions by four to not have overflow in
         # thresholding of the UHFQC
         weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
-        optimized_weights_I = np.array(weight_scale_factor*optimized_weights_I)
-        optimized_weights_Q = np.array(weight_scale_factor*optimized_weights_Q)
+        W_func_I = np.array(weight_scale_factor*optimized_weights_I)
+        W_func_Q = np.array(weight_scale_factor*optimized_weights_Q)
+
+        # Smooth optimal weight functions
+        T = np.arange(len(W_func_I))/1.8e9
+        W_demod_func_I = np.real( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
+        W_demod_func_Q = np.imag( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
+
+        from scipy.signal import medfilt
+        W_dsmooth_func_I = medfilt(W_demod_func_I, 101)
+        W_dsmooth_func_Q = medfilt(W_demod_func_Q, 101)
+
+        W_smooth_func_I = np.real( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
+        W_smooth_func_Q = np.imag( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
 
         if update:
-            self.ro_acq_weight_func_I(optimized_weights_I)
-            self.ro_acq_weight_func_Q(optimized_weights_Q)
+            self.ro_acq_weight_func_I(np.array(W_smooth_func_I))
+            self.ro_acq_weight_func_Q(np.array(W_smooth_func_Q))
             if optimal_IQ:
                 self.ro_acq_weight_type('optimal IQ')
             else:
@@ -4093,7 +4105,7 @@ class CCLight_Transmon(Qubit):
                                   result_keys=['P_QND', 'P_QNDp'],
                                   value_names=['P_QND', 'P_QNDp'],
                                   value_units=['a.u.', 'a.u.'],
-                                  msmt_kw={'calibrate_optimal_weights': True}
+                                  msmt_kw={'calibrate_optimal_weights': False}
                                   )
         nested_MC = self.instr_nested_MC.get_instr()
         nested_MC.set_detector_function(d)
@@ -4153,7 +4165,7 @@ class CCLight_Transmon(Qubit):
             return [np.array(t, dtype=np.float64) for t in transients]
 
     def measure_dispersive_shift_pulsed(self, freqs=None, MC=None, analyze: bool = True,
-                                        prepare: bool = True):
+                                        prepare: bool = True, Pulse_comb: list=['off', 'on']):
         """
         Measures the RO resonator spectroscopy with the qubit in ground and excited state.
         Specifically, performs two experiments. Applies sequence:
@@ -4188,7 +4200,7 @@ class CCLight_Transmon(Qubit):
         # off/on switching is achieved by turning the MW source on and
         # off as this is much faster than recompiling/uploading
         f_res = []
-        for i, pulse_comb in enumerate(['off', 'on']):
+        for i, pulse_comb in enumerate(Pulse_comb):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
                 initialize=False,
@@ -4223,6 +4235,7 @@ class CCLight_Transmon(Qubit):
             return True
 
     def measure_rabi(self, MC=None, amps=np.linspace(0, 1, 31),
+                     cross_driving_qubit=None,
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         """
@@ -4249,7 +4262,7 @@ class CCLight_Transmon(Qubit):
                                   analyze, close_fig, real_imag,
                                   prepare_for_timedomain, all_modules)
         else:
-            self.measure_rabi_channel_amp(MC, amps,
+            self.measure_rabi_channel_amp(MC, amps,cross_driving_qubit,
                                           analyze, close_fig, real_imag,
                                           prepare_for_timedomain)
 
@@ -4311,6 +4324,7 @@ class CCLight_Transmon(Qubit):
         return True
 
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
+                                 cross_driving_qubit=None,
                                  analyze=True, close_fig=True, real_imag=True,
                                  prepare_for_timedomain=True):
         """
@@ -4323,25 +4337,37 @@ class CCLight_Transmon(Qubit):
                 amplitude of the AWG, in max range (0 to 1).
         """
 
-        MW_LutMan = self.instr_LutMan_MW.get_instr()
+        if cross_driving_qubit is not None:
+            MW_LutMan = self.find_instrument(cross_driving_qubit).instr_LutMan_MW.get_instr()
+            qubi_cd_idx = self.find_instrument(cross_driving_qubit).cfg_qubit_nr()
+            self.find_instrument(cross_driving_qubit)._prep_td_sources()
+            self.find_instrument(cross_driving_qubit)._prep_mw_pulses()
+
+        else:
+            MW_LutMan = self.instr_LutMan_MW.get_instr()
 
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+        
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
             initialize=False,
+            cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
         s = MW_LutMan.channel_amp
+        print(s)
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
         # real_imag is acutally not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='rabi_'+self.msmt_suffix)
+
+        label = f'drive-{cross_driving_qubit}' if cross_driving_qubit else '' 
+        MC.run(name=f'rabi_'+self.msmt_suffix+label)
         ma.Rabi_Analysis(label='rabi_')
         return True
 
@@ -5784,8 +5810,8 @@ class CCLight_Transmon(Qubit):
 
 
     def measure_flipping(self, number_of_flips=np.arange(0, 61, 2), equator=True,
-                         MC=None, analyze=True, close_fig=True, update=False,
-                         ax='x', angle='180'):
+                         MC=None, analyze=True, close_fig=True, update=False,flip_ef=False,
+                         ax='x', angle='180',label=''):
         """
         Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
         pi (repeated N-times) - pi/2 - measure
@@ -5832,7 +5858,7 @@ class CCLight_Transmon(Qubit):
                                 nf[-1]+4*dn) ])
 
         self.prepare_for_timedomain()
-        p = sqo.flipping(number_of_flips=nf, equator=equator,
+        p = sqo.flipping(number_of_flips=nf, equator=equator,flip_ef=flip_ef,
                          qubit_idx=self.cfg_qubit_nr(),
                          platf_cfg=self.cfg_openql_platform_fn(),
                          ax=ax.lower(), angle=angle)
@@ -5843,7 +5869,9 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(nf)
         MC.set_detector_function(d)
-        MC.run('flipping_'+ax+angle+self.msmt_suffix)
+        if flip_ef:
+            label = 'ef_rx12'
+        MC.run('flipping_'+ax+angle+label+self.msmt_suffix)
         if analyze:
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})

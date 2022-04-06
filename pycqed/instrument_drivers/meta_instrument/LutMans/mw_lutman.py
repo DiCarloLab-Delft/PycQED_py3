@@ -25,6 +25,7 @@ default_mw_lutmap = {
     12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
     14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
+    15 : {"name" : "rX12_90"  , "theta" : 90, "phi" : 0 , "type" : "ef"},
     30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
     52 : {"name" : "phaseCorrPark1" , "type" : "phase"},
     53 : {"name" : "phaseCorrPark2" , "type" : "phase"},
@@ -385,15 +386,8 @@ class Base_MW_LutMan(Base_LutMan):
                 self._wave_dict)
         return self._wave_dict
 
-    def apply_mixer_predistortion_corrections(self, wave_dict):
-        M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
-                                          self.mixer_phi())
-        for key, val in wave_dict.items():
-            wave_dict[key] = np.dot(M, val)
-        return wave_dict
-
     def load_waveform_onto_AWG_lookuptable(
-            self, 
+            self,
             waveform_idx: int,
             regenerate_waveforms: bool=False
             ):
@@ -410,6 +404,48 @@ class Base_MW_LutMan(Base_LutMan):
 
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
+
+    ############################################################################
+    # Base_MW_LutMan functions (ma be overridden in subclass)
+    ############################################################################
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+        M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
+                                          self.mixer_phi())
+        for key, val in wave_dict.items():
+            wave_dict[key] = np.dot(M, val)
+        return wave_dict
+
+    def _add_mixer_corr_pars(self):
+        self.add_parameter('mixer_alpha', vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=1.0)
+        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
+                'If True applies a mixer correction using mixer_phi and '
+                'mixer_alpha to all microwave pulses using.'),
+            parameter_class=ManualParameter, initial_value=True)
+
+    def _add_channel_params(self):
+        """
+        add parameters that define connectivity of logical channels to
+        hardware channel numbers of the instrument involved (i.e. self.AWG)
+        """
+        self.add_parameter('channel_I',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
+
+        self.add_parameter('channel_Q',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
+
+    ############################################################################
+    # Functions
+    # FIXME: the load_* functions provide an undesired backdoor, also see issue #626
+    ############################################################################
 
     def load_phase_pulses_to_AWG_lookuptable(
             self,
@@ -528,7 +564,7 @@ class QWG_MW_LutMan(Base_MW_LutMan):
     ##########################################################################
 
     def _add_channel_params(self):
-        super()._add_channel_params()
+
         self.add_parameter('channel_amp',
                            unit='a.u.',
                            vals=vals.Numbers(-1.8, 1.8),
@@ -652,8 +688,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         for gate in ['NW','NE','SW','SE']:
             self.add_parameter(
                 name=f'vcz_virtual_q_ph_corr_{gate}',
-                parameter_class=ManualParameter, 
-                unit='deg', 
+                parameter_class=ManualParameter,
+                unit='deg',
                 vals=vals.Numbers(-360, 360),
                 initial_value=0.0,
                 docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
@@ -661,30 +697,30 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             )
 
         # corrections for phases that the qubit can acquire during parking as spectator of a CZ gate.
-        # this can happen in general for each of its neighbouring qubits (below: 'direction'), 
+        # this can happen in general for each of its neighbouring qubits (below: 'direction'),
         # while it is doing a gate in each possible direction (below: 'gate')
         # for direction in ['NW','NE','SW','SE']:
         #     for gate in ['NW','NE','SW','SE']:
         #         self.add_parameter(
         #             name=f'vcz_virtual_q_ph_corr_spec_{direction}_gate_{gate}',
-        #             parameter_class=ManualParameter, 
-        #             unit='deg', 
+        #             parameter_class=ManualParameter,
+        #             unit='deg',
         #             vals=vals.Numbers(0, 360),
         #             initial_value=0.0,
-        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, " 
+        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, "
         #                       f"that is doing a gate in direction {gate}."
         #                         "Will be applied as increment to sine generator phases via command table."
         #         )
 
         # corrections for phases that the qubit can acquire during parking as part of a flux-dance step
         # there are 8 flux-dance steps for the S17 scheme.
-        # NOTE: this correction must not be the same as the above one for the case of a spectator 
-        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates 
+        # NOTE: this correction must not be the same as the above one for the case of a spectator
+        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
         for step in np.arange(1,9):
             self.add_parameter(
                 name=f'vcz_virtual_q_ph_corr_park_step_{step}',
-                parameter_class=ManualParameter, 
-                unit='deg', 
+                parameter_class=ManualParameter,
+                unit='deg',
                 vals=vals.Numbers(-360, 360),
                 initial_value=0.0,
                 docstring=f"Virtual phase correction for parking in flux-dance step {step}."
@@ -713,7 +749,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             AWG.set('sigouts_{}_range'.format(self.channel_I()-1), val)
             AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 0)
             AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), val)
-                
+
 
     def _get_channel_range(self):
         awg_nr = (self.channel_I()-1)//2
@@ -775,7 +811,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 0)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_0'.format(awg_nr, 1)))
             vals.append(AWG.get('awgs_{}_outputs_{}_gains_1'.format(awg_nr, 1)))
-            assert vals[0]==vals[4]
+            assert vals[0]==vals[3]
             assert vals[1]==vals[2]==0
 
         # In case of sideband modulation mode 'real-time', amplitudes have to be set
@@ -998,23 +1034,23 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # the last 4 are for phase corrections due to gate in corresponding direction
         phase_corr_inds = np.arange(52,64,1)
         for step, cw in enumerate(phase_corr_inds[:8]):
-            phase = self.parameters[f"vcz_virtual_q_ph_corr_park_step_{step+1}"]()
-            commandtable_dict['table'] += [{"index": int(cw), 
-                                            "phase0": {"value": float(phase), "increment": True}, 
+            phase = self.parameters[f"vcz_virtual_q_ph_corr_step_{step+1}"]()
+            commandtable_dict['table'] += [{"index": int(cw),
+                                            "phase0": {"value": float(phase), "increment": True},
                                             "phase1": {"value": float(phase), "increment": True}
                                             }]
         for i,d in enumerate(['NW','NE','SW','SE']):
             phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
-            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i+8]), 
-                                            "phase0": {"value": float(phase), "increment": True}, 
+            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i+8]),
+                                            "phase0": {"value": float(phase), "increment": True},
                                             "phase1": {"value": float(phase), "increment": True}
                                             }]
 
-        # NOTE: Whenever the command table is used, the phase offset between I and Q channels on 
+        # NOTE: Whenever the command table is used, the phase offset between I and Q channels on
         # the HDAWG for real-time modulation has to be initialized from the table itself.
-        # Index 1023 will be reserved for this (it should no be used for codeword triggering) 
-        commandtable_dict['table'] += [{"index": 1023, 
-                                        "phase0": {"value": 90.0, "increment": False}, 
+        # Index 1023 will be reserved for this (it should no be used for codeword triggering)
+        commandtable_dict['table'] += [{"index": 1023,
+                                        "phase0": {"value": 90.0, "increment": False},
                                         "phase1": {"value":  0.0, "increment": False}
                                         }]
 
@@ -1033,8 +1069,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         for gate in ['NW','NE','SW','SE']:
             self.add_parameter(
                 name=f'vcz_virtual_q_ph_corr_{gate}',
-                parameter_class=ManualParameter, 
-                unit='deg', 
+                parameter_class=ManualParameter,
+                unit='deg',
                 vals=vals.Numbers(-360, 360),
                 initial_value=0.0,
                 docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
@@ -1042,35 +1078,35 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             )
 
         # corrections for phases that the qubit can acquire during parking as spectator of a CZ gate.
-        # this can happen in general for each of its neighbouring qubits (below: 'direction'), 
+        # this can happen in general for each of its neighbouring qubits (below: 'direction'),
         # while it is doing a gate in each possible direction (below: 'gate')
         # for direction in ['NW','NE','SW','SE']:
         #     for gate in ['NW','NE','SW','SE']:
         #         self.add_parameter(
         #             name=f'vcz_virtual_q_ph_corr_spec_{direction}_gate_{gate}',
-        #             parameter_class=ManualParameter, 
-        #             unit='deg', 
+        #             parameter_class=ManualParameter,
+        #             unit='deg',
         #             vals=vals.Numbers(0, 360),
         #             initial_value=0.0,
-        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, " 
+        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, "
         #                       f"that is doing a gate in direction {gate}."
         #                         "Will be applied as increment to sine generator phases via command table."
         #         )
 
         # corrections for phases that the qubit can acquire during parking as part of a flux-dance step
         # there are 8 flux-dance steps for the S17 scheme.
-        # NOTE: this correction must not be the same as the above one for the case of a spectator 
-        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates 
-        # for step in np.arange(1,9):
-        #     self.add_parameter(
-        #         name=f'vcz_virtual_q_ph_corr_step_{step}',
-        #         parameter_class=ManualParameter, 
-        #         unit='deg', 
-        #         vals=vals.Numbers(0, 360),
-        #         initial_value=0.0,
-        #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
-        #                     "Will be applied as increment to sine generator phases via command table."
-        #     )
+        # NOTE: this correction must not be the same as the above one for the case of a spectator
+        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
+        for step in np.arange(1,9):
+            self.add_parameter(
+                name=f'vcz_virtual_q_ph_corr_step_{step}',
+                parameter_class=ManualParameter,
+                unit='deg',
+                vals=vals.Numbers(0, 360),
+                initial_value=0.0,
+                docstring=f"Virtual phase correction for parking in flux-dance step {step}."
+                            "Will be applied as increment to sine generator phases via command table."
+            )
 
     def _set_channel_range(self, val):
         awg_nr = (self.channel_I()-1)//2
