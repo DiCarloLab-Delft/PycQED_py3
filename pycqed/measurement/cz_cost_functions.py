@@ -260,7 +260,7 @@ def parity_check_cost_function(
     # flux_lm.generate_cz_waveforms()
     # flux_lm.load_waveforms_onto_AWG_lookuptable()
 
-    result = device.measure_parity_check_flux_dance(
+    result_dict = device.measure_parity_check_flux_dance(
         MC=MC,
         target_qubits=target_qubits,
         control_qubits=control_qubits,
@@ -278,20 +278,33 @@ def parity_check_cost_function(
         **kwargs
         )
 
-    phases = result['quantities_of_interest']['oscillation_phases']
-    cases = result['quantities_of_interest']['control_cases']
-    missing_fractions = result['quantities_of_interest']['mean_missing_fraction_per_qubit']
-
-    phi_diff = (phases[cases[0]] - phases[cases[-1]]) % 360
+    phi_diff = (result_dict['phi_osc'][result_dict['cases'][0]] \
+                - result_dict['phi_osc'][result_dict['cases'][-1]]) % 360
     
     cost = parity_check_cost(phase_diff=phi_diff, 
-                            missing_fraction=missing_fractions[control_qubits[0]] 
+                            missing_fraction=result_dict['missing_frac'][control_qubits[0]] 
                                             if include_missing_frac_cost else None,
                             phase_weight=phase_weight_factor)
 
-    result_dict[f'missing_frac_{control_qubits[0]}'] = 100 * missing_fractions[control_qubits[0]]
+    result_dict[f'missing_frac_{control_qubits[0]}'] = 100 * result_dict['missing_frac'][control_qubits[0]]
     result_dict['cost_function_val'] = cost
     result_dict['phi_diff'] = phi_diff
 
     return result_dict
+    # phases = result['quantities_of_interest']['oscillation_phases']
+    # cases = result['quantities_of_interest']['control_cases']
+    # missing_fractions = result['quantities_of_interest']['mean_missing_fraction_per_qubit']
+
+    # phi_diff = (phases[cases[0]] - phases[cases[-1]]) % 360
+    
+    # cost = parity_check_cost(phase_diff=phi_diff, 
+    #                         missing_fraction=missing_fractions[control_qubits[0]] 
+    #                                         if include_missing_frac_cost else None,
+    #                         phase_weight=phase_weight_factor)
+
+    # result[f'missing_frac_{control_qubits[0]}'] = 100 * missing_fractions[control_qubits[0]]
+    # result['cost_function_val'] = cost
+    # result['phi_diff'] = phi_diff
+
+    # return result
 

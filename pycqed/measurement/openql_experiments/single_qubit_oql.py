@@ -379,6 +379,7 @@ def flipping(
         platf_cfg: str,
         equator: bool = False,
         cal_points: bool = True,
+        flip_ef: bool = False,
         ax: str = 'x',
         angle: str = '180'
 ) -> OqlProgram:
@@ -417,13 +418,19 @@ def flipping(
                              i == (len(number_of_flips)-1)):
             if ax == 'y':
                 k.y(qubit_idx)
+            elif flip_ef:
+                k.gate('rX12',[qubit_idx])
             else:
                 k.x(qubit_idx)
+
             k.measure(qubit_idx)
         else:
             if equator:
                 if ax == 'y':
                     k.gate('ry90', [qubit_idx])
+                elif flip_ef:
+                    k.gate('rx180', [qubit_idx])
+                    k.gate('cw_15', [qubit_idx])
                 else:
                     k.gate('rx90', [qubit_idx])
             for j in range(n):
@@ -435,8 +442,13 @@ def flipping(
                 elif angle == '90':
                     k.gate('rx90', [qubit_idx])
                     k.gate('rx90', [qubit_idx])
+                elif flip_ef:
+                    k.gate('rX12',[qubit_idx])
                 else:
                     k.x(qubit_idx)
+
+            if flip_ef:
+                k.gate('rx180',[qubit_idx])
             k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -1339,7 +1351,8 @@ def off_on(
         nr_flux_after_init: float=None,
         flux_cw_after_init: Union[str, List[str]]=None,
         fluxed_qubit_idx: int=None,
-        wait_time_after_flux: float=0
+        wait_time_after_flux: float=0,
+        cross_driving_qubit: int=None,
         ) -> OqlProgram:
 
     """
@@ -1397,93 +1410,31 @@ def off_on(
                     k.gate(flux_cw_after_init, [fluxed_qubit_idx])
             k.gate("wait", [], wait_time_after_flux)
 
-        k.gate('rx180', [qubit_idx])
+        
+        # k.gate('rx180', [qubit_idx])
+        if cross_driving_qubit is not None:
+            k.gate('rx180', [cross_driving_qubit])
+            k.gate("i", [qubit_idx])
+            k.gate("wait", [])
+        else: 
+            k.gate('rx180', [qubit_idx])
+
+        k.gate("wait", [])
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
-        raise ValueError()
+    if 'two' in pulse_comb.lower():
+        k = p.create_kernel("two")
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
+        k.gate('rx12', [qubit_idx])
+        k.gate("wait", [])
 
-    p.compile()
-    return p
-
-
-def off_on_ramzz_measurement(
-        inv_qubit_idx: int,
-        meas_qubit_idx: int,
-        pulse_comb: str,
-        platf_cfg: str,
-        ramzz_wait_time_ns: int,
-        nr_flux_dance: float = None,
-        wait_time_ns: float = None
-) -> OqlProgram:
-    """
-    Performs an 'off_on' sequence on the investigated qubit specified.
-        off: (RO) - prepz -      - RO
-        on:  (RO) - prepz - x180 - RO
-    Args:
-        inv_qubit_idx (int) : qubit to perform off_on sequence on
-        meas_qubit_idx (int) : qubit used for ramzz measurement
-        pulse_comb (list): What pulses to play valid options are
-            "off", "on", "off_on"
-        initialize (bool): if True does an extra initial measurement to
-            post select data.
-        platf_cfg (str) : filepath of OpenQL platform config file
-
-    Pulses can be optionally enabled by putting 'off', respectively 'on' in
-    the pulse_comb string.
-    """
-    p = OqlProgram('off_on_ramzz', platf_cfg)
-
-    # # Off
-    if 'off' in pulse_comb.lower():
-        k = p.create_kernel("off")
-        k.prepz(inv_qubit_idx)
-        k.prepz(meas_qubit_idx)
-        k.gate('wait', [], 0)
-
-        if nr_flux_dance:
-            for i in range(int(nr_flux_dance)):
-                for step in [1,2,3,4]:
-                    # if refocusing:
-                    #     k.gate(f'flux-dance-{step}-refocus', [0])
-                    # else:
-                    k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment
-            k.gate("wait", [], wait_time_ns)
-
-        k.gate('wait', [], 0)
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.measure(qubit_idx)
         p.add_kernel(k)
 
-    if 'on' in pulse_comb.lower():
-        k = p.create_kernel("on")
-        k.prepz(inv_qubit_idx)
-        k.prepz(meas_qubit_idx)
-        k.gate('wait', [], 0)
-
-        if nr_flux_dance:
-            for i in range(int(nr_flux_dance)):
-                for step in [1,2,3,4]:
-                    # if refocusing:
-                    #     k.gate(f'flux-dance-{step}-refocus', [0])
-                    # else:
-                    k.gate(f'flux-dance-{step}', [0])
-                k.gate("wait", [], 0)  # alignment
-            k.gate("wait", [], wait_time_ns)
-
-        k.gate('rx180', [inv_qubit_idx])
-        k.gate('wait', [], 0)
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
-        p.add_kernel(k)
-
-    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
+    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()) and ('two' not in pulse_comb.lower()):
         raise ValueError(f"pulse_comb {pulse_comb} has to contain only 'on' and 'off'.")
 
     p.compile()
@@ -1519,7 +1470,7 @@ def RO_QND_sequence(q_idx,
     p.add_kernel(k)
 
     p.compile()
-
+    
     return p
 
 def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:

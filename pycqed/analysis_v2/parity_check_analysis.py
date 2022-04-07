@@ -214,7 +214,7 @@ class Parity_Check_Analysis_OLD():
                     if not bool(case.count('1') % 2) and np.isclose(phase, 360, atol=60):
                         wrapped_phases[case] -= 360
                 phase_diff_by_case = [wrapped_phases[f'{case}'] for case in cases] 
-                
+                res_dict['phi_diff'] = phase_diff_by_case
                 fig, ax = plt.subplots(1, 1, dpi=120, figsize=(6,4))                 
                 ax.plot(cases, phase_diff_by_case, linestyle='-', marker='o', alpha=0.7)
                 
@@ -254,7 +254,7 @@ class Parity_Check_Analysis(BaseDataAnalysis):
             label: str = "Parity_check_flux_dance",
             data_file_path: str = None,
             target_qubit: str = None,
-            analyze_parity_model: bool = True,
+            analyze_parity_model: bool = False,
             options_dict: dict = None,
             extract_only: bool = False,
             auto: bool = True,

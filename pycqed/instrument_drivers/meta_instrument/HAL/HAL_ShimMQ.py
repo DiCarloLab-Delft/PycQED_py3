@@ -185,7 +185,7 @@ class HAL_ShimMQ(Instrument):
         self._prep_ro_integration_weights(qubits=qubits)
         if not reduced:
             self._prep_ro_pulses(qubits=qubits)
-            self._prep_ro_instantiate_detectors()
+            # self._prep_ro_instantiate_detectors() # FIXME: unused
 
         # TODO:
         # - update global readout parameters (relating to mixer settings)
@@ -523,14 +523,6 @@ class HAL_ShimMQ(Instrument):
             )
 
     def _add_ro_parameters(self):
-        # FIXME: no longer used, now in UHFQC_RO_LutMan.LO_freq
-        # self.add_parameter(
-        #     'ro_lo_freq',
-        #     unit='Hz',
-        #     docstring='Frequency of the common LO for all RO pulses.',
-        #     parameter_class=ManualParameter
-        # )
-
         # actually, it should be possible to build the integration
         # weights obeying different settings for different
         # qubits, but for now we use a fixed common value.
@@ -668,20 +660,6 @@ class HAL_ShimMQ(Instrument):
     ##########################################################################
     # private functions: prepare
     ##########################################################################
-
-    # FIXME: unused
-    # def _grab_instruments_from_qb(self):
-    #     """
-    #     initialize instruments that should only exist once from the first
-    #     qubit. Maybe must be done in a more elegant way (at least check
-    #     uniqueness).
-    #     """
-    #
-    #     qb = self.find_instrument(self.qubits()[0])
-    #     self.instr_MC(qb.instr_MC())
-    #     self.instr_VSM(qb.instr_VSM())
-    #     self.instr_CC(qb.instr_CC())
-    #     self.cfg_openql_platform_fn(qb.cfg_openql_platform_fn())
 
     def _prep_ro_sources(self, qubits):
         """
@@ -902,21 +880,22 @@ class HAL_ShimMQ(Instrument):
             ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
-    def _prep_ro_instantiate_detectors(self):
-        """
-        Instantiate acquisition detectors.
-        """
-        log.info("Instantiating readout detectors")
-        # self.input_average_detector = self.get_input_avg_det()  # FIXME: unused
-        # self.int_avg_det = self.get_int_avg_det()  # FIXME: unused
-        self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True)
-        # self.int_log_det = self.get_int_logging_detector()  # FIXME: unused
+    # FIXME: unused
+    # def _prep_ro_instantiate_detectors(self):
+    #     """
+    #     Instantiate acquisition detectors.
+    #     """
+    #     # log.info("Instantiating readout detectors")
+    #     # self.input_average_detector = self.get_input_avg_det()  # FIXME: unused
+    #     # self.int_avg_det = self.get_int_avg_det()  # FIXME: unused
+    #     # self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True) # FIXME: unused
+    #     # self.int_log_det = self.get_int_logging_detector()  # FIXME: unused
 
-        # FIXME: unused
-        # if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
-        #     self.corr_det = self.get_correlation_detector(qubits=qubits)
-        # else:
-        #     self.corr_det = None
+    #     # FIXME: unused
+    #     # if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
+    #     #     self.corr_det = self.get_correlation_detector(qubits=qubits)
+    #     # else:
+    #     #     self.corr_det = None
 
 
     @deprecated(version='0.4', reason="VSM support is broken")
