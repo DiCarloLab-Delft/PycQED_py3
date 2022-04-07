@@ -916,7 +916,7 @@ class ZI_base_instrument(Instrument):
                 par_kw['set_cmd'] = _gen_set_cmd(self.setv, parpath)
                 par_kw['get_cmd'] = _gen_get_cmd(self.getv, parpath)
                 # min/max not implemented yet for ZI auto docstrings #352
-                par_kw['vals'] = validators.Arrays()
+                par_kw['vals'] = validators.Arrays(valid_types=(complex, np.integer, np.floating))
 
             elif par['Type'] == 'String':
                 par_kw['set_cmd'] = _gen_set_cmd(self.sets, parpath)
