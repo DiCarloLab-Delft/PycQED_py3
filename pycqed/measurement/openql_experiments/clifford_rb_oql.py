@@ -63,6 +63,7 @@ def wait_for_rb_tasks(rb_tasks, refresh_interval: float = 4):
         # it is an internal number of groups of compilation tasks (chunks)
         # It is enough to have an indication of progress without
         # compromising the efficiency
+        # FIXME: uses internal private data structure
         print(
             "{} RB compilation tasks left."
             " Elapsed waiting {:>7.1f}s".format(
@@ -78,27 +79,36 @@ def wait_for_rb_tasks(rb_tasks, refresh_interval: float = 4):
     print("\nDone compiling RB sequences!")
 
 # FIXME: WIP on runner, naming needs improvement. Move to separate file
-def run_vector(func, parameters_vector, parallel: bool=False):
+def run_vector(func, parameters_vector: list, parallel: bool=False):
     ret = []
     if not parallel:
-        # FIXME: use map, collect return value
+        # FIXME: use map?
+        i = 0
         for parameters in parameters_vector:
-            func(**parameters)
+            name = parameters["program_name"]  # FIXME: assumes that program_name exits
+            log.info(f"Executing task {i}: '{name}'")
+            # ret.append(func(**parameters))
+            ret.append(func(parameters))    # assumes wrapper
+            # print(f"par[{i}] = {parameters}")
+            i += 1
     else:
         with multiprocessing.Pool(
             processes=4, # FIXME
-            maxtasksperchild=2
+            maxtasksperchild=2  # FIXME
         ) as pool:
-            rb_tasks = pool.map_async(func, parameters_vector)
-            wait_for_rb_tasks(rb_tasks)
-            ret = rb_tasks.get()
+            log.info(f"Asynchronously starting {len(parameters_vector)} tasks")
+            # log.info(f"parameters_vector = '{parameters_vector}'")
+            rb_tasks = pool.map_async(func, parameters_vector)  # NB: assumes wrapper
+            # rb_tasks = pool.starmap_async(func, parameters_vector)  # NB: starmap_async unpacks parameters_vector
+            # wait_for_rb_tasks(rb_tasks)
+            ret = rb_tasks.get()  # FIXME: see note by Victor on return type limitations
 
     return ret
 
 
 def randomized_benchmarking(
-        qubits: list,
         platf_cfg: str,
+        qubits: list,
         nr_cliffords,
         nr_seeds: int,
         net_cliffords: list = [0],
@@ -119,12 +129,12 @@ def randomized_benchmarking(
     # FIXME: split into separate functions for different types of RB
     """
     Input pars:
+        platf_cfg:
+            filename of the platform config file
+
         qubits:
             list of ints specifying qubit indices. based on the length this function detects if it should generate a
             single or two or multi qubit RB sequence.
-
-        platf_cfg:
-            filename of the platform config file
 
         nr_cliffords:
             list nr_cliffords for which to generate RB seqs
@@ -521,183 +531,183 @@ def randomized_benchmarking(
     return p
 
 
-# def two_qubit_randomized_benchmarking(
-#     two_qubit_pair: list,
-#     single_qubits: list,
-#     platf_cfg: str,
-#     nr_cliffords,
-#     nr_seeds: int,
-#     two_qubit_net_cliffords: list = [0],
-#     single_qubit_net_cliffords: list = [0],
-#     max_clifford_idx: int = 11520,
-#     flux_codeword: str = "cz",
-#     flux_allocated_duration_ns: int = None,
-#     interleaving_cliffords=[None],
-#     program_name: str = "randomized_benchmarking",
-#     cal_points: bool = True,
-#     f_state_cal_pts: bool = True,
-#     recompile: bool = True,
-# ):
-    
-#     assert len(two_qubit_net_cliffords) == len(single_qubit_net_cliffords)
+def two_qubit_randomized_benchmarking_original(
+    platf_cfg: str,
+    two_qubit_pair: list,
+    single_qubits: list,
+    nr_cliffords,
+    nr_seeds: int,
+    two_qubit_net_cliffords: list = [0],
+    single_qubit_net_cliffords: list = [0],
+    max_clifford_idx: int = 11520,
+    flux_codeword: str = "cz",
+    flux_allocated_duration_ns: int = None,
+    interleaving_cliffords=[None],
+    program_name: str = "randomized_benchmarking",
+    cal_points: bool = True,
+    f_state_cal_pts: bool = True,
+    recompile: bool = True,
+):
 
-#     two_qubit_map = {f'q{i}' : qb for i, qb in enumerate(two_qubit_pair)}
-#     if single_qubits != None:
-#         single_qubit_map = {f'q{i}' : qb for i, qb in enumerate(single_qubits)}
-    
-#     p = oqh.create_program(program_name, platf_cfg)
+    assert len(two_qubit_net_cliffords) == len(single_qubit_net_cliffords)
 
-#     this_file = inspect.getfile(inspect.currentframe())
+    two_qubit_map = {f'q{i}' : qb for i, qb in enumerate(two_qubit_pair)}
+    if single_qubits != None:
+        single_qubit_map = {f'q{i}' : qb for i, qb in enumerate(single_qubits)}
 
-#     # Ensure that programs are recompiled when changing the code as well
-#     recompile_dict = oqh.check_recompilation_needed_hash_based(
-#         program_fn=p.filename,
-#         platf_cfg=platf_cfg,
-#         clifford_rb_oql=this_file,
-#         recompile=recompile,
-#     )
+    p = oqh.create_program(program_name, platf_cfg)
 
-#     if not recompile_dict["recompile"]:
-#         os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
-#         return p
+    this_file = inspect.getfile(inspect.currentframe())
 
-#     if 100_000 in interleaving_cliffords and flux_allocated_duration_ns is None:
-#         # Try to get the flux duration from the cfg file
-#         with open(platf_cfg) as json_file:
-#             loaded_json = json.load(json_file)
-#         try:
-#             flux_allocated_duration_ns = loaded_json["instructions"]["sf_cz_se q0"][
-#                 "duration"
-#             ]
-#         except KeyError:
-#             raise ValueError("Could not find flux duration. Specify manually!")
+    # Ensure that programs are recompiled when changing the code as well
+    recompile_dict = oqh.check_recompilation_needed_hash_based(
+        program_fn=p.filename,
+        platf_cfg=platf_cfg,
+        clifford_rb_oql=this_file,
+        recompile=recompile,
+    )
 
-#     for seed in range(nr_seeds):
-#         for j, n_cl in enumerate(nr_cliffords):
-#             for interleaving_cl in interleaving_cliffords:
+    if not recompile_dict["recompile"]:
+        os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
+        return p
 
-#                 # Generate 2-qubit sequence
-#                 for net_clifford_2q, net_clifford_1q in zip(two_qubit_net_cliffords, single_qubit_net_cliffords):
-#                     two_cl_seq = rb.randomized_benchmarking_sequence(
-#                         n_cl,
-#                         number_of_qubits=2,
-#                         desired_net_cl=net_clifford_2q,
-#                         max_clifford_idx=max_clifford_idx,
-#                         interleaving_cl=interleaving_cl,
-#                     )
-#                     net_two_cl_seq = rb.calculate_net_clifford(two_cl_seq, TwoQubitClifford)
-#                     # decompose
-#                     two_cl_seq_decomposed = []
-#                     for cl in two_cl_seq:
-#                         # benchmarking only CZ (not as a member of CNOT group)
-#                         if cl == 104368:  # 104368 = 100_000 + CZ
-#                             two_cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
-#                         # benchmarking only idling identity, with duration of cz
-#                         # see below where wait-time is added
-#                         elif cl == 100_000:
-#                             two_cl_seq_decomposed.append([("I", ["q0", "q1"])])
-#                         else:
-#                             two_cl_seq_decomposed.append(TwoQubitClifford(cl).gate_decomposition)
+    if 100_000 in interleaving_cliffords and flux_allocated_duration_ns is None:
+        # Try to get the flux duration from the cfg file
+        with open(platf_cfg) as json_file:
+            loaded_json = json.load(json_file)
+        try:
+            flux_allocated_duration_ns = loaded_json["instructions"]["sf_cz_se q0"][
+                "duration"
+            ]
+        except KeyError:
+            raise ValueError("Could not find flux duration. Specify manually!")
 
-#                     # Generate single-qubit sequence
-#                     if single_qubits != None:
-#                         Single_cl_seq = {}
-#                         net_Single_cl_seq = {}
-#                         Single_cl_seq_decomposed = dict.fromkeys(single_qubits)
-#                         for single_qubit in single_qubits:
-#                             Single_cl_seq[single_qubit] = rb.randomized_benchmarking_sequence(
-#                                 n_cl,
-#                                 number_of_qubits=1,
-#                                 desired_net_cl=net_clifford_1q,
-#                                 max_clifford_idx=max_clifford_idx,
-#                             )
-#                             net_Single_cl_seq[single_qubit] = rb.calculate_net_clifford(Single_cl_seq[single_qubit], SingleQubitClifford)
-#                             Single_cl_seq_decomposed[single_qubit] = []
-#                             for cl in Single_cl_seq[single_qubit]:
-#                                 Single_cl_seq_decomposed[single_qubit].append(SingleQubitClifford(cl).gate_decomposition)
+    for seed in range(nr_seeds):
+        for j, n_cl in enumerate(nr_cliffords):
+            for interleaving_cl in interleaving_cliffords:
+
+                # Generate 2-qubit sequence
+                for net_clifford_2q, net_clifford_1q in zip(two_qubit_net_cliffords, single_qubit_net_cliffords):
+                    two_cl_seq = rb.randomized_benchmarking_sequence(
+                        n_cl,
+                        number_of_qubits=2,
+                        desired_net_cl=net_clifford_2q,
+                        max_clifford_idx=max_clifford_idx,
+                        interleaving_cl=interleaving_cl,
+                    )
+                    net_two_cl_seq = rb.calculate_net_clifford(two_cl_seq, TwoQubitClifford)
+                    # decompose
+                    two_cl_seq_decomposed = []
+                    for cl in two_cl_seq:
+                        # benchmarking only CZ (not as a member of CNOT group)
+                        if cl == 104368:  # 104368 = 100_000 + CZ
+                            two_cl_seq_decomposed.append([("CZ", ["q0", "q1"])])
+                        # benchmarking only idling identity, with duration of cz
+                        # see below where wait-time is added
+                        elif cl == 100_000:
+                            two_cl_seq_decomposed.append([("I", ["q0", "q1"])])
+                        else:
+                            two_cl_seq_decomposed.append(TwoQubitClifford(cl).gate_decomposition)
+
+                    # Generate single-qubit sequence
+                    if single_qubits != None:
+                        Single_cl_seq = {}
+                        net_Single_cl_seq = {}
+                        Single_cl_seq_decomposed = dict.fromkeys(single_qubits)
+                        for single_qubit in single_qubits:
+                            Single_cl_seq[single_qubit] = rb.randomized_benchmarking_sequence(
+                                n_cl,
+                                number_of_qubits=1,
+                                desired_net_cl=net_clifford_1q,
+                                max_clifford_idx=max_clifford_idx,
+                            )
+                            net_Single_cl_seq[single_qubit] = rb.calculate_net_clifford(Single_cl_seq[single_qubit], SingleQubitClifford)
+                            Single_cl_seq_decomposed[single_qubit] = []
+                            for cl in Single_cl_seq[single_qubit]:
+                                Single_cl_seq_decomposed[single_qubit].append(SingleQubitClifford(cl).gate_decomposition)
 
 
-#                 # # generate OpenQL kernel for every net_clifford
-#                 # for net_clifford in net_cliffords:
-#                     # create decomposed sequence including recovery
-#                     two_recovery_to_idx_clifford = net_two_cl_seq.get_inverse()
-#                     two_recovery_clifford = TwoQubitClifford(net_clifford_2q) * two_recovery_to_idx_clifford
-#                     two_cl_seq_decomposed_with_net = two_cl_seq_decomposed + [
-#                         two_recovery_clifford.gate_decomposition
-#                     ]
-#                     if single_qubits != None:
-#                         for single_qubit in single_qubits:
-#                             single_recovery_to_idx_clifford = net_Single_cl_seq[single_qubit].get_inverse()
-#                             single_recovery_clifford = SingleQubitClifford(net_clifford_1q) * single_recovery_to_idx_clifford
-#                             single_cl_seq_decomposed_with_net = Single_cl_seq_decomposed[single_qubit] + [
-#                                 single_recovery_clifford.gate_decomposition
-#                             ]
+                # # generate OpenQL kernel for every net_clifford
+                # for net_clifford in net_cliffords:
+                    # create decomposed sequence including recovery
+                    two_recovery_to_idx_clifford = net_two_cl_seq.get_inverse()
+                    two_recovery_clifford = TwoQubitClifford(net_clifford_2q) * two_recovery_to_idx_clifford
+                    two_cl_seq_decomposed_with_net = two_cl_seq_decomposed + [
+                        two_recovery_clifford.gate_decomposition
+                    ]
+                    if single_qubits != None:
+                        for single_qubit in single_qubits:
+                            single_recovery_to_idx_clifford = net_Single_cl_seq[single_qubit].get_inverse()
+                            single_recovery_clifford = SingleQubitClifford(net_clifford_1q) * single_recovery_to_idx_clifford
+                            single_cl_seq_decomposed_with_net = Single_cl_seq_decomposed[single_qubit] + [
+                                single_recovery_clifford.gate_decomposition
+                            ]
 
-#                     k = oqh.create_kernel(
-#                         "RB_{}Cl_s{}_net{}_inter{}".format(
-#                             int(n_cl), seed, net_clifford_2q, interleaving_cl
-#                         ),
-#                         p,
-#                     )
-#                     for qubit_idx in two_qubit_map.values():
-#                         k.prepz(qubit_idx)
-#                     if single_qubits != None:
-#                         for qubit_idx in single_qubit_map.values():
-#                             k.prepz(qubit_idx)
+                    k = oqh.create_kernel(
+                        "RB_{}Cl_s{}_net{}_inter{}".format(
+                            int(n_cl), seed, net_clifford_2q, interleaving_cl
+                        ),
+                        p,
+                    )
+                    for qubit_idx in two_qubit_map.values():
+                        k.prepz(qubit_idx)
+                    if single_qubits != None:
+                        for qubit_idx in single_qubit_map.values():
+                            k.prepz(qubit_idx)
 
-#                     print(two_cl_seq_decomposed_with_net)
-#                     if single_qubits != None:
-#                         print(single_cl_seq_decomposed_with_net)
-#                     # print(len(two_cl_seq_decomposed_with_net), len(single_cl_seq_decomposed_with_net))
+                    print(two_cl_seq_decomposed_with_net)
+                    if single_qubits != None:
+                        print(single_cl_seq_decomposed_with_net)
+                    # print(len(two_cl_seq_decomposed_with_net), len(single_cl_seq_decomposed_with_net))
 
-#                     for i, gates in enumerate(two_cl_seq_decomposed_with_net):
-                        
-#                         if i%2 == 0 and single_qubit != None:
-#                             for g1, q1 in single_cl_seq_decomposed_with_net[i//2]:
-#                                 k.gate(g1, [single_qubit_map[q1]])
+                    for i, gates in enumerate(two_cl_seq_decomposed_with_net):
 
-#                         for g, q in gates:
-#                             if isinstance(q, str):  # single qubit gate
-#                                 k.gate(g, [two_qubit_map[q]])
-#                             elif isinstance(q, list):  # 2 qubit gate
-#                                 if g == "I":
-#                                     # interleaving an idling with the length of the CZ
-#                                     k.gate("wait", [], 0)  # alignment
-#                                     k.gate("wait", [], flux_allocated_duration_ns)
-#                                     k.gate("wait", [], 0)
-#                                 else:
-#                                     k.gate("wait", [], 0)
-#                                     k.gate(
-#                                         flux_codeword, list(two_qubit_map.values())
-#                                     )  # fix for QCC
-#                                     k.gate("wait", [], 0)
-#                     # Measurement
-#                     k.gate("wait", [], 0)
-#                     for qubit_idx in two_qubit_map.values():
-#                         k.measure(qubit_idx)
-#                     k.gate("wait", [], 0)
-#                     p.add_kernel(k)
+                        if i%2 == 0 and single_qubit != None:
+                            for g1, q1 in single_cl_seq_decomposed_with_net[i//2]:
+                                k.gate(g1, [single_qubit_map[q1]])
 
-#         if cal_points:
-#             if f_state_cal_pts:
-#                 combinations = ["00", "01", "10", "11", "02", "20", "22"]
-#             else:
-#                 combinations = ["00", "01", "10", "11"]
-#             p = oqh.add_multi_q_cal_points(
-#                 p, qubits=two_qubit_pair, combinations=combinations
-#             )
+                        for g, q in gates:
+                            if isinstance(q, str):  # single qubit gate
+                                k.gate(g, [two_qubit_map[q]])
+                            elif isinstance(q, list):  # 2 qubit gate
+                                if g == "I":
+                                    # interleaving an idling with the length of the CZ
+                                    k.barrier()  # alignment
+                                    k.gate("wait", [], flux_allocated_duration_ns)
+                                    k.barrier()
+                                else:
+                                    k.barrier()
+                                    k.gate(
+                                        flux_codeword, list(two_qubit_map.values())
+                                    )  # fix for QCC
+                                    k.barrier()
+                    # Measurement
+                    k.barrier()
+                    for qubit_idx in two_qubit_map.values():
+                        k.measure(qubit_idx)
+                    k.barrier()
+                    p.add_kernel(k)
 
-#     p = oqh.compile(p)
-#     # Just before returning we rename the hashes file as an indication of the
-#     # integrity of the RB code
-#     os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
-#     return p
+        if cal_points:
+            if f_state_cal_pts:
+                combinations = ["00", "01", "10", "11", "02", "20", "22"]
+            else:
+                combinations = ["00", "01", "10", "11"]
+            p = oqh.add_multi_q_cal_points(
+                p, qubits=two_qubit_pair, combinations=combinations
+            )
+
+    p = oqh.compile(p)
+    # Just before returning we rename the hashes file as an indication of the
+    # integrity of the RB code
+    os.rename(recompile_dict["tmp_file"], recompile_dict["file"])
+    return p
 
 
 def two_qubit_randomized_benchmarking(
+    platf_cfg: str,
     two_qubit_pair: list,
     single_qubits: list,
-    platf_cfg: str,
     nr_cliffords,
     nr_seeds: int,
     two_qubit_net_cliffords: list = [0],
@@ -798,7 +808,7 @@ def two_qubit_randomized_benchmarking(
                         two_recovery_clifford.gate_decomposition
                     ]
                     # Jorge 6-4-2022: Fixme, recovery clifford for simultaneous
-                    # single qubit RB of spectators is not working.
+                    #  single qubit RB of spectators is not working.
                     # if single_qubits != None:
                     #     for sq in single_qubits:
                     #         single_recovery_to_idx_clifford = net_Single_cl_seq[sq].get_inverse()
@@ -824,7 +834,7 @@ def two_qubit_randomized_benchmarking(
                     # print(len(two_cl_seq_decomposed_with_net), len(single_cl_seq_decomposed_with_net))
 
                     for i, gates in enumerate(two_cl_seq_decomposed_with_net):
-                        
+
                         if i%2 == 0 and single_qubits != None:
                             for sq in single_qubits:
                                 for g1, q1 in Single_cl_seq_decomposed[sq][i//2]:
@@ -836,21 +846,21 @@ def two_qubit_randomized_benchmarking(
                             elif isinstance(q, list):  # 2 qubit gate
                                 if g == "I":
                                     # interleaving an idling with the length of the CZ
-                                    k.gate("wait", [], 0)  # alignment
+                                    k.barrier()  # alignment
                                     k.gate("wait", [], flux_allocated_duration_ns)
-                                    k.gate("wait", [], 0)
+                                    k.barrier()
                                 else:
-                                    k.gate("wait", [], 0)
+                                    k.barrier()
                                     k.gate(
                                         flux_codeword, list(two_qubit_map.values())
                                     )  # fix for QCC
-                                    k.gate("wait", [], 0)
+                                    k.barrier()
 
                     # Measurement
-                    k.gate("wait", [], 0)
+                    k.barrier()
                     for qubit_idx in two_qubit_map.values():
                         k.measure(qubit_idx)
-                    k.gate("wait", [], 0)
+                    k.barrier()
                     p.add_kernel(k)
 
         if cal_points:
@@ -858,7 +868,7 @@ def two_qubit_randomized_benchmarking(
                 combinations = ["00", "01", "10", "11", "02", "20", "22"]
             else:
                 combinations = ["00", "01", "10", "11"]
-                
+
             p.add_multi_q_cal_points(
                 qubits=two_qubit_pair, combinations=combinations
             )

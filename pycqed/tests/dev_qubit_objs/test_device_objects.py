@@ -235,7 +235,10 @@ class Test_Device_obj(unittest.TestCase):
     # @classmethod
     # def tearDownClass(cls):
     def tearDown(self):
-        Instrument.close_all()
+        try:
+            Instrument.close_all()
+        except Exception as e:
+            print(f"Caught exception during tearDown: {str(e)}")
 
     ##############################################
     # HAL_Shim_MQ
@@ -678,8 +681,11 @@ class Test_Device_obj(unittest.TestCase):
     # FIXME: split into separate test class, like in test_qubit_objects.py
     ##############################################
 
-    def test_measure_two_qubit_randomized_benchmarking(self):
+    def test_measure_two_qubit_randomized_benchmarking_sequential(self):
         self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
+
+    def test_measure_two_qubit_randomized_benchmarking_parallel(self):
+        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"], parallel=True)
 
     def test_measure_two_qubit_interleaved_randomized_benchmarking(self):
         self.device.measure_two_qubit_interleaved_randomized_benchmarking(qubits=["q8", "q10"])

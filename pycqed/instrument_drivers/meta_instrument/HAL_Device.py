@@ -10,15 +10,16 @@ import time
 import logging
 import adaptive
 import networkx as nx
-import datetime
+# import datetime
 import multiprocessing
 from importlib import reload
 from typing import List, Union, Optional, Tuple
 from deprecated import deprecated
 
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import HAL_ShimMQ
+from pycqed.measurement.openql_experiments.clifford_rb_oql import run_vector
 
-from pycqed.analysis import multiplexed_RO_analysis as mra
+# from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
 reload(det)
 
@@ -2679,9 +2680,10 @@ class HAL_Device(HAL_ShimMQ):
 
         MC: Optional[MeasurementControl] = None,
         recompile: bool = "as needed",
-        compile_only: bool = False,
-        pool=None,  # a multiprocessing.Pool()
-        rb_tasks=None,  # used after called with `compile_only=True`
+        # compile_only: bool = False,
+        # pool=None,  # a multiprocessing.Pool()
+        # rb_tasks=None,  # used after called with `compile_only=True`
+        parallel: bool = False
     ):
         """
         Measures two qubit randomized benchmarking, including
@@ -2759,7 +2761,7 @@ class HAL_Device(HAL_ShimMQ):
         # 2-state readout and postprocessing
         old_weight_type = self.ro_acq_weight_type()
         old_digitized = self.ro_acq_digitized()
-        old_avg = self.ro_acq_averages()
+        old_avg = self.ro_acq_averages()  # FIXME: unused
         self.ro_acq_weight_type("optimal IQ")
         self.ro_acq_digitized(False)
 
@@ -2804,56 +2806,52 @@ class HAL_Device(HAL_ShimMQ):
 
         net_cliffords = [0, 3 * 24 + 3]  # see two_qubit_clifford_group::common_cliffords
 
-        def send_rb_tasks(pool_):
-            tasks_inputs = []
-            for i in range(nr_seeds):
-                task_dict = dict(
-                    qubits=qubit_idxs,
-                    nr_cliffords=nr_cliffords,
-                    nr_seeds=1,
-                    flux_codeword=flux_codeword,
-                    flux_allocated_duration_ns=flux_allocated_duration_ns,
-                    platf_cfg=self.cfg_openql_platform_fn(),
-                    program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
-                        int(i),
-                        list(map(int, nr_cliffords)),
-                        interleaving_cliffords,
-                        qubits[0],
-                        qubits[1],
-                    ),
-                    interleaving_cliffords=interleaving_cliffords,
-                    cal_points=cal_points,
-                    net_cliffords=net_cliffords,  # measures with and without inverting
-                    f_state_cal_pts=True,
-                    recompile=recompile,
-                    sim_cz_qubits=sim_cz_qubits_idxs,
-                )
-                tasks_inputs.append(task_dict)
+        # define work to do
+        tasks_inputs = []
+        for i in range(nr_seeds):
+            task_dict = dict(
+                platf_cfg=self.cfg_openql_platform_fn(),
+                two_qubit_pair=qubit_idxs,
+                single_qubits=sim_single_qubits_idxs,
+                nr_cliffords=nr_cliffords,
+                nr_seeds=1,
+                flux_codeword=flux_codeword,
+                flux_allocated_duration_ns=flux_allocated_duration_ns,
+                program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
+                    int(i),
+                    list(map(int, nr_cliffords)),
+                    interleaving_cliffords,
+                    qubits[0],
+                    qubits[1],
+                ),
+                interleaving_cliffords=interleaving_cliffords,
+                cal_points=cal_points,
+                two_qubit_net_cliffords=net_cliffords,
+                single_qubit_net_cliffords=net_cliffords,
+                f_state_cal_pts=True,
+                recompile=recompile
+            )
+            tasks_inputs.append(task_dict)
 
-            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+        # if compile_only:
+        # programs = run_vector(cl_oql.two_qubit_randomized_benchmarking, tasks_inputs, parallel)
+        programs_filenames = run_vector(cl_oql.parallel_friendly_rb_2, tasks_inputs, parallel)
 
-            return rb_tasks
-
-        if compile_only:
-            assert pool is not None  # FIXME: add proper message
-            rb_tasks = send_rb_tasks(pool)
-            return rb_tasks
-
-        if rb_tasks is None:
-            # avoid starting too many processes,
-            # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
-
-            # Using `with ...:` makes sure that proper cleanup is performed
-            # See: # see: https://docs.python.org/3/library/multiprocessing.html#multiprocessing.pool.Pool
-            with multiprocessing.Pool(
-                nr_processes,
-                maxtasksperchild=cl_oql.maxtasksperchild
-            ) as pool:
-                rb_tasks = send_rb_tasks(pool)
-                cl_oql.wait_for_rb_tasks(rb_tasks)
-
-        programs_filenames = rb_tasks.get()
+        # if rb_tasks is None:    # FIXME: would be performed on !compile_only and no previously started rb_tasks provided
+        #     # avoid starting too many processes,
+        #     # nr_processes = None will start as many as the PC can handle
+        #     nr_processes = None if recompile else 1
+        #
+        #     # Using `with ...:` makes sure that proper cleanup is performed
+        #     # See: # see: https://docs.python.org/3/library/multiprocessing.html#multiprocessing.pool.Pool
+        #     with multiprocessing.Pool(
+        #         nr_processes,
+        #         maxtasksperchild=cl_oql.maxtasksperchild
+        #     ) as pool:
+        #         rb_tasks = send_rb_tasks(pool)
+        #         cl_oql.wait_for_rb_tasks(rb_tasks)
+        #
+        # programs_filenames = rb_tasks.get()
 
         # to include calibration points
         if cal_points:
@@ -2870,14 +2868,16 @@ class HAL_Device(HAL_ShimMQ):
         counter_param = ManualParameter("name_ctr", initial_value=0)
         prepare_function_kwargs = {
             "counter_param": counter_param,
-            "programs": programs,
+            # "programs": programs,
+            "programs_filenames": programs_filenames,
             "CC": self.instr_CC.get_instr(),
         }
 
         # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
         d.set_prepare_function(
-            oqh.load_range_of_oql_programs,
+            # oqh.load_range_of_oql_programs,
+            oqh.load_range_of_oql_programs_from_filenames,
             prepare_function_kwargs, detectors="first"
         )
         # d.nr_averages = 128  FIXME: commented out
