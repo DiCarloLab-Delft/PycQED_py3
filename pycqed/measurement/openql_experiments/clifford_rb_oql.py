@@ -5,6 +5,8 @@ import inspect
 import logging
 import numpy as np
 from importlib import reload
+import multiprocessing
+
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
@@ -74,6 +76,24 @@ def wait_for_rb_tasks(rb_tasks, refresh_interval: float = 4):
         time.sleep(refresh_interval)
 
     print("\nDone compiling RB sequences!")
+
+# FIXME: WIP on runner, naming needs improvement. Move to separate file
+def run_vector(func, parameters_vector, parallel: bool=False):
+    ret = []
+    if not parallel:
+        # FIXME: use map, collect return value
+        for parameters in parameters_vector:
+            func(**parameters)
+    else:
+        with multiprocessing.Pool(
+            processes=4, # FIXME
+            maxtasksperchild=2
+        ) as pool:
+            rb_tasks = pool.map_async(func, parameters_vector)
+            wait_for_rb_tasks(rb_tasks)
+            ret = rb_tasks.get()
+
+    return ret
 
 
 def randomized_benchmarking(

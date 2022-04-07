@@ -4412,6 +4412,13 @@ class HAL_Device(HAL_ShimMQ):
                 tasks_inputs.append(task_dict)
             # pool.starmap_async can be used for positional arguments
             # but we are using a wrapper
+            # FIXME: the line below, if we're called with compile_only, seems to violate
+            #  https://docs.python.org/3/library/multiprocessing.html#module-multiprocessing.pool:
+            #  Warning multiprocessing.pool objects have internal resources that need to be properly managed (like any
+            #  other resource) by using the pool as a context manager or by calling close() and terminate() manually.
+            #  Failure to do this can lead to the process hanging on finalization.
+            #  Note that it is not correct to rely on the garbage collector to destroy the pool as CPython does not
+            #  assure that the finalizer of the pool will be called (see object.__del__() for more information).
             rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
 
             return rb_tasks
@@ -4422,7 +4429,7 @@ class HAL_Device(HAL_ShimMQ):
             return rb_tasks
 
         if rb_tasks is None:
-            # avoid starting too mane processes,
+            # avoid starting too many processes,
             # nr_processes = None will start as many as the PC can handle
             nr_processes = None if recompile else 1
 
