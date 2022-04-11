@@ -2891,8 +2891,9 @@ class HAL_Device(HAL_ShimMQ):
 
         if RB_type == "CZ":
             measurement_func = self.measure_two_qubit_interleaved_randomized_benchmarking
-        elif RB_type == "CZ_parked_qubit":
-            measurement_func = self.measure_single_qubit_interleaved_randomized_benchmarking_parking
+        # NB: measure_single_qubit_interleaved_randomized_benchmarking_parking was removed around commit b2e571fb4c5d436c69a98c9b710e3bb3018ece14
+        # elif RB_type == "CZ_parked_qubit":
+        #     measurement_func = self.measure_single_qubit_interleaved_randomized_benchmarking_parking
         else:
             raise ValueError(
                 "RB type `{}` not recognized!".format(RB_type)
@@ -3179,188 +3180,46 @@ class HAL_Device(HAL_ShimMQ):
                 )
         return True
 
-    def measure_single_qubit_interleaved_randomized_benchmarking_parking(
-        self,
-        qubits: list,
-        MC: MeasurementControl,
-        nr_cliffords=2**np.arange(12),
-        nr_seeds: int = 100,
-        flux_codeword: str = "cz",
-        rb_on_parked_qubit_only: bool = False,
-
-        recompile: bool = 'as needed',
-        parallel: bool = False
-        # pool=None,
-        # rb_tasks_start: list = None,
-        # start_next_round_compilation: bool = False
-    ):
-
-        if 0:
-            """
-            This function uses the same parallelization approaches as the
-            `measure_two_qubit_interleaved_randomized_benchmarking`. See it
-            for details and useful comments
-            """
-
-            def run_parallel_iRB(
-                recompile, pool, rb_tasks_start: list = None,
-                start_next_round_compilation: bool = False
-            ):
-
-                rb_tasks_next = None
-
-                # 1. Start (non-blocking) compilation for [None]
-                if rb_tasks_start is None:
-                    rb_tasks_start = self.measure_single_qubit_randomized_benchmarking_parking(
-                        qubits=qubits,
-                        MC=MC,
-                        nr_cliffords=nr_cliffords,
-                        interleaving_cliffords=[None],
-                        recompile=recompile,
-                        flux_codeword=flux_codeword,
-                        nr_seeds=nr_seeds,
-                        rb_on_parked_qubit_only=rb_on_parked_qubit_only,
-                        compile_only=True,
-                        pool=pool
-                    )
-
-                # 2. Wait for [None] compilation to finish
-                cl_oql.wait_for_rb_tasks(rb_tasks_start)
-
-                # 200_000 by convention is a CZ on the first two qubits with
-                # implicit parking on the 3rd qubit
-                # 3. Start (non-blocking) compilation for [200_000]
-                rb_tasks_CZ_park = self.measure_single_qubit_randomized_benchmarking_parking(
-                    qubits=qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[200_000],
-                    recompile=recompile,
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    rb_on_parked_qubit_only=rb_on_parked_qubit_only,
-                    compile_only=True,
-                    pool=pool
-                )
-                # 4. Start the measurement and run the analysis for [None]
-                self.measure_single_qubit_randomized_benchmarking_parking(
-                    qubits=qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[None],
-                    recompile=False,  # This of course needs to be False
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    rb_on_parked_qubit_only=rb_on_parked_qubit_only,
-                    rb_tasks=rb_tasks_start,
-                )
-
-                # 5. Wait for [200_000] compilation to finish
-                cl_oql.wait_for_rb_tasks(rb_tasks_CZ_park)
-
-                if start_next_round_compilation:
-                    # Optionally send to the `pool` the tasks of RB compilation to be
-                    # used on the next round of calling the iRB method
-                    rb_tasks_next = self.measure_single_qubit_randomized_benchmarking_parking(
-                        qubits=qubits,
-                        MC=MC,
-                        nr_cliffords=nr_cliffords,
-                        interleaving_cliffords=[None],
-                        recompile=recompile,
-                        flux_codeword=flux_codeword,
-                        nr_seeds=nr_seeds,
-                        rb_on_parked_qubit_only=rb_on_parked_qubit_only,
-                        compile_only=True,
-                        pool=pool
-                    )
-                # 7. Start the measurement and run the analysis for [200_000]
-                self.measure_single_qubit_randomized_benchmarking_parking(
-                    qubits=qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[200_000],
-                    recompile=False,
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    rb_on_parked_qubit_only=rb_on_parked_qubit_only,
-                    rb_tasks=rb_tasks_CZ_park,
-                )
-
-                ma2.InterleavedRandomizedBenchmarkingParkingAnalysis(
-                    label_base="icl[None]",
-                    label_int="icl[200000]"
-                )
-
-                return rb_tasks_next
-
-#         if recompile or recompile == "as needed":
-#             # This is an optimization that compiles the interleaved RB
-#             # sequences for the next measurement while measuring the previous
-#             # one
-#             if pool is None:
-#                 # Using `with ...:` makes sure the other processes will be terminated
-#                 with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
-#                     run_parallel_iRB(
-#                         recompile=recompile,
-#                         pool=pool,
-#                         rb_tasks_start=rb_tasks_start)
-# # =======
-# #                 with multiprocessing.Pool(maxtasksperchild=maxtasksperchild) as pool:
-# #                     run_parallel_iRB(recompile=recompile,
-# #                                     pool=pool,
-# #                                     rb_tasks_start=rb_tasks_start)
-# # >>>>>>> d6b2348fa6046f9ca45b5f8f3391903870f93ac2
-#             else:
-#                 # In this case the `pool` to execute the RB compilation tasks
-#                 # is provided, `rb_tasks_start` is expected to be as well
-#                 rb_tasks_next = run_parallel_iRB(
-#                     recompile=recompile,
-#                     pool=pool,
-#                     rb_tasks_start=rb_tasks_start,
-#                     start_next_round_compilation=start_next_round_compilation)
-#                 return rb_tasks_next
-
-
 # FIXME: the stuff below seems to belong elsewhere
 
-        else:
-            # recompile=False no need to parallelize compilation with measurement
-            # Perform two-qubit RB (no interleaved gate)
-            self.measure_two_qubit_randomized_benchmarking(
-                qubits=qubits,
-                MC=MC,
-                nr_cliffords=nr_cliffords,
-                interleaving_cliffords=[None],
-                recompile=recompile,
-                flux_codeword=flux_codeword,
-                nr_seeds=nr_seeds,
-                sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
-            )
-
-            # Perform two-qubit RB with CZ interleaved
-            self.measure_two_qubit_randomized_benchmarking(
-                qubits=qubits,
-                MC=MC,
-                nr_cliffords=nr_cliffords,
-                interleaving_cliffords=[104368],
-                recompile=recompile,
-                flux_codeword=flux_codeword,
-                nr_seeds=nr_seeds,
-                sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
-            )
-
-            a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                label_base="icl[None]",
-                label_int="icl[104368]",
-            )
-            if cardinal:
-                opposite_cardinal = {'NW':'SE', 'NE':'SW', 'SW':'NE', 'SE':'NW'}
-                self.find_instrument(qubits[0]).parameters[f'F_2QRB_{cardinal}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
-                self.find_instrument(qubits[1]).parameters[f'F_2QRB_{opposite_cardinal[cardinal]}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
+        # else:
+        #     # recompile=False no need to parallelize compilation with measurement
+        #     # Perform two-qubit RB (no interleaved gate)
+        #     self.measure_two_qubit_randomized_benchmarking(
+        #         qubits=qubits,
+        #         MC=MC,
+        #         nr_cliffords=nr_cliffords,
+        #         interleaving_cliffords=[None],
+        #         recompile=recompile,
+        #         flux_codeword=flux_codeword,
+        #         nr_seeds=nr_seeds,
+        #         sim_cz_qubits=sim_cz_qubits,
+        #         # FIXME: Under testing by Jorge
+        #         # sim_single_qubits=sim_single_qubits,
+        #     )
+        #
+        #     # Perform two-qubit RB with CZ interleaved
+        #     self.measure_two_qubit_randomized_benchmarking(
+        #         qubits=qubits,
+        #         MC=MC,
+        #         nr_cliffords=nr_cliffords,
+        #         interleaving_cliffords=[104368],
+        #         recompile=recompile,
+        #         flux_codeword=flux_codeword,
+        #         nr_seeds=nr_seeds,
+        #         sim_cz_qubits=sim_cz_qubits,
+        #         # FIXME: Under testing by Jorge
+        #         # sim_single_qubits=sim_single_qubits,
+        #     )
+        #
+        #     a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
+        #         label_base="icl[None]",
+        #         label_int="icl[104368]",
+        #     )
+        #     if cardinal:
+        #         opposite_cardinal = {'NW':'SE', 'NE':'SW', 'SW':'NE', 'SE':'NW'}
+        #         self.find_instrument(qubits[0]).parameters[f'F_2QRB_{cardinal}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
+        #         self.find_instrument(qubits[1]).parameters[f'F_2QRB_{opposite_cardinal[cardinal]}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
 
 # <<<<<<< HEAD
 #
