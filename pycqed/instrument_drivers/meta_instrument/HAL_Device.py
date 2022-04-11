@@ -2770,7 +2770,7 @@ class HAL_Device(HAL_ShimMQ):
 
         MC.soft_avg(1) # FIXME: again?
 
-        # determine sim_cz_qubits_idxs
+        # determine sim_cz_qubits_idxs FIXME: unused
         qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
         if sim_cz_qubits is not None:
             sim_cz_qubits_idxs = [
@@ -2817,7 +2817,6 @@ class HAL_Device(HAL_ShimMQ):
             tasks_inputs.append(task_dict)
 
         programs = run_tasks(cl_oql.two_qubit_randomized_benchmarking, tasks_inputs, parallel)
-        # programs_filenames = run_tasks(cl_oql.parallel_friendly_rb_2, tasks_inputs, parallel)
 
         # to include calibration points
         if cal_points:
@@ -4164,9 +4163,10 @@ class HAL_Device(HAL_ShimMQ):
             ro_acq_weight_type: str = "optimal IQ",
 
             recompile: bool = "as needed",
-            compile_only: bool = False,
-            pool=None,  # a multiprocessing.Pool()
-            rb_tasks=None  # used after called with `compile_only=True`
+            parallel: bool = False
+            # compile_only: bool = False,
+            # pool=None,  # a multiprocessing.Pool()
+            # rb_tasks=None  # used after called with `compile_only=True`
         ):
         """
         Performs simultaneous single qubit RB on two qubits.
@@ -4226,63 +4226,33 @@ class HAL_Device(HAL_ShimMQ):
             mw_lutman = q_instr.instr_LutMan_MW.get_instr()
             mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
 
-        MC.soft_avg(1)
+        MC.soft_avg(1)  # FIXME: again
 
-        def send_rb_tasks(pool_):
-            tasks_inputs = []
-            for i in range(nr_seeds):
-                task_dict = dict(
-                    qubits=[self.find_instrument(q).cfg_qubit_nr() for q in qubits],
-                    nr_cliffords=nr_cliffords,
-                    nr_seeds=1,
-                    platf_cfg=self.cfg_openql_platform_fn(),
-                    program_name="TwoQ_Sim_RB_int_cl{}_s{}_ncl{}_{}_{}_double".format(
-                        i,
-                        list(map(int, nr_cliffords)),
-                        interleaving_cliffords,
-                        qubits[0],
-                        qubits[1],
-                    ),
-                    interleaving_cliffords=interleaving_cliffords,
-                    simultaneous_single_qubit_RB=True,
-                    cal_points=cal_points,
-                    net_cliffords=[0, 3],  # measures with and without inverting
-                    f_state_cal_pts=True,
-                    recompile=recompile,
-                )
-                tasks_inputs.append(task_dict)
-            # pool.starmap_async can be used for positional arguments
-            # but we are using a wrapper
-            # FIXME: the line below, if we're called with compile_only, seems to violate
-            #  https://docs.python.org/3/library/multiprocessing.html#module-multiprocessing.pool:
-            #  Warning multiprocessing.pool objects have internal resources that need to be properly managed (like any
-            #  other resource) by using the pool as a context manager or by calling close() and terminate() manually.
-            #  Failure to do this can lead to the process hanging on finalization.
-            #  Note that it is not correct to rely on the garbage collector to destroy the pool as CPython does not
-            #  assure that the finalizer of the pool will be called (see object.__del__() for more information).
-            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+        # define work to do
+        tasks_inputs = []
+        for i in range(nr_seeds):
+            task_dict = dict(
+                platf_cfg=self.cfg_openql_platform_fn(),
+                qubits=[self.find_instrument(q).cfg_qubit_nr() for q in qubits],
+                nr_cliffords=nr_cliffords,
+                nr_seeds=1,
+                program_name="TwoQ_Sim_RB_int_cl{}_s{}_ncl{}_{}_{}_double".format(
+                    i,
+                    list(map(int, nr_cliffords)),
+                    interleaving_cliffords,
+                    qubits[0],
+                    qubits[1],
+                ),
+                interleaving_cliffords=interleaving_cliffords,
+                simultaneous_single_qubit_RB=True,
+                cal_points=cal_points,
+                net_cliffords=[0, 3],  # measures with and without inverting
+                f_state_cal_pts=True,
+                recompile=recompile,
+            )
+            tasks_inputs.append(task_dict)
 
-            return rb_tasks
-
-        if compile_only:
-            assert pool is not None
-            rb_tasks = send_rb_tasks(pool)
-            return rb_tasks
-
-        if rb_tasks is None:
-            # avoid starting too many processes,
-            # nr_processes = None will start as many as the PC can handle
-            nr_processes = None if recompile else 1
-
-            # Using `with ...:` makes sure the other processes will be terminated
-            with multiprocessing.Pool(
-                nr_processes,
-                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
-            ) as pool:
-                rb_tasks = send_rb_tasks(pool)
-                cl_oql.wait_for_rb_tasks(rb_tasks)
-
-        programs_filenames = rb_tasks.get()
+        programs = run_tasks(cl_oql.randomized_benchmarking, tasks_inputs, parallel)
 
         # to include calibration points
         if cal_points:
@@ -4298,14 +4268,14 @@ class HAL_Device(HAL_ShimMQ):
         counter_param = ManualParameter("name_ctr", initial_value=0)
         prepare_function_kwargs = {
             "counter_param": counter_param,
-            "programs_filenames": programs_filenames,
+            "programs": programs,
             "CC": self.instr_CC.get_instr(),
         }
 
         # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
         d.set_prepare_function(
-            oqh.load_range_of_oql_programs_from_filenames,
+            oqh.load_range_of_oql_programs,
             prepare_function_kwargs, detectors="first"
         )
         # d.nr_averages = 128
