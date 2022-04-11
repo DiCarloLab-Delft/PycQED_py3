@@ -681,16 +681,39 @@ class Test_Device_obj(unittest.TestCase):
     # FIXME: split into separate test class, like in test_qubit_objects.py
     ##############################################
 
+    ### measure_two_qubit_randomized_benchmarking
+
     def test_measure_two_qubit_randomized_benchmarking_sequential(self):
         self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
 
-    @unittest.skip("FIXME: WIP")
-    # FIXME: add other parallel variants once they work
-    def test_measure_two_qubit_randomized_benchmarking_parallel(self):
-        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"], parallel=True)
+    # @unittest.skip("FIXME: WIP")
+    # # FIXME: add other parallel variants once they work
+    # def test_measure_two_qubit_randomized_benchmarking_parallel(self):
+    #     self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"], parallel=True)
+
+    ### measure_interleaved_randomized_benchmarking_statistics
+
+    ### measure_two_qubit_interleaved_randomized_benchmarking
 
     def test_measure_two_qubit_interleaved_randomized_benchmarking(self):
         self.device.measure_two_qubit_interleaved_randomized_benchmarking(qubits=["q8", "q10"])
+
+    ### measure_single_qubit_interleaved_randomized_benchmarking_parking
+
+    ### measure_single_qubit_randomized_benchmarking_parking
+
+    ### measure_two_qubit_purity_benchmarking
+
+    ### measure_two_qubit_character_benchmarking
+
+    ### measure_two_qubit_simultaneous_randomized_benchmarking
+
+    ### measure_multi_qubit_simultaneous_randomized_benchmarking
+
+
+
+
+
 
 
     def test_measure_two_qubit_simultaneous_randomized_benchmarking(self):
