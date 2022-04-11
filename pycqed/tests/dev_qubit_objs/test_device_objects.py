@@ -700,6 +700,9 @@ class Test_Device_obj(unittest.TestCase):
 
     ### measure_single_qubit_interleaved_randomized_benchmarking_parking
 
+    def test_measure_single_qubit_interleaved_randomized_benchmarking_parking(self):
+        self.device.measure_single_qubit_interleaved_randomized_benchmarking_parking(qubits=["q8", "q10"], MC=self.MC)
+
     ### measure_single_qubit_randomized_benchmarking_parking
 
     ### measure_two_qubit_purity_benchmarking

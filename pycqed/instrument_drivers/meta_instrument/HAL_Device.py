@@ -3554,6 +3554,10 @@ class HAL_Device(HAL_ShimMQ):
 #                     rb_tasks_start=rb_tasks_start,
 #                     start_next_round_compilation=start_next_round_compilation)
 #                 return rb_tasks_next
+
+
+# FIXME: the stuff below seems to belong elsewhere
+
         else:
             # recompile=False no need to parallelize compilation with measurement
             # Perform two-qubit RB (no interleaved gate)
@@ -3609,9 +3613,9 @@ class HAL_Device(HAL_ShimMQ):
             interleaving_cliffords: list = [None],
 
             recompile: bool = 'as needed',
-            compile_only: bool = False,
-            pool=None,  # a multiprocessing.Pool()
-            rb_tasks=None  # used after called with `compile_only=True`
+            # compile_only: bool = False,
+            # pool=None,  # a multiprocessing.Pool()
+            # rb_tasks=None  # used after called with `compile_only=True`
         ):
         """
         [2020-07-06 Victor] This is a modified copy of the same method from CCL_Transmon.
