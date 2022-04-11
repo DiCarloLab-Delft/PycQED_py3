@@ -696,6 +696,8 @@ class Test_Device_obj(unittest.TestCase):
     def test_measure_two_qubit_simultaneous_randomized_benchmarking(self):
         self.device.measure_two_qubit_simultaneous_randomized_benchmarking(qubits=["q8", "q10"])
 
+    def test_measure_multi_qubit_simultaneous_randomized_benchmarking(self):
+        self.device.measure_multi_qubit_simultaneous_randomized_benchmarking(qubits=["q8", "q10"])
 
 
     def test_measure_two_qubit_allxy(self):
