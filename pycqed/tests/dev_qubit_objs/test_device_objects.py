@@ -681,35 +681,47 @@ class Test_Device_obj(unittest.TestCase):
     # FIXME: split into separate test class, like in test_qubit_objects.py
     ##############################################
 
-    ### measure_two_qubit_randomized_benchmarking
-
     def test_measure_two_qubit_randomized_benchmarking_sequential(self):
-        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
+        self.device.measure_two_qubit_randomized_benchmarking(
+            qubits=["q8", "q10"],
+            nr_seeds=10
+        )
 
     # @unittest.skip("FIXME: WIP")
     # # FIXME: add other parallel variants once they work
     # def test_measure_two_qubit_randomized_benchmarking_parallel(self):
     #     self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"], parallel=True)
 
-    ### measure_interleaved_randomized_benchmarking_statistics
 
-    ### measure_two_qubit_interleaved_randomized_benchmarking
+    # FIXME: add measure_interleaved_randomized_benchmarking_statistics
 
+    # FIXME: fails:
+    # pycqed/tests/dev_qubit_objs/test_device_objects.py:699:
+    # _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    # pycqed/instrument_drivers/meta_instrument/HAL_Device.py:3145: in measure_two_qubit_interleaved_randomized_benchmarking
+    #     sim_cz_qubits=sim_cz_qubits,
+    # pycqed/instrument_drivers/meta_instrument/HAL_Device.py:2751: in measure_two_qubit_randomized_benchmarking
+    #     self.prepare_for_timedomain(qubits=qubits)
+    # pycqed/instrument_drivers/meta_instrument/HAL/HAL_ShimMQ.py:227: in prepare_for_timedomain
+    #     self.prepare_readout(qubits=qubits, reduced=reduced)
+    # pycqed/instrument_drivers/meta_instrument/HAL/HAL_ShimMQ.py:182: in prepare_readout
+    #     self._prep_ro_sources(qubits=qubits)
+    # pycqed/instrument_drivers/meta_instrument/HAL/HAL_ShimMQ.py:671: in _prep_ro_sources
+    #     LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
+    # _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     def test_measure_two_qubit_interleaved_randomized_benchmarking(self):
-        self.device.measure_two_qubit_interleaved_randomized_benchmarking(qubits=["q8", "q10"])
+        self.device.measure_two_qubit_interleaved_randomized_benchmarking(
+            qubits=["q8", "q10"],
+            nr_seeds=10
+        )
 
-    ### measure_two_qubit_purity_benchmarking
+    # FIXME: measure_two_qubit_purity_benchmarking
 
-    ### measure_two_qubit_character_benchmarking
+    # FIXME: measure_two_qubit_character_benchmarking
 
-    ### measure_two_qubit_simultaneous_randomized_benchmarking
+    # FIXME: measure_two_qubit_simultaneous_randomized_benchmarking
 
-    ### measure_multi_qubit_simultaneous_randomized_benchmarking
-
-
-
-
-
+    # FIXME: measure_multi_qubit_simultaneous_randomized_benchmarking
 
 
     def test_measure_two_qubit_simultaneous_randomized_benchmarking(self):

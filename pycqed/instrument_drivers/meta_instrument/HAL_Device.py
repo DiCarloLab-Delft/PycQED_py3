@@ -2842,7 +2842,6 @@ class HAL_Device(HAL_ShimMQ):
         # in charge of controlling the CC (see self.get_int_logging_detector)
         d.set_prepare_function(
             oqh.load_range_of_oql_programs,
-            # oqh.load_range_of_oql_programs_from_filenames,
             prepare_function_kwargs, detectors="first"
         )
         # d.nr_averages = 128  FIXME: commented out
@@ -2941,10 +2940,6 @@ class HAL_Device(HAL_ShimMQ):
             MC: Optional[MeasurementControl] = None,
             recompile: bool = "as needed",
             parallel: bool = False
-            # pool=None,
-            # rb_tasks_start: list = None,
-            # start_next_round_compilation: bool = False,
-            # maxtasksperchild=None,
         ):
         # USED_BY: inspire_dependency_graph.py,
         """
@@ -2958,6 +2953,19 @@ class HAL_Device(HAL_ShimMQ):
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
+
+        # common kwargs for calls to measure_two_qubit_randomized_benchmarking below
+        common_kwargs = dict(
+            qubits=qubits,
+            MC=MC,
+            nr_cliffords=nr_cliffords,
+            flux_codeword=flux_codeword,
+            nr_seeds=nr_seeds,
+            sim_cz_qubits=sim_cz_qubits,
+            # sim_single_qubits=sim_single_qubits,  FIXME: Under testing by Jorge
+            recompile=recompile,
+        )
+
 
         if 0:
             ################# FIXME: definition of parallel work ####################
@@ -2986,24 +2994,12 @@ class HAL_Device(HAL_ShimMQ):
             # define work to do
             tasks_inputs = []
 
-            # common kwargs for tasks below
-            tasks_dict_common = dict(
-                qubits=qubits,
-                MC=MC,
-                nr_cliffords=nr_cliffords,
-                flux_codeword=flux_codeword,
-                nr_seeds=nr_seeds,
-                sim_cz_qubits=sim_cz_qubits,
-                # sim_single_qubits=sim_single_qubits,  FIXME: Under testing by Jorge
-                recompile=recompile,
-            )
-
             # 1. Start (non-blocking) compilation for [None]
             task_dict = dict(
                 interleaving_cliffords=[None],
                 compile_only=True,
             )
-            tasks_inputs.append({**tasks_dict_common, **task_dict})
+            tasks_inputs.append({**common_kwargs, **task_dict})
 
             # # 2. Wait for [None] compilation to finish
             # cl_oql.wait_for_rb_tasks(rb_tasks_start)
@@ -3014,7 +3010,7 @@ class HAL_Device(HAL_ShimMQ):
                 interleaving_cliffords=[104368],
                 compile_only=True,
             )
-            tasks_inputs.append({**tasks_dict_common, **task_dict})
+            tasks_inputs.append({**common_kwargs, **task_dict})
 
 
             # 4. Start the measurement and run the analysis for [None]
@@ -3023,7 +3019,7 @@ class HAL_Device(HAL_ShimMQ):
                 interleaving_cliffords=[None],
     #             rb_tasks=rb_tasks_start, FIXME
             )
-            tasks_inputs.append({**tasks_dict_common, **task_dict})
+            tasks_inputs.append({**common_kwargs, **task_dict})
 
             # # 5. Wait for [104368] compilation to finish
             # cl_oql.wait_for_rb_tasks(rb_tasks_CZ)
@@ -3036,7 +3032,7 @@ class HAL_Device(HAL_ShimMQ):
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     compile_only=True,
                 )
-                tasks_inputs.append({**tasks_dict_common, **task_dict})
+                tasks_inputs.append({**common_kwargs, **task_dict})
 
 
             elif start_next_round_compilation:
@@ -3047,7 +3043,7 @@ class HAL_Device(HAL_ShimMQ):
                     interleaving_cliffords=[None],
                     compile_only=True,
                 )
-                tasks_inputs.append({**tasks_dict_common, **task_dict})
+                tasks_inputs.append({**common_kwargs, **task_dict})
 
 
             # 7. Start the measurement and run the analysis for [104368]
@@ -3056,7 +3052,7 @@ class HAL_Device(HAL_ShimMQ):
                 interleaving_cliffords=[104368],
                 rb_tasks=rb_tasks_CZ,
             )
-            tasks_inputs.append({**tasks_dict_common, **task_dict})
+            tasks_inputs.append({**common_kwargs, **task_dict})
             ma2.InterleavedRandomizedBenchmarkingAnalysis(
                 label_base="icl[None]",
                 label_int="icl[104368]"
@@ -3073,7 +3069,7 @@ class HAL_Device(HAL_ShimMQ):
                     task_dict = dict(
                         interleaving_cliffords=[None],
                     )
-                    tasks_inputs.append({**tasks_dict_common, **task_dict})
+                    tasks_inputs.append({**common_kwargs, **task_dict})
 
                 # 9. Start the measurement and run the analysis for [100_000]
                 # self.measure_two_qubit_randomized_benchmarking(
@@ -3082,7 +3078,7 @@ class HAL_Device(HAL_ShimMQ):
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     rb_tasks=rb_tasks_I
                 )
-                tasks_inputs.append({**tasks_dict_common, **task_dict})
+                tasks_inputs.append({**common_kwargs, **task_dict})
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
                     label_base="icl[None]",
                     label_int="icl[104368]",
@@ -3123,39 +3119,25 @@ class HAL_Device(HAL_ShimMQ):
 #                 )
 #                 return rb_tasks_next
         else:
-            # recompile=False no need to parallelize compilation with measurement
+            # sequential code version
+
             # Perform two-qubit RB (no interleaved gate)
             self.measure_two_qubit_randomized_benchmarking(
-                qubits=qubits,
-                MC=MC,
-                nr_cliffords=nr_cliffords,
+                **common_kwargs,
                 interleaving_cliffords=[None],
-                recompile=recompile,
-                flux_codeword=flux_codeword,
-                nr_seeds=nr_seeds,
-                sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
             )
 
             # Perform two-qubit RB with CZ interleaved
             self.measure_two_qubit_randomized_benchmarking(
-                qubits=qubits,
-                MC=MC,
-                nr_cliffords=nr_cliffords,
+                **common_kwargs,
                 interleaving_cliffords=[104368],
-                recompile=recompile,
-                flux_codeword=flux_codeword,
-                nr_seeds=nr_seeds,
-                sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
             )
 
             a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
                 label_base="icl[None]",
                 label_int="icl[104368]",
             )
+
             if cardinal:
                 opposite_cardinal = {'NW':'SE', 'NE':'SW', 'SW':'NE', 'SE':'NW'}
                 val = 1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n
@@ -3165,18 +3147,11 @@ class HAL_Device(HAL_ShimMQ):
             if measure_idle_flux:
                 # Perform two-qubit iRB with idle identity of same duration as CZ
                 self.measure_two_qubit_randomized_benchmarking(
-                    qubits=qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
+                    **common_kwargs,
                     interleaving_cliffords=[100_000],
-                    recompile=recompile,
-                    flux_codeword=flux_codeword,
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                    # FIXME: Under testing by Jorge
-                    # sim_single_qubits=sim_single_qubits,
                 )
+
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
                     label_base="icl[None]",
                     label_int="icl[104368]",
