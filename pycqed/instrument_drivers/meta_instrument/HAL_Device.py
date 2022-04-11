@@ -3136,6 +3136,8 @@ class HAL_Device(HAL_ShimMQ):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                # FIXME: Under testing by Jorge
+                # sim_single_qubits=sim_single_qubits,
             )
 
             # Perform two-qubit RB with CZ interleaved
@@ -3148,6 +3150,8 @@ class HAL_Device(HAL_ShimMQ):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
+                # FIXME: Under testing by Jorge
+                # sim_single_qubits=sim_single_qubits,
             )
 
             a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
@@ -3180,49 +3184,6 @@ class HAL_Device(HAL_ShimMQ):
                 )
         return True
 
-# FIXME: the stuff below seems to belong elsewhere
-
-        # else:
-        #     # recompile=False no need to parallelize compilation with measurement
-        #     # Perform two-qubit RB (no interleaved gate)
-        #     self.measure_two_qubit_randomized_benchmarking(
-        #         qubits=qubits,
-        #         MC=MC,
-        #         nr_cliffords=nr_cliffords,
-        #         interleaving_cliffords=[None],
-        #         recompile=recompile,
-        #         flux_codeword=flux_codeword,
-        #         nr_seeds=nr_seeds,
-        #         sim_cz_qubits=sim_cz_qubits,
-        #         # FIXME: Under testing by Jorge
-        #         # sim_single_qubits=sim_single_qubits,
-        #     )
-        #
-        #     # Perform two-qubit RB with CZ interleaved
-        #     self.measure_two_qubit_randomized_benchmarking(
-        #         qubits=qubits,
-        #         MC=MC,
-        #         nr_cliffords=nr_cliffords,
-        #         interleaving_cliffords=[104368],
-        #         recompile=recompile,
-        #         flux_codeword=flux_codeword,
-        #         nr_seeds=nr_seeds,
-        #         sim_cz_qubits=sim_cz_qubits,
-        #         # FIXME: Under testing by Jorge
-        #         # sim_single_qubits=sim_single_qubits,
-        #     )
-        #
-        #     a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
-        #         label_base="icl[None]",
-        #         label_int="icl[104368]",
-        #     )
-        #     if cardinal:
-        #         opposite_cardinal = {'NW':'SE', 'NE':'SW', 'SW':'NE', 'SE':'NW'}
-        #         self.find_instrument(qubits[0]).parameters[f'F_2QRB_{cardinal}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
-        #         self.find_instrument(qubits[1]).parameters[f'F_2QRB_{opposite_cardinal[cardinal]}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
-
-# <<<<<<< HEAD
-#
     def measure_single_qubit_randomized_benchmarking_parking(
             self,
             qubits: list,
