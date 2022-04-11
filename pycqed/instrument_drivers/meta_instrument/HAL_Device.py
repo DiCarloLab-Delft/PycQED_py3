@@ -17,7 +17,7 @@ from typing import List, Union, Optional, Tuple
 from deprecated import deprecated
 
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import HAL_ShimMQ
-from pycqed.measurement.openql_experiments.clifford_rb_oql import run_vector
+from pycqed.measurement.openql_experiments.clifford_rb_oql import run_tasks
 
 # from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
@@ -41,7 +41,7 @@ from qcodes.instrument.parameter import ManualParameter, Parameter
 
 log = logging.getLogger(__name__)
 
-try:
+try:    # FIXME: why?
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
     from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
@@ -2680,17 +2680,11 @@ class HAL_Device(HAL_ShimMQ):
 
         MC: Optional[MeasurementControl] = None,
         recompile: bool = "as needed",
-        # compile_only: bool = False,
-        # pool=None,  # a multiprocessing.Pool()
-        # rb_tasks=None,  # used after called with `compile_only=True`
         parallel: bool = False
     ):
         """
         Measures two qubit randomized benchmarking, including
         the leakage estimate.
-
-        [2020-07-04 Victor] this method was updated to allow for parallel
-        compilation using all the cores of the measurement computer
 
         Refs:
         Knill PRA 77, 012307 (2008)
@@ -2740,19 +2734,8 @@ class HAL_Device(HAL_ShimMQ):
                 generated since the most recent change of OpenQL file
                 specified in self.cfg_openql_platform_fn
 
-            compile_only (bool):
-                Compile only the RB sequences without measuring, intended for
-                parallelizing iRB sequences compilation with measurements
-
-            pool (multiprocessing.Pool):
-                Only relevant for `compile_only=True`
-                Pool to which the compilation tasks will be assigned
-
-            rb_tasks (list):
-                Only relevant when running `compile_only=True` previously,
-                saving the rb_tasks, waiting for them to finish then running
-                this method again and providing the `rb_tasks`.
-                See the interleaved RB for use case.
+            parallel:
+                if True, runs compilation tasks in parallel to increase speed
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2833,25 +2816,8 @@ class HAL_Device(HAL_ShimMQ):
             )
             tasks_inputs.append(task_dict)
 
-        # if compile_only:
-        # programs = run_vector(cl_oql.two_qubit_randomized_benchmarking, tasks_inputs, parallel)
-        programs_filenames = run_vector(cl_oql.parallel_friendly_rb_2, tasks_inputs, parallel)
-
-        # if rb_tasks is None:    # FIXME: would be performed on !compile_only and no previously started rb_tasks provided
-        #     # avoid starting too many processes,
-        #     # nr_processes = None will start as many as the PC can handle
-        #     nr_processes = None if recompile else 1
-        #
-        #     # Using `with ...:` makes sure that proper cleanup is performed
-        #     # See: # see: https://docs.python.org/3/library/multiprocessing.html#multiprocessing.pool.Pool
-        #     with multiprocessing.Pool(
-        #         nr_processes,
-        #         maxtasksperchild=cl_oql.maxtasksperchild
-        #     ) as pool:
-        #         rb_tasks = send_rb_tasks(pool)
-        #         cl_oql.wait_for_rb_tasks(rb_tasks)
-        #
-        # programs_filenames = rb_tasks.get()
+        programs = run_tasks(cl_oql.two_qubit_randomized_benchmarking, tasks_inputs, parallel)
+        # programs_filenames = run_tasks(cl_oql.parallel_friendly_rb_2, tasks_inputs, parallel)
 
         # to include calibration points
         if cal_points:
@@ -2868,16 +2834,16 @@ class HAL_Device(HAL_ShimMQ):
         counter_param = ManualParameter("name_ctr", initial_value=0)
         prepare_function_kwargs = {
             "counter_param": counter_param,
-            # "programs": programs,
-            "programs_filenames": programs_filenames,
+            "programs": programs,
+            # "programs_filenames": programs_filenames,
             "CC": self.instr_CC.get_instr(),
         }
 
         # Using the first detector of the multi-detector as this is
         # in charge of controlling the CC (see self.get_int_logging_detector)
         d.set_prepare_function(
-            # oqh.load_range_of_oql_programs,
-            oqh.load_range_of_oql_programs_from_filenames,
+            oqh.load_range_of_oql_programs,
+            # oqh.load_range_of_oql_programs_from_filenames,
             prepare_function_kwargs, detectors="first"
         )
         # d.nr_averages = 128  FIXME: commented out

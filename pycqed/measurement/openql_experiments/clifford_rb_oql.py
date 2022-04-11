@@ -6,10 +6,15 @@ import logging
 import numpy as np
 from importlib import reload
 import multiprocessing
+# import dill  # FIXME: work on wrapping OqlProgram in dill
+
+from typing import List, Dict
 
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
+# import pycqed.measurement.openql_experiments.openql_helpers as oqh
+# OqlProgram = oqh.OqlProgram
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import (
     SingleQubitClifford,
     TwoQubitClifford,
@@ -78,17 +83,25 @@ def wait_for_rb_tasks(rb_tasks, refresh_interval: float = 4):
 
     print("\nDone compiling RB sequences!")
 
-# FIXME: WIP on runner, naming needs improvement. Move to separate file
-def run_vector(func, parameters_vector: list, parallel: bool=False):
+# FIXME: WIP on runner. Move to separate file
+def _wrap_result_with_dill(func, parameters: Dict):
+    # return dill.dumps(func(**parameters))
+    return func(**parameters)
+
+    # print(f"Starting processing of function {func}")
+    # d = dill.dumps(func(**parameters))
+    # print("Processing done")
+    # return None
+
+def run_tasks(func, parameter_list: List[Dict], parallel: bool=False):
     ret = []
     if not parallel:
-        # FIXME: use map?
         i = 0
-        for parameters in parameters_vector:
-            name = parameters["program_name"]  # FIXME: assumes that program_name exits
+        for parameters in parameter_list:
+            name = parameters["program_name"]  # FIXME: assumes that program_name exists
             log.info(f"Executing task {i}: '{name}'")
-            # ret.append(func(**parameters))
-            ret.append(func(parameters))    # assumes wrapper
+            ret.append(func(**parameters))
+            # ret.append(func(parameters))    # assumes wrapper
             # print(f"par[{i}] = {parameters}")
             i += 1
     else:
@@ -96,12 +109,34 @@ def run_vector(func, parameters_vector: list, parallel: bool=False):
             processes=4, # FIXME
             maxtasksperchild=2  # FIXME
         ) as pool:
-            log.info(f"Asynchronously starting {len(parameters_vector)} tasks")
-            # log.info(f"parameters_vector = '{parameters_vector}'")
-            rb_tasks = pool.map_async(func, parameters_vector)  # NB: assumes wrapper
-            # rb_tasks = pool.starmap_async(func, parameters_vector)  # NB: starmap_async unpacks parameters_vector
+            # testing dill
+            # print("wrapping OqlProgram")
+            # p = OqlProgram
+            # dill.dumps(p)
+            # print("wrapping done")
+
+            log.info(f"Asynchronously starting {len(parameter_list)} tasks")
+            async_result_list = []
+            for parameters in parameter_list:
+                async_result = pool.apply_async(_wrap_result_with_dill, [func, parameters])
+                async_result_list.append(async_result)
+
+            for async_result in async_result_list:
+                # retrieve result of asynchronous function call, catching errors to ease debugging
+                try:
+                    result_dill = async_result.get()
+                except Exception as e:
+                    log.error(f"Asynchronous function call returned '{e}'")
+                    raise
+
+                # result = dill.loads(result_dill)
+                result = result_dill
+                ret.append(result)
+
+            # rb_tasks = pool.map_async(func, parameter_list)  # NB: assumes wrapper
+            # rb_tasks = pool.starmap_async(func, parameter_list)  # NB: starmap_async unpacks parameter_list
             # wait_for_rb_tasks(rb_tasks)
-            ret = rb_tasks.get()  # FIXME: see note by Victor on return type limitations
+            # ret = rb_tasks.get()  # FIXME: see note by Victor on return type limitations
 
     return ret
 
@@ -720,7 +755,7 @@ def two_qubit_randomized_benchmarking(
     cal_points: bool = True,
     f_state_cal_pts: bool = True,
     recompile: bool = True,
-):
+) -> OqlProgram:
 
     assert len(two_qubit_net_cliffords) == len(single_qubit_net_cliffords)
 
