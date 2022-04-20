@@ -1424,8 +1424,8 @@ class HAL_Device(HAL_ShimMQ):
 
         all_qubits = [q0] + q_spectators
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=all_qubits, prepare_for_readout=False)
-            self.prepare_readout(qubits=[q0])
+            self.prepare_for_timedomain(qubits=all_qubits, prepare_for_readout=True)
+            self.prepare_readout(qubits=all_qubits)
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1447,7 +1447,7 @@ class HAL_Device(HAL_ShimMQ):
         )
 
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
-        d = self.get_int_avg_det(qubits=[q0])
+        d = self.get_int_avg_det(qubits=all_qubits)
         MC.set_sweep_function(s)
         MC.set_sweep_points(times_with_cal_points)
         MC.set_detector_function(d)
