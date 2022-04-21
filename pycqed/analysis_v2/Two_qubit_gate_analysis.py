@@ -4,7 +4,8 @@ import numpy as np
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.measurement.hdf5_data as h5d
-from matplotlib.colors import to_rgba
+from matplotlib.colors import to_rgba, LogNorm
+from pycqed.analysis.tools.plotting import hsluv_anglemap45
 
 
 class Two_qubit_gate_tomo_Analysis(ba.BaseDataAnalysis):
@@ -315,3 +316,370 @@ def Param_table_plotfn(ax,
     table.scale(1.5, 1.5)
     ax.text(-.4,-.5, 'Cphase: {:.2f}$^o$'.format((phi_on-phi_off)*180/np.pi), fontsize=14)
     ax.text(-.4,-.9, 'Leakage diff: {:.2f} %'.format(Leakage_on-Leakage_off), fontsize=14)
+
+
+class VCZ_tmid_Analysis(ba.BaseDataAnalysis):
+    """
+    Analysis 
+    """
+    def __init__(self,
+                 Q0,
+                 Q1,
+                 A_ranges,
+                 Q_parks: str = None,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True):
+
+        super().__init__(t_start=t_start, 
+                         t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.Q0 = Q0
+        self.Q1 = Q1
+        self.Q_parks = Q_parks
+        self.ranges = A_ranges
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+                             data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        self.proc_data_dict = {}
+
+        Amps_idxs = np.unique(self.raw_data_dict['data'][:,0])
+        Tmid = np.unique(self.raw_data_dict['data'][:,1])
+        nx, ny = len(Amps_idxs), len(Tmid)
+        Amps_list = [ np.linspace(r[0], r[1], nx) for r in self.ranges ] 
+        self.proc_data_dict['Amps'] = Amps_list
+        self.proc_data_dict['Tmid'] = Tmid
+
+        for i, q0 in enumerate(self.Q0):
+            CP = self.raw_data_dict['data'][:,2*i+2].reshape(nx, ny)
+            MF = self.raw_data_dict['data'][:,2*i+3].reshape(nx, ny)
+            self.proc_data_dict[f'CP_{i}'] = CP
+            self.proc_data_dict[f'MF_{i}'] = MF
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        n = len(self.Q0)
+        self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'] = plt.figure(figsize=(9,4*n), dpi=100)
+        # self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'].patch.set_alpha(0)
+        axs = []
+        for i, q0 in enumerate(self.Q0):
+            axs.append(self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'].add_subplot(n,2,2*i+1))
+            axs.append(self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'].add_subplot(n,2,2*i+2))
+
+            self.axs_dict[f'plot_{i}'] = axs[0]
+
+            self.plot_dicts[f'VCZ_landscape_{self.Q0}_{self.Q1}_{i}']={
+                'plotfn': VCZ_Tmid_landscape_plotfn,
+                'ax_id': f'plot_{i}',
+                'Amps' : self.proc_data_dict['Amps'][i], 
+                'Tmid' : self.proc_data_dict['Tmid'], 
+                'CP' : self.proc_data_dict[f'CP_{i}'],
+                'MF' : self.proc_data_dict[f'MF_{i}'],
+                'q0' : self.Q0[i], 'q1' : self.Q1[i],
+                'ts' : self.timestamp, 'n': i,
+                'title' : f'Qubits {" ".join(self.Q0)}, {" ".join(self.Q1)}',
+            }
+
+        for i, q0 in enumerate(self.Q0):
+            self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'] = plt.figure(figsize=(9,4), dpi=100)
+            # self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'].patch.set_alpha(0)
+            axs = [self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'].add_subplot(121),
+                   self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'].add_subplot(122)]
+
+            self.axs_dict[f'conditional_phase_{i}'] = axs[0]
+            self.axs_dict[f'missing_fraction_{i}'] = axs[0]
+
+            self.plot_dicts[f'VCZ_landscape_{self.Q0[i]}_{self.Q1[i]}']={
+                'plotfn': VCZ_Tmid_landscape_plotfn,
+                'ax_id': f'conditional_phase_{i}',
+                'Amps' : self.proc_data_dict['Amps'][i], 
+                'Tmid' : self.proc_data_dict['Tmid'], 
+                'CP' : self.proc_data_dict[f'CP_{i}'], 
+                'MF' : self.proc_data_dict[f'MF_{i}'],
+                'q0' : self.Q0[i], 'q1' : self.Q1[i],
+                'ts' : self.timestamp
+            }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def VCZ_Tmid_landscape_plotfn(
+    ax, 
+    Amps, Tmid, 
+    CP, MF, 
+    q0, q1,
+    ts, n=0,
+    title=None, **kw):
+
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+
+    def get_plot_axis(vals, rang=None):
+        dx = vals[1]-vals[0]
+        X = np.concatenate((vals, [vals[-1]+dx])) - dx/2
+        if rang:
+            X = X/np.max(vals) * (rang[1]-rang[0]) + rang[0]
+        return X
+
+    X = get_plot_axis(Amps)
+    Y = get_plot_axis(Tmid)
+    a1 = axs[0+2*n].pcolormesh(X, Y, CP, cmap=hsluv_anglemap45, vmin=0, vmax=360)
+    fig.colorbar(a1, ax=axs[0+2*n], label='conditional phase', ticks=[0, 90, 180, 270, 360])
+    a2 = axs[1+2*n].pcolormesh(X, Y, MF, cmap='hot')
+    fig.colorbar(a2, ax=axs[1+2*n], label='missing fraction')
+
+    def get_contours(cphase, phase):
+        n = len(cphase)
+        x = []
+        y = np.arange(n)
+        for i in range(n):
+            x.append(np.argmin(abs(cphase[i]-phase)))
+        dx = np.array(x)[1:]-np.array(x)[:-1]
+        k = 0
+        contours = {'0': {'x':[x[0]], 'y':[0]}}
+        for i, s in enumerate(dx):
+            if s > 0:
+                contours[f'{k}']['x'].append(x[i+1])
+                contours[f'{k}']['y'].append(i+1)
+            else:
+                k += 1
+                contours[f'{k}'] = {'x':[x[i+1]], 'y':[i+1]}
+        return contours
+    CT = get_contours(CP, phase=180)
+    for c in CT.values():
+        c['x'] = Amps[c['x']]
+        axs[1+2*n].plot(c['x'], c['y'], marker='', ls='--', color='white')
+
+    for i in range(2):
+        axs[i+2*n].set_xlabel('Amplitude')
+        axs[i+2*n].set_ylabel(r'$\tau_\mathrm{mid}$')
+    axs[0+2*n].set_title(f'Conditional phase')
+    axs[1+2*n].set_title(f'Missing fraction')
+
+    if title:
+        fig.suptitle(title+'\n'+ts, y=1.01)
+        axs[0+2*n].set_title(f'Conditional phase {q0} {q1}')
+        axs[1+2*n].set_title(f'Missing fraction {q0} {q1}')
+    else:
+        fig.suptitle(f'Qubits {q0} {q1}\n'+ts, y=1.02)
+        axs[0].set_title(f'Conditional phase')
+        axs[1].set_title(f'Missing fraction')
+
+    fig.tight_layout()
+
+
+
+class VCZ_B_Analysis(ba.BaseDataAnalysis):
+    """
+    Analysis 
+    """
+    def __init__(self,
+                 Q0,
+                 Q1,
+                 A_ranges,
+                 directions,
+                 Q_parks: str = None,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True):
+
+        super().__init__(t_start=t_start, 
+                         t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.Q0 = Q0
+        self.Q1 = Q1
+        self.Q_parks = Q_parks
+        self.ranges = A_ranges
+        self.directions = directions
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+                             data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        self.proc_data_dict = {}
+        self.qoi = {}
+        Amps_idxs = np.unique(self.raw_data_dict['data'][:,0])
+        Bamps = np.unique(self.raw_data_dict['data'][:,1])
+        nx, ny = len(Amps_idxs), len(Bamps)
+        Amps_list = [ np.linspace(r[0], r[1], nx) for r in self.ranges ] 
+
+        self.proc_data_dict['Amps'] = Amps_list
+        self.proc_data_dict['Bamps'] = Bamps
+
+        def cost_function(CP, MF,
+                          phase=180,
+                          cp_coef=1, l1_coef=1):
+            A = ((np.abs(CP)-180)/180)**2
+            B = (MF/.5)**2
+            return cp_coef*A + l1_coef*B
+
+        for i, q0 in enumerate(self.Q0):
+            CP = self.raw_data_dict['data'][:,2*i+2].reshape(nx, ny)
+            MF = self.raw_data_dict['data'][:,2*i+3].reshape(nx, ny)
+            CF = cost_function(CP, MF)
+
+            idxs_min = np.unravel_index(np.argmin(CF), CF.shape)
+            A_min, B_min = Amps_list[i][idxs_min[1]], Bamps[idxs_min[0]]
+            CP_min, L1_min = CP[idxs_min], MF[idxs_min]/2
+
+            self.proc_data_dict[f'CP_{i}'] = CP
+            self.proc_data_dict[f'MF_{i}'] = MF
+            self.proc_data_dict[f'CF_{i}'] = CF
+            self.qoi[f'Optimal_amps_{q0}'] = A_min, B_min
+            self.qoi[f'Gate_perf_{q0}'] = CP_min, L1_min
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+
+        n = len(self.Q0)
+        self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'] = plt.figure(figsize=(15,4*n), dpi=100)
+        # self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'].patch.set_alpha(0)
+        axs = []
+        for i, q0 in enumerate(self.Q0):
+            axs.append(self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'].add_subplot(n,3,3*i+1))
+            axs.append(self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'].add_subplot(n,3,3*i+2))
+            axs.append(self.figs[f'VCZ_landscape_{self.Q0}_{self.Q1}'].add_subplot(n,3,3*i+3))
+
+            self.axs_dict[f'plot_{i}'] = axs[0]
+
+            self.plot_dicts[f'VCZ_landscape_{self.Q0}_{self.Q1}_{i}']={
+                'plotfn': VCZ_B_landscape_plotfn,
+                'ax_id': f'plot_{i}',
+                'Amps' : self.proc_data_dict['Amps'][i], 
+                'Bamps' : self.proc_data_dict['Bamps'], 
+                'CP' : self.proc_data_dict[f'CP_{i}'],
+                'MF' : self.proc_data_dict[f'MF_{i}'],
+                'CF' : self.proc_data_dict[f'CF_{i}'],
+                'q0' : self.Q0[i], 'q1' : self.Q1[i],
+                'opt' : self.qoi[f'Optimal_amps_{q0}'],
+                'ts' : self.timestamp, 'n': i,
+                'direction' : self.directions[i][0],
+                'title' : f'Qubits {" ".join(self.Q0)}, {" ".join(self.Q1)}',
+                'gate_perf' : self.qoi[f'Gate_perf_{q0}']
+            }
+
+        for i, q0 in enumerate(self.Q0):
+            self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'] = plt.figure(figsize=(15,4), dpi=100)
+            # self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'].patch.set_alpha(0)
+            axs = [self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'].add_subplot(131),
+                   self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'].add_subplot(132),
+                   self.figs[f'VCZ_landscape_{q0}_{self.Q1[i]}'].add_subplot(133)]
+            self.axs_dict[f'conditional_phase_{i}'] = axs[0]
+
+            self.plot_dicts[f'VCZ_landscape_{self.Q0[i]}_{self.Q1[i]}']={
+                'plotfn': VCZ_B_landscape_plotfn,
+                'ax_id': f'conditional_phase_{i}',
+                'Amps' : self.proc_data_dict['Amps'][i], 
+                'Bamps' : self.proc_data_dict['Bamps'], 
+                'CP' : self.proc_data_dict[f'CP_{i}'],
+                'MF' : self.proc_data_dict[f'MF_{i}'],
+                'CF' : self.proc_data_dict[f'CF_{i}'],
+                'q0' : self.Q0[i], 'q1' : self.Q1[i],
+                'opt' : self.qoi[f'Optimal_amps_{q0}'],
+                'ts' : self.timestamp,
+                'gate_perf' : self.qoi[f'Gate_perf_{q0}']
+            }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def VCZ_B_landscape_plotfn(
+    ax,
+    Amps, Bamps,
+    CP, MF, CF,
+    q0, q1, ts,
+    gate_perf,
+    opt, direction=None,
+    n=0, title=None, **kw):
+
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+
+    def get_plot_axis(vals, rang=None):
+        dx = vals[1]-vals[0]
+        X = np.concatenate((vals, [vals[-1]+dx])) - dx/2
+        if rang:
+            X = X/np.max(vals) * (rang[1]-rang[0]) + rang[0]
+        return X
+
+    X = get_plot_axis(Amps)
+    Y = get_plot_axis(Bamps)
+    a1 = axs[0+3*n].pcolormesh(X, Y, CP, cmap=hsluv_anglemap45, vmin=0, vmax=360)
+    fig.colorbar(a1, ax=axs[0+3*n], label='conditional phase', ticks=[0, 90, 180, 270, 360])
+    a2 = axs[1+3*n].pcolormesh(X, Y, MF, cmap='hot')
+    fig.colorbar(a2, ax=axs[1+3*n], label='missing fraction')
+    a3 = axs[2+3*n].pcolormesh(X, Y, CF, cmap='viridis',
+                   norm=LogNorm(vmin=CF.min(), vmax=CF.max()))
+    fig.colorbar(a3, ax=axs[2+3*n], label='cost function')
+
+    text_str = 'Optimal parameters\n'+\
+               f'gate: {q0} CZ_{direction}\n'+\
+               f'$\phi$: {gate_perf[0]:.2f} \t $L_1$: {gate_perf[1]*100:.1f}%\n'+\
+               f'A amp: {opt[0]:.4f}\n'+\
+               f'B amp: {opt[1]:.4f}'
+    props = dict(boxstyle='round', facecolor='white', alpha=1)
+    axs[2+3*n].text(1.35, 0.98, text_str, transform=axs[2+3*n].transAxes, fontsize=10,
+            verticalalignment='top', bbox=props, linespacing=1.6)
+
+    for i in range(3):
+        axs[i+3*n].plot(opt[0], opt[1], 'o', mfc='white', mec='grey', mew=.5)
+        axs[i+3*n].set_xlabel('Amplitude')
+        axs[i+3*n].set_ylabel(r'B amplitude')
+
+    if title:
+        fig.suptitle(title+'\n'+ts, y=1)
+        axs[0+3*n].set_title(f'Conditional phase {q0} {q1}')
+        axs[1+3*n].set_title(f'Missing fraction {q0} {q1}')
+        axs[2+3*n].set_title(f'Cost function {q0} {q1}')
+    else:
+        fig.suptitle(f'Qubits {q0} {q1}\n'+ts, y=1)
+        axs[0].set_title(f'Conditional phase')
+        axs[1].set_title(f'Missing fraction')
+        axs[2].set_title(f'Cost function')
+    fig.tight_layout()

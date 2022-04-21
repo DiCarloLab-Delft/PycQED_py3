@@ -30,7 +30,8 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import tomography as tomo
 from pycqed.analysis_v2 import measurement_analysis as ma2
-from pycqed.utilities.general import check_keyboard_interrupt, print_exception
+from pycqed.utilities.general import check_keyboard_interrupt, print_exception,\
+                                     get_gate_directions
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
     QuTech_AWG_Module,
@@ -1173,9 +1174,9 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(self.get_int_avg_det(qubits=measured_qubits))
 
         MC.run(
-            "conditional_oscillation_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}".format(
+            "conditional_oscillation_{}_{}_&_{}_{}_x{}_wb{}_wa{}{}{}{}".format(
                 q0, q1, q2, q3, cz_repetitions,
-                wait_time_before_flux_ns, wait_time_after_flux_ns,
+                wait_time_before_flux_ns, wait_time_after_flux_ns,parked_qubit_seq,
                 self.msmt_suffix, label,
             ),
             disable_snapshot_metadata=disable_metadata,
@@ -1421,7 +1422,10 @@ class DeviceCCL(Instrument):
             phase_offsets: List[float] = None,
             control_cases_to_measure: List[str] = None,
             downsample_angle_points: int = 1,
+            pc_repetitions: int = 1,
             initialization_msmt: bool = False,
+            disable_pc: bool = False,
+            disabled_pc_duration: int = 40,
             wait_time_before_flux_ns: int = 0,
             wait_time_after_flux_ns: int = 0,
             analyze_parity_model: bool = False,
@@ -1682,9 +1686,12 @@ class DeviceCCL(Instrument):
             Q_idxs_ramsey=Q_idxs_ramsey if ramsey_qubits else None,
             Q_idxs_parking=Q_idxs_parking if parking_qubits else None,
             nr_flux_dance_before_cal_points=nr_flux_dance_before_cal_points,
+            pc_repetitions = pc_repetitions,
             platf_cfg=self.cfg_openql_platform_fn(),
             angles=angles,
             initialization_msmt=initialization_msmt,
+            disable_pc=disable_pc,
+            disabled_pc_duration=disabled_pc_duration,
             wait_time_before_flux=wait_time_before_flux_ns,
             wait_time_after_flux=wait_time_after_flux_ns
             )
@@ -1702,7 +1709,10 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(p.sweep_points)
         MC.set_detector_function(d)
 
-        label = f"Parity_check_flux_dance_{target_qubits}_{control_qubits_by_case}_{self.msmt_suffix}_{label_suffix}"
+        if not disable_pc:
+            label = f"Parity_check_flux_dance_{target_qubits}_{control_qubits_by_case}_x{pc_repetitions}_{self.msmt_suffix}_{label_suffix}"
+        else: 
+            label = f"Parity_check_flux_dance_{target_qubits}_{control_qubits_by_case}_x{pc_repetitions}_{disabled_pc_duration}ns_{self.msmt_suffix}_{label_suffix}"
         MC.run(label, disable_snapshot_metadata=disable_metadata)
         self.ro_acq_digitized(old_digitized)
         self.ro_acq_weight_type(old_weight_type)
@@ -7474,113 +7484,6 @@ class DeviceCCL(Instrument):
     #######################################
     # Two qubit gate calibration functions
     #######################################
-
-    def measure_vcz_A_B_landscape(
-        self, 
-        Q0,
-        Q1,
-        A_ranges,
-        A_points: int,
-        B_amps: list,
-        Q_parks: list = None,
-        flux_codeword: str = 'cz'):
-        """
-        Perform 2D sweep of amplitude and wave parameter while measuring 
-        conditional phase and missing fraction via the "conditional 
-        oscillation" experiment.
-
-        Q0 : High frequency qubit(s). Can be given as single qubit or list.
-        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
-        T_mids : list of vcz "T_mid" values to sweep.
-        A_ranges : list of tuples containing ranges of amplitude sweep.
-        A_points : Number of points to sweep for amplitude range.
-        Q_parks : list of qubits parked during operation.
-        """
-        if isinstance(Q0, str):
-            Q0 = [Q0]
-        if isinstance(Q1, str):
-            Q1 = [Q1]
-        assert len(Q0) == len(Q1)
-
-        MC = self.instr_MC.get_instr()
-        nested_MC = self.instr_nested_MC.get_instr()
-        # get gate directions
-        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
-        
-        # Time-domain preparation
-        # Prepare for time domain
-        self.prepare_for_timedomain(
-            qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
-            bypass_flux=True)
-        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
-        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
-        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
-        for i, lm in enumerate(Flux_lm_0):
-            print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
-            print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
-            lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-        for i, lm in enumerate(Flux_lm_1):
-            print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
-
-        # Wrapper function for conditional oscillation detector function.
-        def wrapper(Q0, Q1,
-                    prepare_for_timedomain,
-                    downsample_swp_points,
-                    extract_only,
-                    disable_metadata):
-            a = self.measure_conditional_oscillation_multi(
-                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
-                    parked_qbs=Q_parks,
-                    flux_codeword=flux_codeword,
-                    prepare_for_timedomain=prepare_for_timedomain,
-                    downsample_swp_points=downsample_swp_points,
-                    extract_only=extract_only,
-                    disable_metadata=disable_metadata,
-                    verbose=False)
-            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
-                  for i in range(len(Q0)) }
-            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
-                  for i in range(len(Q0)) }
-            return { **cp, **mf} 
-            
-        d = det.Function_Detector(
-            wrapper,
-            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
-                     'prepare_for_timedomain' : False,
-                     'downsample_swp_points': 3,
-                     'extract_only': True,
-                     'disable_metadata': True},
-            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
-                                   for i in range(len(Q0))]).flatten()),
-            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
-                                   for i in range(len(Q0))]).flatten()),
-            value_units=list(np.array([['deg', '%']\
-                                   for i in range(len(Q0))]).flatten()))
-        nested_MC.set_detector_function(d)
-
-        swf1 = swf.multi_sweep_function_ranges(
-            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude
-                             for i in range(len(Q0))],
-            sweep_ranges= A_ranges,
-            n_points=A_points)
-        swfs = [swf.FLsweep(lm = lm,
-                            par = lm.parameters[f'vcz_amp_fine_{directions[i][0]}'],
-                            waveform_name = f'cz_{directions[i][0]}')
-                for i, lm in enumerate(Flux_lm_0) ]
-        swf2 = swf.multi_sweep_function(sweep_functions=swfs)
-        nested_MC.set_sweep_function(swf1)
-        nested_MC.set_sweep_points(np.arange(A_points))
-        nested_MC.set_sweep_function_2D(swf2)
-        nested_MC.set_sweep_points_2D(B_amps)
-
-        MC.live_plot_enabled(False)
-        nested_MC.run(f'VCZ_Amp_vs_B_{Q0}_{Q1}_{Q_parks}',
-                      mode='2D')
-        MC.live_plot_enabled(True)
-
-
     def measure_vcz_A_tmid_landscape(
         self, 
         Q0,
@@ -7689,56 +7592,166 @@ class DeviceCCL(Instrument):
         nested_MC.set_sweep_points(np.arange(A_points))
         nested_MC.set_sweep_function_2D(swf2)
         nested_MC.set_sweep_points_2D(T_mids)
-
         MC.live_plot_enabled(False)
         nested_MC.run(f'VCZ_Amp_vs_Tmid_{Q0}_{Q1}_{Q_parks}',
                       mode='2D')
         MC.live_plot_enabled(True)
+        ma2.tqg.VCZ_tmid_Analysis(Q0=Q0, Q1=Q1,
+                                  A_ranges=A_ranges,
+                                  label='VCZ_Amp_vs_Tmid')
 
+    def measure_vcz_A_B_landscape(
+        self, 
+        Q0,
+        Q1,
+        A_ranges,
+        A_points: int,
+        B_amps: list,
+        Q_parks: list = None,
+        update_flux_params: bool = False,
+        flux_codeword: str = 'cz'):
+        """
+        Perform 2D sweep of amplitude and wave parameter while measuring 
+        conditional phase and missing fraction via the "conditional 
+        oscillation" experiment.
 
+        Q0 : High frequency qubit(s). Can be given as single qubit or list.
+        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
+        T_mids : list of vcz "T_mid" values to sweep.
+        A_ranges : list of tuples containing ranges of amplitude sweep.
+        A_points : Number of points to sweep for amplitude range.
+        Q_parks : list of qubits parked during operation.
+        """
+        if isinstance(Q0, str):
+            Q0 = [Q0]
+        if isinstance(Q1, str):
+            Q1 = [Q1]
+        assert len(Q0) == len(Q1)
 
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        # get gate directions
+        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+        
+        # Time-domain preparation
+        self.prepare_for_timedomain(
+            qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+            bypass_flux=True)
+        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
+        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
+        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
+        for i, lm in enumerate(Flux_lm_0):
+            print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
+            print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
+            lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
+            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
+        for i, lm in enumerate(Flux_lm_1):
+            print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
 
+        ###################################
+        # This feature is yet to be tested 
+        ###################################
+        if update_flux_params:
+            # List of current flux lutman amplitudes
+            Amps_11_02 = [{ d: lm.get(f'vcz_amp_dac_at_11_02_{d}')\
+                         for d in ['NW', 'NE', 'SW', 'SE']} for lm in Flux_lm_0]
+            # List of current flux lutman channel gains
+            Old_gains = [ lm.get('cfg_awg_channel_amplitude') for lm in Flux_lm_0]
 
-def get_gate_directions(q0, q1,
-                        map_qubits=None):
-    """
-    Helper function to determine two-qubit gate directions.
-    q0 and q1 should be given as high-freq and low-freq qubit, respectively.
-    Default map is surface-17, however other maps are supported.
-    """
-    if map_qubits == None:
-        # Surface-17 layout
-        map_qubits = {'Z3' : [-2,-1],
-                      'D9' : [ 0, 2],
-                      'X4' : [-1, 2],
-                      'D8' : [-1, 1],
-                      'Z4' : [ 0, 1],
-                      'D6' : [ 1, 1],
-                      'D7' : [-2, 0],
-                      'X3' : [-1, 0],
-                      'D5' : [ 0, 0],
-                      'X2' : [ 1, 0],
-                      'D3' : [ 2, 0],
-                      'D4' : [-1,-1],
-                      'Z1' : [ 0,-1],
-                      'D2' : [ 1,-1],
-                      'X1' : [ 1,-2],
-                      'Z2' : [ 2, 1],
-                      'D1' : [ 0,-2]
-                     }
-    V0 = np.array(map_qubits[q0])
-    V1 = np.array(map_qubits[q1])
-    diff = V1-V0
-    dist = np.sqrt(np.sum((diff)**2))
-    if dist > 1:
-        raise ValueError('Qubits are not nearest neighbors')
-    if diff[0] == 0.:
-        if diff[1] > 0:
-            return ('NE', 'SW')
-        else:
-            return ('SW', 'NE')
-    elif diff[1] == 0.:
-        if diff[0] > 0:
-            return ('SE', 'NW')
-        else:
-            return ('NW', 'SE')
+        # Wrapper function for conditional oscillation detector function.
+        def wrapper(Q0, Q1,
+                    prepare_for_timedomain,
+                    downsample_swp_points,
+                    extract_only,
+                    disable_metadata):
+            a = self.measure_conditional_oscillation_multi(
+                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+                    parked_qbs=Q_parks,
+                    flux_codeword=flux_codeword,
+                    prepare_for_timedomain=prepare_for_timedomain,
+                    downsample_swp_points=downsample_swp_points,
+                    extract_only=extract_only,
+                    disable_metadata=disable_metadata,
+                    verbose=False)
+            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
+                  for i in range(len(Q0)) }
+            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
+                  for i in range(len(Q0)) }
+            return { **cp, **mf} 
+            
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
+                     'prepare_for_timedomain' : False,
+                     'downsample_swp_points': 3,
+                     'extract_only': True,
+                     'disable_metadata': True},
+            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_units=list(np.array([['deg', '%']\
+                                   for i in range(len(Q0))]).flatten()))
+        nested_MC.set_detector_function(d)
+
+        swf1 = swf.multi_sweep_function_ranges(
+            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude
+                             for i in range(len(Q0))],
+            sweep_ranges= A_ranges,
+            n_points=A_points)
+        swfs = [swf.FLsweep(lm = lm,
+                            par = lm.parameters[f'vcz_amp_fine_{directions[i][0]}'],
+                            waveform_name = f'cz_{directions[i][0]}')
+                for i, lm in enumerate(Flux_lm_0) ]
+        swf2 = swf.multi_sweep_function(sweep_functions=swfs)
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(np.arange(A_points))
+        nested_MC.set_sweep_function_2D(swf2)
+        nested_MC.set_sweep_points_2D(B_amps)
+
+        MC.live_plot_enabled(False)
+        nested_MC.run(f'VCZ_Amp_vs_B_{Q0}_{Q1}_{Q_parks}',
+                      mode='2D')
+        MC.live_plot_enabled(True)
+        a = ma2.tqg.VCZ_B_Analysis(Q0=Q0, Q1=Q1,
+                                   A_ranges=A_ranges,
+                                   directions=directions,
+                                   label='VCZ_Amp_vs_B')
+        ###################################
+        # This feature is yet to be tested 
+        ###################################
+        if update_flux_params:
+            print('Updating flux lutman parameters:')
+            def _set_amps_11_02(amps, lm, verbose=True):
+                '''
+                Helper function to set amplitudes in Flux_lutman
+                '''
+                for d in amps.keys():
+                    lm.set(f'vcz_amp_dac_at_11_02_{d}', amps[d])
+                    if verbose:
+                        print(f'Set {lm.name}.vcz_amp_dac_at_11_02_{d} to {amps[d]}')
+            # Update channel gains for each gate
+            Opt_gains = [ a.qoi[f'Optimal_amps_{q}'][0] for q in Q0 ]
+            Opt_Bvals = [ a.qoi[f'Optimal_amps_{q}'][1] for q in Q0 ]
+            
+            for i in range(len(Q0)):
+                # If new channel gain is higher than old gain then scale dac
+                # values accordingly: new_dac = old_dac*(old_gain/new_gain)
+                if Opt_gains[i] > Old_gains[i]:
+                    Flux_lm_0[i].set('cfg_awg_channel_amplitude', Opt_gains[i])
+                    print(f'Set {Flux_lm_0[i].name}.cfg_awg_channel_amplitude to {Opt_gains[i]}')
+                    for d in ['NW', 'NE', 'SW', 'SE']:
+                        Amps_11_02[i][d] *= Old_gains[i]/Opt_gains[i]
+                    Amps_11_02[i][directions[i][0]] = 0.5
+                # If new channel gain is lower than old gain, then choose
+                # dac value for measured gate based on old gain
+                else:
+                    Flux_lm_0[i].set('cfg_awg_channel_amplitude', Old_gains[i])
+                    print(f'Set {Flux_lm_0[i].name}.cfg_awg_channel_amplitude to {Old_gains[i]}')
+                    Amps_11_02[i][directions[i][0]] = 0.5*Opt_gains[i]/Old_gains[i]
+                # Set flux_lutman amplitudes
+                _set_amps_11_02(Amps_11_02[i], Flux_lm_0[i])
+                Flux_lm_0[i].set(f'vcz_amp_fine_{directions[i][0]}', Opt_Bvals[i])
+
+        return a.qoi
