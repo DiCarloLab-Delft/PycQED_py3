@@ -4,6 +4,7 @@ from pytest import approx
 import numpy as np
 import os
 import pathlib
+import logging
 
 import pycqed as pq
 
@@ -38,6 +39,7 @@ this_path = pathlib.Path(__file__).parent
 output_path = pathlib.Path(this_path) / 'test_output_cc'
 platf_cfg_path = output_path / 'config_cc_s17_direct_iq_openql_0_10.json'
 
+log = logging.getLogger(__name__)
 
 class Test_Device_obj(unittest.TestCase):
     # FIXME: using setUpClass is more efficient, but failing tests tend to influence each other, making debugging difficult
@@ -48,6 +50,8 @@ class Test_Device_obj(unittest.TestCase):
         """
         This sets up a mock setup using a CC to control multiple qubits
         """
+
+        log.info("starting setUp")
         # generate OpenQL configuration
         gen.generate_config_modular(platf_cfg_path)
 
@@ -177,7 +181,7 @@ class Test_Device_obj(unittest.TestCase):
             # q.mw_vsm_delay(15)
             q.mw_mixer_offs_GI(0.1)
             q.mw_mixer_offs_GQ(0.2)
-            q.mw_mixer_offs_DI(0.3)
+            q.mw_mixer_offs_DI(0.3) # FIXME
             q.mw_mixer_offs_DQ(0.4)
 
         # Set up the device object and set required params
@@ -230,15 +234,18 @@ class Test_Device_obj(unittest.TestCase):
         }
 
         cls.device.dio_map(cls.dio_map_CC)
+        log.info("setUp finished")
 
     # FIXME
     # @classmethod
     # def tearDownClass(cls):
     def tearDown(self):
+        log.info("starting tearDown")
         try:
             Instrument.close_all()
         except Exception as e:
             print(f"Caught exception during tearDown: {str(e)}")
+        log.info("tearDown finished")
 
     ##############################################
     # HAL_Shim_MQ
@@ -689,8 +696,10 @@ class Test_Device_obj(unittest.TestCase):
 
     # @unittest.skip("FIXME: WIP")
     # # FIXME: add other parallel variants once they work
-    # def test_measure_two_qubit_randomized_benchmarking_parallel(self):
-    #     self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"], parallel=True)
+    def test_measure_two_qubit_randomized_benchmarking_parallel(self):
+        log.info("starting test_measure_two_qubit_randomized_benchmarking_parallel")
+        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"], parallel=True)
+        log.info("test_measure_two_qubit_randomized_benchmarking_parallel finished")
 
 
     # FIXME: add measure_interleaved_randomized_benchmarking_statistics

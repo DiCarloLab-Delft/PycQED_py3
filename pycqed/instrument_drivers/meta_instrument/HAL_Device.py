@@ -10,7 +10,6 @@ import time
 import logging
 import adaptive
 import networkx as nx
-# import datetime
 import multiprocessing
 from importlib import reload
 from typing import List, Union, Optional, Tuple
@@ -19,7 +18,6 @@ from deprecated import deprecated
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import HAL_ShimMQ
 from pycqed.measurement.openql_experiments.clifford_rb_oql import run_tasks
 
-# from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
 reload(det)
 
@@ -36,7 +34,7 @@ from pycqed.utilities.general import check_keyboard_interrupt, print_exception
 #from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
 from pycqed.measurement.measurement_control import MeasurementControl
 
-from qcodes.instrument.parameter import ManualParameter, Parameter
+from qcodes.instrument.parameter import ManualParameter
 
 
 log = logging.getLogger(__name__)
@@ -1154,7 +1152,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_two_qubit_tomo_bell(
             self,
-            qubits: list,
+            qubits: List[str],
             bell_state=0,
             wait_after_flux=None,
             analyze=True,
@@ -1327,7 +1325,8 @@ class HAL_Device(HAL_ShimMQ):
 
 
     def measure_two_qubit_allXY_crosstalk(
-            self, q0: str,
+            self,
+            q0: str,
             q1: str,
             q1_replace_cases: list = [
                 None, "i", "rx180", "rx180", "rx180"
@@ -1425,7 +1424,8 @@ class HAL_Device(HAL_ShimMQ):
 
 
     def measure_state_tomography(
-            self, qubits=['D2', 'X'],
+            self,
+            qubits: List[str] = ['D2', 'X'],
             MC: Optional[MeasurementControl] = None,
             bell_state: float = None,
             product_state: float = None,
@@ -1486,7 +1486,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_ssro_multi_qubit(
             self,
-            qubits: list,
+            qubits: List[str],
             nr_shots_per_case: int = 2 ** 13,  # 8192
             prepare_for_timedomain: bool = True,
             result_logging_mode='raw',
@@ -1601,7 +1601,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_ssro_single_qubit(
             self,
-            qubits: list,
+            qubits: List[str],
             q_target: str,
             nr_shots: int = 2 ** 13,  # 8192
             prepare_for_timedomain: bool = True,
@@ -1731,7 +1731,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_transients(
             self,
-            qubits: list,
+            qubits: List[str],
             q_target: str,
             cases: list = ['off', 'on'],
             MC: Optional[MeasurementControl] = None,
@@ -2367,7 +2367,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_cryoscope(
         self,
-        qubits,
+        qubits: List[str],
         times,
         MC: Optional[MeasurementControl] = None,
         nested_MC: Optional[MeasurementControl] = None,
@@ -2586,7 +2586,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_timing_diagram(
             self,
-            qubits: list,
+            qubits: List[str],
             flux_latencies,
             microwave_latencies,
             MC: Optional[MeasurementControl] = None,
@@ -2667,7 +2667,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_two_qubit_randomized_benchmarking(
         self,
-        qubits,
+        qubits: List[str],
         nr_cliffords=np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]),
         nr_seeds=100,
         interleaving_cliffords=[None],
@@ -2928,7 +2928,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_two_qubit_interleaved_randomized_benchmarking(
             self,
-            qubits: list,
+            qubits: List[str],
             nr_cliffords=np.array([1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50., 70., 90., 120.]),
             nr_seeds=100,
             flux_codeword="cz",
@@ -3162,7 +3162,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_two_qubit_purity_benchmarking(
             self,
-            qubits,
+            qubits: List[str],
             MC,
             nr_cliffords=np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0]),
             nr_seeds=100,
@@ -3228,7 +3228,7 @@ class HAL_Device(HAL_ShimMQ):
         d = self.get_int_logging_detector(qubits=qubits)
 
         MC.soft_avg(1)
-        # set back the settings
+        # restore settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
@@ -3340,7 +3340,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_two_qubit_character_benchmarking(
         self,
-        qubits,
+        qubits: List[str],
         MC,
         nr_cliffords=np.array(
             [
@@ -3383,7 +3383,7 @@ class HAL_Device(HAL_ShimMQ):
         self.prepare_for_timedomain(qubits=qubits)
 
         MC.soft_avg(1)
-        # set back the settings
+        # restore settings
         d = self.get_int_logging_detector(qubits=qubits)
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
@@ -3474,7 +3474,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self,
-            qubits,
+            qubits: List[str],
             MC: Optional[MeasurementControl] = None,
             nr_cliffords=2 ** np.arange(11),
             nr_seeds=100,
@@ -3538,7 +3538,7 @@ class HAL_Device(HAL_ShimMQ):
 
         # The detector needs to be defined before setting back parameters
         d = self.get_int_logging_detector(qubits=qubits)
-        # set back the settings
+        # restore settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
@@ -3638,7 +3638,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_multi_qubit_simultaneous_randomized_benchmarking(
             self,
-            qubits,
+            qubits: List[str],
             MC: Optional[MeasurementControl] = None,
             nr_cliffords=2 ** np.arange(11),
             nr_seeds=100,
@@ -3694,7 +3694,7 @@ class HAL_Device(HAL_ShimMQ):
 
         # The detector needs to be defined before setting back parameters
         d = self.get_int_logging_detector(qubits=qubits)
-        # set back the settings
+        # restore settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
@@ -3909,7 +3909,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_multi_AllXY(
             self,
-            qubits: list = None,
+            qubits: List[str] = None,
             MC: Optional[MeasurementControl] = None,
             double_points=True,
             termination_opt=0.08
@@ -4430,7 +4430,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def calibrate_mux_ro(
         self,
-        qubits,
+        qubits: List[str],
         calibrate_optimal_weights=True,
         calibrate_threshold=True,
         # option should be here but is currently not implemented:

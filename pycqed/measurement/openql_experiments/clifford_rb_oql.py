@@ -35,27 +35,28 @@ log = logging.getLogger(__name__)
 maxtasksperchild = 4
 
 
-def parallel_friendly_rb(rb_kw_dict):
-    """
-    A wrapper around `randomized_benchmarking` such that we collect only
-    the filenames of the resulting programs that can be communicated back to
-    the main process when parallelizing the compilation using the python
-    multiprocessing capabilities.
-    """
-    p = randomized_benchmarking(**rb_kw_dict)
-
-    return p.filename
-
-def parallel_friendly_rb_2(rb_kw_dict):
-    """
-    A wrapper around `randomized_benchmarking` such that we collect only
-    the filenames of the resulting programs that can be communicated back to
-    the main process when parallelizing the compilation using the python
-    multiprocessing capabilities.
-    """
-    p = two_qubit_randomized_benchmarking(**rb_kw_dict)
-
-    return p.filename
+# FIXME
+# def parallel_friendly_rb(rb_kw_dict):
+#     """
+#     A wrapper around `randomized_benchmarking` such that we collect only
+#     the filenames of the resulting programs that can be communicated back to
+#     the main process when parallelizing the compilation using the python
+#     multiprocessing capabilities.
+#     """
+#     p = randomized_benchmarking(**rb_kw_dict)
+#
+#     return p.filename
+#
+# def parallel_friendly_rb_2(rb_kw_dict):
+#     """
+#     A wrapper around `randomized_benchmarking` such that we collect only
+#     the filenames of the resulting programs that can be communicated back to
+#     the main process when parallelizing the compilation using the python
+#     multiprocessing capabilities.
+#     """
+#     p = two_qubit_randomized_benchmarking(**rb_kw_dict)
+#
+#     return p.filename
 
 
 def wait_for_rb_tasks(rb_tasks, refresh_interval: float = 4):
@@ -105,11 +106,13 @@ def run_tasks(func, parameter_list: List[Dict], parallel: bool=False):
             # print(f"par[{i}] = {parameters}")
             i += 1
     else:
+        raise NotImplementedError("parallel compilation is still Work In Progress")
+
         with multiprocessing.Pool(
-            processes=4, # FIXME
-            maxtasksperchild=2  # FIXME
+            processes=4, # FIXME: get from global
+            maxtasksperchild=maxtasksperchild
         ) as pool:
-            # testing dill
+            # FIXME: testing dill
             # print("wrapping OqlProgram")
             # p = OqlProgram
             # dill.dumps(p)
@@ -132,11 +135,6 @@ def run_tasks(func, parameter_list: List[Dict], parallel: bool=False):
                 # result = dill.loads(result_dill)
                 result = result_dill
                 ret.append(result)
-
-            # rb_tasks = pool.map_async(func, parameter_list)  # NB: assumes wrapper
-            # rb_tasks = pool.starmap_async(func, parameter_list)  # NB: starmap_async unpacks parameter_list
-            # wait_for_rb_tasks(rb_tasks)
-            # ret = rb_tasks.get()  # FIXME: see note by Victor on return type limitations
 
     return ret
 
