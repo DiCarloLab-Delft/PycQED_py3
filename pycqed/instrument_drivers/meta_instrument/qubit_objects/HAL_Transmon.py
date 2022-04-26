@@ -2386,20 +2386,32 @@ class HAL_Transmon(HAL_ShimSQ):
         # deskewing the input signal
 
         # Calculate optimal weights
-        optimized_weights_I = (transients[1][0] - transients[0][0])
-        optimized_weights_Q = (transients[1][1] - transients[0][1])
+        optimized_weights_I = transients[1][0] - transients[0][0]
+        optimized_weights_Q = transients[1][1] - transients[0][1]
         # joint rescaling to +/-1 Volt
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
-        # fixme: deviding the weight functions by four to not have overflow in
+        # fixme: dividing the weight functions by four to not have overflow in
         # thresholding of the UHFQC
-        weight_scale_factor = 1. / (4 * np.max([maxI, maxQ]))
-        optimized_weights_I = np.array(weight_scale_factor * optimized_weights_I)
-        optimized_weights_Q = np.array(weight_scale_factor * optimized_weights_Q)
+        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
+        W_func_I = np.array(weight_scale_factor*optimized_weights_I)
+        W_func_Q = np.array(weight_scale_factor*optimized_weights_Q)
+
+        # Smooth optimal weight functions
+        T = np.arange(len(W_func_I))/1.8e9
+        W_demod_func_I = np.real( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
+        W_demod_func_Q = np.imag( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
+
+        from scipy.signal import medfilt
+        W_dsmooth_func_I = medfilt(W_demod_func_I, 101)
+        W_dsmooth_func_Q = medfilt(W_demod_func_Q, 101)
+
+        W_smooth_func_I = np.real( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
+        W_smooth_func_Q = np.imag( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
 
         if update:
-            self.ro_acq_weight_func_I(optimized_weights_I)
-            self.ro_acq_weight_func_Q(optimized_weights_Q)
+            self.ro_acq_weight_func_I(np.array(W_smooth_func_I))
+            self.ro_acq_weight_func_Q(np.array(W_smooth_func_Q))
             if optimal_IQ:
                 self.ro_acq_weight_type('optimal IQ')
             else:
@@ -2408,8 +2420,10 @@ class HAL_Transmon(HAL_ShimSQ):
                 self._prep_ro_integration_weights()
                 self._prep_ro_instantiate_detectors()
                 ssro_dict = self.measure_ssro(
-                    no_figs=no_figs, update=update,
-                    prepare=True, disable_metadata=disable_metadata,
+                    no_figs=no_figs, 
+                    update=update,
+                    prepare=True, 
+                    disable_metadata=disable_metadata,
                     nr_shots_per_case=nr_shots_per_case,
                     post_select=post_select,
                     post_select_threshold=post_select_threshold)
