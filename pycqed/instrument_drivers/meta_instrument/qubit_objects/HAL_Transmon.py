@@ -850,7 +850,8 @@ class HAL_Transmon(HAL_ShimSQ):
             verbose=False,
             MC: Optional[MeasurementControl] = None,
             update=True,
-            all_modules=False
+            all_modules=False,
+            prepare_for_timedomain=True
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -867,7 +868,7 @@ class HAL_Transmon(HAL_ShimSQ):
             else:
                 amps = np.linspace(0, 1, 31)
 
-        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules)
+        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules, prepare_for_timedomain=prepare_for_timedomain)
 
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
 
