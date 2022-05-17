@@ -21,6 +21,7 @@ networkx
 qutechopenql>=0.10.3
 spirack
 zhinst
+zhinst-deviceutils
 packaging
 deprecated
 adaptive>=0.10.0
