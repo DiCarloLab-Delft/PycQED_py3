@@ -91,6 +91,17 @@ class DeviceConstants:
         MIN_LENGTH = 2048
 
 
+class DioCalibration:
+    """
+    Class collecting constants relative to DIO calibration under one common namespace.
+    """
+
+    DELAYS = range(16)
+    NUM_BITS = 32
+    GENERATOR_INDEX = 0
+    CC_TO_SHFQA_PROGRAM = "while(1){}"
+
+
 def preprocess_generator_waveform(waveform) -> None:
     """
     Validates a candidate complex array candidate for upload onto a generator slot of the device. The

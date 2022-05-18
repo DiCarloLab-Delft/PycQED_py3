@@ -38,6 +38,7 @@ from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.internal._
     DeviceConstants,
     UserRegisters,
     SeqC,
+    DioCalibration,
     preprocess_generator_waveform,
     hold_off_length,
     make_result_mode_manager,
@@ -665,17 +666,15 @@ class SHFQA(ZI_base_instrument, CalInterface):
         Args:
             value: value to set the parameter to.
         """
-        if value < 0 or value > 15:
+        if value not in DioCalibration.DELAYS:
             raise ziValueError(
-                "Trying to set DIO calibration delay to invalid value! Expected value in range 0 to 15. Got {}.".format(
-                    value
-                )
+                f"Trying to set DIO calibration delay to invalid value! Expected value in {DioCalibration.DELAYS}"
             )
 
         log.info(f"{self.devname}: Setting DIO calibration delay to {value}")
         self._dio_calibration_delay = value
-        # TODO this crashes for some reason
-        # self.setd("raw/dios/0/delay", self._dio_calibration_delay)
+        for bit in range(DioCalibration.NUM_BITS):
+            self.seti(f"raw/dios/0/delays/{bit}/value", self._dio_calibration_delay)
 
     def _get_dio_calibration_delay(self) -> float:
         """
@@ -1132,7 +1131,88 @@ class SHFQA(ZI_base_instrument, CalInterface):
     def calibrate_dio_protocol(
         self, dio_mask: int, expected_sequence: List, port: int = 0
     ):
-        raise NotImplementedError
+        self._ensure_activity(mask=dio_mask)
+
+        log.info(f"{self.devname}: Finding valid delays...")
+
+        valid_delays = []
+        for delay in DioCalibration.DELAYS:
+            self._set_dio_calibration_delay(delay)
+            self.daq.setInt(f"/{self.devname}/raw/dios/0/error/timingclear", 1)
+            time.sleep(3)
+            timing_error = self.daq.getInt(
+                f"/{self.devname}/raw/dios/0/error/timingsticky"
+            )
+            if timing_error == 0:
+                valid_delays.append(delay)
+
+        if not valid_delays:
+            raise Exception("DIO calibration failed! No valid delays found")
+
+        log.info(f"{self.devname}: Valid delays are {valid_delays}")
+
+        subseqs = [[valid_delays[0]]]
+        for delay in valid_delays:
+            last_subseq = subseqs[-1]
+            last_delay = last_subseq[-1]
+            delay_following_sequence = not last_subseq or last_delay == delay - 1
+            if delay_following_sequence:
+                subseqs[-1].append(delay)
+            else:
+                subseqs.append([delay])
+
+        longest_subseq = max(subseqs, key=len)
+        delay = len(longest_subseq) // 2 + longest_subseq[0]
+
+        self._set_dio_calibration_delay(delay)
+
+        # Clear all detected errors (caused by DIO timing calibration)
+        self.check_errors(errors_to_ignore=["AWGDIOTIMING"])
+
+    def _ensure_activity(self, mask: int):
+        """
+        Record DIO data and test whether there is activity on the bits activated in the DIO protocol.
+        """
+        log.debug(f"{self.devname}: Testing DIO activity.")
+
+        # The sequencer must be running in order for the RT logger to acquire data
+        self.configure_awg_from_string(
+            awg_nr=DioCalibration.GENERATOR_INDEX,
+            program_string=DioCalibration.CC_TO_SHFQA_PROGRAM,
+        )
+        shfqa_utils.enable_sequencer(
+            self.daq,
+            self.devname,
+            channel_index=DioCalibration.GENERATOR_INDEX,
+            single=1,
+        )
+
+        rt_logger_path = (
+            f"qachannels_{DioCalibration.GENERATOR_INDEX}_generator_rtlogger_"
+        )
+        self.set(rt_logger_path + "mode", 1)
+        self.set(rt_logger_path + "starttimestamp", 0)
+        self.set(rt_logger_path + "enable", 1)
+        time.sleep(0.01)
+        path = f"/{self.devname}/qachannels/0/generator/rtlogger/data"
+        data = self.daq.get(path, settingsonly=False, flat=True)[path][0]["vector"]
+        dio_snapshot = data[1::2]
+        self.set(rt_logger_path + "enable", 0)
+        self.set(rt_logger_path + "clear", 1)
+
+        self.set(f"qachannels_{0}_generator_enable", 0)
+
+        if dio_snapshot is None:
+            raise ziValueError(f"{self.devname}: Failed to get DIO snapshot!")
+
+        activity = 0
+        for dio_value in dio_snapshot:
+            activity |= int(dio_value) & mask
+
+        if activity != mask:
+            raise ziValueError(
+                f"{self.devname}: Did not see activity on all bits! Got 0x{activity:08x}, expected 0x{mask:08x}."
+            )
 
     ##########################################################################
     # Overriding private ZI_base_instrument methods
