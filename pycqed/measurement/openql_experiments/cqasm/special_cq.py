@@ -168,6 +168,7 @@ def active_reset(
         map qubit = q[{qubit_idx}]
 
         .init
+        # FIXME: 
     """
 
     p = OqlProgram(name, platf_cfg)  # NB: name must be identical to name set by "pragma @ql.name" above

@@ -637,6 +637,20 @@
         // measure
         //**************************************************************************************************************
 
+        "measure": {
+            "prototype": ["M:qubit"],
+            "duration": @RO_DURATION@,
+            "cc": {
+                "signal": [
+                    {   "type": "measure",
+                        "operand_idx": 0,
+                        "value": ["dummy"]          // Future extension: specify output and weight, and generate code word
+                    }
+                ],
+                "static_codeword_override": [0]   // FIXME
+            }
+        },
+
         // allow decompositions that prepend measurement with microwave gate
         "_do_measure": {
             "prototype": ["M:qubit"],
@@ -651,7 +665,8 @@
                 "static_codeword_override": [0]   // FIXME
             }
         },
-        "measure": {
+        // FIXME: fails if used in conjunction with legacy API
+        "_measure": {
             "prototype": ["M:qubit"],
             "duration": 0,
             "decomposition": {
@@ -668,6 +683,147 @@
                     "_do_measure q[6]"
                 ]
             }
+        },
+
+
+        //**************************************************************************************************************
+        // Parameterized gate decompositions
+        // Require OpenQL >= 0.10.5 with passes 'opt.ConstProp' and 'opt.DeadCodeElim' enabled
+        //**************************************************************************************************************
+
+        // Parameterized gate decompositions (test)
+        "_rx": {
+           "prototype": ["X:qubit", "L:int"],
+           "duration": 0,
+           "decomposition": {
+               "into": [  // FIXME: makes no real sense, should match gateset used by QI
+                    "if (op(1) < 45) {",
+                    "   rx45 op(0)",
+                    "} else {",
+                    "   rx90 op(0)",
+                    "}"
+                ]
+           }
+        },
+        // Randomized banchmarking (test)
+        // Based on epstein_efficient_decomposition
+        "_test_epstein": {
+           "prototype": ["X:qubit", "R:int"],
+           "duration": 0,
+           "decomposition": {
+                // NB: to meet timing, the CC backend of OpenQL would need to implement a computed goto for this long if-tree
+                // Alternatively, a binary tree could help improve timing
+               "into": [
+                    "if (op(1) == 0) {",
+                    "    i op(0)",
+                    "} else if (op(1) == 1) {",
+                    "    y90 op(0)",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 2) {",
+                    "    mx90 op(0)",
+                    "    my90 op(0)",
+                    "} else if (op(1) == 3) {",
+                    "    x180 op(0)",
+                    "} else if (op(1) == 4) {",
+                    "    my90 op(0)",
+                    "    mx90 op(0)",
+                    "} else if (op(1) == 5) {",
+                    "    x90 op(0)",
+                    "    my90 op(0)",
+                    "} else if (op(1) == 6) {",
+                    "    y180 op(0)",
+                    "} else if (op(1) == 7) {",
+                    "    my90 op(0)",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 8) {",
+                    "    x90 op(0)",
+                    "    y90 op(0)",
+                    "} else if (op(1) == 9) {",
+                    "    x180 op(0)",
+                    "    y180 op(0)",
+                    "} else if (op(1) == 10) {",
+                    "    y90 op(0)",
+                    "    mx90 op(0)",
+                    "} else if (op(1) == 11) {",
+                    "    mx90 op(0)",
+                    "    y90 op(0)",
+                    "} else if (op(1) == 12) {",
+                    "    y90 op(0)",
+                    "    x180 op(0)",
+                    "} else if (op(1) == 13) {",
+                    "    mx90 op(0)",
+                    "} else if (op(1) == 14) {",
+                    "    x90 op(0)",
+                    "    my90 op(0)",
+                    "    mx90 op(0)",
+                    "} else if (op(1) == 15) {",
+                    "    my90 op(0)",
+                    "} else if (op(1) == 16) {",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 17) {",
+                    "    x90 op(0)",
+                    "    y90 op(0)",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 18) {",
+                    "    my90 op(0)",
+                    "    x180 op(0)",
+                    "} else if (op(1) == 19) {",
+                    "    x90 op(0)",
+                    "    y180 op(0)",
+                    "} else if (op(1) == 20) {",
+                    "    x90 op(0)",
+                    "    my90 op(0)",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 21) {",
+                    "    y90 op(0)",
+                    "} else if (op(1) == 22) {",
+                    "    mx90 op(0)",
+                    "    y180 op(0)",
+                    "} else if (op(1) == 23) {",
+                    "    x90 op(0)",
+                    "    y90 op(0)",
+                    "    mx90 op(0)",
+                    "}"
+                    // FIXME: else Error
+                ]
+           }
+        },
+
+        // based on TwoQubitClifford::gate_decomposition
+        "_test_decompose_2q_clifford": {
+           "prototype": ["X:qubit", "X:qubit", "L:int"],
+           "duration": 0,
+           "decomposition": {
+               "into": [
+                    "if (op(2) < 576) {",
+//                    "   _test_single_qubit_like_gates op(0),op(1),op(2)",
+                    "   rx90 op(0)",
+                    "} else if (op(2) < 576 + 5184) {",
+//                    "   _test_CNOT_like_gates op(0),op(1),op(2)",
+                    "   rx90 op(0)",
+                    "}" // FIXME: etc
+                ]
+           }
+        },
+        "_test_single_qubit_like_gates": {
+           "prototype": ["X:qubit", "X:qubit", "R:int", "R:int"],
+           "duration": 0,
+           "decomposition": {
+                // FIXME: becomes sequential if op(0) and op(1) are handled by same sequencer (and also if not!)
+               "into": [
+                    "   _test_epstein op(0), op(2)",
+                    "   _test_epstein op(1), op(3)"
+                ]
+           }
+        },
+        "_test_CNOT_like_gates": {
+           "prototype": ["X:qubit", "X:qubit", "R:int", "R:int", "R:int", "R:int"],
+           "duration": 0,
+           "decomposition": {
+               "into": [
+                    "   rx90 op(0)"
+                ]
+           }
         },
 
         //**************************************************************************************************************

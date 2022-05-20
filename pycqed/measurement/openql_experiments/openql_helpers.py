@@ -694,6 +694,27 @@ class OqlProgram:
             }
         )
 
+        if ql.get_version() >= '0.10.5':
+            # add constant propagation pass
+            c.append_pass(
+                'opt.ConstProp',
+                'const_prop',
+                {
+                    'output_prefix': 'test_output/%N.%P',
+                    'debug': 'yes'
+                }
+            )
+
+            # add dead code elimination pass
+            c.append_pass(
+                'opt.DeadCodeElim',
+                'dead_code_elim',
+                {
+                    'output_prefix': 'test_output/%N.%P',
+                    'debug': 'yes'
+                }
+            )
+
         # schedule
         c.append_pass(
             'sch.ListSchedule',

@@ -499,55 +499,6 @@
             }
         },
 
-        // Parameterized gate decompositions (test)
-        "_rx": {
-           "prototype": ["X:qubit", "L:int"],
-           "duration": @MW_DURATION@,
-           "decomposition": {
-               "into": [  // FIXME: makes no real sense, and currently fails in backend
-                    "if (op(1) < 45) {",
-                    "   rx45 op(0)",
-                    "} else {",
-                    "   rx90 op(0)",
-                    "}"
-                ]
-           }
-        },
-
-        // Randomized banchmarking (test)
-        // based on TwoQubitClifford::gate_decomposition
-        "_test_decompose_2q_clifford": {
-           "prototype": ["X:qubit", "X:qubit", "L:int"],
-           "duration": @MW_DURATION@,  // FIXME: depends
-           "decomposition": {
-               "into": [  // FIXME: currently fails in backend
-                    "if (op(2) < 576) {",
-//                    "   _test_single_qubit_like_gates op(0),op(1),op(2)",
-                    "   rx90 op(0)",
-                    "} else if (op(2) < 576 + 5184) {",
-//                    "   _test_CNOT_like_gates op(0),op(1),op(2)",
-                    "   rx90 op(0)",
-                    "}" // FIXME: etc
-                ]
-           }
-        },
-        "_test_single_qubit_like_gates": {
-           "prototype": ["X:qubit", "X:qubit", "L:int"],
-           "duration": @MW_DURATION@,  // FIXME: depends
-           "decomposition": {
-               "into": [  // FIXME: currently fails in backend
-                ]
-           }
-        },
-        "_test_CNOT_like_gates": {
-           "prototype": ["X:qubit", "X:qubit", "L:int"],
-           "duration": @MW_DURATION@,  // FIXME: depends
-           "decomposition": {
-               "into": [  // FIXME: currently fails in backend
-                ]
-           }
-        },
-
         // Refocussing (test)
         // CZ with park and refocus
         "__cz_sw_ne_park_refocus": {
