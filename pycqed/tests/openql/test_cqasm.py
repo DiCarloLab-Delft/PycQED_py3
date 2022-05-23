@@ -131,7 +131,7 @@ class Test_cQASM(unittest.TestCase):
                 map r4 = creg(5)
                 map foo = creg(31) 
 
-                # Configure Random Number Generators. NB: on all CCIO:  
+                # Configure Random Number Generators. NB: on all modules:  
                 # Quoting PycQED:
                 #     The two qubit clifford group (C2) consists of 11520 two-qubit cliffords
                 #     These gates can be subdivided into four classes.
@@ -143,12 +143,13 @@ class Test_cQASM(unittest.TestCase):
                 #         Two-qubit Clifford group C2     | 11520 elements
 
                 .config_RND
+                # NB: we are currently required by cQASM to assign the function result to a variable
                 set foo = rnd_seed(0, 12345678)                
-                #set foo = rnd_range(0, 20)                
+                set foo = rnd_range(0, 20)                
                 set foo = rnd_seed(1, 12345678)                
-                #set foo = rnd_range(1, 24)                
+                set foo = rnd_range(1, 24)                
                 set foo = rnd_seed(2, 12345678)                
-                #set foo = rnd_range(2, 9)                
+                set foo = rnd_range(2, 3)                
 
                 .rb_2q
                 for (i=0; i<10000; i=i+1) {{
@@ -163,7 +164,6 @@ class Test_cQASM(unittest.TestCase):
                         set r3 = rnd(2)
                         set r4 = rnd(2)
                         _test_cnot_like_gates {qa}, {qb}, r1, r2, r3, r4
-#                        _test_CNOT_like_gates {qa}, {qb}, 1, 2, 3, 4
                     }} else if(r < 1+9+9) {{    # iSWAP-like, probability 5184/11520 = 9/20   
                     }} else {{                  # SWAP-like, probability 576/11520 = 1/20
                     }}
