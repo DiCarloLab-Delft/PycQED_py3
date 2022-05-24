@@ -667,6 +667,7 @@ class HAL_ShimMQ(Instrument):
         turn on and configure the RO LO's of all qubits to be measured and
         update the modulation frequency of all qubits.
         """
+        log.info(f"preparing ro sources for qubits {qubits}")
         # FIXME: This device object works under the assumption that a single LO
         #  is used to drive all readout lines.
         qb = self.find_instrument(qubits[0])

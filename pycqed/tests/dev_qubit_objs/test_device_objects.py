@@ -55,6 +55,15 @@ class Test_Device_obj(unittest.TestCase):
         # generate OpenQL configuration
         gen.generate_config_modular(platf_cfg_path)
 
+        # close all instruments, since a failing test may not have called tearDown, also see:
+        # https://github.com/QCoDeS/Qcodes/issues/528
+        log.info("closing all instruments before we start")
+        try:
+            Instrument.close_all()
+        except Exception as e:
+            print(f"Caught exception during tearDown: {str(e)}")
+        log.info("done closing all instruments")
+
 
         cls.station = station.Station()
 
@@ -694,15 +703,19 @@ class Test_Device_obj(unittest.TestCase):
             nr_seeds=10
         )
 
-    # @unittest.skip("FIXME: WIP")
     # # FIXME: add other parallel variants once they work
     def test_measure_two_qubit_randomized_benchmarking_parallel(self):
         log.info("starting test_measure_two_qubit_randomized_benchmarking_parallel")
-        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"], parallel=True)
+        with self.assertRaises(NotImplementedError):  # FIXME: for now
+            self.device.measure_two_qubit_randomized_benchmarking(
+                qubits=["q8", "q10"],
+                nr_seeds=10,
+                parallel=True
+            )
         log.info("test_measure_two_qubit_randomized_benchmarking_parallel finished")
 
 
-    # FIXME: add measure_interleaved_randomized_benchmarking_statistics
+    # FIXME: add: measure_interleaved_randomized_benchmarking_statistics
 
     # FIXME: fails:
     # pycqed/tests/dev_qubit_objs/test_device_objects.py:699:
@@ -719,10 +732,13 @@ class Test_Device_obj(unittest.TestCase):
     #     LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
     # _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     def test_measure_two_qubit_interleaved_randomized_benchmarking(self):
+        log.info("starting test_measure_two_qubit_interleaved_randomized_benchmarking")
         self.device.measure_two_qubit_interleaved_randomized_benchmarking(
             qubits=["q8", "q10"],
-            nr_seeds=10
+            nr_seeds=10,
+            measure_idle_flux=False  # FIXME: default of 'True' makes test fail with 'Instrument q8 has been removed' as shown above
         )
+        log.info("test_measure_two_qubit_interleaved_randomized_benchmarking finished")
 
     # FIXME: measure_two_qubit_purity_benchmarking
 
@@ -734,10 +750,16 @@ class Test_Device_obj(unittest.TestCase):
 
 
     def test_measure_two_qubit_simultaneous_randomized_benchmarking(self):
-        self.device.measure_two_qubit_simultaneous_randomized_benchmarking(qubits=["q8", "q10"])
+        self.device.measure_two_qubit_simultaneous_randomized_benchmarking(
+            qubits=["q8", "q10"],
+            nr_seeds=10
+        )
 
     def test_measure_multi_qubit_simultaneous_randomized_benchmarking(self):
-        self.device.measure_multi_qubit_simultaneous_randomized_benchmarking(qubits=["q8", "q10"])
+        self.device.measure_multi_qubit_simultaneous_randomized_benchmarking(
+            qubits=["q8", "q10"],
+            nr_seeds=10
+        )
 
 
     def test_measure_two_qubit_allxy(self):

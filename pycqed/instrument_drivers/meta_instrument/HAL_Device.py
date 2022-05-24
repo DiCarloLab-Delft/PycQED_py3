@@ -3124,18 +3124,18 @@ class HAL_Device(HAL_ShimMQ):
             # Perform two-qubit RB (no interleaved gate)
             self.measure_two_qubit_randomized_benchmarking(
                 **common_kwargs,
-                interleaving_cliffords=[None],
+                interleaving_cliffords=[None]
             )
 
             # Perform two-qubit RB with CZ interleaved
             self.measure_two_qubit_randomized_benchmarking(
                 **common_kwargs,
-                interleaving_cliffords=[104368],
+                interleaving_cliffords=[104368]
             )
 
             a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
                 label_base="icl[None]",
-                label_int="icl[104368]",
+                label_int="icl[104368]"
             )
 
             if cardinal:
@@ -3149,7 +3149,7 @@ class HAL_Device(HAL_ShimMQ):
                 self.measure_two_qubit_randomized_benchmarking(
                     **common_kwargs,
                     interleaving_cliffords=[100_000],
-                    flux_allocated_duration_ns=flux_allocated_duration_ns,
+                    flux_allocated_duration_ns=flux_allocated_duration_ns
                 )
 
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
@@ -3532,6 +3532,7 @@ class HAL_Device(HAL_ShimMQ):
         self.ro_acq_digitized(False)
 
         self.prepare_for_timedomain(qubits=qubits)
+
         if MC is None:
             MC = self.instr_MC.get_instr()
         MC.soft_avg(1)
