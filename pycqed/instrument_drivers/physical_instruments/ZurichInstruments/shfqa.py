@@ -1126,7 +1126,34 @@ class SHFQA(ZI_base_instrument, CalInterface):
     def output_dio_calibration_data(
         self, dio_mode: str, port: int = 0
     ) -> Tuple[int, List]:
-        raise NotImplementedError
+
+        self.configure_awg_from_string(
+            awg_nr=DioCalibration.GENERATOR_INDEX,
+            program_string=DioCalibration.SHFQA_TO_CC_PROGRAM,
+        )
+        shfqa_utils.enable_sequencer(
+            self.daq,
+            self.devname,
+            channel_index=DioCalibration.GENERATOR_INDEX,
+            single=1,
+        )
+
+        DIO_SEQUENCER_1_OUTPUT = 32
+        self.set("dios_0_mode", DIO_SEQUENCER_1_OUTPUT)
+        generator_dio_path = (
+            f"qachannels_{DioCalibration.GENERATOR_INDEX}_generator_dio_"
+        )
+        self.set(
+            generator_dio_path + "valid_polarity",
+            uhf_compatibility.Dio.VALID_POLARITY,
+        )
+        self.set(
+            generator_dio_path + "valid_index",
+            uhf_compatibility.Dio.VALID_INDEX,
+        )
+        dio_mask = 0x7FFF
+        expected_sequence = []
+        return dio_mask, expected_sequence
 
     def calibrate_dio_protocol(
         self, dio_mask: int, expected_sequence: List, port: int = 0
