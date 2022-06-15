@@ -149,13 +149,13 @@ class CCCore(SCPIBase):
         self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL {expected_bits}')
 
     def get_calibrate_dio_success(self, ccio: int) -> int:
-        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:SUCCESS?')
+        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:SUCCESS?')
 
     def get_calibrate_dio_read_index(self, ccio: int) -> int:
-        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:READINDEX?')
+        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:READINDEX?')
 
     def get_calibrate_dio_margin(self, ccio: int) -> int:
-        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:MARGIN?')
+        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:MARGIN?')
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')
