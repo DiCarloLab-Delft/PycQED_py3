@@ -323,7 +323,7 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
     Plays an ALLXY sequence in two settings without and with
     a pre-measurement meant to assess depletion after the measurement.
     """
-    p = oqh.create_program("Depletion_AllXY", platf_cfg)
+    p = OqlProgram("Depletion_AllXY", platf_cfg)
 
     allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
              ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -336,35 +336,29 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
 
     for i, xy in enumerate(allXY):
         for j in range(2):
-            k = oqh.create_kernel("AllXY_{}_{}".format(i, j), p)
+            k = p.create_kernel("AllXY_{}_{}".format(i, j))
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
-            # k.gate('wait', [qubit_idx], 500)
+            k.gate('wait', [qubit_idx], 500)
             k.measure(qubit_idx)
             p.add_kernel(k)
 
-            k = oqh.create_kernel("AllXY_meas_{}_{}".format(i, j), p)
+            k = p.create_kernel("AllXY_meas_{}_{}".format(i, j))
             k.prepz(qubit_idx)
             k.measure(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
-            # k.gate('wait', [qubit_idx], 500)
+            k.gate('wait', [qubit_idx], 500)
             k.measure(qubit_idx)
             p.add_kernel(k)
 
-    p = oqh.compile(p)
+    p.compile()
     return p
 
 def T1(qubit_idx: int,
         platf_cfg: str, 
-        times: List[float], 
-        nr_cz_instead_of_idle_time: List[int]=None,
-        qb_cz_idx: int=None,
-        cw_cz_instead_of_idle_time: str='cz',
-        nr_flux_dance: float=None, 
-        wait_time_after_flux_dance: float=0
-        ):
+        times: List[float]):
     """
     Single qubit T1 sequence.
     Writes output files to the directory specified in openql.
@@ -384,30 +378,10 @@ def T1(qubit_idx: int,
     for i, time in enumerate(times[:-4]):
         k = p.create_kernel('T1_{}'.format(i))
         k.prepz(qubit_idx)
-
-        if nr_flux_dance:
-            for _ in range(int(nr_flux_dance)):
-                for step in [1,2,3,4]:
-                    # if refocusing:
-                    #     k.gate(f'flux-dance-{step}-refocus', [0])
-                    # else:
-                    k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment 
-            k.gate("wait", [], wait_time_after_flux_dance)
-
         k.gate('rx180', [qubit_idx])
 
-        if nr_cz_instead_of_idle_time is not None:
-            for n in range(nr_cz_instead_of_idle_time[i]):
-                if cw_cz_instead_of_idle_time.lower() is 'cz':
-                    k.gate("cz", [qubit_idx, qb_cz_idx])
-                else:
-                    k.gate(cw_cz_instead_of_idle_time, [0])
-            k.gate("wait", [], 0)  # alignment 
-            k.gate("wait", [], wait_time_after_flux_dance)
-        else:
-            wait_nanoseconds = int(round(time/1e-9))
-            k.gate("wait", [qubit_idx], wait_nanoseconds)
+        wait_nanoseconds = int(round(time/1e-9))
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
         
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -948,6 +922,7 @@ def off_on(
         fluxed_qubit_idx: int=None,
         wait_time_after_flux: float=0,
         cross_driving_qubit: int=None,
+        mw_train_pulse: int=None,
         ):
 
     """
@@ -985,6 +960,12 @@ def off_on(
                     k.gate(flux_cw_after_init, [fluxed_qubit_idx]) 
             k.gate("wait", [], wait_time_after_flux) 
 
+        if mw_train_pulse:
+             for i in range(int(mw_train_pulse)):
+                k.gate('rx180', [qubit_idx])
+                k.gate('cw_27', [qubit_idx])
+        k.gate("wait", [])
+
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -1006,6 +987,13 @@ def off_on(
             k.gate("wait", [], wait_time_after_flux) 
 
         
+        if mw_train_pulse:
+             for i in range(int(mw_train_pulse)):
+                k.gate('rx180', [qubit_idx])
+                k.gate('cw_27', [qubit_idx])
+        k.gate("wait", [])
+
+
         # k.gate('rx180', [qubit_idx])
         if cross_driving_qubit is not None:
             k.gate('rx180', [cross_driving_qubit])
@@ -1036,32 +1024,40 @@ def off_on(
     return p
 
 def RO_QND_sequence(q_idx,
-                    platf_cfg: str):
+                    platf_cfg: str,
+                    use_rx12: bool = False):
     '''
     RO QND sequence.
     '''
 
     p = OqlProgram("RO_QND_sequence", platf_cfg)
 
+    def add_measure(k, idx, rx12):
+        if rx12:
+            k.gate('rx12', [q_idx])
+            k.measure(idx)
+            k.gate('rx12', [q_idx])
+        else:
+            k.measure(idx)
+
     k = p.create_kernel("Experiment")
-    
     k.prepz(q_idx)
     k.gate('rx90', [q_idx])
-    k.measure(q_idx)
-    k.measure(q_idx)
+    add_measure(k, q_idx, use_rx12)
+    add_measure(k, q_idx, use_rx12)
     k.gate('rx180', [q_idx])
-    k.measure(q_idx)
+    add_measure(k, q_idx, use_rx12)
     p.add_kernel(k)
 
     k = p.create_kernel("Init_0")
     k.prepz(q_idx)
-    k.measure(q_idx)
+    add_measure(k, q_idx, use_rx12)
     p.add_kernel(k)
 
     k = p.create_kernel("Init_1")
     k.prepz(q_idx)
     k.gate('rx180', [q_idx])
-    k.measure(q_idx)
+    add_measure(k, q_idx, use_rx12)
     p.add_kernel(k)
     
     p.compile()

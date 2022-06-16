@@ -409,8 +409,10 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         # This enforces the oscillation to start at the equator
         # and ensures that any over/under rotation is absorbed in the
         # frequency
-        guess_pars["amplitude"].value = 0.5
+        guess_pars["amplitude"].value = 0.45
         guess_pars["amplitude"].vary = True
+        guess_pars["amplitude"].min = 0.4
+        guess_pars["amplitude"].max = 0.5
         guess_pars["offset"].value = 0.5
         guess_pars["offset"].vary = True
 

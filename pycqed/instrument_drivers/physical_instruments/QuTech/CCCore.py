@@ -15,6 +15,7 @@
 
 import logging
 import sys
+import re
 
 from pycqed.instrument_drivers.library.SCPIBase import SCPIBase
 from pycqed.instrument_drivers.library.Transport import Transport
@@ -109,10 +110,16 @@ class CCCore(SCPIBase):
     # CC SCPI protocol wrapper functions
     ##########################################################################
 
-    def sequence_program_assemble(self, program_string: str) -> None:
+    def sequence_program_assemble(self, program_string: str, strip_comments: bool = True) -> None:
         """
         upload sequence program string
         """
+        # optionally strip comments to reduce size and limit transfer and assembly time
+        if(strip_comments):
+            print(f'original size of .vq1asm {len(program_string)}')
+            program_string = re.sub(r"#.*", "", program_string)
+            print(f'size of .vq1asm {len(program_string)} after stripping comments')
+
         # check size, because overrunning gives irrecoverable errors. FIXME: move to Transport
         if len(program_string) > self._MAX_PROG_STR_LEN:
             raise RuntimeError(f'source program size {len(program_string)} exceeds maximum of {self._MAX_PROG_STR_LEN}')

@@ -174,7 +174,6 @@ class None_Sweep(Soft_Sweep):
         '''
         pass
 
-
 class None_Sweep_With_Parameter_Returned(Soft_Sweep):
 
     def __init__(self, sweep_control='soft', sweep_points=None,
@@ -447,6 +446,7 @@ class ZNB_VNA_sweep(Hard_Sweep):
     def finish(self, **kw):
         self.VNA.rf_off()
 
+
 class QWG_lutman_par(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, **kw):
@@ -569,26 +569,23 @@ class RO_freq_sweep(Soft_Sweep):
     label and units are grabbed from parameter_1
     """
 
-    def __init__(self, name, qubit, ro_lutman, idx, parameter):
+    def __init__(self, qubit):
         self.set_kw()
-        self.name = name
-        self.parameter_name = parameter.label
-        self.unit = parameter.unit
+        self.name = 'Readout_frequency_sweep'
+        self.parameter_name = 'Readout_frequency'
+        self.unit = 'Hz'
         self.sweep_control = 'soft'
         self.qubit = qubit
-        self.ro_lm = ro_lutman
-        self.idx = idx
+        self.ro_lm = qubit.instr_LutMan_RO.get_instr()
+        self.q_idx = qubit.cfg_qubit_nr()
 
     def set_parameter(self, val):
         LO_freq = self.ro_lm.LO_freq()
         IF_freq = val - LO_freq
-        # Parameter 1 will be qubit.ro_freq()
-        # self.qubit.ro_freq.set(val)
-        # Parameter 2 will be qubit.ro_freq_mod()
-        self.qubit.ro_freq_mod.set(IF_freq)
-
-        self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
-        self.ro_lm.load_waveforms_onto_AWG_lookuptable()
+        self.qubit.ro_freq_mod(IF_freq)
+        self.ro_lm.set('M_modulation_R{}'.format(self.q_idx), IF_freq)
+        self.ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
+        self.qubit._prep_ro_integration_weights()
 
 
 class QWG_lutman_par_chunks(Soft_Sweep):
@@ -900,6 +897,7 @@ class multi_sweep_function(Soft_Sweep):
                 v = (val-1)*self.sweep_point_ratios[i]+1
                 sweep_function.set_parameter(v)
 
+
 class multi_sweep_function_ranges(Soft_Sweep):
     '''
     cascades several sweep functions into a single joint sweep functions.
@@ -1021,6 +1019,7 @@ class FLsweep(Soft_Sweep):
         self.AWG.start()
         return
 
+
 class flux_t_middle_sweep(Soft_Sweep):
 
     def __init__(self, 
@@ -1115,6 +1114,7 @@ class Nested_resonator_tracker(Soft_Sweep):
         spec_source.on()
         self.cc.start()
 
+
 class Nested_spec_source_pow(Soft_Sweep):
     """
     Sets a parameter and performs a "find_resonator_frequency" measurement
@@ -1142,6 +1142,7 @@ class Nested_spec_source_pow(Soft_Sweep):
         spec_source.on()
         self.cc.start()
 
+
 class Nested_amp_ro(Soft_Sweep):
     """
     Sets a parameter and performs a "find_resonator_frequency" measurement
@@ -1167,6 +1168,7 @@ class Nested_amp_ro(Soft_Sweep):
             # reload the meaningfull sequence
             self.cc.eqasm_program(self.sequence_file.filename)
         self.cc.start()
+
 
 class tim_flux_latency_sweep(Soft_Sweep):
     def __init__(self, device):

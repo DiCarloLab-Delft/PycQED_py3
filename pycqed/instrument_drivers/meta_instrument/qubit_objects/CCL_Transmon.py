@@ -2133,7 +2133,6 @@ class CCLight_Transmon(Qubit):
     #         LutMan.mixer_alpha(alpha)
     #         LutMan.mixer_phi(phi)
 
-
     def calibrate_mixer_skewness_RO(self, update=True):
             """
             Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
@@ -2707,7 +2706,6 @@ class CCLight_Transmon(Qubit):
         if verify:
             log.warning('Not verifying as settings were not updated.')
         return True
-
 
     #####################################################
     # "measure_" methods below
@@ -3737,6 +3735,8 @@ class CCLight_Transmon(Qubit):
             post_select: bool = False,
             post_select_threshold: float = None,
             nr_flux_after_init: float=None,
+            cross_driving_qubit: int=None,
+            mw_train_pulse: int=None,
             flux_cw_after_init: Union[str, List[str]]=None,
             fluxed_qubit: str=None,
             wait_time_after_flux: float=0,
@@ -3801,6 +3801,8 @@ class CCLight_Transmon(Qubit):
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
             nr_flux_after_init=nr_flux_after_init,
+            mw_train_pulse=mw_train_pulse,
+            cross_driving_qubit=cross_driving_qubit,
             flux_cw_after_init=flux_cw_after_init, 
             wait_time_after_flux=wait_time_after_flux, 
             fluxed_qubit_idx=self.find_instrument(fluxed_qubit).cfg_qubit_nr() \
@@ -3876,7 +3878,6 @@ class CCLight_Transmon(Qubit):
                 'F_a': a.qoi['F_a'],
                 'relaxation': a.proc_data_dict['relaxation_events'],
                 'excitation': a.proc_data_dict['residual_excitation']}
-
 
     def measure_ssro_vs_TWPA_frequency_power(
             self, pump_source, freqs, powers,
@@ -4055,64 +4056,115 @@ class CCLight_Transmon(Qubit):
 
     def measure_RO_QND(
             self,
-            prepare_for_timedomain: bool = False,
+            prepare_for_timedomain: bool = True,
             calibrate_optimal_weights: bool = False,
+            nr_max_acq: int = 2**17,
+            disable_metadata: bool = False,
+            no_figs: bool = False,
+            use_rx12: bool = False
             ):
-        # ensure readout settings are restored
-        old_ro_type = self.ro_acq_weight_type()
-        old_acq_type = self.ro_acq_digitized()
+        # ensure readout settings are correct
+        assert self.ro_acq_weight_type() != 'optimal'
+        assert self.ro_acq_digitized() == False
 
         if calibrate_optimal_weights:
-            self.calibrate_optimal_weights(prepare=True)
-        
-        self.ro_acq_digitized(False)
-        self.ro_acq_weight_type('optimal IQ')
+            self.calibrate_optimal_weights(
+                prepare=prepare_for_timedomain,
+                verify=False, 
+                optimal_IQ=True,
+                disable_metadata=True)
+
         if prepare_for_timedomain:
+            if use_rx12:
+                mw_lm = self.instr_LutMan_MW.get_instr()
+                LM = mw_lm.LutMap()
+                LM[9] = {'name': 'rX12', 'theta': 180, 'phi': 0, 'type': 'ef'}
+                mw_lm.LutMap(LM)
             self.prepare_for_timedomain()
-        else:
-            # we always need to prepare at least readout
-            self.prepare_readout()
-        
+
         d = self.int_log_det
-        # the QND sequence has 5 measurements, 
+        # the QND sequence has 5 measurements,
         # therefore we need to make sure the number of shots is a multiple of that
-        uhfqc_max_avg = 2**17
-        d.nr_shots = int(uhfqc_max_avg/5) * 5
-        p = sqo.RO_QND_sequence(q_idx = self.cfg_qubit_nr(),
-                                platf_cfg = self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
+        uhfqc_max_avg = min(max(2**10, nr_max_acq), 2**17)
+        nr_measurements: int = 5
+        nr_shots: int = int(uhfqc_max_avg/nr_measurements) * nr_measurements
+        d.nr_shots = nr_shots
+        p = sqo.RO_QND_sequence(
+            q_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            use_rx12=use_rx12
+        )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr()
+        )
         MC = self.instr_MC.get_instr()
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(int(uhfqc_max_avg/5)*5))
+        MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run(f"RO_QND_measurement_{self.name}")
-        self.ro_acq_weight_type(old_ro_type)
-        self.ro_acq_digitized(old_acq_type)
-
-        a = ma2.mra.measurement_QND_analysis(qubit=self.name, label='QND')
-        return a.quantities_of_interest
-
+        MC.run(
+            f"RO_QND_measurement_{self.name}",
+            disable_snapshot_metadata=disable_metadata
+        )
+        a = ma2.mra.measurement_QND_analysis(
+            qubit=self.name,
+            label='QND',
+            extract_only=no_figs)
+        return a.qoi
 
     def calibrate_RO_QND(
             self,
-            amps: list
-            ):
-        s = self.ro_pulse_amp
-        d = det.Function_Detector(self.measure_RO_QND,
-                                  result_keys=['P_QND', 'P_QNDp'],
-                                  value_names=['P_QND', 'P_QNDp'],
-                                  value_units=['a.u.', 'a.u.'],
-                                  msmt_kw={'calibrate_optimal_weights': False}
-                                  )
+            frequencies: list,
+            amplitudes: list,
+            use_rx12:bool=False,
+            update_ro_params: bool = True):
+        '''
+        Sweeps readout frequency and amplitude while measuring
+        RO fidelity and QNDness. Updates readout frequency and
+        amplitude to optimal values in the sweep based on P_QND.
+        '''
+        # ensure readout settings are correct
+        assert self.ro_acq_weight_type() != 'optimal'
+        assert self.ro_acq_digitized() == False
+        # prepare for timedomain
+        self.prepare_for_timedomain()
+        # Set sweep function and detector function
+        ro_lm = self.instr_LutMan_RO.get_instr()
+        q_idx = self.cfg_qubit_nr()
+        swf1 = swf.RO_freq_sweep(qubit=self)
+        swf2 = swf.lutman_par_UHFQC_dig_trig(
+            LutMan=ro_lm,
+            LutMan_parameter=ro_lm.parameters[f'M_amp_R{q_idx}'])
+        d = det.Function_Detector(
+            self.measure_RO_QND,
+            msmt_kw={'prepare_for_timedomain' : False,
+                     'disable_metadata' : True,
+                     'nr_max_acq' : 2**15,
+                     'use_rx12':use_rx12,
+                     'no_figs' : False},
+            result_keys=['Fidelity', 'P_QND', 'P_QNDp'],
+            value_names=['Fidelity', 'P_QND', 'P_QNDp'],
+            value_units=['fraction', 'fraction', 'fraction'])
         nested_MC = self.instr_nested_MC.get_instr()
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_function_2D(swf2)
+        nested_MC.set_sweep_points(frequencies)
+        nested_MC.set_sweep_points_2D(amplitudes)
         nested_MC.set_detector_function(d)
-        nested_MC.set_sweep_function(s)
-        nested_MC.set_sweep_points(amps)
-        nested_MC.run(f"RO_QND_sweep_{self.name}")
+        nested_MC.run(f'RO_QND_sweep_{self.name}', mode='2D')
 
+        a = ma2.mra.Readout_sweep_analysis(
+            label=f'RO_QND_sweep_{self.name}',
+            qubit=self.name,
+            frequencies=frequencies,
+            amplitudes=amplitudes)
+
+        if update_ro_params:
+            opt_freq, opt_amp = a.qoi['Opt_Cal']
+            self.ro_freq(opt_freq)
+            self.ro_pulse_amp(opt_amp)
 
     def measure_transients_CCL_switched(self, MC=None, analyze: bool = True,
                                         cases=('off', 'on'),
@@ -4164,8 +4216,11 @@ class CCLight_Transmon(Qubit):
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
-    def measure_dispersive_shift_pulsed(self, freqs=None, MC=None, analyze: bool = True,
-                                        prepare: bool = True, Pulse_comb: list=['off', 'on']):
+    def measure_dispersive_shift_pulsed(
+        self, 
+        freqs=None,
+        analyze: bool = True,
+        prepare: bool = True):
         """
         Measures the RO resonator spectroscopy with the qubit in ground and excited state.
         Specifically, performs two experiments. Applies sequence:
@@ -4180,8 +4235,7 @@ class CCLight_Transmon(Qubit):
         """
 
         # docstring from parent class
-        if MC is None:
-            MC = self.instr_MC.get_instr()
+        MC = self.instr_MC.get_instr()
 
         if freqs is None:
             if self.freq_res() is None:
@@ -4200,7 +4254,7 @@ class CCLight_Transmon(Qubit):
         # off/on switching is achieved by turning the MW source on and
         # off as this is much faster than recompiling/uploading
         f_res = []
-        for i, pulse_comb in enumerate(Pulse_comb):
+        for i, pulse_comb in enumerate(['off', 'on']):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
                 initialize=False,
@@ -4216,13 +4270,7 @@ class CCLight_Transmon(Qubit):
             self.int_avg_det_single._set_real_imag(False)
             MC.set_detector_function(self.int_avg_det_single)
             MC.run(name='Resonator_scan_'+pulse_comb+self.msmt_suffix)
-            if analyze:
-                ma.MeasurementAnalysis()
-                a = ma.Homodyne_Analysis(
-                    label=self.msmt_suffix, close_fig=True)
-                # fit converts to Hz
-                f_res.append(a.fit_results.params['f0'].value*1e9)
-
+            
         if analyze:
             a = ma2.Dispersive_shift_Analysis()
             self.dispersive_shift(a.qoi['dispersive_shift'])
@@ -4440,7 +4488,8 @@ class CCLight_Transmon(Qubit):
     def measure_depletion_allxy(self, MC=None,
                                 analyze=True, close_fig=True,
                                 prepare_for_timedomain=True,
-                                label=''):
+                                label='',
+                                disable_metadata=False):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -4453,7 +4502,8 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(21*2*3))
         MC.set_detector_function(d)
-        MC.run('Depletion_AllXY'+self.msmt_suffix+label)
+        MC.run('Depletion_AllXY'+self.msmt_suffix+label,
+               disable_snapshot_metadata=disable_metadata)
         ma2.mra.Depletion_AllXY_analysis(self.name, label='Depletion')
 
     def calibrate_mw_gates_restless(
@@ -5051,12 +5101,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_T1(
             self, 
-            times: List[float]=None, 
-            nr_cz_instead_of_idle_time: List[int]=None,
-            qb_cz_instead_of_idle_time: str=None,
-            cw_cz_instead_of_idle_time: str='cz',
-            nr_flux_dance: float=None,
-            wait_time_after_flux_dance: float=0,
+            times: List[float]=None,
             prepare_for_timedomain=True,
             update=True,
             close_fig=True,
@@ -5068,63 +5113,29 @@ class CCLight_Transmon(Qubit):
         the CCL transmon.
 
         """
-        if times and nr_cz_instead_of_idle_time:
-            raise ValueError("Either idle time or CZ mode must be chosen!")
-
-        if nr_cz_instead_of_idle_time is not None \
-                and not qb_cz_instead_of_idle_time \
-                and cw_cz_instead_of_idle_time.lower() == 'cz':
-            raise ValueError("If CZ instead of idle time should be used, qubit to apply CZ to must be given!")
         
-        if qb_cz_instead_of_idle_time:
-            qb_cz_idx = self.find_instrument(qb_cz_instead_of_idle_time).cfg_qubit_nr()
-
         if MC is None:
             MC = self.instr_MC.get_instr()
-
         if times is None:
-            if nr_cz_instead_of_idle_time is not None:
-                # convert given numbers of CZs into time
-                # NOTE: CZ time hardcoded to 40ns!
-                times = np.array(nr_cz_instead_of_idle_time) * 40e-9
-            else:
-                # default timing: 4 x current T1
-                times = np.linspace(0, self.T1()*4, 31)
-
-        if nr_cz_instead_of_idle_time is not None:
-            # define time for calibration points at sufficiently distant times
-            dt = 10*40e-9 # (times[-1] - times[-2])/2
-        else:
-            # append the calibration points, times are for location in plot
-            dt = times[1] - times[0]
-
+            times = np.linspace(0, 4*self.T1(), 51)
+        dt = times[1] - times[0]
         times = np.concatenate([times, (times[-1]+1*dt,
                                         times[-1]+2*dt,
                                         times[-1]+3*dt,
                                         times[-1]+4*dt) ])
-
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-
         p = sqo.T1(qubit_idx=self.cfg_qubit_nr(),
                     platf_cfg=self.cfg_openql_platform_fn(),
-                    times=times,
-                    nr_cz_instead_of_idle_time=nr_cz_instead_of_idle_time,
-                    qb_cz_idx=qb_cz_idx if qb_cz_instead_of_idle_time else None,
-                    cw_cz_instead_of_idle_time=cw_cz_instead_of_idle_time,
-                    nr_flux_dance=nr_flux_dance, 
-                    wait_time_after_flux_dance=wait_time_after_flux_dance)
-
+                    times=times)
         s = swf.OpenQL_Sweep(openql_program=p,
                              parameter_name='Time',
                              unit='s',
                              CCL=self.instr_CC.get_instr())
-
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
         MC.run('T1'+self.msmt_suffix)
-
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
             if update:
@@ -5284,7 +5295,6 @@ class CCLight_Transmon(Qubit):
                 }
                 return res
 
-
     def measure_complex_ramsey(self, times=None, MC=None,
                        freq_qubit: float = None,
                        label: str = '',
@@ -5373,7 +5383,6 @@ class CCLight_Transmon(Qubit):
             #         'frequency': a.qubit_frequency,
             #     }
             #     return res
-
 
     def measure_msmt_induced_dephasing(self, MC=None, sequence='ramsey',
                                        label: str = '',
@@ -5620,7 +5629,6 @@ class CCLight_Transmon(Qubit):
 
             return a
 
-
     def measure_spin_locking_simple(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
                      label: str = '', prepare_for_timedomain=True,
@@ -5686,7 +5694,6 @@ class CCLight_Transmon(Qubit):
             a = ma.T1_Analysis(label='spin_lock_simple', auto=True, close_fig=True)
             return a
 
-
     def measure_spin_locking_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
                      label: str = '', prepare_for_timedomain=True):
@@ -5741,7 +5748,6 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma.T1_Analysis(label='spin_lock_echo', auto=True, close_fig=True)
             return a
-
 
     def measure_rabi_frequency(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
@@ -5808,10 +5814,19 @@ class CCLight_Transmon(Qubit):
             a = ma.Echo_analysis_V15(label='rabi_frequency', auto=True, close_fig=True)
             return a
 
-
-    def measure_flipping(self, number_of_flips=np.arange(0, 61, 2), equator=True,
-                         MC=None, analyze=True, close_fig=True, update=False,flip_ef=False,
-                         ax='x', angle='180',label=''):
+    def measure_flipping(
+        self, 
+        number_of_flips=np.arange(0, 61, 2), 
+        equator=True,
+        MC=None, 
+        analyze=True, 
+        close_fig=True, 
+        update=False,
+        flip_ef=False,
+        ax='x', 
+        angle='180',
+        label='',
+        disable_metadata=False):
         """
         Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
         pi (repeated N-times) - pi/2 - measure
@@ -5871,7 +5886,8 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
         if flip_ef:
             label = 'ef_rx12'
-        MC.run('flipping_'+ax+angle+label+self.msmt_suffix)
+        MC.run('flipping_'+ax+angle+label+self.msmt_suffix,
+               disable_snapshot_metadata=disable_metadata)
         if analyze:
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})
@@ -5880,7 +5896,7 @@ class CCLight_Transmon(Qubit):
             # choose scale factor based on simple goodness-of-fit comparison
             # This method gives priority to the line fit: 
             # the cos fit will only be chosen if its chi^2 relative to the 
-            # chi^2 of the line fit is at least 10% smaller 
+            # chi^2 of the line fit is at least 10% smaller
             if (a.fit_res['line_fit'].chisqr - a.fit_res['cos_fit'].chisqr)/a.fit_res['line_fit'].chisqr \
                     > 0.1:
                 scale_factor = a._get_scale_factor_cos()
@@ -6318,7 +6334,6 @@ class CCLight_Transmon(Qubit):
             ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
             self.mw_ef_amp(a2.proc_data_dict['ef_pi_amp'])
 
-
     def measure_gst_1Q(self,
                        shots_per_meas: int,
                        maxL: int = 256,
@@ -6578,224 +6593,6 @@ class CCLight_Transmon(Qubit):
                 prepare_function_kwargs=prepare_function_kwargs,
                 always_prepare=True)
         return d
-
-    # ###########################################################################
-    # # Dep graph
-    # ###########################################################################
-    # def create_dep_graph(self):
-    #     dag = AutoDepGraph_DAG(name=self.name+' DAG')
-    #     cal_True_delayed = 'autodepgraph.node_functions.calibration_functions.test_calibration_True_delayed'
-
-    #     dag.add_node('Resonators Wide Search',
-    #                  calibrate_function=self.name + '.find_resonators')
-    #     dag.add_node('Zoom on resonators',
-    #                  calibrate_function=self.name + '.find_resonator_frequency_initial')
-    #     dag.add_node('Resonators Power Scan',
-    #                  calibrate_function=self.name + '.find_test_resonators')
-    #     dag.add_node('Resonators Flux Sweep',
-    #                  calibrate_function=self.name + '.find_qubit_resonator_fluxline')
-
-    #     dag.add_node(self.name + ' Resonator Frequency',
-    #                  calibrate_function=self.name + '.find_resonator_frequency')
-    #     dag.add_node(self.name + ' Resonator Power Scan',
-    #                  calibrate_function=self.name + '.calibrate_ro_pulse_amp_CW')
-
-    #     # Calibration of instruments and ro
-    #     dag.add_node(self.name + ' Calibrations',
-    #                  calibrate_function=cal_True_delayed)
-    #     dag.add_node(self.name + ' Mixer Skewness',
-    #                  # calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
-    #                  calibrate_function=cal_True_delayed)
-    #     dag.add_node(self.name + ' Mixer Offset Drive',
-    #                  calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
-    #     dag.add_node(self.name + ' Mixer Offset Readout',
-    #                  calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
-    #     dag.add_node(self.name + ' Ro/MW pulse timing',
-    #                  calibrate_function=cal_True_delayed)
-
-    #     dag.add_node(self.name + ' Mixer Skewness',
-    #                  # calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
-    #                  calibrate_function=cal_True_delayed)
-    #     dag.add_node(self.name + ' Mixer Offset Drive',
-    #                  calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
-    #     dag.add_node(self.name + ' Mixer Offset Readout',
-    #                  calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
-    #     dag.add_node(self.name + ' Ro/MW pulse timing',
-    #                  calibrate_function=cal_True_delayed)
-
-    #     dag.add_node(self.name + ' Mixer Skewness Drive',
-    #                  calibrate_function=cal_True_delayed)
-    #                       # calibrate_function=self.name + '.calibrate_mixer_skewness_drive')
-    #     dag.add_node(self.name + ' Mixer Skewness Readout',
-    #                  calibrate_function=cal_True_delayed)
-    #                       # calibrate_function=self.name + '.calibrate_mixer_skewness_RO')
-    #     dag.add_node(self.name + ' Mixer Offset Drive',
-    #                  calibrate_function=self.name + '.calibrate_mixer_offsets_drive')
-    #     dag.add_node(self.name + ' Mixer Offset Readout',
-    #                  calibrate_function=self.name + '.calibrate_mixer_offsets_RO')
-    #     dag.add_node(self.name + ' Ro/MW pulse timing',
-    #                  calibrate_function=cal_True_delayed)
-
-    #     # Qubits calibration
-    #     dag.add_node(self.name + ' Frequency Coarse',
-    #                  calibrate_function=self.name + '.find_frequency',
-    #                  check_function=self.name + '.check_qubit_spectroscopy',
-    #                  tolerance=0.2e-3)
-    #     dag.add_node(self.name + ' Frequency at Sweetspot',
-    #                  calibrate_function=self.name + '.find_frequency')
-    #     dag.add_node(self.name + ' Spectroscopy Power',
-    #                  calibrate_function=self.name + '.calibrate_spec_pow')
-    #     dag.add_node(self.name + ' Sweetspot',
-    #                  calibrate_function=self.name + '.find_qubit_sweetspot')
-    #     dag.add_node(self.name + ' Rabi',
-    #                  calibrate_function=self.name + '.calibrate_mw_pulse_amplitude_coarse',
-    #                  check_function=self.name + '.check_rabi',
-    #                  tolerance=0.01)
-    #     dag.add_node(self.name + ' Frequency Fine',
-    #                  calibrate_function=self.name + '.calibrate_frequency_ramsey',
-    #                  check_function=self.name + '.check_ramsey',
-    #                  tolerance=0.1e-3)
-    #     dag.add_node(self.name + ' f_12 estimate',
-    #                  calibrate_function=self.name + ' find_anharmonicity_estimate')
-    #     dag.add_node(self.name + ' DAC Arc Polynomial',
-    #                  calibrate_function=cal_True_delayed)
-
-    #     # dag.add_node(self.name + ' Calibrate single qubit gate',
-    #     #              calibrate_function=None)
-    #     # dag.add_edge(self.name + ' Calibrate single qubit gate', self.name + ' Rabi')
-
-    #     # Validate qubit calibration
-    #     # dag.add_node(self.name + ' ALLXY',
-    #     #              calibrate_function=self.name + '.measure_allxy')
-    #     # dag.add_node(self.name + ' MOTZOI Calibration',
-    #     #              calibrate_function=self.name + '.calibrate_motzoi')
-
-    #     # If all goes well, the qubit is fully 'calibrated' and can be controlled
-
-    #     # Qubits measurements
-    #     dag.add_node(self.name + ' Anharmonicity')
-    #     dag.add_node(self.name + ' Avoided Crossing')
-    #     dag.add_node(self.name + ' T1')
-    #     dag.add_node(self.name + ' T1(time)')
-    #     dag.add_node(self.name + ' T1(frequency)')
-    #     dag.add_node(self.name + ' T2_Echo')
-    #     dag.add_node(self.name + ' T2_Echo(time)')
-    #     dag.add_node(self.name + ' T2_Echo(frequency)')
-    #     dag.add_node(self.name + ' T2_Star')
-    #     dag.add_node(self.name + ' T2_Star(time)')
-    #     dag.add_node(self.name + ' T2_Star(frequency)')
-    #     #######################################################################
-    #     # EDGES
-    #     #######################################################################
-
-    #     # Resonators
-    #     dag.add_edge('Zoom on resonators', 'Resonators Wide Search')
-    #     dag.add_edge('Resonators Power Scan',
-    #                  'Zoom on resonators')
-    #     dag.add_edge('Resonators Flux Sweep',
-    #                  'Zoom on resonators')
-    #     dag.add_edge('Resonators Flux Sweep',
-    #                  'Resonators Power Scan')
-
-    #     dag.add_edge(self.name + ' Resonator Frequency',
-    #                  'Resonators Power Scan')
-    #     dag.add_edge(self.name + ' Resonator Frequency',
-    #                  'Resonators Flux Sweep')
-    #     dag.add_edge(self.name + ' Resonator Power Scan',
-    #                  self.name + ' Resonator Frequency')
-    #     dag.add_edge(self.name + ' Frequency Coarse',
-    #                  self.name + ' Resonator Power Scan')
-    #     # Qubit Calibrations
-    #     dag.add_edge(self.name + ' Frequency Coarse',
-    #                  self.name + ' Resonator Frequency')
-    #     dag.add_edge(self.name + ' Resonator Frequency',
-    #                  self.name + ' Calibrations')
-
-    #     # Calibrations
-    #     dag.add_edge(self.name + ' Calibrations',
-    #                  self.name + ' Mixer Skewness')
-    #     dag.add_edge(self.name + ' Calibrations',
-    #                  self.name + ' Mixer Offset Drive')
-    #     dag.add_edge(self.name + ' Calibrations',
-    #                  self.name + ' Mixer Offset Readout')
-    #     dag.add_edge(self.name + ' Calibrations',
-    #                  self.name + ' Ro/MW pulse timing')
-    #     dag.add_edge(self.name + ' Calibrations',
-    #                  self.name + ' Ro Pulse Amplitude')
-    #     # Qubit
-    #     dag.add_edge(self.name + ' Spectroscopy Power',
-    #                  self.name + ' Frequency Coarse')
-    #     dag.add_edge(self.name + ' Sweetspot',
-    #                  self.name + ' Frequency Coarse')
-    #     dag.add_edge(self.name + ' Sweetspot',
-    #                  self.name + ' Spectroscopy Power')
-    #     dag.add_edge(self.name + ' Rabi',
-    #                  self.name + ' Frequency at Sweetspot')
-    #     dag.add_edge(self.name + ' Frequency Fine',
-    #                  self.name + ' Frequency at Sweetspot')
-    #     dag.add_edge(self.name + ' Frequency Fine',
-    #                  self.name + ' Rabi')
-
-    #     dag.add_edge(self.name + ' Frequency at Sweetspot',
-    #                  self.name + ' Sweetspot')
-
-    #     dag.add_edge(self.name + ' ALLXY',
-    #                  self.name + ' Rabi')
-    #     dag.add_edge(self.name + ' ALLXY',
-    #                  self.name + ' Frequency Fine')
-    #     dag.add_edge(self.name + ' ALLXY',
-    #                  self.name + ' MOTZOI Calibration')
-
-    #     dag.add_edge(self.name + ' T1',
-    #                  self.name + ' Frequency Fine')
-    #     dag.add_edge(self.name + ' T2_Echo',
-    #                  self.name + ' Frequency Fine')
-    #     dag.add_edge(self.name + ' T2_Star',
-    #                  self.name + ' Frequency Fine')
-
-    #     # Perform initial measurements to see if they make sense
-    #     dag.add_edge(self.name + ' T1',
-    #                  self.name + ' ALLXY')
-    #     dag.add_edge(self.name + ' T2_Echo',
-    #                  self.name + ' ALLXY')
-    #     dag.add_edge(self.name + ' T2_Star',
-    #                  self.name + ' ALLXY')
-
-    #     # Measure as function of frequency and time
-    #     dag.add_edge(self.name + ' T1(frequency)',
-    #                  self.name + ' T1')
-    #     dag.add_edge(self.name + ' T1(time)',
-    #                  self.name + ' T1')
-
-    #     dag.add_edge(self.name + ' T2_Echo(frequency)',
-    #                  self.name + ' T2_Echo')
-    #     dag.add_edge(self.name + ' T2_Echo(time)',
-    #                  self.name + ' T2_Echo')
-
-    #     dag.add_edge(self.name + ' T2_Star(frequency)',
-    #                  self.name + ' T2_Star')
-    #     dag.add_edge(self.name + ' T2_Star(time)',
-    #                  self.name + ' T2_Star')
-
-    #     dag.add_edge(self.name + ' DAC Arc Polynomial',
-    #                  self.name + ' Frequency at Sweetspot')
-
-    #     # Measurements of anharmonicity and avoided crossing
-    #     dag.add_edge(self.name + ' f_12 estimate',
-    #                  self.name + ' Frequency at Sweetspot')
-    #     dag.add_edge(self.name + ' Anharmonicity',
-    #                  self.name + ' f_12 estimate')
-    #     dag.add_edge(self.name + ' Avoided Crossing',
-    #                  self.name + ' DAC Arc Polynomial')
-
-    #     dag.cfg_plot_mode = 'svg'
-    #     dag.update_monitor()
-    #     dag.cfg_svg_filename
-
-    #     url = dag.open_html_viewer()
-    #     print('Dependancy Graph Created. URL = '+url)
-    #     self._dag = dag
-    #     return dag
 
     # functions for quantum efficiency measurements and crossdephasing measurements
 
