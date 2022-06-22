@@ -4,6 +4,7 @@ from pytest import approx
 import numpy as np
 import os
 import pathlib
+import logging
 
 import pycqed as pq
 
@@ -38,6 +39,7 @@ this_path = pathlib.Path(__file__).parent
 output_path = pathlib.Path(this_path) / 'test_output_cc'
 platf_cfg_path = output_path / 'config_cc_s17_direct_iq_openql_0_10.json'
 
+log = logging.getLogger(__name__)
 
 class Test_Device_obj(unittest.TestCase):
     # FIXME: using setUpClass is more efficient, but failing tests tend to influence each other, making debugging difficult
@@ -48,8 +50,19 @@ class Test_Device_obj(unittest.TestCase):
         """
         This sets up a mock setup using a CC to control multiple qubits
         """
+
+        log.info("starting setUp")
         # generate OpenQL configuration
         gen.generate_config_modular(platf_cfg_path)
+
+        # close all instruments, since a failing test may not have called tearDown, also see:
+        # https://github.com/QCoDeS/Qcodes/issues/528
+        log.info("closing all instruments before we start")
+        try:
+            Instrument.close_all()
+        except Exception as e:
+            print(f"Caught exception during tearDown: {str(e)}")
+        log.info("done closing all instruments")
 
 
         cls.station = station.Station()
@@ -177,7 +190,7 @@ class Test_Device_obj(unittest.TestCase):
             # q.mw_vsm_delay(15)
             q.mw_mixer_offs_GI(0.1)
             q.mw_mixer_offs_GQ(0.2)
-            q.mw_mixer_offs_DI(0.3)
+            q.mw_mixer_offs_DI(0.3) # FIXME
             q.mw_mixer_offs_DQ(0.4)
 
         # Set up the device object and set required params
@@ -230,12 +243,18 @@ class Test_Device_obj(unittest.TestCase):
         }
 
         cls.device.dio_map(cls.dio_map_CC)
+        log.info("setUp finished")
 
     # FIXME
     # @classmethod
     # def tearDownClass(cls):
     def tearDown(self):
-        Instrument.close_all()
+        log.info("starting tearDown")
+        try:
+            Instrument.close_all()
+        except Exception as e:
+            print(f"Caught exception during tearDown: {str(e)}")
+        log.info("tearDown finished")
 
     ##############################################
     # HAL_Shim_MQ
@@ -678,8 +697,70 @@ class Test_Device_obj(unittest.TestCase):
     # FIXME: split into separate test class, like in test_qubit_objects.py
     ##############################################
 
-    def test_measure_two_qubit_randomized_benchmarking(self):
-        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
+    def test_measure_two_qubit_randomized_benchmarking_sequential(self):
+        self.device.measure_two_qubit_randomized_benchmarking(
+            qubits=["q8", "q10"],
+            nr_seeds=10
+        )
+
+    # # FIXME: add other parallel variants once they work
+    def test_measure_two_qubit_randomized_benchmarking_parallel(self):
+        log.info("starting test_measure_two_qubit_randomized_benchmarking_parallel")
+        with self.assertRaises(NotImplementedError):  # FIXME: for now
+            self.device.measure_two_qubit_randomized_benchmarking(
+                qubits=["q8", "q10"],
+                nr_seeds=10,
+                parallel=True
+            )
+        log.info("test_measure_two_qubit_randomized_benchmarking_parallel finished")
+
+
+    # FIXME: add: measure_interleaved_randomized_benchmarking_statistics
+
+    # FIXME: fails:
+    # pycqed/tests/dev_qubit_objs/test_device_objects.py:699:
+    # _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    # pycqed/instrument_drivers/meta_instrument/HAL_Device.py:3145: in measure_two_qubit_interleaved_randomized_benchmarking
+    #     sim_cz_qubits=sim_cz_qubits,
+    # pycqed/instrument_drivers/meta_instrument/HAL_Device.py:2751: in measure_two_qubit_randomized_benchmarking
+    #     self.prepare_for_timedomain(qubits=qubits)
+    # pycqed/instrument_drivers/meta_instrument/HAL/HAL_ShimMQ.py:227: in prepare_for_timedomain
+    #     self.prepare_readout(qubits=qubits, reduced=reduced)
+    # pycqed/instrument_drivers/meta_instrument/HAL/HAL_ShimMQ.py:182: in prepare_readout
+    #     self._prep_ro_sources(qubits=qubits)
+    # pycqed/instrument_drivers/meta_instrument/HAL/HAL_ShimMQ.py:671: in _prep_ro_sources
+    #     LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
+    # _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    def test_measure_two_qubit_interleaved_randomized_benchmarking(self):
+        log.info("starting test_measure_two_qubit_interleaved_randomized_benchmarking")
+        self.device.measure_two_qubit_interleaved_randomized_benchmarking(
+            qubits=["q8", "q10"],
+            nr_seeds=10,
+            measure_idle_flux=False  # FIXME: default of 'True' makes test fail with 'Instrument q8 has been removed' as shown above
+        )
+        log.info("test_measure_two_qubit_interleaved_randomized_benchmarking finished")
+
+    # FIXME: measure_two_qubit_purity_benchmarking
+
+    # FIXME: measure_two_qubit_character_benchmarking
+
+    # FIXME: measure_two_qubit_simultaneous_randomized_benchmarking
+
+    # FIXME: measure_multi_qubit_simultaneous_randomized_benchmarking
+
+
+    def test_measure_two_qubit_simultaneous_randomized_benchmarking(self):
+        self.device.measure_two_qubit_simultaneous_randomized_benchmarking(
+            qubits=["q8", "q10"],
+            nr_seeds=10
+        )
+
+    def test_measure_multi_qubit_simultaneous_randomized_benchmarking(self):
+        self.device.measure_multi_qubit_simultaneous_randomized_benchmarking(
+            qubits=["q8", "q10"],
+            nr_seeds=10
+        )
+
 
     def test_measure_two_qubit_allxy(self):
         self.device.measure_two_qubit_allxy("q8", "q10", detector="int_avg")

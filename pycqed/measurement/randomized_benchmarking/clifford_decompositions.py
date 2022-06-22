@@ -79,5 +79,5 @@ for el in epstein_fixed_length_decomposition:
     for i in range(3-len(el)):
         el.append('I')
 
-# assigning to this variable for legacy reasons
+# FIXME: assigning to this variable for legacy reasons
 gate_decomposition = epstein_efficient_decomposition

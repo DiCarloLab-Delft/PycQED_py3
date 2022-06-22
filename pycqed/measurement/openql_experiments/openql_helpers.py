@@ -949,7 +949,7 @@ def check_recompilation_needed_hash_based(
     raise DeprecationWarning("use OqlProgram.check_recompilation_needed_hash_based")
 
 
-@deprecated(reason="Use `check_recompilation_needed_hash_based`!")
+@deprecated(reason="Use `OqlProgram.check_recompilation_needed_hash_based`!")
 def check_recompilation_needed(
         program_fn: str,
         platf_cfg: str,

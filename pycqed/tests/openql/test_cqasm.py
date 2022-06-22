@@ -16,7 +16,7 @@ from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 
 
 this_path = pathlib.Path(__file__).parent
-output_path = pathlib.Path(this_path) / 'test_output_cc'
+output_path = this_path / 'test_output_cc'
 platf_cfg_path = output_path / 'config_cc_s17_direct_iq_openql_0_10.json'
 
 
@@ -27,7 +27,7 @@ class Test_cQASM(unittest.TestCase):
         gen.generate_config_modular(platf_cfg_path)
         OqlProgram.output_dir = str(output_path)
 
-    if oqh.is_compatible_openql_version_cc():  # we require unreleased version not yet available for CI
+    if oqh.is_compatible_openql_version_cc():
         def test_nested_rus_angle_0(self):
             ancilla1_idx = 10
             ancilla2_idx = 8

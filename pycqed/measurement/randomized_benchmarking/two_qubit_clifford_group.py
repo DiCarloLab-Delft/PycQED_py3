@@ -1,106 +1,63 @@
+"""
+FIXME: handling of cliffords is spread all over the place:
+- this file provides classes Clifford, SingleQubitClifford and TwoQubitClifford
+- pycqed.measurement.randomized_benchmarking.clifford_group defines clifford_group_single_qubit, and generate_clifford_lookuptable
+- pycqed.measurement.randomized_benchmarking.generate_clifford_hash_tables provides generate_hash_tables
+- pycqed.measurement.randomized_benchmarking.clifford_decompositions provides decompositions
+- pycqed.simulations.pauli_transfer_matrices provides transfer matrices
+
+And then there are hardcoded Clifford IDs and group sizes overywhere
+"""
+
 import numpy as np
 from zlib import crc32
 from os.path import join, dirname, abspath
-from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_group_single_qubit as C1, CZ, S1
+
+from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_group_single_qubit as C1  # the full group
+from pycqed.measurement.randomized_benchmarking.clifford_group import S1  # the S1 subgroup of C1
+from pycqed.simulations.pauli_transfer_matrices import CZ
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions import epstein_efficient_decomposition
+
 
 hash_dir = join(abspath(dirname(__file__)), 'clifford_hash_tables')
 
-"""
-This file contains Clifford decompositions for the two qubit Clifford group.
-
-The Clifford decomposition closely follows two papers:
-Corcoles et al. Process verification ... Phys. Rev. A. 2013
-    http://journals.aps.org/pra/pdf/10.1103/PhysRevA.87.030301
-for the different classes of two-qubit Cliffords.
-
-and
-Barends et al. Superconducting quantum circuits at the ... Nature 2014
-    https://www.nature.com/articles/nature13171?lang=en
-for writing the cliffords in terms of CZ gates.
-
-
-###########################################################################
-2-qubit clifford decompositions
-
-The two qubit clifford group (C2) consists of 11520 two-qubit cliffords
-These gates can be subdivided into four classes.
-    1. The Single-qubit like class  | 576 elements  (24^2)
-    2. The CNOT-like class          | 5184 elements (24^2 * 3^2)
-    3. The iSWAP-like class         | 5184 elements (24^2 * 3^2)
-    4. The SWAP-like class          | 576  elements (24^2)
-    --------------------------------|------------- +
-    Two-qubit Clifford group C2     | 11520 elements
-
-
-1. The Single-qubit like class
-    -- C1 --
-    -- C1 --
-
-2. The CNOT-like class
-    --C1--•--S1--      --C1--•--S1------
-          |        ->        |
-    --C1--⊕--S1--      --C1--•--S1^Y90--
-
-3. The iSWAP-like class
-    --C1--*--S1--     --C1--•---Y90--•--S1^Y90--
-          |       ->        |        |
-    --C1--*--S1--     --C1--•--mY90--•--S1^X90--
-
-4. The SWAP-like class
-    --C1--x--     --C1--•-mY90--•--Y90--•-------
-          |   ->        |       |       |
-    --C1--x--     --C1--•--Y90--•-mY90--•--Y90--
-
-C1: element of the single qubit Clifford group
-    N.B. we use the decomposition defined in Epstein et al. here
-
-S1: element of the S1 group, a subgroup of the single qubit Clifford group
-
-S1[0] = I
-S1[1] = rY90, rX90
-S1[2] = rXm90, rYm90
-
-Important clifford indices:
-
-        I    : Cl 0
-        X90  : Cl 16
-        Y90  : Cl 21
-        X180 : Cl 3
-        Y180 : Cl 6
-        Z180 : Cl 9
-        CZ   : 4368
-
-"""
-# set as a module wide variable instead of argument to function for speed
-# reasons
+# set as a module wide variable instead of argument to function for speed reasons
 gate_decomposition = epstein_efficient_decomposition
 
-# used to transform the S1 subgroup
+# matrices used to transform the S1 subgroup
+# FIXME: handle indices vs name in single place only
 X90 = C1[16]
 Y90 = C1[21]
 mY90 = C1[15]
 
 # A dict containing clifford IDs with common names.
-common_cliffords = {'I':  0, 'X':  3, 'Y':  6, 'Z':  9,
-                    'II':  0, 'IX':  3, 'IY':  6, 'IZ':  9,
+# FIXME: should be separate per Clifford class. Hardly used
+# FIXME: handle indices vs name in single place only
+common_cliffords = {
+    # in SingleQubitClifford:
+    'I':  0, 'X':  3, 'Y':  6, 'Z':  9,
 
-                    'XI': 24*3 + 0, 'XX': 24*3 + 3,
-                    'XY': 24*3 + 6, 'XZ': 24*3 + 9,
+    'X90':  16,
+    'Y90':  21,
+    'X180':  3,
+    'Y180':  6,
+    'Z180':  9,
 
-                    'YI':  24*6 + 0, 'YX':  24*6 + 3,
-                    'YY':  24*6 + 6, 'YZ':  24*6 + 9,
+    # in TwoQubitClifford:
+    'II':  0, 'IX':  3, 'IY':  6, 'IZ':  9,
 
-                    'ZI':  24*9 + 0, 'ZX':  24*9 + 3,
-                    'ZY':  24*9 + 6, 'ZZ':  24*9 + 9,
+    'XI': 24*3 + 0, 'XX': 24*3 + 3,
+    'XY': 24*3 + 6, 'XZ': 24*3 + 9,
 
-                    'X90':  16,
-                    'Y90':  21,
-                    'X180':  3,
-                    'Y180':  6,
-                    'Z180':  9,
-                    'CZ': 104368,
-                    }
+    'YI':  24*6 + 0, 'YX':  24*6 + 3,
+    'YY':  24*6 + 6, 'YZ':  24*6 + 9,
+
+    'ZI':  24*9 + 0, 'ZX':  24*9 + 3,
+    'ZY':  24*9 + 6, 'ZZ':  24*9 + 9,
+
+    # single qubit gates (hack) when using TwoQubitClifford
+    'CZ': 104368 # 100000 + 576 + 14*24 + 2*1728
+}
 
 
 class Clifford(object):
@@ -179,6 +136,73 @@ class SingleQubitClifford(Clifford):
         idx = cls._hash_table.index(unique_hash)
         return idx
 
+
+"""
+This class contains Clifford decompositions for the two qubit Clifford group.
+
+The Clifford decomposition closely follows two papers:
+Corcoles et al. Process verification ... Phys. Rev. A. 2013
+    http://journals.aps.org/pra/pdf/10.1103/PhysRevA.87.030301
+for the different classes of two-qubit Cliffords.
+
+and
+Barends et al. Superconducting quantum circuits at the ... Nature 2014
+    https://www.nature.com/articles/nature13171?lang=en
+for writing the cliffords in terms of CZ gates.
+
+
+###########################################################################
+2-qubit clifford decompositions
+
+The two qubit clifford group (C2) consists of 11520 two-qubit cliffords
+These gates can be subdivided into four classes.
+    1. The Single-qubit like class  | 576 elements  (24^2)
+    2. The CNOT-like class          | 5184 elements (24^2 * 3^2)
+    3. The iSWAP-like class         | 5184 elements (24^2 * 3^2)
+    4. The SWAP-like class          | 576  elements (24^2)
+    --------------------------------|------------- +
+    Two-qubit Clifford group C2     | 11520 elements
+
+
+1. The Single-qubit like class
+    -- C1 --
+    -- C1 --
+
+2. The CNOT-like class
+    --C1--•--S1--      --C1--•--S1------
+          |        ->        |
+    --C1--⊕--S1--      --C1--•--S1^Y90--
+
+3. The iSWAP-like class
+    --C1--*--S1--     --C1--•---Y90--•--S1^Y90--
+          |       ->        |        |
+    --C1--*--S1--     --C1--•--mY90--•--S1^X90--
+
+4. The SWAP-like class
+    --C1--x--     --C1--•-mY90--•--Y90--•-------
+          |   ->        |       |       |
+    --C1--x--     --C1--•--Y90--•-mY90--•--Y90--
+
+C1: element of the single qubit Clifford group
+    N.B. we use the decomposition defined in Epstein et al. here
+
+S1: element of the S1 group, a subgroup of the single qubit Clifford group
+
+S1[0] = I
+S1[1] = rY90, rX90
+S1[2] = rXm90, rYm90
+
+Important clifford indices:
+
+        I    : Cl 0
+        X90  : Cl 16
+        Y90  : Cl 21
+        X180 : Cl 3
+        Y180 : Cl 6
+        Z180 : Cl 9
+        CZ   : 4368
+
+"""
 
 class TwoQubitClifford(Clifford):
     # class constants
@@ -331,7 +355,7 @@ class TwoQubitClifford(Clifford):
 
         C1_q0 = [(g, 'q0') for g in gate_decomposition[idx_0]]
         C1_q1 = [(g, 'q1') for g in gate_decomposition[idx_1]]
-        CZ = [('CZ', ['q0', 'q1'])]
+        CZ = [('CZ', ['q0', 'q1'])]  # FIXME: shadows 'CZ' from outer scope, more occurrences below
 
         idx_2s = SingleQubitClifford._get_clifford_id(S1[idx_2])
         S1_q0 = [(g, 'q0') for g in gate_decomposition[idx_2s]]
@@ -469,6 +493,8 @@ class TwoQubitClifford(Clifford):
 # It is important that this check is after the Clifford objects as otherwise
 # it is impossible to generate the hash tables
 ##############################################################################
+
+# FIXME: handle all hash table handling to single file/class
 try:
     open(join(hash_dir, 'single_qubit_hash_lut.txt'), 'r')
     # FIXME: also check 'two_qubit_hash_lut.txt'

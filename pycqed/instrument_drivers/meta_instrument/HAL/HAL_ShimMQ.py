@@ -10,6 +10,7 @@ import logging
 import warnings
 from collections import OrderedDict
 import numpy as np
+from typing import List
 from deprecated import deprecated
 
 from pycqed.measurement import detector_functions as det
@@ -211,7 +212,7 @@ class HAL_ShimMQ(Instrument):
 
     def prepare_for_timedomain(
             self,
-            qubits: list,
+            qubits: List[str],
             reduced: bool = False,
             bypass_flux: bool = False,
             prepare_for_readout: bool = True
@@ -661,15 +662,17 @@ class HAL_ShimMQ(Instrument):
     # private functions: prepare
     ##########################################################################
 
-    def _prep_ro_sources(self, qubits):
+    def _prep_ro_sources(self, qubits: List[str]):
         """
         turn on and configure the RO LO's of all qubits to be measured and
         update the modulation frequency of all qubits.
         """
+        log.info(f"preparing ro sources for qubits {qubits}")
         # FIXME: This device object works under the assumption that a single LO
         #  is used to drive all readout lines.
-        LO = self.find_instrument(qubits[0]).instr_LO_ro.get_instr()
-        RO_lutman = self.find_instrument(qubits[0]).instr_LutMan_RO.get_instr()
+        qb = self.find_instrument(qubits[0])
+        LO = qb.instr_LO_ro.get_instr()
+        RO_lutman = qb.instr_LutMan_RO.get_instr()
         LO.frequency.set(RO_lutman.LO_freq())
         LO.power(self.ro_pow_LO())
         LO.on()
@@ -690,7 +693,7 @@ class HAL_ShimMQ(Instrument):
                 LO_q.on()
                 #raise ValueError("Expect a single LO to drive all feedlines")
 
-    def _prep_ro_assign_weights(self, qubits):
+    def _prep_ro_assign_weights(self, qubits: List[str]):
         """
         Assign acquisition weight channels to the different qubits.
 
@@ -755,7 +758,7 @@ class HAL_ShimMQ(Instrument):
         return acq_ch_map
 
     # FIXME: align with HAL_ShimSQ::_prep_ro_integration_weights
-    def _prep_ro_integration_weights(self, qubits):
+    def _prep_ro_integration_weights(self, qubits: List[str]):
         """
         Set the acquisition integration weights on each channel.
 
@@ -823,7 +826,7 @@ class HAL_ShimMQ(Instrument):
             raise NotImplementedError('ro_acq_weight_type "{}" not supported'.format(self.ro_acq_weight_type()))
 
     # FIXME: align with HAL_ShimSQ::_prep_ro_pulses
-    def _prep_ro_pulses(self, qubits):
+    def _prep_ro_pulses(self, qubits: List[str]):
         """
         Configure the ro lutmans.
 

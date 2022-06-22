@@ -10,8 +10,10 @@
 
 from pathlib import Path
 from datetime import datetime
+from deprecated import deprecated
 
 
+@deprecated(version='0.4', reason='please use pycqed.measurement.openql_experiments.generate_CC_cfg_modular.generate_config_modular')
 def generate_config(out_filename: str,
                     mw_pulse_duration: int = 20,
                     flux_pulse_duration: int = 40,

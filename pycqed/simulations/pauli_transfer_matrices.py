@@ -1,4 +1,6 @@
 import numpy as np
+from deprecated import deprecated
+
 """
 This file contains pauli transfer matrices for all basic qubit operations.
 """
@@ -106,6 +108,7 @@ def Z_theta(theta:float, unit='deg'):
 #
 ##############################################################################
 
+@deprecated(version='0.4', reason='not used within pyqed (except tests)')
 def process_fidelity(ptm_0, ptm_1, d: int=None):
     """
     Calculates the average process fidelity between two pauli transfer matrices
@@ -122,6 +125,7 @@ def process_fidelity(ptm_0, ptm_1, d: int=None):
     return np.dot(ptm_0.T, ptm_1).trace()/(d**2)
 
 
+@deprecated(version='0.4', reason='not used within pyqed (except tests)')
 def average_gate_fidelity(ptm_0, ptm_1, d: int=None):
 
     """
@@ -141,6 +145,7 @@ def average_gate_fidelity(ptm_0, ptm_1, d: int=None):
     F_avg_gate = process_fid_to_avg_gate_fid(F_pro, d)
     return F_avg_gate
 
+@deprecated(version='0.4', reason='not used within pyqed (except tests)')
 def process_fid_to_avg_gate_fid(F_pro: float, d:int):
     """
     Converts
