@@ -3434,3 +3434,11 @@ def sim_pars_sanity_check(station, flm, flm_static, which_gate):
             log.warning(msg_str.format(par_name))
 
     return True
+
+#########################################################################
+# Convenience functions below
+#########################################################################
+
+
+def roundup1024(n):
+    return int(np.ceil(n / 96) * 96)
