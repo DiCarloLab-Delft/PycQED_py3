@@ -170,7 +170,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Generate CZ waveforms and populates self._wave_dict
         """
         self._wave_dict = {}
-        
+
         for _, waveform in self.LutMap().items():
             wave_name = waveform["name"]
             if waveform["type"] == "cz" or waveform["type"] == "idle_z":
@@ -1277,4 +1277,4 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
 
 
 def roundup1024(n):
-    return int(np.ceil(n / 96) * 96)
+    return int(np.ceil(n / 96) * 96)  # FIXME: does not perform rounding implied by function name
