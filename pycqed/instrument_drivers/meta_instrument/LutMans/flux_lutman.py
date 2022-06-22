@@ -3441,4 +3441,4 @@ def sim_pars_sanity_check(station, flm, flm_static, which_gate):
 
 
 def roundup1024(n):
-    return int(np.ceil(n / 96) * 96)
+    return int(np.ceil(n / 1024) * 1024)
