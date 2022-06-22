@@ -148,8 +148,11 @@ class CCCore(SCPIBase):
     def calibrate_dio(self, ccio: int, expected_bits: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL {expected_bits}')
 
-    def get_calibrate_dio_success(self, ccio: int) -> int:
-        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:SUCCESS?')
+    def get_calibrate_dio_success(self, ccio: int) -> bool:
+        return self.get_calibrate_dio_status(ccio) == 0
+
+    def get_calibrate_dio_status(self, ccio: int) -> int:
+        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:SUCCESS?') # FIXME: CC actually returns a *status* equivalent to stat_ques_diocal, see flags SQD_*
 
     def get_calibrate_dio_read_index(self, ccio: int) -> int:
         return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:READINDEX?')
