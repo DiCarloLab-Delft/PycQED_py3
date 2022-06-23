@@ -2350,19 +2350,19 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
                ls='--', linewidth=1., color='black', alpha=.75)
     ax.set_xlabel(mpl_utils.latex_friendly_str(value_name.decode('utf-8')))
     ax.set_ylabel('Counts')
-    # l = ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
-    #     qubit_labels), prop={'size': 4})
-    # l.get_title().set_fontsize('5')
+    l = ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
+        qubit_labels), prop={'size': 8})
+    l.get_title().set_fontsize('8')
 
     if flag == False:
         if post_selection is True:
             ax.set_title(mpl_utils.latex_friendly_str('Post-selected mux_ssro_{}_{}'.format(qubit_label, timestamp)))
         else:
             ax.set_title(mpl_utils.latex_friendly_str('Mux_ssro_{}_{}'.format(qubit_label, timestamp)))
-        # l = ax.legend(loc=(1.05, .01),
-        #               title='Prepared state\n{}'.format(qubit_labels),
-        #               prop={'size': 4})
-        # l.get_title().set_fontsize('4')
+        l = ax.legend(loc=(1.05, .01),
+                      title='Prepared state\n{}'.format(qubit_labels),
+                      prop={'size': 8})
+        l.get_title().set_fontsize('8')
 
     f.tight_layout()
 

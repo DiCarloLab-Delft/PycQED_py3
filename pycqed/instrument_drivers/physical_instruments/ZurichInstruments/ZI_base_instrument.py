@@ -724,8 +724,8 @@ class ZI_base_instrument(Instrument):
             self._awg_waveforms = {}
 
             # Asserted when AWG needs to be reconfigured
-            self._awg_needs_configuration = [False]*(self._num_channels()//2)
-            self._awg_program = [None]*(self._num_channels()//2)
+            self._awg_needs_configuration = [False]*(self._num_awgs())
+            self._awg_program = [None]*(self._num_awgs())
 
             # Create waveform parameters
             self._num_codewords = 0
@@ -800,6 +800,9 @@ class ZI_base_instrument(Instrument):
 
     def _num_channels(self):
         raise NotImplementedError('Virtual method with no implementation!')
+
+    def _num_awgs(self):
+        return self._num_channels()//2
 
     def _get_waveform_table(self, awg_nr: int) -> list:
         return dict()
@@ -898,8 +901,7 @@ class ZI_base_instrument(Instrument):
             elif par['Type'] == 'Integer (enumerated)':
                 par_kw['set_cmd'] = _gen_set_cmd(self.seti, parpath)
                 par_kw['get_cmd'] = _gen_get_cmd(self.geti, parpath)
-                par_kw['vals'] = validators.Ints(min_value=0,
-                                                 max_value=len(par["Options"]))
+                par_kw['vals'] = validators.Ints()
 
             elif par['Type'] == 'Double':
                 par_kw['set_cmd'] = _gen_set_cmd(self.setd, parpath)
@@ -917,7 +919,7 @@ class ZI_base_instrument(Instrument):
                 par_kw['set_cmd'] = _gen_set_cmd(self.setv, parpath)
                 par_kw['get_cmd'] = _gen_get_cmd(self.getv, parpath)
                 # min/max not implemented yet for ZI auto docstrings #352
-                par_kw['vals'] = validators.Arrays()
+                par_kw['vals'] = validators.Arrays(valid_types=(complex, np.integer, np.floating))
 
             elif par['Type'] == 'String':
                 par_kw['set_cmd'] = _gen_set_cmd(self.sets, parpath)
@@ -1383,7 +1385,7 @@ class ZI_base_instrument(Instrument):
         self.check_errors()
 
         # Loop through each AWG and check whether to reconfigure it
-        for awg_nr in range(self._num_channels()//2):
+        for awg_nr in range(self._num_awgs()):
             self._length_match_waveforms(awg_nr)
 
             # If the reconfiguration flag is set, upload new program
@@ -1399,7 +1401,7 @@ class ZI_base_instrument(Instrument):
                 self._clear_dirty_waveforms(awg_nr)
 
         # Start all AWG's
-        for awg_nr in range(self._num_channels()//2):
+        for awg_nr in range(self._num_awgs()):
             # Skip AWG's without programs
             if self._awg_program[awg_nr] is None:
                 # to configure all awgs use "upload_codeword_program" or specify
@@ -1417,7 +1419,7 @@ class ZI_base_instrument(Instrument):
     def stop(self):
         log.info(f"{self.devname}: Stopping '{self.name}'")
         # Stop all AWG's
-        for awg_nr in range(self._num_channels()//2):
+        for awg_nr in range(self._num_awgs()):
             self.set('awgs_{}_enable'.format(awg_nr), 0)
 
         self.check_errors()

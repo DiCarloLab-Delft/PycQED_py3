@@ -314,6 +314,15 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
             dio_mask = 0x03ff0000
 
+        elif dio_mode == "shfqa":
+            dio_mask = 0x7fff0000
+            cc_prog = inspect.cleandoc(
+                f"""
+            mainLoop:   seq_out         {hex(dio_mask)},1
+                        seq_out         0x00000000,1
+                        jmp             @mainLoop
+            """
+            )
         else:
             raise ValueError(f"unsupported DIO mode '{dio_mode}'")
 
