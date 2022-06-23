@@ -18,9 +18,6 @@ from typing import Tuple,List
 from .CCCore import CCCore
 from pycqed.instrument_drivers.library.Transport import Transport
 import pycqed.instrument_drivers.library.DIO as DIO
-from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.shfqa_uhfqc_compatibility import (
-    Dio as ShfqaDio,
-)
 
 from qcodes.utils import validators as vals
 from qcodes import Instrument
@@ -318,8 +315,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
             dio_mask = 0x03ff0000
 
         elif dio_mode == "shfqa":
-            valid_mask = 1 << ShfqaDio.VALID_INDEX
-            dio_mask = ShfqaDio.codeword_mask() | valid_mask
+            dio_mask = 0x7fff0000
             cc_prog = inspect.cleandoc(
                 f"""
             mainLoop:   seq_out         {hex(dio_mask)},1
