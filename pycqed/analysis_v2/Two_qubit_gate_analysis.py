@@ -370,8 +370,8 @@ class VCZ_tmid_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['Tmid'] = Tmid
 
         for i, q0 in enumerate(self.Q0):
-            CP = self.raw_data_dict['data'][:,2*i+2].reshape(nx, ny)
-            MF = self.raw_data_dict['data'][:,2*i+3].reshape(nx, ny)
+            CP = self.raw_data_dict['data'][:,2*i+2].reshape(ny, nx)
+            MF = self.raw_data_dict['data'][:,2*i+3].reshape(ny, nx)
             self.proc_data_dict[f'CP_{i}'] = CP
             self.proc_data_dict[f'MF_{i}'] = MF
 
@@ -472,6 +472,7 @@ def VCZ_Tmid_landscape_plotfn(
     CT = get_contours(CP, phase=180)
     for c in CT.values():
         c['x'] = Amps[c['x']]
+        c['y'] = Tmid[c['y']]
         axs[1+2*n].plot(c['x'], c['y'], marker='', ls='--', color='white')
 
     for i in range(2):

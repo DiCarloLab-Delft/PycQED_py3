@@ -47,9 +47,7 @@ def multi_qubit_off_on(
         qubits: list,
         initialize: bool,
         second_excited_state: bool,
-        platf_cfg: str,
-        nr_flux_dance: int = None,
-        wait_time: float = None
+        platf_cfg: str
 ) -> OqlProgram:
     """
     Performs an 'off_on' sequence on the qubits specified.
@@ -93,15 +91,18 @@ def multi_qubit_off_on(
                 k.measure(q)
             k.barrier(qubits)
 
-        if nr_flux_dance:
-            for i in range(int(nr_flux_dance)):
-                for step in [1, 2, 3, 4]:
-                    # if refocusing:
-                    #     k.gate(f'flux-dance-{step}-refocus', [0])
-                    # else:
-                    k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment 
-            k.gate("wait", [], wait_time)
+        # if True:
+        #     for i in range(5):
+        #         k.gate(f'flux_dance_refocus_5', [0])
+        #         k.gate(f'flux_dance_refocus_6', [0])
+        #         k.gate(f'flux_dance_refocus_7', [0])
+        #         k.gate(f'flux_dance_refocus_8', [0])
+        #         # k.gate(f'flux_dance_refocus_1', [0])
+        #         # k.gate(f'flux_dance_refocus_2', [0])
+        #         # k.gate(f'flux_dance_refocus_3', [0])
+        #         # k.gate(f'flux_dance_refocus_4', [0])
+        #         k.barrier([])  # alignment 
+        #     # k.gate("wait", [], wait_time)
 
             # 3. prepare desired state
         for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
@@ -1993,7 +1994,7 @@ def parity_check_ramsey(
             k.gate('wait', [], wait_time_before_flux)
             for j in range(pc_repetitions): 
                 for flux_cw in flux_cw_list:
-                    if flux_cw == 'cz':
+                    if 'cz' in flux_cw:
                         k.gate(flux_cw, [Q_idxs_target[0], Q_idxs_control[0]])
                     else:
                         k.gate(flux_cw, [0])
@@ -2411,7 +2412,7 @@ def Weight_n_parity_tomography(
     ops = ['Z','X','Y']
     Operators = [''.join(op) for op in itertools.product(ops, repeat=n)]
     for op in Operators:   
-        k = p.create_kernel(f'Tomo_{op}')
+        k = p.create_kernel(f'{op}')
 
         for q in all_Q_idxs:
             k.prepz(q)
@@ -2442,7 +2443,8 @@ def Weight_n_parity_tomography(
         
         for q, g in zip(Q_D, [tomo_gates[o] for o in op]):
             k.gate(g, [q])
-            k.gate("wait", [q], 200)
+            if not simultaneous_measurement:
+                k.gate("wait", [q], 200)
             k.measure(q)
         k.gate("wait", [], 0)
 

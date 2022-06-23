@@ -54,7 +54,7 @@ _def_lm = {
     4: {"name": "cz_NW", "type": "idle_z", "which": "NW"},
     5: {"name": "park", "type": "square"},
     6: {"name": "square", "type": "square"},
-    7: {"name": "custom_wf", "type": "custom"},
+    7: {"name": "cz_aux", "type": "cz", "which": "aux"},
 }
 
 
@@ -288,7 +288,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             "vcz_waveform": wf_vcz.vcz_waveform
         }
 
-        for this_cz in ["NE", "NW", "SW", "SE"]:
+        for this_cz in ["NE", "NW", "SW", "SE", "aux"]:
             self.add_parameter(
                 "cz_wf_generator_%s" % this_cz,
                 initial_value="vcz_waveform",

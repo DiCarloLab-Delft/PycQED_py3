@@ -955,7 +955,7 @@ def off_on(
             for i in range(int(nr_flux_after_init)):
                 if type(flux_cw_after_init) == list:
                     for cw in flux_cw_after_init:
-                        k.gate(cw, [fluxed_qubit_idx])
+                        k.gate(cw, [0])
                 else:
                     k.gate(flux_cw_after_init, [fluxed_qubit_idx]) 
             k.gate("wait", [], wait_time_after_flux) 
@@ -981,7 +981,7 @@ def off_on(
             for i in range(int(nr_flux_after_init)):
                 if type(flux_cw_after_init) == list:
                     for cw in flux_cw_after_init:
-                        k.gate(cw, [fluxed_qubit_idx])
+                        k.gate(cw, [0])
                 else:
                     k.gate(flux_cw_after_init, [fluxed_qubit_idx]) 
             k.gate("wait", [], wait_time_after_flux) 

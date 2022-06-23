@@ -2935,6 +2935,7 @@ class DeviceCCL(Instrument):
         waveform_name: str = "square",
         max_delay=None,
         twoq_pair=[2, 0],
+        disable_metadata: bool = False,
         init_buffer=0,
         prepare_for_timedomain: bool = True,
         ):
@@ -3034,7 +3035,7 @@ class DeviceCCL(Instrument):
         )
         MC.set_detector_function(d)
         label = 'Cryoscope_{}_amps'.format('_'.join(qubits))
-        MC.run(label)
+        MC.run(label,disable_snapshot_metadata=disable_metadata)
         # Run analysis
         a = ma2.cv2.multi_qubit_cryoscope_analysis(label='Cryoscope',
                                                    update_FIRs=update_FIRs)
@@ -7342,180 +7343,6 @@ class DeviceCCL(Instrument):
         else:
             fl_lm.set(fl_par, P0)
             print(f'Park amplitude of {Q_park_target} reset to {P0}.')
-
-    def measure_parity_check_fidelity_old(
-            self,
-            target_qubits: List[str],
-            control_qubits: List[str], # have to be given in readout (feedline) order
-            flux_dance_steps: List[int] = [1,2,3,4],
-            flux_codeword: str = 'flux_dance',
-            ramsey_qubits: List[str] = None,
-            refocusing: bool = False,
-            phase_offsets: List[float] = None,
-            cases_to_measure: List[str] = None,
-            result_logging_mode: str = 'raw',
-            prepare_for_timedomain: bool = True,
-            initialization_msmt: bool = True,
-            nr_shots_per_case: int = 2**14,
-            shots_per_meas: int = 2**16,
-            wait_time_before_flux_ns: int = 0,
-            wait_time_after_flux_ns: int = 0,
-            label_suffix: str = "",
-            disable_metadata: bool = False,
-            MC = None,
-            ):
-        """
-        Measures a parity check fidelity. In this experiment the conditional phase
-        in the two-qubit Cphase gate is measured using Ramsey-lie sequence.
-        Specifically qubit q0 of each pair is prepared in the superposition, while q1 is in 0 or 1 state.
-        Next the flux pulse is applied. Finally pi/2 afterrotation around various axes
-        is applied to q0, and q1 is flipped back (if neccessary) to 0 state.
-        Plotting the probabilities of the zero state for each qubit as a function of
-        the afterrotation axis angle, and comparing case of q1 in 0 or 1 state, enables to
-        measure the conditional phase and estimale the leakage of the Cphase gate.
-
-
-        Args:
-            pairs (lst(lst)):
-                Contains all pairs with the order (q0,q1) where q0 in 'str' is the target and q1 in
-                'str' is the control. This is based on qubits that are parked in the flux-dance.
-
-            prepare_for_timedomain (bool):
-                should the insruments be reconfigured for time domain measurement
-
-            disable_cz (bool):
-                execute the experiment with no flux pulse applied
-
-            disabled_cz_duration_ns (int):
-                waiting time to emulate the flux pulse
-
-            wait_time_before_flux_ns (int):
-                additional waiting time (in ns) before the flux pulse.
-
-            wait_time_after_flux_ns (int):
-                additional waiting time (in ns) after the flux pulse, before
-                the final afterrotations
-
-        """
-        assert all([qb in self.qubits() for qb in control_qubits])
-        assert all([qb in self.qubits() for qb in target_qubits])
-        if self.ro_acq_weight_type() != 'optimal':
-            # this occurs because the detector groups qubits per feedline.
-            # If you do not pay attention, this will mess up the analysis of
-            # this experiment.
-            raise ValueError('Current analysis is not working with {}'.format(self.ro_acq_weight_type()))
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        cases = ['{:0{}b}'.format(i, len(control_qubits)) for i in range(2**len(control_qubits))]
-        # prepare list of all used qubits
-        all_qubits = target_qubits + control_qubits
-
-        # MW preparation
-        Q_idxs_control = []   
-        for qb in control_qubits:
-            Q_idxs_control += [self.find_instrument(qb).cfg_qubit_nr()]  
-            mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
-            # check the lutman of the target, control and parking qubits for cw_27, 
-            # which is needed for refocusing, case preparation, and preparation in 1 (respectively)
-            # and prepare if necessary       
-            xm180_dict = {"name": "rXm180", "theta": -180, "phi": 0, "type": "ge"}
-            if mw_lutman.LutMap().get(27) != xm180_dict:
-                log.warning(f"{mw_lutman.name} does not have refocusing pulse, overriding `cw_27` ...")
-                mw_lutman.LutMap()[27] = xm180_dict
-                mw_lutman.load_waveform_onto_AWG_lookuptable(27, regenerate_waveforms=True)
-
-        Q_idxs_target = [] 
-        for i,ancilla in enumerate(target_qubits):
-            log.info(f"Parity check fidelity {ancilla} - {control_qubits}")
-            Q_idxs_target += [self.find_instrument(ancilla).cfg_qubit_nr()]
-            mw_lutman = self.find_instrument(ancilla).instr_LutMan_MW.get_instr()
-            # check if phase pulses already exist on target qubits to avoid unnecessary upload delay
-            if not np.all([mw_lutman.LutMap()[i+9] == {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
-                            for i, phase in enumerate(np.arange(0,360,20)) ]) \
-                    or phase_offsets:
-                # load_phase_pulses already uploads all other waveforms inside
-                mw_lutman.load_phase_pulses_to_AWG_lookuptable(
-                    phases=np.arange(0,360,20)+phase_offsets[i] if phase_offsets else np.arange(0,360,20))
-
-        if ramsey_qubits:
-            Q_idxs_ramsey = []
-            for i,qb in enumerate(ramsey_qubits):
-                assert qb in self.qubits()
-                if qb in target_qubits:
-                    log.warning(f"Ramsey qubit {qb} already given as ancilla qubit!")
-                Q_idxs_ramsey += [self.find_instrument(qb).cfg_qubit_nr()]
-
-        if initialization_msmt:
-            nr_shots = 2 * nr_shots_per_case * len(cases)
-            label_suffix = '_'.join([label_suffix, "init-msmt"])
-        else:
-            nr_shots = nr_shots_per_case * len(cases)
-
-        self.ro_acq_digitized(False)
-        if prepare_for_timedomain:
-            # Take care of readout order (by feedline/UHF)
-            if self.qubits_by_feedline():
-                all_qubits = sorted(all_qubits, 
-                                key=lambda x: [i for i, feedline in enumerate(self.qubits_by_feedline()) \
-                                                if x in feedline])
-                log.info(f"Sorted qubits for readout preparation: {all_qubits}")
-            else:
-                log.warning("Qubit order by feedline in `self.qubits_by_feedline()` parameter is not set, "
-                            + "readout will be prepared in order of given qubits which can lead to errors!")
-
-            self.prepare_for_timedomain(qubits=target_qubits+control_qubits)
-
-        # prepare flux codeword list according to given step numbers
-        # will be programmed in order of the list, but scheduled in parallel (if possible)
-        # flux_cw_list = [flux_codeword + f'_{step}' for step in flux_dance_steps]
-        if refocusing:
-            flux_cw_list = [flux_codeword + '_refocus' + f'_{step}' for step in flux_dance_steps]
-
-        else:
-            flux_cw_list = [flux_codeword + f'_{step}' for step in flux_dance_steps]
-
-        p = mqo.parity_check_fidelity_old(
-            Q_idxs_target=Q_idxs_target,
-            Q_idxs_control=Q_idxs_control,
-            control_cases=cases,
-            flux_cw_list=flux_cw_list,
-            Q_idxs_ramsey=Q_idxs_ramsey if ramsey_qubits else None,
-            refocusing=refocusing,
-            platf_cfg=self.cfg_openql_platform_fn(),
-            initialization_msmt=initialization_msmt,
-            wait_time_before_flux=wait_time_before_flux_ns,
-            wait_time_after_flux=wait_time_after_flux_ns
-            )
-
-        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
-
-        d = self.get_int_logging_detector(
-            qubits=target_qubits+control_qubits, 
-            result_logging_mode=result_logging_mode
-            )
-        shots_per_meas = int(np.floor(np.min([shots_per_meas, nr_shots]) / len(cases)) 
-                            * len(cases) )
-        d.set_child_attr("nr_shots", shots_per_meas)
-
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(nr_shots))
-        MC.set_detector_function(d)
-
-        # disable live plotting and soft averages
-        old_soft_avg = MC.soft_avg()
-        old_live_plot_enabled = MC.live_plot_enabled()
-        MC.soft_avg(1)
-        MC.live_plot_enabled(False)
-
-        label = f"Parity_check_fidelity_{target_qubits}_{control_qubits}_{self.msmt_suffix}_{label_suffix}"
-        MC.run(label, disable_snapshot_metadata=disable_metadata)
-
-        MC.soft_avg(old_soft_avg)
-        MC.live_plot_enabled(old_live_plot_enabled)
-
-        # a = ma2.Parity_Check_Fidelity_Analysis(label=label)
-        # return a.result
 
     def measure_parity_check_fidelity(
         self,

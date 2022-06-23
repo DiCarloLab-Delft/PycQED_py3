@@ -760,7 +760,7 @@ def plot_function(P0, P1, P, E1, E2, M1, M2,
     ax[4].set_title('Parity results')
     ax[4].axhline(1, color='black', alpha=.5, linestyle='--')
     ax[4].axhline(-1, color='black', alpha=.5, linestyle='--')
-    ax[4].bar([1, 2], [M1*2-1, M2*2-1])
+    ax[4].bar([1, 2], [1-M1*2, 1-M2*2])
     ax[4].set_ylim(-1.1, 1.1)
     ax[4].set_xticks([1,2])
     ax[4].set_xticklabels([r'$\langle m_1\rangle$', r'$\langle m_2\rangle$'])
@@ -770,7 +770,7 @@ def plot_function(P0, P1, P, E1, E2, M1, M2,
                           '$\Delta^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[2][0]+Disturbances_ovd_single[3][0], Disturbances_ovd_single[2][1]+Disturbances_ovd_single[3][1]),
                           '$r$  =  %f' % (r_single)))
     
-    textstr2 = '\n'.join(('Repeatability  =  %.1f%%' % (M2*100),
+    textstr2 = '\n'.join(('Repeatability  =  %.1f%%' % ((1-M2)*100),
                           '$D_1^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[0][0], Disturbances_ovd_double[0][1]),
                           '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[1][0], Disturbances_ovd_double[1][1]),
                           '$\Delta^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[2][0]+Disturbances_ovd_double[3][0], Disturbances_ovd_double[2][1]+Disturbances_ovd_double[3][1]),
