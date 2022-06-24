@@ -82,7 +82,7 @@ class Test_cQASM(unittest.TestCase):
             p = OqlProgram(name, str(platf_cfg_path))  # NB: name must be identical to name set by "pragma @ql.name" above
             p.compile_cqasm(src)
 
-        @unittest.skipIf(ql.get_version() < '0.10.5', "test requires later OpenQL verrsion")
+        @unittest.skipIf(ql.get_version() < '0.10.5', "test requires later OpenQL version")
         def test_experimental_functions(self):
             name = f'test_experimental_functions'
             src = f"""
@@ -95,7 +95,7 @@ class Test_cQASM(unittest.TestCase):
                 pragma @ql.name("{name}")  # set the name of generated files
 
                 map i = creg(0)
-                map foo = creg(60) 
+                map foo = creg(31) 
                 map b = breg(0) # FIXME: assign on PL state, not DSM
 
                 # Configure Random Number Generators. NB: on all CCIO:  
@@ -109,7 +109,8 @@ class Test_cQASM(unittest.TestCase):
             p = OqlProgram(name, str(platf_cfg_path))  # NB: name must be identical to name set by "pragma @ql.name" above
             p.compile_cqasm(src)
 
-        @unittest.skipIf(ql.get_version() < '0.10.5', "test requires later OpenQL verrsion")
+        @unittest.skipIf(ql.get_version() < '0.10.5', "test requires later OpenQL version")
+        # FIXME: fails with "Inconsistency detected in bundle contents: time travel not yet possible in this version"
         def test_rb_2q(self):
             name = f'test_rb_2q'
             qa = 'q[0]'
@@ -157,13 +158,13 @@ class Test_cQASM(unittest.TestCase):
                     if(r < 1) {{                # single-qubit-like, probability 576/11520 = 1/20
                         set r1 = rnd(1)
                         set r2 = rnd(1)
-                        _test_single_qubit_like_gates {qa}, {qb}, r1, r2
+                        __test_single_qubit_like_gates {qa}, {qb}, r1, r2
                     }} else if(r < 1+9) {{      # CNOT-like, probability 5184/11520 = 9/20             
                         set r1 = rnd(1)
                         set r2 = rnd(1)
                         set r3 = rnd(2)
                         set r4 = rnd(2)
-                        _test_cnot_like_gates {qa}, {qb}, r1, r2, r3, r4
+                        __test_cnot_like_gates {qa}, {qb}, r1, r2, r3, r4
                     }} else if(r < 1+9+9) {{    # iSWAP-like, probability 5184/11520 = 9/20   
                     }} else {{                  # SWAP-like, probability 576/11520 = 1/20
                     }}
