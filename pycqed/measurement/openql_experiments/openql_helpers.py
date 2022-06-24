@@ -665,24 +665,30 @@ class OqlProgram:
                 }
             )
 
-            # decomposer for legacy decompositions (those defined in the "gate_decomposition" section)
-            # FIXME: comment incorrect, also decomposes new-style definitions
-            # see https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
+            # perform legacy decompositions (those defined in the "gate_decomposition" section), see:
+            # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
+            # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#predicate-key
             c.append_pass(
                 'dec.Instructions',
-                # NB: don't change the name 'legacy', see:
-                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
-                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#predicate-key
-                'legacy',
+                'dec_legacy',
+                {
+                    'predicate_key': 'name',
+                    'predicate_value': 'legacy'
+                }
             )
-        else:  # FIXME: experimental. Also decompose API input to allow use of new style decompositions
-            c.append_pass(
-                'dec.Instructions',
-                # NB: don't change the name 'legacy', see:
-                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
-                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#predicate-key
-                'legacy',
-            )
+
+        else:  # API input, note that legacy decompositions are applied on the fly by the API
+            pass
+
+        # perform new-style decompositions, pre-scheduling
+        c.append_pass(
+            'dec.Instructions',
+            'dec_pre_sched',
+            {
+                'predicate_key': 'when',
+                'predicate_value': 'pre-sched'
+            }
+        )
 
         # report the initial qasm
         c.append_pass(
@@ -721,6 +727,16 @@ class OqlProgram:
             'scheduler',
             {
                 'resource_constraints': 'yes'
+            }
+        )
+
+        # perform new-style decompositions, post-scheduling
+        c.append_pass(
+            'dec.Instructions',
+            'dec_post_sched',
+            {
+                'predicate_key': 'when',
+                'predicate_value': 'post-sched'
             }
         )
 
