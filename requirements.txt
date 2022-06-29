@@ -42,4 +42,5 @@ qutechopenql>=0.10.4  # pip install qutechopenql --verbose --verbose --verbose -
 # Hardware support
 spirack
 zhinst
+zhinst-deviceutils; python_version > '3.6'
 pyvisa  # >=1.8
