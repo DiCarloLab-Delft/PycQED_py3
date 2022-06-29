@@ -36,8 +36,8 @@ pygsti==0.9.6  # FIXME: 0.9.7.5 breaks test_gst.py
 plotly<3.8  # FIXME: removing version constraint breaks test_gst.py
 
 # OpenQL
+# pip install msvc-runtime # needed for qutechopenql on lab-PC, but breaks CI
 qutechopenql>=0.10.4  # pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases
-# msvc-runtime # needed for qutechopenql on lab-PC, but breaks CI
 
 # Hardware support
 spirack
