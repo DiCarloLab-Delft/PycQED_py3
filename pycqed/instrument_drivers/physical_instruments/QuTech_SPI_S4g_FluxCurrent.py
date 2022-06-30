@@ -71,8 +71,6 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
     def _get_current(self, parname):
         mod_id, dac = self.channel_map[parname]
         current, span = self.current_sources[mod_id].get_settings(dac)
-        # just to make sure
-        assert span == 2
         return current
 
     def _set_current(self, parname, value):
