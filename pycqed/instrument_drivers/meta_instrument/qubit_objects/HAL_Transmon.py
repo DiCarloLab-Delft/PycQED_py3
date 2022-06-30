@@ -850,7 +850,8 @@ class HAL_Transmon(HAL_ShimSQ):
             verbose=False,
             MC: Optional[MeasurementControl] = None,
             update=True,
-            all_modules=False
+            all_modules=False,
+            prepare_for_timedomain=True
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -867,7 +868,7 @@ class HAL_Transmon(HAL_ShimSQ):
             else:
                 amps = np.linspace(0, 1, 31)
 
-        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules)
+        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules, prepare_for_timedomain=prepare_for_timedomain)
 
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
 
@@ -3247,7 +3248,8 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True,
+            disable_metadata=False
     ) -> float:
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3262,7 +3264,8 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(np.arange(42))
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('AllXY' + label + self.msmt_suffix)
+        MC.run('AllXY' + label + self.msmt_suffix,
+               disable_metadata=disable_metadata)
 
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
@@ -3322,6 +3325,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
+            disable_snapshot_metadata: bool = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3386,7 +3390,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('T1' + self.msmt_suffix)
+        MC.run('T1' + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
 
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
@@ -3502,7 +3506,8 @@ class HAL_Transmon(HAL_ShimSQ):
             update=True,
             detector=False,
             double_fit=False,
-            test_beating=True
+            test_beating=True,
+            disable_snapshot_metadata: bool = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3561,7 +3566,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('Ramsey' + label + self.msmt_suffix)
+        MC.run('Ramsey' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
 
         # Restore old frequency value
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)
@@ -3791,7 +3796,8 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             update=True,
             label: str = '',
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True,
+            disable_snapshot_metadata: bool = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3862,7 +3868,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('echo' + label + self.msmt_suffix)
+        MC.run('echo' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
 
         if analyze:
             # N.B. v1.5 analysis
