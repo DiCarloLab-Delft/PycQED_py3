@@ -1441,37 +1441,47 @@ def off_on(
     return p
 
 def RO_QND_sequence(q_idx,
-                    platf_cfg: str) -> OqlProgram:
+                    platf_cfg: str,
+                    use_rx12: bool = False) -> OqlProgram:
     '''
     RO QND sequence.
     '''
 
     p = OqlProgram("RO_QND_sequence", platf_cfg)
 
-    k = p.create_kernel("Experiment")
+    def add_measure(k, idx, rx12):
+        if rx12:
+            k.gate('rx12', [q_idx])
+            k.measure(idx)
+            k.gate('rx12', [q_idx])
+        else:
+            k.measure(idx)
 
+    k = p.create_kernel("Experiment")
     k.prepz(q_idx)
     k.gate('rx90', [q_idx])
-    k.measure(q_idx)
-    k.measure(q_idx)
+    add_measure(k, q_idx, use_rx12)
+    add_measure(k, q_idx, use_rx12)
     k.gate('rx180', [q_idx])
-    k.measure(q_idx)
+    add_measure(k, q_idx, use_rx12)
     p.add_kernel(k)
 
     k = p.create_kernel("Init_0")
     k.prepz(q_idx)
-    k.measure(q_idx)
+    add_measure(k, q_idx, use_rx12)
     p.add_kernel(k)
 
     k = p.create_kernel("Init_1")
     k.prepz(q_idx)
     k.gate('rx180', [q_idx])
-    k.measure(q_idx)
+    add_measure(k, q_idx, use_rx12)
     p.add_kernel(k)
 
     p.compile()
     
     return p
+# endregion
+
 
 def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:
     """
