@@ -1579,9 +1579,9 @@ class ZI_base_instrument(Instrument):
                     success_and_ready = True
                     break
 
-        t1 = time.time()
-        print(self._awgModule.get('awgModule/compiler/statusstring')
-              ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
+        # t1 = time.time()
+        # print(self._awgModule.get('awgModule/compiler/statusstring')
+        #       ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
 
         # Check status
         if self.get('awgs_{}_waveform_memoryusage'.format(awg_nr)) > 1.0:
