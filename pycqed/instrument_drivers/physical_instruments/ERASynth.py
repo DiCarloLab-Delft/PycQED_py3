@@ -78,6 +78,9 @@ class ERASynth(Instrument):
 
         print("Connected to EraSynth " + self.name)
 
+    def __del__(self):
+        self.off()
+
     def _add_qcodes_parameters(self):
 
         # ##############################################################################
