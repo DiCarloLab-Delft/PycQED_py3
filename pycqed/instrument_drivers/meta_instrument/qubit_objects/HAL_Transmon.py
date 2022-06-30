@@ -2034,7 +2034,7 @@ class HAL_Transmon(HAL_ShimSQ):
         cost function.
 
         Refs:
-        Bultnik PR Applied 6, 034008 (2016)
+        Bultink PR Applied 6, 034008 (2016)
 
         Args:
             two_par:    if readout is performed at the symmetry point and in the
@@ -2446,11 +2446,11 @@ class HAL_Transmon(HAL_ShimSQ):
         # joint rescaling to +/-1 Volt
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
-        # fixme: deviding the weight functions by four to not have overflow in
+        # fixme: dividing the weight functions by four to not have overflow in
         # thresholding of the UHFQC
         weight_scale_factor = 1. / (4 * np.max([maxI, maxQ]))
-        optimized_weights_I = np.array(weight_scale_factor * optimized_weights_I)
-        optimized_weights_Q = np.array(weight_scale_factor * optimized_weights_Q)
+        W_func_I = np.array(weight_scale_factor * optimized_weights_I)
+        W_func_Q = np.array(weight_scale_factor * optimized_weights_Q)
 
         # Smooth optimal weight functions
         T = np.arange(len(W_func_I))/1.8e9
@@ -2475,8 +2475,10 @@ class HAL_Transmon(HAL_ShimSQ):
                 self._prep_ro_integration_weights()
                 self._prep_ro_instantiate_detectors()
                 ssro_dict = self.measure_ssro(
-                    no_figs=no_figs, update=update,
-                    prepare=True, disable_metadata=disable_metadata,
+                    no_figs=no_figs,
+                    update=update,
+                    prepare=True,
+                    disable_metadata=disable_metadata,
                     nr_shots_per_case=nr_shots_per_case,
                     post_select=post_select,
                     post_select_threshold=post_select_threshold)
@@ -2665,8 +2667,6 @@ class HAL_Transmon(HAL_ShimSQ):
         # This snippet causes 0.08 s of overhead but is dangerous to bypass
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
-            nr_flux_dance=nr_flux_dance,
-            wait_time=wait_time,
             initialize=post_select,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
@@ -4012,7 +4012,7 @@ class HAL_Transmon(HAL_ShimSQ):
             ax (str {'x', 'y'}):
                 axis arour which the pi pulses are to be performed. Possible values 'x' or 'y'
 
-            angle (str {'90', '180'}):r
+            angle (str {'90', '180'}):
                 specifies whether to apply pi or pi/2 pulses. Possible values: '180' or '90'
 
             update (bool):
@@ -4025,20 +4025,20 @@ class HAL_Transmon(HAL_ShimSQ):
             MC = self.instr_MC.get_instr()
 
         # allow flipping only with pi/2 or pi, and x or y pulses
-        assert angle in ['90','180']
+        assert angle in ['90', '180']
         assert ax.lower() in ['x', 'y']
 
         # append the calibration points, times are for location in plot
         nf = np.array(number_of_flips)
         dn = nf[1] - nf[0]
         nf = np.concatenate([nf,
-                                (nf[-1]+1*dn,
-                                nf[-1]+2*dn,
-                                nf[-1]+3*dn,
-                                nf[-1]+4*dn) ])
+                             (nf[-1] + 1 * dn,
+                              nf[-1] + 2 * dn,
+                              nf[-1] + 3 * dn,
+                              nf[-1] + 4 * dn)])
 
         self.prepare_for_timedomain()
-        p = sqo.flipping(number_of_flips=nf, equator=equator,flip_ef=flip_ef,
+        p = sqo.flipping(number_of_flips=nf, equator=equator,  # flip_ef=flip_ef, (Unexpected keyword!)
                          qubit_idx=self.cfg_qubit_nr(),
                          platf_cfg=self.cfg_openql_platform_fn(),
                          ax=ax.lower(), angle=angle)
