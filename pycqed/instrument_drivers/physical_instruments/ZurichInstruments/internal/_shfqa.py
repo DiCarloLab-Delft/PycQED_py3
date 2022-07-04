@@ -239,14 +239,10 @@ class SeqC:
                 generator_mask=SeqC._make_mask("QA_GEN_", indices),
                 integrator_mask=SeqC._make_mask("QA_INT_", indices),
             )
-            case = SeqC._scope(preamble=f"case {bin(case)}:", body=startQA)
+            case = SeqC._scope(preamble=f"case {bin(case << 17)}:", body=startQA)
             switch.append(case)
-        dummy_readout = SeqC._readout(
-            generator_mask=0,
-            integrator_mask="QA_INT_7",  # This is a temporary hack - this value must be different than 0 to trigger the result logger
-        )
         default = SeqC._scope(
-            preamble="default:", body=dummy_readout + f"{SeqC._VAR_NUM_ERRORS} += 1;\n"
+            preamble="default:", body=f"{SeqC._VAR_NUM_ERRORS} += 1;\n"
         )
         switch.append(default)
         switch = SeqC._scope(preamble=f"switch({SeqC._VAR_CODEWORD})", body=switch)
@@ -406,7 +402,7 @@ class SeqC:
         """
         Returns a SeqC string that corresponds to the value of the codeword currently present at the DIO interface.
         """
-        return f"(getDIOTriggered() & {bin(mask)}) >> {shift}"
+        return f"(getDIOTriggered() & {bin(mask)})"
 
     @staticmethod
     def _var_definition(name: str, value) -> str:
