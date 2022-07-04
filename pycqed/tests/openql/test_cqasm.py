@@ -206,6 +206,12 @@ class Test_cQASM(unittest.TestCase):
                 pragma @ql.name("{name}")  # set the name of generated files
 
                 __cz_sw_ne_park q[0],q[1],q[2]
+                cond (b[0]) __cz_sw_ne_park q[0],q[1],q[2]
+
+                # FIXME: other cond stuff, move
+                cond (b[0]) __test_epstein q[0],5  # FIXME: condition is lost
+                cond (b[0]) __rx q[0], 10 # FIXME: condition is lost, constant propagation not performed
+
             """
 
             p = OqlProgram(name, str(platf_cfg_path))  # NB: name must be identical to name set by "pragma @ql.name" above
