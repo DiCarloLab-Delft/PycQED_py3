@@ -799,6 +799,7 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
     def __init__(self,
                  Q_target,
                  Q_control,
+                 Q_spectator,
                  control_cases,
                  angles,
                  solve_for_phase_gate_model:bool = False,
@@ -816,6 +817,7 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
                          extract_only=extract_only)
         self.Q_target = Q_target
         self.Q_control = Q_control
+        self.Q_spectator = Q_spectator
         self.control_cases = control_cases
         self.angles = angles
         self.solve_for_phase_gate_model = solve_for_phase_gate_model
@@ -897,12 +899,16 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
             Missing_fraction[q] = L_1[q]-L_0[q]
 
         # Solve for Phase gate model
+        Phase_model = {}
         if self.solve_for_phase_gate_model:
-            q = self.Q_target[0]
-            n_c = len(self.Q_control)
-            Phase_vec = np.array([Fit_res[q][c][0] for c in self.control_cases])
-            Phase_model = get_phase_model_values(n_c, Phase_vec)
-
+            for q in self.Q_target:
+                n_c = len(self.Q_control)
+                Phase_vec = np.array([Fit_res[q][c][0] for c in self.control_cases])
+                if self.Q_spectator:
+                    n_spec = len(self.Q_spectator)
+                    Phase_model[q] = get_phase_model_values(n_c, Phase_vec, n_spec)
+                else:
+                    Phase_model[q] = get_phase_model_values(n_c, Phase_vec)
         self.proc_data_dict['Ramsey_curves'] = Ramsey_curves
         self.proc_data_dict['Cal_points'] = Cal_points
         self.proc_data_dict['Fit_res'] = Fit_res
@@ -916,8 +922,8 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
         # self.qoi['L_1'] = L_1
         self.qoi['P_excited'] = P_excited
         self.qoi['Phases'] = {}
-        q = self.Q_target[0]
-        self.qoi['Phases'][q] = { c:Fit_res[q][c][0] for c in self.control_cases }
+        for q in self.Q_target:
+            self.qoi['Phases'][q] = { c:Fit_res[q][c][0] for c in self.control_cases }
         if self.solve_for_phase_gate_model:
             self.qoi['Phase_model'] = Phase_model
 
@@ -947,18 +953,21 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
                 'Missing_fraction': self.proc_data_dict['Missing_fraction'],
                 'timestamp': self.timestamps[0]}
 
-        fig, axs = plt.subplots(figsize=(9,4), ncols=2, dpi=100)
-        self.figs[f'Parity_check_phases_{"_".join(Q_total)}'] = fig
-        self.axs_dict[f'plot_2'] = axs[0]
+        for i, q in enumerate(self.Q_target):
+            Q_total = [q]+self.Q_control
+            fig, axs = plt.subplots(figsize=(9,4), ncols=2, dpi=100)
+            self.figs[f'Parity_check_phases_{"_".join(Q_total)}'] = fig
+            self.axs_dict[f'plot_phases_{i}'] = axs[0]
 
-        self.plot_dicts[f'Parity_check_phases_{"_".join(Q_total)}']={
-                'plotfn': Phases_plotfn,
-                'ax_id': f'plot_2',
-                'Q_target': self.Q_target,
-                'Q_control': self.Q_control,
-                'control_cases': self.control_cases,
-                'Phases': self.qoi['Phases'],
-                'timestamp': self.timestamps[0]}
+            self.plot_dicts[f'Parity_check_phases_{"_".join(Q_total)}']={
+                    'plotfn': Phases_plotfn,
+                    'ax_id': f'plot_phases_{i}',
+                    'q_target': q,
+                    'Q_control': self.Q_control,
+                    'Q_spectator': self.Q_spectator,
+                    'control_cases': self.control_cases,
+                    'Phases': self.qoi['Phases'],
+                    'timestamp': self.timestamps[0]}
 
         n = len(self.Q_control)
         fig, axs = plt.subplots(figsize=(5,2*n), nrows=n, sharex=True, dpi=100)
@@ -966,7 +975,6 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
             axs = [axs]
         self.figs[f'Parity_check_missing_fraction_{"_".join(Q_total)}'] = fig
         self.axs_dict[f'plot_3'] = axs[0]
-
         self.plot_dicts[f'Parity_check_missing_fraction_{"_".join(Q_total)}']={
                 'plotfn': Missing_fraction_plotfn,
                 'ax_id': f'plot_3',
@@ -975,6 +983,21 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
                 'P_excited': self.proc_data_dict['P_excited'],
                 'control_cases': self.control_cases,
                 'timestamp': self.timestamps[0]}
+
+        if self.solve_for_phase_gate_model:
+            for i, q in enumerate(self.Q_target):
+                Q_total = [q]+self.Q_control
+                fig, ax = plt.subplots(figsize=(5,4))
+                self.figs[f'Phase_gate_model_{"_".join(Q_total)}'] = fig
+                self.axs_dict[f'plot_phase_gate_{i}'] = ax
+                self.plot_dicts[f'Phase_gate_model_{"_".join(Q_total)}']={
+                        'plotfn': Phase_model_plotfn,
+                        'ax_id': f'plot_phase_gate_{i}',
+                        'q_target': q,
+                        'Q_control': self.Q_control,
+                        'Q_spectator': self.Q_spectator,
+                        'Phase_model': self.qoi['Phase_model'][q],
+                        'timestamp': self.timestamps[0]}
 
     def run_post_extract(self):
         self.prepare_plots()  # specify default plots
@@ -1006,18 +1029,22 @@ def Ramsey_curves_plotfn(
         return A*(np.cos( (x+phi)/360 *2*np.pi )+1)/2 + B
 
     cal_ax = np.arange(len(calibration_points))*10+360
-    from matplotlib.cm import hsv 
-    Colors = { case : hsv(x) for x, case in \
-               zip(np.linspace(0,1,len(control_cases)), control_cases)}
+    if len(control_cases) == 2:
+        Colors = { case : color for color, case in zip(['C2', 'C3'],control_cases)}
+    else:
+        from matplotlib.cm import hsv
+        Colors = { case : hsv(x) for x, case in \
+                   zip(np.linspace(0,1,len(control_cases)), control_cases)}
     for i, q in enumerate(Q_target+Q_control):
         for case in control_cases:
             if q in Q_target:
                 axs[i].plot(angles, func(angles, *Fit_res[q][case]),
-                            '--', color=Colors[case], alpha=.5,
+                            '--', color=Colors[case], alpha=1 if len(control_cases)==2 else .5,
                             label=rf'$|{case}\rangle$ : {Fit_res[q][case][0]:.1f}')
             axs[i].plot(angles, Ramsey_curves[q][case],
-                        '.', color=Colors[case], alpha=.5)
+                        '.', color=Colors[case], alpha=1 if len(control_cases)==2 else .5)
         axs[i].plot(cal_ax, Cal_points[q], 'C0.-')
+        axs[i].legend(frameon=False, bbox_to_anchor=(1.04,1), loc="upper left")
         if q in Q_control:
             axs[i].plot([angles[0], angles[-1]], [L_0[q], L_0[q]], 'k--')
             axs[i].plot([angles[0], angles[-1]], [L_1[q], L_1[q]], 'k--',
@@ -1026,14 +1053,14 @@ def Ramsey_curves_plotfn(
         axs[i].set_ylabel(f'Population {q}')
     axs[-1].set_xticks(np.arange(0, 360, 60))
     axs[-1].set_xlabel('Phase (deg), calibration points')
-    axs[0].legend(frameon=False, bbox_to_anchor=(1.04,1), loc="upper left")
     axs[0].set_title(f'{timestamp}\nParity check ramsey '+\
                      f'{" ".join(Q_target)} with control qubits {" ".join(Q_control)}')
 
 def Phases_plotfn(
     ax,
-    Q_target,
+    q_target,
     Q_control,
+    Q_spectator,
     control_cases, 
     Phases,
     timestamp,
@@ -1042,34 +1069,44 @@ def Phases_plotfn(
     axs = fig.get_axes()
     # Sort control cases by number of excitations
     # and get ideal phases vector "vec"
-    cases_sorted = [control_cases[0]]
-    vec = [0]
-    for n in range(len(control_cases[0])):
-        for c in control_cases:
-            if c.count('1') == n+1:
-                cases_sorted.append(c)
-                vec.append(180*np.mod(n+1%2,2))
+    if Q_spectator:
+        n_spec = len(Q_spectator)
+        cases_sorted = [control_cases[0], control_cases[1]]
+        vec = [0, 0]
+        for n in range(len(control_cases[0])):
+            for c in control_cases:
+                if c[:-n_spec].count('1') == n+1:
+                    cases_sorted.append(c)
+                    vec.append(180*np.mod(n+1%2,2))
+    else:
+        cases_sorted = [control_cases[0]]
+        vec = [0]
+        for n in range(len(control_cases[0])):
+            for c in control_cases:
+                if c.count('1') == n+1:
+                    cases_sorted.append(c)
+                    vec.append(180*np.mod(n+1%2,2))
     # Phase error vector
-    q = Q_target[0]
+    q = q_target
     phase_err_sorted = np.array([Phases[q][c] for c in cases_sorted])-np.array(vec)
 
     axs[0].plot(cases_sorted, np.zeros(len(cases_sorted))+180, 'k--')
     axs[0].plot(cases_sorted, np.zeros(len(cases_sorted)), 'k--')
     axs[0].plot(cases_sorted, [Phases[q][c] for c in cases_sorted], 'o-')
-    axs[0].set_xticklabels([fr'$|{c}\rangle$' for c in cases_sorted], rotation=90)
+    axs[0].set_xticklabels([fr'$|{c}\rangle$' for c in cases_sorted], rotation=90, fontsize=7)
     axs[0].set_yticks([0, 45, 90, 135, 180])
     axs[0].set_xlabel(fr'Control qubit states $|${",".join(Q_control)}$\rangle$')
-    axs[0].set_ylabel(f'{"".join(Q_target)} Phase (deg)')
+    axs[0].set_ylabel(f'{q_target} Phase (deg)')
     axs[0].grid(ls='--')
     
-    axs[1].bar(cases_sorted, phase_err_sorted)
-    axs[1].set_xticklabels([fr'$|{c}\rangle$' for c in cases_sorted], rotation=90)
+    axs[1].bar(cases_sorted, phase_err_sorted, zorder=10)
+    axs[1].grid(ls='--', zorder=-10)
+    axs[1].set_xticklabels([fr'$|{c}\rangle$' for c in cases_sorted], rotation=90, fontsize=7)
     axs[1].set_xlabel(fr'Control qubit states $|${",".join(Q_control)}$\rangle$')
-    axs[1].set_ylabel(f'{"".join(Q_target)} Phase error (deg)')
+    axs[1].set_ylabel(f'{q_target} Phase error (deg)')
     fig.suptitle(f'{timestamp}\nParity check ramsey '+\
-                 f'{" ".join(Q_target)} with control qubits {" ".join(Q_control)}', y=1.1)
+                 f'{q_target} with control qubits {" ".join(Q_control)}', y=1.0)
     fig.tight_layout()
-
 
 def Missing_fraction_plotfn(
     ax,
@@ -1095,7 +1132,7 @@ def Missing_fraction_plotfn(
     axs[0].set_title(f'{timestamp}\nParity check ramsey '+\
                      f'{" ".join(Q_target)} with control qubits {" ".join(Q_control)}')
 
-def get_phase_model_values(n, Phase_vec):
+def get_phase_model_values(n, Phase_vec, n_spec=None):
     # Get Operator matrix dictionary
     I = np.array([[1, 0],
                   [0, 1]])
@@ -1123,13 +1160,19 @@ def get_phase_model_values(n, Phase_vec):
             M[i, j] = np.dot(state, np.dot(Op, state.T))
     # Get ideal phase vector
     states = ['{:0{}b}'.format(i, n) for i in range(2**n)]
-    Phase_vec_ideal = np.array([s.count('1')*180 for s in states])
+    if n_spec:
+        Phase_vec_ideal = np.array([s[:-n_spec].count('1')*180 for s in states])
+    else:
+        Phase_vec_ideal = np.array([s.count('1')*180 for s in states])
     ########################################
     # Correct rotations for modulo of phase
     ########################################
     state_idxs_sorted_by_exc = {i:[] for i in range(n+1)}
     for i, s in enumerate(states):
-        nr_exc = s.count('1')
+        if n_spec:
+            nr_exc = s[:-n_spec].count('1')
+        else:
+            nr_exc = s.count('1')
         state_idxs_sorted_by_exc[nr_exc].append(i)
     for i in range(n):
         phi_0 = Phase_vec[state_idxs_sorted_by_exc[i][0]]
@@ -1144,6 +1187,48 @@ def get_phase_model_values(n, Phase_vec):
     Result = {op:vector[i]-vector_ideal[i] for i, op in enumerate(Operators.keys())}
 
     return Result
+
+def Phase_model_plotfn(
+    ax,
+    q_target,
+    Q_control,
+    Q_spectator,
+    Phase_model,
+    timestamp,
+    **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+
+    Ops = np.array([ op for op in Phase_model.keys() ])
+    
+    if Q_spectator:
+        n_spec = len(Q_spectator)
+        Ops_sorted = [Ops[0], Ops[1]]
+        Phases_sorted = [Phase_model[Ops[0]], Phase_model[Ops[1]]]
+        for n in range(len(Ops[0])):
+            for c in Ops:
+                if c[:-n_spec].count('Z') == n+1:
+                    Ops_sorted.append(c)
+                    Phases_sorted.append(Phase_model[c])
+    else:
+        Ops_sorted = [Ops[0]]
+        Phases_sorted = [Phase_model[Ops[0]]]
+        for n in range(len(Ops[0])):
+            for c in Ops:
+                if c.count('Z') == n+1:
+                    Ops_sorted.append(c)
+                    Phases_sorted.append(Phase_model[c])
+
+    axs[0].bar(Ops_sorted, Phases_sorted, color='C0', zorder=10)
+    axs[0].set_xticks(Ops_sorted)
+    axs[0].set_xticklabels(Ops_sorted, rotation=90, fontsize=7)
+    axs[0].set_xlabel('Operator $U_{'+fr'{"}U_{".join(Q_control)}'+'}$')
+    axs[0].set_ylabel(f'Phase model coefficient error (deg)')
+    axs[0].grid(ls='--', zorder=0)
+    fig.suptitle(f'{timestamp}\nPhase gate model coefficients\n'+\
+             f'{q_target} with control qubits {" ".join(Q_control)}', y=1.0)
+    fig.tight_layout()
+
 
 class Parity_check_calibration_analysis(ba.BaseDataAnalysis):
     """

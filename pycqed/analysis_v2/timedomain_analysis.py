@@ -1916,7 +1916,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "xpos": 1.45,
                 "plotfn": self.plot_text,
                 "box_props": "fancy",
-                "line_kws": {"alpha": 0},
+                "line_kws": {"alpha": 1},
                 "horizontalalignment": "right",
                 "text_string": phase_message,
             }

@@ -288,7 +288,7 @@ def Msmt_induced_dephasing_ramsey(
                                 k.gate('rY180', [q])
                                 k.gate('rYm180', [q])
                         elif echo_times == 'XY':
-                            for cycle in range(int(meas_time/6/20)):
+                            for cycle in range(int(meas_time/10/20)):
                                 k.gate('i', [q])
                                 k.gate('rX180', [q])
                                 k.gate('i', [q])
@@ -2350,6 +2350,10 @@ def parity_check_fidelity(
         ####################
         for q in Q_ancilla_idx + Q_control_idx:
             k.prepz(q)
+        # for qb in [7,14,12]:
+        #     k.gate("ry90", [qb])
+        # for qb in [3,8,11,9]:
+        #     k.gate("rx180", [qb])
         k.barrier([])
         if initialization_msmt:
             for q in Q_ancilla_idx + Q_control_idx:
@@ -2417,6 +2421,7 @@ def Weight_n_parity_tomography(
         for q in all_Q_idxs:
             k.prepz(q)
             k.gate("ry90", [q])
+        k.gate("rx180", [8])
 
         k.gate('wait', [], wait_time_before_flux)
         for flux_cw in flux_cw_list:
