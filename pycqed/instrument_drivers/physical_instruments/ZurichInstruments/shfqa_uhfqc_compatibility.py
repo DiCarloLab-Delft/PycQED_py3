@@ -27,14 +27,14 @@ class Dio:
     VALID_INDEX = 16
     DRIVE = 0x3
 
-    MAX_NUM_CHANNELS = 2
-    MAX_NUM_RESULTS_PER_CHANNEL = 7
+    MAX_NUM_CHANNELS = 1
+    MAX_NUM_RESULTS_PER_CHANNEL = 14
     MAX_NUM_RESULTS = MAX_NUM_CHANNELS * MAX_NUM_RESULTS_PER_CHANNEL
     MAX_NUM_CODEWORDS = 2 ** MAX_NUM_RESULTS
 
     "               <---- Input ----> <--- Output --->"
     _CW_MASK_STR = "01111111 11111110 00000000 00000000"
-    "                <-ch2-> <-ch1->"
+    "                <-----ch1----->"
     INPUT_SHIFT = 17
 
     @staticmethod
