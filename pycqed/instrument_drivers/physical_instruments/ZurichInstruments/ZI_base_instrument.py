@@ -742,8 +742,6 @@ class ZI_base_instrument(Instrument):
         self._errors = None
         # Structure for storing errors that should be demoted to warnings
         self._errors_to_ignore = []
-        # Make initial error check
-        self.check_errors()
 
         # Default is not to use async mode
         self._async_mode = False
@@ -753,6 +751,9 @@ class ZI_base_instrument(Instrument):
             self._logfile = open(logfile, 'w')
         else:
             self._logfile = None
+
+        # Make initial error check
+        self.check_errors()
 
         # Show some info
         serial = self.get('features_serial')
