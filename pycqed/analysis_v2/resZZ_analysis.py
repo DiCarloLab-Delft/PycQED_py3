@@ -15,6 +15,7 @@ import cmath as cm
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 from copy import deepcopy
+from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 
