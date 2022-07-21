@@ -1420,7 +1420,8 @@ class HAL_Device(HAL_ShimMQ):
 
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
-        return a
+            a2 = ma2.ResZZAnalysis()
+        return a2
 
 
     def measure_state_tomography(
