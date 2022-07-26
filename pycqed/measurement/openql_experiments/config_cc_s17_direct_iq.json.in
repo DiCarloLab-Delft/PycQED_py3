@@ -182,7 +182,7 @@
                     "ref_control_mode": "awg8-mw-direct-iq",
                     "controller": {
                         "name": "cc",   // FIXME
-                        "slot": 7,
+                        "slot": 4,
                         "io_module": "CC-CONN-DIO-DIFF"
                     }
                 },

@@ -366,7 +366,6 @@ class lutman_par(Soft_Sweep):
     Sweeps a LutMan parameter and uploads the waveforms to AWG (in real-time if
     supported)
     """
-
     def __init__(
             self,
             LutMan: Base_LutMan,
@@ -447,32 +446,24 @@ class joint_HDAWG_lutman_parameters(Soft_Sweep):
 
 class RO_freq_sweep(Soft_Sweep):
     """
-    name is defined by user
-    label and units are grabbed from parameter_1
+    Change qubit's RO frequency by changing the LO source frequency
+    and fixing modulation frequency.
     """
-
-    def __init__(self, name, qubit, ro_lutman, idx, parameter):
+    def __init__(self, qubit):
         self.set_kw()
-        self.name = name
-        self.parameter_name = parameter.label
-        self.unit = parameter.unit
+        self.name = f'RO_frequency_{qubit.name}'
+        self.parameter_name = f'RO_frequency_{qubit.name}'
+        self.unit = 'Hz'
         self.sweep_control = 'soft'
-
         self.qubit = qubit
-        self.ro_lm = ro_lutman
-        self.idx = idx
+        self.LO_instr = self.qubit.instr_LO_ro.get_instr()
 
     def set_parameter(self, val):
-        LO_freq = self.ro_lm.LO_freq()
-        IF_freq = val - LO_freq
-
-        # Parameter 1 will be qubit.ro_freq()
-        # self.qubit.ro_freq.set(val)
-        # Parameter 2 will be qubit.ro_freq_mod()
-        self.qubit.ro_freq_mod.set(IF_freq)
-
-        # self.ro_lm.set('M_modulation_R{}'.format(self.idx), IF_freq)
-        # self.ro_lm.load_waveforms_onto_AWG_lookuptable()
+        # Calculate LO frequency change
+        IF_freq = self.qubit.ro_freq_mod()
+        LO_freq = val-IF_freq
+        # Set LO frequency
+        self.LO_instr.frequency(LO_freq)
 
 
 @deprecated(version='0.4', reason='not used within pyqed')
