@@ -27,6 +27,17 @@ class TestDIODataTransfer(object):
                         jmp             @mainLoop
                         """)
 
+    def debug_pattern_CC(self, central_controller):
+        central_controller.reset()
+        central_controller.clear_status()
+        central_controller.status_preset()
+
+        central_controller.assemble_and_start("""mainLoop:
+                                seq_out         0x4321,1
+                                seq_out         0x0000,1 
+                                jmp             @mainLoop
+                                """)
+
     ##########################################################################
     # Configure HDAWG
     ##########################################################################
@@ -56,8 +67,12 @@ class TestDIODataTransfer(object):
         HDAWG.configure_awg_from_string(0, hd_awg_program)
         awgModule.set("awg/enable", 1)
 
-    def calibrate_HDAWG_dio(self, HDAWG):
+    def calibrate_HDAWG_dio(self, HDAWG, central_controller, dio_mask):
         log.info(f"{HDAWG.devname}: Finding valid delays...")
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/dio/valid/index", 0)
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/dio/valid/polarity", 2)
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/dio/mask/value", 0x3FF)  # 0x3FF
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/dio/mask/shift", 1)
 
         valid_delays = []
         for delay in range(16):
@@ -68,13 +83,16 @@ class TestDIODataTransfer(object):
             time.sleep(3)
             timing_error = HDAWG.daq.getInt(
                 f"/{HDAWG.devname}/raw/dios/0/error/timingsticky"
-            )
+            ) & dio_mask
             if timing_error == 0:
                 valid_delays.append(delay)
                 print("SUCCESS")
 
         if not valid_delays:
+            self.check_pattern(HDAWG, central_controller)
             raise Exception("DIO calibration failed! No valid delays found")
+
+
 
         log.info(f"{HDAWG.devname}: Valid delays are {valid_delays}")
 
@@ -97,15 +115,25 @@ class TestDIODataTransfer(object):
         # Clear all detected errors (caused by DIO timing calibration)
         HDAWG.check_errors(errors_to_ignore=["AWGDIOTIMING"])
 
-    def check_timing_error(self, HDAWG):
+    def check_timing_error(self, HDAWG, central_controller, dio_mask):
         """Check if the timing error is kept at 0 when we switch from
         calibration to walking 1s."""
         HDAWG.daq.set(f"/{HDAWG.devname}/raw/dios/0/error/timingclear", 1)
-        time.sleep(1)
+        time.sleep(3)
         timing_error = HDAWG.daq.getInt(f"/{HDAWG.devname}/raw/dios/0/error/timingsticky")
-        assert (
-                timing_error == 0
-        ), f"Timing error was not kept at 0 after calibration, changed to {timing_error}"
+        print(timing_error)
+        if timing_error != 0:
+            print("TIMING ERROR is NOT 0, calibrate again")
+            self.init_CC(central_controller)
+            self.calibrate_HDAWG_dio(HDAWG, central_controller, dio_mask)
+            HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/valid/polarity", 2)
+            HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/valid/index", 0)
+            HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/mask/shift", 0)
+            HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/mask/value", 0x0)
+            self.run_walking_ones_pattern(central_controller)
+        # assert (
+        #         timing_error == 0
+        # ), f"Timing error was not kept at 0 after calibration, changed to {timing_error}"
 
     def run_walking_ones_pattern(self, central_controller):
         central_controller.assemble_and_start("""mainLoop:
@@ -173,7 +201,25 @@ class TestDIODataTransfer(object):
                         or ((data[i + 1] & dio_mask) == 1 and (data[i] & dio_mask) == highest_pattern_value)
                 ), f"consecutive values {data[i]} and {data[i + 1]} do not respect the walking ones pattern"
 
-
+    def check_pattern(self, HDAWG, central_controller):
+        self.debug_pattern_CC(central_controller)
+        HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/valid/polarity", 2)
+        HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/valid/index", 0)
+        HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/mask/shift", 0)
+        HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/mask/value", 0x0)
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/rtlogger/mode", 1)
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/rtlogger/starttimestamp", 0)
+        path = f"/{HDAWG.devname}/awgs/0/rtlogger/data"
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/rtlogger/enable", 1)
+        time.sleep(0.01)
+        vector_d = HDAWG.daq.get(path, settingsonly=False, flat=True)[path][0]["vector"]
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/rtlogger/enable", 0)
+        HDAWG.daq.setInt(f"/{HDAWG.devname}/awgs/0/rtlogger/clear", 1)
+        data = vector_d.tolist()
+        data = data[1::2]
+        for i in range(len(data) - 1):
+            result = data[i] & 0xFFFF
+            print(result)
 
     def test_with_calib_HDAWG_dio(self):
         station = qc.Station()
@@ -188,41 +234,46 @@ class TestDIODataTransfer(object):
             port=8004
         )
         # HDAWG.daq.set(f"/{HDAWG.devname}/raw/system/restart", 1)
+        dio_mask = 0xFFFF
+
+        self.init_HDAWG(HDAWG)
 
         start_time = time.time()
-        seconds = 86400 #86400  # 24 hours
+        seconds = 172800 #86400  # 48 hours
         current_time = time.time()
         elapsed_time = current_time - start_time
         while elapsed_time <= seconds:
             current_time = time.time()
             elapsed_time = current_time - start_time
-            self.init_HDAWG(HDAWG)
             self.init_CC(central_controller)
-            self.calibrate_HDAWG_dio(HDAWG)
-            self.check_timing_error(HDAWG)
+
+            self.calibrate_HDAWG_dio(HDAWG, central_controller, dio_mask)
+
+            self.check_timing_error(HDAWG, central_controller, dio_mask,)
+            self.run_walking_ones_pattern(central_controller)
+            self.check_timing_error(HDAWG, central_controller, dio_mask)
 
             HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/valid/polarity", 2)
             HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/valid/index", 0)
             HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/mask/shift", 0)
             HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/mask/value", 0x0)
+            self.verify_walking_ones_pattern_HD(HDAWG, dio_mask, 0x8001)
 
-            self.check_timing_error(HDAWG)
-            self.run_walking_ones_pattern(central_controller)
-            self.verify_walking_ones_pattern_HD(HDAWG, 0xFFFF, 0x8001)
-
-    def test_calib_HDAWG_dio(self):
-        station = qc.Station()
-        central_controller = CC("central_controller", IPTransport("192.168.0.241"))
-        station.add_component(central_controller, update_snapshot=False)
-
-        self.init_CC(central_controller)
-
-        HDAWG = ZI_HDAWG8(
-            name="hdawg",
-            device="dev8066",
-            interface="1GbE",
-            server="localhost",
-            port=8004
-        )
-        self.calibrate_HDAWG_dio(HDAWG)
-        self.check_timing_error(HDAWG)
+    # def test_calib_HDAWG_dio(self):
+    #     station = qc.Station()
+    #     central_controller = CC("central_controller", IPTransport("192.168.0.241"))
+    #     station.add_component(central_controller, update_snapshot=False)
+    #
+    #     HDAWG = ZI_HDAWG8(
+    #         name="hdawg",
+    #         device="dev8066",
+    #         interface="1GbE",
+    #         server="localhost",
+    #         port=8004
+    #     )
+    #     self.init_HDAWG(HDAWG)
+    #     self.check_pattern(HDAWG, central_controller)
+#
+# DIO_datatest = TestDIODataTransfer()
+# # DIO_datatest.test_with_calib_HDAWG_dio()
+# DIO_datatest.test_calib_HDAWG_dio()
