@@ -124,6 +124,7 @@ class TestDIODataTransfer(object):
         print(timing_error)
         if timing_error != 0:
             print("TIMING ERROR is NOT 0, calibrate again")
+            self.check_pattern(HDAWG, central_controller)
             self.init_CC(central_controller)
             self.calibrate_HDAWG_dio(HDAWG, central_controller, dio_mask)
             HDAWG.daq.set(f"/{HDAWG.devname}/awgs/0/dio/valid/polarity", 2)
@@ -239,7 +240,7 @@ class TestDIODataTransfer(object):
         self.init_HDAWG(HDAWG)
 
         start_time = time.time()
-        seconds = 172800 #86400  # 48 hours
+        seconds = 86400 #86400  # 48 hours
         current_time = time.time()
         elapsed_time = current_time - start_time
         while elapsed_time <= seconds:
