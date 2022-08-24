@@ -553,8 +553,7 @@ class Qubit(Instrument):
             timeout=200,
             f_step=1e6,
             with_VNA=None,
-            verbose=True,
-            disable_snapshot_metadata=disable_snapshot_metadata
+            verbose=True
     ):
         # USED_BY: device_dependency_graphs.py,
         """
@@ -582,7 +581,7 @@ class Qubit(Instrument):
             raise NotImplementedError
         else:
             freqs = np.arange(start_freq, stop_freq + f_step, f_step)
-            self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False, disable_snapshot_metadata=disable_snapshot_metadata)
+            self.measure_heterodyne_spectroscopy(freqs=freqs, analyze=False)
             result = ma2.sa.Initial_Resonator_Scan_Analysis()
 
         # Create resonator list
@@ -1213,8 +1212,7 @@ class Qubit(Instrument):
             update=True,
             close_fig=True,
             MC=None,
-            label='',
-            disable_snapshot_metadata=disable_snapshot_metadata
+            label=''
     ):
         # USED_BY: device_dependency_graphs.py
         """
@@ -1270,7 +1268,7 @@ class Qubit(Instrument):
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, mode=spec_mode, MC=MC,
                                       analyze=False, label = label,
-                                      close_fig=close_fig, disable_snapshot_metadata=disable_snapshot_metadata)
+                                      close_fig=close_fig)
 
             label = 'spec'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
@@ -1306,7 +1304,7 @@ class Qubit(Instrument):
             return self.calibrate_frequency_ramsey(
                 steps=steps, artificial_periods=artificial_periods,
                 verbose=verbose, update=update,
-                close_fig=close_fig, disable_snapshot_metadata=disable_snapshot_metadata)
+                close_fig=close_fig)
         return analysis_spec.fitted_freq
 
     def calibrate_spec_pow(
@@ -1315,7 +1313,7 @@ class Qubit(Instrument):
             start_power=-55,
             power_step=5,
             threshold=0.5,
-            verbose=True, disable_snapshot_metadata=disable_snapshot_metadata
+            verbose=True
     ):
         # USED_BY: device_dependency_graphs.py
         """
@@ -1335,7 +1333,7 @@ class Qubit(Instrument):
         while w < (1 + threshold) * w0:
             self.spec_pow(power)
             self.measure_spectroscopy(freqs=freqs, analyze=False,
-                                      label='spec_pow_' + str(power) + '_dBm', disable_snapshot_metadata=disable_snapshot_metadata)
+                                      label='spec_pow_' + str(power) + '_dBm')
 
             a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                                qb_name=self.name)
@@ -1397,8 +1395,7 @@ class Qubit(Instrument):
             verbose: bool = True,
             update: bool = True,
             close_fig: bool = True,
-            test_beating: bool = True,
-            disable_snapshot_metadata=disable_snapshot_metadata
+            test_beating: bool = True
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -1430,8 +1427,7 @@ class Qubit(Instrument):
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
                                 analyze=False,
-                                prepare_for_timedomain=True if 0 == i else False,
-                                disable_snapshot_metadata=disable_snapshot_metadata)
+                                prepare_for_timedomain=True if 0 == i else False)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,

@@ -436,8 +436,7 @@ class HAL_Transmon(HAL_ShimSQ):
             update=True,
             use_max=False,
             spec_mode='pulsed_marked',
-            verbose=True,
-            disable_snapshot_metadata=False
+            verbose=True
     ) -> bool:
         # USED_BY: device_dependency_graphs.py
         """
@@ -476,7 +475,7 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs = np.arange(f_center - f_span / 2, f_center + f_span / 2, f_step)
 
             self.measure_spectroscopy(MC=MC, freqs=freqs, mode=spec_mode,
-                                      analyze=False, disable_snapshot_metadata=disable_snapshot_metadata)
+                                      analyze=False)
             label = 'spec'
 
             # Use 'try' because it can give a TypeError when no peak is found
@@ -536,8 +535,7 @@ class HAL_Transmon(HAL_ShimSQ):
             set_to_sweetspot=True,
             method='DAC',
             fluxChan=None,
-            spec_mode='pulsed_marked',
-            disable_snapshot_metadata=False
+            spec_mode='pulsed_marked'
     ):
         # USED_BY: device_dependency_graphs.py
         """
@@ -577,8 +575,7 @@ class HAL_Transmon(HAL_ShimSQ):
                 mode=spec_mode,
                 nested_resonator_calibration=False,
                 # nested_resonator_calibration_use_min=False,
-                resonator_freqs=np.arange(-5e6, 5e6, 0.2e6) + self.freq_res(),
-                disable_snapshot_metadata=disable_snapshot_metadata
+                resonator_freqs=np.arange(-5e6, 5e6, 0.2e6) + self.freq_res()
             )
 
             timestamp = a_tools.get_timestamps_in_range(
@@ -595,9 +592,9 @@ class HAL_Transmon(HAL_ShimSQ):
             for i, dac_value in enumerate(dac_values):
                 self.instr_FluxCtrl.get_instr()[self.fl_dc_ch()](dac_value)
                 if i == 0:
-                    self.find_frequency(freqs=freqs, update=True, disable_snapshot_metadata=disable_snapshot_metadata)
+                    self.find_frequency(freqs=freqs, update=True)
                 else:
-                    self.find_frequency(update=True, disable_snapshot_metadata=disable_snapshot_metadata)
+                    self.find_frequency(update=True)
 
             t_end = time.strftime('%Y%m%d_%H%M%S')
 
@@ -639,8 +636,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         return True
 
-    def find_qubit_sweetspot_1D(self, freqs=None, dac_values=None,
-            disable_snapshot_metadata=False):
+    def find_qubit_sweetspot_1D(self, freqs=None, dac_values=None):
 
         # self.spec_pow(-30)
         self.ro_acq_averages(2 ** 14)
@@ -665,9 +661,9 @@ class HAL_Transmon(HAL_ShimSQ):
             self.instr_FluxCtrl.get_instr()[flux_channel](dac_value)
 
             # Find Resonator
-            self.find_resonator_frequency(freqs=np.arange(-5e6, 5.1e6, .1e6) + self.freq_res(), use_min=True, disable_snapshot_metadata=disable_snapshot_metadata)
+            self.find_resonator_frequency(freqs=np.arange(-5e6, 5.1e6, .1e6) + self.freq_res(), use_min=True)
             # Find Qubit frequency
-            self.find_frequency(freqs=freqs, disable_snapshot_metadata=disable_snapshot_metadata)
+            self.find_frequency(freqs=freqs)
 
             Qubit_frequency.append(self.freq_qubit())
             Reson_frequency.append(self.freq_res())
@@ -679,9 +675,9 @@ class HAL_Transmon(HAL_ShimSQ):
         # Set Flux Current to sweetspot
         self.instr_FluxCtrl.get_instr()[flux_channel](sweetspot_current)
         self.find_resonator_frequency(freqs=np.arange(-5e6, 5.1e6, .1e6) + self.freq_res(),
-                                      use_min=True, disable_snapshot_metadata=disable_snapshot_metadata)
+                                      use_min=True)
         frequency_sweet_spot = self.find_frequency(
-            freqs=np.arange(-50e6, 50e6, .5e6) + self.freq_qubit(), disable_snapshot_metadata=disable_snapshot_metadata)
+            freqs=np.arange(-50e6, 50e6, .5e6) + self.freq_qubit())
 
         return frequency_sweet_spot
 
@@ -690,8 +686,7 @@ class HAL_Transmon(HAL_ShimSQ):
             anharmonicity=None,
             mode='pulsed_marked',
             update=True,
-            power_12=10,
-            disable_snapshot_metadata=False
+            power_12=10
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -716,7 +711,7 @@ class HAL_Transmon(HAL_ShimSQ):
         old_spec_pow = self.spec_pow()
         self.spec_pow(self.spec_pow() + power_12)
 
-        self.measure_spectroscopy(freqs=freqs, mode=mode, analyze=False, disable_snapshot_metadata=disable_snapshot_metadata)
+        self.measure_spectroscopy(freqs=freqs, mode=mode, analyze=False)
 
         a = ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            analyze_ef=True)
@@ -736,8 +731,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
-            prepare_for_continuous_wave=True,
-            disable_snapshot_metadata=False
+            prepare_for_continuous_wave=True
     ):
         """
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
@@ -801,7 +795,7 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Bus_spectroscopy_' + self.msmt_suffix + label, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='Bus_spectroscopy_' + self.msmt_suffix + label)
         spec_source_bus.off()
 
         self.hal_acq_spec_mode_off()
@@ -815,8 +809,7 @@ class HAL_Transmon(HAL_ShimSQ):
     # calibrate_ functions (HAL_Transmon specific)
     ##########################################################################
 
-    def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True,
-            disable_snapshot_metadata=False):
+    def calibrate_ro_pulse_amp_CW(self, freqs=None, powers=None, update=True):
         # USED_BY: device_dependency_graphs.py
         """
         Does a resonator power scan and determines at which power the low power
@@ -834,7 +827,7 @@ class HAL_Transmon(HAL_ShimSQ):
         if powers is None:
             powers = np.arange(-40, 0.1, 8)
 
-        self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False, disable_snapshot_metadata=disable_snapshot_metadata)
+        self.measure_resonator_power(freqs=freqs, powers=powers, analyze=False)
         fit_res = ma.Resonator_Powerscan_Analysis(label='Resonator_power_scan',
                                                   close_fig=True)
         if update:
@@ -857,8 +850,7 @@ class HAL_Transmon(HAL_ShimSQ):
             verbose=False,
             MC: Optional[MeasurementControl] = None,
             update=True,
-            all_modules=False,
-            disable_snapshot_metadata=False
+            all_modules=False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -875,7 +867,7 @@ class HAL_Transmon(HAL_ShimSQ):
             else:
                 amps = np.linspace(0, 1, 31)
 
-        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules, disable_snapshot_metadata=disable_snapshot_metadata)
+        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules)
 
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
 
@@ -963,8 +955,7 @@ class HAL_Transmon(HAL_ShimSQ):
             x0: list = [1.0, 0.0],
             cma_stds: list = [.15, 10],
             maxfevals: int = 250,
-            update: bool = True,
-            disable_snapshot_metadata=False
+            update: bool = True
     ) -> bool:
         # USED_BY: device_dependency_graphs.py
         """
@@ -1077,7 +1068,7 @@ class HAL_Transmon(HAL_ShimSQ):
             MC.set_detector_function(detector)  # sets test_detector
             MC.set_adaptive_function_parameters(ad_func_pars)
             MC.set_sweep_points(np.linspace(0, 2, 300))
-            MC.run, disable_snapshot_metadata=disable_snapshot_metadata(
+            MC.run(
                 name='Spurious_sideband_{}{}'.format(
                     mixer_ch, self.msmt_suffix),
                 mode='adaptive')
@@ -1138,7 +1129,7 @@ class HAL_Transmon(HAL_ShimSQ):
     #     MC.set_sweep_functions([S1, S2])
     #     MC.set_detector_function(detector)  # sets test_detector
     #     MC.set_adaptive_function_parameters(ad_func_pars)
-    #     MC.run(name='Spurious_sideband', mode='adaptive', disable_snapshot_metadata=disable_snapshot_metadata)
+    #     MC.run(name='Spurious_sideband', mode='adaptive')
     #     a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
     #     alpha = a.optimization_result[0][0]
     #     phi = a.optimization_result[0][1]
@@ -1149,8 +1140,7 @@ class HAL_Transmon(HAL_ShimSQ):
     #         LutMan.mixer_alpha(alpha)
     #         LutMan.mixer_phi(phi)
 
-    def calibrate_mixer_skewness_RO(self, update=True,
-            disable_snapshot_metadata=False):
+    def calibrate_mixer_skewness_RO(self, update=True):
         """
         Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
         see calibration toolbox for details FIXME: outdated
@@ -1201,7 +1191,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_functions([S1, S2])
         MC.set_detector_function(detector)  # sets test_detector
         MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run(name='Spurious_sideband', mode='adaptive', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='Spurious_sideband', mode='adaptive')
         a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
         alpha = a.optimization_result[0][0]
         phi = a.optimization_result[0][1]
@@ -1214,8 +1204,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
     def calibrate_mixer_offsets_RO(
             self, update: bool = True,
-            ftarget=-110,
-            disable_snapshot_metadata=False
+            ftarget=-110
     ) -> bool:
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -1268,8 +1257,7 @@ class HAL_Transmon(HAL_ShimSQ):
             kw_offsets={'ftarget': -120},
             kw_skewness={},
             kw_motzoi={'update': True},
-            f_target_skewness=-120,
-            disable_snapshot_metadata=False
+            f_target_skewness=-120
     ):
 
         """
@@ -1312,8 +1300,7 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs=None,
             amps=None,
             analyze: bool = True,
-            update: bool = True,
-            disable_snapshot_metadata=False
+            update: bool = True
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -1371,7 +1358,7 @@ class HAL_Transmon(HAL_ShimSQ):
                                   msmt_kw={'prepare': True}
                                   )
         nested_MC.set_detector_function(d)
-        nested_MC.run(name='RO_coarse_tuneup', mode='2D', disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(name='RO_coarse_tuneup', mode='2D')
 
         if analyze is True:
             # Analysis
@@ -1402,8 +1389,7 @@ class HAL_Transmon(HAL_ShimSQ):
             use_adaptive: bool = True,
             n_points: int = 80,
             analyze: bool = True,
-            update: bool = True,
-            disable_snapshot_metadata=False
+            update: bool = True
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -1477,13 +1463,13 @@ class HAL_Transmon(HAL_ShimSQ):
                  'bounds': [(10e-9, 400e-9), amp_lim],
                  'minimize': False
                  })
-            nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name), disable_snapshot_metadata=disable_snapshot_metadata,
+            nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
                           mode='adaptive')
         # Use standard 2D sweep
         else:
             nested_MC.set_sweep_points(times)
             nested_MC.set_sweep_points_2D(amps)
-            nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name), disable_snapshot_metadata=disable_snapshot_metadata,
+            nested_MC.run(name='RO_duration_tuneup_{}'.format(self.name),
                           mode='2D')
         #####################
         # Analysis
@@ -1510,8 +1496,7 @@ class HAL_Transmon(HAL_ShimSQ):
             optimize_threshold: float = .99,
             check_threshold: float = .90,
             analyze: bool = True,
-            update: bool = True,
-            disable_snapshot_metadata=False
+            update: bool = True
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -1539,7 +1524,7 @@ class HAL_Transmon(HAL_ShimSQ):
         '''
 
         ## check single-qubit ssro first, if assignment fidelity below 92.5%, run optimizer
-        self.measure_ssro(post_select=True, disable_snapshot_metadata=disable_snapshot_metadata)
+        self.measure_ssro(post_select=True)
         if self.F_ssro() > check_threshold:
             return True
 
@@ -1586,7 +1571,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
 
         nested_MC.set_optimization_method('nelder_mead')
-        nested_MC.run(name='RO_fine_tuneup', mode='adaptive', disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(name='RO_fine_tuneup', mode='adaptive')
 
         if analyze is True:
             ma.OptimizationAnalysis(label='RO_fine_tuneup')
@@ -1597,8 +1582,7 @@ class HAL_Transmon(HAL_ShimSQ):
             MC: Optional[MeasurementControl] = None,
             analyze: bool = True,
             prepare: bool = True,
-            disable_snapshot_metadata: bool = False,
-            disable_snapshot_metadata=False
+            disable_metadata: bool = False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -1641,7 +1625,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) / sampling_rate)
         MC.set_detector_function(self.input_average_detector)
-        MC.run(name=f'Measure_Acq_Delay_{self.msmt_suffix}', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name=f'Measure_Acq_Delay_{self.msmt_suffix}', disable_snapshot_metadata=disable_metadata)
 
         self.ro_pulse_amp(old_pow)
 
@@ -1661,8 +1645,7 @@ class HAL_Transmon(HAL_ShimSQ):
             initial_steps: list = [0.05, 0.05, 1e6],
             nr_cliffords: int = 80, nr_seeds: int = 200,
             verbose: bool = True, update: bool = True,
-            prepare_for_timedomain: bool = True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain: bool = True
     ):
         """
         Refs:
@@ -1677,7 +1660,7 @@ class HAL_Transmon(HAL_ShimSQ):
             nr_cliffords=nr_cliffords, nr_seeds=nr_seeds,
             verbose=verbose, update=update,
             prepare_for_timedomain=prepare_for_timedomain,
-            method='restless', disable_snapshot_metadata=disable_snapshot_metadata)
+            method='restless')
 
     def calibrate_mw_gates_rb(
             self,
@@ -1689,8 +1672,7 @@ class HAL_Transmon(HAL_ShimSQ):
             verbose: bool = True, update: bool = True,
             prepare_for_timedomain: bool = True,
             method: bool = None,
-            optimizer: str = 'NM',
-            disable_snapshot_metadata=False
+            optimizer: str = 'NM'
     ):
         """
         Calibrates microwave pulses using a randomized benchmarking based
@@ -1793,7 +1775,7 @@ class HAL_Transmon(HAL_ShimSQ):
                             'maxiter': 1500}
 
         MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run(name=msmt_string, disable_snapshot_metadata=disable_snapshot_metadata,
+        MC.run(name=msmt_string,
                mode='adaptive')
         a = ma.OptimizationAnalysis(label=msmt_string)
 
@@ -1823,8 +1805,7 @@ class HAL_Transmon(HAL_ShimSQ):
             start_values=None,
             initial_steps=None,
             parameter_list=None,
-            termination_opt=0.01,
-            disable_snapshot_metadata=False
+            termination_opt=0.01
     ):
         # FIXME: this tuneup does not update the qubit object parameters
         #  update: Fixed on the the pagani set-up
@@ -1874,7 +1855,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
         nested_MC.set_optimization_method('nelder_mead')
-        nested_MC.run(name='gate_tuneup_allxy', mode='adaptive', disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
         a2 = ma.OptimizationAnalysis(label='gate_tuneup_allxy')
 
         if a2.optimization_result[1][0] > termination_opt:
@@ -1886,8 +1867,7 @@ class HAL_Transmon(HAL_ShimSQ):
             self,
             nested_MC: Optional[MeasurementControl] = None,
             start_values=None,
-            initial_steps=None, f_termination=0.01,
-            disable_snapshot_metadata=False
+            initial_steps=None, f_termination=0.01
     ):
         '''
         FIXME! Merge both calibrate allxy methods.
@@ -1947,7 +1927,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
         nested_MC.set_optimization_method('nelder_mead')
-        nested_MC.run(name='gate_tuneup_allxy', mode='adaptive', disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
         a2 = ma.OptimizationAnalysis(label='gate_tuneup_allxy')
         self.ro_acq_averages(old_avg)
         # Open all vsm channels
@@ -1967,8 +1947,7 @@ class HAL_Transmon(HAL_ShimSQ):
             nested_MC: Optional[MeasurementControl] = None,
             start_params=None,
             initial_step=None,
-            threshold=0.05,
-            disable_snapshot_metadata=False
+            threshold=0.05
     ):
         '''
         Optimizes the RO assignment fidelity using 2 parameters:
@@ -2004,7 +1983,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_sweep_functions([self.ro_freq, self.ro_pulse_amp])
 
         def wrap_func():
-            error = 1 - self.calibrate_optimal_weights(disable_snapshot_metadata=disable_snapshot_metadata)['F_a']
+            error = 1 - self.calibrate_optimal_weights()['F_a']
             return error
 
         d = det.Function_Detector(wrap_func,
@@ -2022,7 +2001,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
 
         nested_MC.set_optimization_method('nelder_mead')
-        nested_MC.run(name='RO_tuneup', mode='adaptive', disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(name='RO_tuneup', mode='adaptive')
 
         a = ma.OptimizationAnalysis(label='RO_tuneup')
 
@@ -2046,8 +2025,7 @@ class HAL_Transmon(HAL_ShimSQ):
             use_RTE_cost_function=False,
             use_adaptive_optimizer=False,
             adaptive_loss_weight=5,
-            target_cost=0.02,
-            disable_snapshot_metadata=False
+            target_cost=0.02
             ):
         """
         this function automatically tunes up a two step, four-parameter
@@ -2201,7 +2179,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         optimizer_result = nested_MC.run(
             f"Depletion_tuneup_{self.name}_adaptive-{use_adaptive_optimizer}", 
-            mode='adaptive', disable_snapshot_metadata=disable_snapshot_metadata)
+            mode='adaptive')
         a = ma.OptimizationAnalysis(label='Depletion_tuneup')
 
         return a.optimization_result, optimizer_result
@@ -2215,8 +2193,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             prepare_for_timedomain=True,
-            update=True,
-            disable_snapshot_metadata=False
+            update=True
     ):
         """
         Calibrates the pi pulse of the ef/12 transition using
@@ -2232,8 +2209,7 @@ class HAL_Transmon(HAL_ShimSQ):
             recovery_pulse=recovery_pulse,
             MC=MC, label=label,
             analyze=analyze, close_fig=close_fig,
-            prepare_for_timedomain=prepare_for_timedomain,
-            disable_snapshot_metadata=disable_snapshot_metadata
+            prepare_for_timedomain=prepare_for_timedomain
         )
         if update:
             ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
@@ -2243,12 +2219,7 @@ class HAL_Transmon(HAL_ShimSQ):
     # calibrate_ functions (overrides for class Qubit)
     ##########################################################################
 
-    def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None,
-            verbose=True,
-            update=True,
-            motzois=None,
-            disable_snapshot_metadata=False
-        ):
+    def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, motzois=None):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         """
@@ -2264,7 +2235,7 @@ class HAL_Transmon(HAL_ShimSQ):
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
-        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True, disable_snapshot_metadata=disable_snapshot_metadata)
+        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True)
         opt_motzoi = a.get_intersect()[0]
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
             if verbose:
@@ -2285,8 +2256,7 @@ class HAL_Transmon(HAL_ShimSQ):
             mixer_channels=['G', 'D'],
             update: bool = True,
             ftarget=-110,
-            maxiter=300,
-            disable_snapshot_metadata=False
+            maxiter=300
     ) -> bool:
         # USED_BY: device_dependency_graphs.py
         """
@@ -2421,12 +2391,11 @@ class HAL_Transmon(HAL_ShimSQ):
             optimal_IQ: bool = False,
             measure_transients_CCL_switched: bool = False,
             prepare: bool = True,
-            disable_snapshot_metadata: bool = False,
+            disable_metadata: bool = False,
             nr_shots_per_case: int = 2 ** 13,
             post_select: bool = False,
             averages: int = 2 ** 15,
             post_select_threshold: float = None,
-            disable_snapshot_metadata=False
     ) -> bool:
         """
         Measures readout transients for the qubit in ground and excited state to indicate
@@ -2460,12 +2429,11 @@ class HAL_Transmon(HAL_ShimSQ):
         if measure_transients_CCL_switched:
             transients = self.measure_transients_CCL_switched(MC=MC,
                                                               analyze=analyze,
-                                                              depletion_analysis=False,
-                                                              disable_snapshot_metadata=disable_snapshot_metadata)
+                                                              depletion_analysis=False)
         else:
             transients = self.measure_transients(MC=MC, analyze=analyze,
                                                  depletion_analysis=False,
-                                                 disable_snapshot_metadata=disable_snapshot_metadata)
+                                                 disable_metadata=disable_metadata)
         if analyze:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
@@ -2508,7 +2476,7 @@ class HAL_Transmon(HAL_ShimSQ):
                 self._prep_ro_instantiate_detectors()
                 ssro_dict = self.measure_ssro(
                     no_figs=no_figs, update=update,
-                    prepare=True, disable_snapshot_metadata=disable_snapshot_metadata,
+                    prepare=True, disable_metadata=disable_metadata,
                     nr_shots_per_case=nr_shots_per_case,
                     post_select=post_select,
                     post_select_threshold=post_select_threshold)
@@ -2527,8 +2495,7 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs, MC: Optional[MeasurementControl] = None,
             analyze=True,
             close_fig=True,
-            label='',
-            disable_snapshot_metadata=False
+            label=''
     ):
         # USED_BY: device_dependency_graphs.py (via find_resonator_frequency)
         """
@@ -2569,7 +2536,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_scan' + self.msmt_suffix + label, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='Resonator_scan' + self.msmt_suffix + label)
 
         self.hal_acq_spec_mode_off()
 
@@ -2583,8 +2550,7 @@ class HAL_Transmon(HAL_ShimSQ):
             MC: Optional[MeasurementControl] = None,
             analyze: bool = True,
             close_fig: bool = True,
-            label: str = '',
-            disable_snapshot_metadata=False
+            label: str = ''
     ):
         """
         Measures the readout resonator with UHFQC as a function of the pulse power.
@@ -2622,7 +2588,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points_2D(powers)
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_power_scan' + self.msmt_suffix + label, mode='2D', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='Resonator_power_scan' + self.msmt_suffix + label, mode='2D')
 
         if analyze:
             ma.TwoD_Analysis(label='Resonator_power_scan',
@@ -2643,8 +2609,8 @@ class HAL_Transmon(HAL_ShimSQ):
             SNR_detector: bool = False,
             shots_per_meas: int = 2 ** 16,
             vary_residual_excitation: bool = True,
-            disable_snapshot_metadata: bool = False,
-            label: str = '',
+            disable_metadata: bool = False,
+            label: str = ''
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -2725,7 +2691,8 @@ class HAL_Transmon(HAL_ShimSQ):
         d = self.int_log_det
         d.nr_shots = np.min([shots_per_meas, nr_shots])
         MC.set_detector_function(d)
-        MC.run('SSRO_{}{}'.format(label, self.msmt_suffix), disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('SSRO_{}{}'.format(label, self.msmt_suffix),
+               disable_snapshot_metadata=disable_metadata)
 
         # restore settings
         MC.live_plot_enabled(old_plot_setting)
@@ -2794,9 +2761,8 @@ class HAL_Transmon(HAL_ShimSQ):
             SNR_detector: bool = False,
             shots_per_meas: int = 2**16,
             vary_residual_excitation: bool = True,
-            disable_snapshot_metadata: bool = False, 
-            label: str = '',
-            disable_snapshot_metadata=False
+            disable_metadata: bool = False, 
+            label: str = ''
             ):
         """
         Performs a number of single shot measurements with qubit in ground and excited state
@@ -2875,7 +2841,8 @@ class HAL_Transmon(HAL_ShimSQ):
         d.nr_shots = np.min([shots_per_meas, nr_shots])
         MC.set_detector_function(d)
 
-        MC.run('SSRO_{}{}'.format(label, self.msmt_suffix), disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('SSRO_{}{}'.format(label, self.msmt_suffix),
+               disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(old_plot_setting)
 
         ######################################################################
@@ -2935,8 +2902,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             label='',
-            prepare_for_continuous_wave=True,
-            disable_snapshot_metadata=False
+            prepare_for_continuous_wave=True
     ):
         """
         Performs a two-tone spectroscopy experiment where one tone is kept
@@ -2965,24 +2931,21 @@ class HAL_Transmon(HAL_ShimSQ):
                 freqs=freqs, MC=MC,
                 analyze=analyze, close_fig=close_fig,
                 label=label,
-                prepare_for_continuous_wave=prepare_for_continuous_wave,
-                disable_snapshot_metadata=disable_snapshot_metadata
+                prepare_for_continuous_wave=prepare_for_continuous_wave
             )
         elif mode == 'pulsed_marked':
             self._measure_spectroscopy_pulsed_marked(
                 freqs=freqs, MC=MC,
                 analyze=analyze, close_fig=close_fig,
                 label=label,
-                prepare_for_continuous_wave=prepare_for_continuous_wave,
-                disable_snapshot_metadata=disable_snapshot_metadata
+                prepare_for_continuous_wave=prepare_for_continuous_wave
             )
         elif mode == 'pulsed_mixer':
             self._measure_spectroscopy_pulsed_mixer(
                 freqs=freqs, MC=MC,
                 analyze=analyze, close_fig=close_fig,
                 label=label,
-                prepare_for_timedomain=prepare_for_continuous_wave,
-                disable_snapshot_metadata=disable_snapshot_metadata
+                prepare_for_timedomain=prepare_for_continuous_wave
             )
         else:
             logging.error(f'Mode {mode} not recognized. Available modes: "CW", "pulsed_marked", "pulsed_mixer"')
@@ -2996,9 +2959,8 @@ class HAL_Transmon(HAL_ShimSQ):
             depletion_analysis: bool = True,
             depletion_analysis_plot: bool = True,
             depletion_optimization_window=None,
-            disable_snapshot_metadata: bool = False,
-            plot_max_time=None,
-            disable_snapshot_metadata=False
+            disable_metadata: bool = False,
+            plot_max_time=None
     ):
         # docstring from parent class
         if MC is None:
@@ -3044,7 +3006,7 @@ class HAL_Transmon(HAL_ShimSQ):
             MC.set_detector_function(self.input_average_detector)
             data = MC.run(
                 'Measure_transients{}_{}'.format(self.msmt_suffix, i),
-                disable_snapshot_metadata=disable_snapshot_metadata)
+                disable_snapshot_metadata=disable_metadata)
             dset = data['dset']
             transients.append(dset.T[1:])
             if analyze:
@@ -3067,8 +3029,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             real_imag=True,
             prepare_for_timedomain=True,
-            all_modules=False,
-            disable_snapshot_metadata=False
+            all_modules=False
     ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
@@ -3097,8 +3058,7 @@ class HAL_Transmon(HAL_ShimSQ):
                 close_fig,
                 real_imag,
                 prepare_for_timedomain,
-                all_modules,
-                disable_snapshot_metadata
+                all_modules
             )
         else:
             self.measure_rabi_channel_amp(
@@ -3107,8 +3067,7 @@ class HAL_Transmon(HAL_ShimSQ):
                 analyze,
                 close_fig,
                 real_imag,
-                prepare_for_timedomain,
-                disable_snapshot_metadata
+                prepare_for_timedomain
             )
 
     def measure_rabi_vsm(
@@ -3119,8 +3078,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             real_imag=True,
             prepare_for_timedomain=True,
-            all_modules=False,
-            disable_snapshot_metadata=False
+            all_modules=False
     ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
@@ -3170,7 +3128,7 @@ class HAL_Transmon(HAL_ShimSQ):
         #  real_imag is acutally not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='rabi_' + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='rabi_' + self.msmt_suffix)
         ma.Rabi_Analysis(label='rabi_')
         return True
 
@@ -3181,8 +3139,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             real_imag=True,
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
@@ -3214,7 +3171,7 @@ class HAL_Transmon(HAL_ShimSQ):
         # real_imag is actually not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='rabi_' + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='rabi_' + self.msmt_suffix)
 
         ma.Rabi_Analysis(label='rabi_')
         return True
@@ -3224,8 +3181,7 @@ class HAL_Transmon(HAL_ShimSQ):
                                                    amps=np.linspace(0, 1, 31),
                                                    analyze=True, close_fig=True,
                                                    real_imag=True,
-                                                   prepare_for_timedomain=True,
-                                                   disable_snapshot_metadata=False):
+                                                   prepare_for_timedomain=True):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
         while the drive frequency and pulse duration is kept fixed
@@ -3262,15 +3218,14 @@ class HAL_Transmon(HAL_ShimSQ):
         # real_imag is acutally not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='rabi_'+self.name+'_ramzz_'+meas_qubit.name, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='rabi_'+self.name+'_ramzz_'+meas_qubit.name)
         ma.Rabi_Analysis(label='rabi_')
         return True
 
     def measure_depletion_allxy(self, MC=None,
                                 analyze=True, close_fig=True,
                                 prepare_for_timedomain=True,
-                                label='',
-                                disable_snapshot_metadata=False):
+                                label=''):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -3283,7 +3238,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(21*2*3))
         MC.set_detector_function(d)
-        MC.run('Depletion_AllXY'+self.msmt_suffix+label, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('Depletion_AllXY'+self.msmt_suffix+label)
         ma2.mra.Depletion_AllXY_analysis(self.name, label='Depletion')
 
     def measure_allxy(
@@ -3292,8 +3247,7 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ) -> float:
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3308,7 +3262,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(np.arange(42))
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('AllXY' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('AllXY' + label + self.msmt_suffix)
 
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
@@ -3321,9 +3275,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             prepare_for_timedomain=True,
-            termination_opt=0.02,
-            disable_snapshot_metadata=False
-        ):
+            termination_opt=0.02):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -3349,7 +3301,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(np.arange(42))
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('AllXY' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('AllXY' + label + self.msmt_suffix)
 
         self.ro_soft_avg(old_avg)
         a = ma.AllXY_Analysis(close_main_fig=close_fig)
@@ -3370,7 +3322,6 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
-            disable_snapshot_metadata=False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3435,7 +3386,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('T1' + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('T1' + self.msmt_suffix)
 
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
@@ -3447,9 +3398,7 @@ class HAL_Transmon(HAL_ShimSQ):
                          times=None, MC=None,
                          analyze=True, close_fig=True, update=True,
                          nr_flux_dance: float = None,
-                         prepare_for_timedomain=True,
-                         disable_snapshot_metadata=False
-                        ):
+                         prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -3487,7 +3436,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('T1_' + self.name + '_ramzz_' + meas_qubit.name, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('T1_' + self.name + '_ramzz_' + meas_qubit.name)
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
             if update:
@@ -3499,9 +3448,7 @@ class HAL_Transmon(HAL_ShimSQ):
             times=None,
             MC: Optional[MeasurementControl] = None,
             analyze=True, close_fig=True, update=True,
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
-        ):
+            prepare_for_timedomain=True):
         """
         Performs a T1 experiment on the 2nd excited state.
 
@@ -3537,7 +3484,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(p.sweep_points)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('T1_2nd_exc_state_' + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('T1_2nd_exc_state_' + self.msmt_suffix)
 
         a = ma.T1_Analysis(auto=True, close_fig=True)
         return a.T1
@@ -3555,8 +3502,7 @@ class HAL_Transmon(HAL_ShimSQ):
             update=True,
             detector=False,
             double_fit=False,
-            test_beating=True,
-            disable_snapshot_metadata=False
+            test_beating=True
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3615,7 +3561,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('Ramsey' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('Ramsey' + label + self.msmt_suffix)
 
         # Restore old frequency value
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)
@@ -3660,8 +3606,7 @@ class HAL_Transmon(HAL_ShimSQ):
                              analyze=True, close_fig=True, update=True,
                              detector=False,
                              double_fit=False,
-                             test_beating=True,
-                             disable_snapshot_metadata=False):
+                             test_beating=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -3716,7 +3661,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('Ramsey'+label+self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('Ramsey'+label+self.msmt_suffix)
 
         # Restore old frequency value
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)
@@ -3759,8 +3704,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True, close_fig=True, update=True,
             detector=False,
             double_fit=False,
-            test_beating=True,
-            disable_snapshot_metadata=False
+            test_beating=True
     ):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3805,7 +3749,7 @@ class HAL_Transmon(HAL_ShimSQ):
         d = self.int_avg_det
         MC.set_detector_function(d)
 
-        MC.run('complex_Ramsey' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('complex_Ramsey' + label + self.msmt_suffix)
         self.ro_acq_weight_type(old_ro_type)
 
         if analyze:
@@ -3847,8 +3791,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             update=True,
             label: str = '',
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3919,7 +3862,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('echo' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('echo' + label + self.msmt_suffix)
 
         if analyze:
             # N.B. v1.5 analysis
@@ -3932,8 +3875,7 @@ class HAL_Transmon(HAL_ShimSQ):
     def measure_echo_ramzz(self, measure_qubit, ramzz_wait_time,
                            times=None, MC=None,
                            analyze=True, close_fig=True, update=True,
-                           label: str = '', prepare_for_timedomain=True,
-                           disable_snapshot_metadata=False):
+                           label: str = '', prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -3989,7 +3931,7 @@ class HAL_Transmon(HAL_ShimSQ):
             MC.set_sweep_function(s)
             MC.set_sweep_points(times)
             MC.set_detector_function(d)
-            MC.run('echo_'+label+self.name+'_ramzz_'+meas_qubit.name, disable_snapshot_metadata=disable_snapshot_metadata)
+            MC.run('echo_'+label+self.name+'_ramzz_'+meas_qubit.name)
             if analyze:
                 # N.B. v1.5 analysis
                 a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
@@ -4004,8 +3946,7 @@ class HAL_Transmon(HAL_ShimSQ):
             time=None,
             amount_of_shots=2**20,
             MC: Optional[MeasurementControl] = None,
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ):
         label = f"Restless_Ramsey_N={amount_of_repetitions}_tau={time}"
 
@@ -4035,7 +3976,7 @@ class HAL_Transmon(HAL_ShimSQ):
         d = self.int_log_det
         d.nr_shots = amount_of_shots # int(4094/nr_repetitions) * nr_repetitions
         MC.set_detector_function(d)
-        MC.run(label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(label + self.msmt_suffix)
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
 
@@ -4050,9 +3991,7 @@ class HAL_Transmon(HAL_ShimSQ):
             flip_ef=False,
             ax='x',
             angle='180',
-            label='',
-            disable_snapshot_metadata=False
-        ):
+            label=''):
         """
         Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
         pi (repeated N-times) - pi/2 - measure
@@ -4112,7 +4051,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_detector_function(d)
         if flip_ef:
             label = 'ef_rx12'
-        MC.run('flipping_'+ax+angle+label+self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('flipping_'+ax+angle+label+self.msmt_suffix)
         if analyze:
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})
@@ -4148,10 +4087,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         return a
 
-    def flipping_GBT(self,
-            nr_sequence: int = 7,
-            disable_snapshot_metadata=False
-        ):  # FIXME: prefix with "measure_"
+    def flipping_GBT(self, nr_sequence: int = 7):  # FIXME: prefix with "measure_"
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -4162,7 +4098,7 @@ class HAL_Transmon(HAL_ShimSQ):
         Later we can add a condition as a check.
         '''
         for i in range(nr_sequence):
-            a = self.measure_flipping(update=True, disable_snapshot_metadata=disable_snapshot_metadata)
+            a = self.measure_flipping(update=True)
             scale_factor = a._get_scale_factor_line()
             if abs(1 - scale_factor) <= 0.0005:
                 return True
@@ -4175,8 +4111,7 @@ class HAL_Transmon(HAL_ShimSQ):
             prepare_for_timedomain: bool = True,
             MC: Optional[MeasurementControl] = None,
             analyze=True,
-            close_fig=True,
-            disable_snapshot_metadata=False
+            close_fig=True
     ):
         # USED_BY: device_dependency_graphs.py (via calibrate_motzoi)
         """
@@ -4251,7 +4186,7 @@ class HAL_Transmon(HAL_ShimSQ):
             always_prepare=True
         )
         MC.set_detector_function(d)
-        MC.run('Motzoi_XY' + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('Motzoi_XY' + self.msmt_suffix)
 
         if analyze:
             if self.ro_acq_weight_type() == 'optimal':
@@ -4279,8 +4214,7 @@ class HAL_Transmon(HAL_ShimSQ):
             powers,
             MC: Optional[MeasurementControl] = None,
             analyze: bool = True,
-            close_fig: bool = True,
-            disable_snapshot_metadata=False
+            close_fig: bool = True
     ):
         """
         Measures the CW qubit spectroscopy as a function of the RO pulse power
@@ -4326,7 +4260,7 @@ class HAL_Transmon(HAL_ShimSQ):
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
         label = 'Photon_number_splitting'
-        MC.run(name=label + self.msmt_suffix, mode='2D', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name=label + self.msmt_suffix, mode='2D')
 
         spec_source.off()
 
@@ -4342,8 +4276,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze: bool = True,
             close_fig: bool = True,
             fluxChan=None,
-            label='',
-            disable_snapshot_metadata=False
+            label=''
     ):
         """
         Performs the resonator spectroscopy as a function of the current applied
@@ -4406,7 +4339,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_dac_scan' + self.msmt_suffix + label, mode='2D', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='Resonator_dac_scan' + self.msmt_suffix + label, mode='2D')
 
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
@@ -4422,8 +4355,7 @@ class HAL_Transmon(HAL_ShimSQ):
             nested_resonator_calibration=False,
             nested_resonator_calibration_use_min=False,
             resonator_freqs=None,
-            trigger_idx=None,
-            disable_snapshot_metadata=False
+            trigger_idx=None
     ):
         """
         Performs the qubit spectroscopy while changing the current applied
@@ -4530,7 +4462,7 @@ class HAL_Transmon(HAL_ShimSQ):
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         self.int_avg_det_single.always_prepare = True
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
 
         if analyze:
             return ma.TwoD_Analysis(
@@ -4545,8 +4477,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             label='',
-            prepare_for_continuous_wave=True,
-            disable_snapshot_metadata=False):
+            prepare_for_continuous_wave=True):
         """
         Does a CW spectroscopy experiment by sweeping the frequency of a
         microwave source.
@@ -4592,7 +4523,7 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='CW_spectroscopy' + self.msmt_suffix + label, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
 
         self.hal_acq_spec_mode_off()
 
@@ -4607,8 +4538,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             label='',
             prepare_for_continuous_wave=True,
-            trigger_idx=None,
-            disable_snapshot_metadata=False
+            trigger_idx=None
     ):
         """
         Performs a spectroscopy experiment by triggering the spectroscopy source
@@ -4652,7 +4582,7 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='pulsed_marker_spectroscopy' + self.msmt_suffix + label, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='pulsed_marker_spectroscopy' + self.msmt_suffix + label)
 
         self.hal_acq_spec_mode_off()
 
@@ -4670,8 +4600,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             label='',
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ):
         """
         Performs pulsed spectroscopy by modulating a cw pulse with a square
@@ -4731,7 +4660,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # d = self.int_avg_det
         # MC.set_detector_function(d)
-        MC.run(name='pulsed_mixer_spectroscopy' + self.msmt_suffix + label, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='pulsed_mixer_spectroscopy' + self.msmt_suffix + label)
 
         self.mw_channel_amp(old_channel_amp)
 
@@ -4753,8 +4682,7 @@ class HAL_Transmon(HAL_ShimSQ):
             MC: Optional[MeasurementControl] = None,
             spec_source_2=None,
             mode='pulsed_marked',
-            step_size: int = 1e6,
-            disable_snapshot_metadata=False
+            step_size: int = 1e6
     ):
         """
         Measures the qubit spectroscopy as a function of frequency of the two
@@ -4862,8 +4790,7 @@ class HAL_Transmon(HAL_ShimSQ):
             f_12_power=None,
             MC: Optional[MeasurementControl] = None,
             spec_source_2=None,
-            mode='pulsed_marked',
-            disable_snapshot_metadata=False
+            mode='pulsed_marked'
     ):
         """
         Measures the qubit spectroscopy as a function of frequency of the two
@@ -4971,8 +4898,7 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs_01=None,
             powers=np.arange(-10, 10, 1),
             MC: Optional[MeasurementControl] = None,
-            spec_source_2=None,
-            disable_snapshot_metadata=False
+            spec_source_2=None
     ):
         """
         Measures photon splitting of the qubit due to photons in the bus resonators.
@@ -5034,8 +4960,7 @@ class HAL_Transmon(HAL_ShimSQ):
     def measure_ssro_vs_frequency_amplitude(
             self, freqs=None, amps_rel=np.linspace(0, 1, 11),
             nr_shots=4092 * 4, nested_MC: Optional[MeasurementControl] = None, analyze=True,
-            use_optimal_weights=False, label='SSRO_freq_amp_sweep',
-            disable_snapshot_metadata=False):
+            use_optimal_weights=False, label='SSRO_freq_amp_sweep'):
         """
         Measures SNR and readout fidelities as a function of the readout pulse amplitude
         and frequency. Resonator depletion pulses are automatically scaled.
@@ -5083,8 +5008,7 @@ class HAL_Transmon(HAL_ShimSQ):
             powers,
             nr_shots=4092 * 4,
             nested_MC: Optional[MeasurementControl] = None,
-            analyze=True,
-            disable_snapshot_metadata=False
+            analyze=True
     ):
         """
         Measures the SNR and readout fidelities as a function of the TWPA
@@ -5122,7 +5046,7 @@ class HAL_Transmon(HAL_ShimSQ):
                 'analyze': True, 'SNR_detector': True,
                 'cal_residual_excitation': True,
                 'prepare': False,
-                'disable_snapshot_metadata': True
+                'disable_metadata': True
             },
             result_keys=['SNR', 'F_d', 'F_a']
         )
@@ -5132,7 +5056,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_sweep_function_2D(pump_source.power)
         nested_MC.set_sweep_points_2D(powers)
         label = 'SSRO_freq_amp_sweep' + self.msmt_suffix
-        nested_MC.run(label, mode='2D', disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(label, mode='2D')
 
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
@@ -5145,8 +5069,7 @@ class HAL_Transmon(HAL_ShimSQ):
             nr_shots=4092 * 4,
             nested_MC: Optional[MeasurementControl] = None,
             analyze=True,
-            label_suffix: str = '',
-            disable_snapshot_metadata=False
+            label_suffix: str = ''
     ):
         """
         Measures the SNR and readout fidelities as a function of the duration
@@ -5186,7 +5109,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_sweep_points(lengths)
         nested_MC.set_detector_function(d)
         label = 'SSRO_length_sweep' + self.msmt_suffix + label_suffix
-        nested_MC.run(label, disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
@@ -5199,8 +5122,7 @@ class HAL_Transmon(HAL_ShimSQ):
             prepare: bool = True,
             depletion_analysis: bool = True,
             depletion_analysis_plot: bool = True,
-            depletion_optimization_window=None,
-            disable_snapshot_metadata=False
+            depletion_optimization_window=None
     ):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5233,7 +5155,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
             MC.set_sweep_points(np.arange(self.input_average_detector.nr_samples) / sampling_rate)
             MC.set_detector_function(self.input_average_detector)
-            data = MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i), disable_snapshot_metadata=disable_snapshot_metadata)
+            data = MC.run('Measure_transients{}_{}'.format(self.msmt_suffix, i))
             dset = data['dset']
             transients.append(dset.T[1:])
             if analyze:
@@ -5252,14 +5174,13 @@ class HAL_Transmon(HAL_ShimSQ):
             self,
             prepare_for_timedomain: bool = False,
             calibrate_optimal_weights: bool = False,
-            disable_snapshot_metadata=False
             ):
         # ensure readout settings are correct
         old_ro_type = self.ro_acq_weight_type()
         old_acq_type = self.ro_acq_digitized()
 
         if calibrate_optimal_weights:
-            self.calibrate_optimal_weights(prepare=False, disable_snapshot_metadata=disable_snapshot_metadata)
+            self.calibrate_optimal_weights(prepare=False)
 
         self.ro_acq_digitized(False)
         self.ro_acq_weight_type('optimal IQ')
@@ -5284,7 +5205,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(int(uhfqc_max_avg/5)*5))
         MC.set_detector_function(d)
-        MC.run(f"RO_QND_measurement_{self.name}", disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(f"RO_QND_measurement_{self.name}")
         self.ro_acq_weight_type(old_ro_type)
         self.ro_acq_digitized(old_acq_type)
 
@@ -5294,29 +5215,27 @@ class HAL_Transmon(HAL_ShimSQ):
     def calibrate_RO_QND(
             self,
             amps: list,
-            calibrate_optimal_weights: bool = False,
-            disable_snapshot_metadata=False
+            calibrate_optimal_weights: bool = False
             ):
         s = self.ro_pulse_amp
         d = det.Function_Detector(self.measure_RO_QND,
                                   result_keys=['P_QND', 'P_QNDp'],
                                   value_names=['P_QND', 'P_QNDp'],
                                   value_units=['a.u.', 'a.u.'],
-                                  msmt_kw={'calibrate_optimal_weights': calibrate_optimal_weights, 'disable_snapshot_metadata': disable_snapshot_metadata}
+                                  msmt_kw={'calibrate_optimal_weights': calibrate_optimal_weights}
                                   )
         nested_MC = self.instr_nested_MC.get_instr()
         nested_MC.set_detector_function(d)
         nested_MC.set_sweep_function(s)
         nested_MC.set_sweep_points(amps)
-        nested_MC.run(f"RO_QND_sweep_{self.name}", disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(f"RO_QND_sweep_{self.name}")
 
     def measure_dispersive_shift_pulsed(
             self, freqs=None,
             MC: Optional[MeasurementControl] = None,
             analyze: bool = True,
             prepare: bool = True,
-            Pulse_comb: list=['off', 'on'],
-            disable_snapshot_metadata=False
+            Pulse_comb: list=['off', 'on']
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -5367,7 +5286,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
             self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
-            MC.run(name='Resonator_scan_' + pulse_comb + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+            MC.run(name='Resonator_scan_' + pulse_comb + self.msmt_suffix)
 
             if analyze:
                 ma.MeasurementAnalysis()
@@ -5396,8 +5315,7 @@ class HAL_Transmon(HAL_ShimSQ):
             prepare: bool = True,
             feedback=False,
             depletion_time=None,
-            net_gate='pi',
-            disable_snapshot_metadata=False
+            net_gate='pi'
     ):
         """
         This performs a multi round experiment, the repetition rate is defined
@@ -5450,7 +5368,7 @@ class HAL_Transmon(HAL_ShimSQ):
             depletion_time, self.ro_pulse_type(), feedback, net_gate)
         MC.run(
             'RTE_{}_{}'.format(self.msmt_suffix, suffix),
-            exp_metadata=exp_metadata, disable_snapshot_metadata=disable_snapshot_metadata
+            exp_metadata=exp_metadata
         )
 
         # restore parameters
@@ -5479,8 +5397,7 @@ class HAL_Transmon(HAL_ShimSQ):
             cross_target_qubits: list = None,
             multi_qubit_platf_cfg=None,
             target_qubit_excited=False,
-            extra_echo=False,
-            disable_snapshot_metadata=False
+            extra_echo=False
     ):
         # Refs:
         # Schuster PRL 94, 123602 (2005)
@@ -5554,7 +5471,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(angles)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run(sequence + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(sequence + label + self.msmt_suffix)
 
         if analyze:
             a = ma.Ramsey_Analysis(
@@ -5588,8 +5505,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             update=False,
             label: str = '',
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5679,7 +5595,7 @@ class HAL_Transmon(HAL_ShimSQ):
             msmt_title = 'CPMG_order_' + str(orders) + label + self.msmt_suffix
         elif sweep == 'order':
             msmt_title = 'CPMG_tauN_' + str(times) + label + self.msmt_suffix
-        MC.run(msmt_title, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(msmt_title)
 
         if analyze:
             # N.B. v1.5 analysis
@@ -5703,8 +5619,7 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             prepare_for_timedomain=True,
             tomo=False,
-            mw_gate_duration: float = 40e-9,
-            disable_snapshot_metadata=False
+            mw_gate_duration: float = 40e-9
     ):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5764,7 +5679,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('spin_lock_simple' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('spin_lock_simple' + label + self.msmt_suffix)
 
         if analyze:
             a = ma.T1_Analysis(label='spin_lock_simple', auto=True, close_fig=True)
@@ -5779,8 +5694,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             update=True,
             label: str = '',
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5829,7 +5743,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('spin_lock_echo' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('spin_lock_echo' + label + self.msmt_suffix)
 
         if analyze:
             a = ma.T1_Analysis(label='spin_lock_echo', auto=True, close_fig=True)
@@ -5846,8 +5760,7 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             prepare_for_timedomain=True,
             tomo=False,
-            mw_gate_duration: float = 40e-9,
-            disable_snapshot_metadata=False
+            mw_gate_duration: float = 40e-9
     ):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -5911,7 +5824,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('rabi_frequency' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('rabi_frequency' + label + self.msmt_suffix)
 
         if analyze:
             a = ma.Echo_analysis_V15(label='rabi_frequency', auto=True, close_fig=True)
@@ -5927,8 +5840,7 @@ class HAL_Transmon(HAL_ShimSQ):
             prepare_for_timedomain: bool = True,
             ignore_f_cal_pts: bool = False,
             compile_only: bool = False,
-            rb_tasks=None,
-            disable_snapshot_metadata=False
+            rb_tasks=None
     ):
         # USED_BY: inspire_dependency_graph.py,
         """
@@ -6048,7 +5960,7 @@ class HAL_Transmon(HAL_ShimSQ):
         d.prepare_function_kwargs = prepare_function_kwargs
         d.nr_shots = reps_per_seed * len(sweep_points)
         MC.set_detector_function(d)
-        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points}, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points})
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
             label='RB_',
@@ -6073,8 +5985,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             verbose: bool = True,
             upload=True,
-            update=True,
-            disable_snapshot_metadata=False
+            update=True
     ):
         # USED_BY: device_dependency_graphs_v2.py,
 
@@ -6123,7 +6034,7 @@ class HAL_Transmon(HAL_ShimSQ):
         d.prepare_function_kwargs = prepare_function_kwargs
         d.nr_averages = 128
         MC.set_detector_function(d)
-        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix)
 
         if double_curves:
             a = ma.RB_double_curve_Analysis(
@@ -6149,8 +6060,7 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ):
         """
         Measures a rabi oscillation of the ef/12 transition.
@@ -6186,7 +6096,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points_2D(anharmonicity)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('ef_rabi_2D' + label + self.msmt_suffix, mode='2D', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('ef_rabi_2D' + label + self.msmt_suffix, mode='2D')
 
         if analyze:
             a = ma.TwoD_Analysis()
@@ -6201,8 +6111,7 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain=True
     ):
         """
         Measures a rabi oscillation of the ef/12 transition.
@@ -6237,7 +6146,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(p.sweep_points)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('ef_rabi' + label + self.msmt_suffix, disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('ef_rabi' + label + self.msmt_suffix)
 
         if analyze:
             a2 = ma2.EFRabiAnalysis(close_figs=True, label='ef_rabi')
@@ -6253,8 +6162,7 @@ class HAL_Transmon(HAL_ShimSQ):
             maxL: int = 256,
             MC: Optional[MeasurementControl] = None,
             recompile='as needed',
-            prepare_for_timedomain: bool = True,
-            disable_snapshot_metadata=False
+            prepare_for_timedomain: bool = True
     ):
         """
         Performs single qubit Gate Set Tomography experiment of the StdXYI gateset.
@@ -6329,7 +6237,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(shots)
         MC.set_detector_function(d)
-        MC.run('Single_qubit_GST_L{}_{}'.format(maxL, self.msmt_suffix), disable_snapshot_metadata=disable_snapshot_metadata,
+        MC.run('Single_qubit_GST_L{}_{}'.format(maxL, self.msmt_suffix),
                exp_metadata={'bins': sweep_points,
                              'gst_exp_list_filename': exp_list_fn})
         a = ma2.GST_SingleQubit_DataExtraction(label='Single_qubit_GST')
@@ -6342,8 +6250,7 @@ class HAL_Transmon(HAL_ShimSQ):
             polycoeffs=None,
             MC: Optional[MeasurementControl] = None,
             nested_MC: Optional[MeasurementControl] = None,
-            fluxChan=None,
-            disable_snapshot_metadata=False
+            fluxChan=None
     ):
         """
         Creates a qubit DAC arc by fitting a polynomial function through qubit
@@ -6420,7 +6327,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_function(dac_par)
         MC.set_sweep_points(dac_values)
         MC.set_detector_function(d)
-        MC.run(name='Tracked_Spectroscopy', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='Tracked_Spectroscopy')
 
 
     def measure_msmt_induced_dephasing_sweeping_amps(
@@ -6433,8 +6340,7 @@ class HAL_Transmon(HAL_ShimSQ):
             verbose: bool = True,
             sequence='ramsey',
             target_qubit_excited=False,
-            extra_echo=False,
-            disable_snapshot_metadata=False
+            extra_echo=False
     ):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
@@ -6522,7 +6428,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_detector_function(d)
 
         label = 'ro_amp_sweep_dephasing' + self.msmt_suffix
-        nested_MC.run(label, disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(label)
 
         # Restore qubit objects parameters to previous settings
         self.ro_pulse_type(old_waveform_name)
@@ -6540,8 +6446,7 @@ class HAL_Transmon(HAL_ShimSQ):
             amps_rel,
             nr_shots=2 * 4094,
             nested_MC: Optional[MeasurementControl] = None,
-            analyze=True,
-            disable_snapshot_metadata=False
+            analyze=True
     ):
         """
         Measures SNR and readout fidelities as a function of the readout pulse
@@ -6590,7 +6495,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_sweep_points(amps_rel)
         nested_MC.set_detector_function(d)
         label = 'ro_amp_sweep_SNR' + self.msmt_suffix
-        nested_MC.run(label, disable_snapshot_metadata=disable_snapshot_metadata)
+        nested_MC.run(label)
 
         # restore parameters
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
@@ -6605,8 +6510,7 @@ class HAL_Transmon(HAL_ShimSQ):
             nr_shots=2 * 4094,
             analyze=True,
             verbose=True,
-            dephasing_sequence='ramsey',
-            disable_snapshot_metadata=False
+            dephasing_sequence='ramsey'
     ):
         # requires the cc light to have the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
@@ -6619,8 +6523,7 @@ class HAL_Transmon(HAL_ShimSQ):
         self.measure_msmt_induced_dephasing_sweeping_amps(
             amps_rel=amps_rel,
             analyze=False,
-            sequence=dephasing_sequence,
-            disable_snapshot_metadata=disable_snapshot_metadata
+            sequence=dephasing_sequence
         )
         readout_pulse_length = self.ro_pulse_length()
         readout_pulse_length += self.ro_pulse_down_length0()
@@ -6636,13 +6539,11 @@ class HAL_Transmon(HAL_ShimSQ):
             cal_residual_excitation=True,
             SNR_detector=True,
             nr_shots=nr_shots,
-            update_threshold=False,
-            disable_snapshot_metadata=disable_snapshot_metadata
+            update_threshold=False
         )
         self.measure_SNR_sweeping_amps(
             amps_rel=amps_rel,
-            analyze=False,
-            disable_snapshot_metadata=disable_snapshot_metadata
+            analyze=False
         )
 
         end_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -6688,8 +6589,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
-            prepare_for_continuous_wave=True,
-            disable_snapshot_metadata=False
+            prepare_for_continuous_wave=True
     ):
         """
         Drive the qubit and sit at the spectroscopy peak while the bus is driven with
@@ -6769,7 +6669,7 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Bus_flux_sweep_' + self.msmt_suffix + label, mode='2D', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run(name='Bus_flux_sweep_' + self.msmt_suffix + label, mode='2D')
 
         spec_source_bus.off()
         # FIXME: spec_source not touched
@@ -6779,8 +6679,7 @@ class HAL_Transmon(HAL_ShimSQ):
             ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
 
-    def check_qubit_spectroscopy(self, freqs=None, MC=None,
-            disable_snapshot_metadata=False):
+    def check_qubit_spectroscopy(self, freqs=None, MC=None):
         """
         Check the qubit frequency with spectroscopy of 15 points.
 
@@ -6798,8 +6697,7 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs = np.linspace(freq_center - freq_span / 2,
                                 freq_center + freq_span / 2,
                                 15)
-        self.measure_spectroscopy(MC=MC, freqs=freqs,
-            disable_snapshot_metadata=disable_snapshot_metadata)
+        self.measure_spectroscopy(MC=MC, freqs=freqs)
 
         label = 'spec'
         a = ma.Qubit_Spectroscopy_Analysis(
@@ -6817,8 +6715,7 @@ class HAL_Transmon(HAL_ShimSQ):
         return result
 
 
-    def check_rabi(self, MC: Optional[MeasurementControl] = None, amps=None,
-            disable_snapshot_metadata=False):
+    def check_rabi(self, MC: Optional[MeasurementControl] = None, amps=None):
         """
         Takes 5 equidistantly space points: 3 before channel amp, one at
         channel amp and one after. Compares them with the expected Rabi curve
@@ -6827,14 +6724,12 @@ class HAL_Transmon(HAL_ShimSQ):
         if amps is None:
             amps = np.linspace(0, 4 / 3 * self.mw_channel_amp(), 5)
 
-        amp = self.measure_rabi(MC=MC, amps=amps, analyze=False,
-            disable_snapshot_metadata=disable_snapshot_metadata)
+        amp = self.measure_rabi(MC=MC, amps=amps, analyze=False)
         old_amp = self.mw_channel_amp()
         return np.abs(amp - old_amp)
 
 
-    def check_ramsey(self, MC: Optional[MeasurementControl] = None, times=None, artificial_detuning=None,
-            disable_snapshot_metadata=False):
+    def check_ramsey(self, MC: Optional[MeasurementControl] = None, times=None, artificial_detuning=None):
         # USED_BY: device_dependency_graphs.py
 
         if artificial_detuning is None:
@@ -6844,8 +6739,7 @@ class HAL_Transmon(HAL_ShimSQ):
             times = np.linspace(0, 0.5 / artificial_detuning, 6)
 
         a = self.measure_ramsey(times=times, MC=MC,
-                                artificial_detuning=artificial_detuning,
-                                disable_snapshot_metadata=disable_snapshot_metadata)
+                                artificial_detuning=artificial_detuning)
         freq = a['frequency']
         check_result = (freq - self.freq_qubit()) / freq
         return check_result
@@ -6856,8 +6750,7 @@ class HAL_Transmon(HAL_ShimSQ):
             calibrate_optimal_weights: bool = False,
             prepare_function=None,
             prepare_function_kwargs: dict = None,
-            ssro_kwargs: dict = None,
-            disable_snapshot_metadata=False
+            ssro_kwargs: dict = None
     ):
         """
         Wraps measure_ssro using the Function Detector.
@@ -6870,7 +6763,7 @@ class HAL_Transmon(HAL_ShimSQ):
                 'nr_shots_per_case': 8192,
                 'analyze': True,
                 'prepare': False,
-                'disable_snapshot_metadata': True
+                'disable_metadata': True
             }
 
         if not calibrate_optimal_weights:
