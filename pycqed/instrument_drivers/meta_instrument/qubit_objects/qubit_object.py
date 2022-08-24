@@ -554,7 +554,7 @@ class Qubit(Instrument):
             f_step=1e6,
             with_VNA=None,
             verbose=True,
-            disable_snapshot_metadata=False
+            disable_snapshot_metadata=disable_snapshot_metadata
     ):
         # USED_BY: device_dependency_graphs.py,
         """
@@ -675,8 +675,7 @@ class Qubit(Instrument):
             update=True,
             with_VNA=None,
             resonators=None,
-            look_for_missing=True,
-            disable_snapshot_metadata=False
+            look_for_missing=True
     ):
         # USED_BY: device_dependency_graphs.py,
         """
@@ -751,7 +750,7 @@ class Qubit(Instrument):
                     return True
         else:
             print('Scanning all found resonators')
-            new_res = self.measure_individual_resonators(with_VNA=with_VNA, disable_snapshot_metadata=disable_snapshot_metadata)
+            new_res = self.measure_individual_resonators(with_VNA=with_VNA)
             device.resonators = new_res
             return True
 
@@ -806,7 +805,7 @@ class Qubit(Instrument):
         #                         res.freq = a.fit_results.params['f0'].value*1e9
         # return True
 
-    def find_test_resonators(self, with_VNA=None, resonators=None, disable_snapshot_metadata=False):
+    def find_test_resonators(self, with_VNA=None, resonators=None):
         # USED_BY: device_dependency_graphs.py,
         """
         Does a power sweep over the resonators to see if they have a qubit
@@ -854,8 +853,7 @@ class Qubit(Instrument):
                     continue
                 freqs = np.arange(freq - 8e6, freq + 4e6, f_step)
                 self.measure_resonator_power(freqs=freqs, powers=powers,
-                                             analyze=False, label=label,
-                                             disable_snapshot_metadata=disable_snapshot_metadata)
+                                             analyze=False, label=label)
 
             fit_res = ma.Resonator_Powerscan_Analysis_test(label='Resonator_power_scan',
                                                       close_fig=True,
@@ -892,7 +890,7 @@ class Qubit(Instrument):
         return True
 
     @deprecated(version='0.4', reason="not used anywhere")
-    def find_test_resonators_test(self, with_VNA=None, resonators=None, disable_snapshot_metadata=False):
+    def find_test_resonators_test(self, with_VNA=None, resonators=None):
         """
         Does a power sweep over the resonators to see if they have a qubit
         attached or not, and changes the state in the resonator object
@@ -939,8 +937,7 @@ class Qubit(Instrument):
                     continue
                 freqs = np.arange(freq - 6e6, freq + 3e6, f_step)
                 self.measure_resonator_power(freqs=freqs, powers=powers,
-                                             analyze=False, label=label,
-                                             disable_snapshot_metadata=disable_snapshot_metadata)
+                                             analyze=False, label=label)
 
             fit_res = ma.Resonator_Powerscan_Analysis_test(label='Resonator_power_scan',
                                                       close_fig=True,
@@ -1039,8 +1036,7 @@ class Qubit(Instrument):
                                                               dac_values=dac_values,
                                                               fluxChan=fluxline,
                                                               analyze=False,
-                                                              label=label,
-                                                              disable_snapshot_metadata=disable_snapshot_metadata)
+                                                              label=label)
                     fluxcurrent[fluxline](0)
                     str_freq, unit = plt_tools.SI_val_to_msg_str(res.freq, 'Hz',
                                                                  float)
@@ -1100,8 +1096,7 @@ class Qubit(Instrument):
 
     @deprecated(version='0.4', reason="not used anywhere")
     def find_resonator_sweetspot(self, freqs=None, dac_values=None,
-                                 fluxChan=None, update=True,
-                                 disable_snapshot_metadata=disable_snapshot_metadata):
+                                 fluxChan=None, update=True):
         """
         Finds the resonator sweetspot current.
         TODO: - measure all FBL-resonator combinations
@@ -1129,8 +1124,7 @@ class Qubit(Instrument):
         self.measure_resonator_frequency_dac_scan(freqs=freqs,
                                                   dac_values=dac_values,
                                                   fluxChan=fluxChan,
-                                                  analyze=False,
-                                                  disable_snapshot_metadata=disable_snapshot_metadata)
+                                                  analyze=False)
         if update:
 
             import pycqed.analysis_v2.spectroscopy_analysis as sa
@@ -1149,8 +1143,7 @@ class Qubit(Instrument):
             update=True,
             freqs=None,
             MC=None,
-            close_fig=True,
-            disable_snapshot_metadata=False
+            close_fig=True
     ):
         # USED_BY: device_dependency_graphs.py,
         """
@@ -1188,7 +1181,7 @@ class Qubit(Instrument):
             f_span = 10e6
             f_step = 100e3
             freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
-        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False, disable_snapshot_metadata=disable_snapshot_metadata)
+        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
         a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
         if use_min:
@@ -1221,7 +1214,7 @@ class Qubit(Instrument):
             close_fig=True,
             MC=None,
             label='',
-            disable_snapshot_metadata=False
+            disable_snapshot_metadata=disable_snapshot_metadata
     ):
         # USED_BY: device_dependency_graphs.py
         """
@@ -1322,8 +1315,7 @@ class Qubit(Instrument):
             start_power=-55,
             power_step=5,
             threshold=0.5,
-            verbose=True,
-            disable_snapshot_metadata=False
+            verbose=True, disable_snapshot_metadata=disable_snapshot_metadata
     ):
         # USED_BY: device_dependency_graphs.py
         """
@@ -1368,8 +1360,7 @@ class Qubit(Instrument):
             self,
             MC=None,
             verbose=True,
-            update=True,
-            disable_snapshot_metadata=False
+            update=True
     ):
         # USED_BY: device_dependency_graphs.py
 
@@ -1407,7 +1398,7 @@ class Qubit(Instrument):
             update: bool = True,
             close_fig: bool = True,
             test_beating: bool = True,
-            disable_snapshot_metadata=False
+            disable_snapshot_metadata=disable_snapshot_metadata
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -1532,8 +1523,7 @@ class Qubit(Instrument):
 
     @deprecated(version='0.4', reason="not used anywhere")
     def tune_freq_to_sweetspot(self, freqs=None, dac_values=None, verbose=True,
-                               fit_phase=False, use_dips=False,
-                               disable_snapshot_metadata=False):
+                               fit_phase=False, use_dips=False):
         """
         Tunes the qubit to the sweetspot
         """
@@ -1636,8 +1626,7 @@ class Qubit(Instrument):
                      initial_flux_step: float = None,
                      max_repetitions=15,
                      resonator_use_min=True,
-                     find_res=None,
-                     disable_snapshot_metadata=False):
+                     find_res=None):
         """
         Iteratively tune the qubit frequency to a specific target frequency
         """
@@ -1682,20 +1671,18 @@ class Qubit(Instrument):
 
         def measure_qubit_freq_nested(target_frequency, steps=0.2e6,
                                       spans=[100e6, 400e6, 800e6, 1200e6, 1500e6],
-                                      disable_snapshot_metadata=False
                                       **kw):
             # measure freq
             if find_res:
                 freq_res = self.find_resonator_frequency(
                                     MC=nested_MC,
-                                    use_min=resonator_use_min,
-                                    disable_snapshot_metadata=disable_snapshot_metadata)
+                                    use_min=resonator_use_min)
             else:
                 freq_res = self.freq_res()
 
             spec_succes = False
             for span in spans:
-                spec_succes = self.find_frequency(f_span=span,  MC=nested_MC, disable_snapshot_metadata=disable_snapshot_metadata)
+                spec_succes = self.find_frequency(f_span=span,  MC=nested_MC)
                 if spec_succes:
                     break
 
@@ -1725,4 +1712,4 @@ class Qubit(Instrument):
         MC.set_sweep_function(fluxpar)
         MC.set_detector_function(qubit_freq_det)
         MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run('Tune_to_freq', mode='adaptive', disable_snapshot_metadata=disable_snapshot_metadata)
+        MC.run('Tune_to_freq', mode='adaptive')
