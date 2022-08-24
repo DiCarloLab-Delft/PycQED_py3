@@ -204,9 +204,9 @@ class ResZZAnalysis(ba.BaseDataAnalysis):
         plot_phase = fit_res_params['phase'].value * scale_phase
 
         if plot_phase >= 0:
-            self.resZZ = plot_frequency
-        else:
             self.resZZ = -1*plot_frequency
+        else:
+            self.resZZ = plot_frequency
 
         self.plot_dicts['ResZZ_box'] = {
             'ax_id': f"Control_{control_qubit}",
