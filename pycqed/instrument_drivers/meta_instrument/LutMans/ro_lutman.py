@@ -70,6 +70,18 @@ class Base_RO_LutMan(Base_LutMan):
             else:
                 raise NotImplementedError(
                     'Hardcoded for feedline 0, 1 and 2 of Surface-17')
+        elif feedline_map == 'S17_IQ':
+            if self._feedline_number == 0:
+                self._resonator_codeword_bit_mapping = [6, 11]
+            elif self._feedline_number == 1:
+                self._resonator_codeword_bit_mapping = [0, 1, 2, 3, 7]
+            elif self._feedline_number == 3:
+                self._resonator_codeword_bit_mapping = [8, 12, 13, 15]
+            elif self._feedline_number == 2:
+                self._resonator_codeword_bit_mapping = [4, 5, 9, 10, 14, 16]
+            else:
+                raise NotImplementedError(
+                    'Hardcoded for feedline 0, 1 and 2 of Surface-17')
         else:
             raise ValueError('Feedline map not in {"S5", "S7", "S17"}.')
 

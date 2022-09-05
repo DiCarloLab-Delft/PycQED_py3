@@ -288,7 +288,7 @@ def Msmt_induced_dephasing_ramsey(
                                 k.gate('rY180', [q])
                                 k.gate('rYm180', [q])
                         elif echo_times == 'XY':
-                            for cycle in range(int(meas_time/10/20)):
+                            for cycle in range(int(meas_time/6/20)):
                                 k.gate('i', [q])
                                 k.gate('rX180', [q])
                                 k.gate('i', [q])
@@ -2350,10 +2350,6 @@ def parity_check_fidelity(
         ####################
         for q in Q_ancilla_idx + Q_control_idx:
             k.prepz(q)
-        # for qb in [7,14,12]:
-        #     k.gate("ry90", [qb])
-        # for qb in [3,8,11,9]:
-        #     k.gate("rx180", [qb])
         k.barrier([])
         if initialization_msmt:
             for q in Q_ancilla_idx + Q_control_idx:
@@ -2375,7 +2371,7 @@ def parity_check_fidelity(
         for flux_cw in flux_cw_list:
             k.gate(flux_cw, [0])
         k.gate('wait', [], wait_time_after_flux)
-        k.barrier([])
+        # k.barrier([])
         #####################
         # Single qubit gates
         #####################
@@ -2394,6 +2390,16 @@ def parity_check_fidelity(
             for q in Q_control_idx:
                 k.measure(q)
         p.add_kernel(k)
+    # Add calibration points
+    Q_total = Q_ancilla_idx
+    if initialization_msmt:
+        Q_total += Q_control_idx
+    n = len(Q_total)
+    states = ['0','1']
+    combinations = [''.join(s) for s in itertools.product(states, repeat=n)]
+    p.add_multi_q_cal_points(qubits=Q_total, 
+                             combinations=combinations, 
+                             reps_per_cal_pnt=1)
     p.compile()
     return p
 
@@ -2405,7 +2411,8 @@ def Weight_n_parity_tomography(
         Q_exception: List[str],
         wait_time_before_flux: int = 0,
         wait_time_after_flux: int = 0,
-        simultaneous_measurement: bool=True
+        simultaneous_measurement: bool=True,
+        n_rounds=1,
         ):
     p = OqlProgram("Weight_n_parity_tomography", platf_cfg)
 
@@ -2420,8 +2427,31 @@ def Weight_n_parity_tomography(
 
         for q in all_Q_idxs:
             k.prepz(q)
+
+        for i in range(n_rounds-1):
+            for q in all_Q_idxs:
+                k.gate("ry90", [q])
+            k.gate('wait', [], wait_time_before_flux)
+            for flux_cw in flux_cw_list:
+                k.gate(flux_cw, [0])
+            k.gate('wait', [], wait_time_after_flux)
+            k.barrier([])
+            for q in all_Q_idxs:
+                k.gate("rym90", [q])
+            k.barrier([])
+            k.measure(Q_anc)
+            for q in Q_D:
+                for cycle in range(int(720/6/20)):
+                    k.gate('i', [q])
+                    k.gate('rX180', [q])
+                    k.gate('i', [q])
+                    k.gate('i', [q])
+                    k.gate('rY180', [q])
+                    k.gate('i', [q])
+            k.gate("wait", [], 0)
+
+        for q in all_Q_idxs:
             k.gate("ry90", [q])
-        k.gate("rx180", [8])
 
         k.gate('wait', [], wait_time_before_flux)
         for flux_cw in flux_cw_list:
@@ -2453,7 +2483,12 @@ def Weight_n_parity_tomography(
             k.measure(q)
         k.gate("wait", [], 0)
 
+        # Fill up measurement register for exception qubits
         if not simultaneous_measurement:
+            for q in Q_exception:
+                k.gate("wait", [q], 500)
+                k.measure(q)
+        for i in range(n_rounds-1):
             for q in Q_exception:
                 k.gate("wait", [q], 500)
                 k.measure(q)

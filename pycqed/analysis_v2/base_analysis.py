@@ -818,7 +818,7 @@ class BaseDataAnalysis(object):
                 )
 
                 # transparent background around axes for presenting data
-                self.figs[pdict['ax_id']].patch.set_alpha(0)
+                # self.figs[pdict['ax_id']].patch.set_alpha(0)
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)

@@ -2655,38 +2655,28 @@ class CCLight_Transmon(Qubit):
                 prepare=False,
                 disable_metadata=disable_metadata)
         if analyze:
-            ma.Input_average_analysis(IF=self.ro_freq_mod())
+            # Old analysis
+            # ma.Input_average_analysis(IF=self.ro_freq_mod())
+            # New analysis 202208 (Jorge)
+            fp_off = ma.a_tools.latest_data(f'transients_{self.name}_0')
+            fp_on = ma.a_tools.latest_data(f'transients_{self.name}_1')
+            ts_off = '_'.join([fp_off.split('\\')[-2],
+                               fp_off.split('\\')[-1].split('_')[0]])
+            ts_on = '_'.join([fp_on.split('\\')[-2],
+                              fp_on.split('\\')[-1].split('_')[0]])
+            ro_lm = self.instr_LutMan_RO.get_instr()
+            pulse_id = ro_lm.pulse_type()+f'_R{self.cfg_qubit_nr()}'
+            ro_waveform = ro_lm._wave_dict[pulse_id]
+            a = ma2.ra.Optimal_integration_weights_analysis(
+                t_start=ts_off, t_stop=ts_on,
+                IF=self.ro_freq_mod(), input_waveform=ro_waveform)
 
         self.ro_acq_averages(old_avg)
-        # deskewing the input signal
-
-        # Calculate optimal weights
-        optimized_weights_I = transients[1][0] - transients[0][0]
-        optimized_weights_Q = transients[1][1] - transients[0][1]
-        # joint rescaling to +/-1 Volt
-        maxI = np.max(np.abs(optimized_weights_I))
-        maxQ = np.max(np.abs(optimized_weights_Q))
-        # fixme: dividing the weight functions by four to not have overflow in
-        # thresholding of the UHFQC
-        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
-        W_func_I = np.array(weight_scale_factor*optimized_weights_I)
-        W_func_Q = np.array(weight_scale_factor*optimized_weights_Q)
-
-        # Smooth optimal weight functions
-        T = np.arange(len(W_func_I))/1.8e9
-        W_demod_func_I = np.real( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
-        W_demod_func_Q = np.imag( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
-
-        from scipy.signal import medfilt
-        W_dsmooth_func_I = medfilt(W_demod_func_I, 101)
-        W_dsmooth_func_Q = medfilt(W_demod_func_Q, 101)
-
-        W_smooth_func_I = np.real( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
-        W_smooth_func_Q = np.imag( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
 
         if update:
-            self.ro_acq_weight_func_I(np.array(W_smooth_func_I))
-            self.ro_acq_weight_func_Q(np.array(W_smooth_func_Q))
+            assert analyze == True
+            self.ro_acq_weight_func_I(np.array(a.qoi['Weights_I_s']))
+            self.ro_acq_weight_func_Q(np.array(a.qoi['Weights_Q_s']))
             if optimal_IQ:
                 self.ro_acq_weight_type('optimal IQ')
             else:
@@ -4118,6 +4108,7 @@ class CCLight_Transmon(Qubit):
             self,
             frequencies: list,
             amplitudes: list,
+            calibrate_optimal_weights: bool=False,
             use_rx12:bool=False,
             update_ro_params: bool = True):
         '''
@@ -4141,6 +4132,7 @@ class CCLight_Transmon(Qubit):
             self.measure_RO_QND,
             msmt_kw={'prepare_for_timedomain' : False,
                      'disable_metadata' : True,
+                     'calibrate_optimal_weights':calibrate_optimal_weights,
                      'nr_max_acq' : 2**15,
                      'use_rx12':use_rx12,
                      'no_figs' : False},
@@ -4272,14 +4264,7 @@ class CCLight_Transmon(Qubit):
             MC.run(name='Resonator_scan_'+pulse_comb+self.msmt_suffix)
             
         if analyze:
-            a = ma2.Dispersive_shift_Analysis()
-            self.dispersive_shift(a.qoi['dispersive_shift'])
-            # Dispersive shift from 'hanger' fit
-            #print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
-            # Dispersive shift from peak finder
-            print('dispersive shift is {} MHz'.format(
-                a.qoi['dispersive_shift']*1e-6))
-
+            a = ma2.Dispersive_shift_Analysis(self.name)
             return True
 
     def measure_rabi(self, MC=None, amps=np.linspace(0, 1, 31),
@@ -4428,6 +4413,7 @@ class CCLight_Transmon(Qubit):
             prepare_for_timedomain=True,
             prepend_msmt: bool = False,
             wait_time_after_prepend_msmt: int = 0,
+            disable_metadata=False
             ):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
@@ -4449,7 +4435,8 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42) if not prepend_msmt else np.arange(2*42))
         MC.set_detector_function(d)
-        MC.run('AllXY'+self.msmt_suffix+label)
+        MC.run('AllXY'+self.msmt_suffix+label,
+               disable_snapshot_metadata=disable_metadata)
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig, prepend_msmt=prepend_msmt)
             return a.deviation_total

@@ -6,7 +6,7 @@ from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.measurement.hdf5_data as h5d
 from matplotlib.colors import to_rgba, LogNorm
 from pycqed.analysis.tools.plotting import hsluv_anglemap45
-
+import itertools
 
 class Two_qubit_gate_tomo_Analysis(ba.BaseDataAnalysis):
     """
@@ -222,8 +222,6 @@ class Two_qubit_gate_tomo_Analysis(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
-
-
 def Tomo_plotfn_1(ax, data, **kw):
     ax.set_position((.0, .76, 0.4, .14))
     ax.bar([0], [1], ls='--', ec='k', fc=to_rgba('purple', alpha=.1))
@@ -235,7 +233,6 @@ def Tomo_plotfn_1(ax, data, **kw):
     ax.set_xticklabels(['','', '', ''])
     ax.text(1.65, .75, r'Control $|0\rangle$')
     ax.set_title('Pauli expectation values')
-
 
 def Tomo_plotfn_2(ax, data, **kw):
     ax.set_position((.0, .6, 0.4, .14))
@@ -263,7 +260,6 @@ def Calibration_plotfn(ax, Cal_0, Cal_1, Cal_2, labels, **kw):
     for lh in leg.legendHandles: 
         lh.set_alpha(1)
 
-
 def Equator_plotfn(ax, r_off, phi_off, r_on, phi_on, **kw):
     ax.set_position((0.02, .25, 0.23, 0.23))
     ax.set_rlim(0, 1)
@@ -276,7 +272,6 @@ def Equator_plotfn(ax, r_off, phi_off, r_on, phi_on, **kw):
     ax.set_title('Projection onto equator', pad=20)
     ax.legend(loc=8, frameon=False, fontsize=7)
 
-
 def Leakage_plotfn(ax, Leakage_off, Leakage_on, **kw):
     ax.set_position((0.35, .27, 0.15, 0.24))
     ax.bar([0,1], [Leakage_off, Leakage_on], fc=to_rgba('C2', alpha=1))
@@ -286,7 +281,6 @@ def Leakage_plotfn(ax, Leakage_off, Leakage_on, **kw):
     ax.set_xlabel(r'Control state')
     ax.set_ylabel(r'P$(|2\rangle)$ (%)')
     ax.set_title(r'Leakage $|2\rangle$')
-
 
 def Param_table_plotfn(ax,
                        phi_off,
@@ -491,7 +485,6 @@ def VCZ_Tmid_landscape_plotfn(
         axs[1].set_title(f'Missing fraction')
 
     fig.tight_layout()
-
 
 
 class VCZ_B_Analysis(ba.BaseDataAnalysis):
@@ -1572,12 +1565,50 @@ class Parity_check_fidelity_analysis(ba.BaseDataAnalysis):
         # Process data
         qubit_list = [self.Q_ancilla]
         if self.post_selection:
-            qubit_list.append(self.Q_control)
+            qubit_list += self.Q_control
 
+        n = len(self.Q_control)+1
         nr_cases = len(self.control_cases)
-        nr_shots_per_case = len(self.raw_data_dict['data'][:,0])//nr_cases//(1+self.post_selection)
-        Threshold = { q : float(self.raw_data_dict[f'threshold_{q}'])
-                      for q in qubit_list}
+        total_shots = len(self.raw_data_dict['data'][:,0])
+        nr_shots_per_case = total_shots//((1+self.post_selection)*nr_cases+2**n)
+        Threshold = {}
+        RO_fidelity = {}
+        # Sort calibration shots and calculate threshold
+        Cal_shots = { q: {} for q in qubit_list }
+        states = ['0','1']
+        if self.post_selection:
+            combinations = [''.join(s) for s in itertools.product(states, repeat=n)]
+        else:
+            combinations = ['0', '1']
+        for i, q in enumerate(qubit_list):
+            for j, comb in enumerate(combinations):
+                if self.post_selection:
+                    _shots = self.raw_data_dict['data'][:,i+1]
+                    Cal_shots[q][comb] = _shots[2*nr_cases+j::2*nr_cases+2**n]
+                else:
+                    _shots = self.raw_data_dict['data'][:,i+1]
+                    Cal_shots[q][comb] = _shots[nr_cases+j::nr_cases+2]
+            shots_0 = []
+            shots_1 = []
+            for comb in combinations:
+                if comb[i] == '0':
+                    shots_0 += list(Cal_shots[q][comb])
+                else:
+                    shots_1 += list(Cal_shots[q][comb])
+            def _calculate_threshold(shots_0, shots_1):
+                s_max = np.max(list(shots_0)+list(shots_1))
+                s_min = np.min(list(shots_0)+list(shots_1))
+                s_0, bins_0 = np.histogram(shots_0, bins=100, range=(s_min, s_max))
+                s_1, bins_1 = np.histogram(shots_1, bins=100, range=(s_min, s_max))
+                bins = (bins_0[:-1]+bins_0[1:])/2
+                th_idx = np.argmax(np.cumsum(s_0) - np.cumsum(s_1))
+                threshold = bins[th_idx]
+                return threshold
+            Threshold[q] = _calculate_threshold(shots_0, shots_1)
+            RO_fidelity[q] = \
+                (np.mean([1 if s < Threshold[q] else 0 for s in shots_0])+
+                 np.mean([0 if s < Threshold[q] else 1 for s in shots_1]))/2
+        # Sort experiment shots
         Shots_raw = {}
         Shots_dig = { q: {} for q in qubit_list }
         PS_mask = { case : np.ones(nr_shots_per_case)
@@ -1590,10 +1621,10 @@ class Parity_check_fidelity_analysis(ba.BaseDataAnalysis):
             for j, case in enumerate(self.control_cases):
                 if self.post_selection:
                     PS_mask[case] *= np.array([1 if s == 0 else np.nan for s
-                                               in shots_dig[2*j::2*nr_cases] ])
-                    Shots_dig[q][case] = shots_dig[2*j+1::2*nr_cases]
+                                               in shots_dig[2*j::2*nr_cases+2**n] ])
+                    Shots_dig[q][case] = shots_dig[2*j+1::2*nr_cases+2**n]
                 else:
-                    Shots_dig[q][case] = shots_dig[j::nr_cases]
+                    Shots_dig[q][case] = shots_dig[j::nr_cases+2]
         # Apply post selection
         if self.post_selection:
             ps_fraction = 0
@@ -1611,8 +1642,10 @@ class Parity_check_fidelity_analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['Shots_raw'] = Shots_raw
         self.proc_data_dict['Shots_dig'] = Shots_dig
         self.proc_data_dict['Threshold'] = Threshold
+        self.proc_data_dict['RO_fidelity'] = RO_fidelity
         self.proc_data_dict['P'] = P
         self.proc_data_dict['P_ideal'] = P_ideal
+        self.proc_data_dict['Cal_shots'] = Cal_shots
         self.qoi['fidelity'] = fidelity
 
     def prepare_plots(self):
@@ -1655,17 +1688,21 @@ class Parity_check_fidelity_analysis(ba.BaseDataAnalysis):
             n_plots = 1
         else:
             n_plots = len(self.Q_control)+1
-        fig, axs = plt.subplots(figsize=(n_plots*2.5,2), ncols=n_plots, sharey=True)
+        fig, axs = plt.subplots(figsize=(n_plots*2.5,4),
+                                ncols=n_plots, nrows=2,
+                                sharex='col', sharey='row')
         if not self.post_selection:
             axs = [axs]
         self.figs['Raw_shots'] = fig
-        self.axs_dict['plot_3'] = axs[0]
+        self.axs_dict['plot_3'] = np.array(axs).flatten()[0]
         # fig.patch.set_alpha(0)
         self.plot_dicts['Raw_shots']={
                 'plotfn': raw_shots_plotfn,
                 'ax_id': 'plot_3',
                 'Shots_raw': self.proc_data_dict['Shots_raw'],
+                'Cal_shots': self.proc_data_dict['Cal_shots'],
                 'Threshold': self.proc_data_dict['Threshold'],
+                'RO_fidelity': self.proc_data_dict['RO_fidelity'],
                 'Q_ancilla': self.Q_ancilla,
                 'Q_control': self.Q_control,
                 'post_selection': self.post_selection,
@@ -1749,7 +1786,9 @@ def parity_error_plotfn(
 def raw_shots_plotfn(
     ax,
     Shots_raw,
+    Cal_shots,
     Threshold,
+    RO_fidelity,
     Q_ancilla,
     Q_control,
     timestamp,
@@ -1760,10 +1799,30 @@ def raw_shots_plotfn(
 
     q_list = [Q_ancilla]
     if post_selection:
-        q_list.append(Q_control)
+        q_list += Q_control
+    n = len(q_list)
     for i, q in enumerate(q_list):
-        axs[i].hist(Shots_raw[q], bins=100)
+        shots_0 = []
+        shots_1 = []
+        for case in Cal_shots[q].keys():
+            if case[i] == '0':
+                shots_0 += list(Cal_shots[q][case])
+            else:
+                shots_1 += list(Cal_shots[q][case])
+
+        s_max = np.max(list(shots_0)+list(shots_1))
+        s_min = np.min(list(shots_0)+list(shots_1))
+        s_0, bins_0 = np.histogram(shots_0, bins=100, range=(s_min, s_max))
+        s_1, bins_1 = np.histogram(shots_1, bins=100, range=(s_min, s_max))
+        bins = (bins_0[:-1]+bins_0[1:])/2
+        axs[i].fill_between(bins, s_0, 0, alpha=.25, color='C0')
+        axs[i].fill_between(bins, s_1, 0, alpha=.25, color='C3')
+        axs[i].plot(bins, s_0, 'C0-')
+        axs[i].plot(bins, s_1, 'C3-')
         axs[i].axvline(Threshold[q], color='k', ls='--', lw=1)
-        axs[i].set_title(f'Shots {q}')
-        axs[i].set_xlabel('Integrated voltage')
-    fig.suptitle(timestamp, y=1.1)
+        axs[i].set_title(f'Shots {q}\n{RO_fidelity[q]*100:.1f} %')
+
+        axs[n+i].hist(Shots_raw[q], bins=100)
+        axs[n+i].axvline(Threshold[q], color='k', ls='--', lw=1)
+        axs[n+i].set_xlabel('Integrated voltage')
+    fig.suptitle(timestamp, y=1.05)

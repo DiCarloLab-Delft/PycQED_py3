@@ -261,6 +261,14 @@ class DeviceCCL(Instrument):
             vals=vals.Numbers(),
         )
         self.add_parameter(
+            "tim_ro_latency_3",
+            unit="s",
+            label="Readout latency 2",
+            parameter_class=ManualParameter,
+            initial_value=0,
+            vals=vals.Numbers(),
+        )
+        self.add_parameter(
             "tim_flux_latency_0",
             unit="s",
             label="Flux latency 0",
@@ -415,6 +423,7 @@ class DeviceCCL(Instrument):
                     ("ro_0", self.tim_ro_latency_0()),
                     ("ro_1", self.tim_ro_latency_1()),
                     ("ro_2", self.tim_ro_latency_2()),
+                    ("ro_3", self.tim_ro_latency_3()),
                     ("flux_0", self.tim_flux_latency_0()),
                     ("flux_1", self.tim_flux_latency_1()),
                     ("flux_2", self.tim_flux_latency_2()),
@@ -2947,6 +2956,175 @@ class DeviceCCL(Instrument):
                 )
         return True
 
+    def measure_multi_qubit_simultaneous_randomized_benchmarking(
+            self,
+            qubits,
+            MC = None,
+            nr_cliffords=2 ** np.arange(11),
+            nr_seeds=100,
+            recompile: bool = "as needed",
+            cal_points: bool = True,
+            ro_acq_weight_type: str = "optimal IQ",
+            compile_only: bool = False,
+            pool=None,  # a multiprocessing.Pool()
+            rb_tasks=None,  # used after called with `compile_only=True
+            label_name=None,
+            prepare_for_timedomain=True
+        ):
+        """
+        Performs simultaneous single qubit RB on multiple qubits.
+        The data of this experiment should be compared to the results of single
+        qubit RB to reveal differences due to crosstalk and residual coupling
+
+        Args:
+            qubits (list):
+                list of the qubit names on which to perform RB
+
+            nr_cliffords (array):
+                lengths of the clifford sequences to perform
+
+            nr_seeds (int):
+                number of different clifford sequences of each length
+
+            recompile (bool, str {'as needed'}):
+                indicate whether to regenerate the sequences of clifford gates.
+                By default it checks whether the needed sequences were already
+                generated since the most recent change of OpenQL file
+                specified in self.cfg_openql_platform_fn
+
+            cal_points (bool):
+                should calibration point (qubits in 0, 1 and 2 states)
+                be included in the measurement
+        """
+
+        # Settings that have to be preserved, change is required for
+        # 2-state readout and postprocessing
+        old_weight_type = self.ro_acq_weight_type()
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_weight_type(ro_acq_weight_type)
+        self.ro_acq_digitized(False)
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubits, bypass_flux=True)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        MC.soft_avg(1)
+
+        # The detector needs to be defined before setting back parameters
+        d = self.get_int_logging_detector(qubits=qubits)
+        # set back the settings
+        self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_digitized(old_digitized)
+
+        for q in qubits:
+            q_instr = self.find_instrument(q)
+            mw_lutman = q_instr.instr_LutMan_MW.get_instr()
+            mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        MC.soft_avg(1)
+
+        def send_rb_tasks(pool_):
+            tasks_inputs = []
+            for i in range(nr_seeds):
+                task_dict = dict(
+                    qubits=[self.find_instrument(q).cfg_qubit_nr() for q in qubits],
+                    nr_cliffords=nr_cliffords,
+                    nr_seeds=1,
+                    platf_cfg=self.cfg_openql_platform_fn(),
+                    program_name="MultiQ_RB_s{}_ncl{}_{}".format(
+                        i,
+                        list(map(int, nr_cliffords)),
+                        '_'.join(qubits)
+                    ),
+                    interleaving_cliffords=[None],
+                    simultaneous_single_qubit_RB=True,
+                    cal_points=cal_points,
+                    net_cliffords=[0, 3],  # measures with and without inverting
+                    f_state_cal_pts=True,
+                    recompile=recompile,
+                )
+                tasks_inputs.append(task_dict)
+            # pool.starmap_async can be used for positional arguments
+            # but we are using a wrapper
+            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+            return rb_tasks
+
+        if compile_only:
+            assert pool is not None
+            rb_tasks = send_rb_tasks(pool)
+            return rb_tasks
+
+        if rb_tasks is None:
+            # Using `with ...:` makes sure the other processes will be terminated
+            # avoid starting too mane processes,
+            # nr_processes = None will start as many as the PC can handle
+            nr_processes = None if recompile else 1
+            with multiprocessing.Pool(
+                nr_processes,
+                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+            ) as pool:
+                rb_tasks = send_rb_tasks(pool)
+                cl_oql.wait_for_rb_tasks(rb_tasks)
+
+        programs_filenames = rb_tasks.get()
+
+        # to include calibration points
+        if cal_points:
+            sweep_points = np.append(
+                np.repeat(nr_cliffords, 2),
+                [nr_cliffords[-1] + 0.5]
+                + [nr_cliffords[-1] + 1.5]
+                + [nr_cliffords[-1] + 2.5],
+            )
+        else:
+            sweep_points = np.repeat(nr_cliffords, 2)
+
+        counter_param = ManualParameter("name_ctr", initial_value=0)
+        prepare_function_kwargs = {
+            "counter_param": counter_param,
+            "programs_filenames": programs_filenames,
+            "CC": self.instr_CC.get_instr(),
+        }
+
+        # Using the first detector of the multi-detector as this is
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(
+            oqh.load_range_of_oql_programs_from_filenames,
+            prepare_function_kwargs, detectors="first"
+        )
+        # d.nr_averages = 128
+
+        reps_per_seed = 4094 // len(sweep_points)
+        d.set_child_attr("nr_shots", reps_per_seed * len(sweep_points))
+
+        s = swf.None_Sweep(parameter_name="Number of Cliffords", unit="#")
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
+
+        MC.set_detector_function(d)
+
+        label="Multi_Qubit_sim_RB_{}seeds_recompile={}_".format(nr_seeds, recompile)
+        if label_name is None:
+            label += '_'.join(qubits)
+        else:
+            label += label_name
+        MC.run(label, exp_metadata={"bins": sweep_points})
+
+        cal_2Q = ["0"*len(qubits), "1"*len(qubits), "2"*len(qubits)]
+        Analysis = []
+        for i in range(len(qubits)):
+            rates_I_quad_ch_idx = 2*i
+            cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
+            a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
+                label=label,
+                rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+                cal_pnts_in_dset=cal_1Q
+            )
+            Analysis.append(a)
+
+        return Analysis
+
     ########################################################
     # Calibration methods
     ########################################################
@@ -3860,6 +4038,7 @@ class DeviceCCL(Instrument):
                         possible combinations of states.
         """
         # assert len(Q_target) == 1
+        assert self.ro_acq_weight_type().lower() == 'optimal'
         MC = self.instr_MC.get_instr()
         if Q_spectator:
             Q_control += Q_spectator
@@ -3942,6 +4121,7 @@ class DeviceCCL(Instrument):
         flux_cw_list: list,
         B_amps: list = None,
         control_cases: list = None,
+        pc_repetitions: int = 1,
         downsample_angle_points: int = 1,
         prepare_for_timedomain: bool = True,
         extract_only: bool = False,
@@ -3963,6 +4143,7 @@ class DeviceCCL(Instrument):
         Control_cases : list of different control qubit states. Defaults to all
                         possible combinations of states.
         """
+        assert self.ro_acq_weight_type().lower() == 'optimal'
         assert len(Q_ancilla) == 1
         qubit_list = Q_ancilla + Q_control
         assert Q_pair_target[0] in qubit_list
@@ -4003,6 +4184,7 @@ class DeviceCCL(Instrument):
                 control_cases = None,
                 downsample_angle_points = downsample_angle_points,
                 prepare_for_timedomain = False,
+                pc_repetitions=pc_repetitions,
                 solve_for_phase_gate_model = True,
                 disable_metadata = True,
                 extract_only = extract_only)
@@ -4297,6 +4479,7 @@ class DeviceCCL(Instrument):
         '''
         Measures parity check fidelity by preparing each
         '''
+        assert self.ro_acq_weight_type().lower() == 'optimal'
         assert len(Q_ancilla) == 1
         MC = self.instr_MC.get_instr()
         if control_cases == None:
@@ -4330,9 +4513,10 @@ class DeviceCCL(Instrument):
             parameter_name="Cases",
             unit="a.u.")
         d = self.get_int_logging_detector(qubits=qubit_list)
-        total_shots = nr_shots_per_case*len(control_cases)
+        total_shots = nr_shots_per_case*(len(control_cases)+2)
         if initialization_msmt:
-            total_shots *= 2
+            n = len(Q_control)
+            total_shots = nr_shots_per_case*(len(control_cases)*2+2**(n+1))
         for detector in d.detectors:
             detector.nr_shots = total_shots
         MC.set_sweep_function(s)
@@ -4429,8 +4613,10 @@ class DeviceCCL(Instrument):
             prepare_for_timedomain: bool=True,
             repetitions: int=10,
             wait_time_before_flux: int = 0,
-            wait_time_after_flux: int = 0
+            wait_time_after_flux: int = 0,
+            n_rounds = 1,
             ):
+        assert self.ro_acq_weight_type().lower() == 'optimal'
         assert self.ro_acq_digitized() == False
         ###################
         # setup qubit idxs
@@ -4443,9 +4629,9 @@ class DeviceCCL(Instrument):
         # RO preparation (assign res_combinations)
         ###########################################
         RO_lms = np.unique([self.find_instrument(q).instr_LutMan_RO() for q in all_qubits])
-        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() : 
-                      (self.find_instrument(q).name, 
-                       self.find_instrument(q).instr_LutMan_RO()) for q in all_qubits }
+        qubit_RO_lm = {self.find_instrument(q).cfg_qubit_nr() : 
+            (self.find_instrument(q).name, 
+             self.find_instrument(q).instr_LutMan_RO()) for q in all_qubits }
         main_qubits = []
         exception_qubits = []
         res_combs = {}
@@ -4489,16 +4675,18 @@ class DeviceCCL(Instrument):
             simultaneous_measurement=sim_measurement,
             wait_time_before_flux=wait_time_before_flux,
             wait_time_after_flux=wait_time_after_flux,
+            n_rounds = n_rounds,
             platf_cfg=self.cfg_openql_platform_fn())
 
         uhfqc_max_avg = 2**17
         if sim_measurement:
-            readouts_per_round = 3**n+2**(n+1)
+            readouts_per_round = (3**n)*n_rounds+2**(n+1)
         else:
-            readouts_per_round = 3**n*2+2**(n+1)
-        d = self.get_int_logging_detector(qubits=all_qubits, result_logging_mode='raw')
+            readouts_per_round = (3**n)*(n_rounds+1)+2**(n+1)
+        d = self.get_int_logging_detector(qubits=all_qubits,
+                                          result_logging_mode='raw')
         for det in d.detectors:
-            det.nr_shots = int(uhfqc_max_avg/readouts_per_round) * readouts_per_round
+            det.nr_shots = int(uhfqc_max_avg/readouts_per_round)*readouts_per_round
         s = swf.OpenQL_Sweep(openql_program=p,
                      CCL=self.instr_CC.get_instr())
         MC = self.instr_MC.get_instr()
@@ -4508,9 +4696,12 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.arange(int(uhfqc_max_avg/readouts_per_round) 
                                         * readouts_per_round * repetitions))
         MC.set_detector_function(d)
-        MC.run(f'Weight_{n}_parity_tomography_{ancilla_qubit}_{data_qubits}_sim-msmt-{sim_measurement}')
+        MC.run(f'Weight_{n}_parity_tomography_{ancilla_qubit}_'+\
+               f'{"_".join(data_qubits)}_sim-msmt-{sim_measurement}'+\
+               f'_rounds-{n_rounds}')
         # Warning analysis requires that the detector function is ordered
         # as: [anc_qubit, data_qubit[0],[1],[2],[3]]
         ma2.pba.Weight_n_parity_tomography(
             sim_measurement=sim_measurement,
+            n_rounds=n_rounds,
             exception_qubits=exception_qubits)

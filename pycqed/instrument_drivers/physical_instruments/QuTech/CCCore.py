@@ -297,7 +297,7 @@ class CCCore(SCPIBase):
     # constants
     ##########################################################################
 
-    _MAX_PROG_STR_LEN = 40*1024*1024-1024  # size of CC input buffer, minus some room for command. FIXME: get from instrument
+    _MAX_PROG_STR_LEN = 150*1024*1024-1024  # size of CC input buffer, minus some room for command. FIXME: get from instrument
 
     # trace units
     TRACE_CCIO_DEV_IN = 0

@@ -9,26 +9,27 @@ Originally written by Adriaan, updated/rewritten by Rene May 2018
 """
 import itertools
 from copy import deepcopy
-from collections import OrderedDict
+import os
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import lmfit
+from collections import OrderedDict
 import numpy as np
-from scipy.optimize import minimize
-import scipy.constants as spconst
-
 import pycqed.analysis.fitting_models as fit_mods
 from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.analysis_v2.simple_analysis as sa
+from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str, \
     set_xlabel, set_ylabel, set_cbarlabel, flex_colormesh_plot_vs_xy
 from pycqed.analysis_v2.tools.plotting import scatter_pnts_overlay
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.utilities.general import int2base
 from pycqed.utilities.general import format_value_string
+from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
+import pycqed.measurement.hdf5_data as h5d
 
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
@@ -773,15 +774,14 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 fit_text += '\n\n(Single quadrature data)'
 
             fit_text += '\n\nTotal shots: %d+%d' % (*self.proc_data_dict['nr_shots'],)
-            
             if self.predict_qubit_temp:
-                h = spconst.value('Planck constant')
-                kb = spconst.value('Boltzmann constant')
+                h = 6.62607004e-34
+                kb = 1.38064852e-23
                 res_exc = a_sp.value
-                T_eff = h*self.qubit_freq/(kb*np.log((1-res_exc)/res_exc))
-                fit_text += '\n\nQubit $T_{eff}$' \
-                            + ' = {:.2f} mK\n   @ {:.3f} GHz' \
-                            .format(T_eff*1e3, self.qubit_freq*1e-9)
+                effective_temp = h*6.42e9/(kb*np.log((1-res_exc)/res_exc))
+                fit_text += '\n\nQubit '+'$T_{eff}$'+\
+                    ' = {:.2f} mK\n@{:.0f}'.format(effective_temp*1e3,
+                                                  self.qubit_freq)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {
@@ -792,6 +792,80 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'box_props': 'fancy',
                     'text_string': fit_text,
                 }
+
+def get_shots_zero_one(data, post_select: bool=False,
+                       nr_samples: int=2, sample_0: int=0, sample_1: int=1,
+                       post_select_threshold: float = None):
+    if not post_select:
+        shots_0, shots_1 = a_tools.zigzag(
+            data, sample_0, sample_1, nr_samples)
+    else:
+        presel_0, presel_1 = a_tools.zigzag(
+            data, sample_0, sample_1, nr_samples)
+
+        shots_0, shots_1 = a_tools.zigzag(
+            data, sample_0+1, sample_1+1, nr_samples)
+
+    if post_select:
+        post_select_shots_0 = data[0::nr_samples]
+        shots_0 = data[1::nr_samples]
+
+        post_select_shots_1 = data[nr_samples//2::nr_samples]
+        shots_1 = data[nr_samples//2+1::nr_samples]
+
+        # Determine shots to remove
+        post_select_indices_0 = dm_tools.get_post_select_indices(
+            thresholds=[post_select_threshold],
+            init_measurements=[post_select_shots_0])
+
+        post_select_indices_1 = dm_tools.get_post_select_indices(
+            thresholds=[post_select_threshold],
+            init_measurements=[post_select_shots_1])
+
+        shots_0[post_select_indices_0] = np.nan
+        shots_0 = shots_0[~np.isnan(shots_0)]
+
+        shots_1[post_select_indices_1] = np.nan
+        shots_1 = shots_1[~np.isnan(shots_1)]
+
+    return shots_0, shots_1
+
+def plot_2D_ssro_histogram(xvals, yvals, zvals, xlabel, xunit, ylabel, yunit, zlabel, zunit,
+                           xlim=None, ylim=None,
+                           title='',
+                           cmap='viridis',
+                           cbarwidth='10%',
+                           cbarpad='5%',
+                           no_label=False,
+                           ax=None, cax=None, **kw):
+    if ax is None:
+        f, ax = plt.subplots()
+    if not no_label:
+        ax.set_title(title)
+
+    # Plotting the "heatmap"
+    out = flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=ax,
+                                    plot_cbar=True, cmap=cmap)
+    # Adding the colorbar
+    if cax is None:
+        ax.ax_divider = make_axes_locatable(ax)
+        ax.cax = ax.ax_divider.append_axes(
+            'right', size=cbarwidth, pad=cbarpad)
+    else:
+        ax.cax = cax
+    ax.cbar = plt.colorbar(out['cmap'], cax=ax.cax)
+
+    # Setting axis limits aspect ratios and labels
+    ax.set_aspect(1)
+    set_xlabel(ax, xlabel, xunit)
+    set_ylabel(ax, ylabel, yunit)
+    set_cbarlabel(ax.cbar, zlabel, zunit)
+    if xlim is None:
+        xlim = np.min([xvals, yvals]), np.max([xvals, yvals])
+    ax.set_xlim(xlim)
+    if ylim is None:
+        ylim = np.min([xvals, yvals]), np.max([xvals, yvals])
+    ax.set_ylim(ylim)
 
 
 class Dispersive_shift_Analysis(ba.BaseDataAnalysis):
@@ -1449,382 +1523,310 @@ class Readout_landspace_Analysis(sa.Basic2DInterpolatedAnalysis):
                 }
 
 
-class Multiplexed_Readout_Analysis_deprecated(ba.BaseDataAnalysis):
+class Optimal_integration_weights_analysis(ba.BaseDataAnalysis):
     """
-    For two qubits, to make an n-qubit mux readout experiment.
-    we should vectorize this analysis
-
-    TODO: This needs to be rewritten/debugged!
-    Suggestion:
-        Use N*(N-1)/2 instances of Singleshot_Readout_Analysis,
-          run them without saving the plots and then merge together the
-          plot_dicts as in the cross_dephasing_analysis.
+    Mux transient analysis.
     """
 
-    def __init__(self, t_start: str=None, t_stop: str=None,
-                 label: str='',
-                 data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 nr_of_qubits: int = 2,
-                 qubit_names: list=None,
-                 do_fitting: bool=True, auto=True):
-        """
-        Inherits from BaseDataAnalysis.
-        Extra arguments of interest
-            qubit_names (list) : used to label the experiments, names of the
-                qubits. LSQ is last name in the list. If not specified will
-                set qubit_names to [qN, ..., q1, q0]
-
-
-        """
-        self.nr_of_qubits = nr_of_qubits
-        if qubit_names is None:
-            self.qubit_names = list(reversed(['q{}'.format(i)
-                                              for i in range(nr_of_qubits)]))
-        else:
-            self.qubit_names = qubit_names
+    def __init__(self,
+                 IF: float,
+                 input_waveform: tuple,
+                 t_start: str = None, t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, extract_only: bool = False,
+                 auto=True):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
-                         data_file_path=data_file_path,
                          options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=do_fitting)
-        self.single_timestamp = False
-        self.params_dict = {
-            'measurementstring': 'measurementstring',
-            'measured_values': 'measured_values',
-            'value_names': 'value_names',
-            'value_units': 'value_units'}
+                         extract_only=extract_only)
 
-        self.numeric_params = []
+        self.IF = IF
+        self.input_waveform = input_waveform
         if auto:
             self.run_analysis()
 
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        assert len(self.timestamps) == 2
+        self.raw_data_dict = {}
+        for ts in self.timestamps:
+            data_fp = get_datafilepath_from_timestamp(ts)
+            param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                          'value_names': ('Experimental Data', 'attr:value_names')}
+            self.raw_data_dict[ts] = h5d.extract_pars_from_datafile(
+                data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
     def process_data(self):
-        """
-        Responsible for creating the histograms based on the raw data
-        """
-        # Determine the shape of the data to extract wheter to rotate or not
-        nr_bins = int(self.options_dict.get('nr_bins', 100))
+        ts_off = self.timestamps[0]
+        ts_on = self.timestamps[1]
+        Time = self.raw_data_dict[ts_off]['data'][:,0]
+        Trace_I_0 = self.raw_data_dict[ts_off]['data'][:,1]
+        Trace_Q_0 = self.raw_data_dict[ts_off]['data'][:,2]
+        Trace_I_1 = self.raw_data_dict[ts_on]['data'][:,1]
+        Trace_Q_1 = self.raw_data_dict[ts_on]['data'][:,2]
+        # Subtract offset
+        Trace_I_0 -= np.mean(Trace_I_0)
+        Trace_Q_0 -= np.mean(Trace_Q_0)
+        Trace_I_1 -= np.mean(Trace_I_1)
+        Trace_Q_1 -= np.mean(Trace_Q_1)
 
-        # self.proc_data_dict['shots_0'] = [''] * nr_expts
-        # self.proc_data_dict['shots_1'] = [''] * nr_expts
+        # Demodulate traces
+        def _demodulate(Time, I, Q, IF):
+            Complex_vec = I + 1j*Q
+            I_demod = np.real(np.exp(1j*2*np.pi*IF*Time)*Complex_vec)
+            Q_demod = np.imag(np.exp(1j*2*np.pi*IF*Time)*Complex_vec)
+            return I_demod, Q_demod
+        Trace_I_0_demod, Trace_Q_0_demod = _demodulate(Time, Trace_I_0, Trace_Q_0, self.IF)
+        Trace_I_1_demod, Trace_Q_1_demod = _demodulate(Time, Trace_I_1, Trace_Q_1, self.IF)
 
-        #################################################################
-        #  Separating data into shots for the different prepared states #
-        #################################################################
-        self.proc_data_dict['nr_of_qubits'] = self.nr_of_qubits
-        self.proc_data_dict['qubit_names'] = self.qubit_names
+        # Calculate optimal weights
+        Weights_I = Trace_I_1 - Trace_I_0
+        Weights_Q = Trace_Q_1 - Trace_Q_0
+        # joint rescaling to +/-1 Volt
+        maxI = np.max(np.abs(Weights_I))
+        maxQ = np.max(np.abs(Weights_Q))
+        # Dividing the weight functions by four to not have overflow in
+        # thresholding of the UHFQC
+        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
+        Weights_I = np.array(weight_scale_factor*Weights_I)
+        Weights_Q = np.array(weight_scale_factor*Weights_Q)
 
-        self.proc_data_dict['ch_names'] = self.raw_data_dict['value_names'][0]
+        # Demodulate weights
+        Weights_I_demod, Weights_Q_demod = _demodulate(Time, Weights_I, Weights_Q, self.IF)
+        # Smooth weights
+        from scipy.signal import medfilt
+        Weights_I_demod_s = medfilt(Weights_I_demod, 31)
+        Weights_Q_demod_s = medfilt(Weights_Q_demod, 31)
+        Weights_I_s, Weights_Q_s = _demodulate(Time, Weights_I_demod_s, Weights_Q_demod_s, -self.IF)
 
-        for ch_name, shots in self.raw_data_dict['measured_values_ord_dict'].items():
-            self.proc_data_dict[ch_name] = shots[0]  # only 1 dataset
-            self.proc_data_dict[ch_name +
-                                ' all'] = self.proc_data_dict[ch_name]
-            min_sh = np.min(self.proc_data_dict[ch_name])
-            max_sh = np.max(self.proc_data_dict[ch_name])
-            self.proc_data_dict['nr_shots'] = len(self.proc_data_dict[ch_name])
+        # PSD of output signal
+        time_step = Time[1]
+        ps_0 = np.abs(np.fft.fft(Trace_I_0))**2*time_step/len(Time)
+        ps_1 = np.abs(np.fft.fft(Trace_I_1))**2*time_step/len(Time)
+        Freqs = np.fft.fftfreq(Trace_I_0.size, time_step)
+        idx = np.argsort(Freqs)
+        Freqs = Freqs[idx]
+        ps_0 = ps_0[idx]
+        ps_1 = ps_1[idx]
+        # PSD of input signal
+        _n_tt = len(Time)
+        _n_wf = len(self.input_waveform[0])
+        in_wf = np.concatenate((self.input_waveform[0],
+                                np.zeros(_n_tt-_n_wf)))
+        ps_wf = np.abs(np.fft.fft(in_wf))**2*time_step/len(in_wf)
+        Freqs_wf = np.fft.fftfreq(in_wf.size, time_step)
+        idx_wf = np.argsort(Freqs_wf)
+        Freqs_wf = Freqs_wf[idx_wf]
+        ps_wf = ps_wf[idx_wf]
+        # normalize (for plotting purposes)
+        ps_wf = ps_wf/np.max(ps_wf)*max([np.max(ps_0),np.max(ps_1)])*1.1
 
-            base = 2
-            number_of_experiments = base ** self.nr_of_qubits
+        self.proc_data_dict['Time'] = Time
+        self.proc_data_dict['Trace_I_0'] = Trace_I_0
+        self.proc_data_dict['Trace_Q_0'] = Trace_Q_0
+        self.proc_data_dict['Trace_I_1'] = Trace_I_1
+        self.proc_data_dict['Trace_Q_1'] = Trace_Q_1
+        self.proc_data_dict['Trace_I_0_demod'] = Trace_I_0_demod
+        self.proc_data_dict['Trace_Q_0_demod'] = Trace_Q_0_demod
+        self.proc_data_dict['Trace_I_1_demod'] = Trace_I_1_demod
+        self.proc_data_dict['Trace_Q_1_demod'] = Trace_Q_1_demod
+        self.proc_data_dict['Weights_I_demod'] = Weights_I_demod
+        self.proc_data_dict['Weights_Q_demod'] = Weights_Q_demod
+        self.proc_data_dict['Weights_I_demod_s'] = Weights_I_demod_s
+        self.proc_data_dict['Weights_Q_demod_s'] = Weights_Q_demod_s
+        self.proc_data_dict['Weights_I_s'] = Weights_I_s
+        self.proc_data_dict['Weights_Q_s'] = Weights_Q_s
+        self.proc_data_dict['Freqs'] = Freqs
+        self.proc_data_dict['ps_0'] = ps_0
+        self.proc_data_dict['ps_1'] = ps_1
+        self.proc_data_dict['Freqs_wf'] = Freqs_wf
+        self.proc_data_dict['ps_wf'] = ps_wf
 
-            combinations = [int2base(
-                i, base=base, fixed_length=self.nr_of_qubits) for i in
-                range(number_of_experiments)]
-            self.proc_data_dict['combinations'] = combinations
-
-            for i, comb in enumerate(combinations):
-                # No post selection implemented yet
-                self.proc_data_dict['{} {}'.format(ch_name, comb)] = \
-                    self.proc_data_dict[ch_name][i::number_of_experiments]
-                #####################################
-                #  Binning data into 1D histograms  #
-                #####################################
-                hist_name = 'hist {} {}'.format(
-                    ch_name, comb)
-                self.proc_data_dict[hist_name] = np.histogram(
-                    self.proc_data_dict['{} {}'.format(
-                        ch_name, comb)],
-                    bins=nr_bins, range=(min_sh, max_sh))
-                #  Cumulative histograms #
-                chist_name = 'c'+hist_name
-                # the cumulative histograms are normalized to ensure the right
-                # fidelities can be calculated
-                self.proc_data_dict[chist_name] = np.cumsum(
-                    self.proc_data_dict[hist_name][0])/(
-                    np.sum(self.proc_data_dict[hist_name][0]))
-
-            self.proc_data_dict['bin_centers {}'.format(ch_name)] = (
-                self.proc_data_dict[hist_name][1][:-1] +
-                self.proc_data_dict[hist_name][1][1:]) / 2
-
-            self.proc_data_dict['binsize {}'.format(ch_name)] = (
-                self.proc_data_dict[hist_name][1][1] -
-                self.proc_data_dict[hist_name][1][0])
-
-        #####################################################################
-        # Combining histograms of all different combinations and calc Fid.
-        ######################################################################
-        for ch_idx, ch_name in enumerate(self.proc_data_dict['ch_names']):
-            # Create labels for the specific combinations
-            comb_str_0, comb_str_1, comb_str_2 = get_arb_comb_xx_label(
-                self.proc_data_dict['nr_of_qubits'], qubit_idx=ch_idx)
-
-            # Initialize the arrays
-            self.proc_data_dict['hist {} {}'.format(ch_name, comb_str_0)] = \
-                [np.zeros(nr_bins), np.zeros(nr_bins+1)]
-            self.proc_data_dict['hist {} {}'.format(ch_name, comb_str_1)] = \
-                [np.zeros(nr_bins), np.zeros(nr_bins+1)]
-            zero_hist = self.proc_data_dict['hist {} {}'.format(
-                ch_name, comb_str_0)]
-            one_hist = self.proc_data_dict['hist {} {}'.format(
-                ch_name, comb_str_1)]
-
-            # Fill them with data from the relevant combinations
-            for i, comb in enumerate(self.proc_data_dict['combinations']):
-                if comb[-(ch_idx+1)] == '0':
-                    zero_hist[0] += self.proc_data_dict[
-                        'hist {} {}'.format(ch_name, comb)][0]
-                    zero_hist[1] = self.proc_data_dict[
-                        'hist {} {}'.format(ch_name, comb)][1]
-                elif comb[-(ch_idx+1)] == '1':
-                    one_hist[0] += self.proc_data_dict[
-                        'hist {} {}'.format(ch_name, comb)][0]
-                    one_hist[1] = self.proc_data_dict[
-                        'hist {} {}'.format(ch_name, comb)][1]
-                elif comb[-(ch_idx+1)] == '2':
-                    # Fixme add two state binning
-                    raise NotImplementedError()
-
-            chist_0 = np.cumsum(zero_hist[0])/(np.sum(zero_hist[0]))
-            chist_1 = np.cumsum(one_hist[0])/(np.sum(one_hist[0]))
-
-            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_0)] \
-                = chist_0
-            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_1)] \
-                = chist_1
-            ###########################################################
-            #  Threshold and fidelity based on cumulative histograms  #
-
-            qubit_name = self.proc_data_dict['qubit_names'][-(ch_idx+1)]
-            centers = self.proc_data_dict['bin_centers {}'.format(ch_name)]
-            fid, th = get_assignement_fid_from_cumhist(chist_0, chist_1,
-                                                       centers)
-            self.proc_data_dict['F_ass_raw {}'.format(qubit_name)] = fid
-            self.proc_data_dict['threshold_raw {}'.format(qubit_name)] = th
+        self.qoi = {}
+        self.qoi['Weights_I_s'] = Weights_I_s
+        self.qoi['Weights_Q_s'] = Weights_Q_s
 
     def prepare_plots(self):
-        # N.B. If the log option is used we should manually set the
-        # yscale to go from .5 to the current max as otherwise the fits
-        # mess up the log plots.
-        # log_hist = self.options_dict.get('log_hist', False)
 
-        for ch_idx, ch_name in enumerate(self.proc_data_dict['ch_names']):
-            q_name = self.proc_data_dict['qubit_names'][-(ch_idx+1)]
-            th_raw = self.proc_data_dict['threshold_raw {}'.format(q_name)]
-            F_raw = self.proc_data_dict['F_ass_raw {}'.format(q_name)]
+        self.axs_dict = {}
+        fig, axs = plt.subplots(figsize=(7.5*1.3, 4*1.3 ), nrows=2, ncols=2, sharex=True, sharey='row', dpi=100)
+        axs = axs.flatten()
+        # fig.patch.set_alpha(0)
+        self.axs_dict['Transients_plot'] = axs[0]
+        self.figs['Transients_plot'] = fig
+        self.plot_dicts['Transients_plot'] = {
+            'plotfn': Transients_plotfn,
+            'ax_id': 'Transients_plot',
+            'Time': self.proc_data_dict['Time'],
+            'Trace_I_0': self.proc_data_dict['Trace_I_0'],
+            'Trace_Q_0': self.proc_data_dict['Trace_Q_0'],
+            'Trace_I_1': self.proc_data_dict['Trace_I_1'],
+            'Trace_Q_1': self.proc_data_dict['Trace_Q_1'],
+            'timestamp': self.timestamps[1]
+        }
 
-            self.plot_dicts['histogram_{}'.format(ch_name)] = {
-                'plotfn': make_mux_ssro_histogram,
-                'data_dict': self.proc_data_dict,
-                'ch_name': ch_name,
-                'title': (self.timestamps[0] + ' \n' +
-                          'SSRO histograms {}'.format(ch_name))}
+        fig, ax = plt.subplots(figsize=(5, 5), dpi=100)
+        # fig.patch.set_alpha(0)
+        self.axs_dict['IQ_trajectory_plot'] = ax
+        self.figs['IQ_trajectory_plot'] = fig
+        self.plot_dicts['IQ_trajectory_plot'] = {
+            'plotfn': IQ_plotfn,
+            'ax_id': 'IQ_trajectory_plot',
+            'Trace_I_0_demod': self.proc_data_dict['Trace_I_0_demod'],
+            'Trace_Q_0_demod': self.proc_data_dict['Trace_Q_0_demod'],
+            'Trace_I_1_demod': self.proc_data_dict['Trace_I_1_demod'],
+            'Trace_Q_1_demod': self.proc_data_dict['Trace_Q_1_demod'],
+            'timestamp': self.timestamps[1]
+        }
+        
+        fig, axs = plt.subplots(figsize=(8*1.4, 3*1.4), ncols=2,
+            gridspec_kw={'width_ratios': [5*1.4, 3*1.4]}, dpi=100)
+        axs = axs.flatten()
+        # fig.patch.set_alpha(0)
+        self.axs_dict['Optimal_weights_plot'] = axs[0]
+        self.figs['Optimal_weights_plot'] = fig
+        self.plot_dicts['Optimal_weights_plot'] = {
+            'plotfn': Weights_plotfn,
+            'ax_id': 'Optimal_weights_plot',
+            'Time': self.proc_data_dict['Time'],
+            'Weights_I_demod': self.proc_data_dict['Weights_I_demod'],
+            'Weights_Q_demod': self.proc_data_dict['Weights_Q_demod'],
+            'Weights_I_demod_s': self.proc_data_dict['Weights_I_demod_s'],
+            'Weights_Q_demod_s': self.proc_data_dict['Weights_Q_demod_s'],
+            'timestamp': self.timestamps[1]
+        }
 
-            thresholds = [th_raw]
-            threshold_labels = ['thresh. raw']
+        fig, axs = plt.subplots(figsize=(8,3), ncols=2, dpi=100,
+                                sharey=True)
+        axs = axs.flatten()
+        # fig.patch.set_alpha(0)
+        self.axs_dict['FFT_plot'] = axs[0]
+        self.figs['FFT_plot'] = fig
+        self.plot_dicts['FFT_plot'] = {
+            'plotfn': FFT_plotfn,
+            'ax_id': 'FFT_plot',
+            'Freqs': self.proc_data_dict['Freqs'],
+            'ps_0': self.proc_data_dict['ps_0'],
+            'ps_1': self.proc_data_dict['ps_1'],
+            'Freqs_wf': self.proc_data_dict['Freqs_wf'],
+            'ps_wf': self.proc_data_dict['ps_wf'],
+            'IF': self.IF,
+            'timestamp': self.timestamps[1]
+        }
 
-            self.plot_dicts['comb_histogram_{}'.format(q_name)] = {
-                'plotfn': make_mux_ssro_histogram_combined,
-                'data_dict': self.proc_data_dict,
-                'ch_name': ch_name,
-                'thresholds': thresholds,
-                'threshold_labels': threshold_labels,
-                'qubit_idx': ch_idx,
-                'title': (self.timestamps[0] + ' \n' +
-                          'Combined SSRO histograms {}'.format(q_name))}
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
-            fid_threshold_msg = 'Summary {}\n'.format(q_name)
-            fid_threshold_msg += r'$F_{A}$-raw: ' + '{:.3f} \n'.format(F_raw)
-            fid_threshold_msg += r'thresh. raw: ' + '{:.3f} \n'.format(th_raw)
+def Transients_plotfn(
+    Time,
+    Trace_I_0, Trace_Q_0,
+    Trace_I_1, Trace_Q_1,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+    
+    axs[0].plot(Time*1e6, Trace_I_0, color='#0D47A1', ls='-', lw=1, label='In phase component')
+    axs[2].plot(Time*1e6, Trace_Q_0, color='#82B1FF', ls='-', lw=1, label='Quadrature component')
+    axs[1].plot(Time*1e6, Trace_I_1, color='#C62828', ls='-', lw=1, label='In phase component')
+    axs[3].plot(Time*1e6, Trace_Q_1, color='#E57373', ls='-', lw=1, label='Quadrature component')
+    axs[2].set_xlabel('Time ($\mathrm{\mu s}$)')
+    axs[3].set_xlabel('Time ($\mathrm{\mu s}$)')
+    axs[0].set_ylabel('Voltage (V)')
+    axs[2].set_ylabel('Voltage (V)')
+    axs[0].set_title('Ground state')
+    axs[1].set_title('Excited state')
+    axs[0].legend(frameon=False, fontsize=9)
+    axs[1].legend(frameon=False, fontsize=9)
+    axs[2].legend(frameon=False, fontsize=9)
+    axs[3].legend(frameon=False, fontsize=9)
+    fig.suptitle(f'{timestamp}\nReadout transients', y=.95)
+    fig.tight_layout()
 
-            self.plot_dicts['fid_threshold_msg_{}'.format(q_name)] = {
-                'plotfn': self.plot_text,
-                'xpos': 1.05,
-                'ypos': .9,
-                'horizontalalignment': 'left',
-                'text_string': fid_threshold_msg,
-                'ax_id': 'comb_histogram_{}'.format(q_name)}
+def IQ_plotfn(
+    Trace_I_0_demod, Trace_Q_0_demod,
+    Trace_I_1_demod, Trace_Q_1_demod,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+    
+    ax.plot(Trace_I_0_demod*1e3, Trace_Q_0_demod*1e3, color='#0D47A1', ls='-', lw=.5, label='ground')
+    ax.plot(Trace_I_1_demod*1e3, Trace_Q_1_demod*1e3, color='#C62828', ls='-', lw=.5, label='excited')
+    _lim = np.max(np.concatenate((np.abs(Trace_I_0_demod*1e3), np.abs(Trace_Q_0_demod*1e3),
+                                  np.abs(Trace_I_1_demod*1e3), np.abs(Trace_Q_1_demod*1e3))))
+    ax.set_xlim(-_lim*1.2, _lim*1.2)
+    ax.set_ylim(-_lim*1.2, _lim*1.2)
+    ax.set_xlabel('I Voltage (mV)')
+    ax.set_ylabel('Q Voltage (mV)')
+    ax.set_title(f'{timestamp}\nIQ trajectory')
+    ax.legend(frameon=False, bbox_to_anchor=(1.01, 1))
 
+def Weights_plotfn(
+    Time, 
+    Weights_I_demod, Weights_Q_demod, 
+    Weights_I_demod_s, Weights_Q_demod_s,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+    
+    axs[0].plot(Time*1e6, Weights_I_demod, color='C0', ls='-', lw=1, alpha=.25)
+    axs[0].plot(Time*1e6, Weights_Q_demod, color='C2', ls='-', lw=1, alpha=.25)
+    axs[0].plot(Time*1e6, Weights_I_demod_s, color='C0', ls='-', lw=2, alpha=1, label='Weight function I')
+    axs[0].plot(Time*1e6, Weights_Q_demod_s, color='C2', ls='-', lw=2, alpha=1, label='Weight function Q')
+    axs[1].plot(Weights_I_demod, Weights_Q_demod, color='C0', ls='-', lw=.5, alpha=.5)
+    axs[1].plot(Weights_I_demod_s, Weights_Q_demod_s, color='C0', ls='-', lw=2, alpha=1)
+    axs[0].set_xlabel('Time ($\mathrm{\mu s}$)')
+    axs[0].set_ylabel('Amplitude (a.u.)')
+    axs[0].legend(frameon=False, fontsize=7)
+    _lim = np.max(np.concatenate((np.abs(Weights_I_demod), np.abs(Weights_Q_demod))))
+    axs[1].set_xlim(-_lim*1.1, _lim*1.1)
+    axs[1].set_ylim(-_lim*1.1, _lim*1.1)
+    axs[1].set_xticklabels([])
+    axs[1].set_yticklabels([])
+    axs[1].set_xlabel('I component (a.u.)')
+    axs[1].set_ylabel('Q component (a.u.)')
+    axs[0].set_title('Optimal integration weights')
+    axs[1].set_title('IQ trajectory')
+    fig.suptitle(f'{timestamp}')
 
-def get_shots_zero_one(data, post_select: bool=False,
-                       nr_samples: int=2, sample_0: int=0, sample_1: int=1,
-                       post_select_threshold: float = None):
-    if not post_select:
-        shots_0, shots_1 = a_tools.zigzag(
-            data, sample_0, sample_1, nr_samples)
-    else:
-        presel_0, presel_1 = a_tools.zigzag(
-            data, sample_0, sample_1, nr_samples)
+def FFT_plotfn(
+    Freqs, Freqs_wf, IF, ps_wf, ps_0, ps_1,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
 
-        shots_0, shots_1 = a_tools.zigzag(
-            data, sample_0+1, sample_1+1, nr_samples)
+    axs[0].plot(Freqs*1e-6, ps_0, 'C0')
+    axs[0].plot(Freqs*1e-6, ps_1, 'C3')
+    axs[0].plot(Freqs_wf*1e-6, ps_wf, 'C2--', alpha=.5)
+    axs[0].axvline(abs(IF)*1e-6, color='k', ls='--', lw=1, label=f'IF : {IF*1e-6:.1f} MHz')
+    axs[0].set_xlim(left=0, right=np.max(Freqs*1e-6))
+    axs[0].set_xlabel('Frequency (MHz)')
+    axs[0].set_ylabel('PSD ($\mathrm{V^2/Hz}$)')
 
-    if post_select:
-        post_select_shots_0 = data[0::nr_samples]
-        shots_0 = data[1::nr_samples]
-
-        post_select_shots_1 = data[nr_samples//2::nr_samples]
-        shots_1 = data[nr_samples//2+1::nr_samples]
-
-        # Determine shots to remove
-        post_select_indices_0 = dm_tools.get_post_select_indices(
-            thresholds=[post_select_threshold],
-            init_measurements=[post_select_shots_0])
-
-        post_select_indices_1 = dm_tools.get_post_select_indices(
-            thresholds=[post_select_threshold],
-            init_measurements=[post_select_shots_1])
-
-        shots_0[post_select_indices_0] = np.nan
-        shots_0 = shots_0[~np.isnan(shots_0)]
-
-        shots_1[post_select_indices_1] = np.nan
-        shots_1 = shots_1[~np.isnan(shots_1)]
-
-    return shots_0, shots_1
-
-
-def get_arb_comb_xx_label(nr_of_qubits, qubit_idx: int):
-    """
-    Returns labels of the form "xx0xxx", "xx1xxx", "xx2xxx"
-    Length of the label is equal to the number of qubits
-    """
-    comb_str_0 = list('x'*nr_of_qubits)
-    comb_str_0[-(qubit_idx+1)] = '0'
-    comb_str_0 = "".join(comb_str_0)
-
-    comb_str_1 = list('x'*nr_of_qubits)
-    comb_str_1[-(qubit_idx+1)] = '1'
-    comb_str_1 = "".join(comb_str_1)
-
-    comb_str_2 = list('x'*nr_of_qubits)
-    comb_str_2[-(qubit_idx+1)] = '2'
-    comb_str_2 = "".join(comb_str_2)
-
-    return comb_str_0, comb_str_1, comb_str_2
-
-
-def get_assignement_fid_from_cumhist(chist_0, chist_1, bin_centers=None):
-    """
-    Returns the average assignment fidelity and threshold
-        F_assignment_raw = (P01 - P10 )/2
-            where Pxy equals probability to measure x when starting in y
-    """
-    F_vs_th = (1-(1-abs(chist_1 - chist_0))/2)
-    opt_idx = np.argmax(F_vs_th)
-    F_assignment_raw = F_vs_th[opt_idx]
-
-    if bin_centers is None:
-        bin_centers = np.arange(len(chist_0))
-    threshold = bin_centers[opt_idx]
-
-    return F_assignment_raw, threshold
-
-
-def make_mux_ssro_histogram_combined(data_dict, ch_name, qubit_idx,
-                                     thresholds=None, threshold_labels=None,
-                                     title=None, ax=None, **kw):
-    if ax is None:
-        f, ax = plt.subplots()
-    markers = itertools.cycle(('v', '^', 'd'))
-
-    comb_str_0, comb_str_1, comb_str_2 = get_arb_comb_xx_label(
-        data_dict['nr_of_qubits'], qubit_idx=qubit_idx)
-
-    ax.plot(data_dict['bin_centers {}'.format(ch_name)],
-            data_dict['hist {} {}'.format(ch_name, comb_str_0)][0],
-            linestyle='',
-            marker=next(markers), alpha=.7, label=comb_str_0)
-    ax.plot(data_dict['bin_centers {}'.format(ch_name)],
-            data_dict['hist {} {}'.format(ch_name, comb_str_1)][0],
-            linestyle='',
-            marker=next(markers), alpha=.7, label=comb_str_1)
-
-    if thresholds is not None:
-        # this is to support multiple threshold types such as raw, fitted etc.
-        th_styles = itertools.cycle(('--', '-.', '..'))
-        for threshold, label in zip(thresholds, threshold_labels):
-            ax.axvline(threshold, linestyle=next(th_styles), color='grey',
-                       label=label)
-
-    legend_title = "Prep. state [%s]" % ', '.join(data_dict['qubit_names'])
-    ax.legend(title=legend_title, loc=1)  # top right corner
-    ax.set_ylabel('Counts')
-    # arbitrary units as we use optimal weights
-    set_xlabel(ax, ch_name, 'a.u.')
-
-    if title is not None:
-        ax.set_title(title)
-
-
-def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
-    if ax is None:
-        f, ax = plt.subplots()
-    nr_of_qubits = data_dict['nr_of_qubits']
-    markers = itertools.cycle(('v', '<', '>', '^', 'd', 'o', 's', '*'))
-    for i in range(2**nr_of_qubits):
-        format_str = '{'+'0:0{}b'.format(nr_of_qubits) + '}'
-        binning_string = format_str.format(i)
-        ax.plot(data_dict['bin_centers {}'.format(ch_name)],
-                data_dict['hist {} {}'.format(ch_name, binning_string)][0],
-                linestyle='',
-                marker=next(markers), alpha=.7, label=binning_string)
-
-    legend_title = "Prep. state \n[%s]" % ', '.join(data_dict['qubit_names'])
-    ax.legend(title=legend_title, loc=1)
-    ax.set_ylabel('Counts')
-    # arbitrary units as we use optimal weights
-    set_xlabel(ax, ch_name, 'a.u.')
-
-    if title is not None:
-        ax.set_title(title)
-
-
-def plot_2D_ssro_histogram(xvals, yvals, zvals, xlabel, xunit, ylabel, yunit, zlabel, zunit,
-                           xlim=None, ylim=None,
-                           title='',
-                           cmap='viridis',
-                           cbarwidth='10%',
-                           cbarpad='5%',
-                           no_label=False,
-                           ax=None, cax=None, **kw):
-    if ax is None:
-        f, ax = plt.subplots()
-    if not no_label:
-        ax.set_title(title)
-
-    # Plotting the "heatmap"
-    out = flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=ax,
-                                    plot_cbar=True, cmap=cmap)
-    # Adding the colorbar
-    if cax is None:
-        ax.ax_divider = make_axes_locatable(ax)
-        ax.cax = ax.ax_divider.append_axes(
-            'right', size=cbarwidth, pad=cbarpad)
-    else:
-        ax.cax = cax
-    ax.cbar = plt.colorbar(out['cmap'], cax=ax.cax)
-
-    # Setting axis limits aspect ratios and labels
-    ax.set_aspect(1)
-    set_xlabel(ax, xlabel, xunit)
-    set_ylabel(ax, ylabel, yunit)
-    set_cbarlabel(ax.cbar, zlabel, zunit)
-    if xlim is None:
-        xlim = np.min([xvals, yvals]), np.max([xvals, yvals])
-    ax.set_xlim(xlim)
-    if ylim is None:
-        ylim = np.min([xvals, yvals]), np.max([xvals, yvals])
-    ax.set_ylim(ylim)
+    axs[1].plot(Freqs*1e-6, ps_0, 'C0', label='ground')
+    axs[1].plot(Freqs*1e-6, ps_1, 'C3', label='excited')
+    axs[1].plot(Freqs_wf*1e-6, ps_wf, 'C2--',
+                label='input pulse', alpha=.5)
+    axs[1].axvline(abs(IF)*1e-6, color='k', ls='--', lw=1)
+    axs[1].set_xlim(left=abs(IF)*1e-6-50, right=abs(IF)*1e-6+50)
+    axs[1].set_xlabel('Frequency (MHz)')
+    axs[0].legend(frameon=False)
+    axs[1].legend(frameon=False, fontsize=7, bbox_to_anchor=(1,1))
+    
+    fig.suptitle(f'{timestamp}\nTransients FFT', y=1.025)

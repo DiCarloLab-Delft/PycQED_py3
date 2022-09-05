@@ -261,6 +261,92 @@ class Sandia_parity_benchmark(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
+def plot_function(P0, P1, P, E1, E2, M1, M2,
+                  Disturbances_ovd_single, r_single,
+                  Disturbances_ovd_double, r_double,
+                  timestamp,
+                  ax, **kw):
+    fig = ax[0].get_figure()
+    # Calibration 0
+    ax[0].set_title(r'Reference $|0000\rangle$')
+    ax[0].axhline(1., color='black', alpha=.5, linestyle='--')
+    ax[0].bar(np.arange(0,16), [P0[k] for k in P0.keys()], color='C0')
+    ax[0].set_ylim(0, 1.05)
+    ax[0].set_xticks([0,5,10,15])
+    ax[0].set_yticks([0, .5, 1])
+    ax[0].set_xticklabels(['{:04b}'.format(5*i) for i in range(4)], rotation=45, fontsize=8)
+    ax[0].set_yticklabels([0, 0.5, 1])
+    ax[0].set_ylabel('Fraction')
+    # Calibration 1
+    ax[1].set_title(r'Reference $|1111\rangle$')
+    ax[1].axhline(1., color='black', alpha=.5, linestyle='--')
+    ax[1].bar(np.arange(0,16), [P1[k] for k in P1.keys()], color='C0')
+    ax[1].set_ylim(0, 1.05)
+    ax[1].set_xticks([0,5,10,15])
+    ax[1].set_yticks([0, .5, 1])
+    ax[1].set_xticklabels(['{:04b}'.format(5*i) for i in range(4)], rotation=45, fontsize=8)
+    ax[1].set_yticklabels(['', '', ''])
+    # Single parity
+    ax[2].set_title('Single parity check')
+    ax[2].axhline(.5, color='black', alpha=.5, linestyle='--')
+    ax[2].bar(np.arange(0,16), [P[k] for k in P.keys()], color='C0', alpha=.25, label='calibration')
+    ax[2].bar(np.arange(0,16), [E1[k] for k in E1.keys()], color='C0', label='parity check')
+    ax[2].set_ylim(0, .525)
+    ax[2].set_yticks([0, .25, .5])
+    ax[2].set_xticks(np.arange(0,16))
+    ax[2].set_xticklabels(['{:04b}'.format(i) for i in range(16)], rotation=45, fontsize=8)
+    ax[2].set_yticklabels([0, 0.25, 0.5])
+    ax[2].set_xlabel('measured state')
+    ax[2].set_ylabel('Fraction')
+    ax[2].legend(bbox_to_anchor=(1.025, 1), loc='upper left')
+    # Repeated parity
+    ax[3].set_title('Repeated parity check')
+    ax[3].axhline(.5, color='black', alpha=.5, linestyle='--')
+    ax[3].bar(np.arange(0,16), [P[k] for k in P.keys()], color='C0', alpha=.25, label='calibration')
+    ax[3].bar(np.arange(0,16), [E1[k] for k in E1.keys()], color='C1', label='single parity check')
+    ax[3].bar(np.arange(0,16), [E2[k] for k in E2.keys()], color='C0', label='double parity check')
+    ax[3].set_ylim(0, .525)
+    ax[3].set_yticks([0, .25, .5])
+    ax[3].set_xticks(np.arange(0,16))
+    ax[3].set_xticklabels(['{:04b}'.format(i) for i in range(16)], rotation=45, fontsize=8)
+    ax[3].set_yticklabels([0, 0.25, 0.5])
+    ax[3].set_xlabel('measured state')
+    ax[3].set_ylabel('Fraction')
+    ax[3].legend(bbox_to_anchor=(1.025, 1), loc='upper left', fontsize=6)
+    # Parity outcome results
+    ax[4].set_title('Parity results')
+    ax[4].axhline(1, color='black', alpha=.5, linestyle='--')
+    ax[4].axhline(-1, color='black', alpha=.5, linestyle='--')
+    ax[4].bar([1, 2], [1-M1*2, 1-M2*2])
+    ax[4].set_ylim(-1.1, 1.1)
+    ax[4].set_xticks([1,2])
+    ax[4].set_xticklabels([r'$\langle m_1\rangle$', r'$\langle m_2\rangle$'])
+    textstr1 = '\n'.join(('',
+                          '$D_1^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[0][0], Disturbances_ovd_single[0][1]),
+                          '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[1][0], Disturbances_ovd_single[1][1]),
+                          '$\Delta^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[2][0]+Disturbances_ovd_single[3][0], Disturbances_ovd_single[2][1]+Disturbances_ovd_single[3][1]),
+                          '$r$  =  %f' % (r_single)))
+    
+    textstr2 = '\n'.join(('Repeatability  =  %.1f%%' % ((1-M2)*100),
+                          '$D_1^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[0][0], Disturbances_ovd_double[0][1]),
+                          '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[1][0], Disturbances_ovd_double[1][1]),
+                          '$\Delta^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[2][0]+Disturbances_ovd_double[3][0], Disturbances_ovd_double[2][1]+Disturbances_ovd_double[3][1]),
+                          '$r$  =  %f' % (r_double)))
+
+    props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
+    fig.tight_layout()
+    ax[4].text(1.08, 1.25, 'Single parity', transform=ax[4].transAxes, fontsize=12,
+            verticalalignment='top')
+    ax[4].text(1.1, 0.95, textstr1, transform=ax[4].transAxes, fontsize=10,
+            verticalalignment='top', bbox=props)
+
+    ax[4].text(2.25, 1.25, 'Repeated parity', transform=ax[4].transAxes, fontsize=12,
+            verticalalignment='top')
+    ax[4].text(2.27, 0.95, textstr2, transform=ax[4].transAxes, fontsize=10,
+            verticalalignment='top', bbox=props)
+
+    fig.suptitle(f'Sandia parity benchmark {timestamp}', y=1.01, x=.43)
+
 
 def get_expected_value(operator, state, n):
     m = 1
@@ -397,6 +483,7 @@ def fidelity(rho_1, rho_2, trace_conserved = False):
 class Weight_n_parity_tomography(ba.BaseDataAnalysis):
     def __init__(self,
                  sim_measurement: bool,
+                 n_rounds: int,
                  exception_qubits: list = [],
                  t_start: str = None,
                  t_stop: str = None,
@@ -412,6 +499,7 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
                          extract_only=extract_only)
 
         self.sim_measurement = sim_measurement
+        self.n_rounds = n_rounds
         self.exception_qubits = exception_qubits
 
         if auto:
@@ -452,9 +540,9 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
         combinations = [''.join(s) for s in itertools.product(states, repeat=n+1)]
 
         if self.sim_measurement:
-            cycle = 3**n
+            cycle = 3**n*self.n_rounds
         else:
-            cycle = 3**n*2
+            cycle = 3**n*(self.n_rounds+1)
         Thresholds = {}
         self.proc_data_dict['Shots_0'] = {}
         self.proc_data_dict['Shots_1'] = {}
@@ -493,20 +581,49 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
         if self.sim_measurement:
             for i, qubit in enumerate(Qubits):
                 for j in range(3**n):
-                    Tomo_shots[qubit][j] = list(self.raw_data_dict['data'][:,i+1][j::(3**n)+2**(n+1)])
-                    Tomo_shots_dig[qubit][j] = list(digitize(self.raw_data_dict['data'][:,i+1][j::(3**n)+2**(n+1)], Thresholds[qubit]))
-        else:
+                    if (qubit in self.exception_qubits) or (qubit==Anc_qubit):
+                        _idx = self.n_rounds*j
+                        Tomo_shots[qubit][j] = list(self.raw_data_dict['data'][:,i+1][_idx::cycle+2**(n+1)])
+                    else:
+                        _idx = self.n_rounds*j + self.n_rounds-1
+                        Tomo_shots[qubit][j] = list(self.raw_data_dict['data'][:,i+1][_idx::cycle+2**(n+1)])
+                    Tomo_shots_dig[qubit][j] = list(digitize(Tomo_shots[qubit][j], Thresholds[qubit]))
+        else: # Sequential measurement    
             for i, qubit in enumerate(Data_qubits):
                 for j in range(3**n):
                     if qubit in self.exception_qubits:
-                        Tomo_shots[qubit][j] = list(self.raw_data_dict['data'][:,i+2][2*j::(3**n)*2+2**(n+1)])
-                        Tomo_shots_dig[qubit][j] = list(digitize(self.raw_data_dict['data'][:,i+2][2*j::(3**n)*2+2**(n+1)], Thresholds[qubit]))
+                        _idx = (self.n_rounds+1)*j
+                        Tomo_shots[qubit][j] = list(self.raw_data_dict['data'][:,i+2][_idx::cycle+2**(n+1)])
                     else:
-                        Tomo_shots[qubit][j] = list(self.raw_data_dict['data'][:,i+2][2*j+1::(3**n)*2+2**(n+1)])
-                        Tomo_shots_dig[qubit][j] = list(digitize(self.raw_data_dict['data'][:,i+2][2*j+1::(3**n)*2+2**(n+1)], Thresholds[qubit]))
+                        _idx = (self.n_rounds+1)*j+self.n_rounds
+                        Tomo_shots[qubit][j] = list(self.raw_data_dict['data'][:,i+2][_idx::cycle+2**(n+1)])
+                    Tomo_shots_dig[qubit][j] = list(digitize(Tomo_shots[qubit][j], Thresholds[qubit]))
             for j in range(3**n):
-                Tomo_shots[Anc_qubit][j] = list(self.raw_data_dict['data'][:,1][2*j::(3**n)*2+32])
-                Tomo_shots_dig[Anc_qubit][j] = list(digitize(self.raw_data_dict['data'][:,1][2*j::(3**n)*2+2**(n+1)], Thresholds[Anc_qubit]))
+                _idx = (self.n_rounds+1)*j
+                Tomo_shots[Anc_qubit][j] = list(self.raw_data_dict['data'][:,1][_idx::cycle+2**(n+1)])
+                Tomo_shots_dig[Anc_qubit][j] = list(digitize(Tomo_shots[Anc_qubit][j], Thresholds[Anc_qubit]))
+        # Calculate repeatability
+        if self.n_rounds == 2:
+            M1_dig = []
+            M2_dig = []
+            if self.sim_measurement:
+                for j in range(3**n):
+                    _idx = self.n_rounds*j
+                    _M1 = list(self.raw_data_dict['data'][:,1][_idx::cycle+2**(n+1)])
+                    _M2 = list(self.raw_data_dict['data'][:,1][_idx+1::cycle+2**(n+1)])
+                    M1_dig += list(digitize(_M1, Thresholds[Anc_qubit]))
+                    M2_dig += list(digitize(_M2, Thresholds[Anc_qubit]))
+            else:
+                for j in range(3**n):
+                    _idx = (self.n_rounds+1)*j
+                    _M1 = list(self.raw_data_dict['data'][:,1][_idx::cycle+2**(n+1)])
+                    _M2 = list(self.raw_data_dict['data'][:,1][_idx+1::cycle+2**(n+1)])
+                    M1_dig += list(digitize(_M1, Thresholds[Anc_qubit]))
+                    M2_dig += list(digitize(_M2, Thresholds[Anc_qubit]))
+            self.proc_data_dict['repeatability'] = (1+np.mean(M2_dig))/2
+            self.proc_data_dict['M1'] = np.mean(M1_dig)
+            self.proc_data_dict['M2'] = np.mean(M2_dig)
+
         ###########################
         # Get post-selection masks
         ###########################
@@ -545,6 +662,11 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
         self.proc_data_dict['angle_0'] = np.angle(rho_0[0,-1])*180/np.pi
         self.proc_data_dict['angle_1'] = np.angle(rho_1[0,-1])*180/np.pi
         self.proc_data_dict['nr_shots'] = len(Tomo_shots_dig[Anc_qubit][0])
+        if self.n_rounds==2:
+            diag_0 = np.diagonal(np.real(self.proc_data_dict['rho_0']))
+            diag_1 = np.diagonal(np.real(self.proc_data_dict['rho_1']))
+            self.proc_data_dict['P_dist'] = self.proc_data_dict['ps_frac_0']*diag_0+\
+                                            self.proc_data_dict['ps_frac_1']*diag_1
 
     def prepare_plots(self):
         n = len(self.Qubits)
@@ -572,13 +694,18 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
         ax = fig.add_subplot(221, projection='3d', azim=-35, elev=30)
         self.axs_dict['Tomography_condition_0'] = ax
         self.figs['Tomography_condition_0'] = fig
+        title = rf'{self.timestamp}'+'\n'+\
+                rf'tomography of qubits {" ".join(data_qubits)}'+'\n'+\
+                rf'condition $|0\rangle_{"{"+ancilla+"}"}$'
+        if self.sim_measurement:
+            title += ' (sim-msmt)'
+        else:
+            title += ' (seq-msmt)'
         self.plot_dicts['Tomography_condition_0'] = {
             'plotfn': plot_density_matrix,
             'rho': self.proc_data_dict['rho_0'],
             'rho_id': R_0,
-            'title': rf'{self.timestamp}'+'\n'+\
-                rf'tomography of qubits {" ".join(data_qubits)}'+'\n'+\
-                rf'condition $|0\rangle_{"{"+ancilla+"}"}$',
+            'title': title,
             'Fid': self.proc_data_dict['Fid_0'],
             'Ps_frac': self.proc_data_dict['ps_frac_0'],
             'angle': self.proc_data_dict['angle_0'],
@@ -594,18 +721,37 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
         ax = fig.add_subplot(221, projection='3d', azim=-35, elev=30)
         self.axs_dict['Tomography_condition_1'] = ax
         self.figs['Tomography_condition_1'] = fig
+        title = rf'{self.timestamp}'+'\n'+\
+                rf'tomography of qubits {" ".join(data_qubits)}'+'\n'+\
+                rf'condition $|1\rangle_{"{"+ancilla+"}"}$'
+        if self.sim_measurement:
+            title += ' (sim-msmt)'
+        else:
+            title += ' (seq-msmt)'
         self.plot_dicts['Tomography_condition_1'] = {
             'plotfn': plot_density_matrix,
             'rho': self.proc_data_dict['rho_1'],
             'rho_id': R_1,
-            'title': rf'{self.timestamp}'+'\n'+\
-                rf'tomography of qubits {" ".join(data_qubits)}'+'\n'+\
-                rf'condition $|1\rangle_{"{"+ancilla+"}"}$',
+            'title': title,
             'Fid': self.proc_data_dict['Fid_1'],
             'Ps_frac': self.proc_data_dict['ps_frac_1'],
             'angle': self.proc_data_dict['angle_1'],
             'nr_shots': self.proc_data_dict['nr_shots']
         }
+        if self.n_rounds == 2:
+            fig, axs = plt.subplots(figsize=(10,2), ncols=2,
+                                    gridspec_kw={'width_ratios':[1,2]})
+            self.axs_dict['Repeatability_analysis'] = axs
+            self.figs['Repeatability_analysis'] = fig
+            self.plot_dicts['Repeatability_analysis'] = {
+                'plotfn': plot_repeatabilityfn,
+                'M1': self.proc_data_dict['M1'],
+                'M2': self.proc_data_dict['M2'],
+                'repeatability': self.proc_data_dict['repeatability'],
+                'P_dist': self.proc_data_dict['P_dist'],
+                'ancilla' : ancilla,
+                'data_qubits' : data_qubits
+            }
 
     def run_post_extract(self):
         self.prepare_plots()  # specify default plots
@@ -676,7 +822,7 @@ def plot_density_matrix(rho, rho_id, title,
     ax.set_title(title, size=7)
     # Text box
     s = ''.join((r'$F_{|\psi\rangle}='+fr'{Fid*100:.1f}\%$', '\n',
-                 r'$\mathrm{arg}(\rho_{0,15})='+fr'{angle:.1f}^\circ$', '\n',
+                 r'$\mathrm{arg}(\rho_{0,'+f'{n-1}'+'})='+fr'{angle:.1f}^\circ$', '\n',
                  r'$P_\mathrm{ps}='+fr'{Ps_frac*100:.1f}\%$', '\n',
                  f'# shots per Pauli {nr_shots}'))
     props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=1)
@@ -704,91 +850,21 @@ def plot_calibration(qubits, p0, p1, thresholds,
         ax[i].set_yticks([])
     fig.tight_layout()
 
-def plot_function(P0, P1, P, E1, E2, M1, M2,
-                  Disturbances_ovd_single, r_single,
-                  Disturbances_ovd_double, r_double,
-                  timestamp,
-                  ax, **kw):
+def plot_repeatabilityfn(M1, M2, repeatability, P_dist,
+                         ancilla, data_qubits,
+                         ax, **kw):
     fig = ax[0].get_figure()
-    # Calibration 0
-    ax[0].set_title(r'Reference $|0000\rangle$')
-    ax[0].axhline(1., color='black', alpha=.5, linestyle='--')
-    ax[0].bar(np.arange(0,16), [P0[k] for k in P0.keys()], color='C0')
-    ax[0].set_ylim(0, 1.05)
-    ax[0].set_xticks([0,5,10,15])
-    ax[0].set_yticks([0, .5, 1])
-    ax[0].set_xticklabels(['{:04b}'.format(5*i) for i in range(4)], rotation=45, fontsize=8)
-    ax[0].set_yticklabels([0, 0.5, 1])
-    ax[0].set_ylabel('Fraction')
-    # Calibration 1
-    ax[1].set_title(r'Reference $|1111\rangle$')
-    ax[1].axhline(1., color='black', alpha=.5, linestyle='--')
-    ax[1].bar(np.arange(0,16), [P1[k] for k in P1.keys()], color='C0')
-    ax[1].set_ylim(0, 1.05)
-    ax[1].set_xticks([0,5,10,15])
-    ax[1].set_yticks([0, .5, 1])
-    ax[1].set_xticklabels(['{:04b}'.format(5*i) for i in range(4)], rotation=45, fontsize=8)
-    ax[1].set_yticklabels(['', '', ''])
-    # Single parity
-    ax[2].set_title('Single parity check')
-    ax[2].axhline(.5, color='black', alpha=.5, linestyle='--')
-    ax[2].bar(np.arange(0,16), [P[k] for k in P.keys()], color='C0', alpha=.25, label='calibration')
-    ax[2].bar(np.arange(0,16), [E1[k] for k in E1.keys()], color='C0', label='parity check')
-    ax[2].set_ylim(0, .525)
-    ax[2].set_yticks([0, .25, .5])
-    ax[2].set_xticks(np.arange(0,16))
-    ax[2].set_xticklabels(['{:04b}'.format(i) for i in range(16)], rotation=45, fontsize=8)
-    ax[2].set_yticklabels([0, 0.25, 0.5])
-    ax[2].set_xlabel('measured state')
-    ax[2].set_ylabel('Fraction')
-    ax[2].legend(bbox_to_anchor=(1.025, 1), loc='upper left')
-    # Repeated parity
-    ax[3].set_title('Repeated parity check')
-    ax[3].axhline(.5, color='black', alpha=.5, linestyle='--')
-    ax[3].bar(np.arange(0,16), [P[k] for k in P.keys()], color='C0', alpha=.25, label='calibration')
-    ax[3].bar(np.arange(0,16), [E1[k] for k in E1.keys()], color='C1', label='single parity check')
-    ax[3].bar(np.arange(0,16), [E2[k] for k in E2.keys()], color='C0', label='double parity check')
-    ax[3].set_ylim(0, .525)
-    ax[3].set_yticks([0, .25, .5])
-    ax[3].set_xticks(np.arange(0,16))
-    ax[3].set_xticklabels(['{:04b}'.format(i) for i in range(16)], rotation=45, fontsize=8)
-    ax[3].set_yticklabels([0, 0.25, 0.5])
-    ax[3].set_xlabel('measured state')
-    ax[3].set_ylabel('Fraction')
-    ax[3].legend(bbox_to_anchor=(1.025, 1), loc='upper left', fontsize=6)
-    # Parity outcome results
-    ax[4].set_title('Parity results')
-    ax[4].axhline(1, color='black', alpha=.5, linestyle='--')
-    ax[4].axhline(-1, color='black', alpha=.5, linestyle='--')
-    ax[4].bar([1, 2], [1-M1*2, 1-M2*2])
-    ax[4].set_ylim(-1.1, 1.1)
-    ax[4].set_xticks([1,2])
-    ax[4].set_xticklabels([r'$\langle m_1\rangle$', r'$\langle m_2\rangle$'])
-    textstr1 = '\n'.join(('',
-                          '$D_1^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[0][0], Disturbances_ovd_single[0][1]),
-                          '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[1][0], Disturbances_ovd_single[1][1]),
-                          '$\Delta^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[2][0]+Disturbances_ovd_single[3][0], Disturbances_ovd_single[2][1]+Disturbances_ovd_single[3][1]),
-                          '$r$  =  %f' % (r_single)))
-    
-    textstr2 = '\n'.join(('Repeatability  =  %.1f%%' % ((1-M2)*100),
-                          '$D_1^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[0][0], Disturbances_ovd_double[0][1]),
-                          '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[1][0], Disturbances_ovd_double[1][1]),
-                          '$\Delta^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[2][0]+Disturbances_ovd_double[3][0], Disturbances_ovd_double[2][1]+Disturbances_ovd_double[3][1]),
-                          '$r$  =  %f' % (r_double)))
+    ax[0].bar([r'$\langle M_1\rangle$', r'$\langle M_2\rangle$'], [M1, M2])
+    ax[0].set_ylim(-1.05, 1.05)
+    ax[0].set_yticks([-1, -.5, 0, .5, 1])
+    ax[0].set_yticklabels(['-1', '', '0', '', '1'])
+    ax[0].set_title(f'{ancilla} measurement results')
+    ax[0].text(-.4, -.9, f'Repeatability : {repeatability*100:.1f}%')
 
-    props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
-    fig.tight_layout()
-    ax[4].text(1.08, 1.25, 'Single parity', transform=ax[4].transAxes, fontsize=12,
-            verticalalignment='top')
-    ax[4].text(1.1, 0.95, textstr1, transform=ax[4].transAxes, fontsize=10,
-            verticalalignment='top', bbox=props)
-
-    ax[4].text(2.25, 1.25, 'Repeated parity', transform=ax[4].transAxes, fontsize=12,
-            verticalalignment='top')
-    ax[4].text(2.27, 0.95, textstr2, transform=ax[4].transAxes, fontsize=10,
-            verticalalignment='top', bbox=props)
-
-    fig.suptitle(f'Sandia parity benchmark {timestamp}', y=1.01, x=.43)
-
-
-
+    states = ['0', '1']
+    n = len(data_qubits)
+    combs = np.array([''.join(s) for s in itertools.product(states, repeat=n)])
+    idx_sort = np.argsort([ s.count('1') for s in combs ])
+    ax[1].bar(combs[idx_sort], P_dist[idx_sort])
+    ax[1].set_xticklabels(combs[idx_sort], rotation=90)
+    ax[1].set_title(f'{" ".join(data_qubits)} measurement probability')
