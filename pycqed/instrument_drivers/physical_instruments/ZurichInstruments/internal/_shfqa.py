@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
-import zhinst.deviceutils.shfqa as shfqa_utils
+import zhinst.utils.shfqa as shfqa_utils
 from zhinst.utils import wait_for_state_change
 
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument import (

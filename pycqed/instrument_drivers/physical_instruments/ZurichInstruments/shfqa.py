@@ -31,7 +31,7 @@ from pycqed.instrument_drivers.library.DIO import CalInterface
 from qcodes.utils import validators
 from qcodes.utils.helpers import full_class
 
-import zhinst.deviceutils.shfqa as shfqa_utils
+import zhinst.utils.shfqa as shfqa_utils
 from zhinst.utils import wait_for_state_change
 
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.internal._shfqa import (
