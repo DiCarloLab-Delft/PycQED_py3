@@ -671,14 +671,13 @@ class DAC_analysis(ma.TwoD_Analysis):
                            obtained by -b/2a (parabola = ax^2 + bx +c)
     """
 
-    def __init__(self, timestamp,
+    def __init__(self,
                  options_dict=None,
                  do_fitting=True,
                  extract_only=False,
                  auto=True,
                  **kw):
-        super(ma.TwoD_Analysis, self).__init__(timestamp=timestamp,
-                                               options_dict=options_dict,
+        super(ma.TwoD_Analysis, self).__init__(options_dict=options_dict,
                                                extract_only=extract_only,
                                                auto=auto,
                                                do_fitting=do_fitting,
@@ -710,7 +709,7 @@ class DAC_analysis(ma.TwoD_Analysis):
         """
         frequency_guess = kw.get('frequency_guess', None)
         percentile = kw.get('percentile', 20)
-        num_sigma_threshold = kw.get('num_sigma_threshold', 5)
+        num_sigma_threshold = kw.get('num_sigma_threshold', 4)
         window_len_filter = kw.get('window_len_filter', 3)
         optimize = kw.pop('optimize', True)
         verbose = kw.get('verbose', False)

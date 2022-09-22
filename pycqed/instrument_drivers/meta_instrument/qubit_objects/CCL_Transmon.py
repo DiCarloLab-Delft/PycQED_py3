@@ -201,7 +201,7 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('ro_acq_weight_type',
                            initial_value='SSB',
                            vals=vals.Enum(
-                               'SSB', 'DSB', 'optimal', 'optimal IQ'),
+                               'SSB', 'DSB', 'optimal', 'optimal IQ', 'optimal IQ2'),
                            docstring=ro_acq_docstr,
                            parameter_class=ManualParameter)
 
@@ -221,6 +221,15 @@ class CCLight_Transmon(Qubit):
                            label='Optimized weights for I channel',
                            parameter_class=ManualParameter)
         self.add_parameter('ro_acq_weight_func_Q',
+                           vals=vals.Arrays(),
+                           label='Optimized weights for Q channel',
+                           parameter_class=ManualParameter)
+        # Additional weight functions for readout of 2 state
+        self.add_parameter('ro_acq_weight_func_I_2',
+                           vals=vals.Arrays(),
+                           label='Optimized weights for I channel',
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_weight_func_Q_2',
                            vals=vals.Arrays(),
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
@@ -774,27 +783,6 @@ class CCLight_Transmon(Qubit):
                            label='Resonator dispersive shift', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
-
-        self.add_parameter('F_ssro',
-                           initial_value=0,
-                           label='Single shot readout assignment fidelity',
-                           vals=vals.Numbers(0.0, 1.0),
-                           parameter_class=ManualParameter)
-        self.add_parameter('F_discr',
-                           initial_value=0,
-                           label='Single shot readout discrimination fidelity',
-                           vals=vals.Numbers(0.0, 1.0),
-                           parameter_class=ManualParameter)
-        self.add_parameter('ro_rel_events',
-                           initial_value=0,
-                           label='relaxation errors from ssro fit',
-                           vals=vals.Numbers(0.0, 1.0),
-                           parameter_class=ManualParameter)
-        self.add_parameter('ro_res_ext',
-                           initial_value=0,
-                           label='residual extiction errors from ssro fit',
-                           vals=vals.Numbers(0.0, 1.0),
-                           parameter_class=ManualParameter)
         self.add_parameter('F_RB',
                            initial_value=0,
                            label='RB single qubit Clifford fidelity',
@@ -873,7 +861,8 @@ class CCLight_Transmon(Qubit):
         if 'optimal' in self.ro_acq_weight_type():
             if self.ro_acq_weight_type() == 'optimal':
                 ro_channels = [self.ro_acq_weight_chI()]
-            elif self.ro_acq_weight_type() == 'optimal IQ':
+            elif (self.ro_acq_weight_type() == 'optimal IQ') or \
+                 (self.ro_acq_weight_type() == 'optimal IQ2'):
                 ro_channels = [
                     self.ro_acq_weight_chI(), self.ro_acq_weight_chQ()]
             result_logging_mode = 'lin_trans'
@@ -1171,6 +1160,16 @@ class CCLight_Transmon(Qubit):
                             self.ro_acq_weight_chQ()), opt_WI)
                         UHFQC.set('qas_0_rotations_{}'.format(
                             self.ro_acq_weight_chQ()), 1.0 + 1.0j)
+                    elif self.ro_acq_weight_type() == 'optimal IQ2':
+                        print('setting the optimal Q')
+                        opt_WI2 = self.ro_acq_weight_func_I_2()
+                        opt_WQ2 = self.ro_acq_weight_func_Q_2()
+                        UHFQC.set('qas_0_integration_weights_{}_real'.format(
+                            self.ro_acq_weight_chQ()), opt_WI2)
+                        UHFQC.set('qas_0_integration_weights_{}_imag'.format(
+                            self.ro_acq_weight_chQ()), opt_WQ2)
+                        UHFQC.set('qas_0_rotations_{}'.format(
+                            self.ro_acq_weight_chQ()), 1.0 - 1.0j)
 
         else:
             raise NotImplementedError(
@@ -2599,12 +2598,12 @@ class CCLight_Transmon(Qubit):
     def calibrate_optimal_weights(
             self, 
             MC=None, 
+            f_state: bool = False,
             verify: bool = True,
             analyze: bool = True, 
             update: bool = True,
             no_figs: bool = False,
             optimal_IQ: bool = False,
-            measure_transients_CCL_switched: bool = False,
             prepare: bool = True,
             disable_metadata: bool = False,
             nr_shots_per_case: int = 2**13,
@@ -2642,18 +2641,18 @@ class CCLight_Transmon(Qubit):
         if prepare:
             self.prepare_for_timedomain()
 
-        if measure_transients_CCL_switched:
-            transients = self.measure_transients_CCL_switched(
-                MC=MC,
-                analyze=analyze,
-                depletion_analysis=False)
+        if f_state:
+            cases = ['off', 'on', 'two']
         else:
-            transients = self.measure_transients(
-                MC=MC, 
-                analyze=analyze,
-                depletion_analysis=False,
-                prepare=False,
-                disable_metadata=disable_metadata)
+            cases = ['off', 'on']
+        transients = self.measure_transients(
+            MC=MC, 
+            analyze=analyze,
+            cases=cases,
+            depletion_analysis=False,
+            prepare=False,
+            disable_metadata=disable_metadata)
+
         if analyze:
             # Old analysis
             # ma.Input_average_analysis(IF=self.ro_freq_mod())
@@ -2664,20 +2663,32 @@ class CCLight_Transmon(Qubit):
                                fp_off.split('\\')[-1].split('_')[0]])
             ts_on = '_'.join([fp_on.split('\\')[-2],
                               fp_on.split('\\')[-1].split('_')[0]])
+            # Get input readout waveform
             ro_lm = self.instr_LutMan_RO.get_instr()
             pulse_id = ro_lm.pulse_type()+f'_R{self.cfg_qubit_nr()}'
             ro_waveform = ro_lm._wave_dict[pulse_id]
-            a = ma2.ra.Optimal_integration_weights_analysis(
-                t_start=ts_off, t_stop=ts_on,
-                IF=self.ro_freq_mod(), input_waveform=ro_waveform)
-
+            if f_state:
+                fp_two = ma.a_tools.latest_data(f'transients_{self.name}_2')
+                ts_two = '_'.join([fp_two.split('\\')[-2],
+                                   fp_two.split('\\')[-1].split('_')[0]])
+                a = ma2.ra.Optimal_integration_weights_analysis(
+                    t_start=ts_off, t_stop=ts_two,
+                    IF=self.ro_freq_mod(), input_waveform=ro_waveform)
+            else:
+                a = ma2.ra.Optimal_integration_weights_analysis(
+                    t_start=ts_off, t_stop=ts_on,
+                    IF=self.ro_freq_mod(), input_waveform=ro_waveform)
+                
         self.ro_acq_averages(old_avg)
 
         if update:
             assert analyze == True
             self.ro_acq_weight_func_I(np.array(a.qoi['Weights_I_s']))
             self.ro_acq_weight_func_Q(np.array(a.qoi['Weights_Q_s']))
-            if optimal_IQ:
+            if f_state:
+                self.ro_acq_weight_func_I_2(np.array(a.qoi['Weights_I_ef_s']))
+                self.ro_acq_weight_func_Q_2(np.array(a.qoi['Weights_Q_ef_s']))
+            if optimal_IQ or f_state:
                 self.ro_acq_weight_type('optimal IQ')
             else:
                 self.ro_acq_weight_type('optimal')
@@ -2685,13 +2696,13 @@ class CCLight_Transmon(Qubit):
                 self._prep_ro_integration_weights()
                 self._prep_ro_instantiate_detectors()
                 ssro_dict = self.measure_ssro(
-                    no_figs=no_figs, 
+                    f_state=f_state,
+                    no_figs=no_figs,
                     update=update,
                     prepare=True, 
                     disable_metadata=disable_metadata,
                     nr_shots_per_case=nr_shots_per_case,
-                    post_select=post_select,
-                    post_select_threshold=post_select_threshold)
+                    post_select=post_select)
                 return ssro_dict
         if verify:
             log.warning('Not verifying as settings were not updated.')
@@ -2922,7 +2933,8 @@ class CCLight_Transmon(Qubit):
                                          nested_resonator_calibration=False,
                                          nested_resonator_calibration_use_min=False,
                                          resonator_freqs=None,
-                                         trigger_idx= None):
+                                         trigger_idx= None,
+                                         update=True):
         """
         Performs the qubit spectroscopy while changing the current applied
         to the flux bias line.
@@ -3036,8 +3048,12 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Qubit_dac_scan'+self.msmt_suffix, mode='2D')
         if analyze:
-            return ma.TwoD_Analysis(label='Qubit_dac_scan',
-                                    close_fig=close_fig)
+            ma.TwoD_Analysis(label='Qubit_dac_scan',
+                             close_fig=close_fig)
+            a = ma2.da.DAC_analysis()
+            if update:
+                self.fl_dc_I0(a.dac_fit_res['sweetspot_dac'])
+                fluxcontrol.set(self.fl_dc_ch(), self.fl_dc_I0())
 
     def measure_spectroscopy(self, freqs, mode='pulsed_marked', MC=None,
                              analyze=True, close_fig=True, label='',
@@ -3457,10 +3473,11 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def measure_anharmonicity(self, freqs_01=None, freqs_12=None, f_01_power=None,
-                              f_12_power=None,
-                              MC=None, spec_source_2=None,
-                              mode='pulsed_marked',step_size:int= 1e6):
+    def measure_anharmonicity(self, 
+        freqs_01=None, freqs_12=None,
+        f_01_power=None, f_12_power=None,
+        MC=None, spec_source_2=None,
+        mode='pulsed_marked',step_size:int= 1e6):
         """
         Measures the qubit spectroscopy as a function of frequency of the two
         driving tones. The qubit transitions are observed when frequency of one
@@ -3718,21 +3735,14 @@ class CCLight_Transmon(Qubit):
     def measure_ssro(
             self, 
             MC=None,
-            nr_shots_per_case: int = 2**13,  # 8192
-            cases=('off', 'on'),
+            f_state: bool = False,
             prepare: bool = True, 
             no_figs: bool = False,
             post_select: bool = False,
-            post_select_threshold: float = None,
-            nr_flux_after_init: float=None,
-            cross_driving_qubit: int=None,
-            mw_train_pulse: int=None,
-            flux_cw_after_init: Union[str, List[str]]=None,
-            fluxed_qubit: str=None,
-            wait_time_after_flux: float=0,
             update: bool = True,
+            nr_shots_per_case: int = 2**13,
+            post_select_threshold: float = None,
             SNR_detector: bool = False,
-            shots_per_meas: int = 2**16,
             vary_residual_excitation: bool = True,
             disable_metadata: bool = False, 
             label: str = ''
@@ -3748,13 +3758,6 @@ class CCLight_Transmon(Qubit):
             nr_shots_per_case (int):
                 total number of measurements in qubit ground and excited state
 
-            cases:
-                currently unused
-
-            update_threshold (bool):
-                indicating whether to update a threshold according
-                to which the shot is classified as ground or excited state.
-
             prepare (bool):
                 should the prepare_for_timedomain be executed?
 
@@ -3765,46 +3768,35 @@ class CCLight_Transmon(Qubit):
             shots_per_meas (int):
                 number of single shot measurements per single
                 acquisition with UHFQC
-
-            vary_residual_excitation (bool):
-                if False, uses the last known values of residual excitation
-                and measurement induced relaxation and keeps these fixed.
             ...
         """
-
         # off and on, not including post selection init measurements yet
         nr_shots = 2 * nr_shots_per_case
-
+        if f_state:
+            nr_shots += nr_shots_per_case
+        if post_select:
+            nr_shots *= 2
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
-
         if MC is None:
             MC = self.instr_MC.get_instr()
-
         # plotting really slows down SSRO (16k shots plotting is slow)
         old_plot_setting = MC.live_plot_enabled()
         MC.live_plot_enabled(False)
         if prepare:
             self.prepare_for_timedomain()
-
-        # This snippet causes 0.08 s of overhead but is dangerous to bypass
+        pulse_comb = 'off_on'
+        if f_state:
+            pulse_comb += '_two'
         p = sqo.off_on(
-            qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
-            nr_flux_after_init=nr_flux_after_init,
-            mw_train_pulse=mw_train_pulse,
-            cross_driving_qubit=cross_driving_qubit,
-            flux_cw_after_init=flux_cw_after_init, 
-            wait_time_after_flux=wait_time_after_flux, 
-            fluxed_qubit_idx=self.find_instrument(fluxed_qubit).cfg_qubit_nr() \
-                                if fluxed_qubit else None,
+            qubit_idx=self.cfg_qubit_nr(),
+            pulse_comb=pulse_comb,
             initialize=post_select,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
-
         # digitization setting is reset here but the detector still uses
         # the disabled setting that was set above
         self.ro_acq_digitized(old_RO_digit)
-
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Shot', unit='#',
@@ -3813,55 +3805,39 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
-        d.nr_shots = np.min([shots_per_meas, nr_shots])
+        d.nr_shots = nr_shots
         MC.set_detector_function(d)
-
         MC.run('SSRO_{}{}'.format(label, self.msmt_suffix),
                disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(old_plot_setting)
 
-        ######################################################################
-        # SSRO Analysis
-        ######################################################################
-        if post_select_threshold == None:
-            post_select_threshold = self.ro_acq_threshold()
-
-        options_dict = {'post_select': post_select,
-                        'nr_samples': 2+2*post_select,
-                        'post_select_threshold': post_select_threshold,
-                        'predict_qubit_temp': True,
-                        'qubit_freq': self.freq_qubit()}
-        if not vary_residual_excitation:
-            options_dict.update(
-                {'fixed_p10': self.res_exc,
-                 'fixed_p01': self.mmt_rel})
-
         a = ma2.ra.Singleshot_Readout_Analysis(
-            options_dict=options_dict,
+            qubit=self.name,
+            qubit_freq=self.freq_qubit(),
+            heralded_init=post_select,
+            f_state=f_state,
             extract_only=no_figs)
-
+        ####################################
+        # SSRO Analysis (Old and deprecated)
+        ####################################
+        # post_select_threshold = self.ro_acq_threshold()
+        # options_dict = {'post_select': post_select,
+        #                 'nr_samples': 2+2*post_select,
+        #                 'post_select_threshold': post_select_threshold,
+        #                 'predict_qubit_temp': True,
+        #                 'qubit_freq': self.freq_qubit()}
+        # if not vary_residual_excitation:
+        #     options_dict.update(
+        #         {'fixed_p10': self.res_exc,
+        #          'fixed_p01': self.mmt_rel})
+        # a = ma2.ra.Singleshot_Readout_Analysis_old(
+        #     options_dict=options_dict,
+        #     extract_only=no_figs)
         ######################################################################
         # Update parameters in the qubit object based on the analysis
         ######################################################################
         if update:
-            self.res_exc = a.proc_data_dict['quantities_of_interest']['residual_excitation']
-            self.mmt_rel = a.proc_data_dict['quantities_of_interest']['relaxation_events']
-            # UHFQC threshold is wrong, the magic number is a
-            #  dirty hack. This works. we don't know why.
-            magic_scale_factor = 1  # 0.655
-            self.ro_acq_threshold(
-                a.proc_data_dict['threshold_raw'] *
-                magic_scale_factor)
-
-            self.F_ssro(a.proc_data_dict['F_assignment_raw'])
-            self.F_discr(a.proc_data_dict['F_discr'])
-            self.ro_rel_events(
-                a.proc_data_dict['quantities_of_interest']['relaxation_events'])
-            self.ro_res_ext(
-                a.proc_data_dict['quantities_of_interest']['residual_excitation'])
-
-            log.warning("FIXME rotation angle could not be set")
-            # self.ro_acq_rotated_SSB_rotation_angle(a.theta)
+            self.ro_acq_threshold(a.proc_data_dict['threshold_raw'])
 
         return {'SNR': a.qoi['SNR'],
                 'F_d': a.qoi['F_d'],
@@ -3992,23 +3968,16 @@ class CCLight_Transmon(Qubit):
 
         if prepare:
             self.prepare_for_timedomain()
-        # off/on switching is achieved by turning the MW source on and
-        # off as this is much faster than recompiling/uploading
-        p = sqo.off_on(
-            qubit_idx=self.cfg_qubit_nr(), 
-            pulse_comb='on',
-            initialize=False,
-            platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().eqasm_program(p.filename)
-        # else:
-        #     p = None  # object needs to exist for the openql_sweep to work
 
         transients = []
         for i, pulse_comb in enumerate(cases):
-            if 'off' in pulse_comb.lower():
-                self.instr_LO_mw.get_instr().off()
-            elif 'on' in pulse_comb.lower():
-                self.instr_LO_mw.get_instr().on()
+            if pulse_comb.lower() in ['off', 'on', 'two']:
+                p = sqo.off_on(
+                    qubit_idx=self.cfg_qubit_nr(), 
+                    pulse_comb=pulse_comb,
+                    initialize=False,
+                    platf_cfg=self.cfg_openql_platform_fn())
+                self.instr_CC.get_instr().eqasm_program(p.filename)
             else:
                 raise ValueError(f"pulse_comb {pulse_comb} not understood: Only 'on' and 'off' allowed.")
 
@@ -4051,7 +4020,7 @@ class CCLight_Transmon(Qubit):
             nr_max_acq: int = 2**17,
             disable_metadata: bool = False,
             no_figs: bool = False,
-            use_rx12: bool = False
+            f_state: bool = False
             ):
         # ensure readout settings are correct
         assert self.ro_acq_weight_type() != 'optimal'
@@ -4065,7 +4034,7 @@ class CCLight_Transmon(Qubit):
                 disable_metadata=True)
 
         if prepare_for_timedomain:
-            if use_rx12:
+            if f_state:
                 mw_lm = self.instr_LutMan_MW.get_instr()
                 LM = mw_lm.LutMap()
                 LM[9] = {'name': 'rX12', 'theta': 180, 'phi': 0, 'type': 'ef'}
@@ -4082,7 +4051,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.RO_QND_sequence(
             q_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn(),
-            use_rx12=use_rx12
+            f_state=f_state
         )
         s = swf.OpenQL_Sweep(
             openql_program=p,
@@ -4098,8 +4067,9 @@ class CCLight_Transmon(Qubit):
             f"RO_QND_measurement_{self.name}",
             disable_snapshot_metadata=disable_metadata
         )
-        a = ma2.mra.measurement_QND_analysis(
+        a = ma2.ra.measurement_QND_analysis(
             qubit=self.name,
+            f_state=f_state,
             label='QND',
             extract_only=no_figs)
         return a.qoi
@@ -4211,6 +4181,7 @@ class CCLight_Transmon(Qubit):
     def measure_dispersive_shift_pulsed(
         self, 
         freqs=None,
+        cases=['off', 'on'],
         analyze: bool = True,
         prepare: bool = True):
         """
@@ -4246,7 +4217,7 @@ class CCLight_Transmon(Qubit):
         # off/on switching is achieved by turning the MW source on and
         # off as this is much faster than recompiling/uploading
         f_res = []
-        for i, pulse_comb in enumerate(['off', 'on']):
+        for i, pulse_comb in enumerate(cases):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
                 initialize=False,
@@ -4387,7 +4358,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
             initialize=False,
-            cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
+            # cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
@@ -4491,7 +4462,7 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
         MC.run('Depletion_AllXY'+self.msmt_suffix+label,
                disable_snapshot_metadata=disable_metadata)
-        ma2.mra.Depletion_AllXY_analysis(self.name, label='Depletion')
+        ma2.ra.Depletion_AllXY_analysis(self.name, label='Depletion')
 
     def calibrate_mw_gates_restless(
             self, MC=None,
@@ -5179,6 +5150,7 @@ class CCLight_Transmon(Qubit):
             double_fit=False,
             test_beating=True,
             close_fig=True,
+            disable_metadata=False,
         ):
         """
         # docstring from parent class
@@ -5249,7 +5221,8 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Ramsey'+label+self.msmt_suffix)
+        MC.run('Ramsey'+label+self.msmt_suffix,
+               disable_snapshot_metadata=disable_metadata)
 
         # Restore old frequency value
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)

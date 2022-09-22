@@ -240,6 +240,7 @@ class Base_MW_LutMan(Base_LutMan):
         # defined here so that the VSM based LutMan can overwrite this
         self.wf_func = wf.mod_gauss
         self.spec_func = wf.block_pulse
+        self.lru_func = wf.mod_lru_pulse
 
         self._add_channel_params()
         self._add_mixer_corr_pars()
@@ -299,6 +300,23 @@ class Base_MW_LutMan(Base_LutMan):
                                'Pulse amplitude for pulsing the ef/12 transition'),
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter, initial_value=.2)
+        # Parameters for leakage reduction unit pulse.
+        self.add_parameter('mw_lru_modulation', unit='Hz',
+                           docstring=('Modulation frequency for LRU pulse.'),
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter, initial_value=0.0e6)
+        self.add_parameter('mw_lru_amplitude', unit='frac',
+                           docstring=('amplitude for LRU pulse.'),
+                           vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter, initial_value=.8)
+        self.add_parameter('mw_lru_duration',  unit='s',
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=300e-9)
+        self.add_parameter('mw_lru_rise_duration',  unit='s',
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=30e-9)
 
     def generate_standard_waveforms(
             self, apply_predistortion_matrix: bool=True):
@@ -375,6 +393,15 @@ class Base_MW_LutMan(Base_LutMan):
                         phase=0, motzoi=0, sampling_rate=self.sampling_rate())
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
+
+            elif waveform['type'] == 'lru':
+                self._wave_dict[idx] = self.lru_func(
+                    t_total = self.mw_lru_duration(), 
+                    t_rise = self.mw_lru_rise_duration(), 
+                    f_modulation = f_modulation,
+                    amplitude = self.mw_lru_amplitude(),
+                    sampling_rate = self.sampling_rate())
+
             elif waveform['type'] == 'phase':
                 pass
             else:
@@ -734,7 +761,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         for step in np.arange(1,9):
             self.parameters[f'vcz_virtual_q_ph_corr_park_step_{step}'](0)
 
-
     def _set_channel_range(self, val):
         awg_nr = (self.channel_I()-1)//2
         assert awg_nr == (self.channel_Q()-1)//2
@@ -750,7 +776,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             AWG.set('sigouts_{}_range'.format(self.channel_I()-1), val)
             AWG.set('sigouts_{}_direct'.format(self.channel_Q()-1), 0)
             AWG.set('sigouts_{}_range'.format(self.channel_Q()-1), val)
-
 
     def _get_channel_range(self):
         awg_nr = (self.channel_I()-1)//2
@@ -1002,6 +1027,15 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     sampling_rate=self.sampling_rate(),
                     length=self.mw_gauss_width()*4,
                     )
+
+            elif waveform['type'] == 'lru':
+                self._wave_dict[idx] = self.lru_func(
+                    t_total = self.mw_lru_duration(), 
+                    t_rise = self.mw_lru_rise_duration(), 
+                    f_modulation = f_modulation,
+                    amplitude = self.mw_lru_amplitude(),
+                    sampling_rate = self.sampling_rate())
+            
             else:
                 raise ValueError
 
@@ -1194,6 +1228,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             vals.append(self.channel_amp_value)
 
         return vals[0]
+
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 

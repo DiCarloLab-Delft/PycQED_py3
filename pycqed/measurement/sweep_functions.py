@@ -1105,6 +1105,7 @@ class Nested_resonator_tracker(Soft_Sweep):
             freqs=self.freqs,
             MC=self.nested_MC, use_min=self.use_min)
         self.qubit._prep_ro_sources()
+        self.qubit.prepare_for_continuous_wave()
         if self.reload_marked_sequence:
             # reload the meaningfull sequence
             self.cc.stop()

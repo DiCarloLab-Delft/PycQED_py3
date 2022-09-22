@@ -329,3 +329,29 @@ def mod_square_VSM(amp_G, amp_D, length, f_modulation,
     D_I_mod, D_Q_mod = mod_pulse(D_I, D_Q, f_modulation,
                                  sampling_rate=sampling_rate)
     return G_I_mod, G_Q_mod, D_I_mod, D_Q_mod
+
+
+def mod_lru_pulse(t_total, t_rise, 
+                  f_modulation, amplitude,
+                  sampling_rate = 2.4e9):
+    '''
+    Leakage reduction unit waveform.
+    '''
+    # Nr of sampling points alocated for each
+    # part of the pulse.
+    n_total = int(t_total*sampling_rate )
+    n_rise = int(t_rise*sampling_rate)
+    # Rise part of waveform
+    _x_rise = np.arange(n_rise)
+    _rise_wf = amplitude*np.sin(np.pi*_x_rise/(2*t_rise*sampling_rate))**2
+    # Middle part of waveform
+    _x_mid = np.arange(n_total-2*n_rise)
+    _mid_wf = amplitude*np.ones(len(_x_mid))
+    # Concatenate waveforms together
+    _x = np.arange(n_total)
+    _wf_I = np.concatenate([_rise_wf, _mid_wf, _rise_wf[::-1]])
+    _wf_Q = np.zeros(n_total)
+    # _wf_mod = _wf*np.sin(2*np.pi*frequency*_x/sampling_rate)
+    wf_I_mod, wf_Q_mod = mod_pulse(_wf_I, _wf_Q, f_modulation,
+                                   sampling_rate=sampling_rate)
+    return wf_I_mod, wf_Q_mod

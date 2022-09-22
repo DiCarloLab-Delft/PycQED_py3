@@ -1178,7 +1178,8 @@ class Qubit(Instrument):
                        update=True,
                        close_fig=True,
                        MC=None,
-                       label = ''):
+                       label = '',
+                       disable_metadata=False):
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
         method.
@@ -1268,7 +1269,8 @@ class Qubit(Instrument):
             return self.calibrate_frequency_ramsey(
                 steps=steps, artificial_periods=artificial_periods,
                 verbose=verbose, update=update,
-                close_fig=close_fig)
+                close_fig=close_fig,
+                disable_metadata=disable_metadata)
         return analysis_spec.fitted_freq
 
     def calibrate_spec_pow(self, freqs=None, start_power=-55, power_step = 5,
@@ -1344,7 +1346,8 @@ class Qubit(Instrument):
                                    stepsize:float =20e-9,
                                    verbose: bool=True, update: bool=True,
                                    close_fig: bool=True,
-                                   test_beating: bool=True):
+                                   test_beating: bool=True,
+                                   disable_metadata=False):
         """
         Runs an iterative procudere of ramsey experiments to estimate
         frequency detuning to converge to the qubit frequency up to the limit
@@ -1372,7 +1375,8 @@ class Qubit(Instrument):
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
                                 analyze=False,
-                                prepare_for_timedomain=True if 0 == i else False)
+                                prepare_for_timedomain=True if 0 == i else False,
+                                disable_metadata=disable_metadata)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,

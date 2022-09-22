@@ -781,9 +781,7 @@ class DeviceCCL(Instrument):
             resonator_combs = [resonators_in_lm[ro_lm.name]]
             log.info('Setting resonator combinations for {} to {}'.format(
                 ro_lm.name, resonator_combs))
-
-            # FIXME: temporary fix so device object doesnt mess with
-            #       the resonator combinations. Better strategy should be implemented
+            ro_lm.acquisition_delay(self.ro_acq_delay())
             ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 

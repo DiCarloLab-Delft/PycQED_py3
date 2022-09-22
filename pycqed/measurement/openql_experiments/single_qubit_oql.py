@@ -916,13 +916,7 @@ def off_on(
         qubit_idx: int,
         pulse_comb: str, 
         initialize: bool, 
-        platf_cfg: str,
-        nr_flux_after_init: float=None,
-        flux_cw_after_init: Union[str, List[str]]=None,
-        fluxed_qubit_idx: int=None,
-        wait_time_after_flux: float=0,
-        cross_driving_qubit: int=None,
-        mw_train_pulse: int=None,
+        platf_cfg: str
         ):
 
     """
@@ -948,24 +942,6 @@ def off_on(
         k.prepz(qubit_idx)
         if initialize:
             k.measure(qubit_idx)
-
-        if nr_flux_after_init and flux_cw_after_init:
-            if fluxed_qubit_idx is None:
-                fluxed_qubit_idx = qubit_idx
-            for i in range(int(nr_flux_after_init)):
-                if type(flux_cw_after_init) == list:
-                    for cw in flux_cw_after_init:
-                        k.gate(cw, [0])
-                else:
-                    k.gate(flux_cw_after_init, [fluxed_qubit_idx]) 
-            k.gate("wait", [], wait_time_after_flux) 
-
-        if mw_train_pulse:
-             for i in range(int(mw_train_pulse)):
-                k.gate('rx180', [qubit_idx])
-                k.gate('cw_27', [qubit_idx])
-        k.gate("wait", [])
-
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -974,46 +950,17 @@ def off_on(
         k.prepz(qubit_idx)
         if initialize:
             k.measure(qubit_idx)
-
-        if nr_flux_after_init and flux_cw_after_init:
-            if fluxed_qubit_idx is None:
-                fluxed_qubit_idx = qubit_idx
-            for i in range(int(nr_flux_after_init)):
-                if type(flux_cw_after_init) == list:
-                    for cw in flux_cw_after_init:
-                        k.gate(cw, [0])
-                else:
-                    k.gate(flux_cw_after_init, [fluxed_qubit_idx]) 
-            k.gate("wait", [], wait_time_after_flux) 
-
-        
-        if mw_train_pulse:
-             for i in range(int(mw_train_pulse)):
-                k.gate('rx180', [qubit_idx])
-                k.gate('cw_27', [qubit_idx])
-        k.gate("wait", [])
-
-
-        # k.gate('rx180', [qubit_idx])
-        if cross_driving_qubit is not None:
-            k.gate('rx180', [cross_driving_qubit])
-            k.gate("i", [qubit_idx])
-            k.gate("wait", [])
-        else: 
-            k.gate('rx180', [qubit_idx])
-
-        k.gate("wait", [])
-
+        k.gate('rx180', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
 
     if 'two' in pulse_comb.lower():
         k = p.create_kernel("two")
         k.prepz(qubit_idx)
+        if initialize:
+            k.measure(qubit_idx)
         k.gate('rx180', [qubit_idx])
         k.gate('rx12', [qubit_idx])
-        k.gate("wait", [])
-
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -1025,40 +972,40 @@ def off_on(
 
 def RO_QND_sequence(q_idx,
                     platf_cfg: str,
-                    use_rx12: bool = False):
+                    f_state: bool = False):
     '''
     RO QND sequence.
     '''
 
     p = OqlProgram("RO_QND_sequence", platf_cfg)
 
-    def add_measure(k, idx, rx12):
-        if rx12:
-            k.gate('rx12', [q_idx])
-            k.measure(idx)
-            k.gate('rx12', [q_idx])
-        else:
-            k.measure(idx)
-
     k = p.create_kernel("Experiment")
     k.prepz(q_idx)
     k.gate('rx90', [q_idx])
-    add_measure(k, q_idx, use_rx12)
-    add_measure(k, q_idx, use_rx12)
+    k.measure(q_idx)
+    k.measure(q_idx)
     k.gate('rx180', [q_idx])
-    add_measure(k, q_idx, use_rx12)
+    k.measure(q_idx)
     p.add_kernel(k)
 
     k = p.create_kernel("Init_0")
     k.prepz(q_idx)
-    add_measure(k, q_idx, use_rx12)
+    k.measure(q_idx)
     p.add_kernel(k)
 
     k = p.create_kernel("Init_1")
     k.prepz(q_idx)
     k.gate('rx180', [q_idx])
-    add_measure(k, q_idx, use_rx12)
+    k.measure(q_idx)
     p.add_kernel(k)
+
+    if f_state:
+        k = p.create_kernel("Init_2")
+        k.prepz(q_idx)
+        k.gate('rx180', [q_idx])
+        k.gate('rx12', [q_idx])
+        k.measure(q_idx)
+        p.add_kernel(k)
     
     p.compile()
     
