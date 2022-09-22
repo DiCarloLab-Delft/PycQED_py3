@@ -33,3 +33,4 @@ zhinst
 plotly<3.8  # FIXME: removing version constraint breaks test_gst.py
 packaging
 deprecated
+cvxpy
