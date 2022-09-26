@@ -1091,8 +1091,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             popt1 = popt[[1,0,3,2,5,7]]
             # Calculate quantities of interest
             SNR = abs(popt0[0] - popt1[0])/((abs(popt0[2])+abs(popt1[2]))/2)
-            P_e0 = popt0[5]
-            P_g1 = popt1[5]
+            P_e0 = popt0[5]*popt0[2]/(popt0[2]*popt0[5] + popt0[3]*(1-popt0[5]))
+            P_g1 = popt1[5]*popt1[2]/(popt1[2]*popt1[5] + popt1[3]*(1-popt1[5]))
             # Effective qubit temperature
             h = 6.62607004e-34
             kb = 1.38064852e-23
@@ -1457,12 +1457,12 @@ def ssro_IQ_plotfn(
     from matplotlib.patches import Ellipse
     circle_0 = Ellipse((popt_0[1], popt_0[2]),
                       width=4*popt_0[3], height=4*popt_0[4],
-                      angle=popt_0[5]*180/np.pi+90,
+                      angle=-popt_0[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     ax.add_patch(circle_0)
     circle_1 = Ellipse((popt_1[1], popt_1[2]),
                       width=4*popt_1[3], height=4*popt_1[4],
-                      angle=popt_1[5]*180/np.pi+90,
+                      angle=-popt_1[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     ax.add_patch(circle_1)
     if type(shots_2) != type(None):
@@ -1474,7 +1474,7 @@ def ssro_IQ_plotfn(
         # Draw 4sigma ellipse around mean
         circle_2 = Ellipse((popt_2[1], popt_2[2]),
                           width=4*popt_2[3], height=4*popt_2[4],
-                          angle=popt_2[5]*180/np.pi+90,
+                          angle=-popt_2[5]*180/np.pi,
                           ec='white', fc='none', ls='--', lw=1.25, zorder=10)
         ax.add_patch(circle_2)
 
