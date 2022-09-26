@@ -448,9 +448,7 @@ class SeqC:
             body: string enclosed within brackets.
         """
         try:
-            string = ""
-            for line in body:
-                string += line
+            string = "".join([line for line in body])
             body = string
         except TypeError:
             pass
