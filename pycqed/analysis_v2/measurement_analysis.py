@@ -72,6 +72,9 @@ reload(mra)
 import pycqed.analysis_v2.cryoscope_v2_analysis as cv2
 reload(cv2)
 
+import pycqed.analysis_v2.LRU_analysis as lrua
+reload(lrua)
+
 from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,
     Basic2DAnalysis, Basic2DInterpolatedAnalysis)

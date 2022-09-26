@@ -818,14 +818,16 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         self.set_kw()
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
-        self.unit = 'dB'
+        # self.unit = 'dB'
+        self.unit = 'a.u.'
         self.sweep_control = 'soft'
         self.LutMan = LutMan
         self.LutMan_parameter = LutMan_parameter
         self.run = run
 
     def set_parameter(self, val):
-        self.LutMan_parameter.set(10**(val/20))
+        # self.LutMan_parameter.set(10**(val/20))
+        self.LutMan_parameter.set(val)
         if self.run:
             self.LutMan.AWG.get_instr().awgs_0_enable(False)
         self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()

@@ -897,7 +897,6 @@ def idle_error_rate_seq(
     p.compile()
     return p
 
-
 def single_elt_on(qubit_idx: int, platf_cfg: str) -> OqlProgram:
     p = OqlProgram('single_elt_on', platf_cfg)
 
@@ -910,7 +909,6 @@ def single_elt_on(qubit_idx: int, platf_cfg: str) -> OqlProgram:
 
     p.compile()
     return p
-
 
 def off_on(
         qubit_idx: int,
@@ -1047,7 +1045,6 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:
 
     return p
 
-
 def RTE(
         qubit_idx: int,
         sequence_type: str,
@@ -1112,7 +1109,6 @@ def RTE(
 
     p.compile()
     return p
-
 
 def randomized_benchmarking(
         qubit_idx: int,
@@ -1516,38 +1512,115 @@ def Depletion(time, qubit_idx: int, platf_cfg: str, double_points: bool) -> OqlP
     p.compile()
     return p
 
-
-def TEST_RTE(
+def LRU_experiment(
         qubit_idx: int,
+        LRU_duration_ns: int,
+        heralded_init: bool,
         platf_cfg: str,
-        measurements: int) -> OqlProgram:
-    """
-
-    """
-    p = OqlProgram('RTE', platf_cfg)
-
-    k = p.create_kernel('RTE')
+        idle: bool = False) -> OqlProgram:
+    
+    if LRU_duration_ns%20 >0:
+        LRU_duration_ns = (LRU_duration_ns//20)*20 + 20
+    p = OqlProgram('LRU_experiment', platf_cfg)
+    # Calibration_points
+    k = p.create_kernel("cal_0")
     k.prepz(qubit_idx)
-    ######################
-    # Parity check
-    ######################
-    for m in range(measurements):
-        # Superposition
-        k.gate('rx90', [qubit_idx])
-        # CZ emulation
-        k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
-        # Refocus
-        k.gate('rx180', [qubit_idx])
-        # CZ emulation
-        k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
-        k.gate('i', [qubit_idx])
-        # Recovery pulse
-        k.gate('rx90', [qubit_idx])
-        k.measure(qubit_idx)
-
+    if heralded_init:
+        k.measure(qubit_idx)    
+    k.measure(qubit_idx)
     p.add_kernel(k)
+    
+    k = p.create_kernel("cal_1")
+    k.prepz(qubit_idx)
+    if heralded_init:
+        k.measure(qubit_idx)  
+    k.gate('rx180', [qubit_idx])
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    
+    k = p.create_kernel("cal_2")
+    k.prepz(qubit_idx)
+    if heralded_init:
+        k.measure(qubit_idx)  
+    k.gate('rx180', [qubit_idx])
+    k.gate('rx12', [qubit_idx])
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    k = p.create_kernel("cal_LRU")
+    k.prepz(qubit_idx)
+    if heralded_init:
+        k.measure(qubit_idx)  
+    k.gate('rx180', [qubit_idx])
+    k.gate('rx12', [qubit_idx])
+    k.gate("wait", [])
+    k.gate('lru', [qubit_idx])
+    k.gate("wait", [], LRU_duration_ns-20)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    # Compile
+    p.compile()
+    return p
+
+def LRU_process_tomograhpy(
+        qubit_idx: int,
+        LRU_duration_ns: int,
+        platf_cfg: str,
+        idle: bool = False):
+    if LRU_duration_ns%20 >0:
+        LRU_duration_ns = (LRU_duration_ns//20)*20 + 20
+    states = {'0': 'i',
+              '1': 'rx180',
+              'p': 'ry90',
+              'm': 'rym90',
+              'pi': 'rxm90',
+              'mi': 'rx90'}
+    meas_bases = {'Z':'i',
+                  'X':'rym90',
+                  'Y':'rx90'}
+    p = OqlProgram('LRU_process_tomo', platf_cfg)
+    for state in states.keys():
+        for basis in meas_bases.keys():
+            k = p.create_kernel(f'state_{state}_tomo_{basis}')
+            # State preparation
+            k.prepz(qubit_idx)
+            k.gate(states[state], [qubit_idx])
+            # LRU gate
+            k.gate('wait', [])
+            if idle:
+                k.gate('wait', [], 20)
+            else:
+                k.gate('lru', [qubit_idx])
+            k.gate('wait', [], LRU_duration_ns-20)
+            # Measurement in basis
+            k.gate(meas_bases[basis], [qubit_idx])
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+    # Calibration_points
+    k = p.create_kernel("cal_0")
+    k.prepz(qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    k = p.create_kernel("cal_1")
+    k.prepz(qubit_idx)
+    k.gate('rx180', [qubit_idx])
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    k = p.create_kernel("cal_2")
+    k.prepz(qubit_idx)
+    k.gate('rx180', [qubit_idx])
+    k.gate('rx12', [qubit_idx])
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    k = p.create_kernel("cal_LRU")
+    k.prepz(qubit_idx)
+    k.gate('rx180', [qubit_idx])
+    k.gate('rx12', [qubit_idx])
+    k.gate("wait", [])
+    k.gate('lru', [qubit_idx])
+    k.gate('wait', [], LRU_duration_ns-20)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    # Compile
     p.compile()
     return p

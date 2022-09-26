@@ -72,6 +72,8 @@ class CCLight_Transmon(Qubit):
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_LO_mw',
                            parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_LO_LRU',
+                           parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_spec_source',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_spec_source_2',
@@ -119,6 +121,11 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('instr_LutMan_Flux',
                            docstring='Lookuptable manager responsible for '
                                      'flux pulses.',
+                           initial_value=None,
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_LutMan_LRU',
+                           docstring='Lookuptable manager responsible for '
+                                     'LRU pulses.',
                            initial_value=None,
                            parameter_class=InstrumentRefParameter)
 
@@ -490,6 +497,37 @@ class CCLight_Transmon(Qubit):
                            initial_value=0, unit='deg',
                            parameter_class=ManualParameter)
 
+        # LRU pulse parameters
+        self.add_parameter('LRU_channel_amp',
+                           label='LRU AWG channel amplitude. WARNING: Check your hardware specific limits!',
+                           unit='',
+                           initial_value=.5,
+                           vals=vals.Numbers(min_value=0, max_value=1.6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('LRU_channel_range', 
+                           label='LRU AWG channel range. WARNING: Check your hardware specific limits!',
+                           unit='V', 
+                           initial_value=.8,
+                           vals=vals.Enum(0.2, 0.4, 0.6, 0.8, 1, 2, 3, 4, 5),
+                           parameter_class=ManualParameter)
+        self.add_parameter('LRU_freq',
+                           label='LRU pulse frequency', unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('LRU_freq_mod',
+                           label='LRU pulse-modulation frequency', unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('LRU_amplitude',
+                           label='LRU pulse-amplitude',
+                           parameter_class=ManualParameter)
+        self.add_parameter('LRU_duration',
+                           initial_value=300e-9,
+                           label='LRU total pulse duration', unit='s',
+                           parameter_class=ManualParameter)
+        self.add_parameter('LRU_duration_rise',
+                           initial_value=30e-9,
+                           label='LRU pulse rise duration', unit='s',
+                           parameter_class=ManualParameter)
+
     def _using_QWG(self):
         """
         Checks if a QWG is used for microwave control.
@@ -700,6 +738,10 @@ class CCLight_Transmon(Qubit):
             'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 20),
             parameter_class=ManualParameter, initial_value=0,
             docstring='The qubit number is used in the OpenQL compiler. ')
+        self.add_parameter(
+            'cfg_qubit_LRU_nr', label='Qubit LRU number', vals=vals.Ints(0, 20),
+            parameter_class=ManualParameter, initial_value=0,
+            docstring='The LRU number is used in the OpenQL compiler. ')
 
         self.add_parameter('cfg_qubit_freq_calc_method',
                            initial_value='latest',
@@ -1179,6 +1221,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_readout()
         self._prep_td_sources()
         self._prep_mw_pulses()
+        if self.instr_LutMan_LRU():
+            self._prep_LRU_pulses()
         if self.cfg_with_vsm():
             self._prep_td_configure_VSM()
 
@@ -1216,6 +1260,27 @@ class CCLight_Transmon(Qubit):
             raise ValueError('Unexpected value for parameter cfg_sideband_mode.')
 
         self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
+        ###################################
+        # Prepare LRU source
+        ###################################
+        if self.instr_LutMan_LRU():
+            LRU_lutman = self.instr_LutMan_LRU.get_instr()
+            self.instr_LO_LRU.get_instr().on()
+            self.instr_LO_LRU.get_instr().pulsemod_state(False)
+            if LRU_lutman.cfg_sideband_mode() == 'static':
+                # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
+                self.instr_LO_LRU.get_instr().frequency.set(
+                    self.LRU_freq.get() - self.LRU_freq_mod.get())
+            elif LRU_lutman.cfg_sideband_mode() == 'real-time':
+                # For historic reasons, will maintain the change qubit frequency here in
+                # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
+                if ((LRU_lutman.channel_I()-1)//2 != (LRU_lutman.channel_Q()-1)//2):
+                    raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
+                self.LRU_freq_mod(self.LRU_freq.get() - self.instr_LO_LRU.get_instr().frequency.get())
+                LRU_lutman.AWG.get_instr().set('oscs_{}_freq'.format((LRU_lutman.channel_I()-1)//2),
+                    self.LRU_freq_mod.get())
+            else:
+                raise ValueError('Unexpected value for parameter LRU cfg_sideband_mode.')
 
     def _prep_mw_pulses(self):
         # 1. Gets instruments and prepares cases
@@ -1311,6 +1376,39 @@ class CCLight_Transmon(Qubit):
 
         # 5. upload commandtable for virtual-phase gates
         MW_LutMan.upload_single_qubit_phase_corrections()
+
+    def _prep_LRU_pulses(self):
+        '''
+        Prepare LRU pulses from LRU lutman.
+        '''
+        # 1. Gets instruments and prepares cases
+        LRU_LutMan = self.instr_LutMan_LRU.get_instr()
+        AWG = LRU_LutMan.AWG.get_instr()
+        # 2. Prepares map and parameters for waveforms
+        LRU_LutMan.channel_amp(self.LRU_channel_amp())
+        LRU_LutMan.channel_range(self.LRU_channel_range())
+        LRU_LutMan.mw_modulation(self.LRU_freq_mod())
+        LRU_LutMan.mw_amp180(1)
+        LRU_LutMan.mixer_phi(0)
+        LRU_LutMan.mixer_alpha(1)
+
+        LRU_LutMan.mw_lru_amplitude(self.LRU_amplitude())
+        LRU_LutMan.mw_lru_duration(self.LRU_duration())
+        LRU_LutMan.mw_lru_rise_duration(self.LRU_duration_rise())
+        # Set all waveforms to be LRU pulse
+        # to ensure same waveform duration. 
+        _lm = {i: {'name': 'lru', 'type': 'lru'} for i in range(64)}
+        LRU_LutMan.LutMap(_lm)
+        # # TO DO: implement mixer corrections on LRU lutman
+        # # N.B. This part is AWG8 specific
+        # AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
+        #         self.mw_mixer_offs_GI())
+        # AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
+        #         self.mw_mixer_offs_GQ())
+        # 4. reloads the waveforms
+        LRU_LutMan.load_waveforms_onto_AWG_lookuptable()
+        # 5. upload commandtable for virtual-phase gates
+        LRU_LutMan.upload_single_qubit_phase_corrections()
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
@@ -6454,6 +6552,101 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(dac_values)
         MC.set_detector_function(d)
         MC.run(name='Tracked_Spectroscopy')
+
+    def measure_LRU_experiment(self,
+            nr_shots_per_case: int = 2**13,
+            heralded_init: bool = False,
+            prepare_for_timedomain: bool = True,
+            reduced_prepare: bool = False,
+            disable_metadata: bool = False):
+        '''
+        Function to measure 2-state fraction removed by LRU pulse.
+        '''
+        assert self.instr_LutMan_LRU() != None, 'LRU lutman is required.'
+        assert self.ro_acq_digitized() == False, 'Analog readout required'
+        assert 'IQ' in self.ro_acq_weight_type(), 'IQ readout is required!'
+        MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            if reduced_prepare:
+                self._prep_LRU_pulses()
+            else:
+                self.prepare_for_timedomain()
+        # Experiment
+        nr_shots = (4)*nr_shots_per_case
+        if heralded_init:
+            nr_shots *= 2 
+        p = sqo.LRU_experiment(
+            qubit_idx=self.cfg_qubit_nr(),
+            LRU_duration_ns=self.LRU_duration()*1e9,
+            heralded_init=heralded_init,
+            platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Shot', unit='#',
+                             upload=True)
+        MC.soft_avg(1)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        d = self.int_log_det
+        d.nr_shots = nr_shots
+        MC.set_detector_function(d)
+        MC.live_plot_enabled(False)
+        label = 'LRU_experiment'
+        MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
+        MC.live_plot_enabled(True)
+        # Analysis
+        a = ma2.lrua.LRU_experiment_Analysis(qubit=self.name,
+                                             heralded_init=heralded_init)
+        return a.qoi
+
+    def measure_LRU_process_tomo(self,
+            nr_shots_per_case: int = 2**15,
+            prepare_for_timedomain: bool = True,
+            reduced_prepare: bool = False,
+            disable_metadata: bool = False,
+            update: bool = True):
+        '''
+        Function to measure 2-state fraction removed by LRU pulse.
+        Recommended number of averages is 2**15. One can go lower
+        depending on the required precision of the tomography.
+        '''
+        assert self.instr_LutMan_LRU() != None, 'LRU lutman is required.'
+        assert self.ro_acq_digitized() == False, 'Analog readout required.'
+        assert 'IQ' in self.ro_acq_weight_type(), 'IQ readout is required.'
+        MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            if reduced_prepare:
+                self._prep_LRU_pulses()
+            else:
+                self.prepare_for_timedomain()
+        # Experiment
+        nr_shots = (18+4)*nr_shots_per_case
+        p = sqo.LRU_process_tomograhpy(
+            qubit_idx = self.cfg_qubit_nr(),
+            LRU_duration_ns = self.LRU_duration()*1e9,
+            platf_cfg = self.cfg_openql_platform_fn(),
+            idle = False)
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Shot', unit='#',
+                             upload=True)
+        MC.soft_avg(1)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        d = self.int_log_det
+        d.nr_shots = nr_shots
+        MC.set_detector_function(d)
+        MC.live_plot_enabled(False)
+        label = 'LRU_process_tomograhpy'
+        MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
+        MC.live_plot_enabled(True)
+        # Analysis
+        a = ma2.lrua.LRU_process_tomo_Analysis(
+                qubit=self.name, post_select_2state=False)
+        if update:
+            angle = a.proc_data_dict['angle_p']
+            mw_lm = self.instr_LutMan_MW.get_instr()
+            mw_lm.LRU_virtual_q_ph_corr(-angle)
 
     ###########################################################################
     # Dep graph check functions

@@ -5,7 +5,7 @@
     "eqasm_compiler" : "eqasm_backend_cc",
 
     "hardware_settings": {
-        "qubit_number": 19,
+        "qubit_number": 20,
         "cycle_time" : 20,        // in [ns]
 
         "eqasm_backend_cc": {
@@ -252,7 +252,7 @@
                 {
                     "name": "mw_4",
                     "qubits": [                                             // ancilla qubits:
-                        [],
+                        [19],
                         [6],
                         [7],
                         [8]
@@ -355,6 +355,11 @@
 
         // CZ gates
         // "measure %0": ["rx12 %0", "measure %0"],
+
+        // LRU pulses
+        "lru q16": ["barrier q16, q19", "cw_40 q19", "update_ph_LRU q16", "barrier q16, q19"],
+        "lru q3": ["barrier q3, q17", "cw_40 q17", "update_ph_LRU q3", "barrier q3, q17"],
+        "lru q15": ["barrier q15, q18", "cw_40 q18", "update_ph_LRU q15", "barrier q15, q18"],
 
         // Updata by Hany [2021-06-01]
         // Individual CZ gates in Surface-17
@@ -3970,6 +3975,19 @@
         //     }
         // },
         // END OF AUTOMATICALLY GENERATED SECTION
+
+        "update_ph_LRU": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+            "type": "mw",
+            "cc_light_instr": "update_ph_step_1",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [
+                    51
+                ]
+            }
+        },
 
         // BEGIN OF AUTOMATICALLY GENERATED SECTION
         "update_ph_step_1": {
