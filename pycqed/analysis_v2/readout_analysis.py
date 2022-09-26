@@ -1543,17 +1543,17 @@ def ssro_IQ_projection_plotfn(
     from matplotlib.patches import Ellipse
     circle_0 = Ellipse((popt_0[1], popt_0[2]),
                       width=4*popt_0[3], height=4*popt_0[4],
-                      angle=popt_0[5]*180/np.pi+90,
+                      angle=-popt_0[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     axs[0].add_patch(circle_0)
     circle_1 = Ellipse((popt_1[1], popt_1[2]),
                       width=4*popt_1[3], height=4*popt_1[4],
-                      angle=popt_1[5]*180/np.pi+90,
+                      angle=-popt_1[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     axs[0].add_patch(circle_1)
     circle_2 = Ellipse((popt_2[1], popt_2[2]),
                       width=4*popt_2[3], height=4*popt_2[4],
-                      angle=popt_2[5]*180/np.pi+90,
+                      angle=-popt_2[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     axs[0].add_patch(circle_2)
     # Plot classifier zones
