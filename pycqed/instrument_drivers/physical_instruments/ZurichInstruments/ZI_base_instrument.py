@@ -676,8 +676,11 @@ class ZI_base_instrument(Instrument):
         if not self.daq:
             raise(ziDAQError())
 
+        # LDC changing the DebugLevel to 7. 2022/06/24
+        #self.daq.setDebugLevel(0)
         self.daq.setDebugLevel(7)
 
+        
         # Handle absolute path
         self.use_setVector = "setVector" in dir(self.daq)
 
@@ -1578,8 +1581,10 @@ class ZI_base_instrument(Instrument):
                     break
 
         t1 = time.time()
-        print(self._awgModule.get('awgModule/compiler/statusstring')
-              ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
+        # This print statement commented out as per discussions between LDC and ZI (Marios).
+        # LDC, 2022/06/23
+        #print(self._awgModule.get('awgModule/compiler/statusstring')
+        #      ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
 
         # Check status
         if self.get('awgs_{}_waveform_memoryusage'.format(awg_nr)) > 1.0:

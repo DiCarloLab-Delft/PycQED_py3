@@ -2918,7 +2918,7 @@ class HDAWG_Flux_LutMan_Adiabatic(Base_Flux_LutMan):
         sim_control_CZ_par_name = 'instr_sim_control_CZ_{}'.format(which_gate)
         sim_control_CZ_name = self.get(sim_control_CZ_par_name)
         found_name = sim_control_CZ_name is not None
-        found_instr = self._all_lutmans.get(
+        found_instr = self._all_instruments.get(
             sim_control_CZ_name) is not None
         if found_name and found_instr:
             sim_control_CZ = self.find_instrument(sim_control_CZ_name)
@@ -3380,8 +3380,8 @@ def phase_corr_sine_series_half(a_i, nr_samples):
     return s
 
 
-def roundup1024(n):
-    return int(np.ceil(n/1024)*1024)
+def roundup96(n):
+    return int(np.ceil(n/144)*144)
 
 
 def sim_pars_sanity_check(station, flm, flm_static, which_gate):

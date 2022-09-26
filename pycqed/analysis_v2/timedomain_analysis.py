@@ -397,9 +397,13 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
+
+
+        # Sinusoidal fit
+        # --------------
         # Even though we expect an exponentially damped oscillation we use
         # a simple cosine as this gives more reliable fitting and we are only
-        # interested in extracting the frequency of the oscillation
+        # interested in extracting the oscillation frequency.
         cos_mod = lmfit.Model(fit_mods.CosFunc)
 
         guess_pars = fit_mods.Cos_guess(
@@ -408,13 +412,20 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             data=self.proc_data_dict["corr_data"][:-4],
         )
 
-        # This enforces the oscillation to start at the equator
-        # and ensures that any over/under rotation is absorbed in the
-        # frequency
-        guess_pars["amplitude"].value = 0.5
+        # constrain the amplitude to positive and close to 0.5 
+        guess_pars["amplitude"].value = 0.45
         guess_pars["amplitude"].vary = True
+        guess_pars["amplitude"].min = 0.4
+        guess_pars["amplitude"].max = 0.5
+
+        # force the offset to 0.5
         guess_pars["offset"].value = 0.5
-        guess_pars["offset"].vary = True
+        guess_pars["offset"].vary = False   
+        
+
+        guess_pars["phase"].vary = True
+ 
+        guess_pars["frequency"].vary = True
 
         self.fit_dicts["cos_fit"] = {
             "fit_fn": fit_mods.CosFunc,
@@ -423,20 +434,23 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             "guess_pars": guess_pars,
         }
 
-        # In the case there are very few periods we fall back on a small
-        # angle approximation to extract the drive detuning
+        # Linear fit
+        #-----------
+        # In the case that the amplitude is close to perfect, we will not see a full period of oscillation. 
+        # We resort to a linear fit to extract the oscillation frequency from the slop of the best fit 
         poly_mod = lmfit.models.PolynomialModel(degree=1)
-        # the detuning can be estimated using on a small angle approximation
-        # c1 = d/dN (cos(2*pi*f N) ) evaluated at N = 0 -> c1 = -2*pi*f
+        # for historical reasons, the slope 'c1' is here converted to a frequency.
         poly_mod.set_param_hint("frequency", expr="-c1/(2*pi)")
         guess_pars = poly_mod.guess(
             x=self.raw_data_dict["sweep_points"][:-4],
             data=self.proc_data_dict["corr_data"][:-4],
         )
-        # Constraining the line ensures that it will only give a good fit
-        # if the small angle approximation holds
-        guess_pars["c0"].vary = True
+        # Constrain the offset close to nominal 0.5
         guess_pars["c0"].value = 0.5
+        guess_pars["c0"].vary = True
+        guess_pars["c0"].min = 0.45
+        guess_pars["c0"].max = 0.55
+        
 
         self.fit_dicts["line_fit"] = {
             "model": poly_mod,
@@ -450,13 +464,14 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         sf_cos = self._get_scale_factor_cos()
         self.proc_data_dict["scale_factor"] = self.get_scale_factor()
 
-        msg = "Scale fact. based on "
+        msg = "Best fit:  "
         if self.proc_data_dict["scale_factor"] == sf_cos:
-            msg += "cos fit\n"
+            msg += "cos.\n"
         else:
-            msg += "line fit\n"
-        msg += "cos fit: {:.4f}\n".format(sf_cos)
-        msg += "line fit: {:.4f}".format(sf_line)
+            msg += "line.\n"
+        msg += "line scale fac: {:.4f}\n".format(sf_line)
+        msg += "cos scale fac: {:.4f}".format(sf_cos)
+        
 
         self.raw_data_dict["scale_factor_msg"] = msg
         # TODO: save scale factor to file
@@ -478,28 +493,28 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         return scale_factor
 
     def _get_scale_factor_cos(self):
-        # 1/period of the oscillation corresponds to the (fractional)
-        # over/under rotation error per gate
+        
+        # extract the frequency 
         frequency = self.fit_dicts["cos_fit"]["fit_res"].params["frequency"]
+        
+        # extract phase modulo 2pi
+        phase = np.mod(self.fit_dicts["cos_fit"]["fit_res"].params["phase"],2*np.pi)
+        
+        # resolve ambiguity in the fit, making sign of frequency meaningful.
+        frequency*=np.sign(phase-np.pi)
 
-        # the square is needed to account for the difference between
-        # power and amplitude
-        scale_factor = (1 + frequency) ** 2
-
-        phase = np.rad2deg(self.fit_dicts["cos_fit"]["fit_res"].params["phase"]) % 360
-        # phase ~90 indicates an under rotation so the scale factor
-        # has to be larger than 1. A phase ~270 indicates an over
-        # rotation so then the scale factor has to be smaller than one.
-        if phase > 180:
-            scale_factor = 1 / scale_factor
+        # calculate the scale factor
+        scale_factor = 1 / (1 + 2*frequency)
 
         return scale_factor
 
     def _get_scale_factor_line(self):
-        # 2/period (ref is 180 deg) of the oscillation corresponds
-        # to the (fractional) over/under rotation error per gate
+
+        # extract the slope
         frequency = self.fit_dicts["line_fit"]["fit_res"].params["frequency"]
-        scale_factor = (1 + 2 * frequency) ** 2
+        
+
+        scale_factor = 1 / (1 - 4 * frequency)
         # no phase sign check is needed here as this is contained in the
         # sign of the coefficient
 
@@ -509,10 +524,12 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         self.plot_dicts["main"] = {
             "plotfn": self.plot_line,
             "xvals": self.raw_data_dict["sweep_points"],
-            "xlabel": self.raw_data_dict["xlabel"],
-            "xunit": self.raw_data_dict["xunit"],  # does not do anything yet
+            #"xlabel": self.raw_data_dict["xlabel"],
+            "xlabel": r"Number of (effective) $\pi$ pulses",
+            #"xunit": self.raw_data_dict["xunit"],  # does not do anything yet
+            "yunit": "",
             "yvals": self.proc_data_dict["corr_data"],
-            "ylabel": "Excited state population",
+            "ylabel": "Excited-state population",
             "yunit": "",
             "setlabel": "data",
             "title": (
@@ -521,7 +538,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 + self.raw_data_dict["measurementstring"]
             ),
             "do_legend": True,
-            "legend_pos": "upper right",
+            "legend_pos": "upper left",
         }
 
         if self.do_fitting:
@@ -532,7 +549,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 "plot_init": self.options_dict["plot_init"],
                 "setlabel": "line fit",
                 "do_legend": True,
-                "legend_pos": "upper right",
+                "legend_pos": "upper left",
             }
 
             self.plot_dicts["cos_fit"] = {
@@ -542,12 +559,13 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 "plot_init": self.options_dict["plot_init"],
                 "setlabel": "cos fit",
                 "do_legend": True,
-                "legend_pos": "upper right",
+                "legend_pos": "upper left",
             }
 
             self.plot_dicts["text_msg"] = {
                 "ax_id": "main",
                 "ypos": 0.15,
+                "xpos": 0.3,
                 "plotfn": self.plot_text,
                 "box_props": "fancy",
                 "text_string": self.raw_data_dict["scale_factor_msg"],
@@ -1857,7 +1875,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_osc_off"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ off",
+            "setlabel": "Control 0",
             "title": (
                 self.raw_data_dict["timestamps"][0]
                 + " \n"
@@ -1865,7 +1883,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             ),
             "do_legend": True,
             # 'yrange': (0,1),
-            "legend_pos": "upper right",
+            "legend_pos": "lower left",
         }
 
         self.plot_dicts[ax_id + "_on"] = {
@@ -1877,9 +1895,9 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_osc_on"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ on",
+            "setlabel": "Control 1",
             "do_legend": True,
-            "legend_pos": "upper right",
+            "legend_pos": "lower left",
         }
 
         self.plot_dicts[ax_id + "_cal_pnts"] = {
@@ -1887,9 +1905,11 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "ax_id": ax_id,
             "xvals": self.proc_data_dict["xvals_cal"],
             "yvals": self.proc_data_dict["yvals_osc_cal"],
-            "setlabel": "Calib.",
+            "setlabel": "RO Cal",
             "do_legend": True,
+            "legend_pos": "lower left",
             "marker": "d",
+
         }
 
         if self.do_fitting:
@@ -1898,16 +1918,18 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "plotfn": self.plot_fit,
                 "fit_res": self.fit_dicts["cos_fit_off"]["fit_res"],
                 "plot_init": self.options_dict["plot_init"],
-                "setlabel": "Fit CZ off",
+                "setlabel": "Fit Ctrl. 0",
                 "do_legend": True,
+                "legend_pos": "lower left",
             }
             self.plot_dicts[ax_id + "_cos_fit_on"] = {
                 "ax_id": ax_id,
                 "plotfn": self.plot_fit,
                 "fit_res": self.fit_dicts["cos_fit_on"]["fit_res"],
                 "plot_init": self.options_dict["plot_init"],
-                "setlabel": "Fit CZ on",
+                "setlabel": "Fit Ctrl. 1",
                 "do_legend": True,
+                "legend_pos": "lower left",
             }
 
             # offset as a guide for the eye
@@ -1931,13 +1953,13 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             qoi = self.proc_data_dict["quantities_of_interest"]
             phase_message = (
                 "Phase diff.: {}  deg\n"
-                "Phase off: {} deg\n"
-                "Phase on: {} deg\n\n"
+                "Phase 0: {} deg\n"
+                "Phase 1: {} deg\n\n"
                 "Offs. diff.: {} %\n"
-                "Osc. offs. off: {} \n"
-                "Osc. offs. on: {}\n\n"
-                "Osc. amp. off: {} \n"
-                "Osc. amp. on: {} ".format(
+                "Osc. offs. 0: {} \n"
+                "Osc. offs. 1: {}\n\n"
+                "Osc. amp. 0: {} \n"
+                "Osc. amp. 1: {} ".format(
                     qoi["phi_cond"],
                     qoi["phi_0"],
                     qoi["phi_1"],
@@ -1951,8 +1973,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
 
             self.plot_dicts[ax_id + "_phase_message"] = {
                 "ax_id": ax_id,
-                "ypos": 0.9,
-                "xpos": 1.45,
+                "ypos": 0.5,
+                "xpos": 1.4,
                 "plotfn": self.plot_text,
                 "box_props": "fancy",
                 "line_kws": {"alpha": 0},
@@ -1979,7 +2001,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_spec_off"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ off",
+            "setlabel": "Ctrl 0",
             "title": (
                 self.raw_data_dict["timestamps"][0]
                 + " \n"
@@ -1998,7 +2020,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_spec_on"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ on",
+            "setlabel": "Ctrl 1",
             "do_legend": True,
             "legend_pos": "upper right",
         }
@@ -2008,7 +2030,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "ax_id": ax_id,
             "xvals": self.proc_data_dict["xvals_cal"],
             "yvals": self.proc_data_dict["yvals_spec_cal"],
-            "setlabel": "Calib.",
+            "setlabel": "RO Cal",
             "do_legend": True,
             "marker": "d",
         }
@@ -2019,8 +2041,8 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             )
             self.plot_dicts[ax_id + "_leak_msg"] = {
                 "ax_id": ax_id,
-                "ypos": 0.9,
-                "xpos": 1.45,
+                "ypos": 0.5,
+                "xpos": 1.4,
                 "plotfn": self.plot_text,
                 "box_props": "fancy",
                 "line_kws": {"alpha": 0},
@@ -2047,7 +2069,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_park_off"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ off",
+            "setlabel": "Ctrl 0",
             "title": (
                 self.raw_data_dict["timestamps"][0]
                 + " \n"
@@ -2066,7 +2088,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "yvals": self.proc_data_dict["yvals_park_on"],
             "ylabel": y_label,
             "yunit": self.proc_data_dict["yunit"],
-            "setlabel": "CZ on",
+            "setlabel": "Ctrl 1",
             "do_legend": True,
             "legend_pos": "upper right",
         }
@@ -2076,7 +2098,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             "ax_id": ax_id,
             "xvals": self.proc_data_dict["xvals_cal"],
             "yvals": self.proc_data_dict["yvals_park_cal"],
-            "setlabel": "Calib.",
+            "setlabel": "RO Cal",
             "do_legend": True,
             "marker": "d",
         }
@@ -2087,7 +2109,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "plotfn": self.plot_fit,
                 "fit_res": self.fit_dicts["park_fit_off"]["fit_res"],
                 "plot_init": self.options_dict["plot_init"],
-                "setlabel": "Fit CZ off",
+                "setlabel": "Fit Ctrl 0",
                 "do_legend": True,
             }
             self.plot_dicts[ax_id + "_park_fit_on"] = {
@@ -2095,7 +2117,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 "plotfn": self.plot_fit,
                 "fit_res": self.fit_dicts["park_fit_on"]["fit_res"],
                 "plot_init": self.options_dict["plot_init"],
-                "setlabel": "Fit CZ on",
+                "setlabel": "Fit Ctrl 1",
                 "do_legend": True,
             }
 

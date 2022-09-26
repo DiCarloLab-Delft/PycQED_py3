@@ -796,8 +796,11 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
                   % ins_key)
 
 
-def get_timestamps_in_range(timestamp_start, timestamp_end=None,
-                            label=None, exact_label_match=False, folder=None):
+def get_timestamps_in_range(timestamp_start, 
+                                timestamp_end=None,
+                                label=None, 
+                                exact_label_match=False, 
+                                folder=None):
     '''
     Input parameters:
         label: a string or list of strings to compare the experiment name to

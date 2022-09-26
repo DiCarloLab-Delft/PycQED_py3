@@ -963,9 +963,10 @@ class OptimizationAnalysis(MeasurementAnalysis):
             fig1, ax = self.default_ax()
             ax.plot(self.measured_values[i], marker='o')
             # assumes only one value exists because it is an optimization
-            ax.set_xlabel('iteration (n)')
+            ax.set_xlabel('Iteration (n)')
             ax.set_ylabel(self.ylabels[i])
             ax.set_title(self.timestamp_string + ' ' + figname1)
+            ax.grid(axis='both')
 
             textstr = 'Optimization converged to: \n   %s: %.3g %s' % (
                 self.value_names[i], self.measured_values[0][-1],
@@ -978,9 +979,9 @@ class OptimizationAnalysis(MeasurementAnalysis):
             # y coord 0.4 ensures there is no overlap for both maximizing and
             # minim
             if i == 0:
-                ax.text(0.95, 0.4, textstr,
+                ax.text(0.95, 0.95, textstr,
                         transform=ax.transAxes,
-                        fontsize=11, verticalalignment='bottom',
+                        fontsize=10, verticalalignment='top',
                         horizontalalignment='right',
                         bbox=self.box_props)
 
@@ -1000,12 +1001,13 @@ class OptimizationAnalysis(MeasurementAnalysis):
             for i in range(len(self.parameter_names)):
                 axarray[i].plot(self.sweep_points[i], marker='o')
                 # assumes only one value exists because it is an optimization
-                axarray[i].set_xlabel('iteration (n)')
+                axarray[i].set_xlabel('Iteration (n)')
                 axarray[i].set_ylabel(self.parameter_labels[i])
+                axarray[i].grid(axis='both')
         else:
             axarray.plot(self.sweep_points, marker='o')
             # assumes only one value exists because it is an optimization
-            axarray.set_xlabel('iteration (n)')
+            axarray.set_xlabel('Iteration (n)')
             axarray.set_ylabel(self.parameter_labels[0])
             axarray.set_title(self.timestamp_string + ' ' + figname2)
 
@@ -1035,7 +1037,7 @@ class OptimizationAnalysis(MeasurementAnalysis):
             # WARNING: Command does not work in ipython notebook
             cbar_ax = fig3.add_axes([.85, 0.15, 0.05, 0.7])
             cbar = fig3.colorbar(sc, cax=cbar_ax)
-            cbar.set_label('iteration (n)')
+            cbar.set_label('Iteration (n)')
         else:
             # axarray.plot(self.sweep_points, self.measured_values[0],
             #              linestyle='--', c='k')
@@ -1047,7 +1049,7 @@ class OptimizationAnalysis(MeasurementAnalysis):
             axarray.set_ylabel(self.ylabels[0])
             axarray.set_title(self.timestamp_string + ' ' + figname3)
             cbar = fig3.colorbar(sc)
-            cbar.set_label('iteration (n)')
+            cbar.set_label('Iteration (n)')
 
         self.save_fig(fig2, figname=savename2, **kw)
         self.save_fig(fig3, figname=savename3, fig_tight=False, **kw)
@@ -4705,15 +4707,15 @@ class T1_Analysis(TD_Analysis):
                         instr_set[self.qb_name].attrs['T1_ef']) * 1e6
                 else:
                     T1_old = float(instr_set[self.qb_name].attrs['T1']) * 1e6
-                old_vals = '\nold $T_1$ = {:.5f} '.format(T1_old) + units
+                old_vals = '\nold $T_1$ = {:.3f} '.format(T1_old) + units
             except (TypeError, KeyError, ValueError):
                 logging.warning('qb_name is None. Old parameter values will '
                                 'not be retrieved.')
                 old_vals = ''
 
-            textstr = ('$T_1$ = {:.5f} '.format(T1_micro_sec) +
+            textstr = ('$T_1$ = {:.3f} '.format(T1_micro_sec) +
                        units +
-                       ' $\pm$ {:.5f} '.format(T1_err_micro_sec) +
+                       ' $\pm$ {:.3f} '.format(T1_err_micro_sec) +
                        units + old_vals)
 
             self.fig.text(0.5, 0, textstr, transform=self.ax.transAxes,
@@ -10212,70 +10214,90 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                            timestamp_excited=None, close_fig=True,
                            optimization_window=None, post_rotation_angle=None,
                            plot_max_time=4096/1.8e9):
+
+    # using the last x samples for offset subtraction 
+    # 720 is multiple of 2.5 MHz modulation
+
+    # Above statement does not make sense generally. LDC. 2022/09/17
+    offset_calibration_samples = 720
+    
+    # Analyze for qubit in ket(0)
     data_file = MeasurementAnalysis(
         label='_0', auto=True, TwoD=False, close_fig=True, timestamp=timestamp_ground)
     temp = data_file.load_hdf5data()
     data_file.get_naming_and_values()
 
-    # using the last x samples for offset subtraction 720 is multiples of 2.5
-    # MHz modulation
-    offset_calibration_samples = 720
 
-    x = data_file.sweep_points / 1.8
-    offset_I = np.mean(data_file.measured_values[
-        0][-offset_calibration_samples:])
-    offset_Q = np.mean(data_file.measured_values[
-        1][-offset_calibration_samples:])
-    print('offset I {}, offset Q {}'.format(offset_I, offset_Q))
+    Fsampling=1.8e9   # This value is specific to the UHFQA.
+    # time in ns
+    x = data_file.sweep_points / (Fsampling * 1e-9)
+    
+    offset_I = np.mean(data_file.measured_values[0][-offset_calibration_samples:])
+    offset_Q = np.mean(data_file.measured_values[1][-offset_calibration_samples:])
+    
+    # for diagnostics only
+    print('Offset I for ket0: {}, Offset Q for ket0: {}'.format(offset_I, offset_Q))
+    
+    # subtract offset from transients
     y1 = data_file.measured_values[0] - offset_I
     y2 = data_file.measured_values[1] - offset_Q
 
+    # non-demodulated transients
     I0_no_demod = y1
     Q0_no_demod = y2
 
+    # calculate demodulated transients
     I0, Q0 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
                        Q_o=Q_o, IF=IF, predistort=predistort)
     power0 = (I0 ** 2 + Q0 ** 2) / 50
 
+    # Analyze for qubit in ket(1)
     data_file = MeasurementAnalysis(
         label='_1', auto=True, TwoD=False, close_fig=True, plot=True, timestamp=timestamp_excited)
     temp = data_file.load_hdf5data()
     data_file.get_naming_and_values()
 
-    x = data_file.sweep_points / 1.8
-    offset_I = np.mean(data_file.measured_values[
-        0][-offset_calibration_samples:])
-    offset_Q = np.mean(data_file.measured_values[
-        1][-offset_calibration_samples:])
+    x = data_file.sweep_points / (Fsampling * 1e-9)
+    offset_I = np.mean(data_file.measured_values[0][-offset_calibration_samples:])
+    offset_Q = np.mean(data_file.measured_values[1][-offset_calibration_samples:])
+
+    # for diagnostics only
+    print('Offset I for ket1: {}, Offset Q for ket1: {}'.format(offset_I, offset_Q))
+
     y1 = data_file.measured_values[0] - offset_I
     y2 = data_file.measured_values[1] - offset_Q
-    I1, Q1 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
-                       Q_o=Q_o, IF=IF, predistort=predistort)
 
     I1_no_demod = y1
     Q1_no_demod = y2
+
+    I1, Q1 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
+                       Q_o=Q_o, IF=IF, predistort=predistort)
+
 
     power1 = (I1 ** 2 + Q1 ** 2) / 50
 
     amps = np.sqrt((I1 - I0) ** 2 + (Q1 - Q0) ** 2)
     amp_max = np.max(amps)
+
     # defining weight functions for postrotation
     weight_I = (I1 - I0) / amp_max
     weight_Q = (Q1 - Q0) / amp_max
 
-
     weight_I_no_demod = (I1_no_demod - I0_no_demod) / amp_max
     weight_Q_no_demod = (Q1_no_demod - Q0_no_demod) / amp_max
+
+
 
     # Identical rescaling as is happening in the CCL transmon class
     maxI_no_demod = np.max(np.abs(weight_I_no_demod))
     maxQ_no_demod = np.max(np.abs(weight_Q_no_demod))
-    weight_scale_factor = 1./(4*np.max([maxI_no_demod, maxQ_no_demod]))
+    # LDC. 2022/09/15.    
+    #weight_scale_factor = 1./(4*np.max([maxI_no_demod, maxQ_no_demod]))
+    weight_scale_factor = 1./(np.max([maxI_no_demod, maxQ_no_demod]))
     weight_I_no_demod = np.array(
         weight_scale_factor*weight_I_no_demod)
     weight_Q_no_demod = np.array(
         weight_scale_factor*weight_Q_no_demod)
-
 
 
     if post_rotation_angle == None:
@@ -10289,10 +10311,14 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     Q0rot = np.sin(post_rotation_angle) * I0 + np.cos(post_rotation_angle) * Q0
     I1rot = np.cos(post_rotation_angle) * I1 - np.sin(post_rotation_angle) * Q1
     Q1rot = np.sin(post_rotation_angle) * I1 + np.cos(post_rotation_angle) * Q1
-    I0 = I0rot
-    Q0 = Q0rot
-    I1 = I1rot
-    Q1 = Q1rot
+
+
+    # I am avoiding all this as it is an unnecessary complication
+    # LDC. 2022/09/15    
+    #I0 = I0rot
+    #Q0 = Q0rot
+    #I1 = I1rot
+    #Q1 = Q1rot
 
     # redefining weight functions after rotation
     weight_I = (I1 - I0) / amp_max
@@ -10307,66 +10333,87 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     if optimization_window != None:
         optimization_start = optimization_window[0]
         optimization_stop = optimization_window[-1]
-        start_sample = int(optimization_start * 1.8e9)
-        stop_sample = int(optimization_stop * 1.8e9)
+        start_sample = int(optimization_start * Fsampling)
+        stop_sample = int(optimization_stop * Fsampling)
         shift_w = 0e-9
-        start_sample_w = int((optimization_start - shift_w) * 1.8e9)
-        stop_sample_w = int((optimization_stop - shift_w) * 1.8e9)
-        depletion_cost_d = np.mean(rms(I0[start_sample:stop_sample]) +
-                                   rms(Q0[start_sample:stop_sample]) +
-                                   rms(I1[start_sample:stop_sample]) +
-                                   rms(Q1[start_sample:stop_sample]))
-        depletion_cost_w = 10 * np.mean(rms(I0[start_sample_w:stop_sample_w] - I1[start_sample_w:stop_sample_w]) +
-                                        rms(Q0[start_sample_w:stop_sample_w] - Q1[
-                                            start_sample_w:stop_sample_w]))  # +abs(np.mean(Q0[start_sample:stop_sample]))+abs(np.mean(I1[start_sample:stop_sample]))+abs(np.mean(Q1[start_sample:stop_sample]))
+        start_sample_w = int((optimization_start - shift_w) * Fsampling)
+        stop_sample_w = int((optimization_stop - shift_w) * Fsampling)
+
+        # # computing depletion cost using demodulated transients
+        # print('Using demodulated transients')
+        # depletion_cost_d = np.mean(rms(I0[start_sample:stop_sample]) +
+        #                            rms(Q0[start_sample:stop_sample]) +
+        #                            rms(I1[start_sample:stop_sample]) +
+        #                            rms(Q1[start_sample:stop_sample]))
+        # depletion_cost_w = 10 * np.mean(rms(I1[start_sample_w:stop_sample_w] - I0[start_sample_w:stop_sample_w]) +
+        #                                 rms(Q1[start_sample_w:stop_sample_w] - Q0[start_sample_w:stop_sample_w]))  
+                                        
+        # computing depletion cost using non-demodulated transients
+        print('Using no_demod transients')
+        depletion_cost_d = np.mean(rms(I0_no_demod[start_sample:stop_sample]) +
+                                   rms(Q0_no_demod[start_sample:stop_sample]) +
+                                   rms(I1_no_demod[start_sample:stop_sample]) +
+                                   rms(Q1_no_demod[start_sample:stop_sample]))
+        depletion_cost_w = 10 * np.mean(rms(I1_no_demod[start_sample_w:stop_sample_w] - I0_no_demod[start_sample_w:stop_sample_w]) +
+                                        rms(Q1_no_demod[start_sample_w:stop_sample_w] - Q0_no_demod[start_sample_w:stop_sample_w]))  
+                                        
+
         depletion_cost = depletion_cost_d + depletion_cost_w
-        # print('total {} direct {} weights {}'.format(1000*depletion_cost, 1000*depletion_cost_d, 1000*depletion_cost_w))
     else:
         depletion_cost = 0
 
-    if plot:
-        fig, ax = plt.subplots()
-        time = np.arange(0, len(weight_I) / 1.8, 1/1.8)
-        plt.plot(time, I0, label='I ground')
-        plt.plot(time, I1, label='I excited')
-        ax.set_ylim(-edge, edge)
+    # for diagnostics only
+    print('Depletion cost: {}'.format(depletion_cost))
 
+    if plot:
+
+        # Demodulated transients in I quadrature vs time
+        fig, ax = plt.subplots()
+        # time in ns
+        time = np.arange(0, len(weight_I) / (Fsampling*1e-9), 1 / (Fsampling*1e-9))
+        plt.plot(time, I0, color='b', label='I ground')
+        plt.plot(time, I1, color='r', label='I excited')
+        ax.set_ylim(-edge, edge)
         plt.title('Demodulated I')
-        plt.xlabel('time (ns)')
+        plt.xlabel('Time (ns)')
         plt.ylabel('Demodulated voltage (V)')
 
         if optimization_window != None:
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
             plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
+        plt.axhline(0, linestyle='--', color='k')
         ax.set_xlim(0, plot_max_time*1e9)
-        plt.legend()
+        plt.legend(loc='upper right')
 
         plt.savefig(data_file.folder + '\\' +
                     'transients_I_demodulated.' + fig_format, format=fig_format)
         plt.close()
 
+        # Demodulated transients in Q quadrature vs time
         fig, ax = plt.subplots()
-        plt.plot(time, Q0, label='Q ground')
-        plt.plot(time, Q1, label='Q excited')
+        plt.plot(time, Q0, color='b', label='Q ground')
+        plt.plot(time, Q1, color='r', label='Q excited')
         ax.set_ylim(-edge, edge)
         plt.title('Demodulated Q')
-        plt.xlabel('time (ns)')
+        plt.xlabel('Time (ns)')
         plt.ylabel('Demodulated Q')
         if optimization_window != None:
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
             plt.axvline(optimization_stop * 1e9, linestyle='--', color='k')
+        plt.axhline(0, linestyle='--', color='k')
         ax.set_xlim(0, plot_max_time*1e9)
-        plt.legend()
+        plt.legend(loc='upper right')
 
         plt.savefig(data_file.folder + '\\' +
                     'transients_Q_demodulated.' + fig_format, format=fig_format)
         plt.close()
 
+        # Instantaneous power versus time
         fig, ax = plt.subplots()
-        plt.plot(time, power0 * 1e6, label='ground', lw=4)
-        plt.plot(time, power1 * 1e6, label='excited', lw=4)
+        plt.plot(time, power0 * 1e6, color='b', label='ground', lw=4)
+        plt.plot(time, power1 * 1e6, color='r', label='excited', lw=4)
         if optimization_window != None:
             plt.axvline(optimization_start * 1e9, linestyle='--',
                         color='k', label='depletion optimization window')
@@ -10374,7 +10421,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         ax.set_xlim(0, plot_max_time*1e9)
         plt.title('Signal power (uW)')
         plt.ylabel('Signal power (uW)')
-
+        plt.legend(loc='upper right')
         plt.savefig(data_file.folder + '\\' + 'transients_power.' +
                     fig_format, format=fig_format)
         plt.close()
@@ -10385,7 +10432,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
 
     A1I = I1
     A1Q = Q1
-    Fs = 1.8e9
+    Fs = Fsampling
     f_axis, PSD0I = func.PSD(A0I, 1 / Fs)
     f_axis, PSD1I = func.PSD(A1I, 1 / Fs)
     f_axis, PSD0Q = func.PSD(A0Q, 1 / Fs)
@@ -10428,9 +10475,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
             np.abs(PSD0I_o[n_o]) + np.abs(PSD1I_o[n_o]) + \
             np.abs(PSD0Q_o[n_o]) + np.abs(PSD1Q_o[n_o])
 
-    #         print('freq',f_axis[n])
-    #         print('cost_skew', cost_skew)
-    if plot:
+    if 0: #plot:    disable these plots for now. LDC, 2022/09/15.
+
         fig, ax = plt.subplots(2)
         ax[0].set_xlim(0, 0.4)
         # plotting the spectrum
@@ -10479,32 +10525,44 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                     fig_format, format=fig_format)
         plt.close()
 
-        fig, ax = plt.subplots(figsize=[8, 7])
-        plt.plot(I0, Q0, label='ground', lw=1)
-        plt.plot(I1, Q1, label='excited', lw=1)
-        ax.set_ylim(-edge, edge)
-        ax.set_xlim(-edge, edge)
-        plt.legend(frameon=False)
-        plt.title('IQ trajectory alpha{} phi{}_'.format(
-            alpha, phi) + data_file.timestamp_string)
-        plt.xlabel('I (V)')
-        plt.ylabel('Q (V)')
-        plt.savefig(data_file.folder + '\\' + 'IQ_trajectory.' +
-                    fig_format, format=fig_format)
-        plt.close()
 
+    #  Demodulated transients in IQ plane 
+    fig, ax = plt.subplots(figsize=[8, 7])
+    plt.plot(I0, Q0, color='b', label='ground', lw=1)
+    plt.plot(I1, Q1, color='r', label='excited', lw=1)
+    plt.axvline(0, linestyle='--',color='k')
+    plt.axhline(0, linestyle='--',color='k')
+    ax.set_ylim(-edge, edge)
+    ax.set_xlim(-edge, edge)
+    plt.legend(frameon=False, loc='upper right')
+    plt.title('IQ trajectory alpha{} phi{}_'.format(
+        alpha, phi) + data_file.timestamp_string)
+    plt.xlabel('I (V)')
+    plt.ylabel('Q (V)')
+    plt.savefig(data_file.folder + '\\' + 'IQ_trajectory.' +
+                fig_format, format=fig_format)
+    plt.close()
+
+
+
+    # Demodulated weight functions in IQ plane
     fig, ax = plt.subplots(figsize=[8, 7])
     plt.plot(weight_I, weight_Q, label='weights', lw=1)
+    plt.axvline(0, linestyle='--',color='k')
+    plt.axhline(0, linestyle='--',color='k')
     ax.set_ylim(-1.1, 1.1)
     ax.set_xlim(-1.1, 1.1)
-    plt.legend(frameon=False)
+    plt.legend(frameon=False, loc='upper right')
     plt.title('IQ trajectory weights')
     plt.xlabel('weight I')
     plt.ylabel('weight Q')
     plt.savefig(data_file.folder + '\\' + 'IQ_trajectory_weights')
     plt.close()
 
-    time = np.arange(0, len(weight_I) / 1.8, 1/1.8)
+    # time in ns
+    time = np.arange(0, len(weight_I) / (Fsampling*1e-9), 1/(Fsampling*1e-9))
+
+    # Demodulated weight functions versus time
     fig, ax = plt.subplots()
     plt.plot(time, weight_I, label='weight I')
     plt.plot(time, weight_Q, label='weight Q')
@@ -10513,18 +10571,26 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                     color='k', label='depletion optimization window')
         plt.axvline((optimization_stop - shift_w) *
                     1e9, linestyle='--', color='k')
-    plt.legend()
-    plt.xlabel('time (ns)')
+    plt.axhline(0, linestyle='--')
+    plt.legend(loc='upper right')
+    plt.xlabel('Time (ns)')
     plt.ylabel('Integration weight (V)')
     plt.title('demodulated weight functions_' + data_file.timestamp_string)
-    plt.axhline(0, linestyle='--')
-    edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
     ax.set_xlim(0, plot_max_time*1e9)
+    edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
+    ax.set_ylim(-edge, edge)
+    #### Print out current cost-function value
+    textstr = 'Cost value: %.4g' % (depletion_cost)
+    ####
+    ax.text(0.95, 0.05, textstr,
+                        transform=ax.transAxes,
+                        fontsize=10, verticalalignment='bottom',
+                        horizontalalignment='right')
     plt.savefig(data_file.folder + '\\' + 'demodulated_weight_functions.' +
                 fig_format, format=fig_format)
     plt.close()
 
-
+    # Non demodulated weight functions versus time
     fig, ax = plt.subplots()
     plt.plot(time, weight_I_no_demod, label='weight I')
     plt.plot(time, weight_Q_no_demod, label='weight Q')
@@ -10533,13 +10599,18 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                     color='k', label='depletion optimization window')
         plt.axvline((optimization_stop - shift_w) *
                     1e9, linestyle='--', color='k')
-    plt.legend()
-    plt.xlabel('time (ns)')
+    plt.axhline(0, linestyle='--')
+    plt.legend(loc='upper right')
+    plt.xlabel('Time (ns)')
     plt.ylabel('Integration weight (V)')
     plt.title('weight functions_' + data_file.timestamp_string)
-    plt.axhline(0, linestyle='--')
-    edge = 1.05 * max(max(abs(weight_I)), max(abs(weight_Q)))
     ax.set_xlim(0, plot_max_time*1e9)
+    edge = 1.05 * max(max(abs(weight_I_no_demod)), max(abs(weight_Q_no_demod)))
+    ax.set_ylim(-edge, edge)
+    ax.text(0.95, 0.05, textstr,
+                        transform=ax.transAxes,
+                        fontsize=10, verticalalignment='bottom',
+                        horizontalalignment='right')
     plt.savefig(data_file.folder + '\\' + 'weight_functions.' +
                 fig_format, format=fig_format)
     plt.close()

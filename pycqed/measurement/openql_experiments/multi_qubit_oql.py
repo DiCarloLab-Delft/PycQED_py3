@@ -3550,7 +3550,10 @@ def multi_qubit_Echo(times, qubits_idx: list, platf_cfg: str) -> OqlProgram:
             k.gate("wait", [qubit], wait_nanoseconds)
             k.gate('rx180', [qubit])
             k.gate("wait", [qubit], wait_nanoseconds)
+            # finally, do the final pi/2 rotation.
+            # we increase the phase linearly in steps of 40 deg.
             angle = (i * 40) % 360
+            # find the codeword corresponding to the angle
             cw_idx = angle // 20 + 9
             if angle == 0:
                 k.gate('rx90', [qubit])

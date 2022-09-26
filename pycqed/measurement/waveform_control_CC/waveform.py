@@ -23,32 +23,30 @@ import numpy as np
 # import scipy
 # from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
-
 def gauss_pulse(
-        amp: float,
-        sigma_length: float,
+        amp: float=1.0,
+        sigma_length: float=5.0e-9,
         nr_sigma: int = 4,
-        sampling_rate: float = 2e8,
+        sampling_rate: float = 2.4e9,
         axis: str = 'x',
         phase: float = 0,
         phase_unit: str = 'deg',
         motzoi: float = 0,
         delay: float = 0,
-        subtract_offset: str = 'average'
-):
+        subtract_offset: str = 'average',
+        time_gate: float = 20.0e-9
+        ):
     '''
-    All inputs are in s and Hz.
-    phases are in degree.
-
+    This version of gauss_pulse is written by LDC. 2022/07/29
     Args:
         amp (float):
             Amplitude of the Gaussian envelope.
         sigma_length (float):
-            Sigma of the Gaussian envelope.
+            Sigma of the Gaussian envelope, in seconds
         nr_sigma (int):
-            After how many sigma the Gaussian is cut off.
+            Total width (in number of sigmas, dimensionless) desired for the pulse
         sampling_rate (float):
-            Rate at which the pulse is sampled.
+            AWG sampling rate in 1/seconds.
         axis (str):
             Rotation axis of the pulse. If this is 'y', a 90-degree phase is
             added to the pulse, otherwise this argument is ignored.
@@ -59,7 +57,7 @@ def gauss_pulse(
         motzoi (float):
             DRAG-pulse parameter.
         delay (float):
-            Delay of the pulse in s.
+            Delay of the pulse in s. THIS IS DEPRECATED AND NOT USED HERE
         subtract_offset (str):
             Instruction on how to subtract the offset in order to avoid jumps
             in the waveform due to the cut-off.
@@ -71,46 +69,176 @@ def gauss_pulse(
     Returns:
         pulse_I, pulse_Q: Two quadratures of the waveform.
     '''
+
     sigma = sigma_length  # old legacy naming, to be replaced
-    length = sigma * nr_sigma
 
-    t_step = 1 / sampling_rate
-    mu = length / 2. - 0.5 * t_step  # center should be offset by half a sample
-    t = np.arange(0, nr_sigma * sigma, t_step)
+    # compute the time to allocate for the pulse
+    T_sigmas= sigma * nr_sigma
+    # compute the time to allocate for the gate, ensuring a multiple of the QuSurf heartbeat.
+    T_gate = np.ceil(time_gate/20e-9)*20e-9
+    # compute sampling period
+    T_sampling = 1 / sampling_rate
+    # for diagnostics only
+    #print(T_sigmas, T_gate, T_sampling)
 
-    gauss_env = amp * np.exp(-(0.5 * ((t - mu) ** 2) / sigma ** 2))
+    # number of sampling points for pulse, ensuring an even number
+    N_sigmas = int(np.ceil(T_sigmas/T_sampling/2)*2)
+    # number of sampling points for gate, ensuring an even number
+    N_gate   = int(np.floor(T_gate/T_sampling/2)*2)
+    
+    # determine whether the truncation will be set by T_gate or by T_sigmas
+    N_min=np.min([N_gate, N_sigmas])
+    
+    # for diagnostics only
+    #print(N_sigmas, N_gate, N_min)
+
+    # determine length (in sampling points) for zero padding at beggining and end.
+    N_zeros_L=int((N_gate-N_min)/2)
+    N_zeros_R=N_zeros_L
+    
+    # for diagnostics only
+    #print(N_zeros_L, N_zeros_R)
+
+
+    mu = T_gate / 2. - 0.5 * T_sampling  # center should be offset by half a sample
+    
+    t = np.arange(0, T_gate, T_sampling)
+    gauss_env       = np.exp(-(0.5 * ((t - mu) ** 2) / sigma ** 2))
     deriv_gauss_env = motzoi * -1 * (t - mu) / (sigma ** 1) * gauss_env
+
 
     # Subtract offsets
     if subtract_offset.lower() == 'none' or subtract_offset is None:
         # Do not subtract offset
         pass
     elif subtract_offset.lower() == 'average':
-        gauss_env -= (gauss_env[0] + gauss_env[-1]) / 2.
-        deriv_gauss_env -= (deriv_gauss_env[0] + deriv_gauss_env[-1]) / 2.
+        gauss_env -= (gauss_env[N_zeros_L] + gauss_env[N_gate-1-N_zeros_R]) / 2.
     elif subtract_offset.lower() == 'first':
-        gauss_env -= gauss_env[0]
-        deriv_gauss_env -= deriv_gauss_env[0]
+        gauss_env -= gauss_env[N_zeros_L]
     elif subtract_offset.lower() == 'last':
-        gauss_env -= gauss_env[-1]
-        deriv_gauss_env -= deriv_gauss_env[-1]
+        gauss_env -= gauss_env[N_gate-1-N_zeros_R]
     else:
         raise ValueError('Unknown value "{}" for keyword argument '
                          '"subtract_offset".'.format(subtract_offset))
 
-    delay_samples = delay * sampling_rate
-
-    # generate pulses
-    Zeros = np.zeros(int(delay_samples))
-    G = np.array(list(Zeros) + list(gauss_env))
-    D = np.array(list(Zeros) + list(deriv_gauss_env))
-
+    # zero pad as necessary
+    for i in range(N_zeros_L):
+        gauss_env[i]=0
+        deriv_gauss_env[i]=0
+    for i in range(N_zeros_R):
+        gauss_env[N_gate-1-i]=0
+        deriv_gauss_env[N_gate-1-i]=0
+    
+    # scale so that gaussian component has specificed amplitude
+    scale_fac=1/np.max(gauss_env)
+    gauss_env*=scale_fac*amp
+    deriv_gauss_env*=scale_fac*amp 
+    
     if axis == 'y':
         phase += 90
 
-    pulse_I, pulse_Q = rotate_wave(G, D, phase=phase, unit=phase_unit)
+    pulse_I, pulse_Q = rotate_wave(gauss_env, deriv_gauss_env, phase=phase, unit=phase_unit)
 
     return pulse_I, pulse_Q
+
+# def gauss_pulse(
+#     amp: float,
+#     sigma_length: float,
+#     nr_sigma: int = 4,
+#     sampling_rate: float = 2e8,
+#     axis: str = 'x',
+#     phase: float = 0,
+#     phase_unit: str = 'deg',
+#     motzoi: float = 0,
+#     delay: float = 0,
+#     subtract_offset: str = 'average'
+# ):
+# '''
+# All inputs are in s and Hz.
+# phases are in degree.
+
+# Args:
+#     amp (float):
+#         Amplitude of the Gaussian envelope.
+#     sigma_length (float):
+#         Sigma of the Gaussian envelope.
+#     nr_sigma (int):
+#         After how many sigma the Gaussian is cut off.
+#     sampling_rate (float):
+#         Rate at which the pulse is sampled.
+#     axis (str):
+#         Rotation axis of the pulse. If this is 'y', a 90-degree phase is
+#         added to the pulse, otherwise this argument is ignored.
+#     phase (float):
+#         Phase of the pulse.
+#     phase_unit (str):
+#         Unit of the phase (can be either "deg" or "rad")
+#     motzoi (float):
+#         DRAG-pulse parameter.
+#     delay (float):
+#         Delay of the pulse in s.
+#     subtract_offset (str):
+#         Instruction on how to subtract the offset in order to avoid jumps
+#         in the waveform due to the cut-off.
+#         'average': subtract the average of the first and last point.
+#         'first': subtract the value of the waveform at the first sample.
+#         'last': subtract the value of the waveform at the last sample.
+#         'none', None: don't subtract any offset.
+
+# Returns:
+#     pulse_I, pulse_Q: Two quadratures of the waveform.
+# '''
+# sigma = sigma_length  # old legacy naming, to be replaced
+
+# length = sigma * nr_sigma
+# #### LDC Kludge added here! 2022/07/19
+# #### somewhere the code expects the duration to maatch the specified single-qubit-gate time.
+# #### above definition of length doesn't achieve this!
+# #### in previous version there is a failure whenever sigma_nr_sigma neq single-qubit-gate time.
+# length=20.0e-9
+
+# t_step = 1 / sampling_rate
+# mu = length / 2. - 0.5 * t_step  # center should be offset by half a sample
+
+# # t = np.arange(0, nr_sigma * sigma, t_step)
+# t = np.arange(0, length, t_step)
+
+# # for diagnostics only
+# # print(len(t))
+
+# gauss_env = amp * np.exp(-(0.5 * ((t - mu) ** 2) / sigma ** 2))
+# deriv_gauss_env = motzoi * -1 * (t - mu) / (sigma ** 1) * gauss_env
+
+# # Subtract offsets
+# if subtract_offset.lower() == 'none' or subtract_offset is None:
+#     # Do not subtract offset
+#     pass
+# elif subtract_offset.lower() == 'average':
+#     gauss_env -= (gauss_env[0] + gauss_env[-1]) / 2.
+#     deriv_gauss_env -= (deriv_gauss_env[0] + deriv_gauss_env[-1]) / 2.
+# elif subtract_offset.lower() == 'first':
+#     gauss_env -= gauss_env[0]
+#     deriv_gauss_env -= deriv_gauss_env[0]
+# elif subtract_offset.lower() == 'last':
+#     gauss_env -= gauss_env[-1]
+#     deriv_gauss_env -= deriv_gauss_env[-1]
+# else:
+#     raise ValueError('Unknown value "{}" for keyword argument '
+#                      '"subtract_offset".'.format(subtract_offset))
+
+# delay_samples = delay * sampling_rate
+
+# # generate pulses
+# Zeros = np.zeros(int(delay_samples))
+# G = np.array(list(Zeros) + list(gauss_env))
+# D = np.array(list(Zeros) + list(deriv_gauss_env))
+
+# if axis == 'y':
+#     phase += 90
+
+# pulse_I, pulse_Q = rotate_wave(G, D, phase=phase, unit=phase_unit)
+
+# return pulse_I, pulse_Q
 
 
 def single_channel_block(amp, length, sampling_rate=2e8, delay=0):

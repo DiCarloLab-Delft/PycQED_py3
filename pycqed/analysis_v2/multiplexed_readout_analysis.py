@@ -988,7 +988,12 @@ class Multiplexed_Transient_Analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
 
-        length = int(len(self.raw_data_dict['data'][:, 0])/2)
+        # Leo DC change. 
+        # Why is the weight function half the length?
+        #length = int(len(self.raw_data_dict['data'][:, 0])/2)
+        length = int(len(self.raw_data_dict['data'][:, 0]))
+
+
         self.proc_data_dict['Time_data'] = np.arange(length)/1.8e9
         self.proc_data_dict['Channel_0_data'] = self.raw_data_dict['data'][:, 1][:length]
         self.proc_data_dict['Channel_1_data'] = self.raw_data_dict['data'][:, 2][:length]
@@ -1028,7 +1033,8 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
                  A_ground, A_excited,
                  t_start: str = None, t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, extract_only: bool = False,
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
                  auto=True):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
@@ -1069,9 +1075,19 @@ class Multiplexed_Weights_Analysis(ba.BaseDataAnalysis):
         W_I = I_e - I_g
         W_Q = Q_e - Q_g
 
+        # remove average
+        W_I-=np.average(W_I)
+        W_Q-=np.average(W_Q)
+
         #normalize weights
-        W_I = W_I/np.max(W_I)
-        W_Q = W_Q/np.max(W_Q)
+        maxabsW_I=np.max([np.abs(np.max(W_I)), np.abs(np.min(W_I))])
+        maxabsW_Q=np.max([np.abs(np.max(W_Q)), np.abs(np.min(W_Q))])
+        maxabs=np.max([maxabsW_I, maxabsW_Q])
+        W_I = W_I/maxabs
+        W_Q = W_Q/maxabs
+
+        #W_I = W_I/np.max(W_I)
+        #W_Q = W_Q/np.max(W_Q)
 
         C = W_I + 1j*W_Q
 

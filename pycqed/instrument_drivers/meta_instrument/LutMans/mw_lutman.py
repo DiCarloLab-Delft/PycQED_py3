@@ -9,6 +9,11 @@ from qcodes.utils import validators as vals
 
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
+def __get_nearest_rotation(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
 default_mw_lutmap = {
     0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
     1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0 , "type" : "ge"},
@@ -41,137 +46,138 @@ default_mw_lutmap = {
 }
 
 inspire_mw_lutmap = {
-    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0  , "type" : "ge"}, # I for CW compatibility
-    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0  , "type" : "ge"}, # rX180 for CW compatibility
-    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90 , "type" : "ge"}, # rY180 for CW compatibility
-    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0  , "type" : "ge"}, # rX90 for CW compatibility
-    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90 , "type" : "ge"}, # rY90 for CW compatibility
-    5  : {"name" : "rX270" , "theta" : 270      , "phi" : 0  , "type" : "ge"}, # rXm90 for CW compatibility
-    6  : {"name" : "rY270" , "theta" : 270      , "phi" : 90 , "type" : "ge"}, # rYm90 for CW compatibility
-    7  : {"name" : "rX5"   , "theta" : 5.625    , "phi" : 0  , "type" : "ge"},
-    8  : {"name" : "rX11"  , "theta" : 11.25    , "phi" : 0  , "type" : "ge"},
-    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0  , "type" : "ef"}, # rX12 for CW compatibility
-    10 : {"name" : "rX16"  , "theta" : 16.875   , "phi" : 0  , "type" : "ge"},
-    11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90 , "type" : "ge"}, # rY45 for CW compatibility
-    12 : {"name" : "rY315" , "theta" : -45      , "phi" : 90 , "type" : "ge"}, # rYm45 for CW compatibility
-    13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0  , "type" : "ge"}, # rX45 for CW compatibility
-    14 : {"name" : "rX315" , "theta" : -45      , "phi" : 0  , "type" : "ge"}, # rXm45 for CW compatibility
-    15 : {"name" : "rX22"  , "theta" : 22.5     , "phi" : 0  , "type" : "ge"},
-    16 : {"name" : "rX28"  , "theta" : 28.125   , "phi" : 0  , "type" : "ge"},
-    17 : {"name" : "rX33"  , "theta" : 33.75    , "phi" : 0  , "type" : "ge"},
-    18 : {"name" : "rX39"  , "theta" : 39.375   , "phi" : 0  , "type" : "ge"},
-    19 : {"name" : "rX50"  , "theta" : 50.625   , "phi" : 0  , "type" : "ge"},
-    20 : {"name" : "rX56"  , "theta" : 56.25    , "phi" : 0  , "type" : "ge"},
-    21 : {"name" : "rX61"  , "theta" : 61.875   , "phi" : 0  , "type" : "ge"},
-    22 : {"name" : "rX67"  , "theta" : 67.5     , "phi" : 0  , "type" : "ge"},
-    23 : {"name" : "rX73"  , "theta" : 73.125   , "phi" : 0  , "type" : "ge"},
-    24 : {"name" : "rX78"  , "theta" : 78.75    , "phi" : 0  , "type" : "ge"},
-    25 : {"name" : "rX84"  , "theta" : 84.375   , "phi" : 0  , "type" : "ge"},
-    26 : {"name" : "rX95"  , "theta" : 95.625   , "phi" : 0  , "type" : "ge"},
-    27 : {"name" : "rX101" , "theta" : 101.25   , "phi" : 0  , "type" : "ge"},
-    28 : {"name" : "rX106" , "theta" : 106.875  , "phi" : 0  , "type" : "ge"},
-    29 : {"name" : "rX112" , "theta" : 112.5    , "phi" : 0  , "type" : "ge"},
-    30 : {"name" : "rX118" , "theta" : 118.125  , "phi" : 0  , "type" : "ge"},
-    31 : {"name" : "rX123" , "theta" : 123.75   , "phi" : 0  , "type" : "ge"},
-    32 : {"name" : "rX129" , "theta" : 129.375  , "phi" : 0  , "type" : "ge"},
-    33 : {"name" : "rX135" , "theta" : 135      , "phi" : 0  , "type" : "ge"},
-    34 : {"name" : "rX140" , "theta" : 140.625  , "phi" : 0  , "type" : "ge"},
-    35 : {"name" : "rX146" , "theta" : 146.25   , "phi" : 0  , "type" : "ge"},
-    36 : {"name" : "rX151" , "theta" : 151.875  , "phi" : 0  , "type" : "ge"},
-    37 : {"name" : "rX157" , "theta" : 157.5    , "phi" : 0  , "type" : "ge"},
-    38 : {"name" : "rX163" , "theta" : 163.125  , "phi" : 0  , "type" : "ge"},
-    39 : {"name" : "rX168" , "theta" : 168.75   , "phi" : 0  , "type" : "ge"},
-    40 : {"name" : "rX174" , "theta" : 174.375  , "phi" : 0  , "type" : "ge"},
-    41 : {"name" : "rX185" , "theta" : -174.375 , "phi" : 0  , "type" : "ge"},
-    42 : {"name" : "rX191" , "theta" : -168.75  , "phi" : 0  , "type" : "ge"},
-    43 : {"name" : "rX196" , "theta" : -163.125 , "phi" : 0  , "type" : "ge"},
-    44 : {"name" : "rX202" , "theta" : -157.5   , "phi" : 0  , "type" : "ge"},
-    45 : {"name" : "rX208" , "theta" : -151.875 , "phi" : 0  , "type" : "ge"},
-    46 : {"name" : "rX213" , "theta" : -146.25  , "phi" : 0  , "type" : "ge"},
-    47 : {"name" : "rX219" , "theta" : -140.625 , "phi" : 0  , "type" : "ge"},
-    48 : {"name" : "rX225" , "theta" : -135     , "phi" : 0  , "type" : "ge"},
-    49 : {"name" : "rX230" , "theta" : -129.375 , "phi" : 0  , "type" : "ge"},
-    50 : {"name" : "rX236" , "theta" : -123.75  , "phi" : 0  , "type" : "ge"},
-    51 : {"name" : "rX241" , "theta" : -118.125 , "phi" : 0  , "type" : "ge"},
-    52 : {"name" : "rX247" , "theta" : -112.5   , "phi" : 0  , "type" : "ge"},
-    53 : {"name" : "rX253" , "theta" : -106.875 , "phi" : 0  , "type" : "ge"},
-    54 : {"name" : "rX258" , "theta" : -101.25  , "phi" : 0  , "type" : "ge"},
-    55 : {"name" : "rX264" , "theta" : -95.625  , "phi" : 0  , "type" : "ge"},
-    56 : {"name" : "rX275" , "theta" : -84.375  , "phi" : 0  , "type" : "ge"},
-    57 : {"name" : "rX281" , "theta" : -78.75   , "phi" : 0  , "type" : "ge"},
-    58 : {"name" : "rX286" , "theta" : -73.125  , "phi" : 0  , "type" : "ge"},
-    59 : {"name" : "rX292" , "theta" : -67.5    , "phi" : 0  , "type" : "ge"},
-    60 : {"name" : "rX298" , "theta" : -61.875  , "phi" : 0  , "type" : "ge"},
-    61 : {"name" : "rX303" , "theta" : -56.25   , "phi" : 0  , "type" : "ge"},
-    62 : {"name" : "rX309" , "theta" : -50.625  , "phi" : 0  , "type" : "ge"},
-    63 : {"name" : "rX320" , "theta" : -39.375  , "phi" : 0  , "type" : "ge"},
-    64 : {"name" : "rX326" , "theta" : -33.75   , "phi" : 0  , "type" : "ge"},
-    65 : {"name" : "rX331" , "theta" : -28.125  , "phi" : 0  , "type" : "ge"},
-    66 : {"name" : "rX337" , "theta" : -22.5    , "phi" : 0  , "type" : "ge"},
-    67 : {"name" : "rX343" , "theta" : -16.875  , "phi" : 0  , "type" : "ge"},
-    68 : {"name" : "rX348" , "theta" : -11.25   , "phi" : 0  , "type" : "ge"},
-    69 : {"name" : "rX354" , "theta" : -5.625   , "phi" : 0  , "type" : "ge"},
-    70 : {"name" : "rY5"   , "theta" : 5.625    , "phi" : 90 , "type" : "ge"},
-    71 : {"name" : "rY11"  , "theta" : 11.25    , "phi" : 90 , "type" : "ge"},
-    72 : {"name" : "rY16"  , "theta" : 16.875   , "phi" : 90 , "type" : "ge"},
-    73 : {"name" : "rY22"  , "theta" : 22.5     , "phi" : 90 , "type" : "ge"},
-    74 : {"name" : "rY28"  , "theta" : 28.125   , "phi" : 90 , "type" : "ge"},
-    75 : {"name" : "rY33"  , "theta" : 33.75    , "phi" : 90 , "type" : "ge"},
-    76 : {"name" : "rY39"  , "theta" : 39.375   , "phi" : 90 , "type" : "ge"},
-    77 : {"name" : "rY50"  , "theta" : 50.625   , "phi" : 90 , "type" : "ge"},
-    78 : {"name" : "rY56"  , "theta" : 56.25    , "phi" : 90 , "type" : "ge"},
-    79 : {"name" : "rY61"  , "theta" : 61.875   , "phi" : 90 , "type" : "ge"},
-    80 : {"name" : "rY67"  , "theta" : 67.5     , "phi" : 90 , "type" : "ge"},
-    81 : {"name" : "rY73"  , "theta" : 73.125   , "phi" : 90 , "type" : "ge"},
-    82 : {"name" : "rY78"  , "theta" : 78.75    , "phi" : 90 , "type" : "ge"},
-    83 : {"name" : "rY84"  , "theta" : 84.375   , "phi" : 90 , "type" : "ge"},
-    84 : {"name" : "rY95"  , "theta" : 95.625   , "phi" : 90 , "type" : "ge"},
-    85 : {"name" : "rY101" , "theta" : 101.25   , "phi" : 90 , "type" : "ge"},
-    86 : {"name" : "rY106" , "theta" : 106.875  , "phi" : 90 , "type" : "ge"},
-    87 : {"name" : "rY112" , "theta" : 112.5    , "phi" : 90 , "type" : "ge"},
-    88 : {"name" : "rY118" , "theta" : 118.125  , "phi" : 90 , "type" : "ge"},
-    89 : {"name" : "rY123" , "theta" : 123.75   , "phi" : 90 , "type" : "ge"},
-    90 : {"name" : "rY129" , "theta" : 129.375  , "phi" : 90 , "type" : "ge"},
-    91 : {"name" : "rY135" , "theta" : 135      , "phi" : 90 , "type" : "ge"},
-    92 : {"name" : "rY140" , "theta" : 140.625  , "phi" : 90 , "type" : "ge"},
-    93 : {"name" : "rY146" , "theta" : 146.25   , "phi" : 90 , "type" : "ge"},
-    94 : {"name" : "rY151" , "theta" : 151.875  , "phi" : 90 , "type" : "ge"},
-    95 : {"name" : "rY157" , "theta" : 157.5    , "phi" : 90 , "type" : "ge"},
-    96 : {"name" : "rY163" , "theta" : 163.125  , "phi" : 90 , "type" : "ge"},
-    97 : {"name" : "rY168" , "theta" : 168.75   , "phi" : 90 , "type" : "ge"},
-    98 : {"name" : "rY174" , "theta" : 174.375  , "phi" : 90 , "type" : "ge"},
-    99 : {"name" : "rY185" , "theta" : -174.375 , "phi" : 90 , "type" : "ge"},
-    100: {"name" : "rY191" , "theta" : -168.75  , "phi" : 90 , "type" : "ge"},
-    101: {"name" : "rY196" , "theta" : -163.125 , "phi" : 90 , "type" : "ge"},
-    102: {"name" : "rY202" , "theta" : -157.5   , "phi" : 90 , "type" : "ge"},
-    103: {"name" : "rY208" , "theta" : -151.875 , "phi" : 90 , "type" : "ge"},
-    104: {"name" : "rY213" , "theta" : -146.25  , "phi" : 90 , "type" : "ge"},
-    105: {"name" : "rY219" , "theta" : -140.625 , "phi" : 90 , "type" : "ge"},
-    106: {"name" : "rY225" , "theta" : -135     , "phi" : 90 , "type" : "ge"},
-    107: {"name" : "rY230" , "theta" : -129.375 , "phi" : 90 , "type" : "ge"},
-    108: {"name" : "rY236" , "theta" : -123.75  , "phi" : 90 , "type" : "ge"},
-    109: {"name" : "rY241" , "theta" : -118.125 , "phi" : 90 , "type" : "ge"},
-    110: {"name" : "rY247" , "theta" : -112.5   , "phi" : 90 , "type" : "ge"},
-    111: {"name" : "rY253" , "theta" : -106.875 , "phi" : 90 , "type" : "ge"},
-    112: {"name" : "rY258" , "theta" : -101.25  , "phi" : 90 , "type" : "ge"},
-    113: {"name" : "rY264" , "theta" : -95.625  , "phi" : 90 , "type" : "ge"},
-    114: {"name" : "rY275" , "theta" : -84.375  , "phi" : 90 , "type" : "ge"},
-    115: {"name" : "rY281" , "theta" : -78.75   , "phi" : 90 , "type" : "ge"},
-    116: {"name" : "rY286" , "theta" : -73.125  , "phi" : 90 , "type" : "ge"},
-    117: {"name" : "rY292" , "theta" : -67.5    , "phi" : 90 , "type" : "ge"},
-    118: {"name" : "rY298" , "theta" : -61.875  , "phi" : 90 , "type" : "ge"},
-    119: {"name" : "rY303" , "theta" : -56.25   , "phi" : 90 , "type" : "ge"},
-    120: {"name" : "rY309" , "theta" : -50.625  , "phi" : 90 , "type" : "ge"},
-    121: {"name" : "rY320" , "theta" : -39.375  , "phi" : 90 , "type" : "ge"},
-    122: {"name" : "rY326" , "theta" : -33.75   , "phi" : 90 , "type" : "ge"},
-    123: {"name" : "rY331" , "theta" : -28.125  , "phi" : 90 , "type" : "ge"},
-    124: {"name" : "rY337" , "theta" : -22.5    , "phi" : 90 , "type" : "ge"},
-    125: {"name" : "rY343" , "theta" : -16.875  , "phi" : 90 , "type" : "ge"},
-    126: {"name" : "rY348" , "theta" : -11.25   , "phi" : 90 , "type" : "ge"},
-    127: {"name" : "rY354" , "theta" : -5.625   , "phi" : 90 , "type" : "ge"}
+    0  : {"name": "I"     , "theta": 0        , "phi" : 0 , "type" : "ge"}, # I for CW compatibility
+    1  : {"name": "rX180" , "theta": 180      , "phi" : 0 , "type" : "ge"}, # rX180 for CW compatibility
+    2  : {"name": "rY180" , "theta": 180      , "phi" : 90, "type" : "ge"}, # rY180 for CW compatibility
+    3  : {"name": "rX90"  , "theta": 90       , "phi" : 0 , "type" : "ge"}, # rX90 for CW compatibility
+    4  : {"name": "rY90"  , "theta": 90       , "phi" : 90, "type" : "ge"}, # rY90 for CW compatibility
+    5  : {"name": "rX270" , "theta": 270      , "phi" : 0 , "type" : "ge"}, # rXm90 for CW compatibility
+    6  : {"name": "rY270" , "theta": 270      , "phi" : 90, "type" : "ge"}, # rYm90 for CW compatibility
+    7  : {"name": "rX7"   , "theta": 6.666    , "phi" : 0 , "type" : "ge"},
+    8  : {"name": "rX13"  , "theta": 13.333   , "phi" : 0 , "type" : "ge"},
+    9  : {"name": "rX12"  , "theta": 180      , "phi" : 0 , "type" : "ef"}, # rX12 for CW compatibility
+    10 : {"name": "rX20"  , "theta": 19.999   , "phi" : 0 , "type" : "ge"},
+    11 : {"name": "rY45"  , "theta": 45       , "phi" : 90, "type" : "ge"}, # rY45 for CW compatibility
+    12 : {"name": "rY315" , "theta": -45      , "phi" : 90, "type" : "ge"}, # rYm45 for CW compatibility
+    13 : {"name": "rX45"  , "theta": 45       , "phi" : 0 , "type" : "ge"}, # rX45 for CW compatibility
+    14 : {"name": "rX315" , "theta": -45      , "phi" : 0 , "type" : "ge"}, # rXm45 for CW compatibility
+    15 : {"name": "rx27"  , "theta": 26.664   , "phi" : 0 , "type" : "ge"},
+    16 : {"name": "rx33"  , "theta": 33.330   , "phi" : 0 , "type" : "ge"},
+    17 : {"name": "rx40"  , "theta": 39.996   , "phi" : 0 , "type" : "ge"},
+    18 : {"name": "rx47"  , "theta": 46.662   , "phi" : 0 , "type" : "ge"},
+    19 : {"name": "rx53"  , "theta": 53.328   , "phi" : 0 , "type" : "ge"},
+    20 : {"name": "rx60"  , "theta": 59.994   , "phi" : 0 , "type" : "ge"},
+    21 : {"name": "rx67"  , "theta": 66.660   , "phi" : 0 , "type" : "ge"},
+    22 : {"name": "rx73"  , "theta": 73.326   , "phi" : 0 , "type" : "ge"},
+    23 : {"name": "rx80"  , "theta": 79.992   , "phi" : 0 , "type" : "ge"},
+    24 : {"name": "rx87"  , "theta": 86.658   , "phi" : 0 , "type" : "ge"},
+    25 : {"name": "rx93"  , "theta": 93.324   , "phi" : 0 , "type" : "ge"},
+    26 : {"name": "rx100" , "theta": 99.990   , "phi" : 0 , "type" : "ge"},
+    27 : {"name": "rx107" , "theta": 106.656  , "phi" : 0 , "type" : "ge"},
+    28 : {"name": "rx113" , "theta": 113.322  , "phi" : 0 , "type" : "ge"},
+    29 : {"name": "rx120" , "theta": 119.988  , "phi" : 0 , "type" : "ge"},
+    30 : {"name": "rx127" , "theta": 126.654  , "phi" : 0 , "type" : "ge"},
+    31 : {"name": "rx133" , "theta": 133.320  , "phi" : 0 , "type" : "ge"},
+    32 : {"name": "rx140" , "theta": 139.986  , "phi" : 0 , "type" : "ge"},
+    33 : {"name": "rx147" , "theta": 146.652  , "phi" : 0 , "type" : "ge"},
+    34 : {"name": "rx153" , "theta": 153.318  , "phi" : 0 , "type" : "ge"},
+    35 : {"name": "rx160" , "theta": 159.984  , "phi" : 0 , "type" : "ge"},
+    36 : {"name": "rx167" , "theta": 166.650  , "phi" : 0 , "type" : "ge"},
+    37 : {"name": "rx173" , "theta": 173.316  , "phi" : 0 , "type" : "ge"},
+    # 38 : {"name": "rx180" , "theta": 179.982  , "phi" : 0 , "type" : "ge"},
+    39 : {"name": "rx187" , "theta": -173.352 , "phi" : 0 , "type" : "ge"},
+    40 : {"name": "rx193" , "theta": -166.686 , "phi" : 0 , "type" : "ge"},
+    41 : {"name": "rx200" , "theta": -160.020 , "phi" : 0 , "type" : "ge"},
+    42 : {"name": "rx207" , "theta": -153.354 , "phi" : 0 , "type" : "ge"},
+    43 : {"name": "rx213" , "theta": -146.688 , "phi" : 0 , "type" : "ge"},
+    44 : {"name": "rx220" , "theta": -140.022 , "phi" : 0 , "type" : "ge"},
+    45 : {"name": "rx227" , "theta": -133.356 , "phi" : 0 , "type" : "ge"},
+    46 : {"name": "rx233" , "theta": -126.690 , "phi" : 0 , "type" : "ge"},
+    47 : {"name": "rx240" , "theta": -120.024 , "phi" : 0 , "type" : "ge"},
+    48 : {"name": "rx247" , "theta": -113.358 , "phi" : 0 , "type" : "ge"},
+    49 : {"name": "rx253" , "theta": -106.692 , "phi" : 0 , "type" : "ge"},
+    50 : {"name": "rx260" , "theta": -100.026 , "phi" : 0 , "type" : "ge"},
+    51 : {"name": "rx267" , "theta": -93.3600 , "phi" : 0 , "type" : "ge"},
+    52 : {"name": "rx273" , "theta": -86.6940 , "phi" : 0 , "type" : "ge"},
+    53 : {"name": "rx280" , "theta": -80.0280 , "phi" : 0 , "type" : "ge"},
+    54 : {"name": "rx287" , "theta": -73.3620 , "phi" : 0 , "type" : "ge"},
+    55 : {"name": "rx293" , "theta": -66.6960 , "phi" : 0 , "type" : "ge"},
+    56 : {"name": "rx300" , "theta": -60.0299 , "phi" : 0 , "type" : "ge"},
+    57 : {"name": "rx307" , "theta": -53.3639 , "phi" : 0 , "type" : "ge"},
+    58 : {"name": "rx313" , "theta": -46.6979 , "phi" : 0 , "type" : "ge"},
+    59 : {"name" : "phaseCorrPark" , "type" : "phase"},
+    60 : {"name" : "phaseCorrNW" , "type" : "phase"},
+    61 : {"name" : "phaseCorrNE" , "type" : "phase"},
+    62 : {"name" : "phaseCorrSW" , "type" : "phase"},
+    63 : {"name" : "phaseCorrSE" , "type" : "phase"},
+    64 : {"name": "rx320" , "theta": -40.031  , "phi" : 0 , "type" : "ge"},
+    65 : {"name": "rx327" , "theta": -33.365  , "phi" : 0 , "type" : "ge"},
+    66 : {"name": "rx333" , "theta": -26.699  , "phi" : 0 , "type" : "ge"},
+    67 : {"name": "rx340" , "theta": -20.033  , "phi" : 0 , "type" : "ge"},
+    68 : {"name": "rx347" , "theta": -13.367  , "phi" : 0 , "type" : "ge"},
+    69 : {"name": "rx353" , "theta": -6.701   , "phi" : 0 , "type" : "ge"},
+    70 : {"name": "ry7"   , "theta": 6.666    , "phi" : 90 , "type" : "ge"},
+    71 : {"name": "ry13"  , "theta": 13.332   , "phi" : 90 , "type" : "ge"},
+    72 : {"name": "ry20"  , "theta": 19.998   , "phi" : 90 , "type" : "ge"},
+    73 : {"name": "ry27"  , "theta": 26.664   , "phi" : 90 , "type" : "ge"},
+    74 : {"name": "ry33"  , "theta": 33.330   , "phi" : 90 , "type" : "ge"},
+    75 : {"name": "ry40"  , "theta": 39.996   , "phi" : 90 , "type" : "ge"},
+    76 : {"name": "ry47"  , "theta": 46.662   , "phi" : 90 , "type" : "ge"},
+    77 : {"name": "ry53"  , "theta": 53.328   , "phi" : 90 , "type" : "ge"},
+    78 : {"name": "ry60"  , "theta": 59.994   , "phi" : 90 , "type" : "ge"},
+    79 : {"name": "ry67"  , "theta": 66.660   , "phi" : 90 , "type" : "ge"},
+    80 : {"name": "ry73"  , "theta": 73.326   , "phi" : 90 , "type" : "ge"},
+    81 : {"name": "ry80"  , "theta": 79.992   , "phi" : 90 , "type" : "ge"},
+    82 : {"name": "ry87"  , "theta": 86.658   , "phi" : 90 , "type" : "ge"},
+    83 : {"name": "ry93"  , "theta": 93.324   , "phi" : 90 , "type" : "ge"},
+    84 : {"name": "ry100" , "theta": 99.990   , "phi" : 90 , "type" : "ge"},
+    85 : {"name": "ry107" , "theta": 106.656  , "phi" : 90 , "type" : "ge"},
+    86 : {"name": "ry113" , "theta": 113.322  , "phi" : 90 , "type" : "ge"},
+    87 : {"name": "ry120" , "theta": 119.988  , "phi" : 90 , "type" : "ge"},
+    88 : {"name": "ry127" , "theta": 126.654  , "phi" : 90 , "type" : "ge"},
+    89 : {"name": "ry133" , "theta": 133.320  , "phi" : 90 , "type" : "ge"},
+    90 : {"name": "ry140" , "theta": 139.986  , "phi" : 90 , "type" : "ge"},
+    91 : {"name": "ry147" , "theta": 146.652  , "phi" : 90 , "type" : "ge"},
+    92 : {"name": "ry153" , "theta": 153.318  , "phi" : 90 , "type" : "ge"},
+    93 : {"name": "ry160" , "theta": 159.984  , "phi" : 90 , "type" : "ge"},
+    94 : {"name": "ry167" , "theta": 166.650  , "phi" : 90 , "type" : "ge"},
+    95 : {"name": "ry173" , "theta": 173.316  , "phi" : 90 , "type" : "ge"},
+    # 96 : {"name": "ry180" , "theta": 179.982  , "phi" : 90 , "type" : "ge"},
+    97 : {"name": "ry187" , "theta": -173.352 , "phi" : 90 , "type" : "ge"},
+    98 : {"name": "ry193" , "theta": -166.686 , "phi" : 90 , "type" : "ge"},
+    99 : {"name": "ry200" , "theta": -160.020 , "phi" : 90 , "type" : "ge"},
+    100: {"name": "ry207" , "theta": -153.354 , "phi" : 90 , "type" : "ge"},
+    101: {"name": "ry213" , "theta": -146.688 , "phi" : 90 , "type" : "ge"},
+    102: {"name": "ry220" , "theta": -140.022 , "phi" : 90 , "type" : "ge"},
+    103: {"name": "ry227" , "theta": -133.356 , "phi" : 90 , "type" : "ge"},
+    104: {"name": "ry233" , "theta": -126.690 , "phi" : 90 , "type" : "ge"},
+    105: {"name": "ry240" , "theta": -120.024 , "phi" : 90 , "type" : "ge"},
+    106: {"name": "ry247" , "theta": -113.358 , "phi" : 90 , "type" : "ge"},
+    107: {"name": "ry253" , "theta": -106.692 , "phi" : 90 , "type" : "ge"},
+    108: {"name": "ry260" , "theta": -100.026 , "phi" : 90 , "type" : "ge"},
+    109: {"name": "ry267" , "theta": -93.360  , "phi" : 90 , "type" : "ge"},
+    110: {"name": "ry273" , "theta": -86.694  , "phi" : 90 , "type" : "ge"},
+    111: {"name": "ry280" , "theta": -80.028  , "phi" : 90 , "type" : "ge"},
+    112: {"name": "ry287" , "theta": -73.362  , "phi" : 90 , "type" : "ge"},
+    113: {"name": "ry293" , "theta": -66.696  , "phi" : 90 , "type" : "ge"},
+    114: {"name": "ry300" , "theta": -60.029  , "phi" : 90 , "type" : "ge"},
+    115: {"name": "ry307" , "theta": -53.363  , "phi" : 90 , "type" : "ge"},
+    116: {"name": "ry313" , "theta": -46.697  , "phi" : 90 , "type" : "ge"},
+    117: {"name": "ry320" , "theta": -40.031  , "phi" : 90 , "type" : "ge"},
+    118: {"name": "ry327" , "theta": -33.365  , "phi" : 90 , "type" : "ge"},
+    119: {"name": "ry333" , "theta": -26.699  , "phi" : 90 , "type" : "ge"},
+    120: {"name": "ry340" , "theta": -20.033  , "phi" : 90 , "type" : "ge"},
+    121: {"name": "ry347" , "theta": -13.367  , "phi" : 90 , "type" : "ge"},
+    122: {"name": "ry353" , "theta": -6.701   , "phi" : 90 , "type" : "ge"},
 }
 
 valid_types = {'ge', 'ef', 'spec', 'raw-drag', 'ef-raw', 'square', 'phase'}
+
+# for key, value in enumerate(range(15, 59)):
+#     print(r'{} : {{"name": "rx{:.0f}", "theta": {:.3f} , "phi" : 0 , "type" : "ge"}},'.format(value, __get_nearest_rotation(np.round(np.arange(0,360,6.666)), (key+4)*6.666), (key+4)*6.666))
+
+# for key, value in enumerate(range(70, 128)):
+#     print(r'{} : {{"name": "ry{:.0f}", "theta": {:.3f} , "phi" : 90 , "type" : "ge"}},'.format(value, __get_nearest_rotation(np.round(np.arange(0,360,6.666)), key*6.666), key*6.666))
 
 
 def mw_lutmap_is_valid(lutmap: dict) -> bool:
@@ -233,6 +239,10 @@ class Base_MW_LutMan(Base_LutMan):
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
         self.LutMap(default_mw_lutmap.copy())
+
+    def set_inspire_lutmap(self):
+        """Set the default lutmap for expanded microwave drive pulses."""
+        self.LutMap(inspire_mw_lutmap.copy())
 
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
@@ -427,7 +437,22 @@ class Base_MW_LutMan(Base_LutMan):
                 else:
                     raise KeyError('Expected parameter "sq_amp" to exist')
             elif waveform['type'] == 'phase':
-                pass
+                #self._wave_dict[idx] = self.spec_func(
+                    #amp=0,
+                    ##length=self.mw_gauss_width()*4,
+                    ## LDC Kludge for Inspire 2022/07/19
+                    #length=20e-9,     
+                    #sampling_rate=self.sampling_rate(),
+                    #delay=0,
+                    #phase=0)
+                self._wave_dict[idx] = self.wf_func(
+                    amp=0,
+                    phase=0,
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=f_modulation,
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=self.mw_motzoi(),
+                    delay=self.pulse_delay())
             else:
                 raise ValueError
 
@@ -767,6 +792,16 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                            initial_value=0.5)
 
     def _add_phase_correction_parameters(self):
+        self.add_parameter(
+            name=f'vcz_virtual_q_ph_corr_park',
+            parameter_class=ManualParameter,
+            unit='deg',
+            vals=vals.Numbers(-360, 360),
+            initial_value=0.0,
+            docstring=f"Virtual phase correction for parking."
+                        "Will be applied as increment to sine generator phases via command table."
+        )
+
         # corrections for phases that the qubit can acquire during one of its CZ gates
         for gate in ['NW','NE','SW','SE']:
             self.add_parameter(
@@ -799,16 +834,16 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # there are 8 flux-dance steps for the S17 scheme.
         # NOTE: this correction must not be the same as the above one for the case of a spectator
         #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
-        for step in np.arange(1,9):
-            self.add_parameter(
-                name=f'vcz_virtual_q_ph_corr_park_step_{step}',
-                parameter_class=ManualParameter,
-                unit='deg',
-                vals=vals.Numbers(-360, 360),
-                initial_value=0.0,
-                docstring=f"Virtual phase correction for parking in flux-dance step {step}."
-                            "Will be applied as increment to sine generator phases via command table."
-            )
+        # for step in np.arange(1,9):
+        #     self.add_parameter(
+        #         name=f'vcz_virtual_q_ph_corr_park_step_{step}',
+        #         parameter_class=ManualParameter,
+        #         unit='deg',
+        #         vals=vals.Numbers(-360, 360),
+        #         initial_value=0.0,
+        #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
+        #                     "Will be applied as increment to sine generator phases via command table."
+        #     )
 
     def _reset_phase_correction_parameters(self):
         for gate in ['NW','NE','SW','SE']:
@@ -1084,13 +1119,22 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     raise KeyError('Expected parameter "sq_amp" to exist')
 
             elif waveform['type'] == 'phase':
-                # fill codewords that are used for phase correction instructions
+                #fill codewords that are used for phase correction instructions
                 # with a zero waveform
                 self._wave_dict[idx] = wf.block_pulse(
                     amp=0,
                     sampling_rate=self.sampling_rate(),
-                    length=self.mw_gauss_width()*4,
+                    #length=self.mw_gauss_width()*4,
+                    length=20e-9,
                     )
+                #self._wave_dict[idx] = self.wf_func(
+                #    amp=0,
+                #    phase=0,
+                #    sigma_length=self.mw_gauss_width(),
+                #    f_modulation=f_modulation,
+                #    sampling_rate=self.sampling_rate(),
+                #    motzoi=self.mw_motzoi(),
+                #    delay=self.pulse_delay())
             else:
                 raise ValueError
 
@@ -1114,26 +1158,32 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         }
 
         # manual waveform index 1-to-1 mapping
-        for ind in np.arange(0, 60, 1):
+        for ind in np.arange(0, 59, 1):
             commandtable_dict['table'] += [{"index": int(ind),
                                             "waveform": {"index": int(ind)}
                                             }]
 
-        # add phase corrections to the end of the codeword space
-        # the first 8 positions are for parking related phase corrections,
-        # the last 4 are for phase corrections due to gate in corresponding direction
-        phase_corr_inds = np.arange(52,64,1)
-        for step, cw in enumerate(phase_corr_inds[:8]):
-            phase = self.parameters[f"vcz_virtual_q_ph_corr_park_step_{step+1}"]()
-            commandtable_dict['table'] += [{"index": int(cw),
+        # # add phase corrections to the end of the codeword space
+        # # the first 8 positions are for parking related phase corrections,
+        # # the last 4 are for phase corrections due to gate in corresponding direction
+        phase_corr_inds = np.arange(59,64,1)
+
+        phase = self.parameters[f"vcz_virtual_q_ph_corr_park"]()
+        commandtable_dict['table'] += [{"index": int(phase_corr_inds[0]),
+                                        "phase0": {"value": float(phase), "increment": True},
+                                        "phase1": {"value": float(phase), "increment": True}
+                                        }]
+
+        for i,d in enumerate(['NW','NE','SW','SE']):
+            phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
+            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i+1]),
                                             "phase0": {"value": float(phase), "increment": True},
                                             "phase1": {"value": float(phase), "increment": True}
                                             }]
-        for i,d in enumerate(['NW','NE','SW','SE']):
-            phase = self.parameters[f"vcz_virtual_q_ph_corr_{d}"]()
-            commandtable_dict['table'] += [{"index": int(phase_corr_inds[i+8]),
-                                            "phase0": {"value": float(phase), "increment": True},
-                                            "phase1": {"value": float(phase), "increment": True}
+
+        for ind in np.arange(64, 128, 1):
+            commandtable_dict['table'] += [{"index": int(ind),
+                                            "waveform": {"index": int(ind)}
                                             }]
 
         # NOTE: Whenever the command table is used, the phase offset between I and Q channels on
@@ -1153,50 +1203,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     ##########################################################################
     # Private functions
     ##########################################################################
-
-    def _add_phase_correction_parameters(self):
-        # corrections for phases that the qubit can acquire during one of its CZ gates
-        for gate in ['NW','NE','SW','SE']:
-            self.add_parameter(
-                name=f'vcz_virtual_q_ph_corr_{gate}',
-                parameter_class=ManualParameter,
-                unit='deg',
-                vals=vals.Numbers(-360, 360),
-                initial_value=0.0,
-                docstring=f"Virtual phase correction for two-qubit gate in {gate}-direction."
-                            "Will be applied as increment to sine generator phases via command table."
-            )
-
-        # corrections for phases that the qubit can acquire during parking as spectator of a CZ gate.
-        # this can happen in general for each of its neighbouring qubits (below: 'direction'),
-        # while it is doing a gate in each possible direction (below: 'gate')
-        # for direction in ['NW','NE','SW','SE']:
-        #     for gate in ['NW','NE','SW','SE']:
-        #         self.add_parameter(
-        #             name=f'vcz_virtual_q_ph_corr_spec_{direction}_gate_{gate}',
-        #             parameter_class=ManualParameter,
-        #             unit='deg',
-        #             vals=vals.Numbers(0, 360),
-        #             initial_value=0.0,
-        #             docstring=f"Virtual phase correction for parking as spectator of a qubit in direction {direction}, "
-        #                       f"that is doing a gate in direction {gate}."
-        #                         "Will be applied as increment to sine generator phases via command table."
-        #         )
-
-        # corrections for phases that the qubit can acquire during parking as part of a flux-dance step
-        # there are 8 flux-dance steps for the S17 scheme.
-        # NOTE: this correction must not be the same as the above one for the case of a spectator
-        #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
-        # for step in np.arange(1,9):
-        #     self.add_parameter(
-        #         name=f'vcz_virtual_q_ph_corr_step_{step}',
-        #         parameter_class=ManualParameter,
-        #         unit='deg',
-        #         vals=vals.Numbers(0, 360),
-        #         initial_value=0.0,
-        #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
-        #                     "Will be applied as increment to sine generator phases via command table."
-        #     )
 
     def _set_channel_range(self, val):
         awg_nr = (self.channel_I()-1)//2

@@ -54,10 +54,10 @@ def nelder_mead(
         initial_step_matrix = np.eye(dim)*initial_step
     elif (type(initial_step) is list) or (type(initial_step) is np.ndarray):
         if len(initial_step) != dim:
-            raise ValueError('initial_step array must be same lenght as x0')
+            raise ValueError('initial_step array must be same length as x0')
         initial_step_matrix = np.diag(initial_step)
     else:
-        raise TypeError('initial_step ({})must be list or np.array'.format(
+        raise TypeError('initial_step ({}) must be list or np.array'.format(
                         type(initial_step)))
 
     for i in range(dim):
@@ -69,6 +69,9 @@ def nelder_mead(
     # simplex iter
     iters = 0
     while 1:
+        if verbose:
+            print('\nNELDER-MEAD: starting iteration ', iters, "\n")
+        
         # order
         res.sort(key=lambda x: x[1])
         best = res[0][1]
@@ -77,7 +80,7 @@ def nelder_mead(
         if maxiter and iters >= maxiter:
             # Conclude failure break the loop
             if verbose:
-                print('max iterations exceeded, optimization failed')
+                print('\nNELDER-MEAD: max iterations exceeded, optimization failed!')
             break
         iters += 1
 
@@ -90,8 +93,8 @@ def nelder_mead(
         if no_improve >= no_improve_break:
             # Conclude success, break the loop
             if verbose:
-                print('No improvement registered for {} rounds,'.format(
-                      no_improve_break) + 'concluding succesful convergence')
+                print('\nNELDER-MEAD: No improvement registered for {} rounds,'.format(
+                      no_improve_break) + 'concluding succesful convergence!')
             break
 
         # centroid
@@ -146,7 +149,8 @@ def nelder_mead(
 
 def SPSA(fun, x0,
          initial_step=0.1,
-         no_improve_thr=10e-6, no_improv_break=10,
+         no_improve_thr=10e-6, 
+         no_improv_break=10,
          maxiter=0,
          gamma=0.101, alpha=0.602, a=0.2, c=0.3, A=300,
          p=0.5, ctrl_min=0., ctrl_max=np.pi,

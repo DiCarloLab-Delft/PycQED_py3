@@ -66,9 +66,14 @@ def mixer_carrier_cancellation(
     source.on()
     if frequency is None:
         frequency = source.frequency()
+
     else:
         source.frequency(frequency)
 
+    #for diagnostics only
+    frequencyGHz=frequency*1e-9
+    print(f"LO frequency: {frequencyGHz:0.3f} GHz")
+    
     '''
     Make coarse sweeps to approximate the minimum
     '''

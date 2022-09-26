@@ -1,0 +1,67 @@
+{
+    "codewords": {
+        "data": {
+            "mw_0": [
+                [
+                    1,
+                    "[{gateName}-{instrumentName}:{instrumentGroup}-i,{gateName}-{instrumentName}:{instrumentGroup}-q]"
+                ]
+            ],
+            "ro_1": [
+                [
+                    0,
+                    "[dummy]"
+                ],
+                [
+                    0,
+                    "[dummy]"
+                ],
+                [
+                    0,
+                    "[dummy]"
+                ],
+                [
+                    0,
+                    "[dummy]"
+                ]
+            ],
+            "ro_2": [
+                [
+                    0,
+                    "[dummy]"
+                ]
+            ]
+        },
+        "version": 1
+    },
+    "measurements": {
+        "data": [
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0
+                ]
+            }
+        ],
+        "nr-shots": {
+            "ro_1": 2,
+            "ro_2": 1
+        },
+        "version": 2
+    },
+    "openql": {
+        "backend": "cc",
+        "backend-version": "0.4.0",
+        "version": "0.10.4"
+    }
+}

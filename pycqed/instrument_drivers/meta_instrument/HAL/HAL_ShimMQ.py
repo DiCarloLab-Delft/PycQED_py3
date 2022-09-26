@@ -8,6 +8,7 @@ Note:   a lot code was moved around within this file in December 2021. As a cons
 
 import logging
 import warnings
+import itertools
 from collections import OrderedDict
 import numpy as np
 from deprecated import deprecated
@@ -183,7 +184,8 @@ class HAL_ShimMQ(Instrument):
             self._prep_ro_sources(qubits=qubits)
 
         self._prep_ro_assign_weights(qubits=qubits)  # NB: sets self.acq_ch_map
-        self._prep_ro_integration_weights(qubits=qubits)
+        self._prep_ro_integration_weights(qubits=qubits) # Note: also sets thresholds! LDC.
+
         if not reduced:
             self._prep_ro_pulses(qubits=qubits)
             self._prep_ro_instantiate_detectors()
@@ -228,8 +230,10 @@ class HAL_ShimMQ(Instrument):
             self.prepare_readout(qubits=qubits, reduced=reduced)
         if reduced:
             return
+
         if bypass_flux is False:
             self.prepare_fluxing(qubits=qubits)
+
         self.prepare_timing()
 
         for qb_name in qubits:
@@ -242,10 +246,26 @@ class HAL_ShimMQ(Instrument):
 
     # FIXME: setup dependent
     def prepare_for_inspire(self):
+
+        # LDC. Trying to ensure readout is digitized, uses optimal weights, and does single shots w/o averaging
+        self.ro_acq_digitized(True)
+        self.ro_acq_weight_type('optimal')
+        #self.ro_acq_averages(1)
+
         for lutman in ['mw_lutman_QNW','mw_lutman_QNE','mw_lutman_QC','mw_lutman_QSW','mw_lutman_QSE']:
             self.find_instrument(lutman).set_inspire_lutmap()
+        
         self.prepare_for_timedomain(qubits=self.qubits())
+
+        # LDC hack for Quantum Inspire. 2022/07/04
+        # This hot fix addresses the problem that the UHFs are not dividing by the right number of averages.
+        # They seem to be normalizing by the number of averages in the PREVIOUS run.
+        # This way, we set the averages twice. This is the first time.
+        self.find_instrument("UHFQC_1").qas_0_result_averages(1)
+        self.find_instrument("UHFQC_2").qas_0_result_averages(1)
+
         self.find_instrument(self.instr_MC()).soft_avg(1)
+        
         return True
 
     ##########################################################################
@@ -788,6 +808,27 @@ class HAL_ShimMQ(Instrument):
         """
         log.info("Setting integration weights")
 
+        #########################
+        #########################
+        #Added by LDC. 2022/07/07
+        #The goal here is to set the thresholds of UNUSED channels so high that the result is always 0.
+        #We first set all thresholds for all channels very high (30).
+        #Note that the thresholds of USED channels are overwritten to their true values further down.
+        UHFQCs=[];
+        for qb_name in qubits:
+            qb = self.find_instrument(qb_name)
+            thisUHF=qb.instr_acquisition.get_instr()
+            if thisUHF not in UHFQCs:
+                UHFQCs.append(thisUHF)
+        for thisUHF in UHFQCs:
+            #print("got here!")
+            for i in range(10):
+                thisUHF.set(f"qas_0_thresholds_{i}_level", 30)
+        #### NEED TO TEST!!!!!!!!
+        #########################
+        #########################
+
+
         if self.ro_acq_weight_type() == "SSB":
             log.info("using SSB weights")
             for qb_name in qubits:
@@ -815,8 +856,8 @@ class HAL_ShimMQ(Instrument):
                 else:
                     acq_instr.set("qas_0_integration_weights_{}_real".format(qb.ro_acq_weight_chI()), opt_WI,)
                     acq_instr.set("qas_0_integration_weights_{}_imag".format(qb.ro_acq_weight_chI()), opt_WQ,)
-                    acq_instr.set("qas_0_rotations_{}".format(
-                                qb.ro_acq_weight_chI()), 1.0 - 1.0j)
+                    acq_instr.set("qas_0_rotations_{}".format(qb.ro_acq_weight_chI()), 1.0 - 1.0j)
+                    
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         acq_instr.set('qas_0_integration_weights_{}_real'.format(qb.ro_acq_weight_chQ()), opt_WQ)
@@ -824,6 +865,7 @@ class HAL_ShimMQ(Instrument):
                         acq_instr.set('qas_0_rotations_{}'.format(qb.ro_acq_weight_chQ()), 1.0 + 1.0j)
 
                 if self.ro_acq_digitized():
+
                     # Update the RO theshold
                     if (qb.ro_acq_rotated_SSB_when_optimal() and
                             abs(qb.ro_acq_threshold()) > 32):
@@ -888,19 +930,31 @@ class HAL_ShimMQ(Instrument):
             ro_lm.set("M_down_length1_R{}".format(res_nr), qb.ro_pulse_down_length1())
             ro_lm.set("M_down_amp1_R{}".format(res_nr), qb.ro_pulse_down_amp1())
             ro_lm.set("M_down_phi1_R{}".format(res_nr), qb.ro_pulse_down_phi1())
+            # Addede by LDC on 2022/09/16
+            ro_lm.set("M_final_length_R{}".format(res_nr), qb.ro_pulse_final_length())
+            ro_lm.set("M_final_amp_R{}".format(res_nr), qb.ro_pulse_final_amp())
+            ro_lm.set("M_final_delay_R{}".format(res_nr), qb.ro_pulse_final_delay())
+
 
         for ro_lm in ro_lms:
-            # list comprehension should result in a list with each
-            # individual resonator + the combination of all simultaneously
+            # list comprehension should result in a list with each individual resonator + the combination of all simultaneously
             # resonator_combs = [[r] for r in resonators_in_lm[ro_lm.name]] + \
             #     [resonators_in_lm[ro_lm.name]]
-            resonator_combs = [resonators_in_lm[ro_lm.name]]
-            log.info('Setting resonator combinations for {} to {}'.format(
-                ro_lm.name, resonator_combs))
+
+            # list comprehension should result in a list with the combination of all simultaneously
+            # resonator_combs = [resonators_in_lm[ro_lm.name]]
+            # log.info('Setting resonator combinations for {} to {}'.format(
+            #     ro_lm.name, resonator_combs))
+
+            # should result in a list with all the possible combinations of resonators
+            resonator_combs = []
+            for L in range(1, len(resonators_in_lm[ro_lm.name])+1):
+                for subset in itertools.combinations(resonators_in_lm[ro_lm.name],L):
+                    resonator_combs.append(list(subset))
 
             # FIXME: temporary fix so device object doesnt mess with
             #       the resonator combinations. Better strategy should be implemented
-            ro_lm.resonator_combinations(resonator_combs)
+            # ro_lm.resonator_combinations(resonator_combs)
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
     def _prep_ro_instantiate_detectors(self):

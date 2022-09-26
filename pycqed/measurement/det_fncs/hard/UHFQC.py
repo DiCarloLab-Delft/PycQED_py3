@@ -44,6 +44,21 @@ class Multi_Detector_UHF(Multi_Detector):
         for detector in self.detectors:
             new_values = detector.get_values(arm=False, is_single_detector=False)
             values_list.append(new_values)
+
+        maximum = 0
+        minimum = len(values_list[0][0])
+        for feedline in values_list:
+            for result in feedline:
+                if len(result)>maximum: maximum=len(result)
+                if len(result)<minimum: minimum=len(result)
+        if maximum != minimum:
+            padded_values_list = []
+            for index, feedline in enumerate(values_list):
+                padded_values_list.append([])
+                for result in feedline:
+                    padded_values_list[index].append(np.pad(result, (0, maximum-len(result))))
+            values_list = [np.array(values) for values in padded_values_list]
+
         values = np.concatenate(values_list)
         return values
 
@@ -762,7 +777,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                 data[i] = data[i] - self.UHFQC.get('qas_0_trans_offset_weightfunction_{}'.format(channel))
         return data
 
-    def prepare(self):
+    def prepare(self, sweep_points=None):
         if self.AWG is not None:
             self.AWG.stop()
 

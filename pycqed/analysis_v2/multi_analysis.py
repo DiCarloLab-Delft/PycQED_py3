@@ -457,7 +457,7 @@ class Multi_T1_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['quantities_of_interest'] = {}
         for i, q in enumerate(self.qubits):
              ### normalize data using cal points ###
-            self.proc_data_dict['{}_times'.format(q)]=self.raw_data_dict['{}_times'.format(q)]
+            self.proc_data_dict['{}_times'.format(q)] = self.raw_data_dict['{}_times'.format(q)]
             data = self.raw_data_dict['{}_data'.format(q)]
             zero = (data[-4]+data[-3])/2
             one = (data[-2]+data[-1])/2
@@ -466,15 +466,16 @@ class Multi_T1_Analysis(ba.BaseDataAnalysis):
             
             ### fit to normalized data ###
             times = self.proc_data_dict['{}_times'.format(q)]
-            
+            dt=times[1]-times[0]
+
             fit_mods.ExpDecayModel.set_param_hint('amplitude',
                                               value=1,
                                               min=0,
                                               max=2)
             fit_mods.ExpDecayModel.set_param_hint('tau',
-                                                  value=times[1] * 50,
-                                                  min=times[1],
-                                                  max=times[-1] * 1000)
+                                                  value=dt * 50,
+                                                  min=dt,
+                                                  max=dt * 1000)
             fit_mods.ExpDecayModel.set_param_hint('offset',
                                                   value=0,
                                                   vary=False)
@@ -490,6 +491,7 @@ class Multi_T1_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['{}_fitted_data'.format(q)] = fit_res.best_fit
             self.proc_data_dict['{}_fit_res'.format(q)] = fit_res
             self.proc_data_dict['quantities_of_interest'][q] = fit_res.best_values
+
             
     def prepare_plots(self):
         for q in self.qubits:
@@ -499,30 +501,35 @@ class Multi_T1_Analysis(ba.BaseDataAnalysis):
                                         'qubit': q,
                                         'title': 'T1_'+q+'_'
                                         +self.raw_data_dict['timestamps'][0],
-                                        'plotsize': (10,10)
+                                        'plotsize': (5,4)
                                         }
             
 
 def plot_Multi_T1(qubit, data,title, ax=None, **kwargs): 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(15,15))
+        fig, ax = plt.subplots(figsize=(5,4))
            
     q = qubit
     times = data['{}_times'.format(q)]*1e6
     nor_data = data['{}_nor_data'.format(q)]
     fit_data = data['{}_fitted_data'.format(q)]
     T1 = data['quantities_of_interest'][q]['tau']*1e6
-    T1_error = data['{}_fit_res'.format(q)].params['tau'].stderr*10e6
-    T1_text = r'T1 = %.9f' %T1 + '$\mathrm{\mu}$s $\pm$ '
-    T1_error_text = r'%.9f' %T1_error + '$\mathrm{\mu}$s'
+    T1_error = data['{}_fit_res'.format(q)].params['tau'].stderr*1e6
+    T1_text = r'T1 = %.3f' %T1 + ' $\mathrm{\mu}$s $\pm$ '
+    T1_error_text = r'%.3f' %T1_error + ' $\mathrm{\mu}$s'
     props = dict(boxstyle='round', facecolor='white', alpha=0.5)
-    xpos = (times[-1]+times[0])*0.3
-    ypos = min(nor_data)-0.25
-    ax.text(xpos, ypos, T1_text+T1_error_text, fontsize=11,bbox = props)
+    xpos = (times[-1]+times[0])*0.5
+    ypos = -0.3 #min(nor_data)-0.5
+    ax.text(xpos, ypos, T1_text+T1_error_text, 
+        fontsize=11,
+        bbox = props, 
+        horizontalalignment='center',
+        verticalalignment='center')
     ax.plot(times,nor_data,'-o')
     ax.plot(times[:-4],fit_data,'-r')
     ax.set(ylabel=r'$F$ $|1 \rangle$')
     ax.set(xlabel= r'Time ($\mathrm{\mu}$s)')
+    ax.set_ylim(-0.05, 1.05)
     ax.set_title(title)
     
 class Multi_Echo_Analysis(ba.BaseDataAnalysis):
@@ -577,11 +584,14 @@ class Multi_Echo_Analysis(ba.BaseDataAnalysis):
             
             ### fit to normalized data ###
             x = self.proc_data_dict['{}_times'.format(q)][0:-4]
+            dx= x[1]-x[0]
+
             y = self.proc_data_dict['{}_nor_data'.format(q)][0:-4]
 
-            damped_osc_mod = lmfit.Model(fit_mods.ExpDampOscFunc)
-            average = np.mean(y)
+            #damped_osc_mod = lmfit.Model(fit_mods.ExpDampOscFunc)
+            
 
+            # make frequency estimate
             ft_of_data = np.fft.fft(y)
             index_of_fourier_maximum = np.argmax(np.abs(ft_of_data[1:len(ft_of_data) // 2])) + 1
             max_echo_delay = x[-1] - x[0]
@@ -590,43 +600,71 @@ class Multi_Echo_Analysis(ba.BaseDataAnalysis):
             freq_est = fft_axis_scaling * index_of_fourier_maximum
             est_number_of_periods = index_of_fourier_maximum
 
-            damped_osc_mod.set_param_hint('frequency',
+            #damped_osc_mod
+            fit_mods.ExpDampOscModel.set_param_hint('frequency',
                                           value=freq_est,
                                           min=(1/(100 * x[-1])),
-                                          max=(20/x[-1]))
+                                          max=(20/x[-1]),
+                                          vary=True)
 
-            if (np.average(y[:4]) >
-                    np.average(y[4:8])):
+            # make phase estimate
+            if (np.average(y[:3]) >
+                    np.average(y[3:6])):
                 phase_estimate = 0
             else:
                 phase_estimate = np.pi
-            damped_osc_mod.set_param_hint('phase',
-                                          value=phase_estimate, vary=True)
 
-            amplitude_guess = 1
-            damped_osc_mod.set_param_hint('amplitude',
+            #damped_osc_mod
+            fit_mods.ExpDampOscModel.set_param_hint('phase',
+                                          value=phase_estimate,
+                                          min=0,
+                                          max=2*np.pi,
+                                          vary=True)
+
+            amplitude_guess = 0.4
+            #damped_osc_mod.
+            fit_mods.ExpDampOscModel.set_param_hint('amplitude',
                                           value=amplitude_guess,
-                                          min=0.4,
-                                          max=4.0)
-            damped_osc_mod.set_param_hint('tau',
-                                          value=x[1]*10,
-                                          min=x[1],
-                                          max=x[1]*1000)
-            damped_osc_mod.set_param_hint('exponential_offset',
-                                          value=0.5,
-                                          min=0.4,
-                                          max=4.0)
-            damped_osc_mod.set_param_hint('oscillation_offset',
+                                          min=0.2,
+                                          max=0.8,
+                                          vary=True)
+            
+            #damped_osc_mod
+            fit_mods.ExpDampOscModel.set_param_hint('tau',
+                                          value=max_echo_delay/2,
+                                          min=dx,
+                                          max=dx*1000,
+                                          vary=True)
+
+            average = np.mean(y)
+            #damped_osc_mod
+            fit_mods.ExpDampOscModel.set_param_hint('exponential_offset',
+                                          value=average,
+                                          min=0.3,
+                                          max=0.7,
+                                          vary=True)
+
+            #damped_osc_mod
+            fit_mods.ExpDampOscModel.set_param_hint('oscillation_offset',
                                           value=0,
                                           vary=False)
-            damped_osc_mod.set_param_hint('n',
+            
+            #damped_osc_mod
+            fit_mods.ExpDampOscModel.set_param_hint('n',
                                           value=1,
                                           vary=False)
-            params = damped_osc_mod.make_params()
+            
+            #params = damped_osc_mod.make_params()
+            params = fit_mods.ExpDampOscModel.make_params()
 
-            fit_res = damped_osc_mod.fit(data=y,
-                                         t=x,
-                                         params=params)
+
+            # perform the fit
+            #fit_res = damped_osc_mod.fit(data=y, t=x, params=params)
+            fit_res = fit_mods.ExpDampOscModel.fit(data=y, t=x, params=params)
+
+            # for diagnostics only
+            #print(fit_res.fit_report())
+
             self.proc_data_dict['{}_fitted_data'.format(q)] = fit_res.best_fit
             self.proc_data_dict['{}_fit_res'.format(q)] = fit_res
             self.proc_data_dict['quantities_of_interest'][q] = fit_res.best_values
@@ -639,12 +677,12 @@ class Multi_Echo_Analysis(ba.BaseDataAnalysis):
                                         'qubit': q,
                                         'title': 'Echo_'+q+'_'
                                         +self.raw_data_dict['timestamps'][0],
-                                        'plotsize': (10,10)
+                                        'plotsize': (5,4)
                                         }
 
 def plot_Multi_Echo(qubit, data,title, ax=None, **kwargs): 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(10,10))
+        fig, ax = plt.subplots(figsize=(5,4))
            
     q = qubit
     times = data['{}_times'.format(q)]*1e6
@@ -652,19 +690,22 @@ def plot_Multi_Echo(qubit, data,title, ax=None, **kwargs):
     fit_data = data['{}_fitted_data'.format(q)]
     
     T2 = data['quantities_of_interest'][q]['tau']*1e6
-    T2_error = data['{}_fit_res'.format(q)].params['tau'].stderr*10e6
-    
-    T2_text = r'T2_echo = %.9f' %T2 + '$\mathrm{\mu}$s $\pm$ '
-    T2_error_text = r'%.9f' %T2_error + '$\mathrm{\mu}$s'
+    T2_error = data['{}_fit_res'.format(q)].params['tau'].stderr*1e6
+
+    T2_text = r'T2_echo = %.3f' %T2 + ' $\mathrm{\mu}$s $\pm$ '
+    T2_error_text = r'%.3f' %T2_error + ' $\mathrm{\mu}$s'
     props = dict(boxstyle='round', facecolor='white', alpha=0.5)
-    xpos = (times[-1]+times[0])*0.3
-    ypos = min(nor_data)-0.25
-    ax.text(xpos, ypos, T2_text+T2_error_text, fontsize=11,bbox = props)
-    
+    xpos = (times[-1]+times[0])*0.5
+    ypos = -0.3     #min(nor_data)-0.25
+    ax.text(xpos, ypos, T2_text+T2_error_text, 
+        fontsize=10, bbox = props, 
+        horizontalalignment='center',
+        verticalalignment='center')
     ax.plot(times,nor_data,'-o')
     ax.plot(times[:-4],fit_data,'-r')
-    ax.set(ylabel=r'$F$ $|1 \rangle$')
+    ax.set(ylabel= r'$F$ $|1 \rangle$')
     ax.set(xlabel= r'Time ($\mathrm{\mu}$s)')
+    ax.set_ylim(-0.05, 1.05)
     ax.set_title(title)
 
 class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
@@ -720,7 +761,7 @@ class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
             x = number_flips[:-4]
             y = self.proc_data_dict['{}_nor_data'.format(q)][0:-4]
             
-                    ### cos fit ###
+            ### cos fit ###
             cos_fit_mod = fit_mods.CosModel
             params = cos_fit_mod.guess(cos_fit_mod,data=y,t=x)
             cos_mod = lmfit.Model(fit_mods.CosFunc)
@@ -737,7 +778,7 @@ class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
             
             
                 
-                    ### line fit ###
+            ### line fit ###
             poly_mod = lmfit.models.PolynomialModel(degree=1)
             c0_guess = x[0]
             c1_guess = (y[-1]-y[0])/(x[-1]-x[0])

@@ -297,8 +297,7 @@ def gain_corr_double_ExpDecayFunc(t, tau_A, tau_B, amp_A, amp_B, gc):
 
 def ExpDampOscFunc(t, tau, n, frequency, phase, amplitude,
                    oscillation_offset, exponential_offset):
-    return amplitude * np.exp(-(t / tau) ** n) * (np.cos(
-        2 * np.pi * frequency * t + phase) + oscillation_offset) + exponential_offset
+    return amplitude * np.exp(-(t / tau) ** n) * (np.cos(2 * np.pi * frequency * t + phase) + oscillation_offset) + exponential_offset
 
 # def ExpDampOscFuncComplex(t, tau, frequency, phase, amplitude, offset):
 #     return amplitude*np.exp(1j*(2 * np.pi * frequency * t + phase) - t/tau) + offset

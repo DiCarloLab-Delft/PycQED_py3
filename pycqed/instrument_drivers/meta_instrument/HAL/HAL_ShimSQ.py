@@ -12,8 +12,8 @@ import warnings
 import numpy as np
 from deprecated import deprecated
 
-
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object import Qubit
+
 from pycqed.measurement import detector_functions as det
 
 # Imported for type checks
@@ -78,6 +78,17 @@ class HAL_ShimSQ(Qubit):
         """
         if self.cfg_prepare_ro_awg():
             self.instr_acquisition.get_instr().load_default_settings(upload_sequence=False)
+            
+            # LDC test, 2022/07/04
+            # This is a HACK introduced to address the problem with the UHF not normalizing
+            # by the correct number of averages to take. We set the number of averages twice.
+            # This is the first time.
+            thisUHF=self.instr_acquisition.get_instr()
+            thisUHF.qas_0_result_averages(self.ro_acq_averages())
+            for i in range(10):
+                thisUHF.set(f"qas_0_thresholds_{i}_level", 30)
+
+
             self._prep_ro_pulse(CW=CW)
             self._prep_ro_integration_weights()
             self._prep_deskewing_matrix()
@@ -740,6 +751,7 @@ class HAL_ShimSQ(Qubit):
         self.add_parameter(
             'ro_pulse_down_length0',
             unit='s',
+            vals=vals.Numbers(1e-9, 2000e-9),
             initial_value=1e-9,
             parameter_class=ManualParameter)
         self.add_parameter(
@@ -755,6 +767,7 @@ class HAL_ShimSQ(Qubit):
         self.add_parameter(
             'ro_pulse_down_length1',
             unit='s',
+            vals=vals.Numbers(1e-9, 2000e-9),
             initial_value=1e-9,
             parameter_class=ManualParameter)
         self.add_parameter(
@@ -767,6 +780,29 @@ class HAL_ShimSQ(Qubit):
             unit='deg',
             initial_value=0,
             parameter_class=ManualParameter)
+        ### The following parameters added by LDC on 2022/09/16.
+        ### They were missing.
+        self.add_parameter(
+            'ro_pulse_final_amp',
+            unit='V',
+            vals=vals.Numbers(0, 1),
+            parameter_class=ManualParameter,
+            initial_value=0.1
+            )
+        self.add_parameter(
+            'ro_pulse_final_length',
+            unit='s',
+            vals=vals.Numbers(1e-9, 2000e-9),
+            parameter_class=ManualParameter,
+            initial_value=1e-9
+            )
+        self.add_parameter(
+            'ro_pulse_final_delay',
+            unit='s',
+            vals=vals.Numbers(0, 2000e-9),
+            parameter_class=ManualParameter,
+            initial_value=0
+            )
 
         #############################
         # RO acquisition parameters #
@@ -1109,7 +1145,7 @@ class HAL_ShimSQ(Qubit):
             idx = self.cfg_qubit_nr()
 
             # propagate parameters affecting all resonators to readout lutman
-            ro_lm.set('resonator_combinations', [[idx]])
+            # ro_lm.set('resonator_combinations', [[idx]])
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
             ro_lm.set('mixer_alpha', self.ro_pulse_mixer_alpha())
             ro_lm.set('mixer_phi', self.ro_pulse_mixer_phi())
@@ -1124,12 +1160,20 @@ class HAL_ShimSQ(Qubit):
             ro_lm.set('M_amp_R{}'.format(idx), ro_amp)
             ro_lm.set('M_delay_R{}'.format(idx), self.ro_pulse_delay())
             ro_lm.set('M_phi_R{}'.format(idx), self.ro_pulse_phi())
+            
             ro_lm.set('M_down_length0_R{}'.format(idx), self.ro_pulse_down_length0())
             ro_lm.set('M_down_amp0_R{}'.format(idx), self.ro_pulse_down_amp0())
             ro_lm.set('M_down_phi0_R{}'.format(idx), self.ro_pulse_down_phi0())
+            
             ro_lm.set('M_down_length1_R{}'.format(idx), self.ro_pulse_down_length1())
             ro_lm.set('M_down_amp1_R{}'.format(idx), self.ro_pulse_down_amp1())
             ro_lm.set('M_down_phi1_R{}'.format(idx), self.ro_pulse_down_phi1())
+
+            ### Added by LDC. 2022/09/16
+            ro_lm.set('M_final_amp_R{}'.format(idx), self.ro_pulse_final_amp())
+            ro_lm.set('M_final_length_R{}'.format(idx), self.ro_pulse_final_length())
+            ro_lm.set('M_final_delay_R{}'.format(idx), self.ro_pulse_final_delay())
+
 
             # propagate acquisition delay (NB: affects all resonators)
             ro_lm.acquisition_delay(self.ro_acq_delay())  # FIXME: better located in _prep_ro_integration_weights?
@@ -1178,6 +1222,7 @@ class HAL_ShimSQ(Qubit):
             elif 'optimal' in self.ro_acq_weight_type():
                 if (self.ro_acq_weight_func_I() is None or self.ro_acq_weight_func_Q() is None):
                     logging.warning('Optimal weights are None, not setting integration weights')
+                    
                 elif self.ro_acq_rotated_SSB_when_optimal():
                     # this allows bypassing the optimal weights for poor SNR qubits
                     # working around the limitation of threshold in UHFQC which cannot be >abs(32)
@@ -1219,6 +1264,7 @@ class HAL_ShimSQ(Qubit):
                     UHFQC.set(f'qas_0_integration_weights_{self.ro_acq_weight_chI()}_real', opt_WI)
                     UHFQC.set(f'qas_0_integration_weights_{self.ro_acq_weight_chI()}_imag', opt_WQ)
                     UHFQC.set(f'qas_0_rotations_{self.ro_acq_weight_chI()}', 1.0 - 1.0j)
+
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         UHFQC.set(f'qas_0_integration_weights_{self.ro_acq_weight_chQ()}_real', opt_WQ)

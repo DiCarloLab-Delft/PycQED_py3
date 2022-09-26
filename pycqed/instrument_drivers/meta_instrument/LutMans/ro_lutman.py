@@ -218,9 +218,9 @@ class Base_RO_LutMan(Base_LutMan):
             self.add_parameter(
                 'M_final_delay_R{}'.format(res),
                 unit='s',
-                vals=vals.Numbers(1e-9, 8000e-9),
+                vals=vals.Numbers(0, 8000e-9),
                 parameter_class=ManualParameter,
-                initial_value=200e-9
+                initial_value=0
             )
             self.add_parameter(
                 'M_phi_R{}'.format(res),
@@ -362,10 +362,17 @@ class Base_RO_LutMan(Base_LutMan):
                 shape=self.pulse_primitive_shape(),
                 amplitude=self.get('M_down_amp0_R{}'.format(res)),
                 length=self.get('M_down_length0_R{}'.format(res)),  # ns
-                delay=0,
+                delay=self.get('M_final_delay_R{}'.format(res)), # Kludge by LDC. 2022/09/16
                 phase=self.get('M_down_phi0_R{}'.format(res)),
                 sampling_rate=sampling_rate
             )
+
+            #N.B.:  Leo added kludge above to allow some time between the main pulse
+            #       and the first down pulse. To simplify things and avoid having to 
+            #       create a new parameter, I am using the delay for the 'final' pulse.
+            #       This will create probolems if you re not using the up_down_down pulse
+            #       but instead the up_down_down_final pulse. 
+            #       FIX ME!.
 
             down1_len = self.get('M_down_length1_R{}'.format(res))-gauss_length/2
             M_down1 = create_pulse(

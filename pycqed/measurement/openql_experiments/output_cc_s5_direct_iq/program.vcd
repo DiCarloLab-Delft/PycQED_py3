@@ -1,0 +1,116 @@
+$date today $end
+$timescale 1 ns $end
+$scope module kernel $end
+$var string 20 0 kernel $end
+$upscope $end
+$scope module qubits $end
+$var string 20 1 q0 $end
+$var string 20 2 q1 $end
+$var string 20 3 q2 $end
+$var string 20 4 q3 $end
+$var string 20 5 q4 $end
+$upscope $end
+$scope module sd.signal $end
+$var string 20 6 ro_1-0 $end
+$var string 20 7 ro_1-1 $end
+$var string 20 8 ro_1-2 $end
+$var string 20 9 ro_1-3 $end
+$var string 20 10 ro_1-4 $end
+$var string 20 11 ro_1-5 $end
+$var string 20 12 ro_1-6 $end
+$var string 20 13 ro_1-7 $end
+$var string 20 14 ro_1-8 $end
+$var string 20 15 ro_2-0 $end
+$var string 20 16 ro_2-1 $end
+$var string 20 17 ro_2-2 $end
+$var string 20 18 ro_2-3 $end
+$var string 20 19 ro_2-4 $end
+$var string 20 20 ro_2-5 $end
+$var string 20 21 ro_2-6 $end
+$var string 20 22 ro_2-7 $end
+$var string 20 23 ro_2-8 $end
+$var string 20 24 mw_0-0 $end
+$var string 20 25 mw_0-1 $end
+$var string 20 26 mw_0-2 $end
+$var string 20 27 mw_0-3 $end
+$var string 20 28 mw_1-0 $end
+$var string 20 29 mw_1-1 $end
+$var string 20 30 mw_1-2 $end
+$var string 20 31 mw_1-3 $end
+$var string 20 32 flux_0-0 $end
+$var string 20 33 flux_0-1 $end
+$var string 20 34 flux_0-2 $end
+$var string 20 35 flux_0-3 $end
+$var string 20 36 flux_0-4 $end
+$var string 20 37 flux_0-5 $end
+$var string 20 38 flux_0-6 $end
+$var string 20 39 flux_0-7 $end
+$upscope $end
+$scope module codewords $end
+$var string 20 40 ro_1 $end
+$var string 20 41 ro_2 $end
+$var string 20 42 mw_0 $end
+$var string 20 43 mw_1 $end
+$var string 20 44 flux_0 $end
+$upscope $end
+$enddefinitions $end
+#0
+spost_select_block 0
+sprepz 1
+sprepz 2
+sprepz 3
+sprepz 4
+sprepz 5
+s 40
+s 41
+s 42
+s 43
+s 44
+#150000
+smeasure 1
+smeasure 2
+smeasure 3
+smeasure 4
+smeasure 5
+s196608=[dummy] 6
+s327680=[dummy] 7
+s589824=[dummy] 8
+s1114112=[dummy] 9
+s196608=[dummy] 15
+s0x001f0000 40
+s0x00030000 41
+s 42
+s 43
+s 44
+#153000
+send_post_select_block 0
+srx180 1
+s 2
+s 3
+s 4
+s 5
+s 6
+s 7
+s 8
+s 9
+s 15
+s2147483649=[{gateName}-{instrumentName}:{instrumentGroup}-i,{gateName}-{instrumentName}:{instrumentGroup}-q] 24
+s 40
+s 41
+s0x80000001 42
+s 43
+s 44
+#153020
+smeasure 1
+s196608=[dummy] 6
+s 24
+s0x00030000 40
+s 41
+s 42
+s 43
+s 44
+#156020
+s 0
+s 1
+s 6
+s 40

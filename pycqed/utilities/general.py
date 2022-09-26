@@ -885,3 +885,58 @@ def get_formatted_exception():
     sstb = itb.stb2text(stb)
 
     return sstb
+
+
+####################################
+# Surface-17 utility functions
+####################################
+def get_gate_directions(q0, q1,
+                        map_qubits=None):
+    """
+    Helper function to determine two-qubit gate directions.
+    q0 and q1 should be given as high-freq and low-freq qubit, respectively.
+    Default map is surface-17, however other maps are supported.
+    """
+    if map_qubits == None:
+        # Surface-17 layout
+        map_qubits = {'Z3' : [-2,-1],
+                      'D9' : [ 0, 2],
+                      'X4' : [-1, 2],
+                      'D8' : [-1, 1],
+                      'Z4' : [ 0, 1],
+                      'D6' : [ 1, 1],
+                      'D7' : [-2, 0],
+                      'X3' : [-1, 0],
+                      'D5' : [ 0, 0],
+                      'X2' : [ 1, 0],
+                      'D3' : [ 2, 0],
+                      'D4' : [-1,-1],
+                      'Z1' : [ 0,-1],
+                      'D2' : [ 1,-1],
+                      'X1' : [ 1,-2],
+                      'Z2' : [ 2, 1],
+                      'D1' : [ 0,-2]}
+                      
+        # Inspire Surface-5 layout
+        map_qubits = {'QNW' : [0, -2],
+                      'QNE' : [1, -1],
+                      'QC' :  [1, -2],
+                      'QSW' : [1, -3],
+                      'QSE' : [2, -2]}
+
+    V0 = np.array(map_qubits[q0])
+    V1 = np.array(map_qubits[q1])
+    diff = V1-V0
+    dist = np.sqrt(np.sum((diff)**2))
+    if dist > 1:
+        raise ValueError('Qubits are not nearest neighbors')
+    if diff[0] == 0.:
+        if diff[1] > 0:
+            return ('NE', 'SW')
+        else:
+            return ('SW', 'NE')
+    elif diff[1] == 0.:
+        if diff[0] > 0:
+            return ('SE', 'NW')
+        else:
+            return ('NW', 'SE')
