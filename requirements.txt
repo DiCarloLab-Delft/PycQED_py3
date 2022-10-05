@@ -18,7 +18,7 @@ pyqtgraph
 matplotlib
 autodepgraph
 networkx
-qutechopenql>=0.10.3 # FIXME: install manually using "pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases"
+qutechopenql>=0.10.0 # FIXME: install manually using "pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases"
 spirack
 zhinst
 zhinst-deviceutils; python_version > '3.6'
