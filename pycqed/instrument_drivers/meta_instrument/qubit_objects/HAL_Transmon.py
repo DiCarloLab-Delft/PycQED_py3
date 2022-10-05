@@ -1580,7 +1580,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         self.ro_acq_delay(0)  # set delay to zero
         old_pow = self.ro_pulse_amp()
-        self.ro_pulse_amp(0.5)
+        self.ro_pulse_amp(0.5)  # FIXME: Sets readout pulse amplitude during experiment. Why?
 
         if MC is None:
             MC = self.instr_MC.get_instr()
