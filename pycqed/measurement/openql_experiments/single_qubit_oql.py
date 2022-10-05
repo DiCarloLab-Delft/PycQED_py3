@@ -66,6 +66,45 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str) -> OqlProgram:
     return p
 
 
+def CW_RO_pulsed_marked_sequence(qubit_idx: int,
+                                 platf_cfg: str,
+                                 trigger_idx: int,
+                                 spec_pulse_length: float,
+                                 wait_time_ns: int) -> OqlProgram:
+    """
+    A sequence that performs readout back to back without initialization.
+    The separation of the readout triggers is done by specifying the duration
+    of the readout parameter in the configuration file used for compilation.
+    FIXME: Update this docstring.
+    args:
+        qubit_idx (int/list) :  the qubit(s) to be read out, can be either an
+            int or a list of integers.
+        platf_cfg (str)     :
+    """
+    p = OqlProgram('CW_RO_pulsed_marked_sequence', platf_cfg=platf_cfg)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    k = p.create_kernel("main")
+    if not hasattr(qubit_idx, "__iter__"):
+        qubit_idx = [qubit_idx]
+    
+    for qi in qubit_idx:
+        # k.prepz(qi)
+        k.barrier([trigger_idx, qi])
+        for i in range(nr_clocks):
+            # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+            # control works. By repeating it the duration can be controlled.
+            k.gate('spec', [trigger_idx])
+        k.wait([trigger_idx], wait_time_ns)
+        k.measure(qi)
+
+        k.barrier([trigger_idx, qi])
+    p.add_kernel(k)
+    p.compile()
+    return p
+
+
 @deprecated(version='0.4', reason="seems to depend on CCL and VSM")
 def pulsed_spec_seq(
         qubit_idx: int,
