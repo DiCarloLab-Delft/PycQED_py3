@@ -997,13 +997,6 @@ class CCLight_Transmon(Qubit):
 
         return int_avg_det
 
-    # def _prep_ro_sources(self):
-    #     LO = self.instr_LO_ro.get_instr()
-    #     LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
-    #     LO.on()
-    #     LO.power(self.ro_pow_LO())
-
-
     def _prep_ro_sources(self):
         if self.instr_LutMan_RO.get_instr().LO_freq is not None:
             log.info('Warning: This qubit is using a fixed RO LO frequency.')
@@ -1021,17 +1014,6 @@ class CCLight_Transmon(Qubit):
 
         LO.on()
         LO.power(self.ro_pow_LO())
-
-    # def _prep_ro_sources(self, qubits):
-    #     """
-    #     turn on and configure the RO LO's of all qubits to be measured.
-    #     """
-
-    #     for qb_name in qubits:
-    #         LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
-    #         LO.frequency.set(self.ro_lo_freq())
-    #         LO.power(self.ro_pow_LO())
-    #         LO.on()
 
     def _prep_ro_pulse(self, upload=True, CW=False):
         """
@@ -2173,126 +2155,69 @@ class CCLight_Transmon(Qubit):
 
         return True
 
-    # def calibrate_mixer_skewness_RO(self, update=True):
-    #     """
-    #     Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
-    #     see calibration toolbox for details
-
-    #     Args:
-    #         update (bool):
-    #             if True updates values in the qubit object.
-
-    #     Return:
-    #         success (bool):
-    #             returns True if succesful. Currently always
-    #             returns True (i.e., no sanity check implemented)
-    #     """
-
-    #     # using the restless tuning sequence
-    #     self.prepare_for_timedomain()
-    #     p = sqo.randomized_benchmarking(
-    #         self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
-    #         nr_cliffords=[1],
-    #         net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
-    #     self.instr_CC.get_instr().eqasm_program(p.filename)
-    #     self.instr_CC.get_instr().start()
-
-    #     LutMan = self.instr_LutMan_RO.get_instr()
-    #     LutMan.mixer_apply_predistortion_matrix(True)
-    #     MC = self.instr_MC.get_instr()
-    #     S1 = swf.lutman_par_UHFQC_dig_trig(
-    #         LutMan, LutMan.mixer_alpha, single=False, run=True)
-    #     S2 = swf.lutman_par_UHFQC_dig_trig(
-    #         LutMan, LutMan.mixer_phi, single=False, run=True)
-
-    #     detector = det.Signal_Hound_fixed_frequency(
-    #         self.instr_SH.get_instr(), frequency=(self.instr_LO_ro.get_instr().frequency() -
-    #                                               self.ro_freq_mod()),
-    #         Navg=5, delay=0.0, prepare_for_each_point=False)
-
-    #     ad_func_pars = {'adaptive_function': nelder_mead,
-    #                     'x0': [1.0, 0.0],
-    #                     'initial_step': [.15, 10],
-    #                     'no_improve_break': 15,
-    #                     'minimize': True,
-    #                     'maxiter': 500}
-    #     MC.set_sweep_functions([S1, S2])
-    #     MC.set_detector_function(detector)  # sets test_detector
-    #     MC.set_adaptive_function_parameters(ad_func_pars)
-    #     MC.run(name='Spurious_sideband', mode='adaptive')
-    #     a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
-    #     alpha = a.optimization_result[0][0]
-    #     phi = a.optimization_result[0][1]
-
-    #     if update:
-    #         self.ro_pulse_mixer_phi.set(phi)
-    #         self.ro_pulse_mixer_alpha.set(alpha)
-    #         LutMan.mixer_alpha(alpha)
-    #         LutMan.mixer_phi(phi)
-
     def calibrate_mixer_skewness_RO(self, update=True):
-            """
-            Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
-            see calibration toolbox for details
+        """
+        Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
+        see calibration toolbox for details
 
-            Args:
-                update (bool):
-                    if True updates values in the qubit object.
+        Args:
+            update (bool):
+                if True updates values in the qubit object.
 
-            Return:
-                success (bool):
-                    returns True if succesful. Currently always
-                    returns True (i.e., no sanity check implemented)
-            """
-            CCL = self.instr_CC.get_instr()
-            p = sqo.CW_RO_sequence(
-                qubit_idx=self.cfg_qubit_nr(),
-                platf_cfg=self.cfg_openql_platform_fn())
-            CCL.eqasm_program(p.filename)
-            CCL.start()
+        Return:
+            success (bool):
+                returns True if succesful. Currently always
+                returns True (i.e., no sanity check implemented)
+        """
+        CCL = self.instr_CC.get_instr()
+        p = sqo.CW_RO_sequence(
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        CCL.start()
 
-            # using the restless tuning sequence
-            # self.prepare_for_timedomain()
-            # p = sqo.randomized_benchmarking(
-            #     self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
-            #     nr_cliffords=[1],
-            #     net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
-            # self.instr_CC.get_instr().eqasm_program(p.filename)
-            # self.instr_CC.get_instr().start()
+        # using the restless tuning sequence
+        # self.prepare_for_timedomain()
+        # p = sqo.randomized_benchmarking(
+        #     self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
+        #     nr_cliffords=[1],
+        #     net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
+        # self.instr_CC.get_instr().eqasm_program(p.filename)
+        # self.instr_CC.get_instr().start()
 
-            LutMan = self.instr_LutMan_RO.get_instr()
-            LutMan.mixer_apply_predistortion_matrix(True)
-            MC = self.instr_MC.get_instr()
-            S1 = swf.lutman_par_UHFQC_dig_trig(
-                LutMan, LutMan.mixer_alpha, single=False, run=True)
-            S2 = swf.lutman_par_UHFQC_dig_trig(
-                LutMan, LutMan.mixer_phi, single=False, run=True)
+        LutMan = self.instr_LutMan_RO.get_instr()
+        LutMan.mixer_apply_predistortion_matrix(True)
+        MC = self.instr_MC.get_instr()
+        S1 = swf.lutman_par_UHFQC_dig_trig(
+            LutMan, LutMan.mixer_alpha, single=False, run=True)
+        S2 = swf.lutman_par_UHFQC_dig_trig(
+            LutMan, LutMan.mixer_phi, single=False, run=True)
 
-            detector = det.Signal_Hound_fixed_frequency(
-                self.instr_SH.get_instr(), 
-                frequency=self.ro_freq() - 2*self.ro_freq_mod(),
-                Navg=5, delay=0.0, 
-                prepare_for_each_point=False)
+        detector = det.Signal_Hound_fixed_frequency(
+            self.instr_SH.get_instr(), 
+            frequency=self.ro_freq() - 2*self.ro_freq_mod(),
+            Navg=5, delay=0.0, 
+            prepare_for_each_point=False)
 
-            ad_func_pars = {'adaptive_function': nelder_mead,
-                            'x0': [1.0, 0.0],
-                            'initial_step': [.15, 10],
-                            'no_improve_break': 15,
-                            'minimize': True,
-                            'maxiter': 500}
-            MC.set_sweep_functions([S1, S2])
-            MC.set_detector_function(detector)  # sets test_detector
-            MC.set_adaptive_function_parameters(ad_func_pars)
-            MC.run(name='Spurious_sideband', mode='adaptive')
-            a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
-            alpha = a.optimization_result[0][0]
-            phi = a.optimization_result[0][1]
+        ad_func_pars = {'adaptive_function': nelder_mead,
+                        'x0': [1.0, 0.0],
+                        'initial_step': [.15, 10],
+                        'no_improve_break': 15,
+                        'minimize': True,
+                        'maxiter': 500}
+        MC.set_sweep_functions([S1, S2])
+        MC.set_detector_function(detector)  # sets test_detector
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='Spurious_sideband', mode='adaptive')
+        a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
+        alpha = a.optimization_result[0][0]
+        phi = a.optimization_result[0][1]
 
-            if update:
-                self.ro_pulse_mixer_phi.set(phi)
-                self.ro_pulse_mixer_alpha.set(alpha)
-                LutMan.mixer_alpha(alpha)
-                LutMan.mixer_phi(phi)
+        if update:
+            self.ro_pulse_mixer_phi.set(phi)
+            self.ro_pulse_mixer_alpha.set(alpha)
+            LutMan.mixer_alpha(alpha)
+            LutMan.mixer_phi(phi)
 
     def calibrate_mixer_offsets_RO(self, update: bool = True,
                                    ftarget=-110) -> bool:
@@ -3936,7 +3861,6 @@ class CCLight_Transmon(Qubit):
         ######################################################################
         if update:
             self.ro_acq_threshold(a.proc_data_dict['threshold_raw'])
-
         return {'SNR': a.qoi['SNR'],
                 'F_d': a.qoi['F_d'],
                 'F_a': a.qoi['F_a'],
@@ -6603,6 +6527,7 @@ class CCLight_Transmon(Qubit):
             nr_shots_per_case: int = 2**15,
             prepare_for_timedomain: bool = True,
             reduced_prepare: bool = False,
+            idle: bool = False,
             disable_metadata: bool = False,
             update: bool = True):
         '''
@@ -6625,7 +6550,7 @@ class CCLight_Transmon(Qubit):
             qubit_idx = self.cfg_qubit_nr(),
             LRU_duration_ns = self.LRU_duration()*1e9,
             platf_cfg = self.cfg_openql_platform_fn(),
-            idle = False)
+            idle = idle)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Shot', unit='#',
@@ -6642,11 +6567,13 @@ class CCLight_Transmon(Qubit):
         MC.live_plot_enabled(True)
         # Analysis
         a = ma2.lrua.LRU_process_tomo_Analysis(
-                qubit=self.name, post_select_2state=False)
+                qubit=self.name, post_select_2state=False,
+                fit_3gauss=False)
         if update:
             angle = a.proc_data_dict['angle_p']
             mw_lm = self.instr_LutMan_MW.get_instr()
-            mw_lm.LRU_virtual_q_ph_corr(-angle)
+            phase = mw_lm.LRU_virtual_q_ph_corr()
+            mw_lm.LRU_virtual_q_ph_corr(np.mod(phase-angle, 360))
 
     ###########################################################################
     # Dep graph check functions

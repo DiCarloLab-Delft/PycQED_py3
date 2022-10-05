@@ -75,6 +75,9 @@ reload(cv2)
 import pycqed.analysis_v2.LRU_analysis as lrua
 reload(lrua)
 
+import pycqed.analysis_v2.tomography_analysis as tomoa
+reload(tomoa)
+
 from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,
     Basic2DAnalysis, Basic2DInterpolatedAnalysis)

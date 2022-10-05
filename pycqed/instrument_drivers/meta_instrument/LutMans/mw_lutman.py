@@ -745,7 +745,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 name=f'LRU_virtual_q_ph_corr',
                 parameter_class=ManualParameter,
                 unit='deg',
-                vals=vals.Numbers(-360, 360),
+                vals=vals.Numbers(0, 360),
                 initial_value=0.0,
                 docstring=f"Virtual phase correction for LRU gate."
                             "Will be applied as increment to sine generator phases via command table."
@@ -926,10 +926,10 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             stop_start=stop_start)
 
     def apply_mixer_predistortion_corrections(self, wave_dict):
-            M = wf.mixer_predistortion_matrix(self.mixer_alpha(), self.mixer_phi())
-            for key, val in wave_dict.items():
-                wave_dict[key] = np.dot(M, val)
-            return wave_dict
+        M = wf.mixer_predistortion_matrix(self.mixer_alpha(), self.mixer_phi())
+        for key, val in wave_dict.items():
+            wave_dict[key] = np.dot(M, val)
+        return wave_dict
 
     def generate_standard_waveforms(
             self, apply_predistortion_matrix: bool=True):
@@ -1052,8 +1052,14 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                                             }]
 
         # add phase corrections to the end of the codeword space
-        # the first 8 positions are for parking related phase corrections,
+        # the first position is for the LRU phase correction
+        # the 8 positions after that, are for parking related phase corrections,
         # the last 4 are for phase corrections due to gate in corresponding direction
+        phase = self.parameters['LRU_virtual_q_ph_corr']()
+        commandtable_dict['table'] += [{"index": int(51),
+                                        "phase0": {"value": float(phase), "increment": True},
+                                        "phase1": {"value": float(phase), "increment": True}
+                                        }]
         phase_corr_inds = np.arange(52,64,1)
         for step, cw in enumerate(phase_corr_inds[:8]):
             phase = self.parameters[f"vcz_virtual_q_ph_corr_step_{step+1}"]()
@@ -1067,13 +1073,6 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                                             "phase0": {"value": float(phase), "increment": True},
                                             "phase1": {"value": float(phase), "increment": True}
                                             }]
-
-        
-        phase = self.parameters['LRU_virtual_q_ph_corr']()
-        commandtable_dict['table'] += [{"index": 51,
-                                        "phase0": {"value": float(phase), "increment": True},
-                                        "phase1": {"value": float(phase), "increment": True}
-                                        }]
 
         # NOTE: Whenever the command table is used, the phase offset between I and Q channels on
         # the HDAWG for real-time modulation has to be initialized from the table itself.

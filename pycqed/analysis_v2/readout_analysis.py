@@ -32,7 +32,7 @@ from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.measurement.hdf5_data as h5d
 import matplotlib.patches as patches
 
-
+# This analysis is deprecated
 class Singleshot_Readout_Analysis_old(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -1184,11 +1184,18 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 _fid = np.mean(_res == int(state))
                 Fid_dict[state] = _fid
             Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+            # Get assignment fidelity matrix
+            M = np.zeros((3,3))
+            for i, shots in enumerate([Shots_0, Shots_1, Shots_2]):
+                for j, state in enumerate(['0', '1', '2']):
+                    _res = clf.predict(shots)
+                    M[i][j] = np.mean(_res == int(state))
             self.proc_data_dict['classifier'] = clf
             self.proc_data_dict['dec_bounds'] = dec_bounds
             self.proc_data_dict['Fid_dict'] = Fid_dict
             self.qoi['Fid_dict'] = Fid_dict
-            #########################################
+            self.qoi['Assignment_matrix'] = M
+                #########################################
             # Project data along axis perpendicular
             # to the decision boundaries.
             #########################################
@@ -1354,6 +1361,17 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'qubit': self.qubit,
                     'timestamp': self.timestamp
                 }
+                fig, ax = plt.subplots(figsize=(3,3), dpi=100)
+                # fig.patch.set_alpha(0)
+                self.axs_dict['Assignment_matrix'] = ax
+                self.figs['Assignment_matrix'] = fig
+                self.plot_dicts['Assignment_matrix'] = {
+                    'plotfn': assignment_matrix_plotfn,
+                    'ax_id': 'Assignment_matrix',
+                    'M': self.qoi['Assignment_matrix'],
+                    'qubit': self.qubit,
+                    'timestamp': self.timestamp
+                }
 
     def run_post_extract(self):
         self.prepare_plots()  # specify default plots
@@ -1439,7 +1457,7 @@ def ssro_IQ_plotfn(
         y = (_y[:-1] + _y[1:]) / 2
         _x, _y = np.meshgrid(_x, _y)
         x, y = np.meshgrid(x, y)
-        p0 = [counts.max(), np.mean(X), np.mean(Y), .2, .2, 0]
+        p0 = [counts.max(), np.mean(X), np.mean(Y), np.std(X), np.std(Y), 0]
         popt, pcov = curve_fit(twoD_Gaussian, (x, y), counts.T.ravel(), p0=p0)
         return popt
     popt_0 = _fit_2D_gaussian(shots_0[:,0], shots_0[:,1])
@@ -1520,7 +1538,7 @@ def ssro_IQ_projection_plotfn(
         y = (_y[:-1] + _y[1:]) / 2
         _x, _y = np.meshgrid(_x, _y)
         x, y = np.meshgrid(x, y)
-        p0 = [counts.max(), np.mean(X), np.mean(Y), .2, .2, 0]
+        p0 = [counts.max(), np.mean(X), np.mean(Y), np.std(X), np.std(Y), 0]
         popt, pcov = curve_fit(twoD_Gaussian, (x, y), counts.T.ravel(), p0=p0)
         return popt
     popt_0 = _fit_2D_gaussian(shots_0[:,0], shots_0[:,1])
@@ -1655,6 +1673,32 @@ def ssro_IQ_projection_plotfn(
     props = dict(boxstyle='round', facecolor='gray', alpha=.2)
     axs[1].text(1.05, 1, text, transform=axs[1].transAxes,
                 verticalalignment='top', bbox=props)
+
+def assignment_matrix_plotfn(
+    M,
+    qubit,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    im = ax.imshow(M, cmap=plt.cm.Reds, vmin=0, vmax=1)
+    for i in range(3):
+        for j in range(3):
+            c = M[j,i]
+            if abs(c) > .5:
+                ax.text(i, j, '{:.2f}'.format(c), va='center', ha='center',
+                             color = 'white')
+            else:
+                ax.text(i, j, '{:.2f}'.format(c), va='center', ha='center')
+    ax.set_xticks([0,1,2])
+    ax.set_xticklabels([r'$|0\rangle$',r'$|1\rangle$',r'$|2\rangle$'])
+    ax.set_xlabel('Assigned state')
+    ax.set_yticks([0,1,2])
+    ax.set_yticklabels([r'$|0\rangle$',r'$|1\rangle$',r'$|2\rangle$'])
+    ax.set_ylabel('Prepared state')
+    ax.set_title(f'{timestamp}\nQutrit assignment matrix qubit {qubit}')
+    cbar_ax = fig.add_axes([.95, .15, .03, .7])
+    cb = fig.colorbar(im, cax=cbar_ax)
+    cb.set_label('assignment probability')
 
 
 class Dispersive_shift_Analysis(ba.BaseDataAnalysis):
@@ -2318,7 +2362,7 @@ class Optimal_integration_weights_analysis(ba.BaseDataAnalysis):
     """
     def __init__(self,
                  IF: float,
-                 input_waveform: tuple,
+                 input_waveform: tuple = None,
                  t_start: str = None, t_stop: str = None,
                  label: str = '',
                  options_dict: dict = None, extract_only: bool = False,
@@ -2395,25 +2439,31 @@ class Optimal_integration_weights_analysis(ba.BaseDataAnalysis):
 
         # PSD of output signal
         time_step = Time[1]
-        ps_0 = np.abs(np.fft.fft(_trace_I_0))**2*time_step/len(Time)
-        ps_1 = np.abs(np.fft.fft(_trace_I_1))**2*time_step/len(Time)
+        ps_0 = np.abs(np.fft.fft(1j*_trace_I_0+_trace_Q_0))**2*time_step/len(Time)
+        ps_1 = np.abs(np.fft.fft(1j*_trace_I_1+_trace_Q_1))**2*time_step/len(Time)
         Freqs = np.fft.fftfreq(_trace_I_0.size, time_step)
         idx = np.argsort(Freqs)
         Freqs = Freqs[idx]
         ps_0 = ps_0[idx]
         ps_1 = ps_1[idx]
         # PSD of input signal
-        _n_tt = len(Time)
-        _n_wf = len(self.input_waveform[0])
-        in_wf = np.concatenate((self.input_waveform[0],
-                                np.zeros(_n_tt-_n_wf)))
-        ps_wf = np.abs(np.fft.fft(in_wf))**2*time_step/len(in_wf)
-        Freqs_wf = np.fft.fftfreq(in_wf.size, time_step)
-        idx_wf = np.argsort(Freqs_wf)
-        Freqs_wf = Freqs_wf[idx_wf]
-        ps_wf = ps_wf[idx_wf]
-        # normalize (for plotting purposes)
-        ps_wf = ps_wf/np.max(ps_wf)*max([np.max(ps_0),np.max(ps_1)])*1.1
+        if self.input_waveform:
+            _n_tt = len(Time)
+            _n_wf = len(self.input_waveform[0])
+            in_wf_I = np.concatenate((self.input_waveform[0],
+                                      np.zeros(_n_tt-_n_wf)))
+            in_wf_Q = np.concatenate((self.input_waveform[1],
+                                      np.zeros(_n_tt-_n_wf)))
+            in_wf = 1j*in_wf_I + in_wf_Q
+            ps_wf = np.abs(np.fft.fft(in_wf))**2*time_step/len(in_wf)
+            Freqs_wf = np.fft.fftfreq(in_wf.size, time_step)
+            idx_wf = np.argsort(Freqs_wf)
+            Freqs_wf = Freqs_wf[idx_wf]
+            ps_wf = ps_wf[idx_wf]
+            # normalize (for plotting purposes)
+            ps_wf = ps_wf/np.max(ps_wf)*max([np.max(ps_0),np.max(ps_1)])*1.1
+            self.proc_data_dict['Freqs_wf'] = Freqs_wf
+            self.proc_data_dict['ps_wf'] = ps_wf
 
         self.proc_data_dict['Time'] = Time
         self.proc_data_dict['Trace_I_0'] = Trace_I_0
@@ -2433,8 +2483,6 @@ class Optimal_integration_weights_analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['Freqs'] = Freqs
         self.proc_data_dict['ps_0'] = ps_0
         self.proc_data_dict['ps_1'] = ps_1
-        self.proc_data_dict['Freqs_wf'] = Freqs_wf
-        self.proc_data_dict['ps_wf'] = ps_wf
 
         self.qoi = {}
         self.qoi['Weights_I_s'] = Weights_I_s
@@ -2566,8 +2614,8 @@ class Optimal_integration_weights_analysis(ba.BaseDataAnalysis):
             'Freqs': self.proc_data_dict['Freqs'],
             'ps_0': self.proc_data_dict['ps_0'],
             'ps_1': self.proc_data_dict['ps_1'],
-            'Freqs_wf': self.proc_data_dict['Freqs_wf'],
-            'ps_wf': self.proc_data_dict['ps_wf'],
+            'Freqs_wf': self.proc_data_dict['Freqs_wf'] if self.input_waveform else None,
+            'ps_wf': self.proc_data_dict['ps_wf'] if self.input_waveform else None,
             'IF': self.IF,
             'timestamp': self.timestamps[1]
         }
@@ -2695,30 +2743,39 @@ def Weights_plotfn(
 
 def FFT_plotfn(
     Freqs, 
-    Freqs_wf,
     IF,
-    ps_wf,
     ps_0,
     ps_1,
     timestamp,
-    ax, **kw):
+    ax,
+    Freqs_wf = None,
+    ps_wf = None,
+    **kw):
     fig = ax.get_figure()
     axs = fig.get_axes()
-
+    # Remove first and last points of
+    # array to remove nyquist frequency
+    Freqs = Freqs[1:-1]
+    ps_0 = ps_0[1:-1]
+    ps_1 = ps_1[1:-1]
     axs[0].plot(Freqs*1e-6, ps_0, 'C0')
     axs[0].plot(Freqs*1e-6, ps_1, 'C3')
-    axs[0].plot(Freqs_wf*1e-6, ps_wf, '--', color='#607D8B', alpha=.5)
-    axs[0].axvline(abs(IF)*1e-6, color='k', ls='--', lw=1, label=f'IF : {IF*1e-6:.1f} MHz')
-    axs[0].set_xlim(left=0, right=np.max(Freqs*1e-6))
+    if type(Freqs_wf) != None:
+        Freqs_wf = Freqs_wf[1:-1]
+        ps_wf = ps_wf[1:-1]
+        axs[0].plot(Freqs_wf*1e-6, ps_wf, '--', color='#607D8B', alpha=.5)
+    axs[0].axvline(IF*1e-6, color='k', ls='--', lw=1, label=f'IF : {IF*1e-6:.1f} MHz')
+    axs[0].set_xlim(left=np.min(Freqs*1e-6), right=np.max(Freqs*1e-6))
     axs[0].set_xlabel('Frequency (MHz)')
     axs[0].set_ylabel('PSD ($\mathrm{V^2/Hz}$)')
 
     axs[1].plot(Freqs*1e-6, ps_0, 'C0', label='ground')
     axs[1].plot(Freqs*1e-6, ps_1, 'C3', label='excited')
-    axs[1].plot(Freqs_wf*1e-6, ps_wf, 'C2--',
-                label='input pulse', alpha=.5)
-    axs[1].axvline(abs(IF)*1e-6, color='k', ls='--', lw=1)
-    axs[1].set_xlim(left=abs(IF)*1e-6-50, right=abs(IF)*1e-6+50)
+    if type(Freqs_wf) != None:
+        axs[1].plot(Freqs_wf*1e-6, ps_wf, 'C2--',
+                    label='input pulse', alpha=.5)
+    axs[1].axvline(IF*1e-6, color='k', ls='--', lw=1)
+    axs[1].set_xlim(left=IF*1e-6-50, right=IF*1e-6+50)
     axs[1].set_xlabel('Frequency (MHz)')
     axs[0].legend(frameon=False)
     axs[1].legend(frameon=False, fontsize=7, bbox_to_anchor=(1,1))
@@ -3067,419 +3124,4 @@ def plot_depletion_allxy(qubit, timestamp,
     ax.plot(data_1, 'C1.-', alpha=.75, label='post-measurement')
     ax.set_title(timestamp+'_Depletion_ALLXY_'+qubit)
     ax.legend(loc=0)
-
-
-# class Optimal_integration_weights_analysis(ba.BaseDataAnalysis):
-#     """
-#     Mux transient analysis.
-#     """
-#     def __init__(self,
-#                  IF: float,
-#                  input_waveform: tuple,
-#                  t_start: str = None, t_stop: str = None,
-#                  label: str = '',
-#                  options_dict: dict = None, extract_only: bool = False,
-#                  auto=True):
-
-#         super().__init__(t_start=t_start, t_stop=t_stop,
-#                          label=label,
-#                          options_dict=options_dict,
-#                          extract_only=extract_only)
-
-#         self.IF = IF
-#         self.input_waveform = input_waveform
-#         if auto:
-#             self.run_analysis()
-
-#     def extract_data(self):
-#         """
-#         This is a new style (sept 2019) data extraction.
-#         This could at some point move to a higher level class.
-#         """
-#         self.get_timestamps()
-#         self.raw_data_dict = {}
-#         for ts in self.timestamps:
-#             data_fp = get_datafilepath_from_timestamp(ts)
-#             param_spec = {'data': ('Experimental Data/Data', 'dset'),
-#                           'value_names': ('Experimental Data', 'attr:value_names')}
-#             self.raw_data_dict[ts] = h5d.extract_pars_from_datafile(
-#                 data_fp, param_spec)
-#         # Parts added to be compatible with base analysis data requirements
-#         self.raw_data_dict['timestamps'] = self.timestamps
-#         self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
-
-#     def process_data(self):
-#         ts_off = self.timestamps[0]
-#         ts_on = self.timestamps[1]
-#         Time = self.raw_data_dict[ts_off]['data'][:,0]
-#         Trace_I_0 = self.raw_data_dict[ts_off]['data'][:,1]
-#         Trace_Q_0 = self.raw_data_dict[ts_off]['data'][:,2]
-#         Trace_I_1 = self.raw_data_dict[ts_on]['data'][:,1]
-#         Trace_Q_1 = self.raw_data_dict[ts_on]['data'][:,2]
-#         # Subtract offset
-#         _trace_I_0 = Trace_I_0 - np.mean(Trace_I_0)
-#         _trace_Q_0 = Trace_Q_0 - np.mean(Trace_Q_0)
-#         _trace_I_1 = Trace_I_1 - np.mean(Trace_I_1)
-#         _trace_Q_1 = Trace_Q_1 - np.mean(Trace_Q_1)
-#         # Demodulate traces
-#         def _demodulate(Time, I, Q, IF):
-#             Complex_vec = I + 1j*Q
-#             I_demod = np.real(np.exp(1j*2*np.pi*IF*Time)*Complex_vec)
-#             Q_demod = np.imag(np.exp(1j*2*np.pi*IF*Time)*Complex_vec)
-#             return I_demod, Q_demod
-#         Trace_I_0_demod, Trace_Q_0_demod = _demodulate(Time, _trace_I_0, _trace_Q_0, self.IF)
-#         Trace_I_1_demod, Trace_Q_1_demod = _demodulate(Time, _trace_I_1, _trace_Q_1, self.IF)
-
-#         # Calculate optimal weights
-#         Weights_I = _trace_I_1 - _trace_I_0
-#         Weights_Q = _trace_Q_1 - _trace_Q_0
-#         # joint rescaling to +/-1 Volt
-#         maxI = np.max(np.abs(Weights_I))
-#         maxQ = np.max(np.abs(Weights_Q))
-#         # Dividing the weight functions by four to not have overflow in
-#         # thresholding of the UHFQC
-#         weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
-#         Weights_I = np.array(weight_scale_factor*Weights_I)
-#         Weights_Q = np.array(weight_scale_factor*Weights_Q)
-
-#         # Demodulate weights
-#         Weights_I_demod, Weights_Q_demod = _demodulate(Time, Weights_I, Weights_Q, self.IF)
-#         # Smooth weights
-#         from scipy.signal import medfilt
-#         Weights_I_demod_s = medfilt(Weights_I_demod, 31)
-#         Weights_Q_demod_s = medfilt(Weights_Q_demod, 31)
-#         Weights_I_s, Weights_Q_s = _demodulate(Time, Weights_I_demod_s, Weights_Q_demod_s, -self.IF)
-
-#         # PSD of output signal
-#         time_step = Time[1]
-#         ps_0 = np.abs(np.fft.fft(_trace_I_0))**2*time_step/len(Time)
-#         ps_1 = np.abs(np.fft.fft(_trace_I_1))**2*time_step/len(Time)
-#         Freqs = np.fft.fftfreq(_trace_I_0.size, time_step)
-#         idx = np.argsort(Freqs)
-#         Freqs = Freqs[idx]
-#         ps_0 = ps_0[idx]
-#         ps_1 = ps_1[idx]
-#         # PSD of input signal
-#         _n_tt = len(Time)
-#         _n_wf = len(self.input_waveform[0])
-#         in_wf = np.concatenate((self.input_waveform[0],
-#                                 np.zeros(_n_tt-_n_wf)))
-#         ps_wf = np.abs(np.fft.fft(in_wf))**2*time_step/len(in_wf)
-#         Freqs_wf = np.fft.fftfreq(in_wf.size, time_step)
-#         idx_wf = np.argsort(Freqs_wf)
-#         Freqs_wf = Freqs_wf[idx_wf]
-#         ps_wf = ps_wf[idx_wf]
-#         # normalize (for plotting purposes)
-#         ps_wf = ps_wf/np.max(ps_wf)*max([np.max(ps_0),np.max(ps_1)])*1.1
-
-#         self.proc_data_dict['Time'] = Time
-#         self.proc_data_dict['Trace_I_0'] = Trace_I_0
-#         self.proc_data_dict['Trace_Q_0'] = Trace_Q_0
-#         self.proc_data_dict['Trace_I_1'] = Trace_I_1
-#         self.proc_data_dict['Trace_Q_1'] = Trace_Q_1
-#         self.proc_data_dict['Trace_I_0_demod'] = Trace_I_0_demod
-#         self.proc_data_dict['Trace_Q_0_demod'] = Trace_Q_0_demod
-#         self.proc_data_dict['Trace_I_1_demod'] = Trace_I_1_demod
-#         self.proc_data_dict['Trace_Q_1_demod'] = Trace_Q_1_demod
-#         self.proc_data_dict['Weights_I_demod'] = Weights_I_demod
-#         self.proc_data_dict['Weights_Q_demod'] = Weights_Q_demod
-#         self.proc_data_dict['Weights_I_demod_s'] = Weights_I_demod_s
-#         self.proc_data_dict['Weights_Q_demod_s'] = Weights_Q_demod_s
-#         self.proc_data_dict['Weights_I_s'] = Weights_I_s
-#         self.proc_data_dict['Weights_Q_s'] = Weights_Q_s
-#         self.proc_data_dict['Freqs'] = Freqs
-#         self.proc_data_dict['ps_0'] = ps_0
-#         self.proc_data_dict['ps_1'] = ps_1
-#         self.proc_data_dict['Freqs_wf'] = Freqs_wf
-#         self.proc_data_dict['ps_wf'] = ps_wf
-
-#         self.qoi = {}
-#         self.qoi['Weights_I_s'] = Weights_I_s
-#         self.qoi['Weights_Q_s'] = Weights_Q_s
-
-#         # If second state
-#         if len(self.timestamps) == 3:
-#             self.f_state = True
-#         else:
-#             self.f_state = False
-#         if self.f_state:
-#             ts_two = self.timestamps[2]
-#             Trace_I_2 = self.raw_data_dict[ts_two]['data'][:,1]
-#             Trace_Q_2 = self.raw_data_dict[ts_two]['data'][:,2]
-#             # Subtract offset
-#             _trace_I_2 = Trace_I_2 - np.mean(Trace_I_2)
-#             _trace_Q_2 = Trace_Q_2 - np.mean(Trace_Q_2)
-#             # Demodulate traces
-#             Trace_I_2_demod, Trace_Q_2_demod = _demodulate(Time, _trace_I_2,
-#                                                            _trace_Q_2, self.IF)
-#             # Calculate optimal weights
-#             Weights_I_gf = _trace_I_2 - _trace_I_0
-#             Weights_Q_gf = _trace_Q_2 - _trace_Q_0
-#             # joint rescaling to +/-1 Volt
-#             maxI = np.max(np.abs(Weights_I_gf))
-#             maxQ = np.max(np.abs(Weights_Q_gf))
-#             # Dividing the weight functions by four to not have overflow in
-#             # thresholding of the UHFQC
-#             weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
-#             Weights_I_gf = np.array(weight_scale_factor*Weights_I_gf)
-#             Weights_Q_gf = np.array(weight_scale_factor*Weights_Q_gf)
-#             # # Correction to gf weights.
-#             # # (taken from krinner et al., Nature, 2022).
-#             # W1 = (Weights_I + 1j*Weights_Q)
-#             # W2 = (Weights_I_gf + 1j*Weights_Q_gf)
-#             # dt = Time[1]-Time[0]
-#             # corr_factor = np.sum(W1*W2*dt)/np.sum(np.abs(W1)**2*dt)*W1
-#             # W2 += corr_factor
-#             # Weights_I_gf, Weights_Q_gf = np.real(W2), np.imag(W2)
-#             # Demodulate weights
-#             Weights_I_gf_demod, Weights_Q_gf_demod = _demodulate(Time, Weights_I_gf,
-#                                                                  Weights_Q_gf, self.IF)
-#             # Smooth weights
-#             from scipy.signal import medfilt
-#             Weights_I_gf_demod_s = medfilt(Weights_I_gf_demod, 31)
-#             Weights_Q_gf_demod_s = medfilt(Weights_Q_gf_demod, 31)
-#             Weights_I_gf_s, Weights_Q_gf_s = _demodulate(Time, Weights_I_gf_demod_s,
-#                                                          Weights_Q_gf_demod_s, -self.IF)
-#             # Save quantities
-#             self.proc_data_dict['Trace_I_2'] = Trace_I_2
-#             self.proc_data_dict['Trace_Q_2'] = Trace_Q_2
-#             self.proc_data_dict['Trace_I_2_demod'] = Trace_I_2_demod
-#             self.proc_data_dict['Trace_Q_2_demod'] = Trace_Q_2_demod
-#             self.proc_data_dict['Weights_I_gf_demod'] = Weights_I_gf_demod
-#             self.proc_data_dict['Weights_Q_gf_demod'] = Weights_Q_gf_demod
-#             self.proc_data_dict['Weights_I_gf_demod_s'] = Weights_I_gf_demod_s
-#             self.proc_data_dict['Weights_Q_gf_demod_s'] = Weights_Q_gf_demod_s
-#             self.proc_data_dict['Weights_I_gf_s'] = Weights_I_gf_s
-#             self.proc_data_dict['Weights_Q_gf_s'] = Weights_Q_gf_s
-#             self.qoi['Weights_I_gf_s'] = Weights_I_gf_s
-#             self.qoi['Weights_Q_gf_s'] = Weights_Q_gf_s
-
-#     def prepare_plots(self):
-
-#         self.axs_dict = {}
-#         n = len(self.timestamps)
-#         fig, axs = plt.subplots(figsize=(9.75/2*n, 5.2), nrows=2, ncols=n, sharex=True, sharey='row', dpi=100)
-#         axs = axs.flatten()
-#         # fig.patch.set_alpha(0)
-#         self.axs_dict['Transients_plot'] = axs[0]
-#         self.figs['Transients_plot'] = fig
-#         self.plot_dicts['Transients_plot'] = {
-#             'plotfn': Transients_plotfn,
-#             'ax_id': 'Transients_plot',
-#             'Time': self.proc_data_dict['Time'],
-#             'Trace_I_0': self.proc_data_dict['Trace_I_0'],
-#             'Trace_Q_0': self.proc_data_dict['Trace_Q_0'],
-#             'Trace_I_1': self.proc_data_dict['Trace_I_1'],
-#             'Trace_Q_1': self.proc_data_dict['Trace_Q_1'],
-#             'Trace_I_2': self.proc_data_dict['Trace_I_2'] if self.f_state else None,
-#             'Trace_Q_2': self.proc_data_dict['Trace_Q_2'] if self.f_state else None,
-#             'Trace_I_0_demod': self.proc_data_dict['Trace_I_0_demod'],
-#             'Trace_Q_0_demod': self.proc_data_dict['Trace_Q_0_demod'],
-#             'Trace_I_1_demod': self.proc_data_dict['Trace_I_1_demod'],
-#             'Trace_Q_1_demod': self.proc_data_dict['Trace_Q_1_demod'],
-#             'Trace_I_2_demod': self.proc_data_dict['Trace_I_2_demod'] if self.f_state else None,
-#             'Trace_Q_2_demod': self.proc_data_dict['Trace_Q_2_demod'] if self.f_state else None,
-#             'timestamp': self.timestamps[1]
-#         }
-
-#         fig, ax = plt.subplots(figsize=(5, 5), dpi=100)
-#         # fig.patch.set_alpha(0)
-#         self.axs_dict['IQ_trajectory_plot'] = ax
-#         self.figs['IQ_trajectory_plot'] = fig
-#         self.plot_dicts['IQ_trajectory_plot'] = {
-#             'plotfn': IQ_plotfn,
-#             'ax_id': 'IQ_trajectory_plot',
-#             'Trace_I_0_demod': self.proc_data_dict['Trace_I_0_demod'],
-#             'Trace_Q_0_demod': self.proc_data_dict['Trace_Q_0_demod'],
-#             'Trace_I_1_demod': self.proc_data_dict['Trace_I_1_demod'],
-#             'Trace_Q_1_demod': self.proc_data_dict['Trace_Q_1_demod'],
-#             'Trace_I_2_demod': self.proc_data_dict['Trace_I_2_demod'] if self.f_state else None,
-#             'Trace_Q_2_demod': self.proc_data_dict['Trace_Q_2_demod'] if self.f_state else None,
-#             'timestamp': self.timestamps[1]
-#         }
-        
-#         fig, axs = plt.subplots(figsize=(9*1.4, 3*1.4), ncols=2,
-#                 gridspec_kw={'width_ratios': [5*1.4, 3*1.4]}, dpi=100)
-#         axs = axs.flatten()
-#         # fig.patch.set_alpha(0)
-#         self.axs_dict['Optimal_weights_plot'] = axs[0]
-#         self.figs['Optimal_weights_plot'] = fig
-#         self.plot_dicts['Optimal_weights_plot'] = {
-#             'plotfn': Weights_plotfn,
-#             'ax_id': 'Optimal_weights_plot',
-#             'Time': self.proc_data_dict['Time'],
-#             'Weights_I_demod': self.proc_data_dict['Weights_I_demod'],
-#             'Weights_Q_demod': self.proc_data_dict['Weights_Q_demod'],
-#             'Weights_I_demod_s': self.proc_data_dict['Weights_I_demod_s'],
-#             'Weights_Q_demod_s': self.proc_data_dict['Weights_Q_demod_s'],
-#             'Weights_I_gf_demod': self.proc_data_dict['Weights_I_gf_demod'] if self.f_state else None,
-#             'Weights_Q_gf_demod': self.proc_data_dict['Weights_Q_gf_demod'] if self.f_state else None,
-#             'Weights_I_gf_demod_s': self.proc_data_dict['Weights_I_gf_demod_s'] if self.f_state else None,
-#             'Weights_Q_gf_demod_s': self.proc_data_dict['Weights_Q_gf_demod_s'] if self.f_state else None,
-#             'timestamp': self.timestamps[1]
-#         }
-
-#         fig, axs = plt.subplots(figsize=(8,3), ncols=2, dpi=100,
-#                                 sharey=True)
-#         axs = axs.flatten()
-#         # fig.patch.set_alpha(0)
-#         self.axs_dict['FFT_plot'] = axs[0]
-#         self.figs['FFT_plot'] = fig
-#         self.plot_dicts['FFT_plot'] = {
-#             'plotfn': FFT_plotfn,
-#             'ax_id': 'FFT_plot',
-#             'Freqs': self.proc_data_dict['Freqs'],
-#             'ps_0': self.proc_data_dict['ps_0'],
-#             'ps_1': self.proc_data_dict['ps_1'],
-#             'Freqs_wf': self.proc_data_dict['Freqs_wf'],
-#             'ps_wf': self.proc_data_dict['ps_wf'],
-#             'IF': self.IF,
-#             'timestamp': self.timestamps[1]
-#         }
-
-#     def run_post_extract(self):
-#         self.prepare_plots()  # specify default plots
-#         self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
-#         if self.options_dict.get('save_figs', False):
-#             self.save_figures(
-#                 close_figs=self.options_dict.get('close_figs', True),
-#                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
-
-# def Transients_plotfn(
-#     Time,
-#     Trace_I_0, Trace_Q_0,
-#     Trace_I_1, Trace_Q_1,
-#     Trace_I_2, Trace_Q_2,
-#     Trace_I_0_demod, Trace_Q_0_demod,
-#     Trace_I_1_demod, Trace_Q_1_demod,
-#     Trace_I_2_demod, Trace_Q_2_demod,
-#     timestamp,
-#     ax, **kw):
-#     fig = ax.get_figure()
-#     axs = fig.get_axes()
-#     if type(Trace_I_2) != type(None):
-#         n = 3
-#     else:
-#         n = 2
-#     axs[0].plot(Time*1e6, Trace_I_0, color='#82B1FF', ls='-', lw=1, label='In phase component')
-#     axs[n].plot(Time*1e6, Trace_Q_0, color='#82B1FF', ls='-', lw=1, label='Quadrature component')
-#     axs[1].plot(Time*1e6, Trace_I_1, color='#E57373', ls='-', lw=1, label='In phase component')
-#     axs[n+1].plot(Time*1e6, Trace_Q_1, color='#E57373', ls='-', lw=1, label='Quadrature component')
-#     axs[0].plot(Time*1e6, Trace_I_0_demod, color='#0D47A1', ls='-', lw=1)
-#     axs[n].plot(Time*1e6, Trace_Q_0_demod, color='#0D47A1', ls='-', lw=1)
-#     axs[1].plot(Time*1e6, Trace_I_1_demod, color='#C62828', ls='-', lw=1)
-#     axs[n+1].plot(Time*1e6, Trace_Q_1_demod, color='#C62828', ls='-', lw=1)
-#     if n == 3:
-#         axs[2].plot(Time*1e6, Trace_I_2, color='#A5D6A7', ls='-', lw=1, label='In phase component')
-#         axs[n+2].plot(Time*1e6, Trace_Q_2, color='#A5D6A7', ls='-', lw=1, label='Quadrature component')
-#         axs[2].plot(Time*1e6, Trace_I_2_demod, color='#2E7D32', ls='-', lw=1)
-#         axs[n+2].plot(Time*1e6, Trace_Q_2_demod, color='#2E7D32', ls='-', lw=1)
-#         axs[n+2].set_xlabel('Time ($\mathrm{\mu s}$)')
-#         axs[2].set_title(r'$2^\mathrm{nd}$ excited state')
-#         axs[2].legend(frameon=False, fontsize=9)
-#         axs[n+2].legend(frameon=False, fontsize=9)
-
-#     axs[n].set_xlabel('Time ($\mathrm{\mu s}$)')
-#     axs[n+1].set_xlabel('Time ($\mathrm{\mu s}$)')
-#     axs[0].set_ylabel('Voltage (V)')
-#     axs[n].set_ylabel('Voltage (V)')
-#     axs[0].set_title('Ground state')
-#     axs[1].set_title('Excited state')
-#     axs[0].legend(frameon=False, fontsize=9)
-#     axs[1].legend(frameon=False, fontsize=9)
-#     axs[n].legend(frameon=False, fontsize=9)
-#     axs[n+1].legend(frameon=False, fontsize=9)
-#     fig.suptitle(f'{timestamp}\nReadout transients', y=.95)
-#     fig.tight_layout()
-
-# def IQ_plotfn(
-#     Trace_I_0_demod, Trace_Q_0_demod,
-#     Trace_I_1_demod, Trace_Q_1_demod,
-#     Trace_I_2_demod, Trace_Q_2_demod,
-#     timestamp,
-#     ax, **kw):
-#     fig = ax.get_figure()
-#     axs = fig.get_axes()
-
-#     ax.plot(Trace_I_0_demod*1e3, Trace_Q_0_demod*1e3, color='#0D47A1', ls='-', lw=.5, label='ground')
-#     ax.plot(Trace_I_1_demod*1e3, Trace_Q_1_demod*1e3, color='#C62828', ls='-', lw=.5, label='excited')
-#     if type(Trace_I_2_demod) != type(None):
-#         ax.plot(Trace_I_2_demod*1e3, Trace_Q_2_demod*1e3, color='C2', ls='-', lw=.5, label='$2^{nd}$ excited')    
-#     _lim = np.max(np.concatenate((np.abs(Trace_I_0_demod*1e3), np.abs(Trace_Q_0_demod*1e3),
-#                                   np.abs(Trace_I_1_demod*1e3), np.abs(Trace_Q_1_demod*1e3))))
-#     ax.set_xlim(-_lim*1.2, _lim*1.2)
-#     ax.set_ylim(-_lim*1.2, _lim*1.2)
-#     ax.set_xlabel('I Voltage (mV)')
-#     ax.set_ylabel('Q Voltage (mV)')
-#     ax.set_title(f'{timestamp}\nIQ trajectory')
-#     ax.legend(frameon=False, bbox_to_anchor=(1.01, 1))
-
-# def Weights_plotfn(
-#     Time, 
-#     Weights_I_demod, Weights_Q_demod, 
-#     Weights_I_demod_s, Weights_Q_demod_s,
-#     Weights_I_gf_demod, Weights_Q_gf_demod, 
-#     Weights_I_gf_demod_s, Weights_Q_gf_demod_s,
-#     timestamp,
-#     ax, **kw):
-#     fig = ax.get_figure()
-#     axs = fig.get_axes()
-    
-#     axs[0].plot(Time*1e6, Weights_I_demod, color='C0', ls='-', lw=1, alpha=.25)
-#     axs[0].plot(Time*1e6, Weights_Q_demod, color='#6A1B9A', ls='-', lw=1, alpha=.25)
-#     axs[0].plot(Time*1e6, Weights_I_demod_s, color='C0', ls='-', lw=2, alpha=1, label='Weight function I')
-#     axs[0].plot(Time*1e6, Weights_Q_demod_s, color='#6A1B9A', ls='-', lw=2, alpha=1, label='Weight function Q')
-#     axs[1].plot(Weights_I_demod, Weights_Q_demod, color='C0', ls='-', lw=.5, alpha=.5)
-#     axs[1].plot(Weights_I_demod_s, Weights_Q_demod_s, color='C0', ls='-', lw=2, alpha=1, label='$ge$ weights')
-#     if type(Weights_I_gf_demod) != type(None):
-#         axs[0].plot(Time*1e6, Weights_I_gf_demod, color='#008b00', ls='-', lw=1, alpha=.25)
-#         axs[0].plot(Time*1e6, Weights_Q_gf_demod, color='#B71C1C', ls='-', lw=1, alpha=.25)
-#         axs[0].plot(Time*1e6, Weights_I_gf_demod_s, color='#008b00', ls='-', lw=2, alpha=1, label='Weight function I gf')
-#         axs[0].plot(Time*1e6, Weights_Q_gf_demod_s, color='#B71C1C', ls='-', lw=2, alpha=1, label='Weight function Q gf')
-#         axs[1].plot(Weights_I_gf_demod, Weights_Q_gf_demod, color='C2', ls='-', lw=.5, alpha=.5)
-#         axs[1].plot(Weights_I_gf_demod_s, Weights_Q_gf_demod_s, color='C2', ls='-', lw=2, alpha=1, label='$gf$ weights')
-
-#     axs[0].set_xlabel('Time ($\mathrm{\mu s}$)')
-#     axs[0].set_ylabel('Amplitude (a.u.)')
-#     axs[0].legend(frameon=False, fontsize=7)
-#     _lim = np.max(np.concatenate((np.abs(Weights_I_demod), np.abs(Weights_Q_demod))))
-#     axs[1].set_xlim(-_lim*1.1, _lim*1.1)
-#     axs[1].set_ylim(-_lim*1.1, _lim*1.1)
-#     axs[1].set_xticklabels([])
-#     axs[1].set_yticklabels([])
-#     axs[1].set_xlabel('I component (a.u.)')
-#     axs[1].set_ylabel('Q component (a.u.)')
-#     axs[0].set_title('Optimal integration weights')
-#     axs[1].set_title('IQ trajectory')
-#     axs[1].legend(frameon=False)
-#     fig.suptitle(f'{timestamp}')
-
-# def FFT_plotfn(
-#     Freqs, Freqs_wf, IF, ps_wf, ps_0, ps_1,
-#     timestamp,
-#     ax, **kw):
-#     fig = ax.get_figure()
-#     axs = fig.get_axes()
-
-#     axs[0].plot(Freqs*1e-6, ps_0, 'C0')
-#     axs[0].plot(Freqs*1e-6, ps_1, 'C3')
-#     axs[0].plot(Freqs_wf*1e-6, ps_wf, '--', color='#607D8B', alpha=.5)
-#     axs[0].axvline(abs(IF)*1e-6, color='k', ls='--', lw=1, label=f'IF : {IF*1e-6:.1f} MHz')
-#     axs[0].set_xlim(left=0, right=np.max(Freqs*1e-6))
-#     axs[0].set_xlabel('Frequency (MHz)')
-#     axs[0].set_ylabel('PSD ($\mathrm{V^2/Hz}$)')
-
-#     axs[1].plot(Freqs*1e-6, ps_0, 'C0', label='ground')
-#     axs[1].plot(Freqs*1e-6, ps_1, 'C3', label='excited')
-#     axs[1].plot(Freqs_wf*1e-6, ps_wf, 'C2--',
-#                 label='input pulse', alpha=.5)
-#     axs[1].axvline(abs(IF)*1e-6, color='k', ls='--', lw=1)
-#     axs[1].set_xlim(left=abs(IF)*1e-6-50, right=abs(IF)*1e-6+50)
-#     axs[1].set_xlabel('Frequency (MHz)')
-#     axs[0].legend(frameon=False)
-#     axs[1].legend(frameon=False, fontsize=7, bbox_to_anchor=(1,1))
-    
-#     fig.suptitle(f'{timestamp}\nTransients PSD', y=1.025)
-
-
 

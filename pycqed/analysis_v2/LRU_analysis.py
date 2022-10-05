@@ -115,6 +115,165 @@ def _fit_double_gauss(x_vals, hist_0, hist_1,
             'Fid_fit': Fid_fit, 'Fid_discr': Fid_discr }
     return popt0, popt1, qoi
 
+def _twoD_Gaussian(x, y, x0, y0, sigma_x, sigma_y, theta=0):
+    '''
+    Funtion that paramatrizes a 
+    single 2D gaussian distribution.
+    '''
+    x0 = float(x0)
+    y0 = float(y0)    
+    a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
+    b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
+    c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
+    g = np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0) + c*((y-y0)**2)))
+    return g
+
+def triple_gauss(x, y,
+    x0, x1, x2,
+    y0, y1, y2,
+    sigma_x_0, sigma_x_1, sigma_x_2,
+    sigma_y_0, sigma_y_1, sigma_y_2,
+    A, r_1, r_2):
+    '''
+    Function that paramtrizes a 2D
+    3-gaussian mixture.
+    '''
+    _dist = A*((1-r_1-r_2)*_twoD_Gaussian(x, y, x0, y0, sigma_x_0, sigma_y_0)+
+               r_1*_twoD_Gaussian(x, y, x1, y1, sigma_x_1, sigma_y_1)+
+               r_2*_twoD_Gaussian(x, y, x2, y2, sigma_x_2, sigma_y_2))
+    return _dist
+
+def _triple_gauss_joint(data,
+    x0, x1, x2,
+    y0, y1, y2,
+    sigma_x_0, sigma_x_1, sigma_x_2,
+    sigma_y_0, sigma_y_1, sigma_y_2,
+    A0, A1, A2,
+    r0_1, r1_1, r2_1,
+    r0_2, r1_2, r2_2):
+    '''
+    Helper function to fit 3 simultatneous mixtures
+    of 3 gaussians each in 2D.
+    '''
+    x, y = data
+    _dist0 = triple_gauss(x, y,
+                          x0, x1, x2,
+                          y0, y1, y2,
+                          sigma_x_0, sigma_x_1, sigma_x_2,
+                          sigma_y_0, sigma_y_1, sigma_y_2,
+                          A0, r0_1, r0_2)
+    _dist1 = triple_gauss(x, y,
+                          x1, x0, x2,
+                          y1, y0, y2,
+                          sigma_x_1, sigma_x_0, sigma_x_2,
+                          sigma_y_1, sigma_y_0, sigma_y_2,
+                          A1, r1_1, r1_2)
+    _dist2 = triple_gauss(x, y,
+                          x2, x1, x0,
+                          y2, y1, y0,
+                          sigma_x_2, sigma_x_1, sigma_x_0,
+                          sigma_y_2, sigma_y_1, sigma_y_0,
+                          A2, r2_1, r2_2)
+    return np.concatenate((_dist0.ravel(), _dist1.ravel(), _dist2.ravel()))
+
+def _fit_triple_gauss(x_vals, y_vals, hist_0, hist_1, hist_2):
+    '''
+    Fit three 2D histograms to a 3-gaussian mixture with
+    common parameters. From fitted parameters, calculate
+    P0i, P1i and P2i for each input state i=g,e,f.
+    '''
+    from scipy.optimize import curve_fit
+    #####################
+    # Guesses for fit
+    #####################
+    # Get prob. distribution
+    pdf_0 = hist_0/np.sum(hist_0)
+    pdf_1 = hist_1/np.sum(hist_1)
+    pdf_2 = hist_2/np.sum(hist_2)
+    # calculate mean
+    _x0_guess, _y0_guess = np.sum(np.dot(pdf_0, x_vals)), np.sum(np.dot(pdf_0.T, y_vals)) 
+    _x1_guess, _y1_guess = np.sum(np.dot(pdf_1, x_vals)), np.sum(np.dot(pdf_1.T, y_vals))
+    _x2_guess, _y2_guess = np.sum(np.dot(pdf_2, x_vals)), np.sum(np.dot(pdf_2.T, y_vals))
+    # calculate standard deviation
+    _sigma_x_0_guess, _sigma_y_0_guess = np.sqrt(np.sum(np.dot(pdf_0, (x_vals-_x0_guess)**2))), np.sqrt(np.sum(np.dot(pdf_0.T, (y_vals-_y0_guess)**2)))
+    _sigma_x_1_guess, _sigma_y_1_guess = np.sqrt(np.sum(np.dot(pdf_1, (x_vals-_x1_guess)**2))), np.sqrt(np.sum(np.dot(pdf_1.T, (y_vals-_y1_guess)**2)))
+    _sigma_x_2_guess, _sigma_y_2_guess = np.sqrt(np.sum(np.dot(pdf_2, (x_vals-_x2_guess)**2))), np.sqrt(np.sum(np.dot(pdf_2.T, (y_vals-_y2_guess)**2)))
+    # residual populations
+    _r0_1_guess, _r0_2_guess = 0.05, 0.05
+    _r1_1_guess, _r1_2_guess = 0.05, 0.05
+    _r2_1_guess, _r2_2_guess = 0.05, 0.05
+    # Amplitudes
+    _A0_guess = np.max(hist_0)
+    _A1_guess = np.max(hist_1)
+    _A2_guess = np.max(hist_2)
+    # Guess array
+    p0 = [_x0_guess, _x1_guess, _x2_guess,
+          _y0_guess, _y1_guess, _y2_guess,
+          _sigma_x_0_guess, _sigma_x_1_guess, _sigma_x_2_guess,
+          _sigma_y_0_guess, _sigma_y_1_guess, _sigma_y_2_guess,
+          _A0_guess, _A1_guess, _A2_guess,
+          _r0_1_guess, _r1_1_guess, _r2_1_guess,
+          _r0_2_guess, _r1_2_guess, _r2_2_guess]
+    # Bounding parameters
+    _x0_bound, _y0_bound = (-np.inf,np.inf), (-np.inf,np.inf)
+    _x1_bound, _y1_bound = (-np.inf,np.inf), (-np.inf,np.inf)
+    _x2_bound, _y2_bound = (-np.inf,np.inf), (-np.inf,np.inf)
+    _sigma_x_0_bound, _sigma_y_0_bound = (0,np.inf), (0,np.inf)
+    _sigma_x_1_bound, _sigma_y_1_bound = (0,np.inf), (0,np.inf)
+    _sigma_x_2_bound, _sigma_y_2_bound = (0,np.inf), (0,np.inf)
+    _r0_bound = (0,1)
+    _r1_bound = (0,1)
+    _r2_bound = (0,1)
+    _A0_bound = (0,np.inf)
+    _A1_bound = (0,np.inf)
+    _A2_bound = (0,np.inf)
+    bounds = np.array([_x0_bound, _x1_bound, _x2_bound,
+                       _y0_bound, _y1_bound, _y2_bound,
+                       _sigma_x_0_bound, _sigma_x_1_bound, _sigma_x_2_bound,
+                       _sigma_y_0_bound, _sigma_y_1_bound, _sigma_y_2_bound,
+                       _A0_bound, _A1_bound, _A2_bound,
+                       _r0_bound, _r1_bound, _r2_bound,
+                       _r0_bound, _r1_bound, _r2_bound])
+    # Create meshgrid of points
+    _X, _Y = np.meshgrid(x_vals, y_vals)
+    # Fit parameters within bounds
+    popt, pcov = curve_fit(
+        _triple_gauss_joint, (_X, _Y),
+        np.concatenate((hist_0.ravel(), hist_1.ravel(), hist_2.ravel())),
+        p0=p0, bounds=bounds.transpose())
+    #               x0   x1   x2   y0   y1   y2  sx0  sx1  sx2  sy0  sy1  sy2    A   r1   r2
+    popt0 = popt[[   0,   1,   2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  15,  18]]
+    popt1 = popt[[   1,   0,   2,   4,   3,   5,   7,   6,   8,  10,   9,  11,  13,  16,  19]]
+    popt2 = popt[[   2,   1,   0,   5,   4,   3,   8,   7,   6,  11,  10,   9,  14,  17,  20]]
+    ##################################
+    # Calculate quantites of interest
+    ##################################
+    # ground state distribution
+    sx0, sx1, sx2 = popt0[6], popt1[6], popt2[6]
+    sy0, sy1, sy2 = popt0[9], popt1[9], popt2[9]
+    r1 = popt0[13]
+    r2 = popt0[14]
+    P_0g = ((1-r1-r2)*sx0*sy0)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    P_1g = (r1*sx1*sy1)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    P_2g = (r2*sx2*sy2)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    # excited state distribution
+    r1 = popt1[13]
+    r2 = popt1[14]
+    P_0e = ((1-r1-r2)*sx0*sy0)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    P_1e = (r1*sx1*sy1)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    P_2e = (r2*sx2*sy2)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    # f state distribution
+    r1 = popt2[13]
+    r2 = popt2[14]
+    P_0f = ((1-r1-r2)*sx0*sy0)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    P_1f = (r1*sx1*sy1)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    P_2f = (r2*sx2*sy2)/((1-r1-r2)*sx0*sy0 + r1*sx1*sy1 + r2*sx2*sy2)
+    # qoi dictionary
+    qoi = {'P_0g':P_0g, 'P_1g':P_1g, 'P_2g':P_2g,
+           'P_0e':P_0e, 'P_1e':P_1e, 'P_2e':P_2e,
+           'P_0f':P_0f, 'P_1f':P_1f, 'P_2f':P_2f}
+    return popt0, popt1, popt2, qoi
+
 def _decision_boundary_points(coefs, intercepts):
     '''
     Find points along the decision boundaries of 
@@ -150,6 +309,7 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
     def __init__(self,
                  qubit: str,
                  heralded_init: bool = False,
+                 fit_3gauss: bool = False,
                  t_start: str = None, 
                  t_stop: str = None,
                  label: str = '',
@@ -165,6 +325,7 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
 
         self.qubit = qubit
         self.heralded_init = heralded_init
+        self.fit_3gauss = fit_3gauss
         if auto:
             self.run_analysis()
 
@@ -272,10 +433,26 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
             _fid = np.mean(_res == int(state))
             Fid_dict[state] = _fid
         Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+        # Get assignment fidelity matrix
+        M = np.zeros((3,3))
+        for i, shots in enumerate([Shots_0, Shots_1, Shots_2]):
+            for j, state in enumerate(['0', '1', '2']):
+                _res = clf.predict(shots)
+                M[i][j] = np.mean(_res == int(state))
+        # Get leakage removal fraction 
+        _res = clf.predict(Shots_lru)
+        _vec = np.array([np.mean(_res == int('0')),
+                         np.mean(_res == int('1')),
+                         np.mean(_res == int('2'))])
+        M_inv = np.linalg.inv(M)
+        pop_vec = np.dot(_vec, M_inv)
         self.proc_data_dict['classifier'] = clf
         self.proc_data_dict['dec_bounds'] = dec_bounds
         self.proc_data_dict['Fid_dict'] = Fid_dict
         self.qoi['Fid_dict'] = Fid_dict
+        self.qoi['Assignment_matrix'] = M
+        self.qoi['pop_vec'] = pop_vec
+        self.qoi['removal_fraction'] = 1-pop_vec[2]
         #########################################
         # Project data along axis perpendicular
         # to the decision boundaries.
@@ -350,44 +527,68 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
         # Rotate shots over 02 decision boundary axis
         shots_0 = rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
         shots_2 = rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
-        shots_lru = rotate_and_center_data(Shots_lru[:,0],Shots_lru[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
         # Take relavant quadrature
         shots_0 = shots_0[:,0]
         shots_2 = shots_2[:,0]
-        shots_lru = shots_lru[:,0]
         n_shots_2 = len(shots_2)
         # find range
-        _all_shots = np.concatenate((shots_0, shots_2, shots_lru))
+        _all_shots = np.concatenate((shots_0, shots_2))
         _range = (np.min(_all_shots), np.max(_all_shots))
         # Sort shots in unique values
         x0, n0 = np.unique(shots_0, return_counts=True)
         x2, n2 = np.unique(shots_2, return_counts=True)
-        x3, n3 = np.unique(shots_lru, return_counts=True)
         Fid_02, threshold_02 = _calculate_fid_and_threshold(x0, n0, x2, n2)
-        Fid_32, threshold_32 = _calculate_fid_and_threshold(x3, n3, x2, n2)
         # Histogram of shots for 1 and 2
         h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
         h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
-        h3, bin_edges = np.histogram(shots_lru, bins=100, range=_range)
         bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
         popt0, popt2, params_02 = _fit_double_gauss(bin_centers, h0, h2)
-        popt3, _popt, params_32 = _fit_double_gauss(bin_centers, h3, h2,
-                                                    _x0_guess=popt0[0])
         # Save processed data
         self.proc_data_dict['projection_02'] = {}
         self.proc_data_dict['projection_02']['h0'] = h0
         self.proc_data_dict['projection_02']['h2'] = h2
-        self.proc_data_dict['projection_02']['h3'] = h3
         self.proc_data_dict['projection_02']['bin_centers'] = bin_centers
         self.proc_data_dict['projection_02']['popt0'] = popt0
         self.proc_data_dict['projection_02']['popt2'] = popt2
-        self.proc_data_dict['projection_02']['popt3'] = popt3
         self.proc_data_dict['projection_02']['SNR'] = params_02['SNR']
-        self.proc_data_dict['projection_02']['leak'] = params_32['P_e0']
         self.proc_data_dict['projection_02']['Fid'] = Fid_02
-        self.proc_data_dict['projection_02']['Fid_32'] = Fid_32
         self.proc_data_dict['projection_02']['threshold'] = threshold_02
-        self.qoi['removal_fraction'] = 1-params_32['P_e0']
+        ###############################
+        # Fit 3-gaussian mixture
+        ###############################
+        if self.fit_3gauss:
+            _all_shots = np.concatenate((self.proc_data_dict['shots_0_IQ'], 
+                                         self.proc_data_dict['shots_1_IQ'], 
+                                         self.proc_data_dict['shots_2_IQ']))
+            _lim = np.max([ np.max(np.abs(_all_shots[:,0]))*1.1,
+                            np.max(np.abs(_all_shots[:,1]))*1.1 ])
+            def _histogram_2d(x_data, y_data, lim):
+                _bins = (np. linspace(-lim, lim, 201), np.linspace(-lim, lim, 201))
+                n, _xbins, _ybins = np.histogram2d(x_data, y_data, bins=_bins)
+                return n.T, _xbins, _ybins
+            # 2D histograms
+            n_0, xbins, ybins = _histogram_2d(*self.proc_data_dict['shots_0_IQ'].T, lim=_lim)
+            n_1, xbins, ybins = _histogram_2d(*self.proc_data_dict['shots_1_IQ'].T, lim=_lim)
+            n_2, xbins, ybins = _histogram_2d(*self.proc_data_dict['shots_2_IQ'].T, lim=_lim)
+            n_3, xbins, ybins = _histogram_2d(*self.proc_data_dict['shots_lru_IQ'].T, lim=_lim)
+            # bin centers
+            xbins_c, ybins_c = (xbins[1:]+xbins[:-1])/2, (ybins[1:]+ybins[:-1])/2 
+            popt0, popt1, popt2, qoi = _fit_triple_gauss(xbins_c, ybins_c, n_0, n_1, n_2)
+            popt3, _popt1, _popt2, _qoi = _fit_triple_gauss(xbins_c, ybins_c, n_3, n_1, n_2)
+            self.proc_data_dict['3gauss_fit'] = {}
+            self.proc_data_dict['3gauss_fit']['xbins'] = xbins
+            self.proc_data_dict['3gauss_fit']['ybins'] = ybins
+            self.proc_data_dict['3gauss_fit']['n0'] = n_0
+            self.proc_data_dict['3gauss_fit']['n1'] = n_1
+            self.proc_data_dict['3gauss_fit']['n2'] = n_2
+            self.proc_data_dict['3gauss_fit']['n3'] = n_3
+            self.proc_data_dict['3gauss_fit']['popt0'] = popt0
+            self.proc_data_dict['3gauss_fit']['popt1'] = popt1
+            self.proc_data_dict['3gauss_fit']['popt2'] = popt2
+            self.proc_data_dict['3gauss_fit']['popt3'] = popt3
+            self.proc_data_dict['3gauss_fit']['qoi'] = _qoi
+            self.proc_data_dict['3gauss_fit']['removal_fraction'] = 1-_qoi['P_2g']
+            self.qoi['removal_fraction_gauss_fit'] = 1-_qoi['P_2g']
 
     def prepare_plots(self):
         self.axs_dict = {}
@@ -414,17 +615,50 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
-        fig, ax = plt.subplots(figsize=(4,3), dpi=100)
+        fig, ax = plt.subplots(figsize=(3.25,3.25), dpi=100)
         # fig.patch.set_alpha(0)
         self.axs_dict['Leakage_histogram'] = ax
         self.figs['Leakage_histogram'] = fig
         self.plot_dicts['Leakage_histogram'] = {
             'plotfn': leakage_hist_plotfn,
             'ax_id': 'Leakage_histogram',
-            'projection_02': self.proc_data_dict['projection_02'],
+            'shots_0': self.proc_data_dict['shots_0_IQ'],
+            'shots_1': self.proc_data_dict['shots_1_IQ'],
+            'shots_2': self.proc_data_dict['shots_2_IQ'],
+            'shots_lru': self.proc_data_dict['shots_lru_IQ'],
+            'classifier': self.proc_data_dict['classifier'],
+            'dec_bounds': self.proc_data_dict['dec_bounds'],
+            'qoi': self.qoi,
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
+        fig, ax = plt.subplots(figsize=(3,3), dpi=100)
+        # fig.patch.set_alpha(0)
+        self.axs_dict['Assignment_matrix'] = ax
+        self.figs['Assignment_matrix'] = fig
+        self.plot_dicts['Assignment_matrix'] = {
+            'plotfn': assignment_matrix_plotfn,
+            'ax_id': 'Assignment_matrix',
+            'M': self.qoi['Assignment_matrix'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamp
+        }
+        if self.fit_3gauss:
+            fig = plt.figure(figsize=(12,4), dpi=100)
+            axs = [None,None,None]
+            axs[0] = fig.add_subplot(1, 3, 1)
+            axs[2] = fig.add_subplot(1, 3, 3 , projection='3d', elev=20)
+            axs[1] = fig.add_subplot(1, 3, 2)
+            # fig.patch.set_alpha(0)
+            self.axs_dict['Three_gauss_fit'] = axs[0]
+            self.figs['Three_gauss_fit'] = fig
+            self.plot_dicts['Three_gauss_fit'] = {
+                'plotfn': gauss_fit2D_plotfn,
+                'ax_id': 'Three_gauss_fit',
+                'fit_dict': self.proc_data_dict['3gauss_fit'],
+                'qubit': self.qubit,
+                'timestamp': self.timestamp
+            }
 
     def run_post_extract(self):
         self.prepare_plots()  # specify default plots
@@ -467,7 +701,7 @@ def ssro_IQ_projection_plotfn(
         y = (_y[:-1] + _y[1:]) / 2
         _x, _y = np.meshgrid(_x, _y)
         x, y = np.meshgrid(x, y)
-        p0 = [counts.max(), np.mean(X), np.mean(Y), .2, .2, 0]
+        p0 = [counts.max(), np.mean(X), np.mean(Y), np.std(X), np.std(Y), 0]
         popt, pcov = curve_fit(twoD_Gaussian, (x, y), counts.T.ravel(), p0=p0)
         return popt
     popt_0 = _fit_2D_gaussian(shots_0[:,0], shots_0[:,1])
@@ -490,17 +724,17 @@ def ssro_IQ_projection_plotfn(
     from matplotlib.patches import Ellipse
     circle_0 = Ellipse((popt_0[1], popt_0[2]),
                       width=4*popt_0[3], height=4*popt_0[4],
-                      angle=popt_0[5]*180/np.pi+90,
+                      angle=-popt_0[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     axs[0].add_patch(circle_0)
     circle_1 = Ellipse((popt_1[1], popt_1[2]),
                       width=4*popt_1[3], height=4*popt_1[4],
-                      angle=popt_1[5]*180/np.pi+90,
+                      angle=-popt_1[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     axs[0].add_patch(circle_1)
     circle_2 = Ellipse((popt_2[1], popt_2[2]),
                       width=4*popt_2[3], height=4*popt_2[4],
-                      angle=popt_2[5]*180/np.pi+90,
+                      angle=-popt_2[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     axs[0].add_patch(circle_2)
     # Plot classifier zones
@@ -604,42 +838,205 @@ def ssro_IQ_projection_plotfn(
                 verticalalignment='top', bbox=props)
 
 def leakage_hist_plotfn(
-    projection_02,
+    shots_0, 
+    shots_1,
+    shots_2,
+    shots_lru,
+    classifier,
+    dec_bounds,
+    qoi,
     timestamp,
     qubit, 
     ax, **kw):
-
     fig = ax.get_figure()
+    # Fit 2D gaussians
+    from scipy.optimize import curve_fit
+    def twoD_Gaussian(data, amplitude, x0, y0, sigma_x, sigma_y, theta):
+        x, y = data
+        x0 = float(x0)
+        y0 = float(y0)    
+        a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
+        b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
+        c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
+        g = amplitude*np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0) 
+                                + c*((y-y0)**2)))
+        return g.ravel()
+    def _fit_2D_gaussian(X, Y):
+        counts, _x, _y = np.histogram2d(X, Y, bins=[100, 100], density=True)
+        x = (_x[:-1] + _x[1:]) / 2
+        y = (_y[:-1] + _y[1:]) / 2
+        _x, _y = np.meshgrid(_x, _y)
+        x, y = np.meshgrid(x, y)
+        p0 = [counts.max(), np.mean(X), np.mean(Y), np.std(X), np.std(Y), 0]
+        popt, pcov = curve_fit(twoD_Gaussian, (x, y), counts.T.ravel(), p0=p0)
+        return popt
+    popt_0 = _fit_2D_gaussian(shots_0[:,0], shots_0[:,1])
+    popt_1 = _fit_2D_gaussian(shots_1[:,0], shots_1[:,1])
+    popt_2 = _fit_2D_gaussian(shots_2[:,0], shots_2[:,1])
 
-    _bin_c = projection_02['bin_centers']
-    bin_width = _bin_c[1]-_bin_c[0]
-    # ax.bar(_bin_c, projection_02['h0'], bin_width, fc='C0', alpha=0.1)
-    # ax.bar(_bin_c, projection_02['h2'], bin_width, fc='C2', alpha=0.4)
-    ax.bar(_bin_c, projection_02['h3'], bin_width, fc='C0', alpha=0.15)
-    ax.plot(_bin_c, double_gauss(_bin_c, *projection_02['popt0']), '-C0', alpha=.5)
-    ax.plot(_bin_c, double_gauss(_bin_c, *projection_02['popt2']), '-C2', alpha=.5)
-    ax.plot(_bin_c, double_gauss(_bin_c, *projection_02['popt3']), '--C2')
-    # ax.axvline(projection_02['threshold'], ls='--', color='k', lw=1)
-    text = '\n'.join((f'Fid.  : {projection_02["Fid"]*100:.1f}%',
-                      f'SNR : {projection_02["SNR"]:.1f}',
+    ax.plot(shots_lru[:,0], shots_lru[:,1], '.', color='C0', alpha=1, markersize=1)
+    ax.plot([0, popt_0[1]], [0, popt_0[2]], '--', color='k', lw=.5)
+    ax.plot([0, popt_1[1]], [0, popt_1[2]], '--', color='k', lw=.5)
+    ax.plot([0, popt_2[1]], [0, popt_2[2]], '--', color='k', lw=.5)
+    ax.plot(popt_0[1], popt_0[2], '.', color='C0', label='ground')
+    ax.plot(popt_1[1], popt_1[2], '.', color='C3', label='excited')
+    ax.plot(popt_2[1], popt_2[2], '.', color='C2', label='$2^\mathrm{nd}$ excited')
+    ax.plot(popt_0[1], popt_0[2], 'o', color='w') # change for ket state
+    ax.plot(popt_1[1], popt_1[2], 'o', color='w') # change for ket state
+    ax.plot(popt_2[1], popt_2[2], 'o', color='w') # change for ket state
+    # Draw 4sigma ellipse around mean
+    from matplotlib.patches import Ellipse
+    circle_0 = Ellipse((popt_0[1], popt_0[2]),
+                      width=4*popt_0[3], height=4*popt_0[4],
+                      angle=-popt_0[5]*180/np.pi,
+                      ec='white', fc='none', ls='--', lw=1.25, zorder=10)
+    ax.add_patch(circle_0)
+    circle_1 = Ellipse((popt_1[1], popt_1[2]),
+                      width=4*popt_1[3], height=4*popt_1[4],
+                      angle=-popt_1[5]*180/np.pi,
+                      ec='white', fc='none', ls='--', lw=1.25, zorder=10)
+    ax.add_patch(circle_1)
+    circle_2 = Ellipse((popt_2[1], popt_2[2]),
+                      width=4*popt_2[3], height=4*popt_2[4],
+                      angle=-popt_2[5]*180/np.pi,
+                      ec='white', fc='none', ls='--', lw=1.25, zorder=10)
+    ax.add_patch(circle_2)
+
+    _lim = np.max([ np.max(np.abs(shots_lru[:,0]))*1.1, np.max(np.abs(shots_lru[:,1]))*1.1 ])
+    # Plot classifier zones
+    from matplotlib import colors
+    X, Y = np.meshgrid(np.linspace(-_lim, _lim, 1001), np.linspace(-_lim, _lim, 1001))
+    pred_labels = classifier.predict(np.c_[X.ravel(), Y.ravel()])
+    pred_labels = pred_labels.reshape(X.shape)
+    cmap = colors.LinearSegmentedColormap.from_list("", ["C0","C3","C2"])
+    cs = ax.contourf(X, Y, pred_labels, cmap=cmap, alpha=0.2)
+    # Plot decision boundary
+    for bound in ['01', '12', '02']:
+        _x0, _y0 = dec_bounds['mean']
+        _x1, _y1 = dec_bounds[bound]
+        a = (_y1-_y0)/(_x1-_x0)
+        b = _y0 - a*_x0
+        _xlim = 1e2*np.sign(_x1-_x0)
+        _ylim = a*_xlim + b
+        ax.plot([_x0, _xlim], [_y0, _ylim], 'k--', lw=1)
+    ax.set_xlim(-_lim, _lim)
+    ax.set_ylim(-_lim, _lim)
+    text = '\n'.join(('State population:',
+                      r'$P_\mathrm{|0\rangle}=$'+f'{qoi["pop_vec"][0]*100:.2f}%',
+                      r'$P_\mathrm{|1\rangle}=$'+f'{qoi["pop_vec"][1]*100:.2f}%',
+                      r'$P_\mathrm{|2\rangle}=$'+f'{qoi["pop_vec"][2]*100:.2f}%',
                       r'$|2\rangle$'+f' removal fraction:\n\n\n'))
-    
+    if 'removal_fraction_gauss_fit' in qoi:
+        text +=  '\n'+r'$|2\rangle$'+f' removal fraction\nfrom 3-gauss. fit:\n\n\n'
     props = dict(boxstyle='round', facecolor='white', alpha=1)
-    ax.text(1.05, 1., text, transform=ax.transAxes,
+    ax.text(1.05, .95, text, transform=ax.transAxes,
             verticalalignment='top', bbox=props, fontsize=9)
-    text = f'{100-projection_02["leak"]*100:.1f}%'
-    ax.text(1.05, .75, text, transform=ax.transAxes,
+    text = f'{qoi["removal_fraction"]*100:.1f}%'
+    ax.text(1.05, .55, text, transform=ax.transAxes,
             verticalalignment='top', fontsize=24)
-    ax.text(projection_02['popt0'][0], projection_02['popt0'][4]/2,
-        r'$|g\rangle$', ha='center', va='center', color='C0', size=13)
-    ax.text(projection_02['popt2'][0], projection_02['popt2'][4]/2,
-        r'$|f\rangle$', ha='center', va='center', color='C2', size=13)
-    ax.set_xticklabels([])
-    ax.set_xlim(_bin_c[0], _bin_c[-1])
-    ax.set_ylim(bottom=0)
-    ax.set_xlabel('Integrated voltage')
-    ax.set_ylabel('Number of shots')
+    if 'removal_fraction_gauss_fit' in qoi:
+        text = f'{qoi["removal_fraction_gauss_fit"]*100:.1f}%'
+        ax.text(1.05, .25, text, transform=ax.transAxes,
+                verticalalignment='top', fontsize=24)
+    ax.set_xlabel('Integrated voltage I')
+    ax.set_ylabel('Integrated voltage Q')
     ax.set_title(f'{timestamp}\n2-state removal fraction qubit {qubit}')
+
+def gauss_fit2D_plotfn(
+    fit_dict,
+    timestamp,
+    qubit, 
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+
+    axs = np.array(axs)[[0,2,1]]
+
+    xbins, ybins = fit_dict['xbins'], fit_dict['ybins']
+    xbins_c, ybins_c = (xbins[1:]+xbins[:-1])/2, (ybins[1:]+ybins[:-1])/2 
+    _X, _Y = np.meshgrid(xbins_c, ybins_c)
+    # Plot measured histograms
+    n_3_fit = triple_gauss(_X, _Y, *fit_dict['popt3'])
+    axs[0].pcolormesh(xbins, ybins, fit_dict['n3'], alpha=1, vmax=2)
+    # Draw 4sigma ellipse around mean
+    for i in range(3):
+        # Plot center of distributions 
+        axs[0].plot(fit_dict[f'popt{i}'][0], fit_dict[f'popt{i}'][3], 'C3x')
+        axs[1].plot(fit_dict[f'popt{i}'][0], fit_dict[f'popt{i}'][3], 'C3x')
+        # Draw 4sigma ellipse around mean
+        circle = patches.Ellipse((fit_dict[f'popt{i}'][0], fit_dict[f'popt{i}'][3]),
+                    width=4*fit_dict[f'popt{i}'][6], height=4*fit_dict[f'popt{i}'][9],
+                    angle=0,#-popt_0[5]*180/np.pi,
+                    ec='white', fc='none', ls='--', lw=1.25, zorder=10)
+        axs[1].add_patch(circle)
+    # Plot fitted histograms
+    axs[1].pcolormesh(xbins, ybins, n_3_fit, alpha=1, vmax=1)
+    # Plot center of distributions 
+    axs[1].plot(fit_dict['popt0'][0], fit_dict['popt0'][3], 'C3x')
+    axs[1].plot(fit_dict['popt1'][0], fit_dict['popt1'][3], 'C3x')
+    axs[1].plot(fit_dict['popt2'][0], fit_dict['popt2'][3], 'C3x')
+    axs[0].set_xlabel('Integrated voltage, $I$')
+    axs[0].set_ylabel('Integrated voltage, $Q$')
+    axs[1].set_xlabel('Integrated voltage, $I$')
+    axs[0].set_title('Measured shots')
+    axs[1].set_title('Three gaussian mixture fit')
+    # 3D plot
+    cmap = matplotlib.colors.LinearSegmentedColormap.from_list('', ([(0, '#440154'), (.01,'#3b528b'),
+                                                                     (.02,'#21918c'), (.3, '#fde725'), (1, 'w')]))
+    norm = matplotlib.colors.Normalize(vmin=np.min(n_3_fit), vmax=np.max(n_3_fit))
+    axs[2].axes.axes.set_position((.33, .15, .9, .8))
+    axs[2].patch.set_visible(False)
+    surf = axs[2].plot_surface(_X, _Y, n_3_fit, cmap=cmap, alpha=1,
+                               linewidth=0, antialiased=True)
+    axs[2].set_xticks([-1,-.5, 0, .5, 1])
+    axs[2].set_xticklabels(['-1', '', '0', '', '1'])
+    axs[2].set_yticks([-1,-.5, 0, .5, 1])
+    axs[2].set_yticklabels(['-1', '', '0', '', '1'])
+    axs[2].tick_params(axis='x', which='major', pad=-5)
+    axs[2].tick_params(axis='y', which='major', pad=-5)
+    axs[2].set_xlim(xbins[0], xbins[-1])
+    axs[2].set_ylim(ybins[0], ybins[-1])
+    axs[2].set_xlabel('Voltage, $I$', labelpad=-5)
+    axs[2].set_ylabel('Voltage, $Q$', labelpad=-5)
+    axs[1].text(1.2, 1.025, 'Three gaussian mixture 3D plot', transform=axs[1].transAxes, size=12)
+    # horizontal colorbar
+    from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+    cbar_ax = fig.add_axes([.67, .12, .22, .02])
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    cb = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+    text = '\n'.join((r'$P_{|0\rangle}$'+f' = {fit_dict["qoi"]["P_0g"]*100:.2f}%',
+                      r'$P_{|1\rangle}$'+f' = {fit_dict["qoi"]["P_1g"]*100:.2f}%',
+                      r'$P_{|2\rangle}$'+f' = {fit_dict["qoi"]["P_2g"]*100:.2f}%'))
+    props = dict(boxstyle='round', facecolor='white', alpha=1)
+    axs[1].text(1.05, .95, text, transform=axs[1].transAxes,
+                verticalalignment='top', bbox=props, fontsize=11, zorder=100)
+    fig.suptitle(f'{timestamp}\n2-state removal fraction qubit {qubit}', y=1.05)
+
+def assignment_matrix_plotfn(
+    M,
+    qubit,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    im = ax.imshow(M, cmap=plt.cm.Reds, vmin=0, vmax=1)
+    for i in range(3):
+        for j in range(3):
+            c = M[j,i]
+            if abs(c) > .5:
+                ax.text(i, j, '{:.2f}'.format(c), va='center', ha='center',
+                             color = 'white')
+            else:
+                ax.text(i, j, '{:.2f}'.format(c), va='center', ha='center')
+    ax.set_xticks([0,1,2])
+    ax.set_xticklabels([r'$|0\rangle$',r'$|1\rangle$',r'$|2\rangle$'])
+    ax.set_xlabel('Assigned state')
+    ax.set_yticks([0,1,2])
+    ax.set_yticklabels([r'$|0\rangle$',r'$|1\rangle$',r'$|2\rangle$'])
+    ax.set_ylabel('Prepared state')
+    ax.set_title(f'{timestamp}\nQutrit assignment matrix qubit {qubit}')
+    cbar_ax = fig.add_axes([.95, .15, .03, .7])
+    cb = fig.colorbar(im, cax=cbar_ax)
+    cb.set_label('assignment probability')
 
 
 def _get_expected_value(operator, state, n):
@@ -783,7 +1180,8 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
     """
     def __init__(self,
                  qubit: str,
-                 post_select_2state: bool,
+                 post_select_2state: bool = False,
+                 fit_3gauss: bool = False,
                  t_start: str = None, 
                  t_stop: str = None,
                  label: str = '',
@@ -799,6 +1197,7 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
 
         self.qubit = qubit
         self.post_select_2state = post_select_2state
+        self.fit_3gauss = fit_3gauss
         if auto:
             self.run_analysis()
 
@@ -836,6 +1235,7 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['shots_0_IQ'] = Shots_0
         self.proc_data_dict['shots_1_IQ'] = Shots_1
         self.proc_data_dict['shots_2_IQ'] = Shots_2
+        self.proc_data_dict['shots_3_IQ'] = Shots_3
         # Use classifier for data
         data = np.concatenate((Shots_0, Shots_1, Shots_2))
         labels = [0 for s in Shots_0]+[1 for s in Shots_1]+[2 for s in Shots_2]
@@ -850,11 +1250,27 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
             _fid = np.mean(_res == int(state))
             Fid_dict[state] = _fid
         Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+        # Get assignment fidelity matrix
+        M = np.zeros((3,3))
+        for i, shots in enumerate([Shots_0, Shots_1, Shots_2]):
+            for j, state in enumerate(['0', '1', '2']):
+                _res = clf.predict(shots)
+                M[i][j] = np.mean(_res == int(state))
+        # Get leakage removal fraction 
+        _res = clf.predict(Shots_3)
+        _vec = np.array([np.mean(_res == int('0')),
+                         np.mean(_res == int('1')),
+                         np.mean(_res == int('2'))])
+        M_inv = np.linalg.inv(M)
+        pop_vec = np.dot(_vec, M_inv)
         self.proc_data_dict['classifier'] = clf
         self.proc_data_dict['dec_bounds'] = dec_bounds
         self.proc_data_dict['Fid_dict'] = Fid_dict
         self.qoi = {}
         self.qoi['Fid_dict'] = Fid_dict
+        self.qoi['Assignment_matrix'] = M
+        self.qoi['pop_vec'] = pop_vec
+        self.qoi['removal_fraction'] = 1-pop_vec[2]
         #########################################
         # Project data along axis perpendicular
         # to the decision boundaries.
@@ -929,11 +1345,9 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
         # Rotate shots over 02 axis
         shots_0 = rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
         shots_2 = rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
-        shots_3 = rotate_and_center_data(Shots_3[:,0],Shots_3[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
         # Take relavant quadrature
         shots_0 = shots_0[:,0]
         shots_2 = shots_2[:,0]
-        shots_3 = shots_3[:,0]
         n_shots_2 = len(shots_2)
         # find range
         _all_shots = np.concatenate((shots_0, shots_2))
@@ -941,31 +1355,59 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
         # Sort shots in unique values
         x0, n0 = np.unique(shots_0, return_counts=True)
         x2, n2 = np.unique(shots_2, return_counts=True)
-        x3, n3 = np.unique(shots_3, return_counts=True)
         Fid_02, threshold_02 = _calculate_fid_and_threshold(x0, n0, x2, n2)
-        Fid_32, threshold_32 = _calculate_fid_and_threshold(x3, n3, x2, n2)
         # Histogram of shots for 1 and 2
         h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
         h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
-        h3, bin_edges = np.histogram(shots_3, bins=100, range=_range)
         bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
         popt0, popt2, params_02 = _fit_double_gauss(bin_centers, h0, h2)
-        popt3, popt_, params_32 = _fit_double_gauss(bin_centers, h3, h2)
         # Save processed data
         self.proc_data_dict['projection_02'] = {}
         self.proc_data_dict['projection_02']['h0'] = h0
         self.proc_data_dict['projection_02']['h2'] = h2
-        self.proc_data_dict['projection_02']['h3'] = h3
         self.proc_data_dict['projection_02']['bin_centers'] = bin_centers
         self.proc_data_dict['projection_02']['popt0'] = popt0
         self.proc_data_dict['projection_02']['popt2'] = popt2
-        self.proc_data_dict['projection_02']['popt3'] = popt3
         self.proc_data_dict['projection_02']['SNR'] = params_02['SNR']
-        self.proc_data_dict['projection_02']['leak'] = params_32['P_e0']
         self.proc_data_dict['projection_02']['Fid'] = Fid_02
-        self.proc_data_dict['projection_02']['Fid_32'] = Fid_32
         self.proc_data_dict['projection_02']['threshold'] = threshold_02
-        self.qoi['removal_fraction'] = 1-params_32['P_e0']
+        ###############################
+        # Fit 3-gaussian mixture
+        ###############################
+        if self.fit_3gauss:
+            _all_shots = np.concatenate((self.proc_data_dict['shots_0_IQ'], 
+                                         self.proc_data_dict['shots_1_IQ'], 
+                                         self.proc_data_dict['shots_2_IQ']))
+            _lim = np.max([ np.max(np.abs(_all_shots[:,0]))*1.1,
+                            np.max(np.abs(_all_shots[:,1]))*1.1 ])
+            def _histogram_2d(x_data, y_data, lim):
+                _bins = (np. linspace(-lim, lim, 201), np.linspace(-lim, lim, 201))
+                n, _xbins, _ybins = np.histogram2d(x_data, y_data, bins=_bins)
+                return n.T, _xbins, _ybins
+            # 2D histograms
+            n_0, xbins, ybins = _histogram_2d(*self.proc_data_dict['shots_0_IQ'].T, lim=_lim)
+            n_1, xbins, ybins = _histogram_2d(*self.proc_data_dict['shots_1_IQ'].T, lim=_lim)
+            n_2, xbins, ybins = _histogram_2d(*self.proc_data_dict['shots_2_IQ'].T, lim=_lim)
+            n_3, xbins, ybins = _histogram_2d(*self.proc_data_dict['shots_3_IQ'].T, lim=_lim)
+            # bin centers
+            xbins_c, ybins_c = (xbins[1:]+xbins[:-1])/2, (ybins[1:]+ybins[:-1])/2 
+            popt0, popt1, popt2, qoi = _fit_triple_gauss(xbins_c, ybins_c, n_0, n_1, n_2)
+            popt3, _popt1, _popt2, _qoi = _fit_triple_gauss(xbins_c, ybins_c, n_3, n_1, n_2)
+            self.proc_data_dict['3gauss_fit'] = {}
+            self.proc_data_dict['3gauss_fit']['xbins'] = xbins
+            self.proc_data_dict['3gauss_fit']['ybins'] = ybins
+            self.proc_data_dict['3gauss_fit']['n0'] = n_0
+            self.proc_data_dict['3gauss_fit']['n1'] = n_1
+            self.proc_data_dict['3gauss_fit']['n2'] = n_2
+            self.proc_data_dict['3gauss_fit']['n3'] = n_3
+            self.proc_data_dict['3gauss_fit']['popt0'] = popt0
+            self.proc_data_dict['3gauss_fit']['popt1'] = popt1
+            self.proc_data_dict['3gauss_fit']['popt2'] = popt2
+            self.proc_data_dict['3gauss_fit']['popt3'] = popt3
+            self.proc_data_dict['3gauss_fit']['qoi'] = _qoi
+            self.proc_data_dict['3gauss_fit']['removal_fraction'] = 1-_qoi['P_2g']
+            self.qoi['removal_fraction_gauss_fit'] = 1-_qoi['P_2g']
+
         ################################
         # Process tomo analysis
         ################################
@@ -1014,7 +1456,7 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
             Pauli_vectors[state] = _correct_pauli_vector(Beta_matrix, p_vector)
             rho = _gen_density_matrix(*Pauli_vectors[state][1:])
             Density_matrices[state] = rho
-
+        # Get PTM
         PTM = _get_pauli_transfer_matrix(Pauli_0 = Pauli_vectors['0'], 
                                          Pauli_1 = Pauli_vectors['1'],
                                          Pauli_p = Pauli_vectors['+'], 
@@ -1062,14 +1504,31 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
-        fig, ax = plt.subplots(figsize=(4,3), dpi=100)
+        fig, ax = plt.subplots(figsize=(3,3), dpi=100)
+        # fig.patch.set_alpha(0)
+        self.axs_dict['Assignment_matrix'] = ax
+        self.figs['Assignment_matrix'] = fig
+        self.plot_dicts['Assignment_matrix'] = {
+            'plotfn': assignment_matrix_plotfn,
+            'ax_id': 'Assignment_matrix',
+            'M': self.qoi['Assignment_matrix'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamp
+        }
+        fig, ax = plt.subplots(figsize=(3.25,3.25), dpi=100)
         # fig.patch.set_alpha(0)
         self.axs_dict['Leakage_histogram'] = ax
         self.figs['Leakage_histogram'] = fig
         self.plot_dicts['Leakage_histogram'] = {
             'plotfn': leakage_hist_plotfn,
             'ax_id': 'Leakage_histogram',
-            'projection_02': self.proc_data_dict['projection_02'],
+            'shots_0': self.proc_data_dict['shots_0_IQ'],
+            'shots_1': self.proc_data_dict['shots_1_IQ'],
+            'shots_2': self.proc_data_dict['shots_2_IQ'],
+            'shots_lru': self.proc_data_dict['shots_3_IQ'],
+            'classifier': self.proc_data_dict['classifier'],
+            'dec_bounds': self.proc_data_dict['dec_bounds'],
+            'qoi': self.qoi,
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
@@ -1099,9 +1558,26 @@ class LRU_process_tomo_Analysis(ba.BaseDataAnalysis):
             'F_PTM': self.proc_data_dict['F_PTM'],
             'angle': self.proc_data_dict['angle_p'],
             'F_PTM_r': self.proc_data_dict['F_PTM_r'],
+            'title': r'PTM, $\mathcal{R}_{\mathrm{LRU}}$'+f' {self.qubit}',
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
+        if self.fit_3gauss:
+            fig = plt.figure(figsize=(12,4), dpi=100)
+            axs = [None,None,None]
+            axs[0] = fig.add_subplot(1, 3, 1)
+            axs[2] = fig.add_subplot(1, 3, 3 , projection='3d', elev=20)
+            axs[1] = fig.add_subplot(1, 3, 2)
+            # fig.patch.set_alpha(0)
+            self.axs_dict['Three_gauss_fit'] = axs[0]
+            self.figs['Three_gauss_fit'] = fig
+            self.plot_dicts['Three_gauss_fit'] = {
+                'plotfn': gauss_fit2D_plotfn,
+                'ax_id': 'Three_gauss_fit',
+                'fit_dict': self.proc_data_dict['3gauss_fit'],
+                'qubit': self.qubit,
+                'timestamp': self.timestamp
+            }
 
     def run_post_extract(self):
         self.prepare_plots()  # specify default plots
@@ -1168,8 +1644,10 @@ def density_matrices_plotfn(
     Density_matrices, 
     Density_matrices_ideal,
     timestamp,
-    qubit, 
-    ax, **kw):
+    qubit,
+    ax,
+    title=None,
+    **kw):
     fig = ax.get_figure()
     axs = fig.get_axes()
 
@@ -1193,6 +1671,10 @@ def density_matrices_plotfn(
     cb.ax.tick_params(labelsize=6)
     cb.outline.set_linewidth(.5)
     cb.ax.tick_params(labelsize=5, width=.5, length=2, pad=3)
+    _title = timestamp
+    if title:
+        _title += '\n'+title
+    fig.suptitle(_title, y=.55, x=.55, size=6.5)
     
 def PTM_plotfn(
     R,
@@ -1201,7 +1683,9 @@ def PTM_plotfn(
     F_PTM_r,
     timestamp,
     qubit, 
-    ax, **kw):
+    ax,
+    title=None,
+    **kw):
     im = ax.imshow(R, cmap=plt.cm.PiYG, vmin=-1, vmax=1)
     ax.set_xticks(np.arange(4))
     ax.set_yticks(np.arange(4))
@@ -1215,7 +1699,10 @@ def PTM_plotfn(
                                  color = 'white')
                 else:
                     ax.text(i, j, '{:.2f}'.format(c), va='center', ha='center')
-    ax.set_title(f'{timestamp}\n'+'PTM, $\mathcal{R}_{\mathrm{LRU}}$'+f' {qubit}', pad=4)
+    _title = f'{timestamp}'
+    if title:
+        _title += '\n'+title
+    ax.set_title(_title, pad=4)
     ax.set_xlabel('input Pauli operator')
     ax.set_ylabel('Output Pauli operator')
     ax.axes.tick_params(width=.5, length=2)
@@ -1223,11 +1710,12 @@ def PTM_plotfn(
     ax.spines['right'].set_linewidth(.5)
     ax.spines['top'].set_linewidth(.5)
     ax.spines['bottom'].set_linewidth(.5)
-    text = '\n'.join(('Average gate fidelity:',
-                      f'$F_\mathrm{"{avg}"}=${F_PTM*100:.1f}%',
-                      'Average gate fidelity\nafter rotation:',
-                      f'$\phi=${angle:.1f}$^\mathrm{"{o}"}$',
-                      f'$F_\mathrm{"{avg}"}^\phi=${F_PTM_r*100:.1f}%'))
-    props = dict(boxstyle='round', facecolor='white', alpha=1)
-    ax.text(1.05, 1., text, transform=ax.transAxes,
-            verticalalignment='top', bbox=props)
+    if F_PTM:
+        text = '\n'.join(('Average gate fidelity:',
+                          f'$F_\mathrm{"{avg}"}=${F_PTM*100:.1f}%',
+                          'Average gate fidelity\nafter rotation:',
+                          f'$\phi=${angle:.1f}$^\mathrm{"{o}"}$',
+                          f'$F_\mathrm{"{avg}"}^\phi=${F_PTM_r*100:.1f}%'))
+        props = dict(boxstyle='round', facecolor='white', alpha=1)
+        ax.text(1.05, 1., text, transform=ax.transAxes,
+                verticalalignment='top', bbox=props)

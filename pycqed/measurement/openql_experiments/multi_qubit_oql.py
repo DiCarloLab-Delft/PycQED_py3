@@ -2511,102 +2511,102 @@ def Parity_Sandia_benchmark(
         wait_time_before_flux: int = 0,
         wait_time_after_flux: int = 0,
         platf_cfg: str = None):
-      '''
-      Sandia's weight-4 parity check benchmark protocol.
-      '''
-      delays = {}
-      p = OqlProgram("Sandia_parity_benchmark", platf_cfg)
+    '''
+    Sandia's weight-4 parity check benchmark protocol.
+    '''
+    delays = {}
+    p = OqlProgram("Sandia_parity_benchmark", platf_cfg)
 
-      # lb = ["P_0000","P_1111","Single_parity_check","Double_parity_check"]
-      # for i,ks in enumerate(lb):
+    # lb = ["P_0000","P_1111","Single_parity_check","Double_parity_check"]
+    # for i,ks in enumerate(lb):
 
-      k = p.create_kernel("P_0000")
-      all_q_idxs = QDs+[qA]
-      for q_idx in all_q_idxs:
-            k.prepz(q_idx)
-            k.measure(q_idx)
-      p.add_kernel(k)
-      
-      k = p.create_kernel("P_1111")
-      all_q_idxs = QDs+[qA]
-      for q_idx in all_q_idxs:
-            k.prepz(q_idx)
-            k.gate("rx180", [q_idx])
-            k.measure(q_idx)
-      p.add_kernel(k)
-      
-      k = p.create_kernel("Single_parity_check")
-      all_q_idxs = QDs+[qA]
-      for q_idx in all_q_idxs:
-            k.prepz(q_idx)
-            k.gate("ry90", [q_idx])
-      k.barrier([])
-      # k.gate("flux_dance_refocus_1", [0])
-      # k.gate("flux_dance_refocus_2", [0])
-      # k.gate("flux_dance_refocus_3", [0])
-      # k.gate("flux_dance_refocus_4", [0])
-      k.gate('wait', [], wait_time_before_flux)
-      for flux_cw in flux_cw_list:
+    k = p.create_kernel("P_0000")
+    all_q_idxs = QDs+[qA]
+    for q_idx in all_q_idxs:
+        k.prepz(q_idx)
+        k.measure(q_idx)
+    p.add_kernel(k)
+
+    k = p.create_kernel("P_1111")
+    all_q_idxs = QDs+[qA]
+    for q_idx in all_q_idxs:
+        k.prepz(q_idx)
+        k.gate("rx180", [q_idx])
+        k.measure(q_idx)
+    p.add_kernel(k)
+
+    k = p.create_kernel("Single_parity_check")
+    all_q_idxs = QDs+[qA]
+    for q_idx in all_q_idxs:
+        k.prepz(q_idx)
+        k.gate("ry90", [q_idx])
+    k.barrier([])
+    # k.gate("flux_dance_refocus_1", [0])
+    # k.gate("flux_dance_refocus_2", [0])
+    # k.gate("flux_dance_refocus_3", [0])
+    # k.gate("flux_dance_refocus_4", [0])
+    k.gate('wait', [], wait_time_before_flux)
+    for flux_cw in flux_cw_list:
         k.gate(flux_cw, [0])
-      k.gate('wait', [], wait_time_after_flux)
-      k.barrier([])
-      for q_idx in all_q_idxs:
-            k.gate("rym90", [q_idx])
-            k.measure(q_idx)
-      p.add_kernel(k)
+    k.gate('wait', [], wait_time_after_flux)
+    k.barrier([])
+    for q_idx in all_q_idxs:
+        k.gate("rym90", [q_idx])
+        k.measure(q_idx)
+    p.add_kernel(k)
 
 
-      k = p.create_kernel("Double_parity_check")
-      all_q_idxs = QDs+[qA]
-      for q_idx in all_q_idxs:
-            k.prepz(q_idx)
-            k.gate("ry90", [q_idx])
-      k.barrier([])
-      # k.gate("flux_dance_refocus_1", [0])
-      # k.gate("flux_dance_refocus_2", [0])
-      # k.gate("flux_dance_refocus_3", [0])
-      # k.gate("flux_dance_refocus_4", [0])
-      k.gate('wait', [], wait_time_before_flux)
-      for flux_cw in flux_cw_list:
+    k = p.create_kernel("Double_parity_check")
+    all_q_idxs = QDs+[qA]
+    for q_idx in all_q_idxs:
+        k.prepz(q_idx)
+        k.gate("ry90", [q_idx])
+    k.barrier([])
+    # k.gate("flux_dance_refocus_1", [0])
+    # k.gate("flux_dance_refocus_2", [0])
+    # k.gate("flux_dance_refocus_3", [0])
+    # k.gate("flux_dance_refocus_4", [0])
+    k.gate('wait', [], wait_time_before_flux)
+    for flux_cw in flux_cw_list:
         k.gate(flux_cw, [0])
-      k.gate('wait', [], wait_time_after_flux)
-      k.barrier([])
-      for q_idx in all_q_idxs:
-            k.gate("rym90", [q_idx])
-      k.barrier([])
-      k.measure(qA)
+    k.gate('wait', [], wait_time_after_flux)
+    k.barrier([])
+    for q_idx in all_q_idxs:
+        k.gate("rym90", [q_idx])
+    k.barrier([])
+    k.measure(qA)
 
-      # correct for msmt induced phaseshift on data qubits using phi-echo pulses
-      for q in QDs:
+    # correct for msmt induced phaseshift on data qubits using phi-echo pulses
+    for q in QDs:
         for cycle in range(int(720/6/20)):
-                k.gate('i', [q])
-                k.gate('rX180', [q])
-                k.gate('i', [q])
-                k.gate('i', [q])
-                k.gate('rY180', [q])
-                k.gate('i', [q])
-      k.barrier([])
-      
-      for q_idx in all_q_idxs:
-            k.gate("ry90", [q_idx])
-      k.barrier([])
-      # k.gate("flux_dance_refocus_1", [0])
-      # k.gate("flux_dance_refocus_2", [0])
-      # k.gate("flux_dance_refocus_3", [0])
-      # k.gate("flux_dance_refocus_4", [0])
-      k.gate('wait', [], wait_time_before_flux)
-      for flux_cw in flux_cw_list:
+            k.gate('i', [q])
+            k.gate('rX180', [q])
+            k.gate('i', [q])
+            k.gate('i', [q])
+            k.gate('rY180', [q])
+            k.gate('i', [q])
+    k.barrier([])
+
+    for q_idx in all_q_idxs:
+        k.gate("ry90", [q_idx])
+    k.barrier([])
+    # k.gate("flux_dance_refocus_1", [0])
+    # k.gate("flux_dance_refocus_2", [0])
+    # k.gate("flux_dance_refocus_3", [0])
+    # k.gate("flux_dance_refocus_4", [0])
+    k.gate('wait', [], wait_time_before_flux)
+    for flux_cw in flux_cw_list:
         k.gate(flux_cw, [0])
-      k.gate('wait', [], wait_time_after_flux)
-      k.barrier([])
-      for q_idx in all_q_idxs:
-            k.gate("rym90", [q_idx])
-            k.measure(q_idx)
-      p.add_kernel(k)
+    k.gate('wait', [], wait_time_after_flux)
+    k.barrier([])
+    for q_idx in all_q_idxs:
+        k.gate("rym90", [q_idx])
+        k.measure(q_idx)
+    p.add_kernel(k)
 
-      p.compile()
+    p.compile()
 
-      return p
+    return p
 
 # FIXME: used hardcoded qubits
 def CZ_poisoned_purity_seq(
@@ -3688,5 +3688,79 @@ def Ramsey_tomo(
                       '2' * len(qR) + '0' * len(qC),
                       '0' * len(qR) + '1' * len(qC)])
 
+    p.compile()
+    return p
+
+def gate_process_tomograhpy(
+        meas_qubit_idx: int,
+        gate_qubit_idx: int,
+        gate_name: str,
+        gate_duration_ns: int,
+        platf_cfg: str,
+        wait_after_gate_ns: int = 0):
+    '''
+    Process tomography on a qubit (<meas_qubit_idx>) while performing 
+    gate on other qubit (<gate_qubit_idx>).
+    '''
+    _gate_duration_ns = gate_duration_ns+wait_after_gate_ns
+    if _gate_duration_ns%20 > 0:
+         _gate_duration_ns = ( _gate_duration_ns//20)*20 + 20
+    states = {'0': 'i',
+              '1': 'rx180',
+              'p': 'ry90',
+              'm': 'rym90',
+              'pi': 'rxm90',
+              'mi': 'rx90'}
+    meas_bases = {'Z':'i',
+                  'X':'rym90',
+                  'Y':'rx90'}
+    p = OqlProgram('Gate_process_tomo', platf_cfg)
+    # Idle tomography
+    for state in states.keys():
+        for basis in meas_bases.keys():
+            k = p.create_kernel(f'state_{state}_tomo_{basis}_idle')
+            # State preparation
+            k.prepz(meas_qubit_idx)
+            k.prepz(gate_qubit_idx)
+            k.gate(states[state], [meas_qubit_idx])
+            # Idle for gate duration
+            k.gate('wait', [], _gate_duration_ns)
+            # Measurement in basis
+            k.gate(meas_bases[basis], [meas_qubit_idx])
+            k.measure(meas_qubit_idx)
+            p.add_kernel(k)
+    # Gate process tomography
+    for state in states.keys():
+        for basis in meas_bases.keys():
+            k = p.create_kernel(f'state_{state}_tomo_{basis}_gate')
+            # State preparation
+            k.prepz(meas_qubit_idx)
+            k.prepz(gate_qubit_idx)
+            k.gate(states[state], [meas_qubit_idx])
+            # Play gate
+            k.gate('wait', [])
+            k.gate(gate_name, [gate_qubit_idx])
+            k.gate('wait', [], wait_after_gate_ns)
+            # Measurement in basis
+            k.gate(meas_bases[basis], [meas_qubit_idx])
+            k.measure(meas_qubit_idx)
+            p.add_kernel(k)
+    # Calibration_points
+    k = p.create_kernel("cal_0")
+    k.prepz(meas_qubit_idx)
+    k.measure(meas_qubit_idx)
+    p.add_kernel(k)
+    k = p.create_kernel("cal_1")
+    k.prepz(meas_qubit_idx)
+    k.gate('rx180', [meas_qubit_idx])
+    k.measure(meas_qubit_idx)
+    p.add_kernel(k)
+    k = p.create_kernel("cal_2")
+    k.prepz(meas_qubit_idx)
+    k.gate('rx180', [meas_qubit_idx])
+    k.gate('rx12', [meas_qubit_idx])
+    k.measure(meas_qubit_idx)
+    p.add_kernel(k)
+    # Compile
     p.compile()
     return p

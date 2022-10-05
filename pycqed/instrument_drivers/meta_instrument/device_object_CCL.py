@@ -3123,10 +3123,62 @@ class DeviceCCL(Instrument):
 
         return Analysis
 
+    def measure_gate_process_tomography(
+        self,
+        meas_qubit: str,
+        gate_qubit: str,
+        gate_name: str,
+        gate_duration_ns: int,
+        wait_after_gate_ns: int = 0,
+        nr_shots_per_case: int = 2**14,
+        prepare_for_timedomain: bool= True,
+        ):
+        assert self.ro_acq_weight_type() != 'optimal', 'IQ readout required!'
+        q_meas = self.find_instrument(meas_qubit)
+        q_gate = self.find_instrument(gate_qubit)
+        MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            if gate_qubit != meas_qubit: 
+                q_gate.prepare_for_timedomain()
+            self.prepare_for_timedomain(qubits=[meas_qubit])
+        # Experiment
+        p = mqo.gate_process_tomograhpy(
+                meas_qubit_idx=q_meas.cfg_qubit_nr(),
+                gate_qubit_idx=q_gate.cfg_qubit_nr(),
+                gate_name=gate_name,
+                gate_duration_ns=gate_duration_ns,
+                wait_after_gate_ns=wait_after_gate_ns,
+                platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Shot', unit='#',
+                             upload=True)
+        d = self.get_int_logging_detector()
+        nr_shots = (2*18+3)*nr_shots_per_case
+        if nr_shots < 2**20:
+            d.detectors[0].nr_shots = nr_shots
+        else:
+            _shots_per_run = ((2**20)//(2*18+3))*(2*18+3)
+            nr_shots = np.ceil(nr_shots/_shots_per_run)*_shots_per_run
+            print(f'Number of shots per case increased to {nr_shots/(2*18+3)}.')
+            d.detectors[0].nr_shots = _shots_per_run
+        MC.soft_avg(1)
+        MC.set_detector_function(d)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.live_plot_enabled(False)
+        try:
+            label = f'Gate_process_tomograhpy_gate_{gate_name}{gate_qubit}_{meas_qubit}'
+            MC.run(label+self.msmt_suffix, disable_snapshot_metadata=False)
+        except:
+            print_exception()
+            MC.live_plot_enabled(True)
+        # Analysis
+        ma2.tomoa.Gate_process_tomo_Analysis(qubit=q_meas.name, label='Gate_process')
+
     ########################################################
     # Calibration methods
     ########################################################
-
     def create_dep_graph(self):
         dags = []
         for qi in self.qubits():
