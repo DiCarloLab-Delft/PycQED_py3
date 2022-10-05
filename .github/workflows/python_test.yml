@@ -31,7 +31,7 @@ jobs:
     # NB: 'asset' creation for OpenQL is currently a bit flaky, because uploads tend to fail.
     # As a result, the file needed may not be present, or an older version may be found
     - name: Install development release of OpenQL
-      run: pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases
+      run: pip install qutechopenql
 
     - name: Install dependencies
       run: sudo apt-get install python3-pyqt5
