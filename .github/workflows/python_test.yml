@@ -33,7 +33,7 @@ jobs:
     - name: Install development release of OpenQL
       run: |
         pip install cmake
-        pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases
+        pip install 'qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c'
 
     - name: Install dependencies
       run: sudo apt-get install python3-pyqt5
