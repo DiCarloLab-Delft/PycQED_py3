@@ -51,7 +51,6 @@ class Test_Device_obj(unittest.TestCase):
         # generate OpenQL configuration
         gen.generate_config_modular(platf_cfg_path)
 
-
         cls.station = station.Station()
 
         cls.CC = CC('CC', DummyTransport())
@@ -96,15 +95,14 @@ class Test_Device_obj(unittest.TestCase):
         cls.MC.datadir(test_datadir)
         a_tools.datadir = cls.MC.datadir()
 
-
-        if 0: # FIXME: PR #658: test broken by commit bd19f56
+        if 0:  # FIXME: PR #658: test broken by commit bd19f56
             cls.mw_lutman = mwl.AWG8_VSM_MW_LutMan("MW_LutMan_VSM")
             cls.mw_lutman.AWG(cls.AWG_mw_0.name)
             cls.mw_lutman.channel_GI(1)
             cls.mw_lutman.channel_GQ(2)
             cls.mw_lutman.channel_DI(3)
             cls.mw_lutman.channel_DQ(4)
-        else: # FIXME: workaround
+        else:  # FIXME: workaround
             cls.mw_lutman = mwl.AWG8_MW_LutMan("MW_LutMan")
             cls.mw_lutman.AWG(cls.AWG_mw_0.name)
             cls.mw_lutman.channel_I(1)
@@ -197,7 +195,6 @@ class Test_Device_obj(unittest.TestCase):
             cls.ro_lutman_0.LO_freq(6e9)
             cls.ro_lutman_1.LO_freq(6e9)
             cls.ro_lutman_2.LO_freq(6e9)
-
 
         if 0:  # FIXME: CCL/QCC deprecated
             # Fixed by design
