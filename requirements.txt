@@ -14,7 +14,7 @@ cma
 hsluv
 pandas
 PyQt5
-pyqtgraph
+pyqtgraph<=0.12.4  # Sets version upperbound. Prevents test-failure for python 3.8+
 matplotlib
 autodepgraph
 networkx
