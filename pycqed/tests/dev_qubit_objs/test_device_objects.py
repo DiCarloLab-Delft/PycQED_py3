@@ -228,12 +228,6 @@ class Test_Device_obj(unittest.TestCase):
 
         cls.device.dio_map(cls.dio_map_CC)
 
-    # FIXME
-    # @classmethod
-    # def tearDownClass(cls):
-    def tearDown(self):
-        Instrument.close_all()
-
     ##############################################
     # HAL_Shim_MQ
     # FIXME: split into separate test class, like in test_qubit_objects.py
@@ -380,11 +374,8 @@ class Test_Device_obj(unittest.TestCase):
         # MW1 is specified as the readout LO source
         assert self.MW1.frequency() == 6e9
         for qname in qubits:
-            try:
-                q = self.device.find_instrument(qname)
-                assert 6e9 + q.ro_freq_mod() == q.ro_freq()
-            except KeyError as e:
-                pass  # FIXME: 'qname' instrument seems to be removed between start of the test method and here.
+            q = self.device.find_instrument(qname)
+            assert 6e9 + q.ro_freq_mod() == q.ro_freq()
 
         self.ro_lutman_0.LO_freq(5.8e9)
         self.ro_lutman_1.LO_freq(5.8e9)
@@ -394,11 +385,8 @@ class Test_Device_obj(unittest.TestCase):
         # MW1 is specified as the readout LO source
         assert self.MW1.frequency() == 5.8e9
         for qname in qubits:
-            try:
-                q = self.device.find_instrument(qname)
-                assert 5.8e9 + q.ro_freq_mod() == q.ro_freq()
-            except KeyError as e:
-                pass  # FIXME: 'qname' instrument seems to be removed between start of the test method and here.
+            q = self.device.find_instrument(qname)
+            assert 5.8e9 + q.ro_freq_mod() == q.ro_freq()
 
         # FIXME: no longer raises exception
         # q = self.device.find_instrument("q5")
@@ -686,3 +674,10 @@ class Test_Device_obj(unittest.TestCase):
         self.device.measure_two_qubit_allxy("q8", "q10", detector="int_avg")
 
     # FIXME: add more tests, above just some random routines were added
+
+    # FIXME
+    @classmethod
+    def tearDownClass(cls):
+        Instrument.close_all()
+    # def tearDown(self):
+    #     Instrument.close_all()
