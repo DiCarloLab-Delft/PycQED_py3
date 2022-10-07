@@ -7488,7 +7488,7 @@ class TwoD_Analysis(MeasurementAnalysis):
             fig_title = '{} {} \n{}'.format(
                 self.timestamp_string, self.measurementstring,
                 self.value_names[i])
-
+            ax.set_title(fig_title) # Santi 20221006: Added timestamp to 2D plot in default analysis
             # subtract mean from each row/column if demanded
             plot_zvals = meas_vals.transpose()
             if subtract_mean_x:
