@@ -230,6 +230,9 @@ def flipping(
             if equator:
                 if ax == 'y':
                     k.gate('ry90', [qubit_idx])
+                elif flip_ef:
+                    k.gate('rx180', [qubit_idx])
+                    k.gate('cw_15', [qubit_idx])
                 else:
                     k.gate('rx90', [qubit_idx])
             for j in range(n):
