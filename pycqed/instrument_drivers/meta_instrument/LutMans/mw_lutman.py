@@ -1046,7 +1046,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         }
 
         # manual waveform index 1-to-1 mapping
-        for ind in np.arange(0, 60, 1):
+        for ind in np.arange(0, 51, 1):
             commandtable_dict['table'] += [{"index": int(ind),
                                             "waveform": {"index": int(ind)}
                                             }]

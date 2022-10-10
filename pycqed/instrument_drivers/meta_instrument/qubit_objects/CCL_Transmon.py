@@ -38,6 +38,7 @@ import cma
 from pycqed.measurement.optimization import nelder_mead
 import datetime
 import multiprocessing
+import warnings
 
 # Imported for a type check
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module \
@@ -4261,7 +4262,6 @@ class CCLight_Transmon(Qubit):
             return True
 
     def measure_rabi(self, MC=None, amps=np.linspace(0, 1, 31),
-                     cross_driving_qubit=None,
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         """
@@ -4288,7 +4288,7 @@ class CCLight_Transmon(Qubit):
                                   analyze, close_fig, real_imag,
                                   prepare_for_timedomain, all_modules)
         else:
-            self.measure_rabi_channel_amp(MC, amps,cross_driving_qubit,
+            self.measure_rabi_channel_amp(MC, amps,
                                           analyze, close_fig, real_imag,
                                           prepare_for_timedomain)
 
@@ -4350,9 +4350,50 @@ class CCLight_Transmon(Qubit):
         return True
 
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
-                                 cross_driving_qubit=None,
                                  analyze=True, close_fig=True, real_imag=True,
                                  prepare_for_timedomain=True):
+        """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Args:
+            amps (array):
+                range of amplitudes to sweep. Amplitude is adjusted via the channel
+                amplitude of the AWG, in max range (0 to 1).
+        """
+
+
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        
+        p = sqo.off_on(
+            qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            initialize=False,
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+
+        s = MW_LutMan.channel_amp
+        print(s)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(amps)
+        # real_imag is acutally not polar and as such works for opt weights
+        self.int_avg_det_single._set_real_imag(real_imag)
+        MC.set_detector_function(self.int_avg_det_single)
+
+        label = '' 
+        MC.run(name=f'rabi_'+self.msmt_suffix+label)
+        ma.Rabi_Analysis(label='rabi_')
+        return True
+
+    def measure_rabi_mw_crosstalk(self, MC=None, amps=np.linspace(0, 1, 31),
+                             cross_driving_qubit=None,
+                             analyze=True, close_fig=True, real_imag=True,
+                             disable_metadata = False, 
+                             prepare_for_timedomain=True):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
         while the drive frequency and pulse duration is kept fixed
@@ -4377,10 +4418,10 @@ class CCLight_Transmon(Qubit):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         
-        p = sqo.off_on(
+        p = sqo.off_on_mw_crosstalk(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
             initialize=False,
-            # cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
+            cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
@@ -4392,10 +4433,76 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
 
-        label = f'drive-{cross_driving_qubit}' if cross_driving_qubit else '' 
-        MC.run(name=f'rabi_'+self.msmt_suffix+label)
-        ma.Rabi_Analysis(label='rabi_')
-        return True
+        label = f'_drive_{cross_driving_qubit}' if cross_driving_qubit else '' 
+        MC.run(name=f'rabi'+self.msmt_suffix+label,
+               disable_snapshot_metadata=disable_metadata)
+        a = None
+        try:
+            a = ma.Rabi_Analysis(label='rabi_')
+        except Exception as e:
+            warnings.warn("Failed to fit Rabi for the cross-driving case.")
+
+        if a:
+            return a
+
+    def measure_mw_crosstalk(self, MC=None, amps=np.linspace(0, 1, 121),
+                 cross_driving_qb=None,disable_metadata = False,
+                 analyze=True, close_fig=True, real_imag=True,
+                 prepare_for_timedomain=True):
+        """
+        Measure MW crosstalk matrix by measuring two Rabi experiments: 
+        1. a0 : standand rabi (drive the qubit qj through its dedicated drive line Dj) 
+        2. a1 : cross-drive rabi (drive the qubit qj through another drive line (Di)
+         at the freq of the qj) 
+        Args:
+            amps (array):
+                range of amplitudes to sweep. If cfg_with_vsm()==True pulse amplitude
+                is adjusted by sweeping the attenuation of the relevant gaussian VSM channel,
+                in max range (0.1 to 1.0).
+                If cfg_with_vsm()==False adjusts the channel amplitude of the AWG in range (0 to 1).
+
+            cross_driving_qubit is qubit qi with its drive line Di.
+        Relevant parameters:
+            mw_amp180 (float):
+                amplitude of the waveform corresponding to pi pulse (from 0 to 1)
+
+            mw_channel_amp (float):
+                AWG channel amplitude (digitally scaling the waveform; form 0 to 1)
+        """
+
+        try:    
+            freq_qj = self.freq_qubit() # set qi to this qubit freq of qubit j
+            cross_driving_qubit = None
+            amps=np.linspace(0, 0.1, 51)
+            a0 = self.measure_rabi_mw_crosstalk(MC, amps,cross_driving_qubit,
+                                          analyze, close_fig, real_imag,disable_metadata,
+                                          prepare_for_timedomain)
+
+            cross_driving_qubit = cross_driving_qb
+            qi = self.find_instrument(cross_driving_qubit)
+            freq_qi = qi.freq_qubit()
+            qi.freq_qubit(freq_qj)
+            amps=np.linspace(0, 1, 121)
+            prepare_for_timedomain = False
+            a1 = self.measure_rabi_mw_crosstalk(MC, amps,cross_driving_qubit,
+                                          analyze, close_fig, real_imag,disable_metadata,
+                                          prepare_for_timedomain)
+            ## set back the right parameters. 
+            qi.freq_qubit(freq_qi)
+        except:
+            print_exception()
+            qi.freq_qubit(freq_qi)
+            raise Exception('Experiment failed')
+
+        try:
+            pi_ajj = abs(a0.fit_result.params['period'].value) / 2
+            pi_aji = abs(a1.fit_result.params['period'].value) / 2
+
+            mw_isolation = 20*np.log10(pi_aji/pi_ajj)
+
+            return mw_isolation
+        except:
+            mw_isolation = 80
 
     def measure_allxy(
             self, 
@@ -5890,12 +5997,14 @@ class CCLight_Transmon(Qubit):
                 return a
 
             if angle == '180':
-                if self.cfg_with_vsm():
-                    amp_old = self.mw_vsm_G_amp()
-                    self.mw_vsm_G_amp(scale_factor*amp_old)
+                if flip_ef:
+                    amp_old = self.mw_ef_amp()
+                    self.mw_ef_amp(scale_factor*amp_old)
                 else:
                     amp_old = self.mw_channel_amp()
                     self.mw_channel_amp(scale_factor*amp_old)
+
+
             elif angle == '90':
                 amp_old = self.mw_amp90_scale()
                 self.mw_amp90_scale(scale_factor*amp_old)
@@ -6243,7 +6352,11 @@ class CCLight_Transmon(Qubit):
                                                          amps=amps))
         MC.set_sweep_points_2D(anharmonicity)
         MC.set_detector_function(d)
-        MC.run('ef_rabi_2D'+label+self.msmt_suffix, mode='2D')
+        try:
+            MC.run('ef_rabi_2D'+label+self.msmt_suffix, mode='2D')
+        except:
+            print_exception()
+            mw_lutman.set_default_lutmap()
         if analyze:
             a = ma.TwoD_Analysis()
             return a
@@ -6284,12 +6397,13 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
         MC.set_detector_function(d)
-        MC.run('ef_rabi'+label+self.msmt_suffix)
+        try:
+            MC.run('ef_rabi'+label+self.msmt_suffix)
+        except:
+            print_exception()
+            mw_lutman.set_default_lutmap()
         if analyze:
             a2 = ma2.EFRabiAnalysis(close_figs=True, label='ef_rabi')
-            # if update:
-            #     ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
-            #     self.ef_amp180(a2.proc_data_dict['ef_pi_amp'])
             return a2
 
     def calibrate_ef_rabi(self,
@@ -6307,11 +6421,15 @@ class CCLight_Transmon(Qubit):
         Hint: the expected pi-pulse amplitude of the ef/12 transition is ~1/2
             the pi-pulse amplitude of the ge/01 transition.
         """
-        a2 = self.measure_ef_rabi(amps = amps,
-                        recovery_pulse = recovery_pulse,
-                        MC = MC, label = label,
-                        analyze = analyze, close_fig = close_fig,
-                        prepare_for_timedomain = prepare_for_timedomain)
+        try:
+            a2 = self.measure_ef_rabi(amps = amps,
+                    recovery_pulse = recovery_pulse,
+                    MC = MC, label = label,
+                    analyze = analyze, close_fig = close_fig,
+                    prepare_for_timedomain = prepare_for_timedomain)
+        except:
+            print_exception()
+            mw_lutman.set_default_lutmap()
         if update:
             ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
             self.mw_ef_amp(a2.proc_data_dict['ef_pi_amp'])
@@ -6482,6 +6600,7 @@ class CCLight_Transmon(Qubit):
             heralded_init: bool = False,
             prepare_for_timedomain: bool = True,
             reduced_prepare: bool = False,
+            analyze: bool = True,
             disable_metadata: bool = False):
         '''
         Function to measure 2-state fraction removed by LRU pulse.
@@ -6519,9 +6638,10 @@ class CCLight_Transmon(Qubit):
         MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(True)
         # Analysis
-        a = ma2.lrua.LRU_experiment_Analysis(qubit=self.name,
-                                             heralded_init=heralded_init)
-        return a.qoi
+        if analyze:
+            a = ma2.lrua.LRU_experiment_Analysis(qubit=self.name,
+                                                 heralded_init=heralded_init)
+            return a.qoi
 
     def measure_LRU_process_tomo(self,
             nr_shots_per_case: int = 2**15,
@@ -6919,7 +7039,6 @@ class CCLight_Transmon(Qubit):
         return ct.freq_to_amp_root_parabola(freq=freq,
                                             poly_coeffs=self.fl_dc_polycoeff(),
                                             **kw)
-
 
     def set_target_freqency(self,target_frequency = 6e9,
                             sweetspot_current = None,

@@ -330,6 +330,9 @@ while (1) {
         """
         if isinstance(commandtable, dict):
             commandtable = json.dumps(commandtable, sort_keys=True, indent=2)
+            # inserting here the 'hack' discussed with ZI. Hany and Leo DC. 2022/06/15
+            # internal ZI ticket: HULK-788
+            commandtable = commandtable+" "*10000
 
         # validate json (without schema)
         try:

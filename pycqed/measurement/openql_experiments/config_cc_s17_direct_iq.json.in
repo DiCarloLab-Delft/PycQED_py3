@@ -252,7 +252,7 @@
                 {
                     "name": "mw_4",
                     "qubits": [                                             // ancilla qubits:
-                        [19],
+                        [19], // Added LRU experiment!
                         [6],
                         [7],
                         [8]
@@ -358,9 +358,10 @@
 
         // LRU pulses
         "lru q16": ["barrier q16, q19", "cw_40 q19", "update_ph_LRU q16", "barrier q16, q19"],
-        "lru q3": ["barrier q3, q17", "cw_40 q17", "update_ph_LRU q3", "barrier q3, q17"],
+        "lru q13": ["barrier q13, q17", "cw_40 q17", "update_ph_LRU q13", "barrier q13, q17"],
         "lru q15": ["barrier q15, q18", "cw_40 q18", "update_ph_LRU q15", "barrier q15, q18"],
-
+        // "lru q3": ["barrier q3, q17", "cw_40 q17", "update_ph_LRU q3", "barrier q3, q17"],
+        
         // Updata by Hany [2021-06-01]
         // Individual CZ gates in Surface-17
         // Decomposition of two qubit flux interactions as single-qubit flux

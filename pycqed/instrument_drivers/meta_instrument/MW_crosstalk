@@ -1,0 +1,44 @@
+#########################
+## MW crosstalk matrix 
+#########################
+qubits_right = [D1, X1]
+qubits_middle = [D3, D7, D2, X3, Z1, X2, Z3, D5, D4]
+qubits_left = [D9, D8, X4, Z4, Z2, D6]
+qubits = qubits_right + qubits_middle + qubits_left
+file_cfg = gc.generate_config(
+                in_filename=input_file,
+                out_filename=config_fn,
+                mw_pulse_duration=1000,
+                ro_duration=2200,
+                flux_pulse_duration=40,
+                init_duration=200000)
+mw_crosstalk =  np.zeros((len(qubits),len(qubits)))+80
+for i,qb in enumerate(qubits):
+	for j,cross_qb in enumerate(qubits):
+		qb.mw_gauss_width(250e-9)
+		cross_qb.mw_gauss_width(250e-9)
+		mw_c_qb = cross_qb.instr_LutMan_MW.get_instr()
+		mw_c_qb.cfg_sideband_mode('static')
+
+		if i == j:
+			mw_crosstalk[i][j] = None
+		else:
+			mw_crosstalk[i][j] = qb.measure_mw_crosstalk(cross_driving_qb=cross_qb.name)
+
+file_cfg = gc.generate_config(
+                in_filename=input_file,
+                out_filename=config_fn,
+                mw_pulse_duration=20,
+                ro_duration=2200,
+                flux_pulse_duration=40,
+                init_duration=200000)
+for i,qb in enumerate(qubits):
+	qb.mw_gauss_width(5e-9)
+	qb.mw_gauss_width(5e-9)
+	qb = qb.instr_LutMan_MW.get_instr()
+	qb.cfg_sideband_mode('real-time')
+MW_LO_1.frequency(6.200e9)
+MW_LO_2.frequency(6.140e9)
+MW_LO_3.frequency(5.090e9)
+MW_LO_4.frequency(5.070e9)
+MW_LO_5.frequency(6.950e9)
