@@ -83,7 +83,7 @@ class TestDIODataTransfer(object):
             time.sleep(3)
             timing_error = HDAWG.daq.getInt(
                 f"/{HDAWG.devname}/raw/dios/0/error/timingsticky"
-            ) & dio_mask
+            ) #& dio_mask
             if timing_error == 0:
                 valid_delays.append(delay)
                 print("SUCCESS")
@@ -120,7 +120,7 @@ class TestDIODataTransfer(object):
         calibration to walking 1s."""
         HDAWG.daq.set(f"/{HDAWG.devname}/raw/dios/0/error/timingclear", 1)
         time.sleep(3)
-        timing_error = HDAWG.daq.getInt(f"/{HDAWG.devname}/raw/dios/0/error/timingsticky")
+        timing_error = HDAWG.daq.getInt(f"/{HDAWG.devname}/raw/dios/0/error/timingsticky") #& dio_mask
         print(timing_error)
         if timing_error != 0:
             print("TIMING ERROR is NOT 0, calibrate again")
@@ -223,10 +223,11 @@ class TestDIODataTransfer(object):
             print(result)
 
     def test_with_calib_HDAWG_dio(self):
+        # Set up CC
         station = qc.Station()
         central_controller = CC("central_controller", IPTransport("192.168.0.241"))
         station.add_component(central_controller, update_snapshot=False)
-
+        # Set up HDAWG
         HDAWG = ZI_HDAWG8(
             name="hdawg",
             device="dev8066",
@@ -240,7 +241,7 @@ class TestDIODataTransfer(object):
         self.init_HDAWG(HDAWG)
 
         start_time = time.time()
-        seconds = 86400 #86400  # 48 hours
+        seconds = 172800 #86400  # 48 hours
         current_time = time.time()
         elapsed_time = current_time - start_time
         while elapsed_time <= seconds:
