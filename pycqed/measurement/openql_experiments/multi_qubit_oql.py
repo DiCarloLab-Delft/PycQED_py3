@@ -608,6 +608,7 @@ def Cryoscope(
         twoq_pair=[2, 0],
         platf_cfg: str = '',
         cc: str = 'CC',
+        wait_time_flux: int = 0,
         double_projections: bool = True
 ) -> OqlProgram:
     """
@@ -640,10 +641,12 @@ def Cryoscope(
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
+    k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('sf_square', [q_idx])
     k.barrier([])  # alignment workaround
+    k.gate('wait', [], wait_time_flux)
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
     k.barrier([])
@@ -656,10 +659,12 @@ def Cryoscope(
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
+    k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('sf_square', [q_idx])
     k.barrier([])  # alignment workaround
+    k.gate('wait', [], wait_time_flux)
     for q_idx in qubit_idxs:
         k.gate('ry90', [q_idx])
     k.barrier([])
@@ -673,10 +678,12 @@ def Cryoscope(
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('rx90', [q_idx])
+        k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('sf_square', [q_idx])
         k.barrier([])  # alignment workaround
+        k.gate('wait', [], wait_time_flux)
         for q_idx in qubit_idxs:
             k.gate('rxm90', [q_idx])
         k.barrier([])
@@ -689,10 +696,12 @@ def Cryoscope(
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('rx90', [q_idx])
+        k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('sf_square', [q_idx])
         k.barrier([])  # alignment workaround
+        k.gate('wait', [], wait_time_flux)
         for q_idx in qubit_idxs:
             k.gate('rym90', [q_idx])
         k.barrier([])

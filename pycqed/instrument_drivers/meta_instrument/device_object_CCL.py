@@ -2139,6 +2139,7 @@ class DeviceCCL(Instrument):
         MC=None,
         nested_MC=None,
         double_projections: bool = False,
+        wait_time_flux: int = 0,
         update_FIRs: bool=False,
         waveform_name: str = "square",
         max_delay=None,
@@ -2215,6 +2216,7 @@ class DeviceCCL(Instrument):
             qubit_idxs=Q_idxs,
             flux_cw=flux_cw,
             twoq_pair=twoq_pair,
+            wait_time_flux=wait_time_flux,
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC.get_instr().name,
             double_projections=double_projections,
@@ -3793,7 +3795,8 @@ class DeviceCCL(Instrument):
         A_points: int,
         Q_parks: list = None,
         Tp : float = None,
-        flux_codeword: str = 'cz'):
+        flux_codeword: str = 'cz',
+        flux_pulse_duration: float = 60e-9):
         """
         Perform 2D sweep of amplitude and wave parameter while measuring 
         conditional phase and missing fraction via the "conditional 
@@ -3887,7 +3890,8 @@ class DeviceCCL(Instrument):
                              for i in range(len(Q0))]).flatten()), 
             fl_lm_park = Flux_lms_park,
             which_gate = list(np.array(directions).flatten()),
-            t_pulse = Tp)
+            t_pulse = Tp,
+            duration = flux_pulse_duration)
         nested_MC.set_sweep_function(swf1)
         nested_MC.set_sweep_points(np.arange(A_points))
         nested_MC.set_sweep_function_2D(swf2)

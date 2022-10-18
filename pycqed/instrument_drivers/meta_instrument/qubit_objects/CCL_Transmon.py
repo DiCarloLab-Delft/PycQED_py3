@@ -4258,7 +4258,7 @@ class CCLight_Transmon(Qubit):
             MC.run(name='Resonator_scan_'+pulse_comb+self.msmt_suffix)
             
         if analyze:
-            a = ma2.Dispersive_shift_Analysis(self.name)
+            a = ma2.ra.Dispersive_shift_Analysis(self.name)
             return True
 
     def measure_rabi(self, MC=None, amps=np.linspace(0, 1, 31),
