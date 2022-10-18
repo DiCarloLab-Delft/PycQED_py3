@@ -1271,6 +1271,203 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
         )
 
 
+class LRU_Flux_LutMan(Base_Flux_LutMan):
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
+        self._wave_dict_dist = dict()
+        self.sampling_rate(2.4e9)
+
+    def _add_waveform_parameters(self):
+        # CODEWORD 1: Idling
+        self.add_parameter(
+            "idle_pulse_length",
+            unit="s",
+            label="Idling pulse length",
+            initial_value=40e-9,
+            vals=vals.Numbers(0, 100e-6),
+            parameter_class=ManualParameter,
+        )
+        # Parameters for leakage reduction unit pulse.
+        self.add_parameter('mw_lru_modulation', unit='Hz',
+                           docstring=('Modulation frequency for LRU pulse.'),
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter, initial_value=0.0e6)
+        self.add_parameter('mw_lru_amplitude', unit='frac',
+                           docstring=('amplitude for LRU pulse.'),
+                           vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter, initial_value=.8)
+        self.add_parameter('mw_lru_duration',  unit='s',
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=300e-9)
+        self.add_parameter('mw_lru_rise_duration',  unit='s',
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=30e-9)
+
+    def _add_cfg_parameters(self):
+        self.add_parameter(
+            "cfg_awg_channel",
+            initial_value=1,
+            vals=vals.Ints(1, 8),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "_awgs_fl_sequencer_program_expected_hash",  # FIXME: un used?
+            docstring="crc32 hash of the awg8 sequencer program. "
+            "This parameter is used to dynamically determine "
+            "if the program needs to be uploaded. The initial_value is"
+            " None, indicating that the program needs to be uploaded."
+            " After the first program is uploaded, the value is set.",
+            initial_value=None,
+            vals=vals.Ints(),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "cfg_max_wf_length",
+            parameter_class=ManualParameter,
+            initial_value=10e-6,
+            unit="s",
+            vals=vals.Numbers(0, 100e-6),
+        )
+        self.add_parameter(
+            "cfg_awg_channel_range",
+            docstring="peak peak value, channel range of 5 corresponds to -2.5V to +2.5V",
+            get_cmd=self._get_awg_channel_range,
+            unit="V_pp",
+        )
+        self.add_parameter(
+            "cfg_awg_channel_amplitude",
+            docstring="digital scale factor between 0 and 1",
+            get_cmd=self._get_awg_channel_amplitude,
+            set_cmd=self._set_awg_channel_amplitude,
+            unit="a.u.",
+            vals=vals.Numbers(0, 1),
+        )
+
+    def set_default_lutmap(self):
+        """Set the default lutmap for LRU drive pulses."""
+        lm = {
+            0: {"name": "i", "type": "idle"},
+            1: {"name": "lru", "type": "lru"},
+            2: {"name": "lru", "type": "lru"},
+            3: {"name": "lru", "type": "lru"},
+            4: {"name": "lru", "type": "lru"},
+            5: {"name": "lru", "type": "lru"},
+            6: {"name": "lru", "type": "lru"},
+            7: {"name": "lru", "type": "lru"},
+        }
+        self.LutMap(lm)
+
+    def generate_standard_waveforms(self):
+
+        """
+        Generate all the standard waveforms and populates self._wave_dict
+        """
+
+        self._wave_dict = {}
+        # N.B. the  naming convention ._gen_{waveform_name} must be preserved
+        # as it is used in the load_waveform_onto_AWG_lookuptable method.
+        self._wave_dict["i"] = self._gen_i()
+        self._wave_dict["lru"] = self._gen_lru()
+
+    def _gen_i(self):
+        return np.zeros(int(self.idle_pulse_length() * self.sampling_rate()))
+
+    def _gen_lru(self):
+        self.lru_func = wf.mod_lru_pulse
+        _wf = self.lru_func(
+            t_total = self.mw_lru_duration(), 
+            t_rise = self.mw_lru_rise_duration(), 
+            f_modulation = self.mw_lru_modulation(),
+            amplitude = self.mw_lru_amplitude(),
+            sampling_rate = self.sampling_rate())[0]
+        return _wf
+
+    def _get_awg_channel_amplitude(self):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel() - 1  # -1 is to account for starting at 1
+        awg_nr = awg_ch // 2
+        ch_pair = awg_ch % 2
+
+        channel_amp = AWG.get("awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair))
+        return channel_amp
+
+    def _set_awg_channel_amplitude(self, val):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel() - 1  # -1 is to account for starting at 1
+        awg_nr = awg_ch // 2
+        ch_pair = awg_ch % 2
+        AWG.set("awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair), val)
+
+    def _get_awg_channel_range(self):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel() - 1  # -1 is to account for starting at 1
+        # channel range of 5 corresponds to -2.5V to +2.5V
+        for i in range(5):
+            channel_range_pp = AWG.get("sigouts_{}_range".format(awg_ch))
+            if channel_range_pp is not None:
+                break
+            time.sleep(0.5)
+        return channel_range_pp
+
+    def load_waveform_onto_AWG_lookuptable(
+        self, wave_id: str, regenerate_waveforms: bool = False):
+        """
+        Loads a specific waveform to the AWG
+        """
+        # Here we are ductyping to determine if the waveform name or the
+        # codeword was specified.
+        if type(wave_id) == str:
+            waveform_name = wave_id
+            codeword = get_wf_idx_from_name(wave_id, self.LutMap())
+        else:
+            waveform_name = self.LutMap()[wave_id]["name"]
+            codeword = wave_id
+
+        if regenerate_waveforms:
+            gen_wf_func = getattr(self, "_gen_{}".format(waveform_name))
+            self._wave_dict[waveform_name] = gen_wf_func()
+
+        waveform = self._wave_dict[waveform_name]
+        codeword_str = "wave_ch{}_cw{:03}".format(self.cfg_awg_channel(), codeword)
+
+        # This is where the fixed length waveform is
+        # set to cfg_max_wf_length
+        waveform = self._append_zero_samples(waveform)
+        self._wave_dict_dist[waveform_name] = waveform
+
+        self.AWG.get_instr().set(codeword_str, waveform)
+
+    def load_waveforms_onto_AWG_lookuptable(
+        self, regenerate_waveforms: bool = True, stop_start: bool = True):
+        """
+        Loads all waveforms specified in the LutMap to an AWG for both this
+        LutMap and the partner LutMap.
+
+        Args:
+            regenerate_waveforms (bool): if True calls
+                generate_standard_waveforms before uploading.
+            stop_start           (bool): if True stops and starts the AWG.
+
+        """
+
+        AWG = self.AWG.get_instr()
+
+        if stop_start:
+            AWG.stop()
+
+        for idx, waveform in self.LutMap().items():
+            self.load_waveform_onto_AWG_lookuptable(
+                wave_id=idx, regenerate_waveforms=regenerate_waveforms
+            )
+
+        self.cfg_awg_channel_amplitude()
+        self.cfg_awg_channel_range()
+
+        if stop_start:
+            AWG.start()
+
 #########################################################################
 # Convenience functions below
 #########################################################################
