@@ -659,12 +659,13 @@ class SHFQA(ZI_base_instrument, CalInterface):
         """
         return self._codeword_manager.active_codewords
 
-    def _set_dio_calibration_delay(self, value) -> None:
+    def _set_dio_calibration_delay(self, value, add_delay) -> None:
         """
         Setter function for the "dio_calibration_delay" QCoDeS parameter.
 
         Args:
             value: value to set the parameter to.
+            add_delay: value that determines if conditional delay needs to be added to
         """
         if value not in DioCalibration.DELAYS:
             raise ziValueError(
@@ -675,6 +676,9 @@ class SHFQA(ZI_base_instrument, CalInterface):
         self._dio_calibration_delay = value
         self.daq.syncSetInt(
             f"/{self.devname}/raw/dios/0/offset", self._dio_calibration_delay
+        )
+        self.daq.syncSetInt(
+            f"/{self.devname}/raw/dios/0/addrxdelay", add_delay
         )
 
     def _get_dio_calibration_delay(self) -> float:
@@ -1173,6 +1177,7 @@ class SHFQA(ZI_base_instrument, CalInterface):
         offset = 0
         sampling_error = []
         value_same = []
+        add_delay = []
 
         self.daq.syncSetInt(f"/{self.devname}/raw/dios/0/error/timingcalib", 1)
 
@@ -1197,6 +1202,9 @@ class SHFQA(ZI_base_instrument, CalInterface):
                 self.daq.getInt(f"/{self.devname}/raw/dios/0/error/timingsame")
                 & dio_mask
             )
+            add_delay.append(
+                self.daq.getInt(f"/{self.devname}/raw/dios/0/error/fallingunstable") != 0
+            )
 
             log.debug(
                 f"  sampling point {offset}, sampling unstable: {sampling_error[-1]:#034b}"
@@ -1217,13 +1225,20 @@ class SHFQA(ZI_base_instrument, CalInterface):
             raise Exception("DIO calibration failed! No valid sampling points found")
 
         offset_try = value_same.index(0)
+        if offset_try == 0:
+            for idx, val in reversed(list(enumerate(value_same))):
+                # As long as values at the end of the array indicate value_same == 0, keep walking to the front.
+                if val != 0:
+                    break
+                offset_try = idx
+
         for i in range(num_offsets):
             idx = (offset_try + i) % num_offsets
             if sampling_error[idx] == 0:
                 log.debug(
                     f"  Sampling point {idx} is best match (errors: {sampling_error[idx]:#b}, value same: {value_same[idx]:#b})"
                 )
-                self._set_dio_calibration_delay(idx)
+                self._set_dio_calibration_delay(idx, add_delay[idx])
                 # Clear all detected errors (caused by DIO timing calibration)
                 self.check_errors(errors_to_ignore=["AWGDIOTIMING"])
                 return
