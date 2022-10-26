@@ -233,6 +233,10 @@ class TestDIODataTransfer(object):
         plt.imshow(parity_error_plot, cmap="YlOrRd",interpolation=None)
         plt.xlabel("Parity Errors")
         plt.xticks(range(3), ["DIO FPGA", "Controller", "Processing"])
+        # for y_index in range(len(parity_error_plot)):
+        #     for x_index in range(3):
+        #         label = parity_error_plot[y_index, x_index]
+        #         ax.text(x_index, y_index, label, color='black', ha='center', va='center')
         plt.savefig("parity_error_matrix.png")
 
     ##########################################################################
@@ -273,7 +277,7 @@ class TestDIODataTransfer(object):
 
         # Set up time period for running test
         start_time = time.time()
-        seconds = 57600  #16 hours
+        seconds = 43200  #12 hours
         current_time = time.time()
         elapsed_time = current_time - start_time
         while elapsed_time <= seconds:
@@ -285,6 +289,7 @@ class TestDIODataTransfer(object):
             # Store valid delays found to check how they change over time and plot
             valid_delays = self.checking_valid_delays_HDAWG_dio(HDAWG, central_controller, dio_mask, specific_delay)
             valid_delays_matrix.append(valid_delays)
+            print(valid_delays_matrix)
             self.update_plot_delay(valid_delays_matrix)
 
             # Check once more for timing error
@@ -313,6 +318,7 @@ class TestDIODataTransfer(object):
             # Check for parity errors
             parity_error = self.check_parity_error(HDAWG)
             parity_error_matrix.append(parity_error)
+            print(parity_error_matrix)
             self.update_plot_parity_error(parity_error_matrix)
 
         print(f"Valid delays were the following: {valid_delays_matrix}")
