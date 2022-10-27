@@ -20,8 +20,8 @@ autodepgraph
 networkx
 qutechopenql>=0.10.3 # FIXME: install manually using "pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases"
 spirack
-zhinst
-zhinst-deviceutils; python_version > '3.6'
+zhinst-core
+zhinst-utils; python_version > '3.6'
 packaging
 deprecated
 adaptive>=0.10.0
