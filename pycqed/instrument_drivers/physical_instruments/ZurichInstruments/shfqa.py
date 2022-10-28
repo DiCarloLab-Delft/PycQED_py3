@@ -562,6 +562,16 @@ class SHFQA(ZI_base_instrument, CalInterface):
         ##########################################################################
 
         self.add_parameter(
+            "add_rx_delay",
+            set_cmd=self._set_rx_delay,
+            get_cmd=self._get_rx_delay,
+            unit="",
+            label="Add RX Delay",
+            docstring="Conditional delay of the DIO RX signal by 2 ns in the 500 MHz domain. ",
+            vals=validators.Ints(),
+        )
+
+        self.add_parameter(
             "result_mode",
             set_cmd=self._set_result_mode,
             get_cmd=self._get_result_mode,
@@ -659,13 +669,12 @@ class SHFQA(ZI_base_instrument, CalInterface):
         """
         return self._codeword_manager.active_codewords
 
-    def _set_dio_calibration_delay(self, value, add_delay) -> None:
+    def _set_dio_calibration_delay(self, value) -> None:
         """
         Setter function for the "dio_calibration_delay" QCoDeS parameter.
 
         Args:
             value: value to set the parameter to.
-            add_delay: value that determines if conditional delay needs to be added to
         """
         if value not in DioCalibration.DELAYS:
             raise ziValueError(
@@ -677,15 +686,31 @@ class SHFQA(ZI_base_instrument, CalInterface):
         self.daq.syncSetInt(
             f"/{self.devname}/raw/dios/0/offset", self._dio_calibration_delay
         )
-        self.daq.syncSetInt(
-            f"/{self.devname}/raw/dios/0/addrxdelay", add_delay
-        )
+
 
     def _get_dio_calibration_delay(self) -> float:
         """
         Getter function for the "dio_calibration_delay" QCoDeS parameter.
         """
         return self._dio_calibration_delay
+
+    def _set_rx_delay(self, add_rx_delay) -> None:
+        """
+        Setter function for the "add_rx_delay" QCoDeS parameter.
+
+        Args:
+            add_rx_delay: value that determines if conditional 2ns delay needs to be applied
+        """
+        self._add_rx_delay = add_rx_delay
+        self.daq.syncSetInt(
+            f"/{self.devname}/raw/dios/0/addrxdelay", self._add_rx_delay
+        )
+
+    def _get_rx_delay(self) -> int:
+        """
+                Getter function for the "add_rx_delay" QCoDeS parameter.
+        """
+        return self._add_rx_delay
 
     def _set_result_mode(self, value: str) -> None:
         """
@@ -1221,7 +1246,7 @@ class SHFQA(ZI_base_instrument, CalInterface):
                 f"DIO calibration failed! Expected a single edge in the sampling interval, got {value_same.count(0)}."
             )
 
-        if sampling_error.count(0) > 0:
+        if sampling_error.count(0) == 0:
             raise Exception("DIO calibration failed! No valid sampling points found")
 
         offset_try = value_same.index(0)
@@ -1238,7 +1263,8 @@ class SHFQA(ZI_base_instrument, CalInterface):
                 log.debug(
                     f"  Sampling point {idx} is best match (errors: {sampling_error[idx]:#b}, value same: {value_same[idx]:#b})"
                 )
-                self._set_dio_calibration_delay(idx, add_delay[idx])
+                self._set_dio_calibration_delay(idx)
+                self._set_rx_delay(add_delay[idx])
                 # Clear all detected errors (caused by DIO timing calibration)
                 self.check_errors(errors_to_ignore=["AWGDIOTIMING"])
                 return
