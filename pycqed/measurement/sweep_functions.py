@@ -1029,7 +1029,8 @@ class flux_t_middle_sweep(Soft_Sweep):
             fl_lm_park: list,
             which_gate: list,
             t_pulse: list,
-            duration: float = 40e-9
+            duration: float = 40e-9,
+            time_park: float = None
         ):
         super().__init__()
         self.name = 'time_middle'
@@ -1040,6 +1041,7 @@ class flux_t_middle_sweep(Soft_Sweep):
         self.which_gate = which_gate
         self.t_pulse = t_pulse
         self.duration = duration
+        self.time_park = time_park
 
     def set_parameter(self, val):
         which_gate = self.which_gate
@@ -1050,11 +1052,16 @@ class flux_t_middle_sweep(Soft_Sweep):
         # Calculate vcz times for each flux pulse
         time_mid = val / sampling_rate
         n_points = [ np.ceil(tp / 2 * sampling_rate) for tp in t_pulse ]
+        if self.time_park == None:
+            n_time_park = np.max(n_points)*2 + val + 4
+        else:
+            n_time_park = np.ceil(self.time_park*sampling_rate)
+        n_time_park_pad = np.ceil((total_points-n_time_park)/2)
+        n_time_pad = np.ceil((total_points-(np.max(n_points)*2 + val + 4))/2)
         time_sq  = [ n / sampling_rate for n in n_points ]
-        time_park= np.max(time_sq)*2 + time_mid + 4/sampling_rate
-        time_park_pad = np.ceil((self.duration-time_park)/2*sampling_rate)/sampling_rate
-        time_pad = np.abs(np.array(time_sq)-np.max(time_sq))+time_park_pad
-
+        time_park = n_time_park/sampling_rate
+        time_park_pad = n_time_park_pad/sampling_rate
+        time_pad = np.abs(np.array(time_sq)-np.max(time_sq))+n_time_pad/sampling_rate
         # update parameters and upload waveforms
         Lutmans = self.fl_lm_tm + self.fl_lm_park
         AWGs = np.unique([lm.AWG() for lm in Lutmans])

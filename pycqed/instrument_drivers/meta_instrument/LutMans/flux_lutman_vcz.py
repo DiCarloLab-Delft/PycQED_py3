@@ -407,7 +407,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         state_A: str = "01",
         state_B: str = "02",
         which_gate: str = "NE",
-    ):
+        ):
         """
         Calculates detuning between two levels as a function of pulse
         amplitude in Volt.
@@ -441,7 +441,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         state_B: str = "02",
         which_gate: str = "NE",
         positive_branch=True,
-    ):
+        ):
         """
         See `calc_eps_to_amp`
         """
@@ -457,7 +457,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         state_B: str = "02",
         which_gate: str = "NE",
         positive_branch=True,
-    ):
+        ):
         """
         Calculates amplitude in Volt corresponding to an energy difference
         between two states in Hz.
@@ -635,7 +635,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         state: str = "01",
         which_gate: str = "NE",
         positive_branch=True,
-    ):
+        ):
         """
         Calculates amplitude in Volt corresponding to the energy of a state
         in Hz.
@@ -794,13 +794,23 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         return np.polyval(polycoeffs, amp)
 
+    def calc_parking_freq(self):
+        _gain = self.cfg_awg_channel_amplitude()
+        _rang = self.cfg_awg_channel_range()
+        _dac  = self.park_amp()
+        _out_amp = _gain*_dac*_rang/2
+
+        _coefs = self.q_polycoeffs_freq_01_det()
+        return np.polyval(_coefs, _out_amp)
+
+
     #################################
     #  Waveform loading methods     #
     #################################
 
     def load_waveform_onto_AWG_lookuptable(
         self, wave_id: str, regenerate_waveforms: bool = False
-    ):
+        ):
         """
         Loads a specific waveform to the AWG
         """
@@ -848,7 +858,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def load_waveforms_onto_AWG_lookuptable(
         self, regenerate_waveforms: bool = True, stop_start: bool = True
-    ):
+        ):
         """
         Loads all waveforms specified in the LutMap to an AWG for both this
         LutMap and the partner LutMap.
@@ -1105,7 +1115,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def plot_cz_waveforms(
         self, qubits: list, which_gate_list: list, ax=None, show: bool = True
-    ):
+        ):
         """
         Plots the cz waveforms from several flux lutamns, mainly for
         verification, time alignment and debugging
@@ -1350,12 +1360,6 @@ class LRU_Flux_LutMan(Base_Flux_LutMan):
         lm = {
             0: {"name": "i", "type": "idle"},
             1: {"name": "lru", "type": "lru"},
-            2: {"name": "lru", "type": "lru"},
-            3: {"name": "lru", "type": "lru"},
-            4: {"name": "lru", "type": "lru"},
-            5: {"name": "lru", "type": "lru"},
-            6: {"name": "lru", "type": "lru"},
-            7: {"name": "lru", "type": "lru"},
         }
         self.LutMap(lm)
 
@@ -1410,6 +1414,20 @@ class LRU_Flux_LutMan(Base_Flux_LutMan):
                 break
             time.sleep(0.5)
         return channel_range_pp
+
+    def _append_zero_samples(self, waveform):
+        """
+        Helper method to ensure waveforms have the desired length
+        """
+        length_samples = roundup1024(
+            int(self.sampling_rate() * self.cfg_max_wf_length())
+        )
+        extra_samples = length_samples - len(waveform)
+        if extra_samples >= 0:
+            y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
+        else:
+            y_sig = waveform[:extra_samples]
+        return y_sig
 
     def load_waveform_onto_AWG_lookuptable(
         self, wave_id: str, regenerate_waveforms: bool = False):
@@ -1468,10 +1486,11 @@ class LRU_Flux_LutMan(Base_Flux_LutMan):
         if stop_start:
             AWG.start()
 
+
 #########################################################################
 # Convenience functions below
 #########################################################################
 
 
 def roundup1024(n):
-    return int(np.ceil(n / 96) * 96)
+    return int(np.ceil(n / 144) * 144)

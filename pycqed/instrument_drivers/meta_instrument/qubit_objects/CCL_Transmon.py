@@ -5,6 +5,7 @@ import numpy as np
 from typing import List, Optional, Union
 from autodepgraph import AutoDepGraph_DAG
 
+import pycqed
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
@@ -13,7 +14,7 @@ from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.analysis.tools import cryoscope_tools as ct
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import plotting as plt_tools
-from pycqed.utilities.general import gen_sweep_pts
+from pycqed.utilities.general import gen_sweep_pts, print_exception
 from pycqed.utilities.learnerND_optimize import LearnerND_Optimize, \
     mk_optimize_res_loss_func
 from pycqed.utilities.learnerND_minimizer import LearnerND_Minimizer, \
@@ -739,10 +740,6 @@ class CCLight_Transmon(Qubit):
             'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 20),
             parameter_class=ManualParameter, initial_value=0,
             docstring='The qubit number is used in the OpenQL compiler. ')
-        self.add_parameter(
-            'cfg_qubit_LRU_nr', label='Qubit LRU number', vals=vals.Ints(0, 20),
-            parameter_class=ManualParameter, initial_value=0,
-            docstring='The LRU number is used in the OpenQL compiler. ')
 
         self.add_parameter('cfg_qubit_freq_calc_method',
                            initial_value='latest',
@@ -1250,20 +1247,33 @@ class CCLight_Transmon(Qubit):
             LRU_lutman = self.instr_LutMan_LRU.get_instr()
             self.instr_LO_LRU.get_instr().on()
             self.instr_LO_LRU.get_instr().pulsemod_state(False)
-            if LRU_lutman.cfg_sideband_mode() == 'static':
-                # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
-                self.instr_LO_LRU.get_instr().frequency.set(
-                    self.LRU_freq.get() - self.LRU_freq_mod.get())
-            elif LRU_lutman.cfg_sideband_mode() == 'real-time':
-                # For historic reasons, will maintain the change qubit frequency here in
-                # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
-                if ((LRU_lutman.channel_I()-1)//2 != (LRU_lutman.channel_Q()-1)//2):
-                    raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
-                self.LRU_freq_mod(self.LRU_freq.get() - self.instr_LO_LRU.get_instr().frequency.get())
-                LRU_lutman.AWG.get_instr().set('oscs_{}_freq'.format((LRU_lutman.channel_I()-1)//2),
-                    self.LRU_freq_mod.get())
-            else:
-                raise ValueError('Unexpected value for parameter LRU cfg_sideband_mode.')
+            # If the lutman type is MW
+            if isinstance(LRU_lutman,
+                    pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman.AWG8_MW_LutMan):
+                if LRU_lutman.cfg_sideband_mode() == 'static':
+                    # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
+                    self.instr_LO_LRU.get_instr().frequency.set(
+                        self.LRU_freq.get() - self.LRU_freq_mod.get())
+                elif LRU_lutman.cfg_sideband_mode() == 'real-time':
+                    # For historic reasons, will maintain the change qubit frequency here in
+                    # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
+                    if ((LRU_lutman.channel_I()-1)//2 != (LRU_lutman.channel_Q()-1)//2):
+                        raise KeyError('In real-time sideband mode, channel I/Q should share same awg group.')
+                    self.LRU_freq_mod(self.LRU_freq.get() - self.instr_LO_LRU.get_instr().frequency.get())
+                    LRU_lutman.AWG.get_instr().set('oscs_{}_freq'.format((LRU_lutman.channel_I()-1)//2),
+                        self.LRU_freq_mod.get())
+                else:
+                    raise ValueError('Unexpected value for parameter LRU cfg_sideband_mode.')
+            # If the lutman type is FLUX
+            elif isinstance(LRU_lutman,
+                    pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman_vcz.LRU_Flux_LutMan):
+                # Set modulation frequency and keep LO frequency
+                _mw_mod = self.LRU_freq.get() - self.instr_LO_LRU.get_instr().frequency.get()
+                if _mw_mod < 0:
+                    raise ValueError('Modulation frequency for flux LRU LutMan \
+                                      cannot be negative. Change LRU LO frequency.')
+                else:
+                    self.LRU_freq_mod(_mw_mod)
 
     def _prep_mw_pulses(self):
         # 1. Gets instruments and prepares cases
@@ -1364,34 +1374,54 @@ class CCLight_Transmon(Qubit):
         '''
         Prepare LRU pulses from LRU lutman.
         '''
-        # 1. Gets instruments and prepares cases
+        # 1. Gets instruments
         LRU_LutMan = self.instr_LutMan_LRU.get_instr()
         AWG = LRU_LutMan.AWG.get_instr()
-        # 2. Prepares map and parameters for waveforms
-        LRU_LutMan.channel_amp(self.LRU_channel_amp())
-        LRU_LutMan.channel_range(self.LRU_channel_range())
-        LRU_LutMan.mw_modulation(self.LRU_freq_mod())
-        LRU_LutMan.mw_amp180(1)
-        LRU_LutMan.mixer_phi(0)
-        LRU_LutMan.mixer_alpha(1)
+        lutman_type = str(type(LRU_LutMan))
+        # Check types of Lutman:
+        # Doing this like this is probably a terrible idea,
+        # however, you can do this by using the isinstance command
+        # since you'll just get False always
+        mw_type = str(pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman.AWG8_MW_LutMan)
+        fl_type = str(pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman_vcz.LRU_Flux_LutMan)
+        # If the lutman type is MW
+        if lutman_type == mw_type:
+            # 2. Prepares map and parameters for waveforms
+            LRU_LutMan.channel_amp(self.LRU_channel_amp())
+            LRU_LutMan.channel_range(self.LRU_channel_range())
+            LRU_LutMan.mw_modulation(self.LRU_freq_mod())
+            LRU_LutMan.mw_amp180(1)
+            LRU_LutMan.mixer_phi(0)
+            LRU_LutMan.mixer_alpha(1)
 
-        LRU_LutMan.mw_lru_amplitude(self.LRU_amplitude())
-        LRU_LutMan.mw_lru_duration(self.LRU_duration())
-        LRU_LutMan.mw_lru_rise_duration(self.LRU_duration_rise())
-        # Set all waveforms to be LRU pulse
-        # to ensure same waveform duration. 
-        _lm = {i: {'name': 'lru', 'type': 'lru'} for i in range(64)}
-        LRU_LutMan.LutMap(_lm)
-        # # TO DO: implement mixer corrections on LRU lutman
-        # # N.B. This part is AWG8 specific
-        # AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
-        #         self.mw_mixer_offs_GI())
-        # AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
-        #         self.mw_mixer_offs_GQ())
-        # 4. reloads the waveforms
-        LRU_LutMan.load_waveforms_onto_AWG_lookuptable()
-        # 5. upload commandtable for virtual-phase gates
-        LRU_LutMan.upload_single_qubit_phase_corrections()
+            LRU_LutMan.mw_lru_amplitude(self.LRU_amplitude())
+            LRU_LutMan.mw_lru_duration(self.LRU_duration())
+            LRU_LutMan.mw_lru_rise_duration(self.LRU_duration_rise())
+            # Set all waveforms to be LRU pulse
+            # to ensure same waveform duration. 
+            _lm = {i: {'name': 'lru', 'type': 'lru'} for i in range(64)}
+            LRU_LutMan.LutMap(_lm)
+            # # TO DO: implement mixer corrections on LRU lutman
+            # # N.B. This part is AWG8 specific
+            # AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
+            #         self.mw_mixer_offs_GI())
+            # AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
+            #         self.mw_mixer_offs_GQ())
+            # 4. reloads the waveforms
+            LRU_LutMan.load_waveforms_onto_AWG_lookuptable()
+            # 5. upload commandtable for virtual-phase gates
+            LRU_LutMan.upload_single_qubit_phase_corrections()
+        # If the lutman type is FLUX
+        elif lutman_type == fl_type:
+            # 2. Prepares map and parameters for waveforms
+            LRU_LutMan.cfg_awg_channel_amplitude(self.LRU_channel_amp())
+            # LRU_LutMan.cfg_awg_channel_range(self.LRU_channel_range())
+            LRU_LutMan.mw_lru_amplitude(self.LRU_amplitude())
+            LRU_LutMan.mw_lru_duration(self.LRU_duration())
+            LRU_LutMan.mw_lru_rise_duration(self.LRU_duration_rise())
+            LRU_LutMan.mw_lru_modulation(self.LRU_freq_mod())
+            # 3. upload commandtable for virtual-phase gates
+            LRU_LutMan.load_waveforms_onto_AWG_lookuptable()
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
@@ -3808,6 +3838,10 @@ class CCLight_Transmon(Qubit):
         old_plot_setting = MC.live_plot_enabled()
         MC.live_plot_enabled(False)
         if prepare:
+            # Set default lutmap to ensure rx12 is uploaded
+            if f_state:
+                mw_lm = self.instr_LutMan_MW.get_instr()
+                mw_lm.set_default_lutmap()
             self.prepare_for_timedomain()
         pulse_comb = 'off_on'
         if f_state:
@@ -4150,6 +4184,69 @@ class CCLight_Transmon(Qubit):
             opt_freq, opt_amp = a.qoi['Opt_Cal']
             self.ro_freq(opt_freq)
             self.ro_pulse_amp(opt_amp)
+
+    def measure_msmt_butterfly(self,
+            prepare_for_timedomain: bool = True,
+            calibrate_optimal_weights: bool = False,
+            nr_max_acq: int = 2**17,
+            disable_metadata: bool = False,
+            f_state: bool = False,
+            no_figs: bool = False):
+        
+        # ensure readout settings are correct
+        assert self.ro_acq_weight_type() != 'optimal'
+        assert self.ro_acq_digitized() == False
+
+        if calibrate_optimal_weights:
+            self.calibrate_optimal_weights(
+                prepare=prepare_for_timedomain,
+                verify=False, 
+                optimal_IQ=True,
+                disable_metadata=True)
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        d = self.int_log_det
+        # the msmt butterfly sequence has 2 or 3 measurements,
+        # therefore we need to make sure the number of shots is a multiple of that
+        uhfqc_max_avg = min(max(2**10, nr_max_acq), 2**17)
+
+        if f_state:
+            nr_measurements = 9
+        else:
+            nr_measurements = 6
+            
+
+        
+        nr_shots: int = int(uhfqc_max_avg/nr_measurements) * nr_measurements
+        d.nr_shots = nr_shots
+        p = sqo.butterfly(
+            f_state = f_state,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+        )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr()
+        )
+        MC = self.instr_MC.get_instr()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        MC.run(
+            f"Measurement_butterfly_{self.name}",
+            disable_snapshot_metadata=disable_metadata
+        )
+        a = ma2.ra.measurement_butterfly_analysis(
+            qubit=self.name,
+            label='butterfly',
+            cycle=nr_measurements,
+            f_state=f_state,
+            extract_only=no_figs)
+        return a.qoi
 
     def measure_transients_CCL_switched(self, MC=None, analyze: bool = True,
                                         cases=('off', 'on'),
@@ -5962,7 +6059,9 @@ class CCLight_Transmon(Qubit):
                                 nf[-1]+4*dn) ])
 
         self.prepare_for_timedomain()
-        p = sqo.flipping(number_of_flips=nf, equator=equator,flip_ef=flip_ef,
+        p = sqo.flipping(number_of_flips=nf,
+                         equator=equator,
+                         flip_ef=flip_ef,
                          qubit_idx=self.cfg_qubit_nr(),
                          platf_cfg=self.cfg_openql_platform_fn(),
                          ax=ax.lower(), angle=angle)
@@ -6397,8 +6496,10 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
         MC.set_detector_function(d)
+        mw_lutman = self.instr_LutMan_MW.get_instr()
         try:
             MC.run('ef_rabi'+label+self.msmt_suffix)
+            mw_lutman.set_default_lutmap()
         except:
             print_exception()
             mw_lutman.set_default_lutmap()
@@ -6427,6 +6528,8 @@ class CCLight_Transmon(Qubit):
                     MC = MC, label = label,
                     analyze = analyze, close_fig = close_fig,
                     prepare_for_timedomain = prepare_for_timedomain)
+            mw_lutman = self.instr_LutMan_MW.get_instr()
+            mw_lutman.set_default_lutmap()
         except:
             print_exception()
             mw_lutman.set_default_lutmap()

@@ -44,7 +44,7 @@ class IPTransport(Transport):
 
     def __init__(self, host: str,
                  port: int = 5025,
-                 timeout = 30.0,
+                 timeout = 60.0,
                  snd_buf_size: int = 512 * 1024) -> None:
         """
         establish connection, e.g. IPTransport('192.168.0.16', 4000)

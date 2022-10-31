@@ -1329,6 +1329,11 @@ class DeviceCCL(Instrument):
                         phases=np.arange(0,360,20)+phase_offsets[i])
                 mw_lutman.load_waveforms_onto_AWG_lookuptable(
                     regenerate_waveforms=True)
+            # prepare_parked qubits
+            for q in parked_qbs:
+                fl_lm = self.find_instrument(q).instr_LutMan_Flux.get_instr()
+                fl_lm.load_waveform_onto_AWG_lookuptable(
+                    wave_id='park', regenerate_waveforms=True)
 
         # These are hardcoded angles in the mw_lutman for the AWG8
         # only x2 and x3 downsample_swp_points available
@@ -1462,12 +1467,12 @@ class DeviceCCL(Instrument):
     def measure_ssro_multi_qubit(
             self,
             qubits: list,
+            f_state: bool = False,
             nr_shots_per_case: int = 2**13,  # 8192
             prepare_for_timedomain: bool = True,
             result_logging_mode='raw',
             initialize: bool = False,
             analyze=True,
-            shots_per_meas: int = 2**16,
             label='Mux_SSRO',
             MC=None):
         """
@@ -1479,9 +1484,6 @@ class DeviceCCL(Instrument):
                 total number of measurements for each case under consideration
                     e.g., n*|00> , n*|01>, n*|10> , n*|11> for two qubits
 
-            shots_per_meas (int):
-                number of single shot measurements per single
-                acquisition with UHFQC
 
         """
         log.info("{}.measure_ssro_multi_qubit for qubits{}".format(self.name, qubits))
@@ -1491,7 +1493,10 @@ class DeviceCCL(Instrument):
         # nr_shots = nr_shots_per_case*nr_cases
 
         # off and on, not including post selection init measurements yet
-        nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
+        if f_state:
+            nr_cases = 3 ** len(qubits)
+        else:
+            nr_cases = 2 ** len(qubits)
 
         if initialize:
             nr_shots = 2 * nr_shots_per_case * nr_cases
@@ -1505,30 +1510,31 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
+        d = self.get_int_logging_detector(
+            qubits, result_logging_mode=result_logging_mode
+        )
+        # Check detector order
+        det_qubits = np.unique([ name.split(' ')[2]
+                    for name in d.value_names])
+        if not all(qubits != det_qubits):
+            # this occurs because the detector groups qubits per feedline.
+            # If you do not pay attention, this will mess up the analysis of
+            # this experiment.
+            print('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
+            qubits = det_qubits
+
         qubit_idxs = [self.find_instrument(qn).cfg_qubit_nr() for qn in qubits]
         p = mqo.multi_qubit_off_on(
             qubit_idxs,
             initialize=initialize,
-            second_excited_state=False,
+            second_excited_state=f_state,
             platf_cfg=self.cfg_openql_platform_fn(),
         )
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
-        # right is LSQ
-        d = self.get_int_logging_detector(
-            qubits, result_logging_mode=result_logging_mode
-        )
-
-        # This assumes qubit names do not contain spaces
-        det_qubits = [v.split()[-1] for v in d.value_names]
-        if (qubits != det_qubits) and (self.ro_acq_weight_type() == 'optimal'):
-            # this occurs because the detector groups qubits per feedline.
-            # If you do not pay attention, this will mess up the analysis of
-            # this experiment.
-            raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
 
         shots_per_meas = int(
-            np.floor(np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases
+            np.floor(np.min([2**20, nr_shots]) / nr_cases) * nr_cases
         )
 
         d.set_child_attr("nr_shots", shots_per_meas)
@@ -3128,25 +3134,29 @@ class DeviceCCL(Instrument):
     def measure_gate_process_tomography(
         self,
         meas_qubit: str,
-        gate_qubit: str,
+        gate_qubits: list,
         gate_name: str,
         gate_duration_ns: int,
         wait_after_gate_ns: int = 0,
         nr_shots_per_case: int = 2**14,
         prepare_for_timedomain: bool= True,
+        disable_metadata: bool = False,
         ):
         assert self.ro_acq_weight_type() != 'optimal', 'IQ readout required!'
         q_meas = self.find_instrument(meas_qubit)
-        q_gate = self.find_instrument(gate_qubit)
+        # q_gate = self.find_instrument(gate_qubit)
+        q_gate_idx = [self.find_instrument(q).cfg_qubit_nr() for q in gate_qubits]
+
         MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
-            if gate_qubit != meas_qubit: 
-                q_gate.prepare_for_timedomain()
+            # if gate_qubit != meas_qubit: 
+                # q_gate.prepare_for_timedomain()
+            self.prepare_for_timedomain(qubits=gate_qubits,prepare_for_readout=False)
             self.prepare_for_timedomain(qubits=[meas_qubit])
         # Experiment
         p = mqo.gate_process_tomograhpy(
                 meas_qubit_idx=q_meas.cfg_qubit_nr(),
-                gate_qubit_idx=q_gate.cfg_qubit_nr(),
+                gate_qubit_idx=q_gate_idx,
                 gate_name=gate_name,
                 gate_duration_ns=gate_duration_ns,
                 wait_after_gate_ns=wait_after_gate_ns,
@@ -3170,8 +3180,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.arange(nr_shots))
         MC.live_plot_enabled(False)
         try:
-            label = f'Gate_process_tomograhpy_gate_{gate_name}{gate_qubit}_{meas_qubit}'
-            MC.run(label+self.msmt_suffix, disable_snapshot_metadata=False)
+            label = f'Gate_process_tomograhpy_gate_{gate_name}_{meas_qubit}'
+            MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
         except:
             print_exception()
             MC.live_plot_enabled(True)
@@ -3306,7 +3316,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
         MC.run('Multi_AllXY_'+'_'.join(qubits))
-        a = ma2.Multi_AllXY_Analysis(qubits = qubits)
+        a = ma2.Multi_AllXY_Analysis()
 
         dev = 0
         for Q in qubits:
@@ -3843,7 +3853,18 @@ class DeviceCCL(Instrument):
         else:
             Tp = [lm.get(f'vcz_time_single_sq_{directions[0]}')*2 for lm in Flux_lm_0]
         assert len(Q0) == len(Tp)
-
+        #######################
+        # Load phase pulses
+        #######################
+        for i, q in enumerate(Q0):
+            # only on the CZ qubits we add the ef pulses 
+            mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+            lm = mw_lutman.LutMap()
+            # we hardcode the X on the ef transition to CW 31 here.
+            lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+            lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+            # load_phase_pulses will also upload other waveforms
+            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         # Wrapper function for conditional oscillation detector function.
         def wrapper(Q0, Q1,
                     prepare_for_timedomain,
@@ -3961,7 +3982,18 @@ class DeviceCCL(Instrument):
             Amps_park = [ lm.get('park_amp') for lm in Flux_lm_0 ]
             # List of current flux lutman channel gains
             Old_gains = [ lm.get('cfg_awg_channel_amplitude') for lm in Flux_lm_0]
-
+        ###########################
+        # Load phase pulses
+        ###########################
+        for i, q in enumerate(Q0):
+            # only on the CZ qubits we add the ef pulses 
+            mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+            lm = mw_lutman.LutMap()
+            # we hardcode the X on the ef transition to CW 31 here.
+            lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+            lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+            # load_phase_pulses will also upload other waveforms
+            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         # Wrapper function for conditional oscillation detector function.
         def wrapper(Q0, Q1,
                     prepare_for_timedomain,
@@ -4152,19 +4184,20 @@ class DeviceCCL(Instrument):
                 solve_for_phase_gate_model = solve_for_phase_gate_model,
                 extract_only = extract_only)
             if update_mw_phase:
-                for q in Q_target:
+                if type(mw_phase_param) is str:
+                    mw_phase_param = [mw_phase_param for q in Q_target]
+                for q, param in zip(Q_target, mw_phase_param):
                     # update single qubit phase
                     Q = self.find_instrument(q)
                     mw_lm = Q.instr_LutMan_MW.get_instr()
                     # Make sure mw phase parameter is valid
-                    assert mw_phase_param in mw_lm.parameters.keys()
+                    assert param in mw_lm.parameters.keys()
                     # Calculate new virtual phase
-                    phi0 = mw_lm.get(mw_phase_param)
+                    phi0 = mw_lm.get(param)
                     phi_new = list(a.qoi['Phase_model'][Q.name].values())[0]
                     phi = np.mod(phi0+phi_new, 360)
-                    mw_lm.set(mw_phase_param, phi)
-                    print(f'{Q.name}.{mw_phase_param} changed to {phi} deg.')
-
+                    mw_lm.set(param, phi)
+                    print(f'{Q.name}.{param} changed to {phi} deg.')
             return a.qoi
 
     def calibrate_parity_check_phase(
@@ -4665,7 +4698,7 @@ class DeviceCCL(Instrument):
             flux_cw_list: list,
             sim_measurement: bool,
             prepare_for_timedomain: bool=True,
-            repetitions: int=10,
+            repetitions: int=3,
             wait_time_before_flux: int = 0,
             wait_time_after_flux: int = 0,
             n_rounds = 1,
@@ -4732,7 +4765,7 @@ class DeviceCCL(Instrument):
             n_rounds = n_rounds,
             platf_cfg=self.cfg_openql_platform_fn())
 
-        uhfqc_max_avg = 2**17
+        uhfqc_max_avg = 2**20
         if sim_measurement:
             readouts_per_round = (3**n)*n_rounds+2**(n+1)
         else:

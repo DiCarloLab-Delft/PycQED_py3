@@ -224,7 +224,8 @@ def flipping(
                 k.y(qubit_idx)
             else:
                 k.x(qubit_idx)
-
+                # Should probably have an rx12 here 
+                # when doing ef flipping (Jorge)
             k.measure(qubit_idx)
         else:
             if equator:
@@ -1062,11 +1063,12 @@ def RO_QND_sequence(q_idx,
     
     return p
 
-def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:
+def butterfly(qubit_idx: int, f_state: bool, platf_cfg: str) -> OqlProgram:
     """
     Performs a 'butterfly' sequence on the qubit specified.
-        0:  prepz (RO) -      - RO - RO
+        0:  prepz (RO) - RO - RO
         1:  prepz (RO) - x180 - RO - RO
+        2:  prepz (RO) - x180 - rx12 - RO - RO
 
     Args:
         qubit_idx (int)  : index of the qubit
@@ -1079,20 +1081,28 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:
 
     k = p.create_kernel('0')
     k.prepz(qubit_idx)
-    if initialize:
-        k.measure(qubit_idx)
+    k.measure(qubit_idx)
     k.measure(qubit_idx)
     k.measure(qubit_idx)
     p.add_kernel(k)
 
     k = p.create_kernel('1')
     k.prepz(qubit_idx)
-    if initialize:
-        k.measure(qubit_idx)
-    k.x(qubit_idx)
+    k.measure(qubit_idx)
+    k.gate('rX180',[qubit_idx])
     k.measure(qubit_idx)
     k.measure(qubit_idx)
     p.add_kernel(k)
+
+    if f_state:
+        k = p.create_kernel('2')
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        k.gate('rX180',[qubit_idx])
+        k.gate('rx12',[qubit_idx])
+        k.measure(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
 
     p.compile()
 

@@ -470,6 +470,7 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
         cal_shots_dig[self.qubit]['0'] = [+1 if s < _thresh else -1 for s in Shots_0[:,0]]
         cal_shots_dig[self.qubit]['1'] = [+1 if s < _thresh else -1 for s in Shots_1[:,0]]
         Beta_matrix = _get_Beta_matrix(cal_shots_dig, n=1)
+        print(Beta_matrix)
         # Calculate expectation values for each state
         States = ['0', '1', '+', '-', '+i', '-i']
         Operators = ['Z', 'X', 'Y']

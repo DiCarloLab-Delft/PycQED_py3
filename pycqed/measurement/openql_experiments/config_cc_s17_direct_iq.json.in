@@ -5,7 +5,7 @@
     "eqasm_compiler" : "eqasm_backend_cc",
 
     "hardware_settings": {
-        "qubit_number": 20,
+        "qubit_number": 22,
         "cycle_time" : 20,        // in [ns]
 
         "eqasm_backend_cc": {
@@ -143,18 +143,18 @@
                         "io_module": "CC-CONN-DIO"
                     }
                 },
-                {
-                    "name": "ro_1",
-                    "qubits": [[0], [1], [2], [3], [7], [], [], [], []],
-                    "signal_type": "measure",
-                    "ref_instrument_definition": "zi-uhfqa",
-                    "ref_control_mode": "uhfqa-9ch",
-                    "controller": {
-                        "name": "cc",   // FIXME
-                        "slot": 1,
-                        "io_module": "CC-CONN-DIO"
-                    }
-                },
+                // {
+                //     "name": "ro_1",
+                //     "qubits": [[0], [1], [2], [3], [7], [], [], [], []],
+                //     "signal_type": "measure",
+                //     "ref_instrument_definition": "zi-uhfqa",
+                //     "ref_control_mode": "uhfqa-9ch",
+                //     "controller": {
+                //         "name": "cc",   // FIXME
+                //         "slot": 1,
+                //         "io_module": "CC-CONN-DIO"
+                //     }
+                // },
                 {
                     "name": "ro_2",
                     "qubits": [[4], [5], [9], [10], [14], [16], [], [], []],
@@ -169,7 +169,7 @@
                 },
                 {
                     "name": "ro_3",
-                    "qubits": [[8], [12], [13], [15], [], [], [], [], []],
+                    "qubits": [[0], [1], [2], [3], [7], [8], [12], [13], [15]],
                     "signal_type": "measure",
                     "ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
@@ -295,7 +295,7 @@
                 },
                 {
                     "name": "flux_2",
-                    "qubits": [[11], [], [], [], [], [], [], []],
+                    "qubits": [[11], [], [21], [20], [], [], [], []],
                     "signal_type": "flux",
                     "ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-flux",
@@ -359,8 +359,11 @@
         // LRU pulses
         "lru q16": ["barrier q16, q19", "cw_40 q19", "update_ph_LRU q16", "barrier q16, q19"],
         "lru q13": ["barrier q13, q17", "cw_40 q17", "update_ph_LRU q13", "barrier q13, q17"],
-        "lru q15": ["barrier q15, q18", "cw_40 q18", "update_ph_LRU q15", "barrier q15, q18"],
-        // "lru q3": ["barrier q3, q17", "cw_40 q17", "update_ph_LRU q3", "barrier q3, q17"],
+        // "lru q15": ["barrier q15, q18", "cw_40 q18", "update_ph_LRU q15", "barrier q15, q18"],
+        "lru q15": ["barrier q18", "cw_40 q18", "barrier q18"],
+        "lru q3" : ["barrier q3, q20", "sf_lru q20", "update_ph_LRU q3", "barrier q3, q20"],
+        // "lru q12": ["barrier q12, q21", "sf_lru q21", "update_ph_LRU q12", "barrier q12, q21"],
+        "lru q12": ["barrier q21", "sf_lru q21", "barrier q21"],
         
         // Updata by Hany [2021-06-01]
         // Individual CZ gates in Surface-17
@@ -2218,6 +2221,18 @@
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [7]
+            }
+        },
+
+
+        "sf_lru": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_se",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [1]
             }
         },
         // "sf_park q0": {

@@ -1,9 +1,8 @@
 from .base_lutman import Base_LutMan, get_redundant_codewords, get_wf_idx_from_name
-
 import numpy as np
 from collections.abc import Iterable
 from collections import OrderedDict
-
+from importlib import reload
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 
