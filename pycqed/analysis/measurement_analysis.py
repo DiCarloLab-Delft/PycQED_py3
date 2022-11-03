@@ -6351,6 +6351,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 textstr = format_value_string(
                     '$f_{{\mathrm{{center}}}}$', fit_res.params['f0'],
                     end_char='\n', unit=self.sweep_unit[0])
+                textstr += '$f_{\mathrm{min}}$: %.5f GHz\n' % (
+                self.min_frequency * scale)
                 textstr += format_value_string(
                     '$Qc$', fit_res.params['Qc'], end_char='\n')
                 textstr += format_value_string(
@@ -6394,7 +6396,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             textstr+=old_vals
 
 
-        fig.text(0.5, 0, textstr, transform=ax.transAxes,
+        fig.text(0.5, -0.15, textstr, transform=ax.transAxes,
                  fontsize=self.font_size,
                  verticalalignment='top',
                  horizontalalignment='center', bbox=self.box_props)
