@@ -7135,7 +7135,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 except:
                     label = None
 
-        fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
+        fig_dist.text(0.5, -0.15, label, transform=ax_dist.transAxes,
                       fontsize=self.font_size, verticalalignment='top',
                       horizontalalignment='center', bbox=self.box_props)
 
