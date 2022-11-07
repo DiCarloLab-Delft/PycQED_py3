@@ -1241,10 +1241,6 @@ class SHFQA(ZI_base_instrument, CalInterface):
         self.daq.set(f"/{self.devname}/raw/dios/0/error/timingcalib", 0)
         self.daq.set(f"/{self.devname}/raw/dios/0/error/timingclear", 1)
 
-        if value_same.count(0) != 1:
-            raise Exception(
-                f"DIO calibration failed! Expected a single edge in the sampling interval, got {value_same.count(0)}."
-            )
 
         if sampling_error.count(0) == 0:
             raise Exception("DIO calibration failed! No valid sampling points found")
