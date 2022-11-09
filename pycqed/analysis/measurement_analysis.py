@@ -1835,7 +1835,7 @@ class Rabi_Analysis(TD_Analysis):
                        ' $\pm$ (%.3g) ' % (self.rabi_amplitudes['piHalfPulse_std']) +
                        self.parameter_units[0] + old_vals)
 
-            self.fig.text(0.5, 0, textstr,
+            self.fig.text(0.5, -0.15, textstr,
                           transform=self.ax.transAxes, fontsize=self.font_size,
                           verticalalignment='top',
                           horizontalalignment='center', bbox=self.box_props)
@@ -2498,7 +2498,7 @@ class Echo_analysis_V15(TD_Analysis):
                        '\nartificial detuning = %.2g MHz'
                        % (art_det * 1e-6))
 
-            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+            fig.text(0.5, -0.15, textstr, fontsize=self.font_size,
                      transform=ax.transAxes,
                      verticalalignment='top',
                      horizontalalignment='center', bbox=self.box_props)
@@ -2756,7 +2756,7 @@ class Echo_analysis_V15(TD_Analysis):
                                     % (self.T2['T2_stderr'] * self.scale) +
                                     self.units)
 
-                    self.fig.text(0.5, 0, textstr_main, fontsize=self.font_size,
+                    self.fig.text(0.5, -0.15, textstr_main, fontsize=self.font_size,
                                   transform=self.axs[i].transAxes,
                                   verticalalignment='top',
                                   horizontalalignment='center', bbox=self.box_props)
@@ -4716,7 +4716,7 @@ class T1_Analysis(TD_Analysis):
                        ' $\pm$ {:.5f} '.format(T1_err_micro_sec) +
                        units + old_vals)
 
-            self.fig.text(0.5, 0, textstr, transform=self.ax.transAxes,
+            self.fig.text(0.5, -0.15, textstr, transform=self.ax.transAxes,
                           fontsize=self.font_size,
                           verticalalignment='top',
                           horizontalalignment='center',
@@ -4938,7 +4938,7 @@ class Ramsey_Analysis(TD_Analysis):
                        '\nartificial detuning = %.2g MHz'
                        % (art_det * 1e-6))
 
-            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+            fig.text(0.5, -0.15, textstr, fontsize=self.font_size,
                      transform=ax.transAxes,
                      verticalalignment='top',
                      horizontalalignment='center', bbox=self.box_props)
@@ -5202,7 +5202,7 @@ class Ramsey_Analysis(TD_Analysis):
                                     % (self.T2_star['T2_star_stderr'] * self.scale) +
                                     self.units)
 
-                    self.fig.text(0.5, 0, textstr_main, fontsize=self.font_size,
+                    self.fig.text(0.5, -0.15, textstr_main, fontsize=self.font_size,
                                   transform=self.axs[i].transAxes,
                                   verticalalignment='top',
                                   horizontalalignment='center', bbox=self.box_props)
