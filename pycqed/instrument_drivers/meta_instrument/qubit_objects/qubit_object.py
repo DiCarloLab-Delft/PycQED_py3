@@ -1374,7 +1374,7 @@ class Qubit(Instrument):
             return False
 
         # fine range around optimum
-        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.4, num=31)
+        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.6, num=31)
         a = self.measure_motzoi(motzois)
         opt_motzoi = a.optimal_motzoi
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
