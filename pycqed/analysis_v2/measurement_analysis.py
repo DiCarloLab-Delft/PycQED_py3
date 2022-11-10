@@ -86,7 +86,7 @@ from pycqed.analysis_v2.readout_analysis import (
 
 from pycqed.analysis_v2.multiplexed_readout_analysis import \
     Multiplexed_Readout_Analysis, Multiplexed_Transient_Analysis,\
-    Multiplexed_Weights_Analysis
+    Multiplexed_Weights_Analysis, Readout_sweep_analysis
 
 from pycqed.analysis_v2.parity_check_analysis import \
     Parity_Check_Analysis, Parity_Check_Analysis_OLD, Parity_Check_Fidelity_Analysis, Parity_Model_Optimization_Analysis
