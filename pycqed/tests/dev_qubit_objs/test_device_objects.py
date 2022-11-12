@@ -675,9 +675,10 @@ class Test_Device_obj(unittest.TestCase):
 
     # FIXME: add more tests, above just some random routines were added
 
-    # FIXME
+    def tearDown(self):
+        Instrument.close_all()
+
     @classmethod
     def tearDownClass(cls):
         Instrument.close_all()
-    # def tearDown(self):
-    #     Instrument.close_all()
+
