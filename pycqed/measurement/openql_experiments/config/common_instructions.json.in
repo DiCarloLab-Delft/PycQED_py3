@@ -1090,7 +1090,7 @@
         // just one random gate where we replace the "cc/signal" key by a decomposition into a 'wave' representation not unlike OpenPulse
         "__cz_sw_ne_park": {
             "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
-            "duration": 0,  //@FLUX_DURATION@,
+            "duration": 0,  //@FLUX_DURATION@, FIXME: must be set to schedule
             "decomposition": {
                 "when": "post-sched",
                 "into": [
@@ -1104,7 +1104,7 @@
 
 		// Native waveform gates:
 		"__play": {
-            "duration": @FLUX_DURATION@,    // FIXME
+            "duration": @FLUX_DURATION@,    // FIXME: depends on gate
 			"prototype": [
 				"Z:qubit",  // qubit, used as part 1 of port
 				"L:string", // part 2 of port
