@@ -580,6 +580,186 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
     p.compile()
     return p
 
+def depletion_FourXY(qubit_idx: int, 
+                    dummy_idx: int, 
+                    platf_cfg: str, 
+                    pi_pulse_wait_ns_array: np.ndarray,
+                    nr_repeat: int = 2):
+    """
+    Plays an ALLXY sequence in two settings without and with
+    a pre-measurement meant to assess depletion after the measurement.
+    :param qubit_idx: Pulse lookup reference index, usually uniquelly corresponds to qubit.
+    :param dummy_idx: Pulse lookup reference index (for dummy/virtual qubit).
+    :param platf_cfg: Platform specific string, passed to Oql program constructor.
+    :param pi_pulse_wait_ns: Wait delay that pushes (dummy_idx) pi pulse backwards compared to (dummy_idx) readout block barrier. In ns
+    :param nr_repeat: Integer number of repetitions for oql kernel.
+    """
+    p = OqlProgram("Depletion_FourXY", platf_cfg)
+
+    allxy_gates = [['i', 'i'],
+                   ['rx90', 'ry90'],
+                   ['ry90', 'rx90'], 
+                   ['rx180', 'i']]
+    gate_repeat_count: int = nr_repeat
+
+    for idx, pi_pulse_wait_ns in enumerate(pi_pulse_wait_ns_array):
+    # k = p.create_kernel(f'Depletion_FourXY_{idx}')
+    # pi_pulse_wait_ns = pi_pulse_wait_ns_array[0]
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_ref0_{idx}_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 0-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_meas0_{idx}_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 0-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.measure(dummy_idx)  # Qubit measured in |0>
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_ref1_{idx}_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 1-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate('rx180', [qubit_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_meas1_{idx}_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 1-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate('rx180', [qubit_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.measure(dummy_idx)  # Qubit measured in |1>
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+    
+    # p.add_kernel(k)
+
+    p.compile()
+    return p
+
+
+def FourXY(qubit_idx: int, 
+          dummy_idx: int, 
+          platf_cfg: str,
+          pi_pulse_wait_ns: int,
+          pi_pulse: bool = False,
+          nr_repeat: int = 2):
+    """
+    Plays an ALLXY sequence in two settings without and with
+    a pre-measurement meant to assess depletion after the measurement.
+    :param qubit_idx: Pulse lookup reference index, usually uniquelly corresponds to qubit.
+    :param dummy_idx: Pulse lookup reference index (for dummy/virtual qubit).
+    :param platf_cfg: Platform specific string, passed to Oql program constructor.
+    :param pi_pulse_wait_ns: Wait delay that pushes (dummy_idx) pi pulse backwards compared to (dummy_idx) readout block barrier. In ns
+    :param nr_repeat: Integer number of repetitions for oql kernel.
+    """
+    p = OqlProgram("Depletion_FourXY", platf_cfg)
+
+    allxy_gates = [['i', 'i'],
+                   ['rx90', 'ry90'],
+                   ['ry90', 'rx90'], 
+                   ['rx180', 'i']]
+    gate_repeat_count: int = nr_repeat
+
+
+    if not pi_pulse:
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_ref0_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 0-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_meas0_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 0-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.measure(dummy_idx)  # Qubit measured in |0>
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+    else:
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_ref1_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 1-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate('rx180', [qubit_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_meas1_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 1-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate('rx180', [qubit_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.measure(dummy_idx)  # Qubit measured in |1>
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+    
+
+    p.compile()
+    return p
+
 def T1(qubit_idx: int,
         platf_cfg: str,
         times: List[float],
