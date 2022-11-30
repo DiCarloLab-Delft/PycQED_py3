@@ -480,7 +480,7 @@ class QWGMultiDevices(DIO.CalInterface):
             qwg.stop()
 
         main_qwg = self.qwgs[0]
-        if main_qwg.dio_mode() is not 'MASTER':
+        if main_qwg.dio_mode() != 'MASTER':
             raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefore it is not possible the use it "
                              f"as base QWG for calibration of multiple QWGs.")
         main_qwg.dio_calibrate()

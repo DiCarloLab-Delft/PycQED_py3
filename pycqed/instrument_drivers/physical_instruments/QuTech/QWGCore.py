@@ -628,7 +628,7 @@ class QWGCore(SCPIBase, DIO.CalInterface):
         if nr_itr < 1:
             raise ValueError(f"Cannot calibration inputs: nr_itr needs to be positive; actual: {nr_itr}")
 
-        if target_index is not "":
+        if target_index != "":
             target_index = f",{target_index}"
 
         self._transport.write(f'DIO:CALibrate:PARam {meas_time},{nr_itr}{target_index}')

@@ -1859,7 +1859,7 @@ def conditional_oscillation_seq_multi(
             for dummy_i in range(cz_repetitions):
                 if not disable_cz:
                     # Parallel flux pulses below
-                    if flux_codeword is 'cz':
+                    if flux_codeword == 'cz':
                         for q0, q1 in zip(Q_idxs_target, Q_idxs_control):
                             k.gate(flux_codeword, [q0, q1])
                     else:
@@ -3757,7 +3757,7 @@ def Ramsey_tomo(
                 k.gate('rx180', [qS])
 
             k.barrier([])
-            if flux_codeword is 'cz':
+            if flux_codeword == 'cz':
                 k.gate(flux_codeword, qR + qC)
             else:
 
