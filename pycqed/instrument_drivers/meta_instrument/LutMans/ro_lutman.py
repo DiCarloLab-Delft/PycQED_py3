@@ -203,7 +203,7 @@ class Base_RO_LutMan(Base_LutMan):
             self.add_parameter(
                 'M_delay_R{}'.format(res),
                 unit='V',
-                vals=vals.Numbers(0, 500e-9),
+                vals=vals.Numbers(0, 3000e-9),
                 parameter_class=ManualParameter,
                 initial_value=0
             )
