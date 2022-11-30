@@ -13,6 +13,10 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon import
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import Base_LutMan
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman_config import (
+    FeedlineMapCollection,
+    read_ro_lutman_bit_map,
+)
 
 import pycqed.analysis.analysis_toolbox as a_tools
 from pycqed.measurement import measurement_control
@@ -111,14 +115,30 @@ class Test_Device_obj(unittest.TestCase):
         cls.mw_lutman.mw_modulation(100e6)
         cls.mw_lutman.sampling_rate(2.4e9)
 
+        # Configuration based resonator lookup table
+        feedline_map: str = 'S17'
+        map_collection: FeedlineMapCollection = read_ro_lutman_bit_map()  # Load from config
+
         cls.ro_lutman_0 = UHFQC_RO_LutMan("ro_lutman_0", feedline_number=0, feedline_map="S17", num_res=9)
         cls.ro_lutman_0.AWG(cls.UHFQC_0.name)
+        resonator_codeword_bit_mapping_fl0 = map_collection.get_bitmap(
+            map_id=feedline_map,
+            feedline_nr=0,
+        )
 
         cls.ro_lutman_1 = UHFQC_RO_LutMan("ro_lutman_1", feedline_number=1, feedline_map="S17", num_res=9)
         cls.ro_lutman_1.AWG(cls.UHFQC_1.name)
+        resonator_codeword_bit_mapping_fl1 = map_collection.get_bitmap(
+            map_id=feedline_map,
+            feedline_nr=1,
+        )
 
         cls.ro_lutman_2 = UHFQC_RO_LutMan("ro_lutman_2", feedline_number=2, feedline_map="S17", num_res=9)
         cls.ro_lutman_2.AWG(cls.UHFQC_2.name)
+        resonator_codeword_bit_mapping_fl2 = map_collection.get_bitmap(
+            map_id=feedline_map,
+            feedline_nr=2,
+        )
 
         # Assign instruments
         qubits = []
@@ -132,26 +152,15 @@ class Test_Device_obj(unittest.TestCase):
             q.instr_spec_source(cls.MW3.name)
 
             # map qubits to UHFQC, *must* match mapping inside Base_RO_LutMan (Yuk)
-            if 0:
-                if q_idx in [13, 16]:
-                    q.instr_acquisition(cls.UHFQC_0.name)
-                    q.instr_LutMan_RO(cls.ro_lutman_0.name)
-                elif q_idx in [1, 4, 5, 7, 8, 10, 11, 14, 15]:
-                    q.instr_acquisition(cls.UHFQC_1.name)
-                    q.instr_LutMan_RO(cls.ro_lutman_1.name)
-                elif q_idx in [0, 2, 3, 6, 9, 12]:
-                    q.instr_acquisition(cls.UHFQC_2.name)
-                    q.instr_LutMan_RO(cls.ro_lutman_2.name)
-            else:
-                if q_idx in [6, 11]:
-                    q.instr_acquisition(cls.UHFQC_0.name)
-                    q.instr_LutMan_RO(cls.ro_lutman_0.name)
-                elif q_idx in [0, 1, 2, 3, 7, 8, 12, 13, 15]:
-                    q.instr_acquisition(cls.UHFQC_1.name)
-                    q.instr_LutMan_RO(cls.ro_lutman_1.name)
-                elif q_idx in [4, 5, 9, 10, 14, 16]:
-                    q.instr_acquisition(cls.UHFQC_2.name)
-                    q.instr_LutMan_RO(cls.ro_lutman_2.name)
+            if q_idx in resonator_codeword_bit_mapping_fl0:
+                q.instr_acquisition(cls.UHFQC_0.name)
+                q.instr_LutMan_RO(cls.ro_lutman_0.name)
+            elif q_idx in resonator_codeword_bit_mapping_fl1:
+                q.instr_acquisition(cls.UHFQC_1.name)
+                q.instr_LutMan_RO(cls.ro_lutman_1.name)
+            elif q_idx in resonator_codeword_bit_mapping_fl2:
+                q.instr_acquisition(cls.UHFQC_2.name)
+                q.instr_LutMan_RO(cls.ro_lutman_2.name)
 
             # q.instr_VSM(cls.VSM.name)
             q.cfg_with_vsm(False)
@@ -668,10 +677,10 @@ class Test_Device_obj(unittest.TestCase):
     ##############################################
 
     def test_measure_two_qubit_randomized_benchmarking(self):
-        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
+        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q3", "q6"])
 
     def test_measure_two_qubit_allxy(self):
-        self.device.measure_two_qubit_allxy("q8", "q10", detector="int_avg")
+        self.device.measure_two_qubit_allxy("q3", "q6", detector="int_avg")
 
     # FIXME: add more tests, above just some random routines were added
 
