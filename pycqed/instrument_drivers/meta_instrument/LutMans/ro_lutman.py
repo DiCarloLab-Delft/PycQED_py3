@@ -1,5 +1,5 @@
 import numpy as np
-
+from typing import List
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -52,13 +52,15 @@ class Base_RO_LutMan(Base_LutMan):
     ):
         self._num_res = num_res
         self._feedline_number = feedline_number
+        self._resonator_codeword_bit_mapping: List[int] = kw.pop('force_bit_map', None)
 
-        # FIXME: we should not be aware of topology here
-        map_collection: FeedlineMapCollection = read_ro_lutman_bit_map()
-        self._resonator_codeword_bit_mapping = map_collection.get_bitmap(
-            map_id=feedline_map,
-            feedline_nr=self._feedline_number,
-        )
+        if self._resonator_codeword_bit_mapping is None:
+            # FIXME: we should not be aware of topology here
+            map_collection: FeedlineMapCollection = read_ro_lutman_bit_map()
+            self._resonator_codeword_bit_mapping = map_collection.get_bitmap(
+                map_id=feedline_map,
+                feedline_nr=self._feedline_number,
+            )
 
         # capping the resonator bit mapping in case a limited number of resonators is used
         self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self._num_res]
