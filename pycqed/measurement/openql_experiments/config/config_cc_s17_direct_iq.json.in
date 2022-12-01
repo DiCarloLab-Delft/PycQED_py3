@@ -364,9 +364,6 @@
         "cz q8,q10": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_cz_sw_ne_park q[8],q[10],q[11]"
             }
@@ -374,9 +371,6 @@
         "cz q10,q8": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "cz q[8],q[10]"
             }
@@ -385,9 +379,6 @@
         "cz q8,q11": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_cz_se_nw_park q[8],q[11],q[10]"
             }
@@ -395,9 +386,6 @@
         "cz q11,q8": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "cz q[8],q[11]"
             }
@@ -406,9 +394,6 @@
         "cz q11,q14": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_cz_sw_ne_park q[11],q[14],q[15]"
             }
@@ -416,9 +401,6 @@
         "cz q14,q11": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "cz q[11],q[14]"
             }
@@ -427,9 +409,6 @@
         "cz q10,q14": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_cz_se_nw q[10],q[14]"
             }
@@ -437,9 +416,6 @@
         "cz q14,q10": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "cz q[10],q[14]"
             }
@@ -448,9 +424,6 @@
         "cz q9,q11": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_cz_sw_ne_park q[9],q[11],q[12]"
             }
@@ -458,9 +431,6 @@
         "cz q11,q9": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "cz q[9],q[11]"
             }
@@ -469,9 +439,6 @@
         "cz q9,q12": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_cz_se_nw_park q[9],q[12],q[11]"
             }
@@ -479,9 +446,6 @@
         "cz q12,q9": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "cz q[9],q[12]"
             }
@@ -490,9 +454,6 @@
         "cz q11,q15": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_cz_se_nw_park q[11],q[15],q[14]"
             }
@@ -500,9 +461,6 @@
         "cz q15,q11": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "cz q[11],q[15]"
             }
@@ -511,9 +469,6 @@
         "cz q12,q15": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_cz_sw_ne q[12],q[15]"
             }
@@ -521,9 +476,6 @@
         "cz q15,q12": {
             "prototype": ["Z:qubit", "Z:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "cz q[12],q[15]"
             }
@@ -535,9 +487,6 @@
         "_fluxdance_conflict": {
             "prototype": [],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "{ cz q[8],q[10] | cz q[9],q[11] }" // FIXME: in custom instruction '_cz_sw_ne_park <Z:qubit> q[8], <Z:qubit> q[10], <I:qubit> q[11]': Signal conflict on instrument='flux_0', group=3, between '{type:idle_z,which:NE}' and '{type:park}'
             }
@@ -545,9 +494,6 @@
         "_fluxdance_1": {
             "prototype": [],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "{ cz q[10],q[8] | cz q[9],q[12] }"  // NB: both CZs park q[11]
             }
@@ -557,9 +503,6 @@
         "_test_rotate": {
            "prototype": ["X:qubit", "L:int"],
            "duration": @MW_DURATION@,
-           "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
            "decomposition": {
                "into": [  // FIXME: makes no real sense, and currently fails in backend
                     "if (op(1) < 45) {",
@@ -576,9 +519,6 @@
         "_test_decompose_2q_clifford": {
            "prototype": ["X:qubit", "X:qubit", "L:int"],
            "duration": @MW_DURATION@,  // FIXME: depends
-           "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
            "decomposition": {
                "into": [  // FIXME: currently fails in backend
                     "if (op(2) < 576) {",
@@ -594,9 +534,6 @@
         "_test_single_qubit_like_gates": {
            "prototype": ["X:qubit", "X:qubit", "L:int"],
            "duration": @MW_DURATION@,  // FIXME: depends
-           "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
            "decomposition": {
                "into": [  // FIXME: currently fails in backend
                 ]
@@ -605,9 +542,6 @@
         "_test_CNOT_like_gates": {
            "prototype": ["X:qubit", "X:qubit", "L:int"],
            "duration": @MW_DURATION@,  // FIXME: depends
-           "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
            "decomposition": {
                "into": [  // FIXME: currently fails in backend
                 ]

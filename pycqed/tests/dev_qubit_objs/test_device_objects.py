@@ -4,6 +4,7 @@ from pytest import approx
 import numpy as np
 import os
 import pathlib
+from typing import List
 
 import pycqed as pq
 
@@ -530,7 +531,7 @@ class Test_Device_obj(unittest.TestCase):
             assert isinstance(ch_det, UHFQC_input_average_detector)
 
         # Note that UHFQC_1 is first because q0 is the first in device.qubits
-        assert inp_avg_det.value_names == [
+        expected_value_names: List[str] = [
             "UHFQC_1 ch0",
             "UHFQC_1 ch1",
             "UHFQC_2 ch0",
@@ -538,6 +539,12 @@ class Test_Device_obj(unittest.TestCase):
             "UHFQC_0 ch0",
             "UHFQC_0 ch1",
         ]
+        for i, value_name in enumerate(inp_avg_det.value_names):
+            with self.subTest(i=i):
+                self.assertTrue(
+                    value_name in expected_value_names,
+                    msg=f'Expects {value_name} to be in {expected_value_names}'
+                )
 
     def test_prepare_ro_instantiate_detectors_int_avg_optimal(self):
         qubits = ["q11", "q16", "q1", "q5", "q0"]

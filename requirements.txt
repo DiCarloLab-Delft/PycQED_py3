@@ -1,4 +1,3 @@
-
 # WARNING:
 # `qutip` is a requirement for `pycqed` but its installation has issues for the
 # CI (Continuous Integration) of github (i.e. automatic tests in github)
@@ -8,7 +7,7 @@
 
 qcodes
 numpy
-Cython
+cython
 scipy
 cma
 hsluv
@@ -18,7 +17,6 @@ pyqtgraph<=0.12.4  # Sets version upperbound. Prevents test-failure for python 3
 matplotlib
 autodepgraph
 networkx
-qutechopenql>=0.10.3 # FIXME: install manually using "pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases"
 spirack
 zhinst
 zhinst-deviceutils; python_version > '3.6'
@@ -34,3 +32,10 @@ lmfit>=0.9.5
 pygsti==0.9.6  # FIXME: 0.9.7.5 breaks test_gst.py
 pyvisa>=1.8
 plotly<3.8  # FIXME: removing version constraint breaks test_gst.py
+pytest
+
+
+cmake
+wheel
+# Manually build from source.
+qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c  # Build from commit

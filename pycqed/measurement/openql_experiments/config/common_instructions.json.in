@@ -654,9 +654,6 @@
         "measure": {
             "prototype": ["M:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": "_do_measure op(0)"
             }
@@ -665,9 +662,6 @@
         "_measure q6": {
             "prototype": ["M:qubit"],
             "duration": 0,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            },
             "decomposition": {
                 "into": [
                     "rx12 q[6];",
@@ -860,10 +854,7 @@
         // additions for measurements using real time feedback
 		"_wait_uhfqa": {
             "prototype": ["U:qubit"],
-            "duration": 720,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            }
+            "duration": 720
         },
         "_dist_dsm": {
             "prototype": ["U:qubit"],
@@ -881,10 +872,7 @@
 		},
         "_wait_dsm": {
             "prototype": ["U:qubit"],
-            "duration": 280,
-            "cc": { // FIXME: key (and sub-keys) required, see issue #716
-                "signal": []
-            }
+            "duration": 280
         },
 
         // additions for pragma/break
