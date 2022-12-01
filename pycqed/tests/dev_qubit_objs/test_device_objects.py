@@ -121,28 +121,29 @@ class Test_Device_obj(unittest.TestCase):
 
         cls.ro_lutman_0 = UHFQC_RO_LutMan("ro_lutman_0", feedline_number=0, feedline_map="S17", num_res=9)
         cls.ro_lutman_0.AWG(cls.UHFQC_0.name)
-        resonator_codeword_bit_mapping_fl0 = map_collection.get_bitmap(
+        resonator_codeword_bit_mapping_fl0: List[int] = map_collection.get_bitmap(
             map_id=feedline_map,
             feedline_nr=0,
         )
 
         cls.ro_lutman_1 = UHFQC_RO_LutMan("ro_lutman_1", feedline_number=1, feedline_map="S17", num_res=9)
         cls.ro_lutman_1.AWG(cls.UHFQC_1.name)
-        resonator_codeword_bit_mapping_fl1 = map_collection.get_bitmap(
+        resonator_codeword_bit_mapping_fl1: List[int] = map_collection.get_bitmap(
             map_id=feedline_map,
             feedline_nr=1,
         )
 
         cls.ro_lutman_2 = UHFQC_RO_LutMan("ro_lutman_2", feedline_number=2, feedline_map="S17", num_res=9)
         cls.ro_lutman_2.AWG(cls.UHFQC_2.name)
-        resonator_codeword_bit_mapping_fl2 = map_collection.get_bitmap(
+        resonator_codeword_bit_mapping_fl2: List[int] = map_collection.get_bitmap(
             map_id=feedline_map,
             feedline_nr=2,
         )
 
         # Assign instruments
         qubits = []
-        for q_idx in range(17):
+        qubit_indices: List[int] = resonator_codeword_bit_mapping_fl0 + resonator_codeword_bit_mapping_fl1 + resonator_codeword_bit_mapping_fl2
+        for q_idx in qubit_indices:
             q = CCLight_Transmon("q{}".format(q_idx))
             qubits.append(q)
 
@@ -186,6 +187,10 @@ class Test_Device_obj(unittest.TestCase):
             q.mw_mixer_offs_GQ(0.2)
             q.mw_mixer_offs_DI(0.3)
             q.mw_mixer_offs_DQ(0.4)
+
+        # Store two qubit references for different feedlines to perform unit tests regardless of layout.
+        cls.qfl0 = Instrument.find_instrument(name=f'q{resonator_codeword_bit_mapping_fl0[0]}')
+        cls.qfl1 = Instrument.find_instrument(name=f'q{resonator_codeword_bit_mapping_fl1[0]}')
 
         # Set up the device object and set required params
         cls.device = do.DeviceCCL("device")
@@ -677,10 +682,10 @@ class Test_Device_obj(unittest.TestCase):
     ##############################################
 
     def test_measure_two_qubit_randomized_benchmarking(self):
-        self.device.measure_two_qubit_randomized_benchmarking(qubits=["q3", "q6"])
+        self.device.measure_two_qubit_randomized_benchmarking(qubits=[self.qfl0.name, self.qfl1.name])
 
     def test_measure_two_qubit_allxy(self):
-        self.device.measure_two_qubit_allxy("q3", "q6", detector="int_avg")
+        self.device.measure_two_qubit_allxy(self.qfl0.name, self.qfl1.name, detector="int_avg")
 
     # FIXME: add more tests, above just some random routines were added
 
