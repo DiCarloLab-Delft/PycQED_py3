@@ -61,6 +61,7 @@ import logging
 import inspect
 import numpy as np
 from typing import Tuple,List
+from importlib import reload
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQA_core as uhf
@@ -70,7 +71,7 @@ from qcodes.utils import validators
 from qcodes.utils.helpers import full_class
 
 log = logging.getLogger(__name__)
-
+reload(uhf)
 ##########################################################################
 # Exceptions
 ##########################################################################

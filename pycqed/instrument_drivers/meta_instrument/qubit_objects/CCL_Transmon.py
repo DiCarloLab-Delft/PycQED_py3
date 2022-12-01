@@ -34,6 +34,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 import pycqed.measurement.composite_detector_functions as cdf
 import pytest
+from math import ceil
 
 import cma
 from pycqed.measurement.optimization import nelder_mead
@@ -415,6 +416,10 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_ef_amp',
                            label='Pi-pulse amplitude ef-transition', unit='V',
+                           initial_value=.4,
+                           parameter_class=ManualParameter)
+        self.add_parameter('mw_fh_amp',
+                           label='Pi-pulse amplitude fh-transition', unit='V',
                            initial_value=.4,
                            parameter_class=ManualParameter)
 
@@ -810,11 +815,18 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('asymmetry', unit='',
                            docstring='Asymmetry parameter of the SQUID loop',
                            initial_value=0,
-
                            parameter_class=ManualParameter)
         self.add_parameter('anharmonicity', unit='Hz',
                            label='Anharmonicity',
                            docstring='Anharmonicity, negative by convention',
+                           parameter_class=ManualParameter,
+                           # typical target value
+                           initial_value=-300e6,
+                           vals=vals.Numbers())
+        self.add_parameter('anharmonicity_3state', unit='Hz',
+                           label='Anharmonicity_3state',
+                           docstring='Anharmonicity of 3rd state (f23-f01),'+\
+                                     ' negative by convention',
                            parameter_class=ManualParameter,
                            # typical target value
                            initial_value=-300e6,
@@ -1292,13 +1304,17 @@ class CCLight_Transmon(Qubit):
 
         # used for ef pulsing
         MW_LutMan.mw_ef_amp180(self.mw_ef_amp())
+        MW_LutMan.mw_fh_amp180(self.mw_fh_amp())
         # MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
         #                            self.anharmonicity())
         if MW_LutMan.cfg_sideband_mode() != 'real-time':
           MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
                                    self.anharmonicity())
+          MW_LutMan.mw_fh_modulation(MW_LutMan.mw_modulation() +
+                                   self.anharmonicity_3state())
         else:
           MW_LutMan.mw_ef_modulation(self.anharmonicity())
+          MW_LutMan.mw_fh_modulation(self.anharmonicity_3state())
 
         # 3. Does case-dependent things:
         #                mixers offset+skewness
@@ -2219,16 +2235,24 @@ class CCLight_Transmon(Qubit):
         LutMan = self.instr_LutMan_RO.get_instr()
         LutMan.mixer_apply_predistortion_matrix(True)
         MC = self.instr_MC.get_instr()
+        # S1 = swf.lutman_par_UHFQC_dig_trig(
+        #     LutMan, LutMan.mixer_alpha, single=False, run=True)
+        # S2 = swf.lutman_par_UHFQC_dig_trig(
+        #     LutMan, LutMan.mixer_phi, single=False, run=True)
         S1 = swf.lutman_par_UHFQC_dig_trig(
-            LutMan, LutMan.mixer_alpha, single=False, run=True)
+            LutMan=LutMan,
+            LutMan_parameter=LutMan.parameters['mixer_alpha'],
+            single=False, run=True)
         S2 = swf.lutman_par_UHFQC_dig_trig(
-            LutMan, LutMan.mixer_phi, single=False, run=True)
+            LutMan=LutMan,
+            LutMan_parameter=LutMan.parameters['mixer_phi'],
+            single=False, run=True)
 
         detector = det.Signal_Hound_fixed_frequency(
             self.instr_SH.get_instr(), 
             frequency=self.ro_freq() - 2*self.ro_freq_mod(),
-            Navg=5, delay=0.0, 
-            prepare_for_each_point=False)
+            Navg=5, delay=0,
+            prepare_for_each_point=True)
 
         ad_func_pars = {'adaptive_function': nelder_mead,
                         'x0': [1.0, 0.0],
@@ -3790,6 +3814,7 @@ class CCLight_Transmon(Qubit):
             self, 
             MC=None,
             f_state: bool = False,
+            h_state: bool = False,
             prepare: bool = True, 
             no_figs: bool = False,
             post_select: bool = False,
@@ -3846,6 +3871,8 @@ class CCLight_Transmon(Qubit):
         pulse_comb = 'off_on'
         if f_state:
             pulse_comb += '_two'
+        if h_state:
+            pulse_comb += '_three'
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(),
             pulse_comb=pulse_comb,
@@ -3874,6 +3901,7 @@ class CCLight_Transmon(Qubit):
             qubit_freq=self.freq_qubit(),
             heralded_init=post_select,
             f_state=f_state,
+            h_state=h_state,
             extract_only=no_figs)
         ####################################
         # SSRO Analysis (Old and deprecated)
@@ -4185,7 +4213,8 @@ class CCLight_Transmon(Qubit):
             self.ro_freq(opt_freq)
             self.ro_pulse_amp(opt_amp)
 
-    def measure_msmt_butterfly(self,
+    def measure_msmt_butterfly(
+            self,
             prepare_for_timedomain: bool = True,
             calibrate_optimal_weights: bool = False,
             nr_max_acq: int = 2**17,
@@ -4208,18 +4237,16 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
 
         d = self.int_log_det
-        # the msmt butterfly sequence has 2 or 3 measurements,
+        # the msmt butterfly sequence has 3 measurements per state,
         # therefore we need to make sure the number of shots is a multiple of that
-        uhfqc_max_avg = min(max(2**10, nr_max_acq), 2**17)
+        uhfqc_max_avg = min(max(2**10, nr_max_acq), 2**20)
 
         if f_state:
-            nr_measurements = 9
+            nr_measurements = 12
         else:
-            nr_measurements = 6
-            
+            nr_measurements = 8
 
-        
-        nr_shots: int = int(uhfqc_max_avg/nr_measurements) * nr_measurements
+        nr_shots = int((uhfqc_max_avg//nr_measurements) * nr_measurements)
         d.nr_shots = nr_shots
         p = sqo.butterfly(
             f_state = f_state,
@@ -4235,15 +4262,15 @@ class CCLight_Transmon(Qubit):
         MC.live_plot_enabled(False)
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
+        print(nr_shots)
         MC.set_detector_function(d)
         MC.run(
-            f"Measurement_butterfly_{self.name}",
+            f"Measurement_butterfly_{self.name}_{f_state}",
             disable_snapshot_metadata=disable_metadata
         )
         a = ma2.ra.measurement_butterfly_analysis(
             qubit=self.name,
             label='butterfly',
-            cycle=nr_measurements,
             f_state=f_state,
             extract_only=no_figs)
         return a.qoi
@@ -4684,7 +4711,7 @@ class CCLight_Transmon(Qubit):
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(21*2*3))
+        MC.set_sweep_points(np.arange(21*2*6))
         MC.set_detector_function(d)
         MC.run('Depletion_AllXY'+self.msmt_suffix+label,
                disable_snapshot_metadata=disable_metadata)
@@ -6416,11 +6443,14 @@ class CCLight_Transmon(Qubit):
                            amps: list = np.linspace(0, .8, 18),
                            anharmonicity: list = np.arange(-275e6,-326e6,-5e6),
                            recovery_pulse: bool = True,
+                           measure_3rd_state: bool = False,
                            MC=None, label: str = '',
                            analyze=True, close_fig=True,
                            prepare_for_timedomain=True):
         """
         Measures a rabi oscillation of the ef/12 transition.
+        Can also be used for fh/23 transition with flag <measure_3rd_state>
+        (This requires a calibrated 12 pulse). 
 
         Modulation frequency of the "ef" pusles is controlled through the
         `anharmonicity` parameter of the qubit object.
@@ -6438,6 +6468,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.ef_rabi_seq(
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
+            measure_3rd_state=measure_3rd_state,
             platf_cfg=self.cfg_openql_platform_fn())
 
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -6452,7 +6483,11 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points_2D(anharmonicity)
         MC.set_detector_function(d)
         try:
-            MC.run('ef_rabi_2D'+label+self.msmt_suffix, mode='2D')
+            if measure_3rd_state:
+                _title = 'fh_rabi_2D'
+            else:
+                _title = 'ef_rabi_2D'
+            MC.run(_title+label+self.msmt_suffix, mode='2D')
         except:
             print_exception()
             mw_lutman.set_default_lutmap()
@@ -6464,6 +6499,7 @@ class CCLight_Transmon(Qubit):
                         amps: list = np.linspace(0, .8, 18),
                         recovery_pulse: bool = True,
                         MC=None, label: str = '',
+                        measure_3rd_state: bool = False,
                         analyze=True, close_fig=True,
                         prepare_for_timedomain=True):
         """
@@ -6485,6 +6521,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.ef_rabi_seq(
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
+            measure_3rd_state = measure_3rd_state,
             platf_cfg=self.cfg_openql_platform_fn(),
             add_cal_points = True)
 
@@ -6498,19 +6535,24 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
         mw_lutman = self.instr_LutMan_MW.get_instr()
         try:
-            MC.run('ef_rabi'+label+self.msmt_suffix)
+            if measure_3rd_state:
+                _title = 'fh_rabi'
+            else:
+                _title = 'ef_rabi'
+            MC.run(_title+label+self.msmt_suffix)
             mw_lutman.set_default_lutmap()
         except:
             print_exception()
             mw_lutman.set_default_lutmap()
         if analyze:
-            a2 = ma2.EFRabiAnalysis(close_figs=True, label='ef_rabi')
+            a2 = ma2.EFRabiAnalysis(close_figs=True, label=_title)
             return a2
 
     def calibrate_ef_rabi(self,
                         amps: list = np.linspace(-.8, .8, 18),
                         recovery_pulse: bool = True,
                         MC=None, label: str = '',
+                        measure_3rd_state: bool = False,
                         analyze=True, close_fig=True,
                         prepare_for_timedomain=True, update=True):
         """
@@ -6526,6 +6568,7 @@ class CCLight_Transmon(Qubit):
             a2 = self.measure_ef_rabi(amps = amps,
                     recovery_pulse = recovery_pulse,
                     MC = MC, label = label,
+                    measure_3rd_state = measure_3rd_state,
                     analyze = analyze, close_fig = close_fig,
                     prepare_for_timedomain = prepare_for_timedomain)
             mw_lutman = self.instr_LutMan_MW.get_instr()
@@ -6535,7 +6578,10 @@ class CCLight_Transmon(Qubit):
             mw_lutman.set_default_lutmap()
         if update:
             ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
-            self.mw_ef_amp(a2.proc_data_dict['ef_pi_amp'])
+            if measure_3rd_state:
+                self.mw_fh_amp(a2.proc_data_dict['ef_pi_amp'])
+            else:
+                self.mw_ef_amp(a2.proc_data_dict['ef_pi_amp'])
 
     def measure_gst_1Q(self,
                        shots_per_meas: int,
@@ -6701,6 +6747,7 @@ class CCLight_Transmon(Qubit):
     def measure_LRU_experiment(self,
             nr_shots_per_case: int = 2**13,
             heralded_init: bool = False,
+            h_state: bool = False,
             prepare_for_timedomain: bool = True,
             reduced_prepare: bool = False,
             analyze: bool = True,
@@ -6713,17 +6760,33 @@ class CCLight_Transmon(Qubit):
         assert 'IQ' in self.ro_acq_weight_type(), 'IQ readout is required!'
         MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
+            mwl = self.instr_LutMan_MW.get_instr()
+            mwl.set_default_lutmap()
             if reduced_prepare:
                 self._prep_LRU_pulses()
             else:
                 self.prepare_for_timedomain()
-        # Experiment
-        nr_shots = (4)*nr_shots_per_case
+        # Set UHF number of shots
+        from math import ceil
+        shots_per_exp = 4
+        if h_state:
+            shots_per_exp += 2
+        nr_shots = (shots_per_exp)*nr_shots_per_case
         if heralded_init:
             nr_shots *= 2 
+        uhfqc_max_shots = 2**20
+        if nr_shots < uhfqc_max_shots:
+            # all shots can be acquired in a single UHF run
+            shots_per_run = nr_shots
+        else:
+            # Number of UHF acquisition runs
+            nr_runs = ceil(nr_shots/uhfqc_max_shots) 
+            shots_per_run = int((nr_shots/nr_runs)/shots_per_exp)*shots_per_exp
+            nr_shots = nr_runs*shots_per_run
         p = sqo.LRU_experiment(
             qubit_idx=self.cfg_qubit_nr(),
             LRU_duration_ns=self.LRU_duration()*1e9,
+            h_state=h_state,
             heralded_init=heralded_init,
             platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -6734,17 +6797,90 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
-        d.nr_shots = nr_shots
+        d.nr_shots = shots_per_run
         MC.set_detector_function(d)
         MC.live_plot_enabled(False)
         label = 'LRU_experiment'
+        if h_state:
+            label += '_h_state'
         MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(True)
         # Analysis
         if analyze:
             a = ma2.lrua.LRU_experiment_Analysis(qubit=self.name,
+                                                 h_state=h_state,
                                                  heralded_init=heralded_init)
             return a.qoi
+
+    def measure_LRU_repeated_experiment(self,
+            rounds: int = 50,
+            injected_leak: float = 0.02,
+            leak_3rd_state: bool = False,
+            nr_shots_per_case: int = 2**13,
+            prepare_for_timedomain: bool = True,
+            analyze: bool = True,
+            disable_metadata: bool = False):
+        '''
+        Function to measure 2-state fraction removed by LRU pulse.
+        '''
+        assert self.instr_LutMan_LRU() != None, 'LRU lutman is required.'
+        assert self.ro_acq_digitized() == False, 'Analog readout required'
+        assert 'IQ' in self.ro_acq_weight_type(), 'IQ readout is required!'
+        MC = self.instr_MC.get_instr()
+        # Convert leakage into angle
+        theta = 2*np.arcsin(np.sqrt(2*injected_leak))/np.pi*180
+        if prepare_for_timedomain:
+            # Configure lutmap
+            mwl = self.instr_LutMan_MW.get_instr()
+            mwl.set_default_lutmap()
+            lutmap = mwl.LutMap()
+            if leak_3rd_state:
+                lutmap[10] = {'name': 'leak', 'theta': theta, 'phi': 0, 'type': 'fh'}
+            else:
+                lutmap[10] = {'name': 'leak', 'theta': theta, 'phi': 0, 'type': 'ef'}
+            mwl.LutMap(lutmap)
+            self.prepare_for_timedomain()
+        # Set UHF number of shots
+        from math import ceil
+        _cycle = 2*rounds+4
+        nr_shots = _cycle*nr_shots_per_case
+        # if heralded_init:
+        #     nr_shots *= 2 
+        uhfqc_max_shots = 2**20
+        if nr_shots < uhfqc_max_shots:
+            # all shots can be acquired in a single UHF run
+            shots_per_run = nr_shots
+        else:
+            # Number of UHF acquisition runs
+            nr_runs = ceil(nr_shots/uhfqc_max_shots) 
+            shots_per_run = int((nr_shots/nr_runs)/_cycle)*_cycle
+            nr_shots = nr_runs*shots_per_run
+        # Compile sequence
+        p = sqo.LRU_repeated_experiment(
+            qubit_idx=self.cfg_qubit_nr(),
+            LRU_duration_ns=self.LRU_duration()*1e9,
+            leak_3rd_state=leak_3rd_state,
+            rounds=rounds,
+            heralded_init=False,
+            platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Shot', unit='#',
+                             upload=True)
+        MC.soft_avg(1)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        d = self.int_log_det
+        d.nr_shots = shots_per_run
+        MC.set_detector_function(d)
+        MC.live_plot_enabled(False)
+        label = 'Repeated_LRU_experiment'
+        MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
+        MC.live_plot_enabled(True)
+        # Analysis
+        if analyze:
+            a = ma2.lrua.Repeated_LRU_experiment_Analysis(
+                qubit=self.name, rounds=rounds, label='Repeated_LRU')
 
     def measure_LRU_process_tomo(self,
             nr_shots_per_case: int = 2**15,
@@ -6797,7 +6933,6 @@ class CCLight_Transmon(Qubit):
             mw_lm = self.instr_LutMan_MW.get_instr()
             phase = mw_lm.LRU_virtual_q_ph_corr()
             mw_lm.LRU_virtual_q_ph_corr(np.mod(phase-angle, 360))
-
     ###########################################################################
     # Dep graph check functions
     ###########################################################################

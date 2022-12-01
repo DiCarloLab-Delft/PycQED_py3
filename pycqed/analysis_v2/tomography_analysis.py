@@ -150,6 +150,9 @@ def _get_expected_value(operator, state, n):
             m *= -1
     return m
 
+def _PTM_fidelity(R, R_id):
+    return (np.trace(np.matmul(np.transpose(R_id), R))/2+1)/3
+
 def _gen_M_matrix(n):
     # List of different Operators
     ops = ['I','Z']
@@ -318,7 +321,7 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
         _shots_0 = _raw_shots[36::_cycle]
         _shots_1 = _raw_shots[37::_cycle]
         if self.f_state:
-	        _shots_2 = _raw_shots[38::_cycle]
+            _shots_2 = _raw_shots[38::_cycle]
         # Rotate data
         center_0 = np.array([np.mean(_shots_0[:,0]), np.mean(_shots_0[:,1])])
         center_1 = np.array([np.mean(_shots_1[:,0]), np.mean(_shots_1[:,1])])
@@ -328,8 +331,8 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['shots_0_IQ'] = Shots_0
         self.proc_data_dict['shots_1_IQ'] = Shots_1
         if self.f_state:
-        	Shots_2 = raw_shots[38::_cycle]
-	        self.proc_data_dict['shots_2_IQ'] = Shots_2
+            Shots_2 = raw_shots[38::_cycle]
+            self.proc_data_dict['shots_2_IQ'] = Shots_2
         # Use classifier for data
         data = np.concatenate((Shots_0, Shots_1, Shots_2))
         labels = [0 for s in Shots_0]+[1 for s in Shots_1]+[2 for s in Shots_2]
@@ -462,7 +465,7 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
         _thresh = self.proc_data_dict['projection_01']['threshold']
         
         if self.post_select_2state and self.f_state:
-                _dig_shots = clf.predict(raw_shots)
+            _dig_shots = clf.predict(raw_shots)
         else:
             _dig_shots = [0 if s < _thresh else 1 for s in raw_shots[:,0]]
         # Beta matrix for readout corrections
@@ -470,7 +473,6 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
         cal_shots_dig[self.qubit]['0'] = [+1 if s < _thresh else -1 for s in Shots_0[:,0]]
         cal_shots_dig[self.qubit]['1'] = [+1 if s < _thresh else -1 for s in Shots_1[:,0]]
         Beta_matrix = _get_Beta_matrix(cal_shots_dig, n=1)
-        print(Beta_matrix)
         # Calculate expectation values for each state
         States = ['0', '1', '+', '-', '+i', '-i']
         Operators = ['Z', 'X', 'Y']
@@ -545,14 +547,18 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
             angle_xy = np.arctan2(PTM[1,2], PTM[1,1])*180/np.pi
             angle_xz = np.arctan2(PTM[1,3], PTM[1,1])*180/np.pi
             angle_yz = np.arctan2(PTM[2,3], PTM[2,2])*180/np.pi
+            # angle_xy = np.degrees(np.arcsin(PTM[2,1]))
+            # angle_xz = np.degrees(np.arcsin(PTM[1,3]))
+            # angle_yz = np.degrees(np.arcsin(PTM[3,2]))
             angle_dict = {'xy':angle_xy, 'xz':angle_xz, 'yz':angle_yz}
             return angle_dict
         Angle_dict_idle = _get_PTM_angles(PTM_idle)
         Angle_dict_gate = _get_PTM_angles(PTM_gate)
         # get ideal PTM with same angle and
         # calculate fidelity of extracted PTM.
-        # PTM_id = np.eye(4)
-        # F_PTM_idle = _PTM_fidelity(PTM_idle, PTM_id)
+        PTM_id = np.eye(4)
+        F_PTM_idle = _PTM_fidelity(PTM_idle, PTM_id)
+        F_PTM_gate = _PTM_fidelity(PTM_gate, PTM_id)
         # PTM_id = _PTM_angle(angle_p)
         # F_PTM_rotated = _PTM_fidelity(PTM, PTM_id)
         # self.proc_data_dict['PS_frac'] = leak_frac
@@ -560,6 +566,8 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['Density_matrices_idle'] = Density_matrices_idle
         self.proc_data_dict['Density_matrices_gate'] = Density_matrices_gate
         self.proc_data_dict['PTM_idle'] = PTM_idle
+        self.proc_data_dict['F_PTM_idle'] = F_PTM_idle
+        self.proc_data_dict['F_PTM_gate'] = F_PTM_gate
         self.proc_data_dict['PTM_gate'] = PTM_gate
         self.proc_data_dict['PTM_angles_idle'] = Angle_dict_idle
         self.proc_data_dict['PTM_angles_gate'] = Angle_dict_gate
@@ -641,6 +649,8 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
             'ax_id': 'Pauli_transfer_matrix_Idle',
             'R': self.proc_data_dict['PTM_idle'],
             'R_angles': self.proc_data_dict['PTM_angles_idle'],
+            'F_PTM_gate':self.proc_data_dict['F_PTM_gate'],
+            'F_PTM_idle':self.proc_data_dict['F_PTM_idle'],
             'title': f'PTM of qubit {self.qubit} after idle',
             'qubit': self.qubit,
             'timestamp': self.timestamp
@@ -654,6 +664,8 @@ class Gate_process_tomo_Analysis(ba.BaseDataAnalysis):
             'ax_id': 'Pauli_transfer_matrix_Gate',
             'R': self.proc_data_dict['PTM_gate'],
             'R_angles': self.proc_data_dict['PTM_angles_gate'],
+            'F_PTM_gate':self.proc_data_dict['F_PTM_gate'],
+            'F_PTM_idle':self.proc_data_dict['F_PTM_idle'],
             'title': f'PTM of qubit {self.qubit} after gate',
             'qubit': self.qubit,
             'timestamp': self.timestamp
@@ -737,23 +749,36 @@ def ssro_IQ_projection_plotfn(
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     axs[0].add_patch(circle_2)
     # Plot classifier zones
-    from matplotlib import colors
+    from matplotlib.patches import Polygon
     _all_shots = np.concatenate((shots_0, shots_1))
     _lim = np.max([ np.max(np.abs(_all_shots[:,0]))*1.1, np.max(np.abs(_all_shots[:,1]))*1.1 ])
-    X, Y = np.meshgrid(np.linspace(-_lim, _lim, 1001), np.linspace(-_lim, _lim, 1001))
-    pred_labels = classifier.predict(np.c_[X.ravel(), Y.ravel()])
-    pred_labels = pred_labels.reshape(X.shape)
-    cmap = colors.LinearSegmentedColormap.from_list("", ["C0","C3","C2"])
-    cs = axs[0].contourf(X, Y, pred_labels, cmap=cmap, alpha=0.2)
-    # Plot decision boundary
+    Lim_points = {}
     for bound in ['01', '12', '02']:
+        dec_bounds['mean']
         _x0, _y0 = dec_bounds['mean']
         _x1, _y1 = dec_bounds[bound]
         a = (_y1-_y0)/(_x1-_x0)
         b = _y0 - a*_x0
         _xlim = 1e2*np.sign(_x1-_x0)
         _ylim = a*_xlim + b
-        axs[0].plot([_x0, _xlim], [_y0, _ylim], 'k--', lw=1)
+        Lim_points[bound] = _xlim, _ylim
+    # Plot 0 area
+    _points = [dec_bounds['mean'], Lim_points['01'], Lim_points['02']]
+    _patch = Polygon(_points, color='C0', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot 1 area
+    _points = [dec_bounds['mean'], Lim_points['01'], Lim_points['12']]
+    _patch = Polygon(_points, color='C3', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot 2 area
+    _points = [dec_bounds['mean'], Lim_points['02'], Lim_points['12']]
+    _patch = Polygon(_points, color='C2', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot decision boundary
+    for bound in ['01', '12', '02']:
+        _x0, _y0 = dec_bounds['mean']
+        _x1, _y1 = Lim_points[bound]
+        axs[0].plot([_x0, _x1], [_y0, _y1], 'k--', lw=1)
     axs[0].set_xlim(-_lim, _lim)
     axs[0].set_ylim(-_lim, _lim)
     axs[0].legend(frameon=False)
@@ -954,6 +979,8 @@ def density_matrices_plotfn(
 def PTM_plotfn(
     R,
     R_angles,
+    F_PTM_gate,
+    F_PTM_idle,
     timestamp,
     qubit, 
     ax,
@@ -987,7 +1014,9 @@ def PTM_plotfn(
         text = '\n'.join(('PTM rotation angles',
                           '$\phi_{xy}=$'+f'{R_angles["xy"]:.1f} deg.',
                           '$\phi_{xz}=$'+f'{R_angles["xz"]:.1f} deg.',
-                          '$\phi_{yz}=$'+f'{R_angles["yz"]:.1f} deg.'))
+                          '$\phi_{yz}=$'+f'{R_angles["yz"]:.1f} deg.',))
+                          # f'$F_\mathrm{"{idle}"}=$'+f'{F_PTM_idle*100:.1f} %.',
+                          # f'$F_\mathrm{"{gate}"}=$'+f'{F_PTM_gate*100:.1f} %.',))
         props = dict(boxstyle='round', facecolor='white', alpha=1)
         ax.text(1.05, 1., text, transform=ax.transAxes,
                 verticalalignment='top', bbox=props)

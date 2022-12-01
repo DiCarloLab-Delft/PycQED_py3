@@ -905,6 +905,18 @@ def _get_threshold(Shots_0, Shots_1):
     Fid, threshold = _calculate_fid_and_threshold(x0, n0, x1, n1)
     return threshold
 
+def _gauss_pdf(x, x0, sigma):
+    return np.exp(-((x-x0)/sigma)**2/2)
+
+def double_gauss(x, x0, x1, sigma0, sigma1, A, r):
+    _dist0 = A*( (1-r)*_gauss_pdf(x, x0, sigma0) + r*_gauss_pdf(x, x1, sigma1) )
+    return _dist0
+
+def _double_gauss_joint(x, x0, x1, sigma0, sigma1, A0, A1, r0, r1):
+    _dist0 = double_gauss(x, x0, x1, sigma0, sigma1, A0, r0)
+    _dist1 = double_gauss(x, x1, x0, sigma1, sigma0, A1, r1)
+    return np.concatenate((_dist0, _dist1))
+
 def _fit_double_gauss(x_vals, hist_0, hist_1):
     '''
     Fit two histograms to a double gaussian with
@@ -990,7 +1002,12 @@ def _decision_boundary_points(coefs, intercepts):
     points = {}
     # Cycle through model coeficients
     # and intercepts.
-    for i, j in [[0,1], [1,2], [0,2]]:
+    n = len(intercepts)
+    if n == 3:
+        _bounds = [[0,1], [1,2], [0,2]]
+    if n == 4:
+        _bounds = [[0,1], [1,2], [2,3], [0,3]]
+    for i, j in _bounds:
         c_i = coefs[i]
         int_i = intercepts[i]
         c_j = coefs[j]
@@ -1011,24 +1028,32 @@ def _rotate_and_center_data(I, Q, vec0, vec1, phi=0):
     proc = np.dot(rot_matrix, proc)
     return proc.transpose()
 
-def _calculate_deffect_rate(Shots, n_rounds):
+def _calculate_deffect_rate(Shots, n_rounds, with_reset=False):
     '''
     Shots must be a dictionary with format:
                                   |<---nr_shots--->|
     Shots['round <i>'] = np.array([0/1,......., 0/1])
     '''
-    # M array is measured data
-    # P array is parity data
-    # D array is defect data
     Deffect_rate = {}
     nr_shots = len(Shots['round 1'])
-    M_values = np.ones((nr_shots, n_rounds))
-    for r in range(n_rounds):
-        # Convert to +1 and -1 values
-        M_values[:,r] *= 1-2*(Shots[f'round {r+1}']) 
+    if not with_reset:
+        # M array is measured data
+        # P array is parity data
+        # D array is defect data
+        M_values = np.ones((nr_shots, n_rounds))
+        for r in range(n_rounds):
+            # Convert to +1 and -1 values
+            M_values[:,r] *= 1-2*(Shots[f'round {r+1}']) 
 
-    P_values = np.hstack( (np.ones((nr_shots, 2)), M_values) )
-    P_values = P_values[:,1:] * P_values[:,:-1]
+        P_values = np.hstack( (np.ones((nr_shots, 2)), M_values) )
+        P_values = P_values[:,1:] * P_values[:,:-1]
+    else:
+        # P array is parity data
+        # D array is defect data
+        P_values = np.ones((nr_shots, n_rounds))
+        for r in range(n_rounds):
+            # Convert to +1 and -1 values
+            P_values[:,r] *= 1-2*(Shots[f'round {r+1}']) 
     D_values = P_values[:,1:] * P_values[:,:-1]
     Deffect_rate = [ np.mean(1-D_values[:,i])/2 for i in range(n_rounds)]
     return Deffect_rate
@@ -1078,20 +1103,20 @@ class Repeated_stabilizer_measurement_analysis(ba.BaseDataAnalysis):
         # Sort shots and assign them
         ######################################
         n_rounds = self.n_rounds
-        _cycle = n_rounds*2 + 3
+        _cycle = n_rounds*4 + 3
 
         _raw_shots = self.raw_data_dict['data'][:,1:]# remove shot number
-        _shots_0 = _raw_shots[2*n_rounds+0::_cycle]
-        _shots_1 = _raw_shots[2*n_rounds+1::_cycle]
-        _shots_2 = _raw_shots[2*n_rounds+2::_cycle]
+        _shots_0 = _raw_shots[4*n_rounds+0::_cycle]
+        _shots_1 = _raw_shots[4*n_rounds+1::_cycle]
+        _shots_2 = _raw_shots[4*n_rounds+2::_cycle]
         # Rotate data
         center_0 = np.array([np.mean(_shots_0[:,0]), np.mean(_shots_0[:,1])])
         center_1 = np.array([np.mean(_shots_1[:,0]), np.mean(_shots_1[:,1])])
         center_2 = np.array([np.mean(_shots_2[:,0]), np.mean(_shots_2[:,1])])
         raw_shots = _rotate_and_center_data(_raw_shots[:,0], _raw_shots[:,1], center_0, center_1)
-        Shots_0 = raw_shots[2*n_rounds+0::_cycle]
-        Shots_1 = raw_shots[2*n_rounds+1::_cycle]
-        Shots_2 = raw_shots[2*n_rounds+2::_cycle]
+        Shots_0 = raw_shots[4*n_rounds+0::_cycle]
+        Shots_1 = raw_shots[4*n_rounds+1::_cycle]
+        Shots_2 = raw_shots[4*n_rounds+2::_cycle]
         self.proc_data_dict['Shots_0'] = Shots_0
         self.proc_data_dict['Shots_1'] = Shots_1
         self.proc_data_dict['Shots_2'] = Shots_2
@@ -1109,9 +1134,16 @@ class Repeated_stabilizer_measurement_analysis(ba.BaseDataAnalysis):
             _fid = np.mean(_res == int(state))
             Fid_dict[state] = _fid
         Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+        # Get assignment fidelity matrix
+        M = np.zeros((3,3))
+        for i, shots in enumerate([Shots_0, Shots_1, Shots_2]):
+            for j, state in enumerate(['0', '1', '2']):
+                _res = clf.predict(shots)
+                M[i][j] = np.mean(_res == int(state))
         self.proc_data_dict['dec_bounds'] = dec_bounds
         self.proc_data_dict['classifier'] = clf
         self.proc_data_dict['Fid_dict'] = Fid_dict
+        self.proc_data_dict['Assignment_matrix'] = M
         #########################################
         # Project data along axis perpendicular
         # to the decision boundaries.
@@ -1218,62 +1250,145 @@ class Repeated_stabilizer_measurement_analysis(ba.BaseDataAnalysis):
         ########################################
         # Sort experimental shots
         # 0-Normal experiment
-        # 1-LRU experiment
+        # 1-LRU on data experiment
+        # 2-LRU on ancilla experiment
+        # 3-LRU on data and ancilla experiment
         shots_exp_0 = {}
         Shots_qubit_0 = {}
         Shots_qutrit_0 = {}
         shots_exp_1 = {}
         Shots_qubit_1 = {}
         Shots_qutrit_1 = {}
+        shots_exp_2 = {}
+        Shots_qubit_2 = {}
+        Shots_qutrit_2 = {}
+        shots_exp_3 = {}
+        Shots_qubit_3 = {}
+        Shots_qutrit_3 = {}
+        _zero_lvl = np.mean(self.proc_data_dict['Shots_0'][:,0])
+        _one_lvl = np.mean(self.proc_data_dict['Shots_1'][:,1])
+        threshold = self.proc_data_dict['projection_01']['threshold']
         for r in range(n_rounds):
             # Note we are using the rotated shots already
-            shots_exp_0[f'round {r+1}'] = raw_shots[r::_cycle]
-            shots_exp_1[f'round {r+1}'] = raw_shots[r+100::_cycle]
+            shots_exp_0[f'round {r+1}'] = raw_shots[r+0*n_rounds::_cycle]
+            shots_exp_1[f'round {r+1}'] = raw_shots[r+1*n_rounds::_cycle]
+            shots_exp_2[f'round {r+1}'] = raw_shots[r+2*n_rounds::_cycle]
+            shots_exp_3[f'round {r+1}'] = raw_shots[r+3*n_rounds::_cycle]
             # Perform Qubit assignment
-            threshold = _get_threshold(Shots_0, Shots_1)
-            Shots_qubit_0[f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_0[f'round {r+1}'][:,0]])
-            Shots_qubit_1[f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_1[f'round {r+1}'][:,0]])
+            if _zero_lvl < threshold: # zero level is left of threshold
+                Shots_qubit_0[f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_0[f'round {r+1}'][:,0]])
+                Shots_qubit_1[f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_1[f'round {r+1}'][:,0]])
+                Shots_qubit_2[f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_2[f'round {r+1}'][:,0]])
+                Shots_qubit_3[f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_3[f'round {r+1}'][:,0]])
+            else: # zero level is right of threshold
+                Shots_qubit_0[f'round {r+1}'] = np.array([0 if s>threshold else 1 for s in shots_exp_0[f'round {r+1}'][:,0]])
+                Shots_qubit_1[f'round {r+1}'] = np.array([0 if s>threshold else 1 for s in shots_exp_1[f'round {r+1}'][:,0]])
+                Shots_qubit_2[f'round {r+1}'] = np.array([0 if s>threshold else 1 for s in shots_exp_2[f'round {r+1}'][:,0]])
+                Shots_qubit_3[f'round {r+1}'] = np.array([0 if s>threshold else 1 for s in shots_exp_3[f'round {r+1}'][:,0]])
             # Perform Qutrit assignment
             Shots_qutrit_0[f'round {r+1}'] = clf.predict(shots_exp_0[f'round {r+1}'])
             Shots_qutrit_1[f'round {r+1}'] = clf.predict(shots_exp_1[f'round {r+1}'])
-
+            Shots_qutrit_2[f'round {r+1}'] = clf.predict(shots_exp_2[f'round {r+1}'])
+            Shots_qutrit_3[f'round {r+1}'] = clf.predict(shots_exp_3[f'round {r+1}'])
+        # Calculate leakage in ancilla:
+        Population_0 = {}
+        Population_1 = {}
+        Population_2 = {}
+        Population_3 = {}
+        def _get_pop_vector(Shots):
+            p0 = np.mean(Shots==0)
+            p1 = np.mean(Shots==1)
+            p2 = np.mean(Shots==2)
+            return np.array([p0, p1, p2])
+        M_inv = np.linalg.inv(M)
+        for r in range(n_rounds):
+            _pop_vec_0 = _get_pop_vector(Shots_qutrit_0[f'round {r+1}'])
+            _pop_vec_1 = _get_pop_vector(Shots_qutrit_1[f'round {r+1}'])
+            _pop_vec_2 = _get_pop_vector(Shots_qutrit_2[f'round {r+1}'])
+            _pop_vec_3 = _get_pop_vector(Shots_qutrit_3[f'round {r+1}'])
+            Population_0[f'round {r+1}'] = np.dot(_pop_vec_0, M_inv)
+            Population_1[f'round {r+1}'] = np.dot(_pop_vec_1, M_inv)
+            Population_2[f'round {r+1}'] = np.dot(_pop_vec_2, M_inv)
+            Population_3[f'round {r+1}'] = np.dot(_pop_vec_3, M_inv)
+        Population_0 = np.array([Population_0[k][2] for k in Population_0.keys()])
+        Population_1 = np.array([Population_1[k][2] for k in Population_1.keys()])
+        Population_2 = np.array([Population_2[k][2] for k in Population_2.keys()])
+        Population_3 = np.array([Population_3[k][2] for k in Population_3.keys()])
+        # Fit leakage and seepage rates
+        from scipy.optimize import curve_fit
+        def _func(n, L, S):
+            return (1 - np.exp(-n*(S+L)))*L/(S+L)
+        _x = np.arange(0, self.n_rounds)+1
+        popt_0, pcov_0 = curve_fit(_func, _x, Population_0)
+        popt_1, pcov_1 = curve_fit(_func, _x, Population_1)
+        popt_2, pcov_2 = curve_fit(_func, _x, Population_2)
+        popt_3, pcov_3 = curve_fit(_func, _x, Population_3)
+        self.proc_data_dict['Population_0'] = Population_0
+        self.proc_data_dict['Population_1'] = Population_1
+        self.proc_data_dict['Population_2'] = Population_2
+        self.proc_data_dict['Population_3'] = Population_3
         # Perform post-selection on Qutrit readout
         Shots_qutrit_ps_0 = {}
         Shots_qutrit_ps_1 = {}
+        Shots_qutrit_ps_2 = {}
+        Shots_qutrit_ps_3 = {}
         nr_shots = len(Shots_qutrit_0['round 1'])
         _mask_0 = np.ones(nr_shots)
         _mask_1 = np.ones(nr_shots)
+        _mask_2 = np.ones(nr_shots)
+        _mask_3 = np.ones(nr_shots)
         Ps_fraction_0 = np.ones(n_rounds)
         Ps_fraction_1 = np.ones(n_rounds)
+        Ps_fraction_2 = np.ones(n_rounds)
+        Ps_fraction_3 = np.ones(n_rounds)
         # get post selection mask and ps fraction for each round
         for r in range(n_rounds):
             _mask_0 *= np.array([1 if s != 2 else np.nan for s in Shots_qutrit_0[f'round {r+1}']])
             _mask_1 *= np.array([1 if s != 2 else np.nan for s in Shots_qutrit_1[f'round {r+1}']])
+            _mask_2 *= np.array([1 if s != 2 else np.nan for s in Shots_qutrit_2[f'round {r+1}']])
+            _mask_3 *= np.array([1 if s != 2 else np.nan for s in Shots_qutrit_3[f'round {r+1}']])
             Ps_fraction_0[r] = np.nansum(_mask_0)/nr_shots
             Ps_fraction_1[r] = np.nansum(_mask_1)/nr_shots
+            Ps_fraction_2[r] = np.nansum(_mask_2)/nr_shots
+            Ps_fraction_3[r] = np.nansum(_mask_3)/nr_shots
         # remove leakage detection events
         for r in range(n_rounds):
             Shots_qutrit_ps_0[f'round {r+1}'] = Shots_qutrit_0[f'round {r+1}'][~np.isnan(_mask_0)]
             Shots_qutrit_ps_1[f'round {r+1}'] = Shots_qutrit_1[f'round {r+1}'][~np.isnan(_mask_1)]
-
+            Shots_qutrit_ps_2[f'round {r+1}'] = Shots_qutrit_2[f'round {r+1}'][~np.isnan(_mask_2)]
+            Shots_qutrit_ps_3[f'round {r+1}'] = Shots_qutrit_3[f'round {r+1}'][~np.isnan(_mask_3)]
         ###########################
         # Calculate defect rate
         ###########################
         print(f'Post-selected fraction normal: {Ps_fraction_0[-1]*100:.5f} %')
-        print(f'Post-selected fraction LRU: {Ps_fraction_1[-1]*100:.5f} %')
-
+        print(f'Post-selected fraction LRU data: {Ps_fraction_1[-1]*100:.5f} %')
+        print(f'Post-selected fraction LRU ancilla: {Ps_fraction_2[-1]*100:.5f} %')
+        print(f'Post-selected fraction LRU both: {Ps_fraction_3[-1]*100:.5f} %')
         deffect_rate_0 = _calculate_deffect_rate(Shots_qubit_0, n_rounds)
         deffect_rate_0_ps = _calculate_deffect_rate(Shots_qutrit_ps_0, n_rounds)
         deffect_rate_1 = _calculate_deffect_rate(Shots_qubit_1, n_rounds)
         deffect_rate_1_ps = _calculate_deffect_rate(Shots_qutrit_ps_1, n_rounds)
-
+        deffect_rate_2 = _calculate_deffect_rate(Shots_qubit_2, n_rounds)
+        deffect_rate_2_ps = _calculate_deffect_rate(Shots_qutrit_ps_2, n_rounds)
+        deffect_rate_3 = _calculate_deffect_rate(Shots_qubit_3, n_rounds)
+        deffect_rate_3_ps = _calculate_deffect_rate(Shots_qutrit_ps_3, n_rounds)
         self.qoi = {}
         self.qoi['deffect_rate_normal'] = deffect_rate_0
+        self.qoi['deffect_rate_LRU_data'] = deffect_rate_1
+        self.qoi['deffect_rate_LRU_ancilla'] = deffect_rate_2
+        self.qoi['deffect_rate_LRU_data_ancilla'] = deffect_rate_3
         self.qoi['deffect_rate_normal_ps'] = deffect_rate_0_ps
-        self.qoi['deffect_rate_LRU'] = deffect_rate_1
-        self.qoi['deffect_rate_LRU_ps'] = deffect_rate_1_ps
+        self.qoi['deffect_rate_LRU_data_ps'] = deffect_rate_1_ps
+        self.qoi['deffect_rate_LRU_ancilla_ps'] = deffect_rate_2_ps
+        self.qoi['deffect_rate_LRU_data_ancilla_ps'] = deffect_rate_3_ps
         self.qoi['Ps_fraction_normal'] = Ps_fraction_0
-        self.qoi['Ps_fraction_LRU'] = Ps_fraction_1
+        self.qoi['Ps_fraction_LRU_data'] = Ps_fraction_1
+        self.qoi['Ps_fraction_LRU_ancilla'] = Ps_fraction_2
+        self.qoi['Ps_fraction_LRU_data_ancilla'] = Ps_fraction_3
+        self.qoi['Population_normal'] = Population_0
+        self.qoi['Population_LRU_data'] = Population_1
+        self.qoi['Population_LRU_ancilla'] = Population_2
+        self.qoi['Population_LRU_data_ancilla'] = Population_3
 
     def prepare_plots(self):
         self.axs_dict = {}
@@ -1310,10 +1425,20 @@ class Repeated_stabilizer_measurement_analysis(ba.BaseDataAnalysis):
             'n_rounds': self.n_rounds,
             'deffect_rate_0': self.qoi['deffect_rate_normal'],
             'deffect_rate_0_ps': self.qoi['deffect_rate_normal_ps'],
-            'deffect_rate_1': self.qoi['deffect_rate_LRU'],
-            'deffect_rate_1_ps': self.qoi['deffect_rate_LRU_ps'], 
+            'deffect_rate_1': self.qoi['deffect_rate_LRU_data'],
+            'deffect_rate_1_ps': self.qoi['deffect_rate_LRU_data_ps'], 
+            'deffect_rate_2': self.qoi['deffect_rate_LRU_ancilla'],
+            'deffect_rate_2_ps': self.qoi['deffect_rate_LRU_ancilla_ps'], 
+            'deffect_rate_3': self.qoi['deffect_rate_LRU_data_ancilla'],
+            'deffect_rate_3_ps': self.qoi['deffect_rate_LRU_data_ancilla_ps'], 
             'ps_0': self.qoi['Ps_fraction_normal'], 
-            'ps_1': self.qoi['Ps_fraction_LRU'], 
+            'ps_1': self.qoi['Ps_fraction_LRU_data'], 
+            'ps_2': self.qoi['Ps_fraction_LRU_ancilla'], 
+            'ps_3': self.qoi['Ps_fraction_LRU_data_ancilla'],
+            'p_0': self.qoi['Population_normal'], 
+            'p_1': self.qoi['Population_LRU_data'], 
+            'p_2': self.qoi['Population_LRU_ancilla'], 
+            'p_3': self.qoi['Population_LRU_data_ancilla'], 
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
@@ -1330,9 +1455,11 @@ def ssro_IQ_projection_plotfn(
     shots_0, 
     shots_1,
     shots_2,
+    shots_3,
     projection_01,
     projection_12,
-    projection_02,
+    projection_03,
+    projection_23,
     classifier,
     dec_bounds,
     Fid_dict,
@@ -1365,19 +1492,24 @@ def ssro_IQ_projection_plotfn(
     popt_0 = _fit_2D_gaussian(shots_0[:,0], shots_0[:,1])
     popt_1 = _fit_2D_gaussian(shots_1[:,0], shots_1[:,1])
     popt_2 = _fit_2D_gaussian(shots_2[:,0], shots_2[:,1])
+    popt_3 = _fit_2D_gaussian(shots_3[:,0], shots_3[:,1])
     # Plot stuff
-    axs[0].plot(shots_0[:,0], shots_0[:,1], '.', color='C0', alpha=0.025)
-    axs[0].plot(shots_1[:,0], shots_1[:,1], '.', color='C3', alpha=0.025)
-    axs[0].plot(shots_2[:,0], shots_2[:,1], '.', color='C2', alpha=0.025)
+    axs[0].plot(shots_0[:10000,0], shots_0[:10000,1], '.', color='C0', alpha=0.025)
+    axs[0].plot(shots_1[:10000,0], shots_1[:10000,1], '.', color='C3', alpha=0.025)
+    axs[0].plot(shots_2[:10000,0], shots_2[:10000,1], '.', color='C2', alpha=0.025)
+    axs[0].plot(shots_3[:10000,0], shots_3[:10000,1], '.', color='gold', alpha=0.025)
     axs[0].plot([0, popt_0[1]], [0, popt_0[2]], '--', color='k', lw=.5)
     axs[0].plot([0, popt_1[1]], [0, popt_1[2]], '--', color='k', lw=.5)
     axs[0].plot([0, popt_2[1]], [0, popt_2[2]], '--', color='k', lw=.5)
+    axs[0].plot([0, popt_3[1]], [0, popt_3[2]], '--', color='k', lw=.5)
     axs[0].plot(popt_0[1], popt_0[2], '.', color='C0', label='ground')
     axs[0].plot(popt_1[1], popt_1[2], '.', color='C3', label='excited')
     axs[0].plot(popt_2[1], popt_2[2], '.', color='C2', label='$2^\mathrm{nd}$ excited')
+    axs[0].plot(popt_3[1], popt_3[2], '.', color='gold', label='$3^\mathrm{nd}$ excited')
     axs[0].plot(popt_0[1], popt_0[2], 'x', color='white')
     axs[0].plot(popt_1[1], popt_1[2], 'x', color='white')
     axs[0].plot(popt_2[1], popt_2[2], 'x', color='white')
+    axs[0].plot(popt_3[1], popt_3[2], 'x', color='white')
     # Draw 4sigma ellipse around mean
     from matplotlib.patches import Ellipse
     circle_0 = Ellipse((popt_0[1], popt_0[2]),
@@ -1395,27 +1527,49 @@ def ssro_IQ_projection_plotfn(
                       angle=-popt_2[5]*180/np.pi,
                       ec='white', fc='none', ls='--', lw=1.25, zorder=10)
     axs[0].add_patch(circle_2)
+    circle_3 = Ellipse((popt_3[1], popt_3[2]),
+                      width=4*popt_3[3], height=4*popt_3[4],
+                      angle=-popt_3[5]*180/np.pi,
+                      ec='white', fc='none', ls='--', lw=1.25, zorder=10)
+    axs[0].add_patch(circle_3)
     # Plot classifier zones
-    from matplotlib import colors
+    from matplotlib.patches import Polygon
     _all_shots = np.concatenate((shots_0, shots_1))
     _lim = np.max([ np.max(np.abs(_all_shots[:,0]))*1.1, np.max(np.abs(_all_shots[:,1]))*1.1 ])
-    X, Y = np.meshgrid(np.linspace(-_lim, _lim, 1001), np.linspace(-_lim, _lim, 1001))
-    pred_labels = classifier.predict(np.c_[X.ravel(), Y.ravel()])
-    pred_labels = pred_labels.reshape(X.shape)
-    cmap = colors.LinearSegmentedColormap.from_list("", ["C0","C3","C2"])
-    cs = axs[0].contourf(X, Y, pred_labels, cmap=cmap, alpha=0.2)
-    # Plot decision boundary
-    for bound in ['01', '12', '02']:
+    Lim_points = {}
+    for bound in ['01', '12', '03', '23']:
+        dec_bounds['mean']
         _x0, _y0 = dec_bounds['mean']
         _x1, _y1 = dec_bounds[bound]
         a = (_y1-_y0)/(_x1-_x0)
         b = _y0 - a*_x0
         _xlim = 1e2*np.sign(_x1-_x0)
         _ylim = a*_xlim + b
-        axs[0].plot([_x0, _xlim], [_y0, _ylim], 'k--', lw=1)
+        Lim_points[bound] = _xlim, _ylim
+    # Plot 0 area
+    _points = [dec_bounds['mean'], Lim_points['01'], Lim_points['03']]
+    _patch = Polygon(_points, color='C0', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot 1 area
+    _points = [dec_bounds['mean'], Lim_points['01'], Lim_points['12']]
+    _patch = Polygon(_points, color='C3', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot 2 area
+    _points = [dec_bounds['mean'], Lim_points['12'], Lim_points['23']]
+    _patch = Polygon(_points, color='C2', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot 2 area
+    _points = [dec_bounds['mean'], Lim_points['03'], Lim_points['23']]
+    _patch = Polygon(_points, color='gold', alpha=0.2, lw=0)
+    axs[0].add_patch(_patch)
+    # Plot decision boundary
+    for bound in ['01', '12', '03', '23']:
+        _x0, _y0 = dec_bounds['mean']
+        _x1, _y1 = Lim_points[bound]
+        axs[0].plot([_x0, _x1], [_y0, _y1], 'k--', lw=1)
     axs[0].set_xlim(-_lim, _lim)
     axs[0].set_ylim(-_lim, _lim)
-    axs[0].legend(frameon=False)
+    axs[0].legend(frameon=False, loc=1)
     axs[0].set_xlabel('Integrated voltage I')
     axs[0].set_ylabel('Integrated voltage Q')
     axs[0].set_title(f'IQ plot qubit {qubit}')
@@ -1464,35 +1618,57 @@ def ssro_IQ_projection_plotfn(
     axs[2].set_xticklabels([])
     axs[2].set_xlim(_bin_c[0], _bin_c[-1])
     axs[2].set_ylim(bottom=0)
-    # 02 projection
-    _bin_c = projection_02['bin_centers']
+    # 03 projection
+    _bin_c = projection_03['bin_centers']
     bin_width = _bin_c[1]-_bin_c[0]
-    axs[3].bar(_bin_c, projection_02['h0'], bin_width, fc='C0', alpha=0.4)
-    axs[3].bar(_bin_c, projection_02['h2'], bin_width, fc='C2', alpha=0.4)
-    axs[3].plot(_bin_c, double_gauss(_bin_c, *projection_02['popt0']), '-C0')
-    axs[3].plot(_bin_c, double_gauss(_bin_c, *projection_02['popt2']), '-C2')
-    axs[3].axvline(projection_02['threshold'], ls='--', color='k', lw=1)
-    text = '\n'.join((f'Fid.  : {projection_02["Fid"]*100:.1f}%',
-                      f'SNR : {projection_02["SNR"]:.1f}'))
+    axs[3].bar(_bin_c, projection_03['h0'], bin_width, fc='C0', alpha=0.4)
+    axs[3].bar(_bin_c, projection_03['h3'], bin_width, fc='gold', alpha=0.4)
+    axs[3].plot(_bin_c, double_gauss(_bin_c, *projection_03['popt0']), '-C0')
+    axs[3].plot(_bin_c, double_gauss(_bin_c, *projection_03['popt3']), '-C1')
+    axs[3].axvline(projection_03['threshold'], ls='--', color='k', lw=1)
+    text = '\n'.join((f'Fid.  : {projection_03["Fid"]*100:.1f}%',
+                      f'SNR : {projection_03["SNR"]:.1f}'))
     props = dict(boxstyle='round', facecolor='gray', alpha=0)
     axs[3].text(.775, .9, text, transform=axs[3].transAxes,
                 verticalalignment='top', bbox=props, fontsize=7)
-    axs[3].text(projection_02['popt0'][0], projection_02['popt0'][4]/2,
+    axs[3].text(projection_03['popt0'][0], projection_03['popt0'][4]/2,
                 r'$|g\rangle$', ha='center', va='center', color='C0')
-    axs[3].text(projection_02['popt2'][0], projection_02['popt2'][4]/2,
-                r'$|f\rangle$', ha='center', va='center', color='C2')
+    axs[3].text(projection_03['popt3'][0], projection_03['popt3'][4]/2,
+                r'$|f\rangle$', ha='center', va='center', color='gold')
     axs[3].set_xticklabels([])
     axs[3].set_xlim(_bin_c[0], _bin_c[-1])
     axs[3].set_ylim(bottom=0)
     axs[3].set_xlabel('Integrated voltage')
+    # 23 projection
+    _bin_c = projection_23['bin_centers']
+    bin_width = _bin_c[1]-_bin_c[0]
+    axs[4].bar(_bin_c, projection_23['h2'], bin_width, fc='C2', alpha=0.4)
+    axs[4].bar(_bin_c, projection_23['h3'], bin_width, fc='gold', alpha=0.4)
+    axs[4].plot(_bin_c, double_gauss(_bin_c, *projection_23['popt2']), '-C2')
+    axs[4].plot(_bin_c, double_gauss(_bin_c, *projection_23['popt3']), '-C1')
+    axs[4].axvline(projection_23['threshold'], ls='--', color='k', lw=1)
+    text = '\n'.join((f'Fid.  : {projection_23["Fid"]*100:.1f}%',
+                      f'SNR : {projection_23["SNR"]:.1f}'))
+    props = dict(boxstyle='round', facecolor='gray', alpha=0)
+    axs[4].text(.775, .9, text, transform=axs[4].transAxes,
+                verticalalignment='top', bbox=props, fontsize=7)
+    axs[4].text(projection_23['popt2'][0], projection_23['popt2'][4]/2,
+                r'$|g\rangle$', ha='center', va='center', color='C0')
+    axs[4].text(projection_23['popt3'][0], projection_23['popt3'][4]/2,
+                r'$|f\rangle$', ha='center', va='center', color='gold')
+    axs[4].set_xticklabels([])
+    axs[4].set_xlim(_bin_c[0], _bin_c[-1])
+    axs[4].set_ylim(bottom=0)
+    axs[4].set_xlabel('Integrated voltage')
     # Write fidelity textbox
     text = '\n'.join(('Assignment fidelity:',
                       f'$F_g$ : {Fid_dict["0"]*100:.1f}%',
                       f'$F_e$ : {Fid_dict["1"]*100:.1f}%',
                       f'$F_f$ : {Fid_dict["2"]*100:.1f}%',
+                      f'$F_h$ : {Fid_dict["3"]*100:.1f}%',
                       f'$F_\mathrm{"{avg}"}$ : {Fid_dict["avg"]*100:.1f}%'))
     props = dict(boxstyle='round', facecolor='gray', alpha=.2)
-    axs[1].text(1.05, 1, text, transform=axs[1].transAxes,
+    axs[1].text(1.12, 1, text, transform=axs[1].transAxes,
                 verticalalignment='top', bbox=props)
 
 def deffect_rate_plotfn(
@@ -1501,8 +1677,18 @@ def deffect_rate_plotfn(
     deffect_rate_0_ps,
     deffect_rate_1,
     deffect_rate_1_ps, 
+    deffect_rate_2,
+    deffect_rate_2_ps, 
+    deffect_rate_3,
+    deffect_rate_3_ps, 
     ps_0, 
     ps_1, 
+    ps_2, 
+    ps_3, 
+    p_0, 
+    p_1, 
+    p_2, 
+    p_3, 
     timestamp,
     qubit, 
     ax, **kw):
@@ -1510,22 +1696,579 @@ def deffect_rate_plotfn(
     axs = fig.get_axes()
 
     axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_0[1:], 'C0-', label='Normal')
-    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_0_ps[1:], 'C0-', alpha=.5, label='Normal ps')
-    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_1[1:], 'C2-', label='res-LRU on D4')
-    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_1_ps[1:], 'C2-', alpha=.5, label='res-LRU on D4 ps')
+    # axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_0_ps[1:], 'C0-', alpha=.5)
+    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_1[1:], 'C1-', label='LRU data')
+    # axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_1_ps[1:], 'C1-', alpha=.5)
+    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_2[1:], 'C2-', label='LRU ancilla')
+    # axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_2_ps[1:], 'C2-', alpha=.5)
+    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_3[1:], 'C3-', label='LRU data ancilla')
+    # axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_3_ps[1:], 'C3-', alpha=.5)
     axs[0].grid(ls='--')
     axs[0].set_ylabel('error probability')
     axs[0].set_xlabel('rounds')
     axs[0].legend(frameon=False, bbox_to_anchor = (1.01, 1))
     axs[0].set_title('Deffect rate')
 
-    axs[1].plot((np.arange(n_rounds)+1), ps_0, 'C0-', label='Normal')
-    axs[1].plot((np.arange(n_rounds)+1), ps_1, 'C2-', label='res-LRU on D4')
-    axs[1].set_ylabel('Post-selected fraction')
+    axs[1].plot((np.arange(n_rounds)+1), p_0*100, 'C0-', label='Normal')
+    axs[1].plot((np.arange(n_rounds)+1), p_1*100, 'C1-', label='LRU data')
+    axs[1].plot((np.arange(n_rounds)+1), p_2*100, 'C2-', label='LRU ancilla')
+    axs[1].plot((np.arange(n_rounds)+1), p_3*100, 'C3-', label='LRU data ancilla')
+    axs[1].set_ylabel(r'$|f\rangle$ population (%)')
     axs[1].set_xlabel('rounds')
-    axs[1].set_yscale('log')
-    axs[1].set_title('Leakage post-selection')
+    axs[1].set_title('Leakage population')
     axs[1].grid(ls='--')
 
     fig.suptitle(f'{timestamp}\n{qubit} repeated stabilizer experiment', y=1.01)
+    fig.tight_layout()
+
+
+class Repeated_stabilizer_measurement_with_data_measurement_analysis(ba.BaseDataAnalysis):
+    def __init__(self,
+                 qubit: str,
+                 Rounds: list,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 with_reset: bool = False,
+                 auto=True
+                 ):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qubit = qubit
+        self.Rounds = Rounds
+        self.with_reset=with_reset
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        ######################################
+        # Sort shots and assign them
+        ######################################
+        Rounds = self.Rounds
+        _total_rounds = np.sum(Rounds)
+        _cycle = _total_rounds*4 + 4
+        # Get qubit names in channel order
+        names = [ name.decode().split(' ')[-2] for name in self.raw_data_dict['value_names'] ]
+        self.Qubits = names[::2]
+        # Dictionary that will store raw shots
+        # so that they can later be sorted.
+        raw_shots = {q: {} for q in self.Qubits}
+        for q_idx, qubit in enumerate(self.Qubits):
+            self.proc_data_dict[qubit] = {}
+            _ch_I, _ch_Q = 2*q_idx+1, 2*q_idx+2
+            _raw_shots = self.raw_data_dict['data'][:,[_ch_I, _ch_Q]]
+            _shots_0 = _raw_shots[4*_total_rounds+0::_cycle]
+            _shots_1 = _raw_shots[4*_total_rounds+1::_cycle]
+            _shots_2 = _raw_shots[4*_total_rounds+2::_cycle]
+            _shots_3 = _raw_shots[4*_total_rounds+3::_cycle]
+            # Rotate data
+            center_0 = np.array([np.mean(_shots_0[:,0]), np.mean(_shots_0[:,1])])
+            center_1 = np.array([np.mean(_shots_1[:,0]), np.mean(_shots_1[:,1])])
+            center_2 = np.array([np.mean(_shots_2[:,0]), np.mean(_shots_2[:,1])])
+            center_3 = np.array([np.mean(_shots_3[:,0]), np.mean(_shots_3[:,1])])
+            raw_shots[qubit] = _rotate_and_center_data(_raw_shots[:,0], _raw_shots[:,1], center_0, center_1)
+            Shots_0 = raw_shots[qubit][4*_total_rounds+0::_cycle]
+            Shots_1 = raw_shots[qubit][4*_total_rounds+1::_cycle]
+            Shots_2 = raw_shots[qubit][4*_total_rounds+2::_cycle]
+            Shots_3 = raw_shots[qubit][4*_total_rounds+3::_cycle]
+            self.proc_data_dict[qubit]['Shots_0'] = Shots_0
+            self.proc_data_dict[qubit]['Shots_1'] = Shots_1
+            self.proc_data_dict[qubit]['Shots_2'] = Shots_2
+            self.proc_data_dict[qubit]['Shots_3'] = Shots_3
+            # Use classifier for data
+            data = np.concatenate((Shots_0, Shots_1, Shots_2, Shots_3))
+            labels = [0 for s in Shots_0]+[1 for s in Shots_1]+\
+                     [2 for s in Shots_2]+[3 for s in Shots_3]
+            from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+            clf = LinearDiscriminantAnalysis()
+            clf.fit(data, labels)
+            dec_bounds = _decision_boundary_points(clf.coef_, clf.intercept_)
+            Fid_dict = {}
+            for state, shots in zip([    '0',     '1',     '2',   '3'],
+                                    [Shots_0, Shots_1, Shots_2, Shots_3]):
+                _res = clf.predict(shots)
+                _fid = np.mean(_res == int(state))
+                Fid_dict[state] = _fid
+            Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+            # Get assignment fidelity matrix
+            M = np.zeros((4,4))
+            for i, shots in enumerate([Shots_0, Shots_1, Shots_2, Shots_3]):
+                for j, state in enumerate(['0', '1', '2', '3']):
+                    _res = clf.predict(shots)
+                    M[i][j] = np.mean(_res == int(state))
+            self.proc_data_dict[qubit]['dec_bounds'] = dec_bounds
+            self.proc_data_dict[qubit]['classifier'] = clf
+            self.proc_data_dict[qubit]['Fid_dict'] = Fid_dict
+            self.proc_data_dict[qubit]['Assignment_matrix'] = M
+            #########################################
+            # Project data along axis perpendicular
+            # to the decision boundaries.
+            #########################################
+            ############################
+            # Projection along 01 axis.
+            ############################
+            # Rotate shots over 01 axis
+            shots_0 = _rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['01'],phi=np.pi/2)
+            shots_1 = _rotate_and_center_data(Shots_1[:,0],Shots_1[:,1],dec_bounds['mean'],dec_bounds['01'],phi=np.pi/2)
+            # Take relavant quadrature
+            shots_0 = shots_0[:,0]
+            shots_1 = shots_1[:,0]
+            n_shots_1 = len(shots_1)
+            # find range
+            _all_shots = np.concatenate((shots_0, shots_1))
+            _range = (np.min(_all_shots), np.max(_all_shots))
+            # Sort shots in unique values
+            x0, n0 = np.unique(shots_0, return_counts=True)
+            x1, n1 = np.unique(shots_1, return_counts=True)
+            Fid_01, threshold_01 = _calculate_fid_and_threshold(x0, n0, x1, n1)
+            # Histogram of shots for 1 and 2
+            h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
+            h1, bin_edges = np.histogram(shots_1, bins=100, range=_range)
+            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+            popt0, popt1, params_01 = _fit_double_gauss(bin_centers, h0, h1)
+            # Save processed data
+            self.proc_data_dict[qubit]['projection_01'] = {}
+            self.proc_data_dict[qubit]['projection_01']['h0'] = h0
+            self.proc_data_dict[qubit]['projection_01']['h1'] = h1
+            self.proc_data_dict[qubit]['projection_01']['bin_centers'] = bin_centers
+            self.proc_data_dict[qubit]['projection_01']['popt0'] = popt0
+            self.proc_data_dict[qubit]['projection_01']['popt1'] = popt1
+            self.proc_data_dict[qubit]['projection_01']['SNR'] = params_01['SNR']
+            self.proc_data_dict[qubit]['projection_01']['Fid'] = Fid_01
+            self.proc_data_dict[qubit]['projection_01']['threshold'] = threshold_01
+            ############################
+            # Projection along 12 axis.
+            ############################
+            # Rotate shots over 12 axis
+            shots_1 = _rotate_and_center_data(Shots_1[:,0],Shots_1[:,1],dec_bounds['mean'], dec_bounds['12'], phi=np.pi/2)
+            shots_2 = _rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'], dec_bounds['12'], phi=np.pi/2)
+            # Take relavant quadrature
+            shots_1 = shots_1[:,0]
+            shots_2 = shots_2[:,0]
+            n_shots_2 = len(shots_2)
+            # find range
+            _all_shots = np.concatenate((shots_1, shots_2))
+            _range = (np.min(_all_shots), np.max(_all_shots))
+            # Sort shots in unique values
+            x1, n1 = np.unique(shots_1, return_counts=True)
+            x2, n2 = np.unique(shots_2, return_counts=True)
+            Fid_12, threshold_12 = _calculate_fid_and_threshold(x1, n1, x2, n2)
+            # Histogram of shots for 1 and 2
+            h1, bin_edges = np.histogram(shots_1, bins=100, range=_range)
+            h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
+            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+            popt1, popt2, params_12 = _fit_double_gauss(bin_centers, h1, h2)
+            # Save processed data
+            self.proc_data_dict[qubit]['projection_12'] = {}
+            self.proc_data_dict[qubit]['projection_12']['h1'] = h1
+            self.proc_data_dict[qubit]['projection_12']['h2'] = h2
+            self.proc_data_dict[qubit]['projection_12']['bin_centers'] = bin_centers
+            self.proc_data_dict[qubit]['projection_12']['popt1'] = popt1
+            self.proc_data_dict[qubit]['projection_12']['popt2'] = popt2
+            self.proc_data_dict[qubit]['projection_12']['SNR'] = params_12['SNR']
+            self.proc_data_dict[qubit]['projection_12']['Fid'] = Fid_12
+            self.proc_data_dict[qubit]['projection_12']['threshold'] = threshold_12
+            ############################
+            # Projection along 03 axis.
+            ############################
+            # Rotate shots over 03 axis
+            shots_0 = _rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['03'], phi=np.pi/2)
+            shots_3 = _rotate_and_center_data(Shots_3[:,0],Shots_3[:,1],dec_bounds['mean'],dec_bounds['03'], phi=np.pi/2)
+            # Take relavant quadrature
+            shots_0 = shots_0[:,0]
+            shots_3 = shots_3[:,0]
+            n_shots_3 = len(shots_3)
+            # find range
+            _all_shots = np.concatenate((shots_0, shots_3))
+            _range = (np.min(_all_shots), np.max(_all_shots))
+            # Sort shots in unique values
+            x0, n0 = np.unique(shots_0, return_counts=True)
+            x3, n3 = np.unique(shots_3, return_counts=True)
+            Fid_03, threshold_03 = _calculate_fid_and_threshold(x0, n0, x3, n3)
+            # Histogram of shots for 1 and 2
+            h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
+            h3, bin_edges = np.histogram(shots_3, bins=100, range=_range)
+            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+            popt0, popt3, params_03 = _fit_double_gauss(bin_centers, h0, h3)
+            # Save processed data
+            self.proc_data_dict[qubit]['projection_03'] = {}
+            self.proc_data_dict[qubit]['projection_03']['h0'] = h0
+            self.proc_data_dict[qubit]['projection_03']['h3'] = h3
+            self.proc_data_dict[qubit]['projection_03']['bin_centers'] = bin_centers
+            self.proc_data_dict[qubit]['projection_03']['popt0'] = popt0
+            self.proc_data_dict[qubit]['projection_03']['popt3'] = popt3
+            self.proc_data_dict[qubit]['projection_03']['SNR'] = params_03['SNR']
+            self.proc_data_dict[qubit]['projection_03']['Fid'] = Fid_03
+            self.proc_data_dict[qubit]['projection_03']['threshold'] = threshold_03
+            ############################
+            # Projection along 23 axis.
+            ############################
+            # Rotate shots over 23 axis
+            shots_2 = _rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'],dec_bounds['23'], phi=np.pi/2)
+            shots_3 = _rotate_and_center_data(Shots_3[:,0],Shots_3[:,1],dec_bounds['mean'],dec_bounds['23'], phi=np.pi/2)
+            # Take relavant quadrature
+            shots_2 = shots_2[:,0]
+            shots_3 = shots_3[:,0]
+            n_shots_3 = len(shots_3)
+            # find range
+            _all_shots = np.concatenate((shots_2, shots_3))
+            _range = (np.min(_all_shots), np.max(_all_shots))
+            # Sort shots in unique values
+            x2, n2 = np.unique(shots_2, return_counts=True)
+            x3, n3 = np.unique(shots_3, return_counts=True)
+            Fid_23, threshold_23 = _calculate_fid_and_threshold(x2, n2, x3, n3)
+            # Histogram of shots for 1 and 2
+            h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
+            h3, bin_edges = np.histogram(shots_3, bins=100, range=_range)
+            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+            popt2, popt3, params_23 = _fit_double_gauss(bin_centers, h2, h3)
+            # Save processed data
+            self.proc_data_dict[qubit]['projection_23'] = {}
+            self.proc_data_dict[qubit]['projection_23']['h2'] = h2
+            self.proc_data_dict[qubit]['projection_23']['h3'] = h3
+            self.proc_data_dict[qubit]['projection_23']['bin_centers'] = bin_centers
+            self.proc_data_dict[qubit]['projection_23']['popt2'] = popt2
+            self.proc_data_dict[qubit]['projection_23']['popt3'] = popt3
+            self.proc_data_dict[qubit]['projection_23']['SNR'] = params_23['SNR']
+            self.proc_data_dict[qubit]['projection_23']['Fid'] = Fid_23
+            self.proc_data_dict[qubit]['projection_23']['threshold'] = threshold_23
+        ########################################
+        # Analyze experiment shots, post-select
+        # on leakage and calculate deffect rate
+        ########################################
+        # Sort experimental shots
+        # 0-Normal experiment
+        # 1-LRU on data experiment
+        # 2-LRU on ancilla experiment
+        # 3-LRU on data and ancilla experiment
+        shots_exp_0 = {q: {} for q in self.Qubits}
+        Shots_qubit_0 = {q: {} for q in self.Qubits}
+        Shots_qutrit_0 = {q: {} for q in self.Qubits}
+        shots_exp_1 = {q: {} for q in self.Qubits}
+        Shots_qubit_1 = {q: {} for q in self.Qubits}
+        Shots_qutrit_1 = {q: {} for q in self.Qubits}
+        shots_exp_2 = {q: {} for q in self.Qubits}
+        Shots_qubit_2 = {q: {} for q in self.Qubits}
+        Shots_qutrit_2 = {q: {} for q in self.Qubits}
+        shots_exp_3 = {q: {} for q in self.Qubits}
+        Shots_qubit_3 = {q: {} for q in self.Qubits}
+        Shots_qutrit_3 = {q: {} for q in self.Qubits}
+        for q in self.Qubits:
+            # threshold = _get_threshold(Shots_0, Shots_1)
+            _zero_lvl = np.mean(self.proc_data_dict[q]['Shots_0'][:,0])
+            _one_lvl = np.mean(self.proc_data_dict[q]['Shots_1'][:,1])
+            threshold = self.proc_data_dict[q]['projection_01']['threshold']
+            _clf = self.proc_data_dict[q]['classifier']
+            for r_idx, n_rounds in enumerate(Rounds):
+                shots_exp_0[q][f'{n_rounds}_R'] = {}
+                Shots_qubit_0[q][f'{n_rounds}_R'] = {}
+                Shots_qutrit_0[q][f'{n_rounds}_R'] = {}
+                shots_exp_1[q][f'{n_rounds}_R'] = {}
+                Shots_qubit_1[q][f'{n_rounds}_R'] = {}
+                Shots_qutrit_1[q][f'{n_rounds}_R'] = {}
+                shots_exp_2[q][f'{n_rounds}_R'] = {}
+                Shots_qubit_2[q][f'{n_rounds}_R'] = {}
+                Shots_qutrit_2[q][f'{n_rounds}_R'] = {}
+                shots_exp_3[q][f'{n_rounds}_R'] = {}
+                Shots_qubit_3[q][f'{n_rounds}_R'] = {}
+                Shots_qutrit_3[q][f'{n_rounds}_R'] = {}
+                # counter for number of shots in previous rounds
+                _aux = int(4*np.sum(Rounds[:r_idx]))
+                for r in range(n_rounds):
+                    # Note we are using the rotated shots already
+                    shots_exp_0[q][f'{n_rounds}_R'][f'round {r+1}'] = \
+                        raw_shots[q][r+0*n_rounds+_aux::_cycle]
+                    shots_exp_1[q][f'{n_rounds}_R'][f'round {r+1}'] = \
+                        raw_shots[q][r+1*n_rounds+_aux::_cycle]
+                    shots_exp_2[q][f'{n_rounds}_R'][f'round {r+1}'] = \
+                        raw_shots[q][r+2*n_rounds+_aux::_cycle]
+                    shots_exp_3[q][f'{n_rounds}_R'][f'round {r+1}'] = \
+                        raw_shots[q][r+3*n_rounds+_aux::_cycle]
+                    # Perform Qubit assignment
+                    if _zero_lvl < threshold: # zero level is left of threshold
+                        Shots_qubit_0[q][f'{n_rounds}_R'][f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_0[q][f'{n_rounds}_R'][f'round {r+1}'][:,0]])
+                        Shots_qubit_1[q][f'{n_rounds}_R'][f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_1[q][f'{n_rounds}_R'][f'round {r+1}'][:,0]])
+                        Shots_qubit_2[q][f'{n_rounds}_R'][f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_2[q][f'{n_rounds}_R'][f'round {r+1}'][:,0]])
+                        Shots_qubit_3[q][f'{n_rounds}_R'][f'round {r+1}'] = np.array([0 if s<threshold else 1 for s in shots_exp_3[q][f'{n_rounds}_R'][f'round {r+1}'][:,0]])
+                    else: # zero level is right of threshold
+                        Shots_qubit_0[q][f'{n_rounds}_R'][f'round {r+1}'] = np.array([0 if s>threshold else 1 for s in shots_exp_0[q][f'{n_rounds}_R'][f'round {r+1}'][:,0]])
+                        Shots_qubit_1[q][f'{n_rounds}_R'][f'round {r+1}'] = np.array([0 if s>threshold else 1 for s in shots_exp_1[q][f'{n_rounds}_R'][f'round {r+1}'][:,0]])
+                        Shots_qubit_2[q][f'{n_rounds}_R'][f'round {r+1}'] = np.array([0 if s>threshold else 1 for s in shots_exp_2[q][f'{n_rounds}_R'][f'round {r+1}'][:,0]])
+                        Shots_qubit_3[q][f'{n_rounds}_R'][f'round {r+1}'] = np.array([0 if s>threshold else 1 for s in shots_exp_3[q][f'{n_rounds}_R'][f'round {r+1}'][:,0]])
+                    # Perform Qutrit assignment
+                    Shots_qutrit_0[q][f'{n_rounds}_R'][f'round {r+1}'] = _clf.predict(shots_exp_0[q][f'{n_rounds}_R'][f'round {r+1}'])
+                    Shots_qutrit_1[q][f'{n_rounds}_R'][f'round {r+1}'] = _clf.predict(shots_exp_1[q][f'{n_rounds}_R'][f'round {r+1}'])
+                    Shots_qutrit_2[q][f'{n_rounds}_R'][f'round {r+1}'] = _clf.predict(shots_exp_2[q][f'{n_rounds}_R'][f'round {r+1}'])
+                    Shots_qutrit_3[q][f'{n_rounds}_R'][f'round {r+1}'] = _clf.predict(shots_exp_3[q][f'{n_rounds}_R'][f'round {r+1}'])
+        self.proc_data_dict['Shots_qubit_0'] = Shots_qubit_0
+        self.proc_data_dict['Shots_qubit_1'] = Shots_qubit_1
+        self.proc_data_dict['Shots_qubit_2'] = Shots_qubit_2
+        self.proc_data_dict['Shots_qubit_3'] = Shots_qubit_3
+        self.proc_data_dict['Shots_qutrit_0'] = Shots_qutrit_0
+        self.proc_data_dict['Shots_qutrit_1'] = Shots_qutrit_1
+        self.proc_data_dict['Shots_qutrit_2'] = Shots_qutrit_2
+        self.proc_data_dict['Shots_qutrit_3'] = Shots_qutrit_3
+        ####################
+        # Calculate leakage
+        ####################
+        Population_0 = {q:{} for q in self.Qubits}
+        Population_1 = {q:{} for q in self.Qubits}
+        Population_2 = {q:{} for q in self.Qubits}
+        Population_3 = {q:{} for q in self.Qubits}
+        Population_f_0 = {q:{} for q in self.Qubits}
+        Population_f_1 = {q:{} for q in self.Qubits}
+        Population_f_2 = {q:{} for q in self.Qubits}
+        Population_f_3 = {q:{} for q in self.Qubits}
+        Population_h_0 = {q:{} for q in self.Qubits}
+        Population_h_1 = {q:{} for q in self.Qubits}
+        Population_h_2 = {q:{} for q in self.Qubits}
+        Population_h_3 = {q:{} for q in self.Qubits}
+        def _get_pop_vector(Shots):
+            p0 = np.mean(Shots==0)
+            p1 = np.mean(Shots==1)
+            p2 = np.mean(Shots==2)
+            p3 = np.mean(Shots==3)
+            return np.array([p0, p1, p2, p3])
+        for q in self.Qubits:
+            M_inv = np.linalg.inv(self.proc_data_dict[q]['Assignment_matrix'])
+            if q == self.qubit:
+                # For the ancilla qubit we'll calculate  
+                # leakage in every measurement round.
+                for n_rounds in Rounds:
+                    Population_0[q][f'{n_rounds}_R'] = {}
+                    Population_1[q][f'{n_rounds}_R'] = {}
+                    Population_2[q][f'{n_rounds}_R'] = {}
+                    Population_3[q][f'{n_rounds}_R'] = {}
+                    for r in range(n_rounds):
+                        _pop_vec_0 = _get_pop_vector(Shots_qutrit_0[q][f'{n_rounds}_R'][f'round {r+1}'])
+                        _pop_vec_1 = _get_pop_vector(Shots_qutrit_1[q][f'{n_rounds}_R'][f'round {r+1}'])
+                        _pop_vec_2 = _get_pop_vector(Shots_qutrit_2[q][f'{n_rounds}_R'][f'round {r+1}'])
+                        _pop_vec_3 = _get_pop_vector(Shots_qutrit_3[q][f'{n_rounds}_R'][f'round {r+1}'])
+                        Population_0[q][f'{n_rounds}_R'][f'round {r+1}'] = np.dot(_pop_vec_0, M_inv)
+                        Population_1[q][f'{n_rounds}_R'][f'round {r+1}'] = np.dot(_pop_vec_1, M_inv)
+                        Population_2[q][f'{n_rounds}_R'][f'round {r+1}'] = np.dot(_pop_vec_2, M_inv)
+                        Population_3[q][f'{n_rounds}_R'][f'round {r+1}'] = np.dot(_pop_vec_3, M_inv)
+                Population_f_0[q] = np.array([Population_0[q][f'{Rounds[-1]}_R'][k][2] for k in Population_0[q][f'{Rounds[-1]}_R'].keys()])
+                Population_f_1[q] = np.array([Population_1[q][f'{Rounds[-1]}_R'][k][2] for k in Population_1[q][f'{Rounds[-1]}_R'].keys()])
+                Population_f_2[q] = np.array([Population_2[q][f'{Rounds[-1]}_R'][k][2] for k in Population_2[q][f'{Rounds[-1]}_R'].keys()])
+                Population_f_3[q] = np.array([Population_3[q][f'{Rounds[-1]}_R'][k][2] for k in Population_3[q][f'{Rounds[-1]}_R'].keys()])
+                Population_h_0[q] = np.array([Population_0[q][f'{Rounds[-1]}_R'][k][3] for k in Population_0[q][f'{Rounds[-1]}_R'].keys()])
+                Population_h_1[q] = np.array([Population_1[q][f'{Rounds[-1]}_R'][k][3] for k in Population_1[q][f'{Rounds[-1]}_R'].keys()])
+                Population_h_2[q] = np.array([Population_2[q][f'{Rounds[-1]}_R'][k][3] for k in Population_2[q][f'{Rounds[-1]}_R'].keys()])
+                Population_h_3[q] = np.array([Population_3[q][f'{Rounds[-1]}_R'][k][3] for k in Population_3[q][f'{Rounds[-1]}_R'].keys()])
+            else:
+                # For the data qubit we'll only calculate  
+                # leakage in the last measurement round.
+                for n_rounds in Rounds:
+                    _pop_vec_0 = _get_pop_vector(Shots_qutrit_0[q][f'{n_rounds}_R'][f'round {n_rounds}'])
+                    _pop_vec_1 = _get_pop_vector(Shots_qutrit_1[q][f'{n_rounds}_R'][f'round {n_rounds}'])
+                    _pop_vec_2 = _get_pop_vector(Shots_qutrit_2[q][f'{n_rounds}_R'][f'round {n_rounds}'])
+                    _pop_vec_3 = _get_pop_vector(Shots_qutrit_3[q][f'{n_rounds}_R'][f'round {n_rounds}'])
+                    Population_0[q][f'{n_rounds}_R'] = np.dot(_pop_vec_0, M_inv)
+                    Population_1[q][f'{n_rounds}_R'] = np.dot(_pop_vec_1, M_inv)
+                    Population_2[q][f'{n_rounds}_R'] = np.dot(_pop_vec_2, M_inv)
+                    Population_3[q][f'{n_rounds}_R'] = np.dot(_pop_vec_3, M_inv)
+                Population_f_0[q] = np.array([Population_0[q][k][2] for k in Population_0[q].keys()])
+                Population_f_1[q] = np.array([Population_1[q][k][2] for k in Population_1[q].keys()])
+                Population_f_2[q] = np.array([Population_2[q][k][2] for k in Population_2[q].keys()])
+                Population_f_3[q] = np.array([Population_3[q][k][2] for k in Population_3[q].keys()])
+                Population_h_0[q] = np.array([Population_0[q][k][3] for k in Population_0[q].keys()])
+                Population_h_1[q] = np.array([Population_1[q][k][3] for k in Population_1[q].keys()])
+                Population_h_2[q] = np.array([Population_2[q][k][3] for k in Population_2[q].keys()])
+                Population_h_3[q] = np.array([Population_3[q][k][3] for k in Population_3[q].keys()])
+        self.proc_data_dict['Population_0'] = Population_0
+        self.proc_data_dict['Population_1'] = Population_1
+        self.proc_data_dict['Population_2'] = Population_2
+        self.proc_data_dict['Population_3'] = Population_3
+        self.proc_data_dict['Population_f_0'] = Population_f_0
+        self.proc_data_dict['Population_f_1'] = Population_f_1
+        self.proc_data_dict['Population_f_2'] = Population_f_2
+        self.proc_data_dict['Population_f_3'] = Population_f_3
+        self.proc_data_dict['Population_h_0'] = Population_h_0
+        self.proc_data_dict['Population_h_1'] = Population_h_1
+        self.proc_data_dict['Population_h_2'] = Population_h_2
+        self.proc_data_dict['Population_h_3'] = Population_h_3
+        ###########################
+        # Calculate defect rate
+        ###########################
+        deffect_rate_0 = {}
+        deffect_rate_1 = {}
+        deffect_rate_2 = {}
+        deffect_rate_3 = {}
+        for n_rounds in Rounds:
+            deffect_rate_0[f'{n_rounds}_R'] = _calculate_deffect_rate(Shots_qubit_0[self.qubit][f'{n_rounds}_R'], n_rounds, with_reset=self.with_reset)
+            deffect_rate_1[f'{n_rounds}_R'] = _calculate_deffect_rate(Shots_qubit_1[self.qubit][f'{n_rounds}_R'], n_rounds, with_reset=self.with_reset)
+            deffect_rate_2[f'{n_rounds}_R'] = _calculate_deffect_rate(Shots_qubit_2[self.qubit][f'{n_rounds}_R'], n_rounds, with_reset=self.with_reset)
+            deffect_rate_3[f'{n_rounds}_R'] = _calculate_deffect_rate(Shots_qubit_3[self.qubit][f'{n_rounds}_R'], n_rounds, with_reset=self.with_reset)
+        self.qoi = {}
+        self.qoi['deffect_rate_normal'] = deffect_rate_0
+        self.qoi['deffect_rate_LRU_data'] = deffect_rate_1
+        self.qoi['deffect_rate_LRU_ancilla'] = deffect_rate_2
+        self.qoi['deffect_rate_LRU_data_ancilla'] = deffect_rate_3
+        self.qoi['Population_normal'] = Population_f_0
+        self.qoi['Population_LRU_data'] = Population_f_1
+        self.qoi['Population_LRU_ancilla'] = Population_f_2
+        self.qoi['Population_LRU_data_ancilla'] = Population_f_3
+        self.qoi['Population_normal_h'] = Population_h_0
+        self.qoi['Population_LRU_data_h'] = Population_h_1
+        self.qoi['Population_LRU_ancilla_h'] = Population_h_2
+        self.qoi['Population_LRU_data_ancilla_h'] = Population_h_3
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+
+        for qubit in self.Qubits:
+            fig = plt.figure(figsize=(10,5), dpi=100)
+            axs = [fig.add_subplot(121),
+                   fig.add_subplot(422),
+                   fig.add_subplot(424),
+                   fig.add_subplot(426),
+                   fig.add_subplot(428)]
+            # fig.patch.set_alpha(0)
+            self.axs_dict[f'IQ_readout_histogram_{qubit}'] = axs[0]
+            self.figs[f'IQ_readout_histogram_{qubit}'] = fig
+            self.plot_dicts[f'IQ_readout_histogram_{qubit}'] = {
+                'plotfn': ssro_IQ_projection_plotfn,
+                'ax_id': f'IQ_readout_histogram_{qubit}',
+                'shots_0': self.proc_data_dict[qubit]['Shots_0'],
+                'shots_1': self.proc_data_dict[qubit]['Shots_1'],
+                'shots_2': self.proc_data_dict[qubit]['Shots_2'],
+                'shots_3': self.proc_data_dict[qubit]['Shots_3'],
+                'projection_01': self.proc_data_dict[qubit]['projection_01'],
+                'projection_12': self.proc_data_dict[qubit]['projection_12'],
+                'projection_03': self.proc_data_dict[qubit]['projection_03'],
+                'projection_23': self.proc_data_dict[qubit]['projection_23'],
+                'classifier': self.proc_data_dict[qubit]['classifier'],
+                'dec_bounds': self.proc_data_dict[qubit]['dec_bounds'],
+                'Fid_dict': self.proc_data_dict[qubit]['Fid_dict'],
+                'qubit': qubit,
+                'timestamp': self.timestamp
+            }
+
+        fig = plt.figure(figsize=(11, 3))
+        gs = fig.add_gridspec(1, 5)
+        axs = []
+        axs.append(fig.add_subplot(gs[0, 0:2]))
+        axs.append(fig.add_subplot(gs[0, 2:3]))
+        axs.append(fig.add_subplot(gs[0, 3:4]))
+        axs.append(fig.add_subplot(gs[0, 4:5]))
+        self.axs_dict['Deffect_rate_plot'] = axs[0]
+        self.figs['Deffect_rate_plot'] = fig
+        self.plot_dicts['Deffect_rate_plot'] = {
+            'plotfn': deffect_rate_plotfn2,
+            'ax_id': 'Deffect_rate_plot',
+            'Rounds': self.Rounds,
+            'deffect_rate_0': self.qoi['deffect_rate_normal'][f'{self.Rounds[-1]}_R'],
+            'deffect_rate_1': self.qoi['deffect_rate_LRU_data'][f'{self.Rounds[-1]}_R'], 
+            'deffect_rate_2': self.qoi['deffect_rate_LRU_ancilla'][f'{self.Rounds[-1]}_R'],
+            'deffect_rate_3': self.qoi['deffect_rate_LRU_data_ancilla'][f'{self.Rounds[-1]}_R'],
+            'p_0': self.qoi['Population_normal'], 
+            'p_1': self.qoi['Population_LRU_data'], 
+            'p_2': self.qoi['Population_LRU_ancilla'], 
+            'p_3': self.qoi['Population_LRU_data_ancilla'],
+            'p_0_h': self.qoi['Population_normal_h'], 
+            'p_1_h': self.qoi['Population_LRU_data_h'], 
+            'p_2_h': self.qoi['Population_LRU_ancilla_h'], 
+            'p_3_h': self.qoi['Population_LRU_data_ancilla_h'],  
+            'qubit': self.qubit,
+            'timestamp': self.timestamp
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def deffect_rate_plotfn2(
+    Rounds,
+    deffect_rate_0,
+    deffect_rate_1,
+    deffect_rate_2,
+    deffect_rate_3,
+    p_0, 
+    p_1, 
+    p_2, 
+    p_3, 
+    p_0_h, 
+    p_1_h, 
+    p_2_h, 
+    p_3_h,
+    timestamp,
+    qubit, 
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+
+    n_rounds = Rounds[-1]
+    
+    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_0[1:], 'C0-', label='Normal')
+    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_1[1:], 'C1-', label='LRU data')
+    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_2[1:], 'C2-', label='LRU ancilla')
+    axs[0].plot((np.arange(n_rounds)+1)[1:], deffect_rate_3[1:], 'C3-', label='LRU data ancilla')
+    axs[0].grid(ls='--')
+    axs[0].set_ylabel('error probability')
+    axs[0].set_xlabel('rounds')
+    axs[0].set_title('Deffect rate')
+
+    axs[1].plot((np.arange(n_rounds)+1), p_0[qubit]*100, 'C0-', label='Normal')
+    axs[1].plot((np.arange(n_rounds)+1), p_1[qubit]*100, 'C1-', label='LRU data')
+    axs[1].plot((np.arange(n_rounds)+1), p_2[qubit]*100, 'C2-', label='LRU ancilla')
+    axs[1].plot((np.arange(n_rounds)+1), p_3[qubit]*100, 'C3-', label='LRU data ancilla')
+
+    axs[1].plot((np.arange(n_rounds)+1), p_0_h[qubit]*100, 'C0--',alpha=0.4)
+    axs[1].plot((np.arange(n_rounds)+1), p_1_h[qubit]*100, 'C1--',alpha=0.4)
+    axs[1].plot((np.arange(n_rounds)+1), p_2_h[qubit]*100, 'C2--',alpha=0.4)
+    axs[1].plot((np.arange(n_rounds)+1), p_3_h[qubit]*100, 'C3--',alpha=0.4)
+    axs[1].set_ylabel(r'$|L_{1}\rangle$ population (%)')
+    axs[1].set_xlabel('rounds')
+    axs[1].set_title(qubit)
+    axs[1].grid(ls='--')
+
+    Data_qubits = [name for name in p_0.keys()]
+    Data_qubits.remove(qubit)
+    for i, q in enumerate(Data_qubits):
+        axs[2+i].plot(Rounds, (p_0[q]+p_0_h[q])*100, 'C0-', label='Normal')
+        axs[2+i].plot(Rounds, (p_1[q]+p_1_h[q])*100, 'C1-', label='LRU data')
+        axs[2+i].plot(Rounds, (p_2[q]+p_2_h[q])*100, 'C2-', label='LRU ancilla')
+        axs[2+i].plot(Rounds, (p_3[q]+p_3_h[q])*100, 'C3-', label='LRU data ancilla')
+        # axs[2+i].plot(Rounds, p_0_h[q]*100, 'C0--',alpha=0.4)
+        # axs[2+i].plot(Rounds, p_1_h[q]*100, 'C1--',alpha=0.4)
+        # axs[2+i].plot(Rounds, p_2_h[q]*100, 'C2--',alpha=0.4)
+        # axs[2+i].plot(Rounds, p_3_h[q]*100, 'C3--',alpha=0.4)
+        axs[2+i].set_ylabel(r'Leakage population (%)')
+        axs[2+i].set_xlabel('rounds')
+        axs[2+i].set_title(q)
+        axs[2+i].grid(ls='--')
+
+
+    axs[3].legend(frameon=False, bbox_to_anchor = (1.01, 1))
+
+    fig.suptitle(f'{timestamp}\n{qubit} repeated stabilizer experiment')
     fig.tight_layout()

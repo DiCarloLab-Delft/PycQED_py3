@@ -27,6 +27,7 @@ default_mw_lutmap = {
     15 : {"name" : "rX12_90"  , "theta" : 90, "phi" : 0 , "type" : "ef"},
     27 : {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'},
     30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
+    30 : {"name" : "rX23" , "theta" : 180    , "phi" : 0 , "type" : "fh"},
     51 : {"name" : "phaseCorrLRU" , "type" : "phase"},
     52 : {"name" : "phaseCorrStep1" , "type" : "phase"},
     53 : {"name" : "phaseCorrStep2" , "type" : "phase"},
@@ -267,7 +268,6 @@ class Base_MW_LutMan(Base_LutMan):
                            vals=vals.Numbers(), unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0)
-
         self.add_parameter('spec_length',
                            vals=vals.Numbers(), unit='s',
                            parameter_class=ManualParameter,
@@ -284,7 +284,6 @@ class Base_MW_LutMan(Base_LutMan):
         self.add_parameter('sq_pulse_duration', unit='s', vals=vals.Numbers(0, 1e-6),
                            parameter_class=ManualParameter,
                            initial_value=40e-9)
-
         self.add_parameter(
             'mw_modulation', vals=vals.Numbers(), unit='Hz',
             docstring=('Modulation frequency for qubit driving pulses. Note'
@@ -298,6 +297,15 @@ class Base_MW_LutMan(Base_LutMan):
         self.add_parameter('mw_ef_amp180', unit='frac',
                            docstring=(
                                'Pulse amplitude for pulsing the ef/12 transition'),
+                           vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter, initial_value=.2)
+        self.add_parameter('mw_fh_modulation', vals=vals.Numbers(), unit='Hz',
+                           docstring=('Modulation frequency for driving pulses to the '
+                                      'third excited-state.'),
+                           parameter_class=ManualParameter, initial_value=50.0e6)
+        self.add_parameter('mw_fh_amp180', unit='frac',
+                           docstring=(
+                               'Pulse amplitude for pulsing the fh/23 transition'),
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter, initial_value=.2)
         # Parameters for leakage reduction unit pulse.
@@ -354,6 +362,18 @@ class Base_MW_LutMan(Base_LutMan):
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
                     f_modulation=self.mw_ef_modulation(),
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=0,
+                    delay=self.pulse_delay())
+
+            elif waveform['type'] == 'fh':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_fh_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=self.mw_fh_modulation(),
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
                     delay=self.pulse_delay())
@@ -554,8 +574,8 @@ class Base_MW_LutMan(Base_LutMan):
         # FIXME: hardcoded indices must match OpenQL definitions
         lm = self.LutMap()
         for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
-            lm[i+9] = {"name": "", "type": "raw-drag",
-                       "drag_pars": {
+            lm[i+30] = {"name": "", "type": "raw-drag",
+                        "drag_pars": {
                            "amp": amp, "f_modulation": mod_freq,
                            "sigma_length": self.mw_gauss_width(),
                            "sampling_rate": self.sampling_rate(),
@@ -974,6 +994,18 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
                     f_modulation=self.mw_ef_modulation(),
+                    sampling_rate=self.sampling_rate(),
+                    motzoi=0,
+                    delay=self.pulse_delay())
+
+            elif waveform['type'] == 'fh':
+                amp = theta_to_amp(theta=waveform['theta'],
+                                   amp180=self.mw_fh_amp180())
+                self._wave_dict[idx] = self.wf_func(
+                    amp=amp,
+                    phase=waveform['phi'],
+                    sigma_length=self.mw_gauss_width(),
+                    f_modulation=self.mw_fh_modulation(),
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
                     delay=self.pulse_delay())

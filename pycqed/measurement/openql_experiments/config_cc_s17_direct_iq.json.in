@@ -5,7 +5,7 @@
     "eqasm_compiler" : "eqasm_backend_cc",
 
     "hardware_settings": {
-        "qubit_number": 22,
+        "qubit_number": 24,
         "cycle_time" : 20,        // in [ns]
 
         "eqasm_backend_cc": {
@@ -295,7 +295,7 @@
                 },
                 {
                     "name": "flux_2",
-                    "qubits": [[11], [], [21], [20], [], [], [], []],
+                    "qubits": [[11], [21], [23], [20], [], [], [22], []],
                     "signal_type": "flux",
                     "ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-flux",
@@ -358,12 +358,15 @@
 
         // LRU pulses
         "lru q16": ["barrier q16, q19", "cw_40 q19", "update_ph_LRU q16", "barrier q16, q19"],
-        "lru q13": ["barrier q13, q17", "cw_40 q17", "update_ph_LRU q13", "barrier q13, q17"],
+        // "lru q13": ["barrier q13, q17", "cw_40 q17", "update_ph_LRU q13", "barrier q13, q17"],
         // "lru q15": ["barrier q15, q18", "cw_40 q18", "update_ph_LRU q15", "barrier q15, q18"],
-        "lru q15": ["barrier q18", "cw_40 q18", "barrier q18"],
         "lru q3" : ["barrier q3, q20", "sf_lru q20", "update_ph_LRU q3", "barrier q3, q20"],
         // "lru q12": ["barrier q12, q21", "sf_lru q21", "update_ph_LRU q12", "barrier q12, q21"],
-        "lru q12": ["barrier q21", "sf_lru q21", "barrier q21"],
+        // "lru q1" : ["barrier q1, q22", "sf_lru q22", "update_ph_LRU q1", "barrier q1, q22"],
+        "lru q15": ["barrier q18", "cw_40 q18", "barrier q18"],
+        "lru q12": ["barrier q21, q23", "sf_lru q21", "sf_lru q23", "barrier q21, q23"],
+        "lru q1" : ["barrier q17", "cw_40 q17", "barrier q17"],
+
         
         // Updata by Hany [2021-06-01]
         // Individual CZ gates in Surface-17
@@ -1354,6 +1357,16 @@
                 "static_codeword_override": [9]
             }
         },
+        "rx23": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "rx23",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [30]
+            }
+        },
         // cw_00 .. cw_31
         "cw_00": {
             "duration": @MW_DURATION@,
@@ -1675,6 +1688,166 @@
                 "static_codeword_override": [31]
             }
         },
+        "cw_32": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_32",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [32]
+            }
+        },
+        "cw_33": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_33",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [33]
+            }
+        },
+        "cw_34": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_34",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [34]
+            }
+        },
+        "cw_35": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_35",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [35]
+            }
+        },
+        "cw_36": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_36",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [36]
+            }
+        },
+        "cw_37": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_37",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [37]
+            }
+        },
+        "cw_38": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_38",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [38]
+            }
+        },
+        "cw_39": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_39",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [39]
+            }
+        },
+        "cw_40": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_40",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [40]
+            }
+        },
+        "cw_41": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_41",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [41]
+            }
+        },
+        "cw_42": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_42",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [42]
+            }
+        },
+        "cw_43": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_43",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [43]
+            }
+        },
+        "cw_44": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_44",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [44]
+            }
+        },
+        "cw_45": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_45",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [45]
+            }
+        },
+        "cw_46": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_46",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [46]
+            }
+        },
+        "cw_47": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_47",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [47]
+            }
+        },
         // fl_cw_00 .. fl_cw_07
         "fl_cw_00": {
             "duration": @FLUX_DURATION@,
@@ -1927,27 +2100,6 @@
         //     }
         // },
 
-        "cw_27": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "type": "mw",
-            "cc_light_instr": "cw_27",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [27]
-            }
-        },
-
-        "cw_40": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "type": "mw",
-            "cc_light_instr": "cw_40",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [40]
-            }
-        },
         // "cw_27 q1": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],

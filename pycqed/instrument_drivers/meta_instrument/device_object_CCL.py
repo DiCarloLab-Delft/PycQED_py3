@@ -10,6 +10,7 @@ import multiprocessing
 from importlib import reload
 from typing import List, Union, Tuple
 import itertools as itt
+from math import ceil
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -1514,8 +1515,9 @@ class DeviceCCL(Instrument):
             qubits, result_logging_mode=result_logging_mode
         )
         # Check detector order
-        det_qubits = np.unique([ name.split(' ')[2]
-                    for name in d.value_names])
+        det_qubits, _idxs = np.unique([ name.split(' ')[2]
+            for name in d.value_names], return_index=True)
+        det_qubits = det_qubits[_idxs]
         if not all(qubits != det_qubits):
             # this occurs because the detector groups qubits per feedline.
             # If you do not pay attention, this will mess up the analysis of
@@ -3149,9 +3151,8 @@ class DeviceCCL(Instrument):
 
         MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
-            # if gate_qubit != meas_qubit: 
-                # q_gate.prepare_for_timedomain()
-            self.prepare_for_timedomain(qubits=gate_qubits,prepare_for_readout=False)
+            if gate_qubit != meas_qubit: 
+                self.prepare_for_timedomain(qubits=gate_qubits,prepare_for_readout=False)
             self.prepare_for_timedomain(qubits=[meas_qubit])
         # Experiment
         p = mqo.gate_process_tomograhpy(
@@ -3796,6 +3797,80 @@ class DeviceCCL(Instrument):
         
         return a.qoi
 
+    def measure_repeated_CZ_experiment(self,
+            qubit_pair: list,
+            rounds: int = 50,
+            nr_shots_per_case: int = 2**13,
+            flux_codeword: str = 'cz',
+            gate_time_ns: int = 60,
+            prepare_for_timedomain: bool = True,
+            analyze: bool = True,
+            disable_metadata: bool = False):
+        '''
+        Function used to measure CZ leakage using a repeated measurment scheme:
+               xrounds
+        Q0 ---H---o---Meas
+                  |
+        Q1 ---H---o---Meas
+        
+        Requires Qutrit readout.
+        Also measures 2 qutrit readout assignment to accurately extimate
+        leakage rates.
+        '''
+        assert self.ro_acq_digitized() == False, 'Analog readout required'
+        assert 'IQ' in self.ro_acq_weight_type(), 'IQ readout is required!'
+        MC = self.instr_MC.get_instr()
+        # Configure lutmap
+        for qubit in qubit_pair:
+            qb = self.find_instrument(qubit)
+            mwl = qb.instr_LutMan_MW.get_instr()
+            mwl.set_default_lutmap()
+        self.prepare_for_timedomain(qubits = qubit_pair)
+
+        # get qubit idx 
+        Q_idx = [self.find_instrument(q).cfg_qubit_nr() for q in qubit_pair]
+        # Set UHF number of shots
+        _cycle = (2*rounds+9)
+        nr_shots = _cycle*nr_shots_per_case
+        # if heralded_init:
+        #     nr_shots *= 2 
+        uhfqc_max_shots = 2**20
+        if nr_shots < uhfqc_max_shots:
+            # all shots can be acquired in a single UHF run
+            shots_per_run = nr_shots
+        else:
+            # Number of UHF acquisition runs
+            nr_runs = ceil(nr_shots/uhfqc_max_shots) 
+            shots_per_run = int((nr_shots/nr_runs)/_cycle)*_cycle
+            nr_shots = nr_runs*shots_per_run
+        # Compile sequence
+        p = mqo.repeated_CZ_experiment(
+            qubit_idxs=Q_idx,
+            rounds=rounds,
+            flux_codeword=flux_codeword,
+            gate_time_ns=gate_time_ns,
+            heralded_init=False,
+            platf_cfg=self.cfg_openql_platform_fn())
+        
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Shot', unit='#',
+                             upload=True)
+        MC.soft_avg(1)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        d = self.get_int_logging_detector(qubits=qubit_pair)
+        for det in d.detectors:
+            det.nr_shots = shots_per_run
+        MC.set_detector_function(d)
+        MC.live_plot_enabled(False)
+        label = f'Repeated_CZ_experiment_qubit_pair_{"_".join(qubit_pair)}'
+        MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
+        MC.live_plot_enabled(True)
+        # Analysis
+        if analyze:
+            a = ma2.tqg.Repeated_CZ_experiment_Analysis(rounds=rounds, label=label)
+
     def measure_vcz_A_tmid_landscape(
         self, 
         Q0,
@@ -4155,6 +4230,7 @@ class DeviceCCL(Instrument):
             flux_cw_list = flux_cw_list,
             platf_cfg = self.cfg_openql_platform_fn(),
             angles = angles,
+            nr_spectators = len(Q_spectator) if Q_spectator else 0,
             pc_repetitions=pc_repetitions,
             wait_time_before_flux = wait_time_before_flux,
             wait_time_after_flux = wait_time_after_flux
@@ -4702,6 +4778,7 @@ class DeviceCCL(Instrument):
             wait_time_before_flux: int = 0,
             wait_time_after_flux: int = 0,
             n_rounds = 1,
+            readout_duration_ns: int = 480
             ):
         assert self.ro_acq_weight_type().lower() == 'optimal'
         assert self.ro_acq_digitized() == False
@@ -4763,6 +4840,7 @@ class DeviceCCL(Instrument):
             wait_time_before_flux=wait_time_before_flux,
             wait_time_after_flux=wait_time_after_flux,
             n_rounds = n_rounds,
+            readout_duration_ns=readout_duration_ns,
             platf_cfg=self.cfg_openql_platform_fn())
 
         uhfqc_max_avg = 2**20

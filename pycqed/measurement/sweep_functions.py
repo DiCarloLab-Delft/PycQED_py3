@@ -527,12 +527,11 @@ class anharmonicity_sweep(Soft_Sweep):
         self.amps = amps
 
     def set_parameter(self, val):
-        self.qubit.anharmonicity.set(val)
         # _prep_mw_pulses will upload anharmonicity val to LutMan
-        self.qubit._prep_mw_pulses()
         # and we regenerate the waveform with that new modulation
         mw_lutman = self.qubit.instr_LutMan_MW.get_instr()
-        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=self.amps)
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=self.amps, 
+                                                         mod_freqs=[val])
 
 
 class joint_HDAWG_lutman_parameters(Soft_Sweep):

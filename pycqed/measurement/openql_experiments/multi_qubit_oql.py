@@ -1850,6 +1850,7 @@ def parity_check_ramsey(
         flux_cw_list,
         platf_cfg,
         angles,
+        nr_spectators: int=0,
         pc_repetitions: int=1,
         wait_time_before_flux: int = 0,
         wait_time_after_flux: int = 0
@@ -1868,6 +1869,9 @@ def parity_check_ramsey(
             for j, state in enumerate(case):
                 if state == '1':
                     k.gate("rx180", [Q_idxs_control[j]])
+                elif state == '2':
+                    k.gate("rx180", [Q_idxs_control[j]])
+                    k.gate("rx12", [Q_idxs_control[j]])
             for q in Q_idxs_target:
                 k.gate("rx90", [q])
             k.barrier([]) # alignment workaround
@@ -1876,7 +1880,7 @@ def parity_check_ramsey(
             for j in range(pc_repetitions): 
                 for l, flux_cw in enumerate(flux_cw_list):
                     if 'cz' in flux_cw:
-                        if len(flux_cw_list) == len(Q_idxs_control):
+                        if len(flux_cw_list) == len(Q_idxs_control)-nr_spectators:
                             k.gate(flux_cw, [Q_idxs_target[0], Q_idxs_control[l]])
                         elif len(flux_cw_list) == len(Q_idxs_target):
                             k.gate(flux_cw, [Q_idxs_target[l], Q_idxs_control[0]])
@@ -2304,8 +2308,13 @@ def Weight_n_parity_tomography(
         wait_time_after_flux: int = 0,
         simultaneous_measurement: bool=True,
         n_rounds=1,
+        readout_duration_ns: int = 480
         ):
     p = OqlProgram("Weight_n_parity_tomography", platf_cfg)
+
+    if (readout_duration_ns/6)%20 != 0:
+        print('Warning: Readout duration is not multiple of\
+                Dynamical decoupling block sequence!')
 
     n = len(Q_D)
     all_Q_idxs = [Q_anc] + Q_D
@@ -2335,7 +2344,7 @@ def Weight_n_parity_tomography(
             k.barrier([])
             k.measure(Q_anc)
             for q in Q_D:
-                for cycle in range(int(480/6/20)):
+                for cycle in range(int(readout_duration_ns/6/20)):
                     k.gate('i', [q])
                     k.gate('rX180', [q])
                     k.gate('i', [q])
@@ -2364,7 +2373,7 @@ def Weight_n_parity_tomography(
 
         if not simultaneous_measurement:
             for q in Q_D:
-                for cycle in range(int(240/6/20)):
+                for cycle in range(int(readout_duration_ns/6/20)):
                     k.gate('i', [q])
                     k.gate('rX180', [q])
                     k.gate('i', [q])
@@ -3595,7 +3604,18 @@ def gate_process_tomograhpy(
             k.gate(states[state], [meas_qubit_idx])
             # Play gate
             k.gate('wait', [])
-            k.gate(gate_name, [gate_qubit_idx])
+            # k.gate(gate_name, [gate_qubit_idx])
+            for q in gate_qubit_idx:
+                if gate_name == 'XY':
+                    for cycle in range(int(720/6/20)):
+                        k.gate('i', [q])
+                        k.gate('rX180', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('rY180', [q])
+                        k.gate('i', [q])
+                else:
+                    k.gate(gate_name, [q])
             k.gate('wait', [], wait_after_gate_ns)
             # Measurement in basis
             k.gate(meas_bases[basis], [meas_qubit_idx])
@@ -3617,6 +3637,55 @@ def gate_process_tomograhpy(
     k.gate('rx12', [meas_qubit_idx])
     k.measure(meas_qubit_idx)
     p.add_kernel(k)
+    # Compile
+    p.compile()
+    return p
+
+def repeated_CZ_experiment(
+        qubit_idxs: list,
+        rounds: int,
+        gate_time_ns: int,
+        flux_codeword: str,
+        heralded_init: bool,
+        platf_cfg: str) -> OqlProgram:
+    
+    p = OqlProgram('repeated_CZ_experiment', platf_cfg)
+    # Main experiment
+    k = p.create_kernel("Gate_experiment")
+    k.prepz(qubit_idxs[0])
+    if heralded_init:
+        for qb in qubit_idxs:
+            k.measure(qb)  
+    for i in range(rounds):
+        for qb in qubit_idxs:
+            k.gate('rx90', [qb])
+        k.gate("wait", [])
+        k.gate(flux_codeword, [qubit_idxs[0], qubit_idxs[1]])
+        k.gate("wait", [])
+        for qb in qubit_idxs:
+            k.measure(qb)
+        k.gate("wait", [])
+    p.add_kernel(k)
+    # Reference experiment
+    k = p.create_kernel("Reference_experiment")
+    k.prepz(qubit_idxs[0])
+    if heralded_init:
+        for qb in qubit_idxs:
+            k.measure(qb)  
+    for i in range(rounds):
+        for qb in qubit_idxs:
+            k.gate('rx90', [qb])
+        k.gate("wait", [], gate_time_ns)
+        for qb in qubit_idxs:
+            k.measure(qb)
+        k.gate("wait", [])
+    p.add_kernel(k)
+    # Calibration_points
+    states = ['0','1', '2']
+    combinations = [''.join(s) for s in itertools.product(states, repeat=2)]
+    p.add_multi_q_cal_points(qubits=qubit_idxs, 
+                             combinations=combinations, 
+                             reps_per_cal_pnt=1)
     # Compile
     p.compile()
     return p
