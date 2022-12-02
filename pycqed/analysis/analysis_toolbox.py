@@ -29,9 +29,6 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabe
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor)
 
-# At least define the global if you're going to set it anyways
-DATADIR: str = get_default_datadir()
-
 ######################################################################
 #     Filehandling tools
 ######################################################################
@@ -129,7 +126,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
         the requirements (Cristian)
     """
     if (folder is None):
-        search_dir = DATADIR
+        search_dir = datadir
     else:
         search_dir = folder
 
@@ -212,7 +209,7 @@ def get_datafilepath_from_timestamp(timestamp):
     # Not only verifies but also decomposes the timestamp
     daystamp, tstamp = verify_timestamp(timestamp)
 
-    daydir = os.listdir(os.path.join(DATADIR, daystamp))
+    daydir = os.listdir(os.path.join(datadir, daystamp))
 
     # Looking for the folder starting with the right timestamp
     measdir_names = [item for item in daydir if item.startswith(tstamp)]
@@ -223,7 +220,7 @@ def get_datafilepath_from_timestamp(timestamp):
         raise ValueError('No data at timestamp.')
     measdir_name = measdir_names[0]
     # Naming follows a standard convention
-    data_fp = os.path.join(DATADIR, daystamp, measdir_name,
+    data_fp = os.path.join(datadir, daystamp, measdir_name,
                            measdir_name + '.hdf5')
     return data_fp
 
@@ -234,7 +231,7 @@ def data_from_time(timestamp, folder=None):
     form YYYYmmddHHMMSS.
     """
     if (folder is None):
-        folder = DATADIR
+        folder = datadir
 
     daydirs = os.listdir(folder)
     if len(daydirs) == 0:
@@ -806,7 +803,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
 
     '''
     if folder is None:
-        folder = DATADIR
+        folder = datadir
 
     datetime_start = datetime_from_timestamp(timestamp_start)
     if timestamp_end is None:
