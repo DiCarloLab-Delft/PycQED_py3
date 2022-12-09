@@ -446,6 +446,90 @@
         "Type": "ZIVectorData",
         "Unit": "None"
     },
+    "qachannels/0/generator/waveforms/10/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/10/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/10/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/10/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/11/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/11/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/11/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/11/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/12/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/12/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/12/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/12/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/13/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/13/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/13/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/13/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/14/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/14/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/14/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/14/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/15/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/15/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/15/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/15/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
     "qachannels/0/generator/waveforms/2/length": {
         "Description": "Length of the uploaded waveform in number of complex samples.",
         "Node": "qachannels/0/generator/waveforms/2/length",
@@ -526,6 +610,34 @@
     "qachannels/0/generator/waveforms/7/wave": {
         "Description": "Contains the generators waveforms as a vector of complex samples",
         "Node": "qachannels/0/generator/waveforms/7/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/8/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/8/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/8/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/8/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/9/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/9/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/9/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/9/wave",
         "Properties": "Read, Write",
         "Type": "ZIVectorData",
         "Unit": "None"
@@ -652,6 +764,48 @@
         "Type": "Double",
         "Unit": "None"
     },
+    "qachannels/0/readout/discriminators/10/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/10/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/11/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/11/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/12/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/12/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/13/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/13/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/14/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/14/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/15/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/15/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
     "qachannels/0/readout/discriminators/2/threshold": {
         "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
         "Node": "qachannels/0/readout/discriminators/2/threshold",
@@ -694,6 +848,20 @@
         "Type": "Double",
         "Unit": "None"
     },
+    "qachannels/0/readout/discriminators/8/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/8/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/9/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/9/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
     "qachannels/0/readout/integration/clearweight": {
         "Description": "Clears all integration weights by setting them to 0.",
         "Node": "qachannels/0/readout/integration/clearweight",
@@ -725,6 +893,48 @@
     "qachannels/0/readout/integration/weights/1/wave": {
         "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
         "Node": "qachannels/0/readout/integration/weights/1/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/10/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/10/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/11/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/11/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/12/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/12/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/13/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/13/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/14/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/14/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/15/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/15/wave",
         "Properties": "Read, Write",
         "Type": "ZIVectorData",
         "Unit": "None"
@@ -771,6 +981,20 @@
         "Type": "ZIVectorData",
         "Unit": "None"
     },
+    "qachannels/0/readout/integration/weights/8/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/8/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/9/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/9/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
     "qachannels/0/readout/result/acquired": {
         "Description": "Indicates the index of the acquisition that will be performed on the next trigger.",
         "Node": "qachannels/0/readout/result/acquired",
@@ -795,6 +1019,48 @@
     "qachannels/0/readout/result/data/1/wave": {
         "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
         "Node": "qachannels/0/readout/result/data/1/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/10/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/10/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/11/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/11/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/12/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/12/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/13/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/13/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/14/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/14/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/15/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/15/wave",
         "Properties": "Read",
         "Type": "ZIVectorData",
         "Unit": "None"
@@ -837,6 +1103,20 @@
     "qachannels/0/readout/result/data/7/wave": {
         "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
         "Node": "qachannels/0/readout/result/data/7/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/8/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/8/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/9/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/9/wave",
         "Properties": "Read",
         "Type": "ZIVectorData",
         "Unit": "None"
@@ -1423,6 +1703,90 @@
         "Type": "ZIVectorData",
         "Unit": "None"
     },
+    "qachannels/1/generator/waveforms/10/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/10/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/10/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/10/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/11/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/11/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/11/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/11/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/12/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/12/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/12/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/12/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/13/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/13/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/13/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/13/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/14/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/14/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/14/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/14/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/15/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/15/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/15/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/15/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
     "qachannels/1/generator/waveforms/2/length": {
         "Description": "Length of the uploaded waveform in number of complex samples.",
         "Node": "qachannels/1/generator/waveforms/2/length",
@@ -1503,6 +1867,34 @@
     "qachannels/1/generator/waveforms/7/wave": {
         "Description": "Contains the generators waveforms as a vector of complex samples",
         "Node": "qachannels/1/generator/waveforms/7/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/8/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/8/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/8/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/8/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/9/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/9/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/9/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/9/wave",
         "Properties": "Read, Write",
         "Type": "ZIVectorData",
         "Unit": "None"
@@ -1629,6 +2021,48 @@
         "Type": "Double",
         "Unit": "None"
     },
+    "qachannels/1/readout/discriminators/10/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/10/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/11/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/11/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/12/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/12/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/13/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/13/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/14/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/14/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/15/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/15/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
     "qachannels/1/readout/discriminators/2/threshold": {
         "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
         "Node": "qachannels/1/readout/discriminators/2/threshold",
@@ -1671,6 +2105,20 @@
         "Type": "Double",
         "Unit": "None"
     },
+    "qachannels/1/readout/discriminators/8/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/8/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/9/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/9/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
     "qachannels/1/readout/integration/clearweight": {
         "Description": "Clears all integration weights by setting them to 0.",
         "Node": "qachannels/1/readout/integration/clearweight",
@@ -1702,6 +2150,48 @@
     "qachannels/1/readout/integration/weights/1/wave": {
         "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
         "Node": "qachannels/1/readout/integration/weights/1/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/10/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/10/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/11/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/11/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/12/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/12/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/13/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/13/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/14/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/14/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/15/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/15/wave",
         "Properties": "Read, Write",
         "Type": "ZIVectorData",
         "Unit": "None"
@@ -1748,6 +2238,20 @@
         "Type": "ZIVectorData",
         "Unit": "None"
     },
+    "qachannels/1/readout/integration/weights/8/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/8/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/9/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/9/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
     "qachannels/1/readout/result/acquired": {
         "Description": "Indicates the index of the acquisition that will be performed on the next trigger.",
         "Node": "qachannels/1/readout/result/acquired",
@@ -1772,6 +2276,48 @@
     "qachannels/1/readout/result/data/1/wave": {
         "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
         "Node": "qachannels/1/readout/result/data/1/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/10/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/10/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/11/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/11/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/12/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/12/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/13/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/13/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/14/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/14/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/15/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/15/wave",
         "Properties": "Read",
         "Type": "ZIVectorData",
         "Unit": "None"
@@ -1814,6 +2360,20 @@
     "qachannels/1/readout/result/data/7/wave": {
         "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
         "Node": "qachannels/1/readout/result/data/7/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/8/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/8/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/9/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/9/wave",
         "Properties": "Read",
         "Type": "ZIVectorData",
         "Unit": "None"
@@ -3495,6 +4055,13 @@
     "system/properties/freqscaling": {
         "Description": "The scale factor to use to convert a frequency represented as a freqresolution-bit integer to a floating point value.",
         "Node": "system/properties/freqscaling",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "system/properties/maxdemodrate": {
+        "Description": "[empty]",
+        "Node": "system/properties/maxdemodrate",
         "Properties": "Read",
         "Type": "Double",
         "Unit": "None"

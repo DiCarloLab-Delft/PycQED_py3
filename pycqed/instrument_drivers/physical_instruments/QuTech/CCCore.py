@@ -148,15 +148,18 @@ class CCCore(SCPIBase):
     def calibrate_dio(self, ccio: int, expected_bits: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:DIOIN:CAL {expected_bits}')
 
-    def get_calibrate_dio_success(self, ccio: int) -> int:
-        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:SUCCESS?')
+    def get_calibrate_dio_success(self, ccio: int) -> bool:
+        return self.get_calibrate_dio_status(ccio) == 0
+
+    def get_calibrate_dio_status(self, ccio: int) -> int:
+        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:SUCCESS?') # FIXME: CC actually returns a *status* equivalent to stat_ques_diocal, see flags SQD_*
 
     def get_calibrate_dio_read_index(self, ccio: int) -> int:
-        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:READINDEX?')
+        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:READINDEX?')
 
     # FIXME: actually returns window size: margin = int((result-1)/2)
     def get_calibrate_dio_margin(self, ccio: int) -> int:
-        return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:MARGIN?')
+        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:MARGIN?')
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')
