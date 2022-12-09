@@ -154,6 +154,7 @@ class CCCore(SCPIBase):
     def get_calibrate_dio_read_index(self, ccio: int) -> int:
         return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:READINDEX?')
 
+    # FIXME: actually returns window size: margin = int((result-1)/2)
     def get_calibrate_dio_margin(self, ccio: int) -> int:
         return self._ask_int('QUTech:CCIO#:DIOIN:CALibrate:MARGIN?')
 
