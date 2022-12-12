@@ -31,7 +31,7 @@ from pycqed.instrument_drivers.library.DIO import CalInterface
 from qcodes.utils import validators
 from qcodes.utils.helpers import full_class
 
-import zhinst.deviceutils.shfqa as shfqa_utils
+import zhinst.utils.shfqa as shfqa_utils
 from zhinst.utils import wait_for_state_change
 
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.internal._shfqa import (
@@ -562,6 +562,16 @@ class SHFQA(ZI_base_instrument, CalInterface):
         ##########################################################################
 
         self.add_parameter(
+            "add_rx_delay",
+            set_cmd=self._set_rx_delay,
+            get_cmd=self._get_rx_delay,
+            unit="",
+            label="Add RX Delay",
+            docstring="Conditional delay of the DIO RX signal by 2 ns in the 500 MHz domain. ",
+            vals=validators.Ints(),
+        )
+
+        self.add_parameter(
             "result_mode",
             set_cmd=self._set_result_mode,
             get_cmd=self._get_result_mode,
@@ -673,14 +683,34 @@ class SHFQA(ZI_base_instrument, CalInterface):
 
         log.info(f"{self.devname}: Setting DIO calibration delay to {value}")
         self._dio_calibration_delay = value
-        for bit in range(DioCalibration.NUM_BITS):
-            self.seti(f"raw/dios/0/delays/{bit}/value", self._dio_calibration_delay)
+        self.daq.syncSetInt(
+            f"/{self.devname}/raw/dios/0/offset", self._dio_calibration_delay
+        )
+
 
     def _get_dio_calibration_delay(self) -> float:
         """
         Getter function for the "dio_calibration_delay" QCoDeS parameter.
         """
         return self._dio_calibration_delay
+
+    def _set_rx_delay(self, add_rx_delay) -> None:
+        """
+        Setter function for the "add_rx_delay" QCoDeS parameter.
+
+        Args:
+            add_rx_delay: value that determines if conditional 2ns delay needs to be applied
+        """
+        self._add_rx_delay = add_rx_delay
+        self.daq.syncSetInt(
+            f"/{self.devname}/raw/dios/0/addrxdelay", self._add_rx_delay
+        )
+
+    def _get_rx_delay(self) -> int:
+        """
+                Getter function for the "add_rx_delay" QCoDeS parameter.
+        """
+        return self._add_rx_delay
 
     def _set_result_mode(self, value: str) -> None:
         """
@@ -1158,88 +1188,82 @@ class SHFQA(ZI_base_instrument, CalInterface):
     def calibrate_dio_protocol(
         self, dio_mask: int, expected_sequence: List, port: int = 0
     ):
-        self._ensure_activity(mask=dio_mask)
-
         log.info(f"{self.devname}: Finding valid delays...")
 
-        valid_delays = []
-        for delay in DioCalibration.DELAYS:
-            self._set_dio_calibration_delay(delay)
-            self.daq.setInt(f"/{self.devname}/raw/dios/0/error/timingclear", 1)
-            time.sleep(3)
-            timing_error = self.daq.getInt(
-                f"/{self.devname}/raw/dios/0/error/timingsticky"
+        dio_toggle_freq = 50e6
+        self.daq.set(f"/{self.devname}/raw/dios/0/rate", dio_toggle_freq)
+        dio_sample_freq_actual = self.daq.getDouble(f"/{self.devname}/raw/dios/0/rate")
+
+        assert dio_toggle_freq == dio_sample_freq_actual
+
+        # Calculate measurement time so at least 10k toggles are checked.
+        measurement_time = max(0.5, 10e3 / dio_sample_freq_actual)
+
+        offset = 0
+        sampling_error = []
+        value_same = []
+        add_delay = []
+
+        self.daq.syncSetInt(f"/{self.devname}/raw/dios/0/error/timingcalib", 1)
+
+        while True:
+            self.daq.syncSetInt(f"/{self.devname}/raw/dios/0/offset", offset)
+            offset_actual = self.daq.getInt(f"/{self.devname}/raw/dios/0/offset")
+            if offset != offset_actual:
+                num_offsets = offset
+                break
+            self.daq.syncSetInt(
+                f"/{self.devname}/raw/dios/0/error/checkingenabled", dio_mask
             )
-            if timing_error == 0:
-                valid_delays.append(delay)
+            self.daq.syncSetInt(f"/{self.devname}/raw/dios/0/error/timingclear", 1)
 
-        if not valid_delays:
-            raise Exception("DIO calibration failed! No valid delays found")
+            time.sleep(measurement_time)
 
-        log.info(f"{self.devname}: Valid delays are {valid_delays}")
-
-        subseqs = [[valid_delays[0]]]
-        for delay in valid_delays:
-            last_subseq = subseqs[-1]
-            last_delay = last_subseq[-1]
-            delay_following_sequence = not last_subseq or last_delay == delay - 1
-            if delay_following_sequence:
-                subseqs[-1].append(delay)
-            else:
-                subseqs.append([delay])
-
-        longest_subseq = max(subseqs, key=len)
-        delay = len(longest_subseq) // 2 + longest_subseq[0]
-
-        self._set_dio_calibration_delay(delay)
-
-        # Clear all detected errors (caused by DIO timing calibration)
-        self.check_errors(errors_to_ignore=["AWGDIOTIMING"])
-
-    def _ensure_activity(self, mask: int):
-        """
-        Record DIO data and test whether there is activity on the bits activated in the DIO protocol.
-        """
-        log.debug(f"{self.devname}: Testing DIO activity.")
-
-        # The sequencer must be running in order for the RT logger to acquire data
-        self.configure_awg_from_string(
-            awg_nr=DioCalibration.GENERATOR_INDEX,
-            program_string=DioCalibration.CC_TO_SHFQA_PROGRAM,
-        )
-        shfqa_utils.enable_sequencer(
-            self.daq,
-            self.devname,
-            channel_index=DioCalibration.GENERATOR_INDEX,
-            single=1,
-        )
-
-        rt_logger_path = (
-            f"qachannels_{DioCalibration.GENERATOR_INDEX}_generator_rtlogger_"
-        )
-        self.set(rt_logger_path + "mode", 1)
-        self.set(rt_logger_path + "starttimestamp", 0)
-        self.set(rt_logger_path + "enable", 1)
-        time.sleep(0.01)
-        path = f"/{self.devname}/qachannels/0/generator/rtlogger/data"
-        data = self.daq.get(path, settingsonly=False, flat=True)[path][0]["vector"]
-        dio_snapshot = data[1::2]
-        self.set(rt_logger_path + "enable", 0)
-        self.set(rt_logger_path + "clear", 1)
-
-        self.set(f"qachannels_{0}_generator_enable", 0)
-
-        if dio_snapshot is None:
-            raise ziValueError(f"{self.devname}: Failed to get DIO snapshot!")
-
-        activity = 0
-        for dio_value in dio_snapshot:
-            activity |= int(dio_value) & mask
-
-        if activity != mask:
-            raise ziValueError(
-                f"{self.devname}: Did not see activity on all bits! Got 0x{activity:08x}, expected 0x{mask:08x}."
+            sampling_error.append(
+                self.daq.getInt(f"/{self.devname}/raw/dios/0/error/timingsticky")
+                & dio_mask
             )
+            value_same.append(
+                self.daq.getInt(f"/{self.devname}/raw/dios/0/error/timingsame")
+                & dio_mask
+            )
+            add_delay.append(
+                self.daq.getInt(f"/{self.devname}/raw/dios/0/error/fallingunstable") != 0
+            )
+
+            log.debug(
+                f"  sampling point {offset}, sampling unstable: {sampling_error[-1]:#034b}"
+                f", value same: {value_same[-1]:#034b}"
+            )
+
+            offset += 1
+
+        self.daq.set(f"/{self.devname}/raw/dios/0/error/timingcalib", 0)
+        self.daq.set(f"/{self.devname}/raw/dios/0/error/timingclear", 1)
+
+
+        if sampling_error.count(0) == 0:
+            raise Exception("DIO calibration failed! No valid sampling points found")
+
+        offset_try = value_same.index(0)
+        if offset_try == 0:
+            for idx, val in reversed(list(enumerate(value_same))):
+                # As long as values at the end of the array indicate value_same == 0, keep walking to the front.
+                if val != 0:
+                    break
+                offset_try = idx
+
+        for i in range(num_offsets):
+            idx = (offset_try + i) % num_offsets
+            if sampling_error[idx] == 0:
+                log.debug(
+                    f"  Sampling point {idx} is best match (errors: {sampling_error[idx]:#b}, value same: {value_same[idx]:#b})"
+                )
+                self._set_dio_calibration_delay(idx)
+                self._set_rx_delay(add_delay[idx])
+                # Clear all detected errors (caused by DIO timing calibration)
+                self.check_errors(errors_to_ignore=["AWGDIOTIMING"])
+                return
 
     ##########################################################################
     # Overriding private ZI_base_instrument methods
