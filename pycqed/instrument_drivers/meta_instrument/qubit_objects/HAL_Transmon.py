@@ -5220,7 +5220,8 @@ class HAL_Transmon(HAL_ShimSQ):
         a = ma2.mra.measurement_QND_analysis(
             qubit=self.name,
             label='QND',
-            extract_only=no_figs)
+            extract_only=no_figs,
+            options_dict={'qubit_freq':self.freq_qubit()})
         return a.qoi
 
     def calibrate_RO_QND(

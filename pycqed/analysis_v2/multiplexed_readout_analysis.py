@@ -5,6 +5,8 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.patches as patches
 import numpy as np
+import scipy.constants as spconst
+from copy import deepcopy
 from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.tools import matplotlib_utils as mpl_utils
@@ -1746,15 +1748,18 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
                  label: str = '',
                  options_dict: dict = None,
                  extract_only: bool = False,
+                 do_fitting=True,
                  auto=True
                  ):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
-                         extract_only=extract_only)
+                         extract_only=extract_only,
+                         do_fitting=do_fitting)
 
         self.qubit = qubit
+        self.qubit_freq = self.options_dict.get('qubit_freq', None)
 
         if auto:
             self.run_analysis()
@@ -1850,6 +1855,8 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['I1_proc'], self.proc_data_dict['Q1_proc'] = I1_proc, Q1_proc
         self.proc_data_dict['center_0'] = center_0
         self.proc_data_dict['center_1'] = center_1
+        self.proc_data_dict['cumsum_x_ds'] = all_bins_A
+        self.proc_data_dict['cumsum_y_ds'] = [int_cumsum_A_0, int_cumsum_A_1]
         self.proc_data_dict['threshold'] = threshold
         self.qoi = {}
         self.qoi['p00'] = p00
@@ -1859,6 +1866,134 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
         self.qoi['Fidelity'] = Fidelity
         self.qoi['P_QND'] = P_QND
         self.qoi['P_QNDp'] = P_QNDp
+
+    def prepare_fitting(self):
+
+        self.fit_dicts = OrderedDict()
+
+        ###################################
+        #  First fit the histograms (PDF) #
+        ###################################
+        rang = np.max(list(np.abs(self.proc_data_dict['I0_proc'])) + list(np.abs(self.proc_data_dict['I1_proc'])))
+        hist_I0, bin_edges_I0 = np.histogram(self.proc_data_dict['I0_proc'], bins=100, range=[-rang, rang])
+        hist_I1, bin_edges_I1 = np.histogram(self.proc_data_dict['I1_proc'], bins=100, range=[-rang, rang])
+
+        bin_centers_I0 = (bin_edges_I0[1:] + bin_edges_I0[:-1])/2
+        bin_centers_I1 = (bin_edges_I1[1:] + bin_edges_I1[:-1])/2
+
+        bin_xs = [bin_centers_I0, bin_centers_I1]
+        bin_ys = [hist_I0, hist_I1]
+        m = lmfit.model.Model(ro_gauss)
+        m.guess = ro_double_gauss_guess.__get__(m, m.__class__)
+        params = m.guess(x=bin_xs, data=bin_ys,
+                         fixed_p01=self.options_dict.get('fixed_p01', False),
+                         fixed_p10=self.options_dict.get('fixed_p10', False))
+        res = m.fit(x=bin_xs, data=bin_ys, params=params)
+
+        self.fit_dicts['shots_all_hist'] = {
+            'model': m,
+            'fit_xvals': {'x': bin_xs},
+            'fit_yvals': {'data': bin_ys},
+            'guessfn_pars': {'fixed_p01': self.options_dict.get('fixed_p01', False),
+                             'fixed_p10': self.options_dict.get('fixed_p10', False)},
+        }
+
+        ###################################
+        #  Fit the CDF                    #
+        ###################################
+
+        m_cul = lmfit.model.Model(ro_CDF)
+        cdf_xs = self.proc_data_dict['cumsum_x_ds']
+        cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
+        cdf_ys = self.proc_data_dict['cumsum_y_ds']
+        cdf_ys = [np.array(cdf_ys[0]), np.array(cdf_ys[1])]
+        #cul_res = m_cul.fit(x=cdf_xs, data=cdf_ys, params=res.params)
+        cum_params = res.params
+        cum_params['A_amplitude'].value = np.max(cdf_ys[0])
+        cum_params['A_amplitude'].vary = False
+        cum_params['B_amplitude'].value = np.max(cdf_ys[1])
+        cum_params['A_amplitude'].vary = False # FIXME: check if correct
+        self.fit_dicts['shots_all'] = {
+            'model': m_cul,
+            'fit_xvals': {'x': cdf_xs},
+            'fit_yvals': {'data': cdf_ys},
+            'guess_pars': cum_params,
+        }
+
+    def analyze_fit_results(self):
+        # Create a CDF based on the fit functions of both fits.
+        fr = self.fit_res['shots_all']
+        bv = fr.best_values
+
+        # best values new
+        bvn = deepcopy(bv)
+        bvn['A_amplitude'] = 1
+        bvn['B_amplitude'] = 1
+
+        def CDF(x):
+            return ro_CDF(x=x, **bvn)
+
+        def CDF_0(x):
+            return CDF(x=[x, x])[0]
+
+        def CDF_1(x):
+            return CDF(x=[x, x])[1]
+
+        def infid_vs_th(x):
+            cdf = ro_CDF(x=[x, x], **bvn)
+            return (1-np.abs(cdf[0] - cdf[1]))/2
+
+        self._CDF_0 = CDF_0
+        self._CDF_1 = CDF_1
+        self._infid_vs_th = infid_vs_th
+
+        thr_guess = (3*bv['B_center'] - bv['A_center'])/2
+        opt_fid = minimize(infid_vs_th, thr_guess)
+
+        # for some reason the fit sometimes returns a list of values
+        if isinstance(opt_fid['fun'], float):
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])
+        else:
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])[0]
+
+        self.proc_data_dict['threshold_fit'] = opt_fid['x'][0]
+
+        # Calculate the fidelity of both
+
+        ###########################################
+        #  Extracting the discrimination fidelity #
+        ###########################################
+
+        def CDF_0_discr(x):
+            return gaussianCDF(x, amplitude=1,
+                               mu=bv['A_center'], sigma=bv['A_sigma'])
+
+        def CDF_1_discr(x):
+            return gaussianCDF(x, amplitude=1,
+                               mu=bv['B_center'], sigma=bv['B_sigma'])
+
+        def disc_infid_vs_th(x):
+            cdf0 = gaussianCDF(x, amplitude=1, mu=bv['A_center'],
+                               sigma=bv['A_sigma'])
+            cdf1 = gaussianCDF(x, amplitude=1, mu=bv['B_center'],
+                               sigma=bv['B_sigma'])
+            return (1-np.abs(cdf0 - cdf1))/2
+
+        self._CDF_0_discr = CDF_0_discr
+        self._CDF_1_discr = CDF_1_discr
+        self._disc_infid_vs_th = disc_infid_vs_th
+
+        fr = self.fit_res['shots_all']
+        bv = fr.params
+        self.proc_data_dict['residual_excitation'] = bv['A_spurious'].value
+        self.proc_data_dict['relaxation_events'] = bv['B_spurious'].value
+
+        ###################################
+        #  Save quantities of interest.   #
+        ###################################
+        self.qoi['SNR'] = self.fit_res['shots_all'].params['SNR'].value,
+        self.qoi['residual_excitation'] = self.proc_data_dict['residual_excitation'],
+        self.qoi['relaxation_events'] = self.proc_data_dict['relaxation_events']
 
     def prepare_plots(self):
 
@@ -1886,6 +2021,9 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
             'P_QND': self.qoi['P_QND'],
             'P_QNDp': self.qoi['P_QNDp'],
             'Fidelity': self.qoi['Fidelity'],
+            'fit_res_hist_shots': self.fit_res['shots_all_hist'],
+            'res_exc': self.fit_res['shots_all'].params['A_spurious'].value,
+            'qubit_freq': self.qubit_freq,
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
@@ -1957,6 +2095,7 @@ class Readout_sweep_analysis(ba.BaseDataAnalysis):
         Opt_QNp = Freq_points[QNp_idx], Amp_points[QNp_idx]
         # Calibration point
         Cal_idx = np.argmax(1*P_QNDp+0*P_QND)
+        print(Cal_idx)
         Opt_Cal = Freq_points[Cal_idx], Amp_points[Cal_idx]
         Fid_Cal = Fidelity[Cal_idx]
         QND_Cal = P_QND[Cal_idx]
@@ -3009,6 +3148,9 @@ def plot_QND_metrics(I0, Q0,
                      p01p, p10p,
                      P_QND, P_QNDp,
                      Fidelity,
+                     fit_res_hist_shots,
+                     res_exc,
+                     qubit_freq,
                      timestamp,
                      qubit,
                      ax, **kw):
@@ -3029,9 +3171,17 @@ def plot_QND_metrics(I0, Q0,
                 ls='--', lw=.5, color='k')
     # plot histogram of rotated shots
     rang = np.max(list(np.abs(I0_proc)) + list(np.abs(I1_proc)))
-    axs[1].hist(I0_proc, range=[-rang, rang], bins=100, color='C0', alpha=.75, label='ground')
-    axs[1].hist(I1_proc, range=[-rang, rang], bins=100, color='C3', alpha=.75, label='excited')
+    bins_I0, edges_I0, _ = axs[1].hist(I0_proc, range=[-rang, rang], bins=100, color='C0', alpha=.75, label='ground')
+    bins_I1, edges_I1, _ = axs[1].hist(I1_proc, range=[-rang, rang], bins=100, color='C3', alpha=.75, label='excited')
     axs[1].axvline(threshold, ls='--', lw=.5, color='k', label='threshold')
+
+    # plot fit of rotated shots
+    x = np.linspace(edges_I0[0], edges_I0[-1], 150)
+    fit_params = fit_res_hist_shots.best_values
+    ro_g = ro_gauss(x=[x, x], **fit_params)
+    axs[1].plot(x, ro_g[0], color='C0', label='Fit ground')
+    axs[1].plot(x, ro_g[1], color='C3', label='Fit excited')
+
     axs[1].legend(loc='upper right', fontsize=3, frameon=False)
 
     rang = np.max(list(np.abs(I0)) + list(np.abs(I1)) +
@@ -3053,6 +3203,15 @@ def plot_QND_metrics(I0, Q0,
                       f'Fidelity$= {Fidelity * 100:.2f}$ %',
                       '$P_{QND}$ = ' + f'{P_QND * 100:.2f} %',
                       '$P_{QND,X_\pi}$ = ' + f'{P_QNDp * 100:.2f} %'))
+
+    if qubit_freq is not None:
+        h = spconst.value('Planck constant')
+        kb = spconst.value('Boltzmann constant')
+        T_eff = h*qubit_freq/(kb*np.log((1-res_exc)/res_exc))
+        text += '\n\nQubit $T_{eff}$' \
+                    + ' = {:.2f} mK\n   @ {:.3f} GHz' \
+                    .format(T_eff*1e3, qubit_freq*1e-9)
+
     props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
     axs[1].text(1.05, 1, 'Experiment', transform=axs[1].transAxes, fontsize=6,
                 verticalalignment='top')
