@@ -5,12 +5,10 @@ from matplotlib.gridspec import GridSpec
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.patches as patches
 import numpy as np
-import scipy.constants as spconst
-from copy import deepcopy
 from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.tools import matplotlib_utils as mpl_utils
-from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
+from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp, calculate_rotation_matrix
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
     cmap_to_alpha, cmap_first_to_alpha
 import pycqed.analysis.tools.data_manipulation as dm_tools
@@ -1748,18 +1746,15 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
                  label: str = '',
                  options_dict: dict = None,
                  extract_only: bool = False,
-                 do_fitting=True,
                  auto=True
                  ):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
-                         extract_only=extract_only,
-                         do_fitting=do_fitting)
+                         extract_only=extract_only)
 
         self.qubit = qubit
-        self.qubit_freq = self.options_dict.get('qubit_freq', None)
 
         if auto:
             self.run_analysis()
@@ -1855,8 +1850,6 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['I1_proc'], self.proc_data_dict['Q1_proc'] = I1_proc, Q1_proc
         self.proc_data_dict['center_0'] = center_0
         self.proc_data_dict['center_1'] = center_1
-        self.proc_data_dict['cumsum_x_ds'] = all_bins_A
-        self.proc_data_dict['cumsum_y_ds'] = [int_cumsum_A_0, int_cumsum_A_1]
         self.proc_data_dict['threshold'] = threshold
         self.qoi = {}
         self.qoi['p00'] = p00
@@ -1866,134 +1859,6 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
         self.qoi['Fidelity'] = Fidelity
         self.qoi['P_QND'] = P_QND
         self.qoi['P_QNDp'] = P_QNDp
-
-    def prepare_fitting(self):
-
-        self.fit_dicts = OrderedDict()
-
-        ###################################
-        #  First fit the histograms (PDF) #
-        ###################################
-        rang = np.max(list(np.abs(self.proc_data_dict['I0_proc'])) + list(np.abs(self.proc_data_dict['I1_proc'])))
-        hist_I0, bin_edges_I0 = np.histogram(self.proc_data_dict['I0_proc'], bins=100, range=[-rang, rang])
-        hist_I1, bin_edges_I1 = np.histogram(self.proc_data_dict['I1_proc'], bins=100, range=[-rang, rang])
-
-        bin_centers_I0 = (bin_edges_I0[1:] + bin_edges_I0[:-1])/2
-        bin_centers_I1 = (bin_edges_I1[1:] + bin_edges_I1[:-1])/2
-
-        bin_xs = [bin_centers_I0, bin_centers_I1]
-        bin_ys = [hist_I0, hist_I1]
-        m = lmfit.model.Model(ro_gauss)
-        m.guess = ro_double_gauss_guess.__get__(m, m.__class__)
-        params = m.guess(x=bin_xs, data=bin_ys,
-                         fixed_p01=self.options_dict.get('fixed_p01', False),
-                         fixed_p10=self.options_dict.get('fixed_p10', False))
-        res = m.fit(x=bin_xs, data=bin_ys, params=params)
-
-        self.fit_dicts['shots_all_hist'] = {
-            'model': m,
-            'fit_xvals': {'x': bin_xs},
-            'fit_yvals': {'data': bin_ys},
-            'guessfn_pars': {'fixed_p01': self.options_dict.get('fixed_p01', False),
-                             'fixed_p10': self.options_dict.get('fixed_p10', False)},
-        }
-
-        ###################################
-        #  Fit the CDF                    #
-        ###################################
-
-        m_cul = lmfit.model.Model(ro_CDF)
-        cdf_xs = self.proc_data_dict['cumsum_x_ds']
-        cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
-        cdf_ys = self.proc_data_dict['cumsum_y_ds']
-        cdf_ys = [np.array(cdf_ys[0]), np.array(cdf_ys[1])]
-        #cul_res = m_cul.fit(x=cdf_xs, data=cdf_ys, params=res.params)
-        cum_params = res.params
-        cum_params['A_amplitude'].value = np.max(cdf_ys[0])
-        cum_params['A_amplitude'].vary = False
-        cum_params['B_amplitude'].value = np.max(cdf_ys[1])
-        cum_params['A_amplitude'].vary = False # FIXME: check if correct
-        self.fit_dicts['shots_all'] = {
-            'model': m_cul,
-            'fit_xvals': {'x': cdf_xs},
-            'fit_yvals': {'data': cdf_ys},
-            'guess_pars': cum_params,
-        }
-
-    def analyze_fit_results(self):
-        # Create a CDF based on the fit functions of both fits.
-        fr = self.fit_res['shots_all']
-        bv = fr.best_values
-
-        # best values new
-        bvn = deepcopy(bv)
-        bvn['A_amplitude'] = 1
-        bvn['B_amplitude'] = 1
-
-        def CDF(x):
-            return ro_CDF(x=x, **bvn)
-
-        def CDF_0(x):
-            return CDF(x=[x, x])[0]
-
-        def CDF_1(x):
-            return CDF(x=[x, x])[1]
-
-        def infid_vs_th(x):
-            cdf = ro_CDF(x=[x, x], **bvn)
-            return (1-np.abs(cdf[0] - cdf[1]))/2
-
-        self._CDF_0 = CDF_0
-        self._CDF_1 = CDF_1
-        self._infid_vs_th = infid_vs_th
-
-        thr_guess = (3*bv['B_center'] - bv['A_center'])/2
-        opt_fid = minimize(infid_vs_th, thr_guess)
-
-        # for some reason the fit sometimes returns a list of values
-        if isinstance(opt_fid['fun'], float):
-            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])
-        else:
-            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])[0]
-
-        self.proc_data_dict['threshold_fit'] = opt_fid['x'][0]
-
-        # Calculate the fidelity of both
-
-        ###########################################
-        #  Extracting the discrimination fidelity #
-        ###########################################
-
-        def CDF_0_discr(x):
-            return gaussianCDF(x, amplitude=1,
-                               mu=bv['A_center'], sigma=bv['A_sigma'])
-
-        def CDF_1_discr(x):
-            return gaussianCDF(x, amplitude=1,
-                               mu=bv['B_center'], sigma=bv['B_sigma'])
-
-        def disc_infid_vs_th(x):
-            cdf0 = gaussianCDF(x, amplitude=1, mu=bv['A_center'],
-                               sigma=bv['A_sigma'])
-            cdf1 = gaussianCDF(x, amplitude=1, mu=bv['B_center'],
-                               sigma=bv['B_sigma'])
-            return (1-np.abs(cdf0 - cdf1))/2
-
-        self._CDF_0_discr = CDF_0_discr
-        self._CDF_1_discr = CDF_1_discr
-        self._disc_infid_vs_th = disc_infid_vs_th
-
-        fr = self.fit_res['shots_all']
-        bv = fr.params
-        self.proc_data_dict['residual_excitation'] = bv['A_spurious'].value
-        self.proc_data_dict['relaxation_events'] = bv['B_spurious'].value
-
-        ###################################
-        #  Save quantities of interest.   #
-        ###################################
-        self.qoi['SNR'] = self.fit_res['shots_all'].params['SNR'].value,
-        self.qoi['residual_excitation'] = self.proc_data_dict['residual_excitation'],
-        self.qoi['relaxation_events'] = self.proc_data_dict['relaxation_events']
 
     def prepare_plots(self):
 
@@ -2021,9 +1886,6 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
             'P_QND': self.qoi['P_QND'],
             'P_QNDp': self.qoi['P_QNDp'],
             'Fidelity': self.qoi['Fidelity'],
-            'fit_res_hist_shots': self.fit_res['shots_all_hist'],
-            'res_exc': self.fit_res['shots_all'].params['A_spurious'].value,
-            'qubit_freq': self.qubit_freq,
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
@@ -2095,7 +1957,6 @@ class Readout_sweep_analysis(ba.BaseDataAnalysis):
         Opt_QNp = Freq_points[QNp_idx], Amp_points[QNp_idx]
         # Calibration point
         Cal_idx = np.argmax(1*P_QNDp+0*P_QND)
-        print(Cal_idx)
         Opt_Cal = Freq_points[Cal_idx], Amp_points[Cal_idx]
         Fid_Cal = Fidelity[Cal_idx]
         QND_Cal = P_QND[Cal_idx]
@@ -2357,6 +2218,156 @@ class Depletion_AllXY_analysis(ba.BaseDataAnalysis):
             'data_0': self.proc_data_dict['data_0'],
             'data_1': self.proc_data_dict['data_1']
         }
+
+class FourXY_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 qubit,
+                 nr_shots,
+                 pi_pulse: bool,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qubit = qubit
+        self.nr_shots = nr_shots
+        self.pi_pulse = pi_pulse
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        data_I = self.raw_data_dict['data'][:,1]
+        data_Q = self.raw_data_dict['data'][:,2]
+
+        if not self.pi_pulse:
+            I0 = data_I[:self.nr_shots]
+            I1 = data_I[self.nr_shots*3:self.nr_shots*4]
+            Q0 = data_Q[:self.nr_shots]
+            Q1 = data_Q[self.nr_shots*3:self.nr_shots*4]
+        else:
+            I1 = data_I[:self.nr_shots]
+            I0 = data_I[self.nr_shots*3:self.nr_shots*4]
+            Q1 = data_Q[:self.nr_shots]
+            Q0 = data_Q[self.nr_shots*3:self.nr_shots*4]
+
+        center_0 = np.array([np.mean(I0), np.mean(Q0)])
+        center_1 = np.array([np.mean(I1), np.mean(Q1)])
+
+        # Translate the data
+        trans_data = [data_I - center_0[0], data_Q - center_0[1]]
+
+        # Rotate the data
+        M = calculate_rotation_matrix(center_1[0] - center_0[0], center_1[1] - center_0[1])
+        outp = [np.asarray(elem)[0] for elem in M * trans_data]
+        rotated_data_ch1 = outp[0]
+
+        # Normalize the data
+        one_zero_dist = np.sqrt((center_1[0] - center_0[0]) ** 2 + (center_1[1] - center_0[1]) ** 2)
+        normalized_data = rotated_data_ch1 / one_zero_dist
+
+        data_reference = normalized_data[:self.nr_shots*4]
+        data_depletion = normalized_data[self.nr_shots*4+1::2]
+
+        self.proc_data_dict['data_ref'] = data_reference
+        self.proc_data_dict['data_depl'] = data_depletion
+
+        if not self.pi_pulse:
+            data_ideal = [0 for i in range(self.nr_shots)] + [.5 for i in range(self.nr_shots*2)] + [1 for i in range(self.nr_shots)]
+        else:
+            data_ideal = [1 for i in range(self.nr_shots)] + [.5 for i in range(self.nr_shots*2)] + [0 for i in range(self.nr_shots)]
+
+        self.proc_data_dict['data_ideal'] = np.array(data_ideal)
+
+        error_ref = data_reference - data_ideal
+        error_depl = data_depletion- data_ideal
+        self.qoi ={}
+        self.qoi['deviation_ref'] = np.mean(abs(error_ref))
+        self.qoi['deviation_depl'] = np.mean(abs(error_depl))
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': plot_fourxy,
+            'qubit': self.qubit,
+            'timestamp': self.timestamp,
+            'data_ref': self.proc_data_dict['data_ref'],
+            'data_depl': self.proc_data_dict['data_depl'],
+            'data_ideal': self.proc_data_dict['data_ideal'],
+            'deviation_ref': self.qoi['deviation_ref'],
+            'deviation_depl': self.qoi['deviation_depl'],
+            'pi_pulse': self.pi_pulse,
+            'nr_shots': self.nr_shots,
+        }
+
+class Depletion_FourXY_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 qubit,
+                 pi_pulse: bool,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qubit = qubit
+        self.pi_pulse = pi_pulse
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        self.proc_data_dict['depletion_time'] = self.raw_data_dict['data'][:,0]
+        self.proc_data_dict['deviation_ref'] = self.raw_data_dict['data'][:,1]
+        self.proc_data_dict['deviation_depl'] = self.raw_data_dict['data'][:,2]
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': plot_depletion_fourxy,
+            'qubit': self.qubit,
+            'timestamp': self.timestamp,
+            'depletion_time': self.proc_data_dict['depletion_time'],
+            'deviation_ref': self.proc_data_dict['deviation_ref'],
+            'deviation_depl': self.proc_data_dict['deviation_depl'],
+            'pi_pulse': self.pi_pulse,
+        }
+
 
 ######################################
 # Helper functions
@@ -2998,9 +3009,6 @@ def plot_QND_metrics(I0, Q0,
                      p01p, p10p,
                      P_QND, P_QNDp,
                      Fidelity,
-                     fit_res_hist_shots,
-                     res_exc,
-                     qubit_freq,
                      timestamp,
                      qubit,
                      ax, **kw):
@@ -3021,17 +3029,9 @@ def plot_QND_metrics(I0, Q0,
                 ls='--', lw=.5, color='k')
     # plot histogram of rotated shots
     rang = np.max(list(np.abs(I0_proc)) + list(np.abs(I1_proc)))
-    bins_I0, edges_I0, _ = axs[1].hist(I0_proc, range=[-rang, rang], bins=100, color='C0', alpha=.75, label='ground')
-    bins_I1, edges_I1, _ = axs[1].hist(I1_proc, range=[-rang, rang], bins=100, color='C3', alpha=.75, label='excited')
+    axs[1].hist(I0_proc, range=[-rang, rang], bins=100, color='C0', alpha=.75, label='ground')
+    axs[1].hist(I1_proc, range=[-rang, rang], bins=100, color='C3', alpha=.75, label='excited')
     axs[1].axvline(threshold, ls='--', lw=.5, color='k', label='threshold')
-
-    # plot fit of rotated shots
-    x = np.linspace(edges_I0[0], edges_I0[-1], 150)
-    fit_params = fit_res_hist_shots.best_values
-    ro_g = ro_gauss(x=[x, x], **fit_params)
-    axs[1].plot(x, ro_g[0], color='C0', label='Fit ground')
-    axs[1].plot(x, ro_g[1], color='C3', label='Fit excited')
-
     axs[1].legend(loc='upper right', fontsize=3, frameon=False)
 
     rang = np.max(list(np.abs(I0)) + list(np.abs(I1)) +
@@ -3053,15 +3053,6 @@ def plot_QND_metrics(I0, Q0,
                       f'Fidelity$= {Fidelity * 100:.2f}$ %',
                       '$P_{QND}$ = ' + f'{P_QND * 100:.2f} %',
                       '$P_{QND,X_\pi}$ = ' + f'{P_QNDp * 100:.2f} %'))
-
-    if qubit_freq is not None:
-        h = spconst.value('Planck constant')
-        kb = spconst.value('Boltzmann constant')
-        T_eff = h*qubit_freq/(kb*np.log((1-res_exc)/res_exc))
-        text += '\n\nQubit $T_{eff}$' \
-                    + ' = {:.2f} mK\n   @ {:.3f} GHz' \
-                    .format(T_eff*1e3, qubit_freq*1e-9)
-
     props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
     axs[1].text(1.05, 1, 'Experiment', transform=axs[1].transAxes, fontsize=6,
                 verticalalignment='top')
@@ -3150,4 +3141,44 @@ def plot_depletion_allxy(qubit, timestamp,
     ax.plot(data_0, 'C0o-', alpha=1, label='Standard sequence')
     ax.plot(data_1, 'C1.-', alpha=.75, label='post-measurement')
     ax.set_title(timestamp+'_Depletion_ALLXY_'+qubit)
+    ax.legend(loc=0)
+
+def plot_fourxy(qubit, timestamp,
+               data_ref, data_depl, data_ideal, deviation_ref, deviation_depl, pi_pulse, nr_shots,
+               ax, **kw):
+
+    allXY = ['II', 'xy', 'yx', 'XI']
+    allXY = np.repeat(allXY, nr_shots)
+
+    ax.set_xticks(np.arange(0, len(allXY), 1)+.5)
+    ax.set_xticklabels(allXY)
+    ax.set_ylabel(r'P($|1\rangle$)')
+    ax.set_xlabel(r'Gate combination')
+    ax.plot(data_ideal, 'k--', lw=1, label='ideal')
+    ax.plot(data_ref, 'C0o-', alpha=1, label='Standard sequence')
+    ax.plot(data_depl, 'C1.-', alpha=.75, label='Post-measurement sequence')
+    tag = 'ground' if not pi_pulse else 'excited'
+    ax.set_title(timestamp+'_FourXY_'+tag+'_'+qubit)
+    ax.legend(loc=0)
+
+    text = '\n'.join((f'Qubit initially in {tag} state',
+                      f'Reference sequence deviation$= {deviation_ref:.5f}$',
+                      f'Depletion sequence deviation$= {deviation_depl:.5f}$'))
+
+    props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
+    ax.text(0.5, -0.2, text, transform=ax.transAxes, fontsize=10,
+            verticalalignment='center', bbox=props, horizontalalignment='center')
+
+
+def plot_depletion_fourxy(qubit, timestamp,
+               depletion_time, deviation_ref, deviation_depl, pi_pulse,
+               ax, **kw):
+
+    ax.plot(depletion_time/1e-9, deviation_ref, 'C0o-', alpha=1, label='Standard sequence')
+    ax.plot(depletion_time/1e-9, deviation_depl, 'C1.-', alpha=.75, label='Post-measurement sequence')
+
+    ax.set_ylabel(r'AllXY deviation')
+    ax.set_xlabel(r'Photon depletion time (ns)')
+    tag = 'ground' if not pi_pulse else 'excited'
+    ax.set_title(timestamp+'_Depletion_FourXY_'+tag+'_'+qubit)
     ax.legend(loc=0)
