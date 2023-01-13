@@ -1859,6 +1859,7 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
         self.qoi['Fidelity'] = Fidelity
         self.qoi['P_QND'] = P_QND
         self.qoi['P_QNDp'] = P_QNDp
+        self.proc_data_dict['quantities_of_interest'] = self.qoi
 
     def prepare_plots(self):
 
