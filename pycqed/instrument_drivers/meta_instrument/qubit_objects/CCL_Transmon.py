@@ -1366,7 +1366,7 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GQ())
             else:
                 # case without VSM (and AWG8)
-                MW_LutMan.mw_amp180(1)
+                MW_LutMan.mw_amp180(self.mw_amp180())
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 
@@ -6036,6 +6036,7 @@ class CCLight_Transmon(Qubit):
         close_fig=True, 
         update=False,
         flip_ef=False,
+        flip_fh=False,
         ax='x', 
         angle='180',
         label='',
@@ -6089,6 +6090,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.flipping(number_of_flips=nf,
                          equator=equator,
                          flip_ef=flip_ef,
+                         flip_fh=flip_fh,
                          qubit_idx=self.cfg_qubit_nr(),
                          platf_cfg=self.cfg_openql_platform_fn(),
                          ax=ax.lower(), angle=angle)
@@ -6101,6 +6103,8 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
         if flip_ef:
             label = 'ef_rx12'
+        elif flip_fh:
+            label = 'fh_rx23'
         MC.run('flipping_'+ax+angle+label+self.msmt_suffix,
                disable_snapshot_metadata=disable_metadata)
         if analyze:
@@ -6126,6 +6130,9 @@ class CCLight_Transmon(Qubit):
                 if flip_ef:
                     amp_old = self.mw_ef_amp()
                     self.mw_ef_amp(scale_factor*amp_old)
+                elif flip_fh:
+                    amp_old = self.mw_fh_amp()
+                    self.mw_fh_amp(scale_factor*amp_old)
                 else:
                     amp_old = self.mw_channel_amp()
                     self.mw_channel_amp(scale_factor*amp_old)
@@ -6816,6 +6823,7 @@ class CCLight_Transmon(Qubit):
             rounds: int = 50,
             injected_leak: float = 0.02,
             leak_3rd_state: bool = False,
+            h_state: bool = False,
             nr_shots_per_case: int = 2**13,
             prepare_for_timedomain: bool = True,
             analyze: bool = True,
@@ -6843,6 +6851,8 @@ class CCLight_Transmon(Qubit):
         # Set UHF number of shots
         from math import ceil
         _cycle = 2*rounds+4
+        if h_state:
+            _cycle += 1
         nr_shots = _cycle*nr_shots_per_case
         # if heralded_init:
         #     nr_shots *= 2 
@@ -6862,6 +6872,7 @@ class CCLight_Transmon(Qubit):
             leak_3rd_state=leak_3rd_state,
             rounds=rounds,
             heralded_init=False,
+            h_state=h_state,
             platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
@@ -6880,7 +6891,8 @@ class CCLight_Transmon(Qubit):
         # Analysis
         if analyze:
             a = ma2.lrua.Repeated_LRU_experiment_Analysis(
-                qubit=self.name, rounds=rounds, label='Repeated_LRU')
+                qubit=self.name, rounds=rounds, label='Repeated_LRU',
+                h_state=h_state)
 
     def measure_LRU_process_tomo(self,
             nr_shots_per_case: int = 2**15,

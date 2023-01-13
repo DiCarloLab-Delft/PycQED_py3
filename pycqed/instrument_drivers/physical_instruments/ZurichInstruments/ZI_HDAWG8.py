@@ -96,7 +96,9 @@ import pycqed.instrument_drivers.library.DIO as DIO
 from qcodes.utils import validators
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils.helpers import full_class
+from importlib import reload
 
+reload(zibase)
 log = logging.getLogger(__name__)
 
 ##########################################################################

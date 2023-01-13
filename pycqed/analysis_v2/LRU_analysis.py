@@ -432,6 +432,14 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
             if self.h_state:
                 Shots_3 = raw_shots[4::_cycle]
                 Shots_hlru = raw_shots[5::_cycle]
+        # Save rotated shots
+        self.proc_data_dict['Shots_0'] = Shots_0
+        self.proc_data_dict['Shots_1'] = Shots_1
+        self.proc_data_dict['Shots_2'] = Shots_2
+        self.proc_data_dict['Shots_lru'] = Shots_lru
+        if self.h_state:
+            self.proc_data_dict['Shots_3'] = Shots_3
+            self.proc_data_dict['Shots_hlru'] = Shots_hlru
         ##############################################################
         # From this point onward Shots_<i> contains post-selected
         # shots of state <i> and has shape (nr_ps_shots, nr_quadtrs).
@@ -755,10 +763,10 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
         self.plot_dicts['SSRO_plot'] = {
             'plotfn': ssro_IQ_projection_plotfn,
             'ax_id': 'SSRO_plot',
-            'shots_0': self.proc_data_dict['shots_0_IQ'],
-            'shots_1': self.proc_data_dict['shots_1_IQ'],
-            'shots_2': self.proc_data_dict['shots_2_IQ'],
-            'shots_3': self.proc_data_dict['shots_3_IQ'] if self.h_state \
+            'shots_0': self.proc_data_dict['Shots_0'],
+            'shots_1': self.proc_data_dict['Shots_1'],
+            'shots_2': self.proc_data_dict['Shots_2'],
+            'shots_3': self.proc_data_dict['Shots_3'] if self.h_state \
                        else None,
             'projection_01': self.proc_data_dict['projection_01'],
             'projection_12': self.proc_data_dict['projection_12'],
@@ -781,12 +789,12 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
         self.plot_dicts['Leakage_histogram_f_state'] = {
             'plotfn': leakage_hist_plotfn,
             'ax_id': 'Leakage_histogram_f_state',
-            'shots_0': self.proc_data_dict['shots_0_IQ'],
-            'shots_1': self.proc_data_dict['shots_1_IQ'],
-            'shots_2': self.proc_data_dict['shots_2_IQ'],
-            'shots_3': self.proc_data_dict['shots_3_IQ'] if self.h_state \
+            'shots_0': self.proc_data_dict['Shots_0'],
+            'shots_1': self.proc_data_dict['Shots_1'],
+            'shots_2': self.proc_data_dict['Shots_2'],
+            'shots_3': self.proc_data_dict['Shots_3'] if self.h_state \
                        else None,
-            'shots_lru': self.proc_data_dict['shots_lru_IQ'],
+            'shots_lru': self.proc_data_dict['Shots_lru'],
             'classifier': self.proc_data_dict['classifier'],
             'dec_bounds': self.proc_data_dict['dec_bounds'],
             'pop_vec': self.qoi['pop_vec'],
@@ -803,11 +811,11 @@ class LRU_experiment_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts['Leakage_histogram'] = {
                 'plotfn': leakage_hist_plotfn,
                 'ax_id': 'Leakage_histogram_h_state',
-                'shots_0': self.proc_data_dict['shots_0_IQ'],
-                'shots_1': self.proc_data_dict['shots_1_IQ'],
-                'shots_2': self.proc_data_dict['shots_2_IQ'],
-                'shots_3': self.proc_data_dict['shots_3_IQ'],
-                'shots_lru': self.proc_data_dict['shots_hlru_IQ'],
+                'shots_0': self.proc_data_dict['Shots_0'],
+                'shots_1': self.proc_data_dict['Shots_1'],
+                'shots_2': self.proc_data_dict['Shots_2'],
+                'shots_3': self.proc_data_dict['Shots_3'],
+                'shots_lru': self.proc_data_dict['Shots_hlru'],
                 'classifier': self.proc_data_dict['classifier'],
                 'dec_bounds': self.proc_data_dict['dec_bounds'],
                 'pop_vec': self.qoi['pop_vec_h'],
@@ -1500,6 +1508,7 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
                  qubit: str,
                  rounds: int,
                  heralded_init: bool = False,
+                 h_state: bool = False,
                  t_start: str = None, 
                  t_stop: str = None,
                  label: str = '',
@@ -1516,6 +1525,7 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
         self.qubit = qubit
         self.rounds = rounds
         self.heralded_init = heralded_init
+        self.h_state = h_state
         if auto:
             self.run_analysis()
 
@@ -1538,6 +1548,8 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
     def process_data(self):
         # Perform measurement post-selection
         _cycle = 2*self.rounds+4
+        if self.h_state:
+            _cycle += 1
         if self.heralded_init:
             _cycle *= 2
         ############################################
@@ -1550,16 +1562,22 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
             _shots_1 = _raw_shots[2*self.rounds+3::_cycle]
             _shots_2 = _raw_shots[2*self.rounds+5::_cycle]
             _shots_lru = _raw_shots[2*self.rounds+7::_cycle]
+            if self.h_state:
+                _shots_3 = _raw_shots[2*self.rounds+9::_cycle]
         else:
             _shots_0 = _raw_shots[2*self.rounds+0::_cycle]
             _shots_1 = _raw_shots[2*self.rounds+1::_cycle]
             _shots_2 = _raw_shots[2*self.rounds+2::_cycle]
             _shots_lru = _raw_shots[2*self.rounds+3::_cycle]
+            if self.h_state:
+                _shots_3 = _raw_shots[2*self.rounds+4::_cycle]
         # Save raw shots
         self.proc_data_dict['shots_0_IQ'] = _shots_0
         self.proc_data_dict['shots_1_IQ'] = _shots_1
         self.proc_data_dict['shots_2_IQ'] = _shots_2
         self.proc_data_dict['shots_lru_IQ'] = _shots_lru
+        if self.h_state:
+            self.proc_data_dict['shots_3_IQ'] = _shots_3
         # Rotate data
         center_0 = np.array([np.mean(_shots_0[:,0]), np.mean(_shots_0[:,1])])
         center_1 = np.array([np.mean(_shots_1[:,0]), np.mean(_shots_1[:,1])])
@@ -1598,6 +1616,8 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
             Shots_1 = raw_shots[2*self.rounds+1::_cycle]
             Shots_2 = raw_shots[2*self.rounds+2::_cycle]
             Shots_lru = raw_shots[2*self.rounds+3::_cycle]
+            if self.h_state:
+                Shots_3 = raw_shots[2*self.rounds+4::_cycle]
             Shots_exp = {}
             Shots_ref = {}
             for r in range(self.rounds):
@@ -1611,44 +1631,89 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
         # to denote that array of shots.
         ##############################################################
         self.qoi = {}
-        ############################################
-        # Use classifier to assign states in the 
-        # IQ plane and calculate qutrit fidelity.
-        ############################################
-        # Parse data for classifier
-        data = np.concatenate((Shots_0, Shots_1, Shots_2))
-        labels = [0 for s in Shots_0]+[1 for s in Shots_1]+[2 for s in Shots_2]
-        from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-        clf = LinearDiscriminantAnalysis()
-        clf.fit(data, labels)
-        dec_bounds = _decision_boundary_points(clf.coef_, clf.intercept_)
-        Fid_dict = {}
-        for state, shots in zip([    '0',     '1',     '2'],
-                                [Shots_0, Shots_1, Shots_2]):
-            _res = clf.predict(shots)
-            _fid = np.mean(_res == int(state))
-            Fid_dict[state] = _fid
-        Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
-        # Get assignment fidelity matrix
-        M = np.zeros((3,3))
-        for i, shots in enumerate([Shots_0, Shots_1, Shots_2]):
-            for j, state in enumerate(['0', '1', '2']):
+        if self.h_state:
+            ############################################
+            # Use classifier to assign states in the 
+            # IQ plane and calculate qutrit fidelity.
+            ############################################
+            # Parse data for classifier
+            data = np.concatenate((Shots_0, Shots_1, Shots_2, Shots_3))
+            labels = [0 for s in Shots_0]+[1 for s in Shots_1]+\
+                     [2 for s in Shots_2]+[3 for s in Shots_3]
+            from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+            clf = LinearDiscriminantAnalysis()
+            clf.fit(data, labels)
+            dec_bounds = _decision_boundary_points(clf.coef_, clf.intercept_)
+            Fid_dict = {}
+            for state, shots in zip([    '0',     '1',     '2',     '3'],
+                                    [Shots_0, Shots_1, Shots_2, Shots_3]):
                 _res = clf.predict(shots)
-                M[i][j] = np.mean(_res == int(state))
-        # Get leakage removal fraction 
-        _res = clf.predict(Shots_lru)
-        _vec = np.array([np.mean(_res == int('0')),
-                         np.mean(_res == int('1')),
-                         np.mean(_res == int('2'))])
-        M_inv = np.linalg.inv(M)
-        pop_vec = np.dot(_vec, M_inv)
-        self.proc_data_dict['classifier'] = clf
-        self.proc_data_dict['dec_bounds'] = dec_bounds
-        self.proc_data_dict['Fid_dict'] = Fid_dict
-        self.qoi['Fid_dict'] = Fid_dict
-        self.qoi['Assignment_matrix'] = M
-        self.qoi['pop_vec'] = pop_vec
-        self.qoi['removal_fraction'] = 1-pop_vec[2]
+                _fid = np.mean(_res == int(state))
+                Fid_dict[state] = _fid
+            Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+            # Get assignment fidelity matrix
+            M = np.zeros((4,4))
+            for i, shots in enumerate([Shots_0, Shots_1, Shots_2, Shots_3]):
+                for j, state in enumerate(['0', '1', '2', '3']):
+                    _res = clf.predict(shots)
+                    M[i][j] = np.mean(_res == int(state))
+            # Get leakage removal fraction 
+            _res = clf.predict(Shots_lru)
+            _vec = np.array([np.mean(_res == int('0')),
+                             np.mean(_res == int('1')),
+                             np.mean(_res == int('2')),
+                             np.mean(_res == int('3'))])
+            M_inv = np.linalg.inv(M)
+            pop_vec = np.dot(_vec, M_inv)
+            self.proc_data_dict['classifier'] = clf
+            self.proc_data_dict['dec_bounds'] = dec_bounds
+            self.proc_data_dict['Fid_dict'] = Fid_dict
+            self.qoi['Fid_dict'] = Fid_dict
+            self.qoi['Assignment_matrix'] = M
+            self.qoi['pop_vec'] = pop_vec
+            self.qoi['removal_fraction'] = 1-pop_vec[2]
+        else:
+            ############################################
+            # Use classifier to assign states in the 
+            # IQ plane and calculate qutrit fidelity.
+            ############################################
+            # Parse data for classifier
+            data = np.concatenate((Shots_0, Shots_1, Shots_2))
+            labels = [0 for s in Shots_0]+[1 for s in Shots_1]+[2 for s in Shots_2]
+            from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+            clf = LinearDiscriminantAnalysis()
+            clf.fit(data, labels)
+            dec_bounds = _decision_boundary_points(clf.coef_, clf.intercept_)
+            Fid_dict = {}
+            for state, shots in zip([    '0',     '1',     '2'],
+                                    [Shots_0, Shots_1, Shots_2]):
+                _res = clf.predict(shots)
+                _fid = np.mean(_res == int(state))
+                Fid_dict[state] = _fid
+            Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+            # Get assignment fidelity matrix
+            M = np.zeros((3,3))
+            for i, shots in enumerate([Shots_0, Shots_1, Shots_2]):
+                for j, state in enumerate(['0', '1', '2']):
+                    _res = clf.predict(shots)
+                    M[i][j] = np.mean(_res == int(state))
+            # Get leakage removal fraction 
+            _res = clf.predict(Shots_lru)
+            _vec = np.array([np.mean(_res == int('0')),
+                             np.mean(_res == int('1')),
+                             np.mean(_res == int('2'))])
+            M_inv = np.linalg.inv(M)
+            pop_vec = np.dot(_vec, M_inv)
+            # Make it a 4x4 matrix
+            M = np.append(M, [[0,0,0]], 0)
+            M = np.append(M, [[0],[0],[0],[1]], 1)
+            self.proc_data_dict['classifier'] = clf
+            self.proc_data_dict['dec_bounds'] = dec_bounds
+            self.proc_data_dict['Fid_dict'] = Fid_dict
+            self.qoi['Fid_dict'] = Fid_dict
+            self.qoi['Assignment_matrix'] = M
+            self.qoi['pop_vec'] = pop_vec
+            self.qoi['removal_fraction'] = 1-pop_vec[2]
         #########################################
         # Project data along axis perpendicular
         # to the decision boundaries.
@@ -1717,38 +1782,105 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['projection_12']['SNR'] = params_12['SNR']
         self.proc_data_dict['projection_12']['Fid'] = Fid_12
         self.proc_data_dict['projection_12']['threshold'] = threshold_12
-        ############################
-        # Projection along 02 axis.
-        ############################
-        # Rotate shots over 02 decision boundary axis
-        shots_0 = rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
-        shots_2 = rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
-        # Take relavant quadrature
-        shots_0 = shots_0[:,0]
-        shots_2 = shots_2[:,0]
-        n_shots_2 = len(shots_2)
-        # find range
-        _all_shots = np.concatenate((shots_0, shots_2))
-        _range = (np.min(_all_shots), np.max(_all_shots))
-        # Sort shots in unique values
-        x0, n0 = np.unique(shots_0, return_counts=True)
-        x2, n2 = np.unique(shots_2, return_counts=True)
-        Fid_02, threshold_02 = _calculate_fid_and_threshold(x0, n0, x2, n2)
-        # Histogram of shots for 1 and 2
-        h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
-        h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
-        bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
-        popt0, popt2, params_02 = _fit_double_gauss(bin_centers, h0, h2)
-        # Save processed data
-        self.proc_data_dict['projection_02'] = {}
-        self.proc_data_dict['projection_02']['h0'] = h0
-        self.proc_data_dict['projection_02']['h2'] = h2
-        self.proc_data_dict['projection_02']['bin_centers'] = bin_centers
-        self.proc_data_dict['projection_02']['popt0'] = popt0
-        self.proc_data_dict['projection_02']['popt2'] = popt2
-        self.proc_data_dict['projection_02']['SNR'] = params_02['SNR']
-        self.proc_data_dict['projection_02']['Fid'] = Fid_02
-        self.proc_data_dict['projection_02']['threshold'] = threshold_02
+        if not self.h_state:
+            ############################
+            # Projection along 02 axis.
+            ############################
+            # Rotate shots over 02 decision boundary axis
+            shots_0 = rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
+            shots_2 = rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
+            # Take relavant quadrature
+            shots_0 = shots_0[:,0]
+            shots_2 = shots_2[:,0]
+            n_shots_2 = len(shots_2)
+            # find range
+            _all_shots = np.concatenate((shots_0, shots_2))
+            _range = (np.min(_all_shots), np.max(_all_shots))
+            # Sort shots in unique values
+            x0, n0 = np.unique(shots_0, return_counts=True)
+            x2, n2 = np.unique(shots_2, return_counts=True)
+            Fid_02, threshold_02 = _calculate_fid_and_threshold(x0, n0, x2, n2)
+            # Histogram of shots for 1 and 2
+            h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
+            h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
+            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+            popt0, popt2, params_02 = _fit_double_gauss(bin_centers, h0, h2)
+            # Save processed data
+            self.proc_data_dict['projection_02'] = {}
+            self.proc_data_dict['projection_02']['h0'] = h0
+            self.proc_data_dict['projection_02']['h2'] = h2
+            self.proc_data_dict['projection_02']['bin_centers'] = bin_centers
+            self.proc_data_dict['projection_02']['popt0'] = popt0
+            self.proc_data_dict['projection_02']['popt2'] = popt2
+            self.proc_data_dict['projection_02']['SNR'] = params_02['SNR']
+            self.proc_data_dict['projection_02']['Fid'] = Fid_02
+            self.proc_data_dict['projection_02']['threshold'] = threshold_02
+        else:
+            ############################
+            # Projection along 23 axis.
+            ############################
+            # Rotate shots over 23 decision boundary axis
+            shots_2 = rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'],dec_bounds['23'], phi=np.pi/2)
+            shots_3 = rotate_and_center_data(Shots_3[:,0],Shots_3[:,1],dec_bounds['mean'],dec_bounds['23'], phi=np.pi/2)
+            # Take relavant quadrature
+            shots_3 = shots_3[:,0]
+            shots_2 = shots_2[:,0]
+            n_shots_2 = len(shots_2)
+            # find range
+            _all_shots = np.concatenate((shots_3, shots_2))
+            _range = (np.min(_all_shots), np.max(_all_shots))
+            # Sort shots in unique values
+            x3, n3 = np.unique(shots_3, return_counts=True)
+            x2, n2 = np.unique(shots_2, return_counts=True)
+            Fid_23, threshold_23 = _calculate_fid_and_threshold(x3, n3, x2, n2)
+            # Histogram of shots for 1 and 2
+            h3, bin_edges = np.histogram(shots_3, bins=100, range=_range)
+            h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
+            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+            popt3, popt2, params_23 = _fit_double_gauss(bin_centers, h3, h2)
+            # Save processed data
+            self.proc_data_dict['projection_23'] = {}
+            self.proc_data_dict['projection_23']['h3'] = h3
+            self.proc_data_dict['projection_23']['h2'] = h2
+            self.proc_data_dict['projection_23']['bin_centers'] = bin_centers
+            self.proc_data_dict['projection_23']['popt3'] = popt3
+            self.proc_data_dict['projection_23']['popt2'] = popt2
+            self.proc_data_dict['projection_23']['SNR'] = params_23['SNR']
+            self.proc_data_dict['projection_23']['Fid'] = Fid_23
+            self.proc_data_dict['projection_23']['threshold'] = threshold_23
+            ############################
+            # Projection along 30 axis.
+            ############################
+            # Rotate shots over 30 decision boundary axis
+            shots_0 = rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['30'], phi=np.pi/2)
+            shots_3 = rotate_and_center_data(Shots_3[:,0],Shots_3[:,1],dec_bounds['mean'],dec_bounds['30'], phi=np.pi/2)
+            # Take relavant quadrature
+            shots_3 = shots_3[:,0]
+            shots_0 = shots_0[:,0]
+            n_shots_3 = len(shots_3)
+            # find range
+            _all_shots = np.concatenate((shots_3, shots_0))
+            _range = (np.min(_all_shots), np.max(_all_shots))
+            # Sort shots in unique values
+            x3, n3 = np.unique(shots_3, return_counts=True)
+            x0, n0 = np.unique(shots_0, return_counts=True)
+            Fid_30, threshold_30 = _calculate_fid_and_threshold(x3, n3, x0, n0)
+            # Histogram of shots for 1 and 2
+            h3, bin_edges = np.histogram(shots_3, bins=100, range=_range)
+            h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
+            bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+            popt3, popt0, params_30 = _fit_double_gauss(bin_centers, h3, h0)
+            # Save processed data
+            self.proc_data_dict['projection_30'] = {}
+            self.proc_data_dict['projection_30']['h3'] = h3
+            self.proc_data_dict['projection_30']['h0'] = h0
+            self.proc_data_dict['projection_30']['bin_centers'] = bin_centers
+            self.proc_data_dict['projection_30']['popt3'] = popt3
+            self.proc_data_dict['projection_30']['popt0'] = popt0
+            self.proc_data_dict['projection_30']['SNR'] = params_30['SNR']
+            self.proc_data_dict['projection_30']['Fid'] = Fid_30
+            self.proc_data_dict['projection_30']['threshold'] = threshold_30
+
         #########################################
         # Analyze repeated LRU experiment shots  #
         #########################################
@@ -1765,7 +1897,8 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
             p0 = np.mean(Shots==0)
             p1 = np.mean(Shots==1)
             p2 = np.mean(Shots==2)
-            return np.array([p0, p1, p2])
+            p3 = np.mean(Shots==3)
+            return np.array([p0, p1, p2, p3])
         M_inv = np.linalg.inv(M)
         for r in range(self.rounds):
             _pop_vec = _get_pop_vector(Shots_qutrit_exp[f'round {r+1}'])
@@ -1778,6 +1911,11 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['Population_f_exp'] = Population_f_exp
         self.proc_data_dict['Population_ref'] = Population_ref
         self.proc_data_dict['Population_f_ref'] = Population_f_ref
+        if self.h_state:
+            Population_h_exp = np.array([Population_exp[k][3] for k in Population_exp.keys()])
+            Population_h_ref = np.array([Population_ref[k][3] for k in Population_ref.keys()])
+            self.proc_data_dict['Population_h_exp'] = Population_h_exp
+            self.proc_data_dict['Population_h_ref'] = Population_h_ref
         # Fit leakage and seepage rates
         from scipy.optimize import curve_fit
         def _func(n, L, S):
@@ -1790,15 +1928,29 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
         _y = [0]+list(Population_f_ref)
         popt, pcov = curve_fit(_func, _x, _y, p0=p0, bounds=((0,0), (1,1)))
         self.proc_data_dict['fit_res_ref'] = popt, pcov
+        if self.h_state:
+            _y = [0]+list(Population_h_exp)
+            popt, pcov = curve_fit(_func, _x, _y, p0=p0, bounds=((0,0), (1,1)))
+            self.proc_data_dict['fit_res_exp_h'] = popt, pcov
+            _y = [0]+list(Population_h_ref)
+            popt, pcov = curve_fit(_func, _x, _y, p0=p0, bounds=((0,0), (1,1)))
+            self.proc_data_dict['fit_res_ref_h'] = popt, pcov
 
     def prepare_plots(self):
 
         self.axs_dict = {}
         fig = plt.figure(figsize=(8,4), dpi=100)
-        axs = [fig.add_subplot(121),
-               fig.add_subplot(322),
-               fig.add_subplot(324),
-               fig.add_subplot(326)]
+        if self.h_state:
+            axs = [fig.add_subplot(121),
+                   fig.add_subplot(422),
+                   fig.add_subplot(424),
+                   fig.add_subplot(426),
+                   fig.add_subplot(428)]
+        else:
+            axs = [fig.add_subplot(121),
+                   fig.add_subplot(322),
+                   fig.add_subplot(324),
+                   fig.add_subplot(326)]
         # fig.patch.set_alpha(0)
         self.axs_dict['SSRO_plot'] = axs[0]
         self.figs['SSRO_plot'] = fig
@@ -1808,9 +1960,16 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
             'shots_0': self.proc_data_dict['shots_0_IQ'],
             'shots_1': self.proc_data_dict['shots_1_IQ'],
             'shots_2': self.proc_data_dict['shots_2_IQ'],
+            'shots_3': self.proc_data_dict['shots_3_IQ'] if self.h_state \
+                       else None,
             'projection_01': self.proc_data_dict['projection_01'],
             'projection_12': self.proc_data_dict['projection_12'],
-            'projection_02': self.proc_data_dict['projection_02'],
+            'projection_02': None if self.h_state else\
+                             self.proc_data_dict['projection_02'],
+            'projection_23': None if not self.h_state else\
+                             self.proc_data_dict['projection_23'],
+            'projection_30': None if not self.h_state else\
+                             self.proc_data_dict['projection_30'],
             'classifier': self.proc_data_dict['classifier'],
             'dec_bounds': self.proc_data_dict['dec_bounds'],
             'Fid_dict': self.proc_data_dict['Fid_dict'],
@@ -1827,6 +1986,8 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
             'shots_0': self.proc_data_dict['shots_0_IQ'],
             'shots_1': self.proc_data_dict['shots_1_IQ'],
             'shots_2': self.proc_data_dict['shots_2_IQ'],
+            'shots_3': self.proc_data_dict['shots_3_IQ'] if self.h_state \
+                       else None,
             'shots_lru': self.proc_data_dict['shots_lru_IQ'],
             'classifier': self.proc_data_dict['classifier'],
             'dec_bounds': self.proc_data_dict['dec_bounds'],
@@ -1858,6 +2019,10 @@ class Repeated_LRU_experiment_Analysis(ba.BaseDataAnalysis):
             'fit_res_exp': self.proc_data_dict['fit_res_exp'],
             'Population_ref': self.proc_data_dict['Population_ref'],
             'fit_res_ref': self.proc_data_dict['fit_res_ref'],
+            'fit_res_exp_h': self.proc_data_dict['fit_res_exp_h'] if self.h_state \
+                             else None,
+            'fit_res_ref_h': self.proc_data_dict['fit_res_ref_h'] if self.h_state \
+                             else None,
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
@@ -1879,6 +2044,8 @@ def Population_vs_rounds_plotfn(
     timestamp,
     qubit,
     ax,
+    fit_res_exp_h=None,
+    fit_res_ref_h=None,
     **kw):
     fig = ax.get_figure()
     axs = fig.get_axes()
@@ -1895,6 +2062,13 @@ def Population_vs_rounds_plotfn(
     Population_g_exp = np.array([Population_exp[k][0] for k in Population_exp.keys()])
     Population_e_exp = np.array([Population_exp[k][1] for k in Population_exp.keys()])
     Population_f_exp = np.array([Population_exp[k][2] for k in Population_exp.keys()])
+    if not (fit_res_exp_h is None):
+        Population_h_ref = np.array([Population_ref[k][3] for k in Population_ref.keys()])
+        Population_h_exp = np.array([Population_exp[k][3] for k in Population_exp.keys()])
+        popt_exp_h, pcov_exp_h = fit_res_exp_h
+        perr_exp_h = np.sqrt(np.abs(np.diag(pcov_exp_h)))
+        popt_ref_h, pcov_ref_h = fit_res_ref_h
+        perr_ref_h = np.sqrt(np.abs(np.diag(pcov_ref_h)))
     _rounds_arr = np.arange(rounds)+1
     axs[0].plot(_rounds_arr, Population_g_ref, 'C0-', alpha=.5, label='$|g\\rangle_\\mathrm{{Ref.}}$')
     axs[0].plot(_rounds_arr, Population_e_ref, 'C3-', alpha=.5, label='$|e\\rangle_\\mathrm{{Ref.}}$')
@@ -1902,16 +2076,28 @@ def Population_vs_rounds_plotfn(
     axs[0].plot(_rounds_arr, Population_e_exp, 'C3-', label='$|e\\rangle_\\mathrm{{Gate}}$')
     axs[1].plot(_rounds_arr, _func(_rounds_arr, *popt_ref), 'k--')
     axs[1].plot(_rounds_arr, _func(_rounds_arr, *popt_exp), 'k--')
+    if not (fit_res_exp_h is None):
+        axs[1].plot(_rounds_arr, _func(_rounds_arr, *popt_ref_h), '--', color='goldenrod')
+        axs[1].plot(_rounds_arr, _func(_rounds_arr, *popt_exp_h), '--', color='goldenrod')
     axs[1].plot(_rounds_arr, Population_f_ref, 'C2-', alpha=.5, label='$|f\\rangle_\\mathrm{{Ref.}}$')
     axs[1].plot(_rounds_arr, Population_f_exp, 'C2-', label='$|f\\rangle_\\mathrm{{Gate}}$')
-    txtstr = '\n'.join(('Ref.:',
-                        f'$L_1={popt_ref[0]*100:.2f} \\pm {perr_ref[0]:.2f}\\%$',
-                        f'$L_2={popt_ref[1]*100:.2f} \\pm {perr_ref[1]:.2f}\\%$',
-                        'Gate:',
-                        f'$L_1={popt_exp[0]*100:.2f} \\pm {perr_exp[0]:.2f}\\%$',
-                        f'$L_2={popt_exp[1]*100:.2f} \\pm {perr_exp[1]:.2f}\\%$'))
+    if not (fit_res_exp_h is None):
+        axs[1].plot(_rounds_arr, Population_h_ref, '-', color='gold', alpha=.5, label='$|h\\rangle_\\mathrm{{Ref.}}$')
+        axs[1].plot(_rounds_arr, Population_h_exp, '-', color='gold', label='$|h\\rangle_\\mathrm{{Gate}}$')
+    txtstr = 'Ref.:\n'+\
+             f'$L_1={popt_ref[0]*100:.2f} \\pm {perr_ref[0]:.2f}\\%$\n'+\
+             f'$L_2={popt_ref[1]*100:.2f} \\pm {perr_ref[1]:.2f}\\%$\n'
+    if not (fit_res_exp_h is None):
+        txtstr+= f'$L_1^h={popt_ref_h[0]*100:.2f} \\pm {perr_ref_h[0]:.2f}\\%$\n'+\
+                 f'$L_2^h={popt_ref_h[1]*100:.2f} \\pm {perr_ref_h[1]:.2f}\\%$\n'
+    txtstr+= 'Gate:\n'+\
+             f'$L_1={popt_exp[0]*100:.2f} \\pm {perr_exp[0]:.2f}\\%$\n'+\
+             f'$L_2={popt_exp[1]*100:.2f} \\pm {perr_exp[1]:.2f}\\%$'
+    if not (fit_res_exp_h is None):
+        txtstr+= f'\n$L_1^h={popt_exp_h[0]*100:.2f} \\pm {perr_exp_h[0]:.2f}\\%$\n'+\
+                 f'$L_2^h={popt_exp_h[1]*100:.2f} \\pm {perr_exp_h[1]:.2f}\\%$'
     props = dict(boxstyle='round', facecolor='white', alpha=1)
-    axs[1].text(1.05, .4, txtstr, transform=axs[1].transAxes,
+    axs[1].text(1.3, 1, txtstr, transform=axs[0].transAxes,
                 verticalalignment='top', bbox=props)
     axs[0].legend(loc=2, frameon=False, bbox_to_anchor=(1.01,1))
     axs[1].legend(loc=2, frameon=False, bbox_to_anchor=(1.01,1))

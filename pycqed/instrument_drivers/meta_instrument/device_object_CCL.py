@@ -1312,16 +1312,19 @@ class DeviceCCL(Instrument):
             Q_idxs_parked = [self.find_instrument(Q).cfg_qubit_nr() for Q in parked_qbs]
 
         if prepare_for_timedomain:
+            for i, q in enumerate(list_qubits_used): 
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                mw_lutman.set_default_lutmap()
+                lm = mw_lutman.LutMap()
+                lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+                # This is awkward because cw9 should have rx12 by default
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                mw_lutman.LutMap(lm)
+
             self.prepare_for_timedomain(qubits=list_qubits_used)
 
             for i, q in enumerate(np.concatenate([ramsey_qubits])): 
-            # only on the CZ qubits we add the ef pulses 
                 mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
-
-                lm = mw_lutman.LutMap()
-                # we hardcode the X on the ef transition to CW 31 here.
-                lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
-                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
                 # load_phase_pulses will also upload other waveforms
                 if phase_offsets == None:
                     mw_lutman.load_phase_pulses_to_AWG_lookuptable()
@@ -1706,6 +1709,77 @@ class DeviceCCL(Instrument):
                 self.find_instrument(qubit).ro_acq_threshold(threshold)
             return a.qoi[q_ch]
 
+    def measure_MUX_SSRO(self,
+            qubits: list,
+            f_state: bool = False,
+            nr_shots_per_case: int = 2**13,
+            heralded_init: bool = False,
+            prepare_for_timedomain: bool = True,
+            analyze: bool = True,
+            disable_metadata: bool = False):
+        '''
+        Measures single shot radout multiplexed assignment fidelity matrix.
+        Supports second excited state as well
+        '''
+        assert self.ro_acq_digitized() == False, 'Analog readout required'
+        assert 'IQ' in self.ro_acq_weight_type(), 'IQ readout is required!'
+        MC = self.instr_MC.get_instr()
+        # Configure lutmap
+        for qubit in qubits:
+            qb = self.find_instrument(qubit)
+            mwl = qb.instr_LutMan_MW.get_instr()
+            mwl.set_default_lutmap()
+        self.prepare_for_timedomain(qubits = qubits)
+
+        # get qubit idx 
+        Q_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        # Set UHF number of shots
+        _cycle = (2**len(qubits))
+        _states = ['0', '1']
+        if f_state:
+            _cycle = (3**len(qubits))
+            _states = ['0', '1', '2']
+        nr_shots = _cycle*nr_shots_per_case
+        if heralded_init:
+            nr_shots *= 2
+        uhfqc_max_shots = 2**20
+        if nr_shots < uhfqc_max_shots:
+            # all shots can be acquired in a single UHF run
+            shots_per_run = nr_shots
+        else:
+            # Number of UHF acquisition runs
+            nr_runs = ceil(nr_shots/uhfqc_max_shots) 
+            shots_per_run = int((nr_shots/nr_runs)/_cycle)*_cycle
+            nr_shots = nr_runs*shots_per_run
+        # Compile sequence
+        p = mqo.MUX_RO_sequence(
+            qubit_idxs = Q_idxs,
+            heralded_init = heralded_init,
+            states = _states,
+            platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Shot', unit='#',
+                             upload=True)
+        MC.soft_avg(1)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        d = self.get_int_logging_detector(qubits=qubits)
+        for det in d.detectors:
+            det.nr_shots = shots_per_run
+        MC.set_detector_function(d)
+        MC.live_plot_enabled(False)
+        label = f'MUX_SSRO_{"_".join(qubits)}'
+        MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
+        MC.live_plot_enabled(True)
+        # Analysis
+        if analyze:
+            ma2.ra.Multiplexed_Readout_Analysis(
+                qubits=qubits,
+                f_state=f_state,
+                heralded_init=heralded_init,
+                label=label)
+
     def measure_transients(self,
                            qubits: list,
                            q_target: str,
@@ -1906,10 +1980,10 @@ class DeviceCCL(Instrument):
                 ro_lm = self.find_instrument(lm)
                 ro_lm.resonator_combinations(res_combs[lm])
                 ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
-            if echo_times != None:
-                assert echo_phases != None
-                for i, q in enumerate(target_qubits):
-                    mw_lm = self.find_instrument(f'MW_lutman_{q}')
+            for i, q in enumerate(target_qubits):
+                mw_lm = self.find_instrument(f'MW_lutman_{q}')
+                if echo_times != None:
+                    assert echo_phases != None
                     print(f'Echo phase upload on {mw_lm.name}')    
                     mw_lm.LutMap()[30] = {'name': 'rEcho', 'theta': 180, 
                                           'phi': echo_phases[i], 'type': 'ge'}
@@ -1917,7 +1991,7 @@ class DeviceCCL(Instrument):
                                           "phi": 0, "type": "ge"}
                     mw_lm.LutMap()[28] = {"name": "rYm180", "theta": -180,
                                           "phi": 90, "type": "ge"}
-                    mw_lm.load_phase_pulses_to_AWG_lookuptable()
+                mw_lm.load_phase_pulses_to_AWG_lookuptable()
         if exception_qubits != []:
             exception_idxs = [self.find_instrument(q).cfg_qubit_nr()
                              for q in exception_qubits]
@@ -3814,7 +3888,7 @@ class DeviceCCL(Instrument):
         Q1 ---H---o---Meas
         
         Requires Qutrit readout.
-        Also measures 2 qutrit readout assignment to accurately extimate
+        Also measures 2 qutrit readout assignment to accurately estimate
         leakage rates.
         '''
         assert self.ro_acq_digitized() == False, 'Analog readout required'
@@ -4774,10 +4848,12 @@ class DeviceCCL(Instrument):
             flux_cw_list: list,
             sim_measurement: bool,
             prepare_for_timedomain: bool=True,
+            initialization_msmt: bool = False,
             repetitions: int=3,
             wait_time_before_flux: int = 0,
             wait_time_after_flux: int = 0,
             n_rounds = 1,
+            disable_metadata=True,
             readout_duration_ns: int = 480
             ):
         assert self.ro_acq_weight_type().lower() == 'optimal'
@@ -4837,17 +4913,23 @@ class DeviceCCL(Instrument):
             flux_cw_list=flux_cw_list,
             Q_exception=exc_qubit_idxs,
             simultaneous_measurement=sim_measurement,
+            initialization_msmt = initialization_msmt,
             wait_time_before_flux=wait_time_before_flux,
             wait_time_after_flux=wait_time_after_flux,
             n_rounds = n_rounds,
             readout_duration_ns=readout_duration_ns,
             platf_cfg=self.cfg_openql_platform_fn())
 
-        uhfqc_max_avg = 2**20
+        uhfqc_max_avg = 2**17
         if sim_measurement:
             readouts_per_round = (3**n)*n_rounds+2**(n+1)
+            if initialization_msmt:
+                readouts_per_round = ((3**n)*n_rounds)*2+2**(n+1)
         else:
             readouts_per_round = (3**n)*(n_rounds+1)+2**(n+1)
+            if initialization_msmt:
+                readouts_per_round = ((3**n)*(n_rounds+1))*2+2**(n+1)
+        
         d = self.get_int_logging_detector(qubits=all_qubits,
                                           result_logging_mode='raw')
         for det in d.detectors:
@@ -4863,10 +4945,95 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
         MC.run(f'Weight_{n}_parity_tomography_{ancilla_qubit}_'+\
                f'{"_".join(data_qubits)}_sim-msmt-{sim_measurement}'+\
-               f'_rounds-{n_rounds}')
+               f'_rounds-{n_rounds}',disable_snapshot_metadata=disable_metadata)
         # Warning analysis requires that the detector function is ordered
         # as: [anc_qubit, data_qubit[0],[1],[2],[3]]
         ma2.pba.Weight_n_parity_tomography(
             sim_measurement=sim_measurement,
             n_rounds=n_rounds,
-            exception_qubits=exception_qubits)
+            exception_qubits=exception_qubits,
+            post_selection=initialization_msmt)
+
+    ################################################
+    # Surface-17 specific functions
+    ################################################
+    def measure_defect_rate(
+            self,
+            ancilla_qubit: str,
+            data_qubits: list,
+            Rounds: list=[1, 2, 4, 6, 10, 15, 25, 50],
+            repetitions: int = 20,
+            prepare_for_timedomain: bool=True,
+            heralded_init: bool = True
+            ):
+        assert self.ro_acq_weight_type() == 'optimal IQ'
+        assert self.ro_acq_digitized() == False
+
+        # Surface-17 qubits
+        X_ancillas = ['X1', 'X2', 'X3', 'X4']
+        Z_ancillas = ['Z1', 'Z2', 'Z3', 'Z4']
+        Data_qubits = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9']
+        X_anci_idxs = [ self.find_instrument(q).cfg_qubit_nr() for q in X_ancillas ]
+        Z_anci_idxs = [ self.find_instrument(q).cfg_qubit_nr() for q in Z_ancillas ]
+        Data_idxs = [ self.find_instrument(q).cfg_qubit_nr() for q in Data_qubits ]
+        ancilla_qubit_idx = self.find_instrument(ancilla_qubit).cfg_qubit_nr()
+        data_qubits_idx = [self.find_instrument(q).cfg_qubit_nr() for q in data_qubits] 
+        #########################
+        # Prepare for timedomain
+        #########################
+        if prepare_for_timedomain:
+            # prepare mw lutmans
+            for q in [ancilla_qubit]+data_qubits:
+                mw_lm = self.find_instrument(f'MW_lutman_{q}')
+                mw_lm.set_default_lutmap()
+            # Redundancy just to be sure we are uploading every parameter
+            for q_name in data_qubits+[ancilla_qubit]:
+                q = self.find_instrument(q_name)
+                q.prepare_for_timedomain()
+            self.prepare_for_timedomain(qubits=[ancilla_qubit]+data_qubits,
+                                        prepare_for_readout=True)
+            ro_lm = self.find_instrument(ancilla_qubit).instr_LutMan_RO.get_instr()
+            ro_lm.resonator_combinations([[ancilla_qubit_idx], ro_lm.resonator_combinations()[0]])
+            ro_lm.load_waveforms_onto_AWG_lookuptable()
+        # Generate compiler sequence
+        p = mqo.repeated_stabilizer_data_measurement_sequence(
+                target_stab = ancilla_qubit,
+                Q_anc=ancilla_qubit_idx,
+                Q_D=data_qubits_idx,
+                X_anci_idxs=X_anci_idxs,
+                Z_anci_idxs=Z_anci_idxs,
+                data_idxs=Data_idxs,
+                platf_cfg=self.cfg_openql_platform_fn(),
+                Rounds = Rounds)
+        # Set up nr_shots on detector
+        d = self.get_int_logging_detector(qubits=[ancilla_qubit]+data_qubits,
+                                          result_logging_mode='raw')
+        _anc_q = self.find_instrument(ancilla_qubit)
+        uhfqc_max_avg = 2**20
+        for det in d.detectors:
+            if det.UHFQC.name == _anc_q.instr_acquisition():
+                readouts_per_round = np.sum(np.array(Rounds)+heralded_init)*3\
+                                     + 3*(1+heralded_init)
+            else:
+                readouts_per_round = len(Rounds)*(1+heralded_init)*3\
+                                     + 3*(1+heralded_init)
+
+            det.nr_shots = int(uhfqc_max_avg/readouts_per_round)*readouts_per_round
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        MC = self.instr_MC.get_instr()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(int(uhfqc_max_avg/readouts_per_round) 
+                                        * readouts_per_round * repetitions))
+        MC.set_detector_function(d)
+        _title = f'Repeated_stab_meas_{"_".join([str(r) for r in Rounds])}rounds'+\
+                 f'_{ancilla_qubit}_{data_qubits}_data_qubit_measurement'
+        MC.run(_title)
+        a = ma2.pba.Repeated_stabilizer_measurements(
+            qubit=ancilla_qubit,
+            Rounds=Rounds,
+            heralded_init=heralded_init,
+            label=_title)

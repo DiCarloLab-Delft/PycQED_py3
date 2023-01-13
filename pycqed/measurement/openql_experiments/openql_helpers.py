@@ -444,8 +444,7 @@ class OqlProgram:
             qubits: List[int],
             combinations: List[str] = ["00", "01", "10", "11"],
             reps_per_cal_pnt: int = 1,
-            f_state_cal_pt_cw: int = 9,  # 9 is listed as rX12 in `mw_lutman`
-            h_state_cal_pt_cw: int = 30,  # 30 is listed as rX23 in `mw_lutman`
+            heralded_init: bool = False,
     ) -> None:
         """
 
@@ -476,8 +475,8 @@ class OqlProgram:
         state_to_gates = {
             "0": ["i"],
             "1": ["rx180"],
-            "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
-            "3": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw), "cw_{:02}".format(h_state_cal_pt_cw)],
+            "2": ["rx180", "rX12"],
+            "3": ["rx180", "rX12", "rX23"],
         }
 
         for i, comb in enumerate(comb_repeated):
@@ -485,6 +484,8 @@ class OqlProgram:
 
             for q_state, q in zip(comb, qubits):
                 k.prepz(q)
+                if heralded_init:
+                    k.measure(q)
             k.gate("wait", [], 0)  # alignment
             for q_state, q in zip(comb, qubits):
                 for gate in state_to_gates[q_state]:

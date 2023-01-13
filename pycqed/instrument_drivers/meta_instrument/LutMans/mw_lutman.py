@@ -25,6 +25,7 @@ default_mw_lutmap = {
     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
     14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
     15 : {"name" : "rX12_90"  , "theta" : 90, "phi" : 0 , "type" : "ef"},
+    16 : {"name" : "rX23_90"  , "theta" : 90, "phi" : 0 , "type" : "fh"},
     27 : {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'},
     30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
     30 : {"name" : "rX23" , "theta" : 180    , "phi" : 0 , "type" : "fh"},

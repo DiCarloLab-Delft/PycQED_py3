@@ -1565,7 +1565,8 @@ def VCZ_B_landscape_plotfn(
         AUX[:,i] = np.rad2deg(AUX[:,i])
     cs = axs[1+3*n].contour(Amps, Bamps, AUX, levels=[180, 180+360],
                         colors='white', linestyles='--')
-    axs[1+3*n].clabel(cs, inline=True, fontsize=10, fmt='$180^o$')
+    print(cs)
+    # axs[1+3*n].clabel(cs, inline=True, fontsize=10, fmt='$180^o$')
 
     for i in range(3):
         axs[i+3*n].plot(opt[0], opt[1], 'o', mfc='white', mec='grey', mew=.5)
@@ -1632,7 +1633,7 @@ def VCZ_L1_contour_plotfn(
     fig.colorbar(a1, ax=axs[0], label='missing fraction')
     cs = axs[0].contour(Amps, Bamps, AUX, levels=[180, 180+360, 180+720],
                         colors='white', linestyles='--')
-    axs[0].clabel(cs, inline=True, fontsize=10, fmt='$180^o$')
+    # axs[0].clabel(cs, inline=True, fontsize=10, fmt='$180^o$')
     
     axs[1].axvline(opt[0], color='k', ls='--', alpha=.5)
     axs[1].plot(Amps[idxs[0]], MF[idxs][::-1]/2*100)

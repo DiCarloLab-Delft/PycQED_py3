@@ -184,6 +184,7 @@ def flipping(
         equator: bool = False, 
         cal_points: bool = True,
         flip_ef: bool = False,
+        flip_fh: bool = False,
         ax: str = 'x', 
         angle: str = '180'
     ) -> OqlProgram:
@@ -221,11 +222,16 @@ def flipping(
         elif cal_points and (i == (len(number_of_flips)-2) or
                              i == (len(number_of_flips)-1)):
             if ax == 'y':
-                k.y(qubit_idx)
+                k.gate('ry180', [qubit_idx])
             else:
-                k.x(qubit_idx)
+                k.gate('rx180', [qubit_idx])
                 # Should probably have an rx12 here 
                 # when doing ef flipping (Jorge)
+                if flip_ef:
+                    k.gate('rX12',[qubit_idx])
+                elif flip_fh:
+                    k.gate('rX12',[qubit_idx])
+                    k.gate('rX23',[qubit_idx])
             k.measure(qubit_idx)
         else:
             if equator:
@@ -234,6 +240,10 @@ def flipping(
                 elif flip_ef:
                     k.gate('rx180', [qubit_idx])
                     k.gate('cw_15', [qubit_idx])
+                elif flip_fh:
+                    k.gate('rx180', [qubit_idx])
+                    k.gate('rx12', [qubit_idx])
+                    k.gate('cw_16', [qubit_idx])
                 else:
                     k.gate('rx90', [qubit_idx])
             for j in range(n):
@@ -247,10 +257,15 @@ def flipping(
                     k.gate('rx90', [qubit_idx])
                 elif flip_ef:
                     k.gate('rX12',[qubit_idx])
+                elif flip_fh:
+                    k.gate('rX23',[qubit_idx])
                 else:
                     k.x(qubit_idx)
 
             if flip_ef:
+                k.gate('rx180',[qubit_idx])
+            elif flip_fh:
+                k.gate('rx12',[qubit_idx])
                 k.gate('rx180',[qubit_idx])
             k.measure(qubit_idx)
         p.add_kernel(k)
@@ -1675,6 +1690,7 @@ def LRU_repeated_experiment(
         LRU_duration_ns: int,
         heralded_init: bool,
         platf_cfg: str,
+        h_state: bool=False,
         leak_3rd_state: bool = False) -> OqlProgram:
     
     if LRU_duration_ns%20 >0:
@@ -1687,6 +1703,13 @@ def LRU_repeated_experiment(
         k.measure(qubit_idx)  
     for i in range(rounds):
         k.gate('rx90', [qubit_idx])
+        # k.gate('rx90', [12])
+        # k.gate('rx90', [15])
+        # k.gate('rx90', [1])
+        k.gate("wait", [])
+        # # insert CZ
+        # k.gate('cz', [12, 15])
+        # k.gate('cz', [12, 1])
         if leak_3rd_state:
             k.gate('rx12', [qubit_idx])
         k.gate('cw_10', [qubit_idx])
@@ -1694,8 +1717,34 @@ def LRU_repeated_experiment(
             k.gate('rx12', [qubit_idx])
         k.measure(qubit_idx)
         k.gate("wait", [])
-        k.gate('lru', [qubit_idx])
-        k.gate("wait", [], LRU_duration_ns-20)
+        k.gate('lru', [12])
+        k.gate('lru', [1])
+        k.gate('lru', [15])
+        k.gate("wait", [23, 21], LRU_duration_ns-40)
+        k.gate("wait", [22, 20, 19, 18, 17], LRU_duration_ns-20)
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate('rX180', [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate('rX180', [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("wait", [])
         # k.gate("wait", [], 100)
         # k.gate('rx23', [qubit_idx])
         # k.gate("wait", [], 80)
@@ -1708,13 +1757,45 @@ def LRU_repeated_experiment(
         k.measure(qubit_idx)  
     for i in range(rounds):
         k.gate('rx90', [qubit_idx])
+        # insert CZ
+        # k.gate('cz', [12, 15])
+        # k.gate('cz', [12, 1])
         if leak_3rd_state:
             k.gate('rx12', [qubit_idx])
         k.gate('cw_10', [qubit_idx])
         if leak_3rd_state:
             k.gate('rx12', [qubit_idx])
         k.measure(qubit_idx)
-        k.gate("wait", [], LRU_duration_ns)
+        k.gate("wait", [])
+        # k.gate('lru', [12])
+        # k.gate('lru', [1])
+        # k.gate('lru', [15])
+        # k.gate("wait", [23, 21], LRU_duration_ns-40)
+        # k.gate("wait", [22, 20, 19, 18, 17], LRU_duration_ns-20)
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate('rX180', [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [15])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate('rX180', [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("i", [1])
+        k.gate("wait", [])
+        # k.gate("wait", [], LRU_duration_ns)
     p.add_kernel(k)
     # Calibration_points
     k = p.create_kernel("cal_0")
@@ -1752,8 +1833,21 @@ def LRU_repeated_experiment(
     k.gate("wait", [], LRU_duration_ns-20)
     k.measure(qubit_idx)
     p.add_kernel(k)
+
+    if h_state:
+        k = p.create_kernel("cal_3")
+        k.prepz(qubit_idx)
+        if heralded_init:
+            k.measure(qubit_idx)  
+        k.gate('rx180', [qubit_idx])
+        k.gate('rx12', [qubit_idx])
+        k.gate('rx23', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
     # Compile
     p.compile()
+
+
     return p
 
 
@@ -1783,7 +1877,7 @@ def LRU_process_tomograhpy(
             # LRU gate
             k.gate('wait', [])
             if idle:
-                k.gate('wait', [], 40)
+                k.gate('wait', [], 20)
             else:
                 k.gate('lru', [qubit_idx])
             k.gate('wait', [], LRU_duration_ns-20)
