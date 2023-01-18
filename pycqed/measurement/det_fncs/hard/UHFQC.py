@@ -15,6 +15,7 @@ from pycqed.measurement.det_fncs.Base import Soft_Detector, Hard_Detector, Multi
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
 
+from joblib import Parallel, delayed
 
 log = logging.getLogger(__name__)
 
@@ -25,8 +26,6 @@ class Multi_Detector_UHF(Multi_Detector):
     """
 
     def get_values(self):
-        values_list = []
-
         # Since master (holding cc object) is first in self.detectors,
         self.detectors[0].AWG.stop()
 
@@ -41,9 +40,10 @@ class Multi_Detector_UHF(Multi_Detector):
         self.detectors[0].AWG.start()
 
         # Get data
-        for detector in self.detectors:
-            new_values = detector.get_values(arm=False, is_single_detector=False)
-            values_list.append(new_values)
+        values_list = Parallel(n_jobs=len(self.detectors), backend="threading")(
+            delayed(detector.get_values)(arm=False, is_single_detector=False)
+            for detector in self.detectors
+        )
         values = np.concatenate(values_list)
         return values
 
