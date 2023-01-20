@@ -1198,6 +1198,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.qoi['SNR'] = params_01['SNR']
         self.qoi['F_a'] = Fid_raw
         self.qoi['F_d'] = params_01['Fid_discr']
+        self.proc_data_dict['quantities_of_interest'] = self.qoi
         ############################################
         # If second state data is use classifier
         # to assign states in the IQ plane and 
