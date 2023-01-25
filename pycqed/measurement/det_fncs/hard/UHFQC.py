@@ -44,6 +44,22 @@ class Multi_Detector_UHF(Multi_Detector):
         for detector in self.detectors:
             new_values = detector.get_values(arm=False, is_single_detector=False)
             values_list.append(new_values)
+
+        # Pad all result vectors for them to have equal length.
+        maximum = 0
+        minimum = len(values_list[0][0])   #left index of values_list: detector; right index: channel
+        for feedline in values_list:
+            for result in feedline:
+                if len(result)>maximum: maximum=len(result)
+                if len(result)<minimum: minimum=len(result)
+        if maximum != minimum:
+            padded_values_list = []
+            for index, feedline in enumerate(values_list):
+                padded_values_list.append([])
+                for result in feedline:
+                    padded_values_list[index].append(np.pad(result, (0, maximum-len(result))))
+            values_list = [np.array(values) for values in padded_values_list]
+
         values = np.concatenate(values_list)
         return values
 
