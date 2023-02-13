@@ -3,6 +3,10 @@ import numpy as np
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 
 from pycqed.measurement.waveform_control_CC import waveform as wf
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman_config import (
+    FeedlineMapCollection,
+    read_ro_lutman_bit_map,
+)
 
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals

@@ -6402,7 +6402,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                  horizontalalignment='center', bbox=self.box_props)
 
         if 'complex' in fitting_model:
-            fig2.text(0.5, 0, textstr, transform=ax.transAxes,
+            fig2.text(0.5, -0.15, textstr, transform=ax.transAxes,
                       fontsize=self.font_size,
                       verticalalignment='top', horizontalalignment='center',
                       bbox=self.box_props)

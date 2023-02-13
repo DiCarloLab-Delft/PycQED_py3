@@ -145,10 +145,11 @@ class SingleQubitClifford(Clifford):
     # class variables
     _gate_decompositions = [None] * GRP_SIZE
 
-    def __init__(self, idx: int):
+    def __init__(self, idx: int, i: int=0):
         assert(idx < self.GRP_SIZE)
         self.idx = idx
         self.pauli_transfer_matrix = C1[idx]
+        self.i = i
 
     @property  # FIXME: remove
     def gate_decomposition(self):
@@ -157,9 +158,8 @@ class SingleQubitClifford(Clifford):
         according to the decomposition by Epstein et al.
         """
         if self._gate_decompositions[self.idx] is None:
-            _gate_decomposition = [(g, 'q0') for g in gate_decomposition[self.idx]]
+            _gate_decomposition = [(g, f'q{self.i}') for g in gate_decomposition[self.idx]]
             self._gate_decompositions[self.idx] = _gate_decomposition
-
         return self._gate_decompositions[self.idx]
 
     ##########################################################################

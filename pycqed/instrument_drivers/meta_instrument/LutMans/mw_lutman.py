@@ -25,6 +25,7 @@ default_mw_lutmap = {
     12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
     14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
+    15 : {"name" : "rX12_90"  , "theta" : 90, "phi" : 0 , "type" : "ef"},
     30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
     52 : {"name" : "phaseCorrPark1" , "type" : "phase"},
     53 : {"name" : "phaseCorrPark2" , "type" : "phase"},
@@ -515,7 +516,6 @@ class Base_MW_LutMan(Base_LutMan):
     # Functions
     # FIXME: the load_* functions provide an undesired backdoor, also see issue #626
     ############################################################################
-
     def load_phase_pulses_to_AWG_lookuptable(self, phases=np.arange(0, 360, 20)):
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
@@ -1124,7 +1124,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # the last 4 are for phase corrections due to gate in corresponding direction
         phase_corr_inds = np.arange(52,64,1)
         for step, cw in enumerate(phase_corr_inds[:8]):
-            phase = self.parameters[f"vcz_virtual_q_ph_corr_park_step_{step+1}"]()
+            phase = self.parameters[f"vcz_virtual_q_ph_corr_step_{step+1}"]()
             commandtable_dict['table'] += [{"index": int(cw),
                                             "phase0": {"value": float(phase), "increment": True},
                                             "phase1": {"value": float(phase), "increment": True}
@@ -1187,16 +1187,16 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # there are 8 flux-dance steps for the S17 scheme.
         # NOTE: this correction must not be the same as the above one for the case of a spectator
         #       for a single CZ, because in a flux-dance the qubit can be parked because of multiple adjacent CZ gates
-        # for step in np.arange(1,9):
-        #     self.add_parameter(
-        #         name=f'vcz_virtual_q_ph_corr_step_{step}',
-        #         parameter_class=ManualParameter,
-        #         unit='deg',
-        #         vals=vals.Numbers(0, 360),
-        #         initial_value=0.0,
-        #         docstring=f"Virtual phase correction for parking in flux-dance step {step}."
-        #                     "Will be applied as increment to sine generator phases via command table."
-        #     )
+        for step in np.arange(1,9):
+            self.add_parameter(
+                name=f'vcz_virtual_q_ph_corr_step_{step}',
+                parameter_class=ManualParameter,
+                unit='deg',
+                vals=vals.Numbers(0, 360),
+                initial_value=0.0,
+                docstring=f"Virtual phase correction for parking in flux-dance step {step}."
+                            "Will be applied as increment to sine generator phases via command table."
+            )
 
     def _set_channel_range(self, val):
         awg_nr = (self.channel_I()-1)//2

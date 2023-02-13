@@ -930,14 +930,6 @@ class HAL_ShimSQ(Qubit):
     ##########################################################################
 
     def _prep_cw_spec(self):
-        # FIXME: this code block has no effect
-        # if self.cfg_with_vsm():
-        #     VSM = self.instr_VSM.get_instr()
-        # if self.spec_type() == 'CW':
-        #     marker_source = 'int'
-        # else:
-        #     marker_source = 'ext'
-
         if self.instr_spec_source() != None:
             self.instr_spec_source.get_instr().power(self.spec_pow())
 
@@ -1199,21 +1191,6 @@ class HAL_ShimSQ(Qubit):
                     # When optimal weights are used, only the RO I weight channel is used
                     opt_WI = self.ro_acq_weight_func_I()
                     opt_WQ = self.ro_acq_weight_func_Q()
-
-                    if 0:  # FIXME: remove
-                        # FIXME!: Dirty hack because of qusurf issue #63, adds delay samples in the optimized weights
-                        #  NB: https://github.com/DiCarloLab-Delft/QuSurf-IssueTracker/issues/63 was closed in 2018
-                        del_sampl = self.ro_acq_weight_func_delay_samples_hack()
-                        if del_sampl > 0:
-                            zeros = np.zeros(abs(del_sampl))
-                            opt_WI = np.concatenate([opt_WI[abs(del_sampl):], zeros])
-                            opt_WQ = np.concatenate([opt_WQ[abs(del_sampl):], zeros])
-                        elif del_sampl < 0:
-                            zeros = np.zeros(abs(del_sampl))
-                            opt_WI = np.concatenate([zeros, opt_WI[:-abs(del_sampl)]])
-                            opt_WQ = np.concatenate([zeros, opt_WQ[:-abs(del_sampl)]])
-                        else:
-                            pass
 
                     # FIXME: direct access to UHFQC nodes, consider adding function to UHFQA (like prepare_SSB_weight_and_rotation)
                     UHFQC.set(f'qas_0_integration_weights_{self.ro_acq_weight_chI()}_real', opt_WI)
