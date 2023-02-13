@@ -103,10 +103,8 @@ class DioCalibration:
     OUT_MASK = 0x7FFF
     SHFQA_TO_CC_PROGRAM = """
 while (1) {
-    setDIO(0x7FFF);
-    wait(3);
-    setDIO(0x00000000);
-    wait(8);
+    playZero(80);
+    setDIO(0x3FFF);
 }
         """
 
