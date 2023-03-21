@@ -280,7 +280,7 @@ class MeasurementAnalysis(object):
             s = s.decode('utf-8')
         # If it is an array of value decodes individual entries
         if type(s) == np.ndarray:
-            s = [s.decode('utf-8') for s in s]
+            s = [s if isinstance(s, str) else s.decode('utf-8') for s in s]
         return s
 
     def group_values(self, group_name):
