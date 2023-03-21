@@ -698,7 +698,7 @@ class Test_Device_obj(unittest.TestCase):
     # FIXME: split into separate test class, like in test_qubit_objects.py
     ##############################################
 
-    @unittest.expectedFailure  # "Solve data writing/reading during test cases"
+    # @unittest.expectedFailure  # "Solve data writing/reading during test cases"
     def test_measure_two_qubit_randomized_benchmarking(self):
         self.device.measure_two_qubit_randomized_benchmarking(qubits=["q8", "q10"])
 
