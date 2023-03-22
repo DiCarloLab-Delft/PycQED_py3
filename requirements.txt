@@ -6,7 +6,7 @@
 # `pip install qutip` before you install pycqed
 
 qcodes
-numpy
+numpy<=1.21
 cython
 scipy
 cma
