@@ -148,7 +148,7 @@ def step_scope(t=None, params=None):
     if t is None:
         t_index = np.array(range(max_len_output))
     elif np.double(t).shape == ():
-        t_index_end = np.int(np.min(
+        t_index_end = int(np.min(
             [params['step_first_point']+t*float(params['points_per_ns']), max_len_output]))
         t_index = np.array(range(0, t_index_end, params['points_per_ns']))
     else:
