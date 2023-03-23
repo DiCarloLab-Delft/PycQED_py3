@@ -20,9 +20,9 @@ from .Transport import Transport
 
 log = logging.getLogger(__name__)
 
+
 class SCPIBase:
     def __init__(self, name: str, transport: Transport) -> None:
-        self._name = name
         self._transport = transport
 
     ##########################################################################

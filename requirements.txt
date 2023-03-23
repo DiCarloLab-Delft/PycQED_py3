@@ -5,7 +5,7 @@
 # If you are installing pycqed on your computer run
 # `pip install qutip` before you install pycqed
 
-qcodes<=0.32.0  # FIXME: 0.35.2 removes 'Command' class from qcodes.instrument.parameter module. Causing a number of import issues.
+qcodes
 numpy<=1.21
 cython
 scipy
