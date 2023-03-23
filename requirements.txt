@@ -5,7 +5,7 @@
 # If you are installing pycqed on your computer run
 # `pip install qutip` before you install pycqed
 
-qcodes
+qcodes<=0.32.0
 numpy<=1.21
 cython
 scipy
