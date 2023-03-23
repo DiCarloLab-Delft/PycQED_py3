@@ -48,6 +48,8 @@ jobs:
         pip install codacy-coverage
         pip install pytest
         pip install pytest-xvfb
+    - name: Display Python dependencies
+      run: pip list
     - name: Lint with flake8
       run: |
         pip install flake8
