@@ -1,4 +1,3 @@
-
 # WARNING:
 # `qutip` is a requirement for `pycqed` but its installation has issues for the
 # CI (Continuous Integration) of github (i.e. automatic tests in github)
@@ -7,17 +6,20 @@
 # `pip install qutip` before you install pycqed
 
 qcodes
-numpy
-Cython
+numpy<=1.21
+cython
 scipy
 cma
 hsluv
 pandas
 PyQt5
-pyqtgraph
+pyqtgraph<=0.12.4  # Sets version upperbound. Prevents test-failure for python 3.8+
 matplotlib
 autodepgraph
 networkx
+spirack
+zhinst
+zhinst-deviceutils; python_version > '3.6'
 packaging
 deprecated
 pytest
@@ -31,16 +33,14 @@ lmfit  # >=0.9.5
 
 # packages with version constraints. FIXME: constraints should be removed
 scikit-learn==0.23.1  # Tests started to fail on 2020-08-05 due to 0.23.2
-h5py>=2.6, <3.0  # FIXME: 3.0 breaks measurement_analysis.py
+h5py>=2.6, <=3.0  # FIXME: 3.0 breaks measurement_analysis.py
 pygsti==0.9.6  # FIXME: 0.9.7.5 breaks test_gst.py
+pyvisa>=1.8
 plotly<3.8  # FIXME: removing version constraint breaks test_gst.py
+pytest
 
-# OpenQL
-# pip install msvc-runtime # needed for qutechopenql on lab-PC, but breaks CI
-qutechopenql>=0.10.4  # pip install qutechopenql --verbose --verbose --verbose --no-index -f https://github.com/DiCarloLab-Delft/OpenQL/releases
 
-# Hardware support
-spirack
-zhinst
-zhinst-deviceutils; python_version > '3.6'
-pyvisa  # >=1.8
+cmake
+wheel
+# Manually build from source.
+qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c  # Build from commit

@@ -27,7 +27,7 @@ from qcodes.instrument.parameter import ManualParameter
 from typing import List, Sequence, Dict
 
 from qcodes.instrument.parameter import Parameter
-from qcodes.instrument.parameter import Command
+from qcodes.parameters.command import Command
 import os
 
 
@@ -958,7 +958,7 @@ class QuTech_AWG_Module(SCPI):
         if nr_itr < 1:
             raise ValueError(f"Cannot calibration inputs: nr_itr needs to be positive; actual: {nr_itr}")
 
-        if target_index is not "":
+        if target_index != "":
             target_index = f",{target_index}"
 
         self.write(f'DIO:CALibrate:PARam {meas_time},{nr_itr}{target_index}')
@@ -1125,7 +1125,7 @@ class QWGMultiDevices:
                 raise type(e)(f'{qwg.name}: {e}')
 
         main_qwg = self.qwgs[0]
-        if main_qwg.dio_mode() is not 'MASTER':
+        if main_qwg.dio_mode() != 'MASTER':
             raise ValueError(f"First QWG ({main_qwg.name}) is not a DIO MASTER, therefor it is not save the use it "
                              f"as base QWG for calibration of multiple QWGs.")
         main_qwg.dio_calibrate()

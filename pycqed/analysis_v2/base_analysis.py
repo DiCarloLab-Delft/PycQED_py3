@@ -791,7 +791,7 @@ class BaseDataAnalysis(object):
         if axs_dict is not None:
             for key, val in list(axs_dict.items()):
                 self.axs[key] = val
-        if key_list is 'auto':
+        if key_list == 'auto':
             key_list = self.auto_keys
         if key_list is None:
             key_list = self.plot_dicts.keys()

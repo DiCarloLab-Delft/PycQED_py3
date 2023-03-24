@@ -112,11 +112,11 @@ class Test_HDF5(unittest.TestCase):
             'list_of_mixed_type': ['hello', 4, 4.2, {'a': 5}, [4, 3]],
             'tuple_of_mixed_type': tuple(['hello', 4, 4.2, {'a': 5}, [4, 3]]),
             'a list of strings': ['my ', 'name ', 'is ', 'earl.'],
-            'some_np_bool': np.bool(True),
+            'some_np_bool': bool(True),
             'list_of_dicts': [{'a': 5}, {'b': 3}],
             'some_int': 3,
             'some_float': 3.5,
-            'some_np_int': np.int(3),
+            'some_np_int': int(3),
             'some_np_float': float(3.5)
         }
 

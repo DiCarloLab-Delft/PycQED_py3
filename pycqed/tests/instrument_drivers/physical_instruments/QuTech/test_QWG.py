@@ -11,6 +11,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech.QWG import QWG,QWGMul
 
 
 class Test_QWG(unittest.TestCase):
+    @unittest.skip(reason="Deprecated hardware")
     def test_qwg_core(self):
         file_name = 'Test_QWG_test_qwg_core.scpi.txt'
         test_path = Path('test_output') / file_name

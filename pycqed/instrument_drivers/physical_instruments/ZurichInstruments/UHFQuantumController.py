@@ -1039,10 +1039,20 @@ setTrigger(0);
         for delay in range(12):  # NB: 16 steps are available, but 2 periods of 20 ns should suffice
             log.debug(f'{self.devname}:    Testing delay {delay}')
             self.setd('raw/dios/0/delay', delay)  # in 1/300 MHz = 3.33 ns steps
+            try:
+                # LabOne 22.02 and higher: clear the sticky timing error detection bits
+                self.setd('raw/dios/0/error/timingclear', 0xffffffff)
+            except RuntimeError:
+                # no timingclear node available
+                pass
             time.sleep(0.5)
             valid_sequence = True
             for awg in [0]:
-                error_timing = self.geti('raw/dios/0/error/timing')
+                try:
+                    # LabOne 22.02 and higher: read out timing errors that accumulated since the last call to "timingclear"
+                    error_timing = self.geti('raw/dios/0/error/timingsticky')
+                except RuntimeError:
+                    error_timing = self.geti('raw/dios/0/error/timing')
                 if error_timing & combined_mask != 0:
                     valid_sequence = False
 

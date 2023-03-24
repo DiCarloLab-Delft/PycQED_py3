@@ -138,7 +138,7 @@ pycqed/measurement/openql_experiments/output/*
 # data files
 # test data files should be explicitly added by hand (overriding .gitignore)
 data/*
-pycqed/tests/test_data/*
+test_data/*
 *.hdf5
 *.sdpa
 *.sol
@@ -147,3 +147,4 @@ pycqed/tests/test_data/*
 *.dat
 .idea
 *experiments.db
+*ro_lutman_config.yaml
