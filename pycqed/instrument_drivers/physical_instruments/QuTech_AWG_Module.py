@@ -27,7 +27,10 @@ from qcodes.instrument.parameter import ManualParameter
 from typing import List, Sequence, Dict
 
 from qcodes.instrument.parameter import Parameter
-from qcodes.parameters.command import Command
+try:
+    from qcodes.instrument.parameter import Command
+except ImportError:
+    from qcodes.parameters.command import Command
 import os
 
 
