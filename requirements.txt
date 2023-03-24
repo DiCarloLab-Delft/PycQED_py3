@@ -6,7 +6,7 @@
 # `pip install qutip` before you install pycqed
 
 qcodes
-numpy
+numpy<=1.21  # Required for 3rd party packages that still rely on (deprecated) numpy dtype aliases. Such as np.float, np.complex, etc. (sklearn, ...)
 cython
 scipy
 cma
