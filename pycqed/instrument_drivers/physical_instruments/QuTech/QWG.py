@@ -26,7 +26,10 @@ from pycqed.instrument_drivers.library.Transport import Transport
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import Parameter
-from qcodes.parameters.command import Command
+try:  # Compatible with python 3.6
+    from qcodes.instrument.parameter import Command
+except ImportError:  # Compatible with python 3.7+ (tested until 3.9)
+    from qcodes.parameters.command import Command
 from qcodes import validators as vals
 
 log = logging.getLogger(__name__)
