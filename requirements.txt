@@ -6,7 +6,7 @@
 # `pip install qutip` before you install pycqed
 
 qcodes
-numpy<=1.21
+numpy
 cython
 scipy
 cma
@@ -40,7 +40,7 @@ plotly<3.8  # FIXME: removing version constraint breaks test_gst.py
 pytest
 
 
-cmake
-wheel
-# Manually build from source.
-qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c  # Build from commit
+# cmake
+# wheel
+# # Manually build from source.
+# qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c  # Build from commit
