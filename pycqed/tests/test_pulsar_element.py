@@ -8,14 +8,16 @@ from pycqed.instrument_drivers.virtual_instruments.virtual_awg5014 import \
     VirtualAWG5014
 import time
 
+
 class Test_Element(unittest.TestCase):
 
     def setUp(self):
         # set up a pulsar with some mock settings for the element
         self.station = qc.Station()
-        self.AWG = VirtualAWG5014('AWG'+str(time.time()))
+        print(str(time.time()))
+        self.AWG = VirtualAWG5014('AWG')
         self.AWG.clock_freq(1e9)
-        self.pulsar = Pulsar('Pulsar' + str(time.time()), self.AWG.name)
+        self.pulsar = Pulsar('Pulsar', self.AWG.name)
         self.station.pulsar = self.pulsar
         for i in range(4):
             self.pulsar.define_channel(id='ch{}'.format(i+1),
@@ -88,3 +90,6 @@ class Test_Element(unittest.TestCase):
         expected_wf[902:922] = .5
         expected_wf[1000:1020] = .3
         np.testing.assert_array_almost_equal(ch1_wf, expected_wf)
+
+    def tearDown(self):
+        qc.Instrument.close_all()

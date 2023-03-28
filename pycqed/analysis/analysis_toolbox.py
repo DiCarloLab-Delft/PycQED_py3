@@ -1325,7 +1325,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
 
-    if thresholdlst.size is 0:
+    if thresholdlst.size == 0:
         kk = 0
     else:
         kk = thresholdlst[0]
@@ -1398,7 +1398,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
 
-    if thresholdlst.size is 0:
+    if thresholdlst.size == 0:
         kk = 0
     else:
         kk = thresholdlst[0]
@@ -3041,7 +3041,7 @@ def calculate_g_coupling_from_frequency_shift(f_bare, f_shifted, f_qubit):
 #         mask[min(idx_min, ii):max(idx_min, ii+1)])
 #     # function that returns mask_ii applied for all elements of the vector mask
 #     continuous_mask = np.array(
-#         [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
+#         [m for m in map(mask_ii, np.arange(len(mask)))], dtype=bool)
 #     # doing the fit
 #     my_fit_model = QuadraticModel()
 
@@ -3080,7 +3080,7 @@ def find_min(x, y, return_fit=False, perc=30):
         mask[min(idx_min, ii):max(idx_min, ii + 1)])
     # function that returns mask_ii applied for all elements of the vector mask
     continuous_mask = np.array(
-        [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
+        [m for m in map(mask_ii, np.arange(len(mask)))], dtype=bool)
     # doing the fit
     my_fit_model = QuadraticModel()
     x_fit = x[continuous_mask]

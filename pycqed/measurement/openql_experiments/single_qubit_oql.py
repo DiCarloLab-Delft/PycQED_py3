@@ -596,7 +596,7 @@ def T1(qubit_idx: int,
 
         if nr_cz_instead_of_idle_time is not None:
             for n in range(nr_cz_instead_of_idle_time[i]):
-                if cw_cz_instead_of_idle_time.lower() is 'cz':
+                if cw_cz_instead_of_idle_time.lower() == 'cz':
                     k.gate("cz", [qubit_idx, qb_cz_idx])
                 else:
                     k.gate(cw_cz_instead_of_idle_time, [0])
@@ -764,7 +764,7 @@ def Ramsey(
 
         if nr_cz_instead_of_idle_time is not None:
             for n in range(nr_cz_instead_of_idle_time[i]):
-                if cw_cz_instead_of_idle_time.lower() is 'cz':
+                if cw_cz_instead_of_idle_time.lower() == 'cz':
                     k.gate("cz", [qubit_idx, qb_cz_idx])
                 else:
                     k.gate(cw_cz_instead_of_idle_time, [0])

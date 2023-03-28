@@ -1502,7 +1502,7 @@ class RTE_analysis(ba.BaseDataAnalysis):
         self.thresholds = thresholds
         if error_type is None:
             self.error_type = 'all'
-        elif error_type is 'all' or error_type is 'meas' or error_type is 'flip':
+        elif error_type == 'all' or error_type == 'meas' or error_type == 'flip':
             self.error_type = error_type
         else:
             raise ValueError('Error type "{}" not supported.'.format(error_type))
@@ -1549,18 +1549,18 @@ class RTE_analysis(ba.BaseDataAnalysis):
                         [self.nr_measurements*j:self.nr_measurements*j+self.cycles]
                     # Digitize data
                     shots = np.array([-1 if s < self.thresholds[q] else 1 for s in raw_shots])
-                    if state is '0':
+                    if state == '0':
                         shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = (shots_f[1:]-shots_f[:-1])/2
 
-                    elif state is '1':
+                    elif state == '1':
                         shots_f = -1*shots
                         shots_f = np.pad(shots_f, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = (shots_f[1:]-shots_f[:-1])/2
 
-                    elif state is 'pi':
+                    elif state == 'pi':
                         shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = shots_f[:-1]+shots_f[1:]-1
@@ -1576,11 +1576,11 @@ class RTE_analysis(ba.BaseDataAnalysis):
                     # count errors
                     nr_errors = np.sum(abs(error))
                     # Get RTE
-                    if self.error_type is 'all':
+                    if self.error_type == 'all':
                         RTE = next((i+1 for i, x in enumerate(error) if x), None) # All errors
-                    elif self.error_type is 'meas':
+                    elif self.error_type == 'meas':
                         RTE = next((i+1 for i, x in enumerate(measr) if x), None) # Errors due to misdiagnosis
-                    elif self.error_type is 'flip':
+                    elif self.error_type == 'flip':
                         RTE = next((i+1 for i, x in enumerate(flipr) if x), None) # Errors due to flips
 
                     if RTE is None:

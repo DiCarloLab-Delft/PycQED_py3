@@ -85,14 +85,21 @@ class TomographyExecute(object):
 		tomos = tomography_V2.TomoAnalysis(2)
 
 		if self.tomography_type == "SDPA":
-			self.rhos = tomos.execute_SDPA_2qubit_tomo(self.measurement_operators,self.counts_from_data_prep, used_bins= [0],
-												   correct_measurement_operators=False, N_total=512)
+			self.rhos = tomos.execute_SDPA_2qubit_tomo(
+				self.measurement_operators,
+				self.counts_from_data_prep,
+				used_bins=[0],
+				correct_measurement_operators=False,
+				N_total=512
+			)
 		if self.tomography_type == "MLE":
-			self.rhos =  tomos.execute_mle_T_matrix_tomo(self.measurement_operators[0],
-														 self.counts_from_data_prep[:,0]/512.0,
-			 											 weights_tomo =False,
-		                                   				 show_time=True, ftol=0.01, xtol=0.001, full_output=0, max_iter=100,
-		                                   				 TE_correction_matrix = None)
+			self.rhos = tomos.execute_mle_T_matrix_tomo(
+				self.measurement_operators[0],
+				self.counts_from_data_prep[:, 0] / 512.0,
+				weights_tomo=False,
+				show_time=True, ftol=0.01, xtol=0.001, full_output=0, max_iter=100,
+				TE_correction_matrix=None
+			)
 		if self.tomography_type == "LI":
 			(self.basis_decomposition, self.rhos) = tomos.execute_pseudo_inverse_tomo(self.meas_operators[0], self.counts_from_data_prep[:,0]/512.0, use_pauli_basis=False,
 		                                   											  verbose=False)
