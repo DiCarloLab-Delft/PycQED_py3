@@ -27,12 +27,14 @@ pytest
 # packages that used to have a minimum version constraint (only)
 adaptive  # >=0.10.0
 scikit-optimize  # >=0.5.2
+ipykernel
+ipython-genutils
 ipython  # >=4.0
 ipywidgets  # >=4.1
 lmfit  # >=0.9.5
 
 # packages with version constraints. FIXME: constraints should be removed
-scikit-learn==0.23.1  # Tests started to fail on 2020-08-05 due to 0.23.2
+scikit-learn  # ==0.23.1  # Tests started to fail on 2020-08-05 due to 0.23.2
 h5py>=2.6, <=3.0  # FIXME: 3.0 breaks measurement_analysis.py
 pygsti==0.9.6  # FIXME: 0.9.7.5 breaks test_gst.py
 pyvisa>=1.8
