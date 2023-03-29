@@ -280,7 +280,7 @@ class MeasurementAnalysis(object):
             s = s.decode('utf-8')
         # If it is an array of value decodes individual entries
         if type(s) == np.ndarray:
-            s = [s.decode('utf-8') for s in s]
+            s = [s if isinstance(s, str) else s.decode('utf-8') for s in s]
         return s
 
     def group_values(self, group_name):
@@ -870,7 +870,7 @@ class MeasurementAnalysis(object):
                              % datasaving_format)
 
     def get_best_fit_results(self, peak=False, weighted=False):
-        if len(self.data_file['Analysis']) is 1:
+        if len(self.data_file['Analysis']) == 1:
             return list(self.data_file['Analysis'].values())[0]
         else:
             normalized_chisquares = {}
@@ -1770,7 +1770,7 @@ class Rabi_Analysis(TD_Analysis):
         # we may have 0 cal pts, so writing self.sweep_points[:-self.NoCalPoints]
         # will give an error if self.NoCalPoints==0.
         self.sweep_pts_wo_cal_pts = deepcopy(self.sweep_points)
-        if self.NoCalPoints is not 0:
+        if self.NoCalPoints != 0:
             self.sweep_pts_wo_cal_pts = \
                 self.sweep_pts_wo_cal_pts[:-self.NoCalPoints]
 
@@ -5455,7 +5455,7 @@ class DriveDetuning_Analysis(TD_Analysis):
                                         xlabel=self.xlabel,
                                         ylabel=r'$F$  $|1\rangle$',
                                         **kw)
-        if self.fit_type is 'sine':
+        if self.fit_type == 'sine':
             ax.plot(sweep_points, self.fit_results_sine.best_fit)
         else:
             ax.plot(sweep_points, self.fit_results_quadratic[0])

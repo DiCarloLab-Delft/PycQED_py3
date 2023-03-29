@@ -1,6 +1,7 @@
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 import numpy as np
 from copy import copy
+
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
@@ -34,6 +35,8 @@ _def_lm = {
 
 valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
 
+def roundup1024(n):
+    return int(np.ceil(n / 1024) * 1024)
 
 def flux_lutmap_is_valid(lutmap: dict) -> bool:
     """
@@ -2972,7 +2975,7 @@ class HDAWG_Flux_LutMan_Adiabatic(Base_Flux_LutMan):
             label = 'auto_{}_{}'.format(sim_control_CZ.name, time_string)
 
         if sweep_mode == 'linear':
-            n_pnts_per_dim = np.int(np.ceil(np.sqrt(n_points)))
+            n_pnts_per_dim = int(np.ceil(np.sqrt(n_points)))
             MC.set_sweep_points(np.linspace(*theta_f_lims, n_pnts_per_dim))
             MC.set_sweep_points_2D(np.linspace(*lambda_2_lims, n_pnts_per_dim))
             MC.run(label, mode='2D')

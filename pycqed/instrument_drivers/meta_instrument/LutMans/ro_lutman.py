@@ -1,5 +1,5 @@
 import numpy as np
-
+from typing import List
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -52,38 +52,15 @@ class Base_RO_LutMan(Base_LutMan):
     ):
         self._num_res = num_res
         self._feedline_number = feedline_number
+        self._resonator_codeword_bit_mapping: List[int] = kw.pop('force_bit_map', None)
 
-        # FIXME: we should not be aware of topology here
-        if feedline_map == 'S5':
-            if self._feedline_number == 0:
-                self._resonator_codeword_bit_mapping = [0, 2, 3, 4]
-            elif self._feedline_number == 1:
-                self._resonator_codeword_bit_mapping = [1]
-            else:
-                raise NotImplementedError('Hardcoded for feedline 0 and 1 of Surface-5')
-        elif feedline_map == 'S7':
-            if self._feedline_number == 0:
-                self._resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]
-            elif self._feedline_number == 1:
-                self._resonator_codeword_bit_mapping = [1, 4]
-            else:
-                raise NotImplementedError('Hardcoded for feedline 0 and 1 of Surface-7')
-        elif feedline_map == 'S17':
-            # FIXME: the lines commented out were introduced by commit 68305e29147d1defd4c28341edad7180fb781644
-            #  but they break CI, and don't contain all required values from [0..16]
-            if self._feedline_number == 0:
-                self._resonator_codeword_bit_mapping = [0, 1, 2]
-                # self._resonator_codeword_bit_mapping = [6, 11]
-            elif self._feedline_number == 1:
-                self._resonator_codeword_bit_mapping = [3, 4, 5]
-                # self._resonator_codeword_bit_mapping = [0, 1, 2, 3, 7, 8, 12, 13, 15]
-            elif self._feedline_number == 2:
-                self._resonator_codeword_bit_mapping = [6, 7]
-                # self._resonator_codeword_bit_mapping = [4, 5, 9, 10, 14, 16]
-            else:
-                raise NotImplementedError('Hardcoded for feedline 0, 1 and 2 of Surface-17')
-        else:
-            raise ValueError('Feedline map not in {"S5", "S7", "S17"}.')
+        if self._resonator_codeword_bit_mapping is None:
+            # FIXME: we should not be aware of topology here
+            map_collection: FeedlineMapCollection = read_ro_lutman_bit_map()
+            self._resonator_codeword_bit_mapping = map_collection.get_bitmap(
+                map_id=feedline_map,
+                feedline_nr=self._feedline_number,
+            )
 
         # capping the resonator bit mapping in case a limited number of resonators is used
         self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self._num_res]

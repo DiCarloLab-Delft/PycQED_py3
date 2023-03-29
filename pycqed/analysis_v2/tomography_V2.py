@@ -141,7 +141,7 @@ class TomoAnalysis():
 
         measurement_vectors = []
         for measurement_operator in measurement_operators:
-            measurement_vectors.append([m.full() for m in  self.get_measurement_vector(measurement_operator)])
+            measurement_vectors.append([m.full() for m in self.get_measurement_vector(measurement_operator)])
         measurement_vector = np.vstack(measurement_vectors)
         # initiate with equal weights
         self.weights = weights_tomo if weights_tomo else np.ones(len(measurement_vector))
@@ -154,8 +154,10 @@ class TomoAnalysis():
 
         # now fetch the starting t_params from the cholesky decomp of rho
         tcholesky = time.time()
-        T0 = np.linalg.cholesky(scipy.linalg.sqrtm((rho0.dag() * rho0).full()))
-        t0 = np.zeros(4 ** self.n_qubits, dtype='complex' )
+        matrix: np.ndarray = scipy.linalg.sqrtm((rho0.dag() * rho0).full())
+        matrix = matrix.astype(dtype=np.complex128)
+        T0 = np.linalg.cholesky(matrix)
+        t0 = np.zeros(4 ** self.n_qubits, dtype=np.complex128)
         di = np.diag_indices(2 ** self.n_qubits)
         tri = np.tril_indices(2 ** self.n_qubits, -1)
         t0[0:2 ** self.n_qubits] = T0[di]

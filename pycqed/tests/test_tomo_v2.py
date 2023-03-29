@@ -16,7 +16,6 @@ class Test_tomography_execute(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
 
-
     def test_tomo_analysis_cardinal_state(self):
 
       #The dataset corresponds to the 00 cardinal state.

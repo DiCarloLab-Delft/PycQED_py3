@@ -754,7 +754,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         kernel_before_list = self.dist_dict['ch%d' % self.flux_channel]
         kernel_before_loaded = []
         for k in kernel_before_list:
-            if k is not '':
+            if k != '':
                 kernel_before_loaded.append(np.loadtxt(kernel_dir+k))
         self.kernel_before = kernel_obj.convolve_kernel(kernel_before_loaded,
                                                         30000)
