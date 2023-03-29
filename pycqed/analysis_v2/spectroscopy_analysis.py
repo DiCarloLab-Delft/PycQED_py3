@@ -436,7 +436,7 @@ class VNA_analysis(complex_spectroscopy):
                 'line_kws': {'color': 'r'},
                 'do_legend': True}
 
-            self.plot_dicts['reso_fit_phase'] = {
+            self.plot_dicts['reso_fit_plane'] = {
                 'ax_id': 'plane',
                 'plotfn': self.plot_fit,
                 'fit_res': self.fit_dicts['reso_fit']['fit_res'],

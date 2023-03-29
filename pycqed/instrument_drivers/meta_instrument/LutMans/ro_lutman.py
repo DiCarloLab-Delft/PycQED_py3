@@ -3,6 +3,10 @@ import numpy as np
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 
 from pycqed.measurement.waveform_control_CC import waveform as wf
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman_config import (
+    FeedlineMapCollection,
+    read_ro_lutman_bit_map,
+)
 
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
@@ -68,14 +72,14 @@ class Base_RO_LutMan(Base_LutMan):
             # FIXME: the lines commented out were introduced by commit 68305e29147d1defd4c28341edad7180fb781644
             #  but they break CI, and don't contain all required values from [0..16]
             if self._feedline_number == 0:
-                # self._resonator_codeword_bit_mapping = [0, 1, 2]
-                self._resonator_codeword_bit_mapping = [6, 11]
+                self._resonator_codeword_bit_mapping = [0, 1, 2]
+                # self._resonator_codeword_bit_mapping = [6, 11]
             elif self._feedline_number == 1:
-                # self._resonator_codeword_bit_mapping = [3, 4, 5]
-                self._resonator_codeword_bit_mapping = [0, 1, 2, 3, 7, 8, 12, 13, 15]
+                self._resonator_codeword_bit_mapping = [3, 4, 5]
+                # self._resonator_codeword_bit_mapping = [0, 1, 2, 3, 7, 8, 12, 13, 15]
             elif self._feedline_number == 2:
-                # self._resonator_codeword_bit_mapping = [6, 7]
-                self._resonator_codeword_bit_mapping = [4, 5, 9, 10, 14, 16]
+                self._resonator_codeword_bit_mapping = [6, 7]
+                # self._resonator_codeword_bit_mapping = [4, 5, 9, 10, 14, 16]
             else:
                 raise NotImplementedError('Hardcoded for feedline 0, 1 and 2 of Surface-17')
         else:
@@ -181,6 +185,12 @@ class Base_RO_LutMan(Base_LutMan):
                 initial_value=20.0e6
             )
             self.add_parameter(
+                'M_double_modulation_R{}'.format(res),
+                vals=vals.Numbers(), unit='Hz',
+                parameter_class=ManualParameter,
+                initial_value=0
+            )
+            self.add_parameter(
                 'M_length_R{}'.format(res),
                 unit='s',
                 vals=vals.Numbers(1e-9, 8000e-9),
@@ -197,7 +207,7 @@ class Base_RO_LutMan(Base_LutMan):
             self.add_parameter(
                 'M_delay_R{}'.format(res),
                 unit='V',
-                vals=vals.Numbers(0, 500e-9),
+                vals=vals.Numbers(0, 3000e-9),
                 parameter_class=ManualParameter,
                 initial_value=0
             )
@@ -347,39 +357,39 @@ class Base_RO_LutMan(Base_LutMan):
             )
             res_wave_dict['M_simple_R{}'.format(res)] = M
 
-            # # 3-step RO pulse with ramp-up and double depletion
-            # up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
-            # M_up = create_pulse(
-            #     shape=self.pulse_primitive_shape(),
-            #     amplitude=self.get('M_amp_R{}'.format(res)),
-            #     length=up_len,
-            #     delay=0,
-            #     phase=self.get('M_phi_R{}'.format(res)),
-            #     sampling_rate=sampling_rate
-            # )
+            # 3-step RO pulse with ramp-up and double depletion
+            up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
+            M_up = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_amp_R{}'.format(res)),
+                length=up_len,
+                delay=0,
+                phase=self.get('M_phi_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
 
-            # M_down0 = create_pulse(
-            #     shape=self.pulse_primitive_shape(),
-            #     amplitude=self.get('M_down_amp0_R{}'.format(res)),
-            #     length=self.get('M_down_length0_R{}'.format(res)),  # ns
-            #     delay=0,
-            #     phase=self.get('M_down_phi0_R{}'.format(res)),
-            #     sampling_rate=sampling_rate
-            # )
+            M_down0 = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_down_amp0_R{}'.format(res)),
+                length=self.get('M_down_length0_R{}'.format(res)),  # ns
+                delay=0,
+                phase=self.get('M_down_phi0_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
 
-            # down1_len = self.get('M_down_length1_R{}'.format(res))-gauss_length/2
-            # M_down1 = create_pulse(
-            #     shape=self.pulse_primitive_shape(),
-            #     amplitude=self.get('M_down_amp1_R{}'.format(res)),
-            #     length=down1_len,
-            #     delay=0,
-            #     phase=self.get('M_down_phi1_R{}'.format(res)),
-            #     sampling_rate=sampling_rate
-            # )
+            down1_len = self.get('M_down_length1_R{}'.format(res))-gauss_length/2
+            M_down1 = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_down_amp1_R{}'.format(res)),
+                length=down1_len,
+                delay=0,
+                phase=self.get('M_down_phi1_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
 
-            # M_up_down_down = (np.concatenate((M_up[0], M_down0[0], M_down1[0])),
-            #                   np.concatenate((M_up[1], M_down0[1], M_down1[1])))
-            # res_wave_dict['M_up_down_down_R{}'.format(res)] = M_up_down_down
+            M_up_down_down = (np.concatenate((M_up[0], M_down0[0], M_down1[0])),
+                              np.concatenate((M_up[1], M_down0[1], M_down1[1])))
+            res_wave_dict['M_up_down_down_R{}'.format(res)] = M_up_down_down
 
             # pulse with up, down, down depletion with an additional final
             # strong measurement at some delay
@@ -392,9 +402,9 @@ class Base_RO_LutMan(Base_LutMan):
                 sampling_rate=sampling_rate
             )
 
-            # M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
-            #                         np.concatenate((M_up_down_down[1], M_final[1])))
-            # res_wave_dict['M_up_down_down_final_R{}'.format(res)] = M_up_down_down_final
+            M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
+                                    np.concatenate((M_up_down_down[1], M_final[1])))
+            res_wave_dict['M_up_down_down_final_R{}'.format(res)] = M_up_down_down_final
 
             # 2. convolve with gaussian (if desired)
             if self.gaussian_convolution():
@@ -415,6 +425,16 @@ class Base_RO_LutMan(Base_LutMan):
                     f_modulation=self.get('M_modulation_R{}'.format(res)),
                     sampling_rate=self.get('sampling_rate')
                 )
+                # Apply double modulation if specified
+                f_mod_2 = self.get('M_double_modulation_R{}'.format(res))
+                if f_mod_2 != 0:
+                    print(f'Resonator {res} has double modulation.')
+                    s_1 = res_wave_dict[key]
+                    s_2 = wf.mod_pulse(pulse_I=val[0], pulse_Q=val[1],
+                                       f_modulation=f_mod_2,
+                                       sampling_rate=self.get('sampling_rate'))
+                    s = ( s_1[0]+s_2[0], s_1[1]+s_2[1] )
+                    res_wave_dict[key] = s
 
             # 4. apply mixer predistortion
             if self.mixer_apply_predistortion_matrix():

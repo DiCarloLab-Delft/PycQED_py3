@@ -55,7 +55,6 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
             self.current_sources[mod_id] = S4g_module(
                 self.spi_rack,
                 module=mod_id,
-                max_current=50e-3,
                 reset_currents=reset_currents)
 
         for parname, (mod_id, dac) in self.channel_map.items():
@@ -71,6 +70,8 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
     def _get_current(self, parname):
         mod_id, dac = self.channel_map[parname]
         current, span = self.current_sources[mod_id].get_settings(dac)
+        # just to make sure
+        assert span == 2, f'Checks if SPI rack is connected correctly. Expects span==2, receives span=={span}.'
         return current
 
     def _set_current(self, parname, value):
@@ -100,7 +101,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
             scale_fac, unit = SI_prefix_and_scale_factor(I, 'A')
             msg += '{0:8}\t{1:4}\t{2:4}\t{3:>8.2f} {4:4}\n'.format(
                        ch_name, ch_map[0], ch_map[1], scale_fac*I, unit)
-        
+
         print(msg)
 
     def set_dacs_zero(self):

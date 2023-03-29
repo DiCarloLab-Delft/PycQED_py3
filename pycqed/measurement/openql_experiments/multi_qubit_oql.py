@@ -545,7 +545,7 @@ def residual_coupling_sequence(
     # adding the calibration points
     p.add_multi_q_cal_points(
         qubits=all_qubits,
-        combinations=['0' * n_qubits, '1' * n_qubits])
+        combinations=['0' * n_qubits, '0' * n_qubits, '1' * n_qubits, '1' * n_qubits])
 
     p.compile()
     return p

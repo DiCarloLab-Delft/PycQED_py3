@@ -708,7 +708,7 @@ class HAL_ShimSQ(Qubit):
         self.add_parameter(
             'ro_pulse_delay', unit='s',
             label='Readout pulse delay',
-            vals=vals.Numbers(0, 1e-6),
+            vals=vals.Numbers(0, 3e-6),
             initial_value=0,
             parameter_class=ManualParameter,
             docstring=('The delay time for the readout pulse'))

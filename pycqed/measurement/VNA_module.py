@@ -13,7 +13,8 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
                                          span=None, nr_avg=1, sweep_mode='auto',
                                          nbr_points=101, power=-20,
                                          bandwidth=100, measure='S21',
-                                         options_dict=None):
+                                         options_dict=None,
+                                         disable_metadata=False):
     """
     Acquires a single trace from the VNA.
     Inputs:
@@ -58,15 +59,18 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     print(str_to_write)
     VNA_instr.visa_handle.write(str_to_write)
 
-    VNA_instr.avg(nr_avg)
-    VNA_instr.number_sweeps_all(nr_avg)
+    old_soft_avg = MC_instr.soft_avg()
+    MC_instr.soft_avg(nr_avg)
+    VNA_instr.avg(1) # When using VNA averages, only the last trace is retrieved, not the averaged result. Thus, we use MC soft averages.
+    VNA_instr.number_sweeps_all(1)
     VNA_instr.average_mode(sweep_mode)
 
     VNA_instr.power(power)
     VNA_instr.timeout(10**4)
 
     t_start = ma.a_tools.current_timestamp()
-    MC_instr.run(name=file_name)
+    MC_instr.run(name=file_name, disable_snapshot_metadata=disable_metadata)
+    MC_instr.soft_avg(old_soft_avg)
     t_stop = ma.a_tools.current_timestamp()
     t_meas = ma.a_tools.get_timestamps_in_range(t_start, t_stop, label=file_name)
 

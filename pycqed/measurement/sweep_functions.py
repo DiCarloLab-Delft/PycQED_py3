@@ -450,21 +450,21 @@ class RO_freq_sweep(Soft_Sweep):
     Change qubit's RO frequency by changing the LO source frequency
     and fixing modulation frequency.
     """
-    def __init__(self, qubit, *args, **kwargs):
+    def __init__(self, qubit):
         self.set_kw()
         self.name = f'RO_frequency_{qubit.name}'
         self.parameter_name = f'RO_frequency_{qubit.name}'
         self.unit = 'Hz'
         self.sweep_control = 'soft'
         self.qubit = qubit
-        self.lo_instr = self.qubit.instr_LO_ro.get_instr()
+        self.LO_instr = self.qubit.instr_LO_ro.get_instr()
 
     def set_parameter(self, val):
         # Calculate LO frequency change
         IF_freq = self.qubit.ro_freq_mod()
         LO_freq = val-IF_freq
         # Set LO frequency
-        self.lo_instr.frequency(LO_freq)
+        self.LO_instr.frequency(LO_freq)
 
 
 @deprecated(version='0.4', reason='not used within pyqed')

@@ -1186,7 +1186,7 @@ class HAL_Transmon(HAL_ShimSQ):
         ad_func_pars = {'adaptive_function': nelder_mead,
                         'x0': [1.0, 0.0],
                         'initial_step': [.15, 10],
-                        'no_improv_break': 15,
+                        # 'no_improv_break': 15,
                         'minimize': True,
                         'maxiter': 500}
         MC.set_sweep_functions([S1, S2])
@@ -1296,8 +1296,6 @@ class HAL_Transmon(HAL_ShimSQ):
 
     def calibrate_ssro_coarse(
             self,
-            MC: Optional[MeasurementControl] = None,
-            nested_MC: Optional[MeasurementControl] = None,
             freqs=None,
             amps=None,
             analyze: bool = True,
@@ -1320,22 +1318,8 @@ class HAL_Transmon(HAL_ShimSQ):
                 Range of amplitudes of sweep.
         '''
 
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        if nested_MC is None:
-            nested_MC = self.instr_nested_MC.get_instr()
-
-        if freqs is None:
-            if self.dispersive_shift() is not None:
-                freqs = np.arange(-2 * abs(self.dispersive_shift()),
-                                  abs(self.dispersive_shift()), .5e6) + self.freq_res()
-            else:
-                raise ValueError('self.dispersive_shift is None. Please specify\
-                                 range of sweep frequencies.')
-
-        if amps is None:
-            amps = np.linspace(.001, .5, 31)
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
 
         self.prepare_for_timedomain()
 
@@ -1596,7 +1580,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         self.ro_acq_delay(0)  # set delay to zero
         old_pow = self.ro_pulse_amp()
-        self.ro_pulse_amp(0.5)
+        self.ro_pulse_amp(0.5)  # FIXME: Sets readout pulse amplitude during experiment. Why?
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2091,8 +2075,8 @@ class HAL_Transmon(HAL_ShimSQ):
             d = det.Function_Detector(
                 self.measure_error_fraction,
                 msmt_kw={'net_gate': 'pi',
-                        'feedback': False,
-                        'sequence_type': 'echo'},
+                         'feedback': False,
+                         'sequence_type': 'echo'},
                 value_names=['error fraction'],
                 value_units=['au'],
                 result_keys=['error fraction'])
@@ -2498,7 +2482,8 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs, MC: Optional[MeasurementControl] = None,
             analyze=True,
             close_fig=True,
-            label=''
+            label='',
+            disable_metadata: bool = False,
     ):
         # USED_BY: device_dependency_graphs.py (via find_resonator_frequency)
         """
@@ -2539,7 +2524,7 @@ class HAL_Transmon(HAL_ShimSQ):
 
         self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_scan' + self.msmt_suffix + label)
+        MC.run(name='Resonator_scan' + self.msmt_suffix + label, disable_snapshot_metadata=disable_metadata)
 
         self.hal_acq_spec_mode_off()
 
@@ -2903,7 +2888,7 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             label='',
-            prepare_for_continuous_wave=True
+            prepare_for_continuous_wave=True,
     ):
         """
         Performs a two-tone spectroscopy experiment where one tone is kept
@@ -4044,7 +4029,7 @@ class HAL_Transmon(HAL_ShimSQ):
                               nf[-1] + 4 * dn)])
 
         self.prepare_for_timedomain()
-        p = sqo.flipping(number_of_flips=nf, equator=equator,  # flip_ef=flip_ef, (Unexpected keyword!)
+        p = sqo.flipping(number_of_flips=nf, equator=equator, # flip_ef=flip_ef, (Unexpected keyword!)
                          qubit_idx=self.cfg_qubit_nr(),
                          platf_cfg=self.cfg_openql_platform_fn(),
                          ax=ax.lower(), angle=angle)
@@ -5176,6 +5161,8 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
+
+    # region Local changes from Pagani setup 13-06-2022
     def measure_RO_QND(
             self,
             prepare_for_timedomain: bool = True,
@@ -5233,7 +5220,8 @@ class HAL_Transmon(HAL_ShimSQ):
         a = ma2.mra.measurement_QND_analysis(
             qubit=self.name,
             label='QND',
-            extract_only=no_figs)
+            extract_only=no_figs,
+            options_dict={'qubit_freq':self.freq_qubit()})
         return a.qoi
 
     def calibrate_RO_QND(
@@ -5288,6 +5276,7 @@ class HAL_Transmon(HAL_ShimSQ):
             self.ro_freq(opt_freq)
             self.ro_pulse_amp(opt_amp)
     # endregion
+
 
     def measure_dispersive_shift_pulsed(
             self, freqs=None,

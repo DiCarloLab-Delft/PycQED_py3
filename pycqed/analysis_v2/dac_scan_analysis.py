@@ -677,12 +677,12 @@ class DAC_analysis(ma.TwoD_Analysis):
                  extract_only=False,
                  auto=True,
                  **kw):
-        super(ma.TwoD_Analysis, self).__init__(timestamp=timestamp,
-                                               options_dict=options_dict,
-                                               extract_only=extract_only,
-                                               auto=auto,
-                                               do_fitting=do_fitting,
-                                               **kw)
+        super().__init__(timestamp=timestamp,
+                         options_dict=options_dict,
+                         extract_only=extract_only,
+                         auto=auto,
+                         do_fitting=do_fitting,
+                         **kw)
         linecut_fit_result = self.fit_linecuts()
         self.linecut_fit_result = linecut_fit_result
         f0s = []

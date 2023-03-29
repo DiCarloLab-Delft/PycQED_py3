@@ -1167,24 +1167,24 @@ class Qubit(Instrument):
 
         # This snippet exists to be backwards compatible 9/2017. FIXME: cleanup
         try:
-            freq_res_par = self.freq_res
-            freq_RO_par = self.ro_freq
+            freq_res_par = self.freq_res  # takes the previous resonator frequency
+            freq_RO_par = self.ro_freq  # takes the previous readout frequency
         except:
             warnings.warn("Deprecation warning: rename f_res to freq_res")
             freq_res_par = self.f_res
             freq_RO_par = self.f_RO
         if freqs is None:
-            f_center = freq_res_par()
+            f_center = freq_res_par()  # set the center freq of the scan equal to the previous resonator freq
             if f_center is None:
                 raise ValueError('Specify "freq_res" to generate a freq span')
-            f_span = 10e6
-            f_step = 100e3
+            f_span = 10e6  # spanned freqs
+            f_step = 100e3  # freq step
             freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
         self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
         a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
         if use_min:
-            f_res = a.min_frequency
+            f_res = a.min_frequency  # uses the minimum frequency of the scan
         else:
             f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
         if f_res > max(freqs) or f_res < min(freqs):
@@ -1374,7 +1374,7 @@ class Qubit(Instrument):
             return False
 
         # fine range around optimum
-        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.4, num=31)
+        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.6, num=31)
         a = self.measure_motzoi(motzois)
         opt_motzoi = a.optimal_motzoi
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):

@@ -66,6 +66,45 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str) -> OqlProgram:
     return p
 
 
+def CW_RO_pulsed_marked_sequence(qubit_idx: int,
+                                 platf_cfg: str,
+                                 trigger_idx: int,
+                                 spec_pulse_length: float,
+                                 wait_time_ns: int) -> OqlProgram:
+    """
+    A sequence that performs readout back to back without initialization.
+    The separation of the readout triggers is done by specifying the duration
+    of the readout parameter in the configuration file used for compilation.
+    FIXME: Update this docstring.
+    args:
+        qubit_idx (int/list) :  the qubit(s) to be read out, can be either an
+            int or a list of integers.
+        platf_cfg (str)     :
+    """
+    p = OqlProgram('CW_RO_pulsed_marked_sequence', platf_cfg=platf_cfg)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    k = p.create_kernel("main")
+    if not hasattr(qubit_idx, "__iter__"):
+        qubit_idx = [qubit_idx]
+
+    for qi in qubit_idx:
+        # k.prepz(qi)
+        k.barrier([trigger_idx, qi])
+        for i in range(nr_clocks):
+            # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+            # control works. By repeating it the duration can be controlled.
+            k.gate('spec', [trigger_idx])
+        k.wait([trigger_idx], wait_time_ns)
+        k.measure(qi)
+
+        k.barrier([trigger_idx, qi])
+    p.add_kernel(k)
+    p.compile()
+    return p
+
+
 @deprecated(version='0.4', reason="seems to depend on CCL and VSM")
 def pulsed_spec_seq(
         qubit_idx: int,
@@ -549,6 +588,186 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
             # k.gate('wait', [qubit_idx], 500)
             k.measure(qubit_idx)
             p.add_kernel(k)
+
+    p.compile()
+    return p
+
+def depletion_FourXY(qubit_idx: int,
+                    dummy_idx: int,
+                    platf_cfg: str,
+                    pi_pulse_wait_ns_array: np.ndarray,
+                    nr_repeat: int = 2):
+    """
+    Plays an ALLXY sequence in two settings without and with
+    a pre-measurement meant to assess depletion after the measurement.
+    :param qubit_idx: Pulse lookup reference index, usually uniquelly corresponds to qubit.
+    :param dummy_idx: Pulse lookup reference index (for dummy/virtual qubit).
+    :param platf_cfg: Platform specific string, passed to Oql program constructor.
+    :param pi_pulse_wait_ns: Wait delay that pushes (dummy_idx) pi pulse backwards compared to (dummy_idx) readout block barrier. In ns
+    :param nr_repeat: Integer number of repetitions for oql kernel.
+    """
+    p = OqlProgram("Depletion_FourXY", platf_cfg)
+
+    allxy_gates = [['i', 'i'],
+                   ['rx90', 'ry90'],
+                   ['ry90', 'rx90'],
+                   ['rx180', 'i']]
+    gate_repeat_count: int = nr_repeat
+
+    for idx, pi_pulse_wait_ns in enumerate(pi_pulse_wait_ns_array):
+    # k = p.create_kernel(f'Depletion_FourXY_{idx}')
+    # pi_pulse_wait_ns = pi_pulse_wait_ns_array[0]
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_ref0_{idx}_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 0-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_meas0_{idx}_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 0-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.measure(dummy_idx)  # Qubit measured in |0>
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_ref1_{idx}_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 1-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate('rx180', [qubit_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_meas1_{idx}_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 1-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate('rx180', [qubit_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.measure(dummy_idx)  # Qubit measured in |1>
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+    # p.add_kernel(k)
+
+    p.compile()
+    return p
+
+
+def FourXY(qubit_idx: int,
+          dummy_idx: int,
+          platf_cfg: str,
+          pi_pulse_wait_ns: int,
+          pi_pulse: bool = False,
+          nr_repeat: int = 2):
+    """
+    Plays an ALLXY sequence in two settings without and with
+    a pre-measurement meant to assess depletion after the measurement.
+    :param qubit_idx: Pulse lookup reference index, usually uniquelly corresponds to qubit.
+    :param dummy_idx: Pulse lookup reference index (for dummy/virtual qubit).
+    :param platf_cfg: Platform specific string, passed to Oql program constructor.
+    :param pi_pulse_wait_ns: Wait delay that pushes (dummy_idx) pi pulse backwards compared to (dummy_idx) readout block barrier. In ns
+    :param nr_repeat: Integer number of repetitions for oql kernel.
+    """
+    p = OqlProgram("Depletion_FourXY", platf_cfg)
+
+    allxy_gates = [['i', 'i'],
+                   ['rx90', 'ry90'],
+                   ['ry90', 'rx90'],
+                   ['rx180', 'i']]
+    gate_repeat_count: int = nr_repeat
+
+
+    if not pi_pulse:
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_ref0_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 0-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_meas0_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 0-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.measure(dummy_idx)  # Qubit measured in |0>
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+    else:
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_ref1_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 1-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate('rx180', [qubit_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
+        for i, (gate_0, gate_1) in enumerate(allxy_gates):
+            for j in range(gate_repeat_count):
+                k = p.create_kernel(f'Depletion_FourXY_meas1_{i}_{j}')
+                k.prepz(qubit_idx)
+                # Ensures line-up of dummy measurement (photon introduction) and qubit 1-state rotation
+                k.barrier([qubit_idx, dummy_idx])
+                k.gate('rx180', [qubit_idx])
+                k.gate("wait", [qubit_idx], pi_pulse_wait_ns)
+                k.measure(dummy_idx)  # Qubit measured in |1>
+                k.barrier([qubit_idx, dummy_idx])
+                # Execute and readout normal gate-set
+                k.gate(gate_0, [qubit_idx])
+                k.gate(gate_1, [qubit_idx])
+                k.measure(qubit_idx)
+                p.add_kernel(k)
+
 
     p.compile()
     return p
@@ -1440,9 +1659,9 @@ def off_on(
     p.compile()
     return p
 
-def RO_QND_sequence(q_idx,
-                    platf_cfg: str,
-                    use_rx12: bool = False) -> OqlProgram:
+
+# region Local changes from Pagani setup 13-06-2022
+def RO_QND_sequence(q_idx, platf_cfg: str, use_rx12: bool = False) -> OqlProgram:
     '''
     RO QND sequence.
     '''
@@ -1732,7 +1951,7 @@ def FluxTimingCalibration(
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         k.barrier([])  # alignment workaround
         # k.gate(flux_cw, [2, 0])
-        k.gate('sf_square', [qubit_idx])
+        # k.gate('sf_square', [qubit_idx])
         if t_nanoseconds > 10:
             # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
             k.gate("wait", [], t_nanoseconds)  # alignment workaround

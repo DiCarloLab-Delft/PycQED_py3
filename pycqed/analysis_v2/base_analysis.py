@@ -1451,6 +1451,9 @@ class BaseDataAnalysis(object):
                     pdict_init['yvals'] = output_mod_fn(output)
                 else:
                     pdict_init['yvals'] = output
+                output_mod_fn_x = pdict.get('output_mod_fn_x', None)
+                if output_mod_fn_x is not None:
+                    pdict_init['xvals'] = output_mod_fn_x(output)
 
             pdict_init['setlabel'] += ' init'
             self.plot_line(pdict_init, axs)

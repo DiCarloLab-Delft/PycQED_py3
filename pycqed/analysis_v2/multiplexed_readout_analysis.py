@@ -8,7 +8,7 @@ import numpy as np
 from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.tools import matplotlib_utils as mpl_utils
-from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
+from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp, calculate_rotation_matrix
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
     cmap_to_alpha, cmap_first_to_alpha
 import pycqed.analysis.tools.data_manipulation as dm_tools
@@ -1732,6 +1732,7 @@ class RTE_analysis(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
+# region Local changes from Pagani setup 13-06-2022
 class measurement_QND_analysis(ba.BaseDataAnalysis):
     """
     This analysis extracts measurement QND metrics
@@ -1765,14 +1766,11 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
         """
         self.get_timestamps()
         self.timestamp = self.timestamps[0]
-
         data_fp = get_datafilepath_from_timestamp(self.timestamp)
         param_spec = {'data': ('Experimental Data/Data', 'dset'),
                       'value_names': ('Experimental Data', 'attr:value_names')}
-
         self.raw_data_dict = h5d.extract_pars_from_datafile(
             data_fp, param_spec)
-
         # Parts added to be compatible with base analysis data requirements
         self.raw_data_dict['timestamps'] = self.timestamps
         self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
@@ -1861,6 +1859,7 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
         self.qoi['Fidelity'] = Fidelity
         self.qoi['P_QND'] = P_QND
         self.qoi['P_QNDp'] = P_QNDp
+        self.proc_data_dict['quantities_of_interest'] = self.qoi
 
     def prepare_plots(self):
 
@@ -1899,7 +1898,6 @@ class measurement_QND_analysis(ba.BaseDataAnalysis):
             self.save_figures(
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
-
 
 class Readout_sweep_analysis(ba.BaseDataAnalysis):
     """
@@ -2221,6 +2219,156 @@ class Depletion_AllXY_analysis(ba.BaseDataAnalysis):
             'data_0': self.proc_data_dict['data_0'],
             'data_1': self.proc_data_dict['data_1']
         }
+
+class FourXY_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 qubit,
+                 nr_shots,
+                 pi_pulse: bool,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qubit = qubit
+        self.nr_shots = nr_shots
+        self.pi_pulse = pi_pulse
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        data_I = self.raw_data_dict['data'][:,1]
+        data_Q = self.raw_data_dict['data'][:,2]
+
+        if not self.pi_pulse:
+            I0 = data_I[:self.nr_shots]
+            I1 = data_I[self.nr_shots*3:self.nr_shots*4]
+            Q0 = data_Q[:self.nr_shots]
+            Q1 = data_Q[self.nr_shots*3:self.nr_shots*4]
+        else:
+            I1 = data_I[:self.nr_shots]
+            I0 = data_I[self.nr_shots*3:self.nr_shots*4]
+            Q1 = data_Q[:self.nr_shots]
+            Q0 = data_Q[self.nr_shots*3:self.nr_shots*4]
+
+        center_0 = np.array([np.mean(I0), np.mean(Q0)])
+        center_1 = np.array([np.mean(I1), np.mean(Q1)])
+
+        # Translate the data
+        trans_data = [data_I - center_0[0], data_Q - center_0[1]]
+
+        # Rotate the data
+        M = calculate_rotation_matrix(center_1[0] - center_0[0], center_1[1] - center_0[1])
+        outp = [np.asarray(elem)[0] for elem in M * trans_data]
+        rotated_data_ch1 = outp[0]
+
+        # Normalize the data
+        one_zero_dist = np.sqrt((center_1[0] - center_0[0]) ** 2 + (center_1[1] - center_0[1]) ** 2)
+        normalized_data = rotated_data_ch1 / one_zero_dist
+
+        data_reference = normalized_data[:self.nr_shots*4]
+        data_depletion = normalized_data[self.nr_shots*4+1::2]
+
+        self.proc_data_dict['data_ref'] = data_reference
+        self.proc_data_dict['data_depl'] = data_depletion
+
+        if not self.pi_pulse:
+            data_ideal = [0 for i in range(self.nr_shots)] + [.5 for i in range(self.nr_shots*2)] + [1 for i in range(self.nr_shots)]
+        else:
+            data_ideal = [1 for i in range(self.nr_shots)] + [.5 for i in range(self.nr_shots*2)] + [0 for i in range(self.nr_shots)]
+
+        self.proc_data_dict['data_ideal'] = np.array(data_ideal)
+
+        error_ref = data_reference - data_ideal
+        error_depl = data_depletion- data_ideal
+        self.qoi ={}
+        self.qoi['deviation_ref'] = np.mean(abs(error_ref))
+        self.qoi['deviation_depl'] = np.mean(abs(error_depl))
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': plot_fourxy,
+            'qubit': self.qubit,
+            'timestamp': self.timestamp,
+            'data_ref': self.proc_data_dict['data_ref'],
+            'data_depl': self.proc_data_dict['data_depl'],
+            'data_ideal': self.proc_data_dict['data_ideal'],
+            'deviation_ref': self.qoi['deviation_ref'],
+            'deviation_depl': self.qoi['deviation_depl'],
+            'pi_pulse': self.pi_pulse,
+            'nr_shots': self.nr_shots,
+        }
+
+class Depletion_FourXY_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 qubit,
+                 pi_pulse: bool,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qubit = qubit
+        self.pi_pulse = pi_pulse
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        self.proc_data_dict['depletion_time'] = self.raw_data_dict['data'][:,0]
+        self.proc_data_dict['deviation_ref'] = self.raw_data_dict['data'][:,1]
+        self.proc_data_dict['deviation_depl'] = self.raw_data_dict['data'][:,2]
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': plot_depletion_fourxy,
+            'qubit': self.qubit,
+            'timestamp': self.timestamp,
+            'depletion_time': self.proc_data_dict['depletion_time'],
+            'deviation_ref': self.proc_data_dict['deviation_ref'],
+            'deviation_depl': self.proc_data_dict['deviation_depl'],
+            'pi_pulse': self.pi_pulse,
+        }
+
 
 ######################################
 # Helper functions
@@ -2937,7 +3085,6 @@ def plot_QND_metrics(I0, Q0,
     ax1.text(1, .185, '$m_3$', va='center', ha='center', size=4)
     fig.suptitle(f'Qubit {qubit}\n{timestamp}', y=1.1, size=9)
 
-
 def plot_ramsey_dephasing(qubit, timestamp,
                           M_data, Fit_params,
                           Dephasing_0, Dephasing_1,
@@ -2995,4 +3142,44 @@ def plot_depletion_allxy(qubit, timestamp,
     ax.plot(data_0, 'C0o-', alpha=1, label='Standard sequence')
     ax.plot(data_1, 'C1.-', alpha=.75, label='post-measurement')
     ax.set_title(timestamp+'_Depletion_ALLXY_'+qubit)
+    ax.legend(loc=0)
+
+def plot_fourxy(qubit, timestamp,
+               data_ref, data_depl, data_ideal, deviation_ref, deviation_depl, pi_pulse, nr_shots,
+               ax, **kw):
+
+    allXY = ['II', 'xy', 'yx', 'XI']
+    allXY = np.repeat(allXY, nr_shots)
+
+    ax.set_xticks(np.arange(0, len(allXY), 1)+.5)
+    ax.set_xticklabels(allXY)
+    ax.set_ylabel(r'P($|1\rangle$)')
+    ax.set_xlabel(r'Gate combination')
+    ax.plot(data_ideal, 'k--', lw=1, label='ideal')
+    ax.plot(data_ref, 'C0o-', alpha=1, label='Standard sequence')
+    ax.plot(data_depl, 'C1.-', alpha=.75, label='Post-measurement sequence')
+    tag = 'ground' if not pi_pulse else 'excited'
+    ax.set_title(timestamp+'_FourXY_'+tag+'_'+qubit)
+    ax.legend(loc=0)
+
+    text = '\n'.join((f'Qubit initially in {tag} state',
+                      f'Reference sequence deviation$= {deviation_ref:.5f}$',
+                      f'Depletion sequence deviation$= {deviation_depl:.5f}$'))
+
+    props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
+    ax.text(0.5, -0.2, text, transform=ax.transAxes, fontsize=10,
+            verticalalignment='center', bbox=props, horizontalalignment='center')
+
+
+def plot_depletion_fourxy(qubit, timestamp,
+               depletion_time, deviation_ref, deviation_depl, pi_pulse,
+               ax, **kw):
+
+    ax.plot(depletion_time/1e-9, deviation_ref, 'C0o-', alpha=1, label='Standard sequence')
+    ax.plot(depletion_time/1e-9, deviation_depl, 'C1.-', alpha=.75, label='Post-measurement sequence')
+
+    ax.set_ylabel(r'AllXY deviation')
+    ax.set_xlabel(r'Photon depletion time (ns)')
+    tag = 'ground' if not pi_pulse else 'excited'
+    ax.set_title(timestamp+'_Depletion_FourXY_'+tag+'_'+qubit)
     ax.legend(loc=0)
