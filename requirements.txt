@@ -6,7 +6,7 @@
 # `pip install qutip` before you install pycqed
 
 qcodes
-numpy<=1.21
+numpy<=1.21  # Required for 3rd party packages that still rely on (deprecated) numpy dtype aliases. Such as np.float, np.complex, etc. (sklearn, ...)
 cython
 scipy
 cma
@@ -22,20 +22,27 @@ zhinst-core
 zhinst-utils; python_version > '3.6'
 packaging
 deprecated
-adaptive>=0.10.0
-scikit-optimize>=0.5.2
-scikit-learn==0.23.1  # Tests started to fail on 2020-08-05 due to 0.23.2
+pytest
+
+# packages that used to have a minimum version constraint (only)
+adaptive  # >=0.10.0
+scikit-optimize  # >=0.5.2
+ipykernel
+ipython-genutils
+ipython  # >=4.0
+ipywidgets  # >=4.1
+lmfit  # >=0.9.5
+
+# packages with version constraints. FIXME: constraints should be removed
+scikit-learn  # ==0.23.1  # Tests started to fail on 2020-08-05 due to 0.23.2
 h5py>=2.6, <=3.0  # FIXME: 3.0 breaks measurement_analysis.py
-IPython>=4.0
-ipywidgets>=4.1
-lmfit>=0.9.5
 pygsti==0.9.6  # FIXME: 0.9.7.5 breaks test_gst.py
 pyvisa>=1.8
 plotly<3.8  # FIXME: removing version constraint breaks test_gst.py
 pytest
 
 
-cmake
-wheel
-# Manually build from source.
-qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c  # Build from commit
+# cmake
+# wheel
+# # Manually build from source.
+# qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c  # Build from commit

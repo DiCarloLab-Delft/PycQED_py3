@@ -45,7 +45,6 @@ htmlcov/
 nosetests.xml
 coverage.xml
 *,cover
-test/test_data/*
 
 # Translations
 *.mo
@@ -139,7 +138,7 @@ pycqed/measurement/openql_experiments/output/*
 # data files
 # test data files should be explicitly added by hand (overriding .gitignore)
 data/*
-test_data/
+test_data/*
 *.hdf5
 *.sdpa
 *.sol

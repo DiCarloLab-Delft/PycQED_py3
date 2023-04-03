@@ -27,7 +27,10 @@ from qcodes.instrument.parameter import ManualParameter
 from typing import List, Sequence, Dict
 
 from qcodes.instrument.parameter import Parameter
-from qcodes.parameters.command import Command
+try:  # Compatible with python 3.6
+    from qcodes.instrument.parameter import Command
+except ImportError:  # Compatible with python 3.7+ (tested until 3.9)
+    from qcodes.parameters.command import Command
 import os
 
 

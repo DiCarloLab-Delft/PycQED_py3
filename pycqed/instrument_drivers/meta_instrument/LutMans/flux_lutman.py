@@ -1,6 +1,7 @@
 from .base_lutman import Base_LutMan, get_wf_idx_from_name
 import numpy as np
 from copy import copy
+
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
@@ -34,6 +35,8 @@ _def_lm = {
 
 valid_types = {'idle', 'cz', 'idle_z', 'square', 'custom'}
 
+def roundup1024(n):
+    return int(np.ceil(n / 1024) * 1024)
 
 def flux_lutmap_is_valid(lutmap: dict) -> bool:
     """
