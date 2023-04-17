@@ -3,7 +3,25 @@
         "data": {
             "mw_0": [
                 [
-                    24,
+                    8,
+                    "[{gateName}-{instrumentName}:{instrumentGroup}-i,{gateName}-{instrumentName}:{instrumentGroup}-q]"
+                ],
+                [
+                    8,
+                    "[{gateName}-{instrumentName}:{instrumentGroup}-i,{gateName}-{instrumentName}:{instrumentGroup}-q]"
+                ],
+                [
+                    8,
+                    "[{gateName}-{instrumentName}:{instrumentGroup}-i,{gateName}-{instrumentName}:{instrumentGroup}-q]"
+                ],
+                [
+                    8,
+                    "[{gateName}-{instrumentName}:{instrumentGroup}-i,{gateName}-{instrumentName}:{instrumentGroup}-q]"
+                ]
+            ],
+            "mw_1": [
+                [
+                    8,
                     "[{gateName}-{instrumentName}:{instrumentGroup}-i,{gateName}-{instrumentName}:{instrumentGroup}-q]"
                 ]
             ],
@@ -49,13 +67,118 @@
             },
             {
                 "ro_1": [
-                    0
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
+                ]
+            },
+            {
+                "ro_1": [
+                    0,
+                    2,
+                    3,
+                    4
+                ],
+                "ro_2": [
+                    1
                 ]
             }
         ],
         "nr-shots": {
-            "ro_1": 2,
-            "ro_2": 1
+            "ro_1": 11,
+            "ro_2": 11
         },
         "version": 2
     },

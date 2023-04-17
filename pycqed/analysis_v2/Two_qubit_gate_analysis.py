@@ -550,7 +550,8 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
 
         def cost_function(CP, MF,
                           phase=180,
-                          cp_coef=1, l1_coef=1):
+                          cp_coef=1, 
+                          l1_coef=1):
             A = ((np.abs(CP)-180)/180)**2
             B = ((MF-np.min(MF))/.5)**2
             C = (np.mean(MF-np.min(MF), axis=0)/.5)**2

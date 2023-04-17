@@ -446,7 +446,9 @@ class Multi_T1_Analysis(ba.BaseDataAnalysis):
         data_fp = a_tools.get_datafilepath_from_timestamp(self.timestamps[0])
         param_spec = {'data': ('Experimental Data/Data', 'dset')}
         data = h5d.extract_pars_from_datafile(data_fp, param_spec)
+        
         self.raw_data_dict['points'] = data['data'][:,0]
+
         for i, q in enumerate(self.qubits):
             self.raw_data_dict['{}_data'.format(q)] = data['data'][:,i+1]
             self.raw_data_dict['{}_times'.format(q)] = self.times[i]
@@ -564,7 +566,9 @@ class Multi_Echo_Analysis(ba.BaseDataAnalysis):
         data_fp = a_tools.get_datafilepath_from_timestamp(self.timestamps[0])
         param_spec = {'data': ('Experimental Data/Data', 'dset')}
         data = h5d.extract_pars_from_datafile(data_fp, param_spec)
+        
         self.raw_data_dict['points'] = data['data'][:,0]
+        
         for i, q in enumerate(self.qubits):
             self.raw_data_dict['{}_data'.format(q)] = data['data'][:,i+1]
             self.raw_data_dict['{}_times'.format(q)] = self.times[i]
@@ -732,13 +736,21 @@ class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
             self.run_analysis()
             
     def extract_data(self):
+        
         self.raw_data_dict = {} 
         self.timestamps = a_tools.get_timestamps_in_range(self.t_start,self.t_start, label = self.labels)
         self.raw_data_dict['timestamps'] = self.timestamps
+        
         data_fp = a_tools.get_datafilepath_from_timestamp(self.timestamps[0])
         param_spec = {'data': ('Experimental Data/Data', 'dset')}
         data = h5d.extract_pars_from_datafile(data_fp, param_spec)
         self.raw_data_dict['number_flips'] = data['data'][:,0]
+        
+        ### LDC 2022/10/30
+        ### I do not think this is rigurously correct.
+        ### The order of data is not necessary the same as the order in the qubits list!!!
+        ### This only works if the qubits are sorted per feedline: qubits for feedline 1 first, qubits for feedline 2 second, etc.
+        ### The qubits within a given feedline need not be pre sorted it seems.
         for i, q in enumerate(self.qubits):
             self.raw_data_dict['{}_data'.format(q)] = data['data'][:,i+1]
         self.raw_data_dict['folder'] = os.path.dirname(data_fp)
@@ -748,11 +760,14 @@ class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['quantities_of_interest'] = {}
         number_flips = self.raw_data_dict['number_flips']
         self.proc_data_dict['number_flips'] = number_flips
+
         for i, q in enumerate(self.qubits):
-             ### normalize data using cal points ###
+            
+            ### normalize data using cal points ###
             data = self.raw_data_dict['{}_data'.format(q)]
             zero = (data[-4]+data[-3])/2
             one = (data[-2]+data[-1])/2
+            # normalized data
             nor_data =  (data-zero)/(one-zero)
             self.proc_data_dict['{}_nor_data'.format(q)] = nor_data
             self.proc_data_dict['quantities_of_interest'][q]={}
@@ -761,12 +776,44 @@ class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
             x = number_flips[:-4]
             y = self.proc_data_dict['{}_nor_data'.format(q)][0:-4]
             
-            ### cos fit ###
-            cos_fit_mod = fit_mods.CosModel
-            params = cos_fit_mod.guess(cos_fit_mod,data=y,t=x)
+            # Sinusoidal fit
+            # --------------
+            # Even though we expect an exponentially damped oscillation we use
+            # a simple cosine as this gives more reliable fitting and we are only
+            # interested in extracting the oscillation frequency.
             cos_mod = lmfit.Model(fit_mods.CosFunc)
-            fit_res_cos = cos_mod.fit(data=y,t=x,params = params)
+
+            guess_pars = fit_mods.Cos_guess(
+                model=cos_mod,
+                t=x,
+                data=y,
+                )
+
+            # constrain the amplitude to positive and close to 0.5 
+            guess_pars["amplitude"].value = 0.45
+            guess_pars["amplitude"].vary = True
+            guess_pars["amplitude"].min = 0.4
+            guess_pars["amplitude"].max = 0.5
+
+            # force the offset to 0.5
+            guess_pars["offset"].value = 0.5
+            guess_pars["offset"].vary = False   
+        
+            guess_pars["phase"].vary = True
+ 
+            guess_pars["frequency"].vary = True
+
+            fit_res_cos = cos_mod.fit(data=y,t=x,params = guess_pars)
+
+
+            #### ORIGINAL CODE
+            #### cos fit ###
+            #cos_fit_mod = fit_mods.CosModel
+            #params = cos_fit_mod.guess(cos_fit_mod,data=y,t=x)
+            #cos_mod = lmfit.Model(fit_mods.CosFunc)
+            #fit_res_cos = cos_mod.fit(data=y,t=x,params = params)
             
+            # get the best-fit sinusoidal curve
             t = np.linspace(x[0],x[-1],200)
             cos_fit = fit_mods.CosFunc(t = t ,amplitude = fit_res_cos.best_values['amplitude'],
                                    frequency = fit_res_cos.best_values['frequency'],
@@ -780,35 +827,72 @@ class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
                 
             ### line fit ###
             poly_mod = lmfit.models.PolynomialModel(degree=1)
-            c0_guess = x[0]
-            c1_guess = (y[-1]-y[0])/(x[-1]-x[0])
-            poly_mod.set_param_hint('c0',value=c0_guess,vary=True)
-            poly_mod.set_param_hint('c1',value=c1_guess,vary=True)
-            poly_mod.set_param_hint('frequency', expr='-c1/(2*pi)')
-            params = poly_mod.make_params()
-            fit_res_line = poly_mod.fit(data=y,x=x,params = params)
+            # for historical reasons, the slope 'c1' is here converted to a frequency.
+            poly_mod.set_param_hint("frequency", expr="-c1/(2*pi)")
+            guess_pars = poly_mod.guess(x=x, data=y)
+            # constrain the offset close to nominal 0.5
+            guess_pars["c0"].value = 0.5
+            guess_pars["c0"].vary = True
+            guess_pars["c0"].min = 0.45
+            guess_pars["c0"].max = 0.55
+            fit_res_line = poly_mod.fit(x=x,data=y, params = guess_pars)
+
+
+
+            # # ORIGINAL CODE, replaced by Leo DC on 2022/10/30
+            # poly_mod = lmfit.models.PolynomialModel(degree=1)
+            # c0_guess = x[0]
+            # c1_guess = (y[-1]-y[0])/(x[-1]-x[0])
+            # poly_mod.set_param_hint('c0',value=c0_guess,vary=True)
+            # poly_mod.set_param_hint('c1',value=c1_guess,vary=True)
+            # poly_mod.set_param_hint('frequency', expr='-c1/(2*pi)')
+            # params = poly_mod.make_params()
+            # fit_res_line = poly_mod.fit(data=y,x=x,params = params)
+            
+
             self.proc_data_dict['{}_line_fit_data'.format(q)] = fit_res_line.best_fit
             self.proc_data_dict['{}_line_fit_res'.format(q)] = fit_res_line
             self.proc_data_dict['quantities_of_interest'][q]['line_fit'] = fit_res_line.best_values
-            ### calculating scale factors###
-            sf_cos = (1+fit_res_cos.params['frequency'])**2
-            phase = np.rad2deg(fit_res_cos.params['phase'])%360
-            if phase > 180:
-                sf_cos = 1/sf_cos
-            self.proc_data_dict['quantities_of_interest'][q]['cos_fit']['sf'] = sf_cos
             
-            sf_line = (1+fit_res_line.params['frequency'])**2
-            self.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf'] = sf_line
-            ### choose correct sf ###
-            msg = 'Scale factor based on '
-            if fit_res_line.bic<fit_res_cos.bic:
-                scale_factor = sf_line
-                msg += 'line fit\n'   
+            # ## ORIGINAL CODE, replaced by Leo DC on 2022/10/30
+            # ### calculate the scale factors###
+            # sf_cos = (1+fit_res_cos.params['frequency'])**2
+            # phase = np.rad2deg(fit_res_cos.params['phase'])%360
+            # if phase > 180:
+            #     sf_cos = 1/sf_cos
+            # self.proc_data_dict['quantities_of_interest'][q]['cos_fit']['sf'] = sf_cos
+            
+            # sf_line = (1+fit_res_line.params['frequency'])**2
+            # self.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf'] = sf_line
+
+
+            ## compute scale factor from cos fit
+            ####################################
+            # extract the frequency 
+            frequency = fit_res_cos.params["frequency"]
+            # extract phase modulo 2pi
+            phase = np.mod(fit_res_cos.params["phase"],2*np.pi)
+            # resolve ambiguity in the fit, making sign of frequency meaningful.
+            frequency*=np.sign(phase-np.pi)
+            # calculate the scale factor
+            scale_factor_cos = 1 / (1 + 2*frequency)
+
+            ## compute scale factor from line fit
+            #####################################
+            # extract the slope
+            frequency = fit_res_line.params["frequency"]        
+            scale_factor_line = 1 / (1 - 4 * frequency)
+
+            ### choose the best scale factor based on the quality of fits ###
+            msg = 'Best fit: '
+            if (fit_res_line.bic < fit_res_cos.bic):
+                scale_factor = scale_factor_line
+                msg += 'line.\n'   
             else:
-                scale_factor = sf_cos
-                msg += 'cos fit\n'
-            msg += 'line fit: {:.4f}\n'.format(sf_line)
-            msg += 'cos fit: {:.4f}'.format(scale_factor)
+                scale_factor = scale_factor_cos
+                msg += 'cos.\n'
+            msg += 'line scale fac: {:.4f}\n'.format(scale_factor_line)
+            msg += 'cos scale fac: {:.4f}'.format(scale_factor_cos)
             self.proc_data_dict['{}_scale_factor'.format(q)] = scale_factor
             self.proc_data_dict['{}_scale_factor_msg'.format(q)] = msg
             
@@ -818,7 +902,7 @@ class Multi_Flipping_Analysis(ba.BaseDataAnalysis):
                                         'plotfn': plot_Multi_flipping,
                                         'data': self.proc_data_dict,
                                         'qubit': q,
-                                        'title': 'flipping_'+q+'_'
+                                        'title': 'Flipping_'+q+'_'
                                         +self.raw_data_dict['timestamps'][0],
                                         'plotsize': (10,7)
                                         }
@@ -829,24 +913,23 @@ def plot_Multi_flipping(qubit, data,title, ax=None, **kwargs):
            
     q = qubit
     number_flips = data['number_flips']
-    t = np.linspace(number_flips[0],number_flips[-5],200)
     nor_data = data['{}_nor_data'.format(q)]
     fit_data_line = data['{}_line_fit_data'.format(q)]
+    t = np.linspace(number_flips[0],number_flips[-5],200)
     fit_data_cos = data['{}_cos_fit_data'.format(q)]
     text = data['{}_scale_factor_msg'.format(q)]
-    xpos = (number_flips[-1]+number_flips[0])*0.3
-    ypos = -0.3
+    xpos = 0.0 #(number_flips[-1]+number_flips[0])*0.3
+    ypos = 0.0
     props = dict(boxstyle='round', facecolor='white', alpha=0.5)
     ax.text(xpos, ypos, text, fontsize=11,bbox = props)
     
-    ax.plot(number_flips,nor_data,'-o')
+    ax.plot(number_flips,nor_data,'-o', label='data')
     ax.plot(number_flips[:-4],fit_data_line,'-',label='line fit')
-    ax.plot(t,fit_data_cos,'-',label='cosine fit')
+    ax.plot(t,fit_data_cos,'-',label='cos fit')
     ax.legend()
-    ax.set(ylabel=r'$F$ $|1 \rangle$')
-    ax.set(xlabel= r'number of flips (#)')
+    ax.set(ylabel=r"Excited-state population")
+    ax.set(xlabel=r"Number of (effective) $\pi$ pulses")
     ax.set_title(title)
-    4444444
 
 class Multi_Motzoi_Analysis(ba.BaseDataAnalysis):
     def __init__(

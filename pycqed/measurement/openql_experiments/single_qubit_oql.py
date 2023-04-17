@@ -525,7 +525,7 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
-            # k.gate('wait', [qubit_idx], 500)
+            k.gate('wait', [qubit_idx], 400)
             k.measure(qubit_idx)
             p.add_kernel(k)
 
@@ -534,8 +534,29 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
             k.measure(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
-            # k.gate('wait', [qubit_idx], 500)
+            k.gate('wait', [qubit_idx], 400)
             k.measure(qubit_idx)
+            # k.gate('wait', [qubit_idx], 500)
+            p.add_kernel(k)
+
+            k = p.create_kernel("AllXY_{}_{}_1".format(i, j))
+            k.prepz(qubit_idx)
+            k.gate('rx180', [qubit_idx])
+            k.gate(xy[0], [qubit_idx])
+            k.gate(xy[1], [qubit_idx])
+            k.gate('wait', [qubit_idx], 400)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+            k = p.create_kernel("AllXY_meas_{}_{}_1".format(i, j))
+            k.prepz(qubit_idx)
+            k.gate('rx180', [qubit_idx])
+            k.measure(qubit_idx)
+            k.gate(xy[0], [qubit_idx])
+            k.gate(xy[1], [qubit_idx])
+            k.gate('wait', [qubit_idx], 400)
+            k.measure(qubit_idx)
+            # k.gate('wait', [qubit_idx], 500)
             p.add_kernel(k)
 
     p.compile()
@@ -892,8 +913,9 @@ def echo(times, qubit_idx: int, platf_cfg: str, delta_phase: int = 40) -> OqlPro
 
     for i, time in enumerate(times[:-4]):
 
+        startIndex=32  # added by LDC on 2022/10/23. Starting index used to be 9.
         angle = (i*delta_phase) % 360
-        cw_idx = angle//20 + 9
+        cw_idx = 32 + angle//20
         wait_nanoseconds = int(round(time*1e9 / 2))
 
         k = p.create_kernel("echo_{}".format(i))
@@ -1490,7 +1512,8 @@ def off_on_ramzz_measurement(
     return p
 
 def RO_QND_sequence(q_idx,
-                    platf_cfg: str) -> OqlProgram:
+                    platf_cfg: str,
+                    f_state: bool = False):
     '''
     RO QND sequence.
     '''
@@ -1498,7 +1521,6 @@ def RO_QND_sequence(q_idx,
     p = OqlProgram("RO_QND_sequence", platf_cfg)
 
     k = p.create_kernel("Experiment")
-
     k.prepz(q_idx)
     k.gate('rx90', [q_idx])
     k.measure(q_idx)
@@ -1518,46 +1540,120 @@ def RO_QND_sequence(q_idx,
     k.measure(q_idx)
     p.add_kernel(k)
 
+    if f_state:
+        k = p.create_kernel("Init_2")
+        k.prepz(q_idx)
+        k.gate('rx180', [q_idx])
+        k.gate('rx12', [q_idx])
+        k.measure(q_idx)
+        p.add_kernel(k)
+    
     p.compile()
-
+    
     return p
 
-def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:
+# ADD butterfly from pagani detached. RDC 16-02-2023
+
+def butterfly(qubit_idx: int, f_state: bool, platf_cfg: str) -> OqlProgram:
     """
     Performs a 'butterfly' sequence on the qubit specified.
-        0:  prepz (RO) -      - RO - RO
+        0:  prepz (RO) - RO - RO
         1:  prepz (RO) - x180 - RO - RO
-
+        2:  prepz (RO) - x180 - rx12 - RO - RO
     Args:
         qubit_idx (int)  : index of the qubit
         initialize (bool): if True does an extra initial measurement to
             post select data.
         platf_cfg (str)  : openql config used for setup.
-
     """
     p = OqlProgram('butterfly', platf_cfg)
 
     k = p.create_kernel('0')
     k.prepz(qubit_idx)
-    if initialize:
-        k.measure(qubit_idx)
+    k.measure(qubit_idx)
     k.measure(qubit_idx)
     k.measure(qubit_idx)
     p.add_kernel(k)
 
     k = p.create_kernel('1')
     k.prepz(qubit_idx)
-    if initialize:
-        k.measure(qubit_idx)
-    k.x(qubit_idx)
+    k.measure(qubit_idx)
+    k.gate('rX180',[qubit_idx])
     k.measure(qubit_idx)
     k.measure(qubit_idx)
     p.add_kernel(k)
 
+    if f_state:
+        k = p.create_kernel('2')
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        k.gate('rX180',[qubit_idx])
+        k.gate('rx12',[qubit_idx])
+        k.measure(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    k = p.create_kernel("Init_0")
+    k.prepz(qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    k = p.create_kernel("Init_1")
+    k.prepz(qubit_idx)
+    k.gate('rx180', [qubit_idx])
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    if f_state:
+        k = p.create_kernel("Init_2")
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
+        k.gate('rx12', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+        
     p.compile()
 
     return p
 
+
+# def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:
+#     """
+#     Performs a 'butterfly' sequence on the qubit specified.
+#         0:  prepz (RO) -      - RO - RO
+#         1:  prepz (RO) - x180 - RO - RO
+
+#     Args:
+#         qubit_idx (int)  : index of the qubit
+#         initialize (bool): if True does an extra initial measurement to
+#             post select data.
+#         platf_cfg (str)  : openql config used for setup.
+
+#     """
+#     p = OqlProgram('butterfly', platf_cfg)
+
+#     k = p.create_kernel('0')
+#     k.prepz(qubit_idx)
+#     if initialize:
+#         k.measure(qubit_idx)
+#     k.measure(qubit_idx)
+#     k.measure(qubit_idx)
+#     p.add_kernel(k)
+
+#     k = p.create_kernel('1')
+#     k.prepz(qubit_idx)
+#     if initialize:
+#         k.measure(qubit_idx)
+#     k.x(qubit_idx)
+#     k.measure(qubit_idx)
+#     k.measure(qubit_idx)
+#     p.add_kernel(k)
+
+#     p.compile()
+
+#     return p
+
+########## END ###############################
 
 def RTE(
         qubit_idx: int,
@@ -1953,7 +2049,8 @@ def ef_rabi_seq(
     # These angles correspond to special pi/2 pulses in the lutman
     for i, amp in enumerate(amps):
         # cw_idx corresponds to special hardcoded pulses in the lutman
-        cw_idx = i + 9
+        StartIndex=32 # from 9, LDC, 2022/10/23
+        cw_idx = StartIndex+i
 
         k = p.create_kernel("ef_A{}_{}".format(int(abs(1000*amp)),i))
         k.prepz(q0)
@@ -2060,5 +2157,72 @@ def TEST_RTE(
         k.measure(qubit_idx)
 
     p.add_kernel(k)
+    p.compile()
+    return p
+
+
+###########################
+### RUGGERO 10-11-2022 ####
+###########################
+
+def AllXY_depletion_fast(
+        qubit_idx: int,
+        platf_cfg: str,
+        double_points: bool = True,
+        prepend_msmt=False,
+        wait_time_after_prepend_msmt=0
+        ):
+    """
+    Single qubit AllXY sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+        double_points:  if true repeats every element twice
+                        intended for evaluating the noise at larger time scales
+    Returns:
+        p:              OpenQL Program object
+
+    """
+    p = OqlProgram("AllXY_depletion_fast", platf_cfg)
+
+    # define 21 gate pairs
+    allXY = [['i', 'i'], 
+            ['rx90', 'ry90'], ['ry90', 'rx90'],
+            ['rx90', 'ry90'], ['ry90', 'rx90'], 
+            ['rx90', 'ry90'], ['ry90', 'rx90'],
+            ['rx90', 'ry90'], ['ry90', 'rx90'],
+            ['rx180', 'i'], ['rx180', 'i']]
+
+    # this should be implicit
+    if 0: # FIXME: p.set_sweep_points has been replaced by p.sweep_points, since that was missing here they are probably not necessary for this function
+        p.set_sweep_points(np.arange(len(allXY), dtype=float))
+
+    for i, xy in enumerate(allXY):
+        if double_points:
+            js = 2
+        else:
+            js = 1
+        for j in range(js):
+            k = p.create_kernel("AllXY_depletion_fast_{}_{}".format(i, j))
+            k.prepz(qubit_idx)
+            if prepend_msmt:
+                k.measure(qubit_idx)
+                if i == 3 or i == 4:
+                    k.gate("wait", [qubit_idx], 200) # ns
+                if i == 5 or i == 6:
+                    k.gate("wait", [qubit_idx], 400)
+                if i == 7 or i == 8 or i == 9:
+                    k.gate("wait", [qubit_idx], 600)
+                if i == 10 or i == 0:
+                    k.gate("wait", [qubit_idx], 2500)
+                # k.gate("wait", [])
+            k.gate(xy[0], [qubit_idx])
+            k.gate(xy[1], [qubit_idx])
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
     p.compile()
     return p

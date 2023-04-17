@@ -219,8 +219,8 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
         #        qubitobjects.append(self.device.find_instrument(qubit))
 
         # Prefer to order qubits in the following way
-        #qubitnames=['QNW', 'QNE', 'QC', 'QSW', 'QSE']
-        qubitnames=['QNE', 'QC', 'QSW', 'QSE']
+        qubitnames=['QNW', 'QNE', 'QC', 'QSW', 'QSE']
+        #qubitnames=['QNE', 'QC', 'QSW', 'QSE']
         for qubitname in qubitnames:
             if qubitname != 'fakequbit':
                 qubitobjects.append(self.device.find_instrument(qubitname))
@@ -269,14 +269,14 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
                                                   'update': True,
                                                   'verify': True})
 
-        NewQubitList=['QSW', 'QSE', 'QC', 'QNE']
-        self.add_node('Cross Fidelity',
-                        calibrate_function=self.device.name + '.measure_ssro_multi_qubit',
-                        calibrate_function_args={'qubits': NewQubitList, 'initialize': True})
-
+        #NewQubitList=['QSW', 'QSE', 'QC', 'QNE']
         #self.add_node('Cross Fidelity',
         #                calibrate_function=self.device.name + '.measure_ssro_multi_qubit',
-        #                calibrate_function_args={'qubits': self.device.qubits(), 'initialize': True})
+        #                calibrate_function_args={'qubits': NewQubitList, 'initialize': True})
+
+        self.add_node('Cross Fidelity',
+                        calibrate_function=self.device.name + '.measure_ssro_multi_qubit',
+                        calibrate_function_args={'qubits': self.device.qubits(), 'initialize': True})
 
         self.add_node('Prep Inspire',
                       calibrate_function=self.device.name + '.prepare_for_inspire')
@@ -327,15 +327,15 @@ class inspire_dep_graph_QUICK(AutoDepGraph_DAG):
         #        qubitobjects.append(self.device.find_instrument(qubit))
         
         # I prefer to use this order. Change startup sequence later.
-        #qubitnames=['QNW', 'QNE', 'QC', 'QSW', 'QSE']
-        qubitnames=['QNE', 'QC', 'QSW', 'QSE']
+        qubitnames=['QNW', 'QNE', 'QC', 'QSW', 'QSE']
+        #qubitnames=['QNE', 'QC', 'QSW', 'QSE'] # used when QNW misbehaves.
         for qubitname in qubitnames:
             if qubitname != 'fakequbit':
                 qubitobjects.append(self.device.find_instrument(qubitname))
 
         # doing this very manually for now
-        #CZindices=[0,1,3,4];
-        CZindices=[1,3,4];
+        CZindices=[0,1,3,4];
+        #CZindices=[1,3,4]; # used when QNW misbehaves.
 
         #print(qubitobjects)
 
@@ -524,34 +524,41 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
                         calibrate_function_args={'qubits': spectator_list, 'q_target': Qubit.name, 'return_analysis': False})
 
             self.add_node('T1',
-                           calibrate_function = Qubit.name + '.measure_T1')
+                           calibrate_function = Qubit.name + '.measure_T1',
+                           calibrate_function_args={'disable_metadata': True})
 
             #self.add_node(Qubit.name + ' T2_Star',
             #               calibrate_function = Qubit.name + '.measure_ramsey')
             
             self.add_node('T2e',
-                           calibrate_function = Qubit.name + '.measure_echo')
+                           calibrate_function = Qubit.name + '.measure_echo',
+                           calibrate_function_args={'disable_metadata': True})
       
             self.add_node('Frequency',
                           calibrate_function=Qubit.name + '.calibrate_frequency_ramsey',
-                          calibrate_function_args={'steps':[10, 30]})
+                          calibrate_function_args={'steps':[10, 30],
+                                                  'disable_metadata': True})
                           #check_function=Qubit.name + '.check_ramsey', tolerance=0.1e-3)
             
             self.add_node('Flipping',
                           calibrate_function=Qubit.name + '.flipping_GBT',
-                          calibrate_function_args={'nr_sequence': 5, 'eps': epsFlipping})
+                          calibrate_function_args={'nr_sequence': 5, 'eps': epsFlipping,
+                                                  'disable_metadata': True})
             
             self.add_node('Motzoi',
                           calibrate_function=Qubit.name + '.calibrate_motzoi',
-                          calibrate_function_args={'motzois': np.arange(0,0.21,.02)})
+                          calibrate_function_args={'motzois': np.arange(0,0.21,.02),
+                                                  'disable_metadata': True})
 
             self.add_node('AllXY',
                           calibrate_function = Qubit.name + '.measure_allxy_GBT',
-                          calibrate_function_args={'eps': epsAllXY})
+                          calibrate_function_args={'eps': epsAllXY,
+                                                  'disable_metadata': True})
             
             self.add_node('RB',
                           calibrate_function=Qubit.name + '.measure_single_qubit_randomized_benchmarking',
-                          calibrate_function_args={'recompile': RBrecompile, 'nr_seeds': RBnumseeds, 'nr_cliffords': 2 ** np.arange(11)})
+                          calibrate_function_args={'recompile': RBrecompile, 'nr_seeds': RBnumseeds, 'nr_cliffords': 2 ** np.arange(11),
+                                                  'disable_metadata': True})
             
             #self.add_node(Qubit.name + ' Second Flipping',
             #              calibrate_function=Qubit.name + '.flipping_GBT')
@@ -598,7 +605,6 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
         self.add_node('Upload Calibration Results',
                       calibrate_function='infinity.calibration.calibration')
 
-        
         ##########################
         # Device-node Dependencies
         ##########################
@@ -706,7 +712,7 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
                         calibrate_function=self.device.name + '.calibrate_single_qubit_phase_GBT',
                         calibrate_function_args={'pair': pair, 'eps': epsSQP}
                         )
-        # Calibrate single-qubit phase of pulsed qubit
+        # Calibrate single-qubit phase of static qubit
         self.add_node('SQP Static',
                         calibrate_function=self.device.name + '.calibrate_single_qubit_phase_GBT',
                         calibrate_function_args={'pair': reversedpair, 'eps': epsSQP}
@@ -835,6 +841,8 @@ class inspire_dep_graph_T1T2(AutoDepGraph_DAG):
       url = self.open_html_viewer()
       print('Dependency graph T1T2 created. URL = ' + url)
 
+
+#### next-generation graphs with parallelization
 class inspire_dep_graph_T1T2par(AutoDepGraph_DAG):
     def __init__(self, 
                   name: str, 
@@ -851,8 +859,8 @@ class inspire_dep_graph_T1T2par(AutoDepGraph_DAG):
 
       # Add all nodes
       
-      #qubitlist=["QNW", "QNE", "QSW", "QSE"]
-      qubitlist=["QNE", "QSW", "QSE"]
+      qubitlist=["QNW", "QNE", "QSW", "QSE"]
+      #qubitlist=["QNE", "QSW", "QSE"]
 
       numqubits=len(qubitlist)
       timeslist=[np.linspace(0.0, 50.0,51)*1e-6]*numqubits
@@ -903,3 +911,126 @@ class inspire_dep_graph_T1T2par(AutoDepGraph_DAG):
       url = self.open_html_viewer()
       print('Dependency graph T1T2par created. URL = ' + url)
 
+class inspire_dep_graph_QUICKpar(AutoDepGraph_DAG):
+    def __init__(self, 
+                  name: str, 
+                  device,
+                  epsFlipping=0.001,
+                  epsSQP=2, 
+                  epsSQPP=3,
+                  doSQPs=False,
+                  **kwargs):
+        super().__init__(name, **kwargs)
+        self.device = device
+
+
+        # doing this very manually for now
+        CZindices=[0,1,3,4];
+        #CZindices=[1,3,4]; # used when QNW misbehaves.
+
+
+        self.create_dep_graph(CZindices=CZindices,
+                              epsFlipping=epsFlipping,
+                              epsSQP=epsSQP,
+                              epsSQPP=epsSQPP,
+                              doSQPs=doSQPs)
+
+    def create_dep_graph(self, 
+                    CZindices,
+                    epsFlipping,
+                    epsSQP,
+                    epsSQPP,
+                    doSQPs):
+      
+      print('Creating dependency graph QUICKpar ...')
+
+
+      self.add_node('Flipping',
+                          calibrate_function=self.device.name + '.multi_flipping_GBT',
+                          calibrate_function_args={'qubits': self.device.qubits(), 
+                                                    'nr_sequence': 5, 
+                                                    'number_of_flips': np.arange(0, 31, 2), 
+                                                    'eps': epsFlipping})
+
+      allCZpairs=[['QNW','QC'], ['QNE','QC'], [], ['QC','QSW','QSE'], ['QC','QSE','QSW']]
+      allCZnames=['CZNW', 'CZNE', 'CZnone', 'CZSW', 'CZSE']
+
+      #################
+      # Two-qubit nodes
+      #################
+      for CZindex in CZindices:
+
+        CZname=allCZnames[CZindex]
+        pair=allCZpairs[CZindex]
+        # reverse the first two elements in pair, and determine if there is a qubit to park
+        reversedpair=[pair[1], pair[0]]
+        parkingqubitexists=False
+        if(len(pair)==3):
+          reversedpair.append(pair[2])
+          parkingqubitexists=True  
+        
+        # Calibrate single-qubit phase of pulsed qubit
+        self.add_node(CZname+' SQP Pulsed',
+                        calibrate_function=self.device.name + '.calibrate_single_qubit_phase_GBT',
+                        calibrate_function_args={'pair': pair, 'eps': epsSQP}
+                        )
+        # Calibrate single-qubit phase of pulsed qubit
+        if(doSQPs):
+          self.add_node(CZname + ' SQP Static',
+                        calibrate_function=self.device.name + '.calibrate_single_qubit_phase_GBT',
+                        calibrate_function_args={'pair': reversedpair, 'eps': epsSQP}
+                        )
+        # Calibrate single-qubit phase of parked qubit, if it exists
+        if(parkingqubitexists):
+          ##### need to add specific routing for parked qubit. 
+          ##### the one below does not do the job!!!!!
+          self.add_node(CZname +' SQP Parked',
+                          calibrate_function=self.device.name + '.calibrate_parking_phase_GBT',
+                          calibrate_function_args={'pair': reversedpair, 'eps': epsSQPP}
+                          )
+
+      ##############
+      # Device Nodes
+      ##############
+      self.add_node('Prep Inspire',
+                      calibrate_function=self.device.name + '.prepare_for_inspire')
+      self.add_node('Upload Calibration Results',
+                      calibrate_function='infinity.calibration.calibration')
+      
+      ###################
+      # Node dependencies
+      ###################
+
+      self.add_edge('Prep Inspire',
+                        'Flipping')
+
+      for CZindex in CZindices:
+        CZname=allCZnames[CZindex]
+        pair=allCZpairs[CZindex]
+        # reverse the first two elements in pair, and determine if there is a qubit to park
+        reversedpair=[pair[1], pair[0]]
+        parkingqubitexists=False
+        if(len(pair)==3):
+          reversedpair.append(pair[2])
+          parkingqubitexists=True
+
+        self.add_edge('Prep Inspire', CZname + ' SQP Pulsed')
+
+
+        if(doSQPs):
+          self.add_edge('Prep Inspire', CZname + ' SQP Static')
+
+        if(parkingqubitexists):
+          ##### need to add specific routing for parked qubit. 
+          ##### the one below does not do the job!!!!!
+          self.add_edge('Prep Inspire', CZname + ' SQP Parked')
+
+
+      self.add_edge('Upload Calibration Results', 'Prep Inspire')
+
+      # finishing up
+      self.cfg_plot_mode = 'svg'
+      self.update_monitor()
+      self.cfg_svg_filename
+      url = self.open_html_viewer()
+      print('Dependency graph QUICKpar created. URL = ' + url)

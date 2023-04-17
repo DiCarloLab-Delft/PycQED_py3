@@ -552,6 +552,9 @@ class UHFQA_core(zibase.ZI_base_instrument):
             timeout (float): time in seconds before timeout Error is raised.
 
         """
+        # for diagnostics only
+        #print("\t"+self.name+" acquisition poll started!")
+
         data = {k: [] for k, dummy in enumerate(self._acquisition_nodes)}
 
         # Start acquisition
@@ -560,8 +563,10 @@ class UHFQA_core(zibase.ZI_base_instrument):
 
         # Acquire data
         gotem = [False]*len(self._acquisition_nodes)
-        accumulated_time = 0
 
+        start = time.time()
+        accumulated_time = 0
+        old_length=0
         while accumulated_time < self.timeout() and not all(gotem):
             dataset = self.poll(acquisition_time)
 
@@ -579,16 +584,36 @@ class UHFQA_core(zibase.ZI_base_instrument):
                         data[n] = np.concatenate((data[n], v['vector']))
                         if len(data[n]) >= samples:
                             gotem[n] = True
-            accumulated_time += acquisition_time
+                # for diagnostics only
+                #print("\t Num samples:", n, len(data[n]))
+            #print("\t ------")
+
+
+            # for diagnostics only
+            # record start of download
+            if old_length==0 and len(data[0])>0:
+                download_start_time=accumulated_time
+                old_length=len(data[0])
+            
+            # original line
+            #accumulated_time += acquisition_time
+            # LDC, 23/01/08
+            accumulated_time = time.time()-start
+
 
         if not all(gotem):
             self.acquisition_finalize()
             for n, _c in enumerate(self._acquisition_nodes):
                 if n in data:
-                    print("\t: Channel {}: Got {} of {} samples".format(
+                    print("\t"+self.name+": Channel {}: Got {} of {} samples".format(
                           n, len(data[n]), samples))
-            raise TimeoutError("Error: Didn't get all results!")
-
+                    print("\t"+self.name+": Total time (s)= {}, Timeout (s)={}".format(
+                          int(accumulated_time), self.timeout()))
+            raise TimeoutError("Error: didn't get all results!")
+        
+        # for diagnostics only
+        #print("\t"+self.name+" polling is done! Total time (s)={}. Download only (s)={}".format(
+        #    int(accumulated_time),accumulated_time-download_start_time))
         return data
 
     def acquisition_get(self, samples, arm=True,
@@ -621,7 +646,7 @@ class UHFQA_core(zibase.ZI_base_instrument):
 
         if not done:
             self.acquisition_finalize()
-            raise TimeoutError("Error: Didn't get all results!")
+            raise TimeoutError("Error: Didn't get all results due to timeout!")
 
         gotem = [False for _ in range(len(self._acquisition_nodes))]
         for n, p in enumerate(self._acquisition_nodes):
@@ -631,7 +656,7 @@ class UHFQA_core(zibase.ZI_base_instrument):
 
         if not all(gotem):
             for n in data.keys():
-                print("\t: Channel {}: Got {} of {} samples".format(
+                print("\t"+self.name+": Channel {}: Got {} of {} samples".format(
                       n, len(data[n]), samples))
             raise TimeoutError("Error: Didn't get all results!")
 

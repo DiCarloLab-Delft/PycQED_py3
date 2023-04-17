@@ -1395,7 +1395,8 @@ class Qubit(Instrument):
             verbose: bool = True,
             update: bool = True,
             close_fig: bool = True,
-            test_beating: bool = True
+            test_beating: bool = True,
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -1434,6 +1435,7 @@ class Qubit(Instrument):
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
                                 analyze=False,
+                                disable_metadata = disable_metadata,
                                 prepare_for_timedomain=True if 0 == i else False)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,

@@ -25,7 +25,10 @@ from pycqed.measurement import detector_functions as det
 
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 import pycqed.measurement.composite_detector_functions as cdf
-from pycqed.measurement.optimization import nelder_mead
+from pycqed.measurement.optimization import (
+    nelder_mead,
+    fmin_powell,
+)
 
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
@@ -50,8 +53,14 @@ from pycqed.measurement.measurement_control import MeasurementControl
 
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
+import scipy
 
 log = logging.getLogger(__name__)
+
+import warnings
+import sys
+from numpy import (atleast_1d, eye, argmin, zeros, shape, squeeze,
+                   asarray, sqrt, Inf, asfarray)
 
 
 class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
@@ -2038,7 +2047,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             depletion_optimization_window=None,
             depletion_analysis_plot=False,
             use_RTE_cost_function=False,
-            maxiter: int=10
+            maxiter: int=10,
+            disable_metadata = False
     ):
         """
         this function automatically tunes up a two-step, four-parameter
@@ -2072,7 +2082,10 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         # FIXME: this calibration does not return a boolean upon success
 
         # tuneup requires nested MC as the transients detector will use MC
-        self.ro_pulse_type('up_down_down')
+
+        # Comment this out to test the pre-pulse. RDC 16-02-2023
+        # self.ro_pulse_type('up_down_down')
+
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
@@ -2091,8 +2104,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
 
         if two_par:
             nested_MC.set_sweep_functions([
-                self.ro_pulse_down_amp0,
-                self.ro_pulse_down_amp1])
+                self.ro_pulse_down_phi0,
+                self.ro_pulse_down_phi1])
         else:
             nested_MC.set_sweep_functions([
                 self.ro_pulse_down_phi0,
@@ -2115,7 +2128,10 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
                          'depletion_analysis_plot':
                              depletion_analysis_plot,
                          'depletion_optimization_window':
-                             depletion_optimization_window},
+                             depletion_optimization_window,
+                         'disable_metadata':
+                             disable_metadata,
+                         'analyze': False},
                 value_names=['depletion cost'],
                 value_units=['au'],
                 result_keys=['depletion_cost'])
@@ -2123,17 +2139,17 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
 
         if two_par:
             if initial_steps is None:
-                initial_steps = [-0.5 * amp0, -0.5 * amp1]
+                initial_steps = [-0.5 * phi0, -0.5 * phi1]
             ad_func_pars = {
                 'adaptive_function': nelder_mead,
-                'x0': [amp0, amp1],
+                'x0': [phi0, phi1],
                 'initial_step': initial_steps,
                 'no_improve_break': 5,#12,
                 'minimize': True,
                 'maxiter': maxiter,
                 'verbose': True}
-            self.ro_pulse_down_phi0(phi0)
-            self.ro_pulse_down_phi1(phi1)
+            self.ro_pulse_down_phi0(amp0)
+            self.ro_pulse_down_phi1(amp1)
 
         else:
             if initial_steps is None:
@@ -2151,6 +2167,685 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         nested_MC.set_optimization_method('nelder_mead')
         nested_MC.run(name='depletion_tuneup', mode='adaptive')
         ma.OptimizationAnalysis(label='depletion_tuneup')
+
+
+    ##########################
+    ### Ruggero 09-03-2023 ###
+    ##########################
+
+    def calibrate_ro_pulse(
+            self,
+            nested_MC: Optional[MeasurementControl] = None,
+            amp0=None, 
+            amp1=None,
+            amp2=None, 
+            amp3=None, 
+            phi0=None, 
+            phi1=None, 
+            phi2=None, 
+            phi3=None,
+            opt_par = None,
+            opt_for = None,
+            opt_agorithm = None,
+            initial_steps=None,
+            depletion_optimization_window=None,
+            depletion_analysis_plot=False,
+            use_RTE_cost_function=False,
+            maxiter: int=10,
+            disable_metadata = False
+    ):
+        """
+        this function automatically tunes up a two-step, four-parameter
+        depletion pulse.
+        It uses the averaged transients for ground and excited state for its
+        cost function.
+
+        Refs:
+        Bultink et al, APL (2018) [or ArXiv2017]
+
+        Args:
+            two_par:    if readout is performed at the symmetry point and in the
+                        linear regime two parameters will suffice. Othen, four
+                        paramters do not converge.
+                        First optimizaing the amplitudes (two paramters) and
+                        then run the full 4 paramaters with the correct initial
+                        amplitudes works.
+            optimization_window:  optimization window determins which part of
+                        the transients will be
+                        nulled in the optimization. By default it uses a
+                        window of 500 ns post depletiona with a 50 ns buffer.
+            initial_steps:  These have to be given in the order
+                           [phi0,phi1,amp0,amp1] for 4-par tuning and
+                           [amp0,amp1] for 2-par tunining
+
+            maxiter:    the max number of iterations that the optimizer is allowed 
+                        to perform.
+        """
+
+        # FIXME: this calibration does not update the qubit object params
+        # FIXME: this calibration does not return a boolean upon success
+
+        # tuneup requires nested MC as the transients detector will use MC
+
+        # Comment this out to test the pre-pulse. RDC 16-02-2023
+        # self.ro_pulse_type('up_down_down')
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        # Initialization check
+        assert amp0 != None
+        assert amp1 != None
+        assert amp2 != None
+        assert amp3 != None
+        assert depletion_optimization_window != None
+        assert opt_for != None
+        assert opt_par != None
+
+        # Setting the parameters to sweep
+        if opt_for == 'fidelity':
+            nested_MC.set_sweep_functions([
+                self.ro_pulse_up_amp_p0,
+                self.ro_pulse_up_amp_p1])
+            initial_steps = [abs(-0.5 * amp0), abs(-0.5 * amp1)]
+            opt_par = [amp0, amp1]
+            bounds = [[-1, -1], [1, 1]]
+ 
+        if opt_for == 'depletion':
+            nested_MC.set_sweep_functions([
+                self.ro_pulse_down_amp0,
+                self.ro_pulse_down_amp1,
+                self.ro_pulse_down_phi0,
+                self.ro_pulse_down_phi1])
+            initial_steps = [abs(-0.5 * amp2), abs(-0.5 * amp3), 30, 30]
+            opt_par = [amp2, amp3, phi2, phi3]
+            bounds = [[-1, -1, 0, 0], [1, 1, 360, 360]]
+ 
+        if opt_for == 'total':
+            nested_MC.set_sweep_functions([
+                self.ro_pulse_up_amp_p0,
+                self.ro_pulse_up_amp_p1,
+                self.ro_pulse_down_amp0,
+                self.ro_pulse_down_amp1,
+                self.ro_pulse_down_phi0,
+                self.ro_pulse_down_phi1])
+            initial_steps = [abs(-0.5 * amp0), abs(-0.5 * amp1), abs(-0.5 * amp2), abs(-0.5 * amp3), 30, 30]
+            opt_par = [amp0, amp1, amp2, amp3, phi2, phi3]
+            bounds = [[-1, -1, -1, -1, 0, 0], [1, 1, 1, 1, 360, 360]]
+
+        # Define the detector function
+        if use_RTE_cost_function:
+            d = det.Function_Detector(
+                self.measure_error_fraction,
+                msmt_kw={'net_gate': 'pi',
+                         'feedback': False,
+                         'sequence_type': 'echo'},
+                value_names=['error fraction'],
+                value_units=['au'],
+                result_keys=['error fraction'])
+        else:
+            d = det.Function_Detector(
+                self.measure_msmt_butterfly,
+                msmt_kw={'calibrate_optimal_weights' : True,
+                         'depletion_analysis': True,
+                         'depletion_optimization_window':
+                             depletion_optimization_window,
+                         'opt_for': opt_for,
+                         'disable_metadata':
+                             disable_metadata},
+                value_names=['ro cost'],
+                value_units=['au'],
+                result_keys=['ro_cost'])
+        nested_MC.set_detector_function(d)
+
+        # Optimization
+        if opt_agorithm == 'cma':
+            ### Optimization with CMA-ES ###
+            ad_func_pars = {'adaptive_function': cma.fmin,
+                    'x0': opt_par,
+                    'sigma0': 1,
+                    'options': {'maxiter': maxiter,    # maximum function calls
+                                'maxfevals': maxiter,
+                                'cma_stds': initial_steps,
+                                'BoundaryHandler': 'BoundTransform',
+                                'bounds': bounds,
+                                'ftarget': 0.2
+                                }}
+            nested_MC.set_optimization_method('cma')
+        if opt_agorithm == 'nelder mead':
+            ### Optimization with Nelder Mead ###
+            ad_func_pars = {
+                'adaptive_function': nelder_mead,
+                'x0': opt_par,
+                'initial_step': initial_steps,
+                'bounds': bounds,
+                'no_improve_break': 10,#12,
+                'minimize': True,
+                'maxiter': maxiter,
+                'verbose': True}
+            nested_MC.set_optimization_method('nelder_mead')
+
+        nested_MC.set_adaptive_function_parameters(ad_func_pars)
+        #nested_MC.set_optimization_method('powell')
+        nested_MC.run(name='ro_pulse_tuneup', mode='adaptive')
+        ma.OptimizationAnalysis(label='ro_pulse_tuneup')
+
+
+    ##########################
+    ### Ruggero 03-11-2022 ###
+    ##########################
+
+
+    def calibrate_depletion_pulse_allxy(
+                self,
+                nested_MC: Optional[MeasurementControl] = None,
+                amp0=None,
+                amp1=None,
+                phi0=180,
+                phi1=0,
+                initial_steps=None,
+                two_par=True,
+                maxfun = 1, 
+                depletion_analysis_plot=False,
+                use_RTE_cost_function=False,
+                maxiter: int=10
+        ):
+            """
+            this function automatically tunes up a two-step, four-parameter
+            depletion pulse.
+            It uses the averaged transients for ground and excited state for its
+            cost function.
+
+            Refs:
+            Bultink et al, APL (2018) [or ArXiv2017]
+
+            Args:
+                two_par:    if readout is performed at the symmetry point and in the
+                            linear regime two parameters will suffice. Othen, four
+                            paramters do not converge.
+                            First optimizaing the amplitudes (two paramters) and
+                            then run the full 4 paramaters with the correct initial
+                            amplitudes works.
+                optimization_window:  optimization window determins which part of
+                            the transients will be
+                            nulled in the optimization. By default it uses a
+                            window of 500 ns post depletiona with a 50 ns buffer.
+                initial_steps:  These have to be given in the order
+                               [phi0,phi1,amp0,amp1] for 4-par tuning and
+                               [amp0,amp1] for 2-par tunining
+
+                maxiter:    the max number of iterations that the optimizer is allowed 
+                            to perform.
+            """
+
+            # FIXME: this calibration does not update the qubit object params
+            # FIXME: this calibration does not return a boolean upon success
+
+            # tuneup requires nested MC as the transients detector will use MC
+            self.ro_pulse_type('up_down_down')
+            if nested_MC is None:
+                nested_MC = self.instr_nested_MC.get_instr()
+
+            # setting the initial depletion amplitudes
+            if amp0 is None:
+                amp0 = 2 * self.ro_pulse_amp()
+            if amp1 is None:
+                amp1 = 0.5 * self.ro_pulse_amp()
+
+            # if depletion_optimization_window is None:
+            #     depletion_optimization_window = [
+            #         self.ro_pulse_length() + self.ro_pulse_down_length0()
+            #         + self.ro_pulse_down_length1() + 100e-9,
+            #         self.ro_pulse_length() + self.ro_pulse_down_length0()
+            #         + self.ro_pulse_down_length1() + 1000e-9]
+
+            if two_par:
+                nested_MC.set_sweep_functions([
+                    self.ro_pulse_down_amp0,
+                    self.ro_pulse_down_amp1])
+            else:
+                nested_MC.set_sweep_functions([
+                    self.ro_pulse_down_phi0,
+                    self.ro_pulse_down_phi1,
+                    self.ro_pulse_down_amp0,
+                    self.ro_pulse_down_amp1])
+            if use_RTE_cost_function:
+                d = det.Function_Detector(
+                    self.measure_error_fraction,
+                    msmt_kw={'net_gate': 'pi',
+                             'feedback': False,
+                             'sequence_type': 'echo'},
+                    value_names=['error fraction'],
+                    value_units=['au'],
+                    result_keys=['error fraction'])
+            else:
+                d = det.Function_Detector(
+                    self.measure_allxy_optimization_fast,
+                    msmt_kw={'analyze': True},
+                    value_names=['depletion cost'],
+                    value_units=['au'],
+                    result_keys=['depletion_cost'])
+            nested_MC.set_detector_function(d)
+
+            if two_par:
+                if initial_steps is None:
+                    initial_steps = [-0.5 * amp0, -0.5 * amp1]
+                ad_func_pars = {
+                    'adaptive_function': nelder_mead,
+                    'x0': [amp0, amp1],
+                    'initial_step': initial_steps,
+                    'no_improve_break': 5,#12,
+                    'minimize': True,
+                    'maxiter': maxiter,
+                    'verbose': True}
+                self.ro_pulse_down_phi0(phi0)
+                self.ro_pulse_down_phi1(phi1)
+
+            else:
+                if initial_steps is None:
+                    initial_steps = [30, 30, -0.5 * amp0, -0.5 * amp1]
+                ad_func_pars = {
+                    'adaptive_function': nelder_mead,
+                    'x0': [phi0, phi1, amp0, amp1],
+                    'initial_step': initial_steps,
+                    'no_improve_break': 10, #12,
+                    'minimize': True,
+                    'maxiter': maxiter,
+                    'verbose': True}
+                # ad_func_pars = {
+                #     'adaptive_function': fmin_powell,
+                #     'disp': True,
+                #     'x0': [phi0, phi1, amp0, amp1],
+                #     # 'no_improve_break': 10, #12,
+                #     'maxfun' : maxfun,
+                #     'minimize': True,
+                #     'maxiter': maxiter}
+                #     # 'verbose': True}
+            nested_MC.set_adaptive_function_parameters(ad_func_pars)
+            # nested_MC.set_optimization_method('powell')
+            nested_MC.set_optimization_method('fmin_powell')
+            nested_MC.run(name='depletion_tuneup', mode='adaptive')
+            ma.OptimizationAnalysis(label='depletion_tuneup')
+
+    def calibrate_depletion_pulse_allxy_3_param(
+            self,
+            nested_MC: Optional[MeasurementControl] = None,
+            amp0=None,
+            amp1=None,
+            phi0=180,
+            phi1=0,
+            initial_steps=None,
+            two_par=True,
+            depletion_optimization_window=None,
+            depletion_analysis_plot=False,
+            use_RTE_cost_function=False,
+            maxiter: int=10,
+            disable_metadata = False
+    ):
+            """
+            this function automatically tunes up a two-step, four-parameter
+            depletion pulse.
+            It uses the averaged transients for ground and excited state for its
+            cost function.
+
+            Refs:
+            Bultink et al, APL (2018) [or ArXiv2017]
+
+            Args:
+                two_par:    if readout is performed at the symmetry point and in the
+                            linear regime two parameters will suffice. Othen, four
+                            paramters do not converge.
+                            First optimizaing the amplitudes (two paramters) and
+                            then run the full 4 paramaters with the correct initial
+                            amplitudes works.
+                optimization_window:  optimization window determins which part of
+                            the transients will be
+                            nulled in the optimization. By default it uses a
+                            window of 500 ns post depletiona with a 50 ns buffer.
+                initial_steps:  These have to be given in the order
+                               [phi0,phi1,amp0,amp1] for 4-par tuning and
+                               [amp0,amp1] for 2-par tunining
+
+                maxiter:    the max number of iterations that the optimizer is allowed 
+                            to perform.
+            """
+
+            # FIXME: this calibration does not update the qubit object params
+            # FIXME: this calibration does not return a boolean upon success
+
+            # tuneup requires nested MC as the transients detector will use MC
+            self.ro_pulse_type('up_4_down')
+            if nested_MC is None:
+                nested_MC = self.instr_nested_MC.get_instr()
+
+            # setting the initial depletion amplitudes
+            if amp0 is None:
+                amp0 = self.ro_pulse_amp0()
+            if amp1 is None:
+                amp1 = self.ro_pulse_amp1()
+            ampf = self.ro_pulse_final_amp()
+            amp2 = self.ro_pulse_down_amp2()
+
+            if phi0 is None:
+                phi0 = self.ro_pulse_down_phi0()
+            if phi1 is None:
+                phi1 = self.ro_pulse_down_phi1()
+            phif = self.ro_pulse_phi()
+            phi2 = self.ro_pulse_down_phi2()
+
+            # if depletion_optimization_window is None:
+            #     depletion_optimization_window = [
+            #         self.ro_pulse_length() + self.ro_pulse_down_length0()
+            #         + self.ro_pulse_down_length1() + 100e-9,
+            #         self.ro_pulse_length() + self.ro_pulse_down_length0()
+            #         + self.ro_pulse_down_length1() + 1000e-9]
+
+            if two_par:
+                nested_MC.set_sweep_functions([
+                    self.ro_pulse_down_amp0,
+                    self.ro_pulse_down_amp1])
+            else:
+                nested_MC.set_sweep_functions([
+                    self.ro_pulse_down_phi0,
+                    self.ro_pulse_down_phi1,
+                    self.ro_pulse_phi,
+                    self.ro_pulse_down_amp0,
+                    self.ro_pulse_down_amp1,
+                    self.ro_pulse_final_amp,])
+            if use_RTE_cost_function:
+                d = det.Function_Detector(
+                    self.measure_error_fraction,
+                    msmt_kw={'net_gate': 'pi',
+                             'feedback': False,
+                             'sequence_type': 'echo'},
+                    value_names=['error fraction'],
+                    value_units=['au'],
+                    result_keys=['error fraction'])
+            else:
+                d = det.Function_Detector(
+                    self.measure_allxy_optimization_fast,
+                    msmt_kw={'analyze': True},
+                    value_names=['depletion cost'],
+                    value_units=['au'],
+                    result_keys=['depletion_cost'])
+            nested_MC.set_detector_function(d)
+
+            if two_par:
+                if initial_steps is None:
+                    initial_steps = [-0.5 * amp0, -0.5 * amp1]
+                ad_func_pars = {
+                    'adaptive_function': nelder_mead,
+                    'x0': [amp0, amp1],
+                    'initial_step': initial_steps,
+                    'no_improve_break': 5,#12,
+                    'minimize': True,
+                    'maxiter': maxiter,
+                    'verbose': True}
+                self.ro_pulse_down_phi0(phi0)
+                self.ro_pulse_down_phi1(phi1)
+
+            else:
+                if initial_steps is None:
+                    initial_steps = [30, 30, 30, -0.5 * amp0, -0.5 * amp1, -0.5 * ampf]
+                ad_func_pars = {
+                    'adaptive_function': nelder_mead,
+                    'x0': [phi0, phi1, phif, amp0, amp1, ampf],
+                    'initial_step': initial_steps,
+                    'no_improve_break': 10, #12,
+                    'minimize': True,
+                    'maxiter': maxiter,
+                    'verbose': True}
+                # ad_func_pars = {
+                #     'adaptive_function': fmin_powell,
+                #     'disp': True,
+                #     'x0': [phi0, phi1, amp0, amp1],
+                #     # 'no_improve_break': 10, #12,
+                #     'maxfun' : maxfun,
+                #     'minimize': True,
+                #     'maxiter': maxiter}
+                #     # 'verbose': True}
+            nested_MC.set_adaptive_function_parameters(ad_func_pars)
+            # nested_MC.set_optimization_method('powell')
+            nested_MC.set_optimization_method('nelder_mead')
+            nested_MC.run(name='depletion_tuneup', mode='adaptive')
+            ma.OptimizationAnalysis(label='depletion_tuneup')  
+
+    def calibrate_depletion_pulse_3_param(
+            self,
+            nested_MC: Optional[MeasurementControl] = None,
+            amp0=None,
+            amp1=None,
+            phi0=180,
+            phi1=0,
+            initial_steps=None,
+            two_par=True,
+            depletion_optimization_window=None,
+            depletion_analysis_plot=False,
+            use_RTE_cost_function=False,
+            maxiter: int=10,
+            disable_metadata = False
+    ):
+            """
+            this function automatically tunes up a two-step, four-parameter
+            depletion pulse.
+            It uses the averaged transients for ground and excited state for its
+            cost function.
+
+            Refs:
+            Bultink et al, APL (2018) [or ArXiv2017]
+
+            Args:
+                two_par:    if readout is performed at the symmetry point and in the
+                            linear regime two parameters will suffice. Othen, four
+                            paramters do not converge.
+                            First optimizaing the amplitudes (two paramters) and
+                            then run the full 4 paramaters with the correct initial
+                            amplitudes works.
+                optimization_window:  optimization window determins which part of
+                            the transients will be
+                            nulled in the optimization. By default it uses a
+                            window of 500 ns post depletiona with a 50 ns buffer.
+                initial_steps:  These have to be given in the order
+                               [phi0,phi1,amp0,amp1] for 4-par tuning and
+                               [amp0,amp1] for 2-par tunining
+
+                maxiter:    the max number of iterations that the optimizer is allowed 
+                            to perform.
+            """
+
+            # FIXME: this calibration does not update the qubit object params
+            # FIXME: this calibration does not return a boolean upon success
+
+            # tuneup requires nested MC as the transients detector will use MC
+            self.ro_pulse_type('up_4_down')
+            if nested_MC is None:
+                nested_MC = self.instr_nested_MC.get_instr()
+
+            # setting the initial depletion amplitudes
+            if amp0 is None:
+                amp0 = self.ro_pulse_amp()
+            if amp1 is None:
+                amp1 = self.ro_pulse_amp()
+            ampf = self.ro_pulse_final_amp()
+            amp2 = self.ro_pulse_down_amp2()
+
+            if phi0 is None:
+                phi0 = self.ro_pulse_down_phi0()
+            if phi1 is None:
+                phi1 = self.ro_pulse_down_phi1()
+            phif = self.ro_pulse_phi()
+            phi2 = self.ro_pulse_down_phi2()
+
+            # if depletion_optimization_window is None:
+            #     depletion_optimization_window = [
+            #         self.ro_pulse_length() + self.ro_pulse_down_length0()
+            #         + self.ro_pulse_down_length1() + 100e-9,
+            #         self.ro_pulse_length() + self.ro_pulse_down_length0()
+            #         + self.ro_pulse_down_length1() + 1000e-9]
+
+            if two_par:
+                nested_MC.set_sweep_functions([
+                    self.ro_pulse_down_amp0,
+                    self.ro_pulse_down_amp1])
+            else:
+                nested_MC.set_sweep_functions([
+                    self.ro_pulse_down_phi0,
+                    self.ro_pulse_down_phi1,
+                    self.ro_pulse_phi,
+                    self.ro_pulse_down_phi2,
+                    self.ro_pulse_down_amp0,
+                    self.ro_pulse_down_amp1,
+                    self.ro_pulse_final_amp,
+                    self.ro_pulse_down_amp2])
+            if use_RTE_cost_function:
+                d = det.Function_Detector(
+                    self.measure_error_fraction,
+                    msmt_kw={'net_gate': 'pi',
+                             'feedback': False,
+                             'sequence_type': 'echo'},
+                    value_names=['error fraction'],
+                    value_units=['au'],
+                    result_keys=['error fraction'])
+            else:
+                d = det.Function_Detector(
+                self.measure_transients,
+                msmt_kw={'depletion_analysis': True,
+                         'depletion_analysis_plot':
+                             depletion_analysis_plot,
+                         'depletion_optimization_window':
+                             depletion_optimization_window,
+                         'disable_metadata':
+                             disable_metadata,
+                         'analyze': False,
+                         'averages': 2**19},
+                value_names=['depletion cost'],
+                value_units=['au'],
+                result_keys=['depletion_cost'])
+            nested_MC.set_detector_function(d)
+
+            if two_par:
+                if initial_steps is None:
+                    initial_steps = [-0.5 * amp0, -0.5 * amp1]
+                ad_func_pars = {
+                    'adaptive_function': nelder_mead,
+                    'x0': [amp0, amp1],
+                    'initial_step': initial_steps,
+                    'no_improve_break': 5,#12,
+                    'minimize': True,
+                    'maxiter': maxiter,
+                    'verbose': True}
+                self.ro_pulse_down_phi0(phi0)
+                self.ro_pulse_down_phi1(phi1)
+
+            else:
+                if initial_steps is None:
+                    initial_steps = [30, 30, 30, 30, -0.5 * amp0, -0.5 * amp1, -0.5 * ampf, -0.5 * amp2]
+                ad_func_pars = {
+                    'adaptive_function': nelder_mead,
+                    'x0': [phi0, phi1, phif, phi2, amp0, amp1, ampf, amp2],
+                    'initial_step': initial_steps,
+                    'no_improve_break': 10, #12,
+                    'minimize': True,
+                    'maxiter': maxiter,
+                    'verbose': True}
+                # ad_func_pars = {
+                #     'adaptive_function': fmin_powell,
+                #     'disp': True,
+                #     'x0': [phi0, phi1, amp0, amp1],
+                #     # 'no_improve_break': 10, #12,
+                #     'maxfun' : maxfun,
+                #     'minimize': True,
+                #     'maxiter': maxiter}
+                #     # 'verbose': True}
+            nested_MC.set_adaptive_function_parameters(ad_func_pars)
+            # nested_MC.set_optimization_method('powell')
+            nested_MC.set_optimization_method('nelder_mead')
+            nested_MC.run(name='depletion_tuneup', mode='adaptive')
+            ma.OptimizationAnalysis(label='depletion_tuneup')    
+
+
+    def measure_allxy_optimization_fast(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            label: str = '',
+            analyze=True,
+            close_fig=True,
+            prepare_for_timedomain=True
+    ) -> float:
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_readout()
+            # self.prepare_for_timedomain()
+
+        p = sqo.AllXY_depletion_fast(
+            qubit_idx=self.cfg_qubit_nr(),
+            double_points=False, 
+            platf_cfg=self.cfg_openql_platform_fn(), 
+            prepend_msmt = True
+        )
+
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(22))
+        d = self.int_avg_det
+        MC.set_detector_function(d)
+        MC.run('AllXY_depletion_fast' + label + self.msmt_suffix, 
+               disable_snapshot_metadata = True)
+
+        print(r"phi0 = {}".format(self.ro_pulse_down_phi0()))
+        print(r"phi1 = {}".format(self.ro_pulse_down_phi1()))
+        print(r"phi2 = {}".format(self.ro_pulse_phi()))
+        print(r"phi3 = {}".format(self.ro_pulse_down_phi2()))
+        print(r"amp0 = {}".format(self.ro_pulse_down_amp0()))
+        print(r"amp1 = {}".format(self.ro_pulse_down_amp1()))
+        print(r"amp2 = {}".format(self.ro_pulse_final_amp()))
+        print(r"amp3 = {}".format(self.ro_pulse_down_amp2()))
+
+        if analyze:
+            a = ma.AllXY_Analysis_depletion_fast(prepend_msmt = True, 
+                                          cal_points=[0, 10], 
+                                          NoCalPoints=2)
+            print('Depletion cost: {:.3f}'.format(a.deviation_total))
+            return {'depletion_cost': (a.deviation_total)}
+
+    
+    def measure_allxy_optimization(
+            self,
+            MC: Optional[MeasurementControl] = None,
+            label: str = '',
+            analyze=True,
+            close_fig=True,
+            prepare_for_timedomain=True
+    ) -> float:
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        p = sqo.AllXY(
+            qubit_idx=self.cfg_qubit_nr(),
+            double_points=False, 
+            platf_cfg=self.cfg_openql_platform_fn(), 
+            prepend_msmt = True
+        )
+
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(42))
+        d = self.int_avg_det
+        MC.set_detector_function(d)
+        MC.run('AllXY' + label + self.msmt_suffix)
+
+        if analyze:
+            a = ma.AllXY_Analysis(prepend_msmt = True)
+            print('Depletion cost: {:.3f}'.format(a.deviation_total * 10))
+            return {'depletion_cost': (a.deviation_total * 10)}
+
+
+    #################
+    ## End Ruggero ##
+    #################
 
     def calibrate_ef_rabi(
             self,
@@ -2187,7 +2882,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
     # calibrate_ functions (overrides for class Qubit)
     ##########################################################################
 
-    def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, motzois=None):
+    def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, 
+                        motzois=None, disable_metadata = False):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         """
@@ -2203,7 +2899,7 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
-        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True)
+        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True, disable_metadata = disable_metadata)
         opt_motzoi = a.get_intersect()[0]
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
             if verbose:
@@ -2364,6 +3060,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             post_select: bool = False,
             averages: int = 2 ** 15,
             post_select_threshold: float = None,
+            depletion_analysis: bool = False,
+            depletion_optimization_window = None
     ) -> bool:
         """
         Measures readout transients for the qubit in ground and excited state to indicate
@@ -2399,10 +3097,18 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
                                                               analyze=analyze,
                                                               depletion_analysis=False)
         else:
-            transients = self.measure_transients(MC=MC, analyze=analyze,
-                                                 depletion_analysis=False,
-                                                 disable_metadata=disable_metadata)
-        if analyze:
+            if depletion_analysis:
+                a, transients = self.measure_transients(MC=MC, analyze=analyze,
+                                                     depletion_analysis=depletion_analysis,
+                                                     disable_metadata=disable_metadata,
+                                                     depletion_optimization_window = depletion_optimization_window)
+            else:
+                transients = self.measure_transients(MC=MC, analyze=analyze,
+                                                     depletion_analysis=depletion_analysis,
+                                                     disable_metadata=disable_metadata)
+
+
+        if analyze and depletion_analysis == False:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
         self.ro_acq_averages(old_avg)
@@ -2439,7 +3145,11 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
                 return ssro_dict
         if verify:
             warnings.warn('Not verifying as settings were not updated.')
-        return True
+
+        if depletion_analysis:
+            return a
+        else:
+            return True
 
     ##########################################################################
     # measure_ functions (overrides for class Qubit)
@@ -2759,6 +3469,96 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         else:
             logging.error(f'Mode {mode} not recognized. Available modes: "CW", "pulsed_marked", "pulsed_mixer"')
 
+# Adding measurement butterfly from pagani detached. RDC 16-02-2023
+
+    def measure_msmt_butterfly(
+            self,
+            prepare_for_timedomain: bool = True,
+            calibrate_optimal_weights: bool = False,
+            nr_max_acq: int = 2**17,
+            disable_metadata: bool = False,
+            f_state: bool = False,
+            no_figs: bool = False,
+            opt_for = None,
+            depletion_analysis: bool = False, 
+            depletion_optimization_window = None):
+        
+        # ensure readout settings are correct
+        assert self.ro_acq_weight_type() != 'optimal'
+        assert self.ro_acq_digitized() == False
+
+        if calibrate_optimal_weights:
+            r = self.calibrate_optimal_weights(
+                prepare=prepare_for_timedomain,
+                verify=False, 
+                optimal_IQ=True,
+                disable_metadata=disable_metadata,
+                depletion_analysis = depletion_analysis,
+                depletion_optimization_window = depletion_optimization_window)
+
+        if prepare_for_timedomain and calibrate_optimal_weights == False:
+            self.prepare_for_timedomain()
+
+        d = self.int_log_det
+        # the msmt butterfly sequence has 3 measurements per state,
+        # therefore we need to make sure the number of shots is a multiple of that
+        uhfqc_max_avg = min(max(2**10, nr_max_acq), 2**20)
+
+        if f_state:
+            nr_measurements = 12
+        else:
+            nr_measurements = 8
+
+        nr_shots = int((uhfqc_max_avg//nr_measurements) * nr_measurements)
+        d.nr_shots = nr_shots
+        p = sqo.butterfly(
+            f_state = f_state,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr()
+        )
+        MC = self.instr_MC.get_instr()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        print(nr_shots)
+        MC.set_detector_function(d)
+        MC.run(
+            f"Measurement_butterfly_{self.name}_{f_state}",
+            disable_snapshot_metadata=disable_metadata
+        )
+        a = ma2.ra.measurement_butterfly_analysis(
+            qubit=self.name,
+            label='butterfly',
+            f_state=f_state,
+            extract_only=no_figs)
+
+        # calculate the cost function
+        c = {}
+        if opt_for == 'fidelity':
+            c['ro_cost'] = 0.1 * r['depletion_cost'] + (3 - (a.qoi['Fidelity'] + a.qoi['p00_0'] + a.qoi['p11_1']))
+        if opt_for == 'depletion':
+            c['ro_cost'] = 1 * r['depletion_cost'] + 0.1 * (3 - (a.qoi['Fidelity'] + a.qoi['p00_0'] + a.qoi['p11_1']))
+        if opt_for == 'total':
+            c['ro_cost'] = 10 * r['depletion_cost'] + 10 * (1 - a.qoi['Fidelity']) + 2 - (a.qoi['p00_0'] + a.qoi['p11_1'])
+
+        print('Important values:')
+        print('- Depletion Cost: {}'.format(r['depletion_cost']))
+        print('- Assignment Fidelity: {}%'.format(np.round(a.qoi['Fidelity'] * 100, 2)))
+        print('- QND_g: {}%'.format(np.round(a.qoi['p00_0'] * 100, 2)))
+        print('- QND_e: {}%'.format(np.round(a.qoi['p11_1'] * 100, 2)))
+        print('- Readout Pulse Cost: {}'.format(c['ro_cost']))
+
+        return c
+
+###################################
+
+
+
     def measure_transients(
             self,
             MC: Optional[MeasurementControl] = None,
@@ -2821,6 +3621,7 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             data = MC.run(
                 'Measure_transients{}_{}'.format(self.msmt_suffix, i),
                 disable_snapshot_metadata=disable_metadata)
+
             dset = data['dset']
             transients.append(dset.T[1:])
             if analyze:
@@ -2830,19 +3631,27 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         self.ro_acq_averages(old_avg)
         
         if depletion_analysis:
+            print('Sweeping parameters:')
+            print(r"- amp0 = {}".format(self.ro_pulse_up_amp_p0()))
+            print(r"- amp1 = {}".format(self.ro_pulse_up_amp_p1()))
+            print(r"- amp2 = {}".format(self.ro_pulse_down_amp0()))
+            print(r"- amp3 = {}".format(self.ro_pulse_down_amp1()))
+            print(r"- phi2 = {}".format(self.ro_pulse_down_phi0()))
+            print(r"- phi3 = {}".format(self.ro_pulse_down_phi1()))
+
             a = ma.Input_average_analysis(
                 IF=self.ro_freq_mod(),
                 optimization_window=depletion_optimization_window,
                 plot=depletion_analysis_plot,
                 plot_max_time=plot_max_time)
-            return a
+            return a, [np.array(t, dtype=np.float64) for t in transients] # before it was only a 
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
     def measure_rabi(
             self,
             MC: Optional[MeasurementControl] = None,
-            amps=np.linspace(0, 1, 31),
+            amps=np.linspace(0, 0.99, 31),
             analyze=True,
             close_fig=True,
             real_imag=True,
@@ -3067,7 +3876,28 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
 
- 
+    def measure_depletion_allxy(self, MC=None,
+                                analyze=True, close_fig=True,
+                                prepare_for_timedomain=True,
+                                label='',
+                                disable_metadata=False):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.depletion_AllXY(qubit_idx=self.cfg_qubit_nr(),
+                      platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(21*2*6))
+        MC.set_detector_function(d)
+        MC.run('Depletion_AllXY'+self.msmt_suffix+label,
+               disable_snapshot_metadata=disable_metadata)
+        ma2.mra.Depletion_AllXY_analysis(self.name, label='Depletion')
+
+
     def measure_T1(
             self,
             times=None,
@@ -3080,6 +3910,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
+            disable_metadata = False,
+            auto = True
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3145,10 +3977,10 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('T1' + self.msmt_suffix)
+        MC.run('T1' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
-            a = ma.T1_Analysis(auto=True, close_fig=True)
+            a = ma.T1_Analysis(auto=auto, close_fig=True)
             if update:
                 self.T1(a.T1)
             return a.T1
@@ -3261,7 +4093,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             update=True,
             detector=False,
             double_fit=False,
-            test_beating=True
+            test_beating=True, 
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3320,7 +4153,7 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('Ramsey' + label + self.msmt_suffix)
+        MC.run('Ramsey' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         # Restore old frequency value
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)
@@ -3550,7 +4383,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             close_fig=True,
             update=True,
             label: str = '',
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True, 
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3627,7 +4461,7 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('echo' + label + self.msmt_suffix)
+        MC.run('echo' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             # N.B. v1.5 analysis
@@ -3749,7 +4583,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             close_fig=True,
             update=False,
             ax='x',
-            angle='180'):
+            angle='180',
+            disable_metadata = False):
         """
         Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
         pi (repeated N-times) - pi/2 - measure
@@ -3815,38 +4650,38 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         MC.set_sweep_points(nf)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('flipping_' + ax + angle + self.msmt_suffix)
+        MC.run('flipping_' + ax + angle + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma2.FlippingAnalysis(options_dict={'scan_label': 'flipping'})
 
-        if update:
-            # choose scale factor based on simple goodness-of-fit comparison
-            # This method gives priority to the line fit:
-            # the cos fit will only be chosen if its chi^2 relative to the
-            # chi^2 of the line fit is at least 10% smaller
-            scale_factor = a.get_scale_factor()
+            if update:
+                # choose scale factor based on simple goodness-of-fit comparison
+                # This method gives priority to the line fit:
+                # the cos fit will only be chosen if its chi^2 relative to the
+                # chi^2 of the line fit is at least 10% smaller
+                scale_factor = a.get_scale_factor()
 
-            # for debugging purposes
-            print(scale_factor)
+                # for debugging purposes
+                print(scale_factor)
 
-            if abs(scale_factor - 1) < 0.2e-3:
-                print('Pulse amplitude accurate within 0.02%. Amplitude not updated.')
-                return a
+                if abs(scale_factor - 1) < 0.2e-3:
+                    print('Pulse amplitude accurate within 0.02%. Amplitude not updated.')
+                    return a
 
-            if angle == '180':
-                if self.cfg_with_vsm():
-                    amp_old = self.mw_vsm_G_amp()
-                    self.mw_vsm_G_amp(scale_factor * amp_old)
-                else:
-                    amp_old = self.mw_channel_amp()
-                    self.mw_channel_amp(scale_factor * amp_old)
-            elif angle == '90':
-                amp_old = self.mw_amp90_scale()
-                self.mw_amp90_scale(scale_factor * amp_old)
+                if angle == '180':
+                    if self.cfg_with_vsm():
+                        amp_old = self.mw_vsm_G_amp()
+                        self.mw_vsm_G_amp(scale_factor * amp_old)
+                    else:
+                        amp_old = self.mw_channel_amp()
+                        self.mw_channel_amp(scale_factor * amp_old)
+                elif angle == '90':
+                    amp_old = self.mw_amp90_scale()
+                    self.mw_amp90_scale(scale_factor * amp_old)
 
-            print('Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
-                ax, angle, amp_old, scale_factor * amp_old))
+                print('Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
+                    ax, angle, amp_old, scale_factor * amp_old))
 
         return a
 
@@ -3862,7 +4697,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             prepare_for_timedomain=True,
-            eps=0.02):
+            eps=0.02, 
+            disable_metadata = False):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -3892,7 +4728,7 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         MC.set_sweep_points(np.arange(42))
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('AllXY' + label + self.msmt_suffix)
+        MC.run('AllXY' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         # return soft averages to initial value
         self.ro_soft_avg(old_avg)
@@ -3910,7 +4746,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             self, 
             nr_sequence: int = 7,                # max number of flipping iterations
             number_of_flips=np.arange(0, 31, 2), # specifies the number of pi pulses at each step
-            eps=0.0005):                           # specifies the GBT threshold
+            eps=0.0005,
+            disable_metadata = False):                           # specifies the GBT threshold
         # FIXME: prefix with "measure_"
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3944,7 +4781,7 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         ###############################################
 
         for i in range(nr_sequence):
-            a = self.measure_flipping(update=True, number_of_flips=number_of_flips)
+            a = self.measure_flipping(update=True, number_of_flips=number_of_flips, disable_metadata = disable_metadata)
             scale_factor = a.get_scale_factor()
             if abs(1 - scale_factor) <= eps:
                 return True
@@ -3957,7 +4794,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             prepare_for_timedomain: bool = True,
             MC: Optional[MeasurementControl] = None,
             analyze=True,
-            close_fig=True):
+            close_fig=True, 
+            disable_metadata = False):
         # USED_BY: device_dependency_graphs.py (via calibrate_motzoi)
         """
         Sweeps the amplitude of the DRAG coefficients looking for leakage reduction
@@ -4031,7 +4869,7 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             always_prepare=True
         )
         MC.set_detector_function(d)
-        MC.run('Motzoi_XY' + self.msmt_suffix)
+        MC.run('Motzoi_XY' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             if self.ro_acq_weight_type() == 'optimal':
@@ -5006,45 +5844,65 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
 
     def measure_RO_QND(
             self,
-            prepare_for_timedomain: bool = False,
+            prepare_for_timedomain: bool = True,
             calibrate_optimal_weights: bool = False,
+            nr_max_acq: int = 2**17,
+            disable_metadata: bool = False,
+            no_figs: bool = False,
+            f_state: bool = False
             ):
         # ensure readout settings are correct
-        old_ro_type = self.ro_acq_weight_type()
-        old_acq_type = self.ro_acq_digitized()
+        assert self.ro_acq_weight_type() != 'optimal'
+        assert self.ro_acq_digitized() == False
 
         if calibrate_optimal_weights:
-            self.calibrate_optimal_weights(prepare=False)
+            self.calibrate_optimal_weights(
+                prepare=prepare_for_timedomain,
+                verify=False, 
+                optimal_IQ=True,
+                disable_metadata=True)
 
-        self.ro_acq_digitized(False)
-        self.ro_acq_weight_type('optimal IQ')
         if prepare_for_timedomain:
+            if f_state:
+                mw_lm = self.instr_LutMan_MW.get_instr()
+                LM = mw_lm.LutMap()
+                LM[9] = {'name': 'rX12', 'theta': 180, 'phi': 0, 'type': 'ef'}
+                mw_lm.LutMap(LM)
             self.prepare_for_timedomain()
-        else:
-            # we always need to prepare at least readout
-            self.prepare_readout()
 
         d = self.int_log_det
         # the QND sequence has 5 measurements,
         # therefore we need to make sure the number of shots is a multiple of that
-        uhfqc_max_avg = 2**17
-        d.nr_shots = int(uhfqc_max_avg/5) * 5
-        p = sqo.RO_QND_sequence(q_idx = self.cfg_qubit_nr(),
-                                platf_cfg = self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
+        uhfqc_max_avg = min(max(2**10, nr_max_acq), 2**17)
+        nr_measurements: int = 5
+        nr_shots: int = int(uhfqc_max_avg/nr_measurements) * nr_measurements
+        d.nr_shots = nr_shots
+        p = sqo.RO_QND_sequence(
+            q_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            f_state=f_state
+        )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr()
+        )
         MC = self.instr_MC.get_instr()
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(int(uhfqc_max_avg/5)*5))
+        MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run(f"RO_QND_measurement_{self.name}")
-        self.ro_acq_weight_type(old_ro_type)
-        self.ro_acq_digitized(old_acq_type)
+        MC.run(
+            f"RO_QND_measurement_{self.name}",
+            disable_snapshot_metadata=disable_metadata
+        )
+        a = ma2.mra.measurement_QND_analysis(
+            qubit=self.name,
+            f_state=f_state,
+            label='QND',
+            extract_only=no_figs)
+        return a.qoi
 
-        a = ma2.mra.measurement_QND_analysis(qubit=self.name, label='QND')
-        return a.quantities_of_interest
 
     def calibrate_RO_QND(
             self,
@@ -5671,7 +6529,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             prepare_for_timedomain: bool = True,
             ignore_f_cal_pts: bool = False,
             compile_only: bool = False,
-            rb_tasks=None):
+            rb_tasks=None,
+            disable_metadata = False):
         # USED_BY: inspire_dependency_graph.py,
         """
         Measures randomized benchmarking decay including second excited state
@@ -5790,7 +6649,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         d.prepare_function_kwargs = prepare_function_kwargs
         d.nr_shots = reps_per_seed * len(sweep_points)
         MC.set_detector_function(d)
-        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points})
+        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points},
+                disable_snapshot_metadata = disable_metadata)
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
             label='RB_',
@@ -6766,3 +7626,4 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
     def _prep_ro_integration_weights(self):
         # FIXME: move LutMan support here from HAL_ShimSQ
         super()._prep_ro_integration_weights()
+

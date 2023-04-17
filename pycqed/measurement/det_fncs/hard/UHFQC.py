@@ -4,6 +4,10 @@ extracted from pycqed/measurement/detector_functions.py commit 0da380ad2adf2dc99
 """
 
 import logging
+
+# change by ZI 2023-01-26: added import of the time package
+import time
+
 import numpy as np
 import numpy.fft as fft
 from string import ascii_uppercase
@@ -15,7 +19,6 @@ from pycqed.measurement.det_fncs.Base import Soft_Detector, Hard_Detector, Multi
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQuantumController import UHFQC
 
-
 log = logging.getLogger(__name__)
 
 
@@ -25,10 +28,11 @@ class Multi_Detector_UHF(Multi_Detector):
     """
 
     def get_values(self):
-        values_list = []
+        # change by ZI 2023-01-26: comented out the following line
+        # values_list = []
 
         # Since master (holding cc object) is first in self.detectors,
-        self.detectors[0].AWG.stop()
+        self.detectors[0].AWG.stop() # stops the CC
 
         # Prepare and arm
         for detector in self.detectors:
@@ -38,15 +42,78 @@ class Multi_Detector_UHF(Multi_Detector):
             detector.UHFQC.sync()
 
         # Run (both in parallel and implicitly)
-        self.detectors[0].AWG.start()
+        self.detectors[0].AWG.start() #starts the CC
 
         # Get data
-        for detector in self.detectors:
-            new_values = detector.get_values(arm=False, is_single_detector=False)
-            values_list.append(new_values)
+        # change by ZI 2023-01-26: commented out the following for loop
+        # for detector in self.detectors:
+        #    new_values = detector.get_values(arm=False, is_single_detector=False)
+        #    values_list.append(new_values)
 
+        # ----------------------------------------------------------
+        # --- change by ZI 2023-01-26: added the following code: ---
+
+        # Define the timeout as the timeout defined for the first UHF
+        timeout = self.detectors[0].UHFQC.timeout()
+
+        # Initialize the dictionaries to store the data from the detector
+        data_raw = []
+        gotem = []
+        for detector in self.detectors:
+            data_raw.append({k: [] for k, _ in enumerate(detector.UHFQC._acquisition_nodes)})
+            gotem.append([False]*len(detector.UHFQC._acquisition_nodes))
+
+
+        start_time = time.time()
+        # Outer loop: repeat until all results are acquired or timeout is reached
+        while (time.time() - start_time) < timeout and not all(all(g) for g in gotem):
+
+            # Inner loop over detectors
+            for m, detector in enumerate(self.detectors):
+
+                # Poll the data with a short interval
+                poll_interval_seconds = 0.010
+                dataset = detector.UHFQC.poll(poll_interval_seconds)
+
+                # Loop over the nodes (channels) of the detector
+                for n, p in enumerate(detector.UHFQC._acquisition_nodes):
+
+                    # check if the node is in the dataset returned by the poll() function
+                    if p in dataset:
+
+                        # Note: we only expect one vector per node (m: detector, n: channel)
+                        data_raw[m][n] = dataset[p][0]['vector']
+
+                        # check if the vector has the right length
+                        if len(data_raw[m][n]) == detector.get_num_samples():
+                            gotem[m][n] = True
+
+        # Error handling
+        if not all(all(g) for g in gotem):
+            for m, detector in enumerate(self.detectors):
+                detector.UHFQC.acquisition_finalize()
+                for n, _c in enumerate(detector.UHFQC._acquisition_nodes):
+                    if n in data_raw[m]:
+                        print("\t{}: Channel {}: Got {} of {} samples".format(
+                            detector.UHFQC.devname, n, len(data_raw[m][n]), detector.get_num_samples()))
+                raise TimeoutError("Error: Didn't get all results!")
+
+        # Post-process the data
+        # Note: the detector must feature the get_values_postprocess() function
+        # to be used within the multi-detector
+        values_list = []
+        for m, detector in enumerate(self.detectors):
+            values_list.append(detector.get_values_postprocess(data_raw[m]))
+
+        # --- end of change by ZI 2023-01-26                     ---
+        # Note: see also the changes to the single-detector classes:
+        # * UHFQC_integrated_average_detector
+        # * UHFQC_integration_logging_det
+        # ----------------------------------------------------------
+
+        # this code makes all result vectors have equal length.
         maximum = 0
-        minimum = len(values_list[0][0])
+        minimum = len(values_list[0][0])   #left index of values_list: detector; right index: channel
         for feedline in values_list:
             for result in feedline:
                 if len(result)>maximum: maximum=len(result)
@@ -382,6 +449,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.acquisition_arm()
         self.UHFQC.sync()
 
+    # change by ZI 2023-01-26: added the following function
+    def get_num_samples(self):
+        return self.nr_sweep_points
+
     def get_values(self, arm=True, is_single_detector=True):
         if is_single_detector:
             if self.always_prepare:
@@ -398,7 +469,17 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             if self.AWG is not None:
                 self.AWG.start()
 
-        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+        # change by ZI 2023-01-26: replaced self.nr_sweep_points by self.get_num_samples()
+        # data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+        data_raw = self.UHFQC.acquisition_poll(samples=self.get_num_samples(), arm=False, acquisition_time=0.01)
+
+        # ----------------------------------------------------------------------------
+        # --- change by ZI 2023-01-26: split postprocessing into separate function ---
+        return self.get_values_postprocess(data_raw)
+
+    def get_values_postprocess(self, data_raw):
+        # --- end of change by ZI 2023-01-26                                       ---
+        # ----------------------------------------------------------------------------
 
         # if len(data_raw[next(iter(data_raw))])>1:
         #     print('[DEBUG UHF SWF] SHOULD HAVE HAD AN ERROR')
@@ -749,6 +830,10 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.UHFQC.acquisition_arm()
         self.UHFQC.sync()
 
+    # change by ZI 2023-01-26: add the following function
+    def get_num_samples(self):
+        return self.nr_shots
+
     def get_values(self, arm=True, is_single_detector=True):
         if is_single_detector:
             if self.always_prepare:
@@ -766,7 +851,18 @@ class UHFQC_integration_logging_det(Hard_Detector):
                 self.AWG.start()
 
         # Get the data
-        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_shots, arm=False, acquisition_time=0.01)
+        # change by ZI 2023-01-26: replace self.nr_shots by self.get_num_samples()
+        # data_raw = self.UHFQC.acquisition_poll(samples=self.nr_shots, arm=False, acquisition_time=0.01)
+        data_raw = self.UHFQC.acquisition_poll(samples=self.get_num_samples(), arm=False, acquisition_time=0.01)
+
+        # ----------------------------------------------------------------------------
+        # --- change by ZI 2023-01-26: split postprocessing into separate function ---
+        return self.get_values_postprocess(data_raw)
+
+    def get_values_postprocess(self, data_raw):
+        # --- end of change by ZI 2023-01-26                                       ---
+        # ----------------------------------------------------------------------------
+
         data = np.array([data_raw[key]
         # data = np.array([data_raw[key][-1]
                          for key in sorted(data_raw.keys())])*self.scaling_factor

@@ -1828,7 +1828,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
                show=False, normalize=False, log=False,
                transpose=False, add_colorbar=True,
                xlabel='', ylabel='', zlabel='',
-               x_unit='', y_unit='', z_unit='', **kw):
+               x_unit='', y_unit='', z_unit='', title=None, **kw):
     """
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
@@ -1911,7 +1911,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
                                  linewidth=0, rasterized=True,
                                  vmin=clim[0], vmax=clim[1])
 
-    title = kw.pop('title', None)
+    # title = kw.pop('title', None)
 
     xlabel = kw.get('xlabel', xlabel)
     ylabel = kw.get('ylabel', ylabel)
@@ -1924,6 +1924,7 @@ def color_plot(x, y, z, fig=None, ax=None, cax=None,
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
+
 
     if title is not None:
         ax.set_title(title)

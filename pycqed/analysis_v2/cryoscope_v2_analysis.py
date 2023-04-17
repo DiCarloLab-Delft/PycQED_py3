@@ -76,30 +76,24 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         ================================================================
         A second version of cryoscope analysis, best suited for FIRs
         calibration.
-
         [2020-07-22] Not tested for IIR calibration, should still be usable
         In that case you may want to apply a more aggressive savgol filter
-
         IMPORTANT: how to choose the detuning (i.e. amplitude of flux pulse)?
         Answer: target a detuning on the order of ~450-700 MHz and mind that
         very high detuning might difficult the fitting involved in this
         analysis, but low amplitude has low SNR
-
         Does not require the flux arc, assumes quadratic dependence on
         frequency and a plateau of stable frequency to extract an average
         The plateau is controlled by `plateau_time_start_ns` and
         `plateau_time_stop_ns`.
-
         Uses a moving cos-fitting-window to extract instantaneous oscillation
         frequency
-
         Requirements:
             - Single qubit gates very well calibrated for this qubit to avoid
             systematical errors in the different projections of the Bloch
             vector
             - Well calibrated RO
             - Qubit parked ~ at sweet-spot
-
         Generates 4 variations of the step response, use the one that look
         more suitable to the situation (initial FIR vs last FIR iteration)
         4 variations:
@@ -113,9 +107,7 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 and `savgol_polyorder`. NB: savgol_polyorder=0 is more
                 aggressive but at expense of the points in the beginning and
                 end of the step response
-
         Possible improvements:
-
         a) Instead of doing cosine fittings for each projection, I expect better
         results doing cosine fitting with COMMON frequency free parameter
         between the cosines that are being fitted to each projection, i.e. in
@@ -128,29 +120,21 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         it more, or bad results if the projection have systematic errors.
         Actually, with this the amplitude and offset could be shared as well
         and therefore a second pass maybe not necessary.
-
         b) Don't assume fixed frequency in the fitting window and instead use
         a linear time-dependent frequency. This should help getting more
         accurate response for the rising of the flux pulse.
-
         ================================================================
-
         Full example of working with the cryoscope tools for FIR corrections
-
         NB the analysis is a bit heavy, might take a few minutes to run for
         very long measurements, and especially long if the fist are failing!!!
-
         READ FIRST!
-
         # ##############################################################
         # Analysis tool
         # ##############################################################
-
         from pycqed.analysis_v2 import cryoscope_v2_tools as cv2
         import numpy as np
         from scipy import signal
         from pycqed.analysis_v2 import measurement_analysis as ma2
-
         ts = "20200718_202347"
         qubit = "D1"
         a_obj = ma2.Cryoscope_v2_Analysis(
@@ -169,53 +153,39 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         pdd = a_obj.proc_data_dict
         qois = pdd["quantities_of_interest"]
         time_ns = qois["time_ns"]
-
         # ##############################################################
         # Plot analysed step response
         # ##############################################################
-
         fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-
         time_ns = qois["time_ns"]
-
         key = "step_response_average"
         step_response = qois[key]
         ax.plot(time_ns[:len(step_response)], step_response, label=key)
-
         key = "step_response_average_filtered"
         step_response = qois[key]
         ax.plot(time_ns[:len(step_response)], step_response, label=key)
-
         ax.hlines(np.array([.99, .999, 1.01, 1.001, .97, 1.03]) ,
                   xmin=np.min(time_ns), xmax=np.max(time_ns[:len(step_response)]),
                   linestyle=["-", "--", "-", "--", "-.", "-."])
-
         ax.set_title(ts + ": Cryoscope " + qubit)
         set_xlabel(ax, "Pulse duration", "ns")
         set_ylabel(ax, "Normalized amplitude", "a.u.")
         ax.legend()
-
         # ##############################################################
         # IIR optimization
         # ##############################################################
-
         # TODO: add here for reference next time!!!
-
         # ##############################################################
         # FIR optimization
         # ##############################################################
-
         # Limit the number of point up to which this FIR should correct
         # This helps to avoid fitting noise and make the convergence faster
         # and targeted to what we want to correct
         # maximum 72 taps are available for HDAWG real-time FIR (~ 30 ns)
         max_taps = int(30 * 2.4)
-
         t_min_baseline_ns = np.max(time_ns) - 25
         t_max_baseline_ns = np.max(time_ns) - 5
-
         opt_input = step_response
-
         opt_fir, _ = cv2.optimize_fir_software(
         #     step_response,
             opt_input,
@@ -227,41 +197,31 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 #"ftarget": 1e-3, "tolfun": 1e-15, "tolfunhist": 1e-15, "tolx": 1e-15
             }
         )
-
         # ##############################################################
         # FIR optimization plotting
         # ##############################################################
-
         ac_soft_FIR = signal.lfilter(opt_fir, 1, opt_input)
-
         fig, ax = plt.subplots(1, 1, figsize=(20, 8))
-
         ax.plot(time_ns[:len(step_response)], step_response, "-o")
         ax.plot(time_ns[:len(opt_input)], opt_input, "-o")
         ax.plot(time_ns[:len(step_response)], ac_soft_FIR, "-o")
-
         ax.hlines(np.array([.99, .999, 1.01, 1.001]),
                   xmin=np.min(time_ns), xmax=np.max(time_ns[:len(step_response)]),
                   linestyle=["-", "--", "-", "--"])
-
         ax.vlines(([t_min_baseline_ns, t_max_baseline_ns]),
                   ymin=np.min(step_response), ymax=np.max(step_response), color="red")
-
         # ##############################################################
         # Generate loading code (first iteration only)
         # ##############################################################
-
         # Run this cell for the first FIR only
         # Then copy paste below in order to keep track of the FIRs
         # You may want to go back a previous one
         filter_model_number = 4  # CHANGE ME IF NEEDED!!!
-
         cv2.print_FIR_loading(
             qubit,
             filter_model_number,
             cv2.convert_FIR_for_HDAWG(opt_fir),
             real_time=True)
-
         # Output sample:
         # lin_dist_kern_D1.filter_model_04({'params': {'weights': np.array([ 1.13092421e+00, -6.82709369e-02, -4.64421034e-02, -2.58260195e-02,
         #        -1.04921358e-02, -9.73883537e-03, -2.42308728e-03,  5.35076244e-03,
@@ -273,13 +233,10 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
         #        -3.71967987e-03, -3.46337041e-03,  8.76836280e-03, -7.60823516e-03,
         #         7.90059429e-03, -1.11806920e-02,  8.48894913e-03, -6.42957441e-03,
         #         3.25895281e-03, -1.24377996e-03, -8.87517579e-04,  2.20711760e-03])}, 'model': 'FIR', 'real-time': True })
-
         # Use the above to run on the setup if this is the first FIR
-
         # ##############################################################
         # Convolve new FIR iteration with the last one
         # ##############################################################
-
         # fir_0 should be from the first optimization or the current real-time FIR in use on the setup
         fir_0 = np.array([ 1.05614572e+00, -2.53850198e-03, -2.52682533e-03, -2.51521371e-03,
                -2.50372099e-03, -2.49226498e-03, -2.48089918e-03, -2.46960924e-03,
@@ -291,12 +248,9 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                 1.89748899e-04,  5.96137205e-04,  4.40804891e-04,  1.22959418e-03,
                 6.27207165e-05,  1.78369142e-04,  5.88531033e-04,  3.75452325e-04,
                -1.52053376e-04,  7.29338599e-04, -9.92730555e-05, -7.75952068e-04])
-
         last_hardware_fir = fir_0
-
         last_FIR = cv2.convert_FIR_from_HDAWG(last_hardware_fir)  # UPDATE last FIR FOR EACH ITERATION!
         c1 = cv2.convolve_FIRs([last_FIR, opt_fir])
-
         cv2.print_FIR_loading(
             qubit,
             filter_model_number,
@@ -720,12 +674,14 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                  label: str = '',
                  options_dict: dict = None, 
                  extract_only: bool = False,
-                 auto=True
+                 auto=True,
+                 poly_params: dict = None,
                 ):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
                          extract_only=extract_only)
+        self.poly_params = poly_params
         self.update_FIRs = update_FIRs
         if auto:
             self.run_analysis()
@@ -751,10 +707,13 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                                            'attr:q_polycoeffs_freq_01_det') for q in self.Qubits }
         filter_params = { f'filter_{q}': (f'Instrument settings/lin_dist_kern_{q}',
                                            'attr:filter_model_04') for q in self.Qubits }
-        self.Poly_coeffs = hd5.extract_pars_from_datafile(data_fp, poly_params)
-        # Parse strings
-        self.Poly_coeffs = { q : [ float(n) for n in self.Poly_coeffs[f'polycoeff_{q}'][1:-1].split(' ')\
-                                   if n != '' ] for q in self.Qubits }
+        if self.poly_params:
+            self.Poly_coeffs = self.poly_params
+        else:
+            self.Poly_coeffs = hd5.extract_pars_from_datafile(data_fp, poly_params)
+            # Parse strings
+            self.Poly_coeffs = { q : [ float(n) for n in self.Poly_coeffs[f'polycoeff_{q}'][1:-1].split(' ')\
+                                       if n != '' ] for q in self.Qubits }
         if self.update_FIRs:
             self.Filters = hd5.extract_pars_from_datafile(data_fp, filter_params)
             # Parse strings
@@ -765,7 +724,13 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                 s = s.replace('])', ']')
                 s = s.replace('True', '"True"')
                 s = json.loads(s)
-                self.Filters[q] = np.array(s['params']['weights'])
+                try:
+                    self.Filters[q] = np.array(s['params']['weights'])
+                except:
+                    print(f'No filter in {q} distortion kernel.')
+                    filter_array = np.zeros(40)
+                    filter_array[0] = 1
+                    self.Filters[q] = filter_array
 
     def process_data(self):
         self.proc_data_dict = {}

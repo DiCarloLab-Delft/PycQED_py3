@@ -167,7 +167,7 @@ class Base_RO_LutMan(Base_LutMan):
 
         self.add_parameter(
             'pulse_type',
-            vals=vals.Enum('M_up_down_down', 'M_simple', 'M_up_down_down_final'),
+            vals=vals.Enum('M_up_down_down', 'M_simple', 'M_up_down_down_final', 'M_up_4_down', 'M_up_up'),
             set_cmd=self._set_pulse_type,
             get_cmd=self._get_pulse_type,
             docstring='defines sequence of segments of the pulse'
@@ -204,7 +204,7 @@ class Base_RO_LutMan(Base_LutMan):
             self.add_parameter(
                 'M_final_amp_R{}'.format(res),
                 unit='V',
-                vals=vals.Numbers(0, 1),
+                vals=vals.Numbers(-1, 1),
                 parameter_class=ManualParameter,
                 initial_value=0.1
             )
@@ -225,7 +225,7 @@ class Base_RO_LutMan(Base_LutMan):
             self.add_parameter(
                 'M_phi_R{}'.format(res),
                 unit='deg',
-                vals=vals.Numbers(0, 360),
+                # vals=vals.Numbers(0, 360),
                 parameter_class=ManualParameter,
                 initial_value=0.0
             )
@@ -238,6 +238,13 @@ class Base_RO_LutMan(Base_LutMan):
             )
             self.add_parameter(
                 'M_down_length1_R{}'.format(res),
+                unit='s',
+                vals=vals.Numbers(1e-9, 8000e-9),
+                parameter_class=ManualParameter,
+                initial_value=200.0e-9
+            )
+            self.add_parameter(
+                'M_down_length2_R{}'.format(res),
                 unit='s',
                 vals=vals.Numbers(1e-9, 8000e-9),
                 parameter_class=ManualParameter,
@@ -258,6 +265,13 @@ class Base_RO_LutMan(Base_LutMan):
                 initial_value=0.1
             )
             self.add_parameter(
+                'M_down_amp2_R{}'.format(res),
+                unit='V',
+                vals=vals.Numbers(-1, 1),
+                parameter_class=ManualParameter,
+                initial_value=0.1
+            )
+            self.add_parameter(
                 'M_down_phi0_R{}'.format(res),
                 unit='deg',
                 parameter_class=ManualParameter,
@@ -265,6 +279,54 @@ class Base_RO_LutMan(Base_LutMan):
             )
             self.add_parameter(
                 'M_down_phi1_R{}'.format(res),
+                unit='deg',
+                parameter_class=ManualParameter,
+                initial_value=180.0
+            )
+            self.add_parameter(
+                'M_down_phi2_R{}'.format(res),
+                unit='deg',
+                parameter_class=ManualParameter,
+                initial_value=180.0
+            )
+            # parameters ring-up 0
+            self.add_parameter(
+                'M_up_amp_p0_R{}'.format(res),
+                unit='V',
+                vals=vals.Numbers(-1, 1),
+                parameter_class=ManualParameter,
+                initial_value=0.1
+            )
+            self.add_parameter(
+                'M_up_length_p0_R{}'.format(res),
+                unit='s',
+                vals=vals.Numbers(1e-9, 8000e-9),
+                parameter_class=ManualParameter,
+                initial_value=200.0e-9
+            )
+            self.add_parameter(
+                'M_up_phi_p0_R{}'.format(res),
+                unit='deg',
+                parameter_class=ManualParameter,
+                initial_value=180.0
+            )
+            # parameters ring-up 1
+            self.add_parameter(
+                'M_up_amp_p1_R{}'.format(res),
+                unit='V',
+                vals=vals.Numbers(-1, 1),
+                parameter_class=ManualParameter,
+                initial_value=0.1
+            )
+            self.add_parameter(
+                'M_up_length_p1_R{}'.format(res),
+                unit='s',
+                vals=vals.Numbers(1e-9, 8000e-9),
+                parameter_class=ManualParameter,
+                initial_value=200.0e-9
+            )
+            self.add_parameter(
+                'M_up_phi_p1_R{}'.format(res),
                 unit='deg',
                 parameter_class=ManualParameter,
                 initial_value=180.0
@@ -347,6 +409,7 @@ class Base_RO_LutMan(Base_LutMan):
             )
             res_wave_dict['M_simple_R{}'.format(res)] = M
 
+
             # 3-step RO pulse with ramp-up and double depletion
             up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
             M_up = create_pulse(
@@ -372,7 +435,7 @@ class Base_RO_LutMan(Base_LutMan):
             #       create a new parameter, I am using the delay for the 'final' pulse.
             #       This will create probolems if you re not using the up_down_down pulse
             #       but instead the up_down_down_final pulse. 
-            #       FIX ME!.
+            #       FIX ME! LDC 2022/09
 
             down1_len = self.get('M_down_length1_R{}'.format(res))-gauss_length/2
             M_down1 = create_pulse(
@@ -394,7 +457,7 @@ class Base_RO_LutMan(Base_LutMan):
                 shape=self.pulse_primitive_shape(),
                 amplitude=self.get('M_final_amp_R{}'.format(res)),
                 length=self.get('M_final_length_R{}'.format(res)),  # ns
-                delay=self.get('M_final_delay_R{}'.format(res)),
+                delay=self.get('M_delay_R{}'.format(res)),
                 phase=self.get('M_phi_R{}'.format(res)),
                 sampling_rate=sampling_rate
             )
@@ -402,6 +465,42 @@ class Base_RO_LutMan(Base_LutMan):
             M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
                                     np.concatenate((M_up_down_down[1], M_final[1])))
             res_wave_dict['M_up_down_down_final_R{}'.format(res)] = M_up_down_down_final
+
+            # RDC 12-12-2022
+            M_4down = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_down_amp2_R{}'.format(res)),
+                length=self.get('M_down_length2_R{}'.format(res)),  # ns
+                phase=self.get('M_down_phi2_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
+
+            M_up_4_down = (np.concatenate((M_up_down_down_final[0], M_4down[0])),
+                                    np.concatenate((M_up_down_down_final[1], M_4down[1])))
+            res_wave_dict['M_up_4_down_R{}'.format(res)] = M_up_4_down
+
+            # 2-step RO pulse. ring-up + square pulse
+            M_up_p0 = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_up_amp_p0_R{}'.format(res)),
+                length=self.get('M_up_length_p0_R{}'.format(res)),  # ns
+                delay=0,
+                phase=self.get('M_up_phi_p0_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
+
+            M_up_p1 = create_pulse(
+                shape=self.pulse_primitive_shape(),
+                amplitude=self.get('M_up_amp_p1_R{}'.format(res)),
+                length=self.get('M_up_length_p1_R{}'.format(res)),  # ns
+                delay=0,
+                phase=self.get('M_up_phi_p1_R{}'.format(res)),
+                sampling_rate=sampling_rate
+            )
+
+            M_up_up = (np.concatenate((M_up_p0[0], M_up_p1[0], M_down0[0], M_down1[0])),
+                        np.concatenate((M_up_p0[1], M_up_p1[1], M_down0[1], M_down1[1])))
+            res_wave_dict['M_up_up_R{}'.format(res)] = M_up_up
 
             # 2. convolve with gaussian (if desired)
             if self.gaussian_convolution():

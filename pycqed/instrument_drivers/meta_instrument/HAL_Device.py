@@ -277,7 +277,7 @@ class HAL_Device(HAL_ShimMQ):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
-        in the two-qubit Cphase gate is measured using Ramsey-lie sequence.
+        in the two-qubit Cphase gate is measured using Ramsey-like sequence.
         Specifically qubit q0 of each pair is prepared in the superposition, while q1 is in 0 or 1 state.
         Next the flux pulse is applied. Finally pi/2 afterrotation around various axes
         is applied to q0, and q1 is flipped back (if neccessary) to 0 state.
@@ -1668,6 +1668,7 @@ class HAL_Device(HAL_ShimMQ):
             shots_per_meas: int = 2 ** 17,
             nr_flux_dance: int = None,
             wait_time: float = None,
+            integration_length = 1e-6,
             label='Mux_SSRO',
             MC=None):
         # FIXME: lots of similarity with measure_ssro_multi_qubit
@@ -1728,7 +1729,9 @@ class HAL_Device(HAL_ShimMQ):
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
         # right is LSQ
-        d = self.get_int_logging_detector(qubits, result_logging_mode=result_logging_mode)
+        d = self.get_int_logging_detector(qubits, 
+                                          integration_length = integration_length,
+                                          result_logging_mode=result_logging_mode)
 
         # This assumes qubit names do not contain spaces
         det_qubits = [v.split()[-1] for v in d.value_names]
@@ -1797,11 +1800,13 @@ class HAL_Device(HAL_ShimMQ):
             cases: list = ['off', 'on'],
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain: bool = True,
+            disable_snapshot_metadata: bool=False,
             analyze: bool = True
     ):
         '''
         Documentation.
         '''
+
         if q_target not in qubits:
             raise ValueError("q_target must be included in qubits.")
         # Ensure all qubits use same acquisition instrument
@@ -1859,7 +1864,8 @@ class HAL_Device(HAL_ShimMQ):
             MC.set_sweep_function(s)
             MC.set_sweep_points(np.arange(nr_samples) / sampling_rate)
             MC.set_detector_function(d)
-            MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb, self.msmt_suffix))
+            MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb, self.msmt_suffix),
+                disable_snapshot_metadata=disable_snapshot_metadata)
 
             if analyze:
                 analysis[i] = ma2.Multiplexed_Transient_Analysis(
@@ -2540,56 +2546,52 @@ class HAL_Device(HAL_ShimMQ):
         self,
         qubits,
         times,
-        MC: Optional[MeasurementControl] = None,
-        nested_MC: Optional[MeasurementControl] = None,
+        MC=None,
+        nested_MC=None,
         double_projections: bool = False,
+        wait_time_flux: int = 0,
+        update_FIRs: bool=False,
         waveform_name: str = "square",
         max_delay=None,
         twoq_pair=[2, 0],
+        disable_metadata: bool = False,
         init_buffer=0,
         prepare_for_timedomain: bool = True,
-    ):
+        ):
         """
         Performs a cryoscope experiment to measure the shape of a flux pulse.
-
         Args:
             qubits  (list):
                 a list of two target qubits
-
             times   (array):
                 array of measurment times
-
             label (str):
                 used to label the experiment
-
             waveform_name (str {"square", "custom_wf"}) :
                 defines the name of the waveform used in the
                 cryoscope. Valid values are either "square" or "custom_wf"
-
             max_delay {float, "auto"} :
                 determines the delay in the pulse sequence
                 if set to "auto" this is automatically set to the largest
                 pulse duration for the cryoscope.
-
             prepare_for_timedomain (bool):
                 calls self.prepare_for_timedomain on start
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
-        # FIXME: unused
-        # if nested_MC is None:
-        #     nested_MC = self.instr_nested_MC.get_instr()
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
 
         for q in qubits:
             assert q in self.qubits()
-
+        
         Q_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
 
         if max_delay is None:
-            max_delay = 0
+            max_delay = 0 
         else:
             max_delay = np.max(times) + 40e-9
 
@@ -2603,7 +2605,7 @@ class HAL_Device(HAL_ShimMQ):
             flux_cw = "fl_cw_06"
 
         elif waveform_name == "custom_wf":
-            Sw_functions = [swf.FLsweep(lutman, lutman.custom_wf_length,
+            Sw_functions = [swf.FLsweep(lutman, lutman.custom_wf_length, 
                             waveform_name="custom_wf") for lutman in Fl_lutmans]
             swfs = swf.multi_sweep_function(Sw_functions)
             flux_cw = "fl_cw_05"
@@ -2618,6 +2620,7 @@ class HAL_Device(HAL_ShimMQ):
             qubit_idxs=Q_idxs,
             flux_cw=flux_cw,
             twoq_pair=twoq_pair,
+            wait_time_flux=wait_time_flux,
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC.get_instr().name,
             double_projections=double_projections,
@@ -2638,6 +2641,7 @@ class HAL_Device(HAL_ShimMQ):
             values_per_point_suffex = ["cos", "sin"]
 
         d = self.get_int_avg_det(
+            qubits=qubits,
             values_per_point=values_per_point,
             values_per_point_suffex=values_per_point_suffex,
             single_int_avg=True,
@@ -2645,8 +2649,20 @@ class HAL_Device(HAL_ShimMQ):
         )
         MC.set_detector_function(d)
         label = 'Cryoscope_{}_amps'.format('_'.join(qubits))
-        MC.run(label)
-        ma2.Basic1DAnalysis()
+        MC.run(label+self.msmt_suffix,disable_snapshot_metadata=disable_metadata)
+        # Run analysis
+        a = ma2.cv2.multi_qubit_cryoscope_analysis(
+            label='Cryoscope',
+            update_FIRs=update_FIRs)
+        if update_FIRs:
+            for qubit, fltr in a.proc_data_dict['conv_filters'].items():
+                lin_dist_kern = self.find_instrument(f'lin_dist_kern_{qubit}')
+                filter_dict = {'params': {'weights': fltr},
+                               'model': 'FIR', 'real-time': True }
+                lin_dist_kern.filter_model_04(filter_dict)
+
+        return True
+
 
 
     def measure_cryoscope_vs_amp(
@@ -3203,7 +3219,7 @@ class HAL_Device(HAL_ShimMQ):
                 Duration in ns of the flux pulse used when interleaved gate is
                 [100_000], i.e. idle identity
 
-            compilation_only (bool):
+            compile_only (bool):
                 Compile only the RB sequences without measuring, intended for
                 parallelizing iRB sequences compilation with measurements
 
@@ -4962,6 +4978,26 @@ class HAL_Device(HAL_ShimMQ):
         if qubits is None:
             qubits = self.qubits()
 
+        # sort qubits as per the device qubit list
+        # (a) get list of all qubits on device
+        devicequbitlist=self.qubits()
+        numqubitsAll=len(devicequbitlist)
+
+        # (b) determine the position of the input qubits on device list
+        numqubits=len(qubits)
+        qubitpos=[]
+        for i in range(numqubits):
+            thisqubit=qubits[i]
+            for j in range(numqubitsAll):
+                if (thisqubit==devicequbitlist[j]):
+                    qubitpos.append(j)
+        # (c) sort positions in increasing order according to the device list
+        qubitpos=sorted(qubitpos)
+        sortedqubits=qubits
+        for i in range(numqubits):
+            sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        qubits=sortedqubits
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
 
@@ -5042,13 +5078,33 @@ class HAL_Device(HAL_ShimMQ):
         FIXED: AWG LUTs were not updated with pi/2 pulses with varying phase.
 
         NOTE: THIS ROUTINE DOES NOT CURRENTLY WORK WITH NON-EQUAL TIMES FOR THE DIFFERENT QUBITS!!!! LDC 2022/07/07
-        MUST FIX!!!!
+        FIX ME!!!!
         '''
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         if qubits is None:
             qubits = self.qubits()
+
+        # sort qubits as per the device qubit list
+        # (a) get list of all qubits on device
+        devicequbitlist=self.qubits()
+        numqubitsAll=len(devicequbitlist)
+
+        # (b) determine the position of the input qubits on device list
+        numqubits=len(qubits)
+        qubitpos=[]
+        for i in range(numqubits):
+            thisqubit=qubits[i]
+            for j in range(numqubitsAll):
+                if (thisqubit==devicequbitlist[j]):
+                    qubitpos.append(j)
+        # (c) sort positions in increasing order according to the device list
+        qubitpos=sorted(qubitpos)
+        sortedqubits=qubits
+        for i in range(numqubits):
+            sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        qubits=sortedqubits
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
@@ -5115,25 +5171,102 @@ class HAL_Device(HAL_ShimMQ):
         # if no analysis, simply return true.        
         return True
 
+    def multi_flipping_GBT(
+            self,
+            qubits: List[str] = None, 
+            nr_sequence: int = 7,                   # max number of iterations
+            number_of_flips=np.arange(0, 31, 2),    # specifies the number of pi pulses at each step
+            eps=0.0005):                            # specifies the GBT threshold
+
+
+        # sort qubits as per the device qubit list
+        # (a) get list of all qubits on device
+        devicequbitlist=self.qubits()
+        numqubitsAll=len(devicequbitlist)
+
+        # (b) determine the position of the input qubits on device list
+        numqubits=len(qubits)
+        qubitpos=[]
+        for i in range(numqubits):
+            thisqubit=qubits[i]
+            for j in range(numqubitsAll):
+                if (thisqubit==devicequbitlist[j]):
+                    qubitpos.append(j)
+        # (c) sort positions in increasing order according to the device list
+        qubitpos=sorted(qubitpos)
+        sortedqubits=qubits
+        for i in range(numqubits):
+            sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        qubits=sortedqubits
+        # for diagnostics only
+        #print(qubits)
+
+
+        for i in range(nr_sequence):
+            a = self.measure_multi_flipping(qubits=qubits, 
+                                            number_of_flips=number_of_flips,
+                                            analyze=True,
+                                            update=True)
+            # for diagnostics only
+            print("Iteration ",i,":")
+            print(qubits)
+            print(a)
+
+            # determine if all qubits meet spec
+            # if at least one qubit does not, repeat.
+            isdone=1
+            for j in range(numqubits):
+                scale_factor= a[j]
+                if abs(1 - scale_factor) <= eps:
+                    isdone*=1
+                else:
+                    isdone*=0
+                
+            if (isdone==1):
+                print('GBT has converged on all qubits. Done!')
+                return True
+        return False
 
     def measure_multi_flipping(
             self,
-            qubits: list = None,
-            number_of_flips: int = None,
+            qubits: List[str] = None,
+            number_of_flips=np.arange(0, 31, 2),
             equator=True,
             ax='x',
             angle='180',
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain=True,
+            analyze=True,
             update=False,
-            scale_factor_based_on_line: bool = False
-    ):
+            scale_factor_based_on_line: bool = False):
+
         # allow flipping only with pi/2 or pi, and x or y pulses
         assert angle in ['90', '180']
         assert ax.lower() in ['x', 'y']
 
         if MC is None:
             MC = self.instr_MC.get_instr()
+
+        # get list of all qubits on device
+        devicequbitlist=self.qubits()
+        numqubitsAll=len(devicequbitlist)
+
+        # determine the position of the input qubits on device list
+        numqubits=len(qubits)
+        qubitpos=[]
+        for i in range(numqubits):
+            thisqubit=qubits[i]
+            for j in range(numqubitsAll):
+                if (thisqubit==devicequbitlist[j]):
+                    qubitpos.append(j)
+        # sort positions in increasing order according to the device list
+        qubitpos=sorted(qubitpos)
+        sortedqubits=qubits
+        for i in range(numqubits):
+            sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        qubits=sortedqubits
+        # for diagnostics only
+        #print(qubits)
 
         if qubits is None:
             qubits = self.qubits()
@@ -5143,7 +5276,12 @@ class HAL_Device(HAL_ShimMQ):
 
         if number_of_flips is None:
             number_of_flips = 30
-        nf = np.arange(0, (number_of_flips + 4) * 2, 2)
+            nf = np.arange(0, (number_of_flips + 4) * 2, 2)
+        else:
+            nf = np.array(number_of_flips)
+            dn = nf[1] - nf[0]
+            nf = np.concatenate([nf, (nf[-1] + 1 * dn, nf[-1] + 2 * dn, nf[-1] + 3 * dn, nf[-1] + 4 * dn)])
+
 
         qubits_idx = []
         for q in qubits:
@@ -5167,50 +5305,79 @@ class HAL_Device(HAL_ShimMQ):
         label = 'Multi_flipping_' + '_'.join(qubits)
         MC.run(label)
 
-        a = ma2.Multi_Flipping_Analysis(qubits=qubits, label=label)
+        if analyze:
+            a = ma2.Multi_Flipping_Analysis(qubits=qubits, label=label)
 
-        if update:
-            for q in qubits:
-                # Same as in single-qubit flipping:
-                # Choose scale factor based on simple goodness-of-fit comparison,
-                # unless it is forced by `scale_factor_based_on_line`
-                # This method gives priority to the line fit:
-                # the cos fit will only be chosen if its chi^2 relative to the
-                # chi^2 of the line fit is at least 10% smaller
-                # cos_chisqr = a.proc_data_dict['quantities_of_interest'][q]['cos_fit'].chisqr
-                # line_chisqr = a.proc_data_dict['quantities_of_interest'][q]['line_fit'].chisqr
+            if update:
+                scale_factor_vec=[]
+                for q in qubits:
+                    #scale_factor = a.get_scale_factor()
+                    scale_factor = a.proc_data_dict['{}_scale_factor'.format(q)]
+                    scale_factor_vec.append(scale_factor)
+                    if abs(scale_factor - 1) < 0.2e-3:
+                        print(f'Qubit {q}: Pulse amplitude accurate within 0.02%. Amplitude not updated.')
+                    else:
+                        qb = self.find_instrument(q)
+                        if angle == '180':
+                            if qb.cfg_with_vsm():
+                                amp_old = qb.mw_vsm_G_amp()
+                                qb.mw_vsm_G_amp(amp_old * scale_factor)
+                            else:
+                                amp_old = qb.mw_channel_amp()
+                                qb.mw_channel_amp(amp_old * scale_factor)
+                        elif angle == '90':
+                            amp_old = qb.mw_amp90_scale()
+                            qb.mw_amp90_scale(amp_old * scale_factor)
+
+                        print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
+                            q, ax, angle, amp_old, scale_factor * amp_old))
+
+                return scale_factor_vec
+            return a
+        return True
+
+
+
+                # # Same as in single-qubit flipping:
+                # # Choose scale factor based on simple goodness-of-fit comparison,
+                # # unless it is forced by `scale_factor_based_on_line`
+                # # This method gives priority to the line fit:
+                # # the cos fit will only be chosen if its chi^2 relative to the
+                # # chi^2 of the line fit is at least 10% smaller
+                # # cos_chisqr = a.proc_data_dict['quantities_of_interest'][q]['cos_fit'].chisqr
+                # # line_chisqr = a.proc_data_dict['quantities_of_interest'][q]['line_fit'].chisqr
+
+                # # if scale_factor_based_on_line:
+                # #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
+                # # elif (line_chisqr - cos_chisqr)/line_chisqr > 0.1:
+                # #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['cos_fit']['sf']
+                # # else:
+                # #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
 
                 # if scale_factor_based_on_line:
                 #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
-                # elif (line_chisqr - cos_chisqr)/line_chisqr > 0.1:
-                #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['cos_fit']['sf']
                 # else:
-                #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
+                #     # choose scale factor preferred by analysis (currently based on BIC measure)
+                #     scale_factor = a.proc_data_dict['{}_scale_factor'.format(q)]
 
-                if scale_factor_based_on_line:
-                    scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
-                else:
-                    # choose scale factor preferred by analysis (currently based on BIC measure)
-                    scale_factor = a.proc_data_dict['{}_scale_factor'.format(q)]
+                # if abs(scale_factor - 1) < 1e-3:
+                #     print(f'Qubit {q}: Pulse amplitude accurate within 0.1%. Amplitude not updated.')
+                #     return a
 
-                if abs(scale_factor - 1) < 1e-3:
-                    print(f'Qubit {q}: Pulse amplitude accurate within 0.1%. Amplitude not updated.')
-                    return a
+                # qb = self.find_instrument(q)
+                # if angle == '180':
+                #     if qb.cfg_with_vsm():
+                #         amp_old = qb.mw_vsm_G_amp()
+                #         qb.mw_vsm_G_amp(scale_factor * amp_old)
+                #     else:
+                #         amp_old = qb.mw_channel_amp()
+                #         qb.mw_channel_amp(scale_factor * amp_old)
+                # elif angle == '90':
+                #     amp_old = qb.mw_amp90_scale()
+                #     qb.mw_amp90_scale(scale_factor * amp_old)
 
-                qb = self.find_instrument(q)
-                if angle == '180':
-                    if qb.cfg_with_vsm():
-                        amp_old = qb.mw_vsm_G_amp()
-                        qb.mw_vsm_G_amp(scale_factor * amp_old)
-                    else:
-                        amp_old = qb.mw_channel_amp()
-                        qb.mw_channel_amp(scale_factor * amp_old)
-                elif angle == '90':
-                    amp_old = qb.mw_amp90_scale()
-                    qb.mw_amp90_scale(scale_factor * amp_old)
-
-                print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
-                    q, ax, angle, amp_old, scale_factor * amp_old))
+                # print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
+                #     q, ax, angle, amp_old, scale_factor * amp_old))
 
 
     def measure_multi_motzoi(
@@ -5405,6 +5572,7 @@ class HAL_Device(HAL_ShimMQ):
             update=True,
             verify=True,
             averages=2 ** 15,
+            disable_snapshot_metadata: bool=False,
             return_analysis=True
     ):
         # USED_BY: inspire_dependency_graph.py,
@@ -5441,6 +5609,7 @@ class HAL_Device(HAL_ShimMQ):
         A = self.measure_transients(
             qubits=qubits,
             q_target=q_target,
+            disable_snapshot_metadata = disable_snapshot_metadata,
             cases=['on', 'off']
         )
 
@@ -5512,6 +5681,7 @@ class HAL_Device(HAL_ShimMQ):
                 ssro_dict= self.measure_ssro_single_qubit(
                     qubits=qubits,
                     q_target=q_target,
+                    integration_length = Q_target.ro_acq_integration_length(),
                     initialize=True)
 
                 # This bit added by LDC to update fit results. 

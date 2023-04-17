@@ -89,7 +89,7 @@ def mixer_carrier_cancellation(
     ad_func_pars = {'adaptive_function': cma.fmin,
                     'x0': x0,
                     'sigma0':1,
-                    'options': {'maxiter': maxiter,    # maximum function cals
+                    'options': {'maxiter': maxiter,    # maximum function calls
                                 # Scaling for individual sigma's
                                 'cma_stds': [init_stepsize]*2,
                                 'ftarget': ftarget

@@ -416,9 +416,10 @@ class OqlProgram:
                 k.gate('rx180', [q0])
             elif comb[0] == '2':
                 k.gate('rx180', [q0])
-                # FIXME: this is a workaround
-                # k.gate('rx12', [q0])
-                k.gate('cw_31', [q0])
+                # LDC 2022/10/23
+                k.gate('rx12', [q0])
+                # original
+                #k.gate('cw_31', [q0])
 
             if comb[1] == '0':
                 k.gate('i', [q1])
@@ -426,9 +427,10 @@ class OqlProgram:
                 k.gate('rx180', [q1])
             elif comb[1] == '2':
                 k.gate('rx180', [q1])
-                # FIXME: this is a workaround
-                # k.gate('rx12', [q1])
-                k.gate('cw_31', [q1])
+                # LDC 2022/10/23
+                k.gate('rx12', [q1])
+                # original
+                # k.gate('cw_31', [q1])
 
             # Used to ensure timing is aligned
             k.gate('wait', measured_qubits, 0)
@@ -444,7 +446,7 @@ class OqlProgram:
             qubits: List[int],
             combinations: List[str] = ["00", "01", "10", "11"],
             reps_per_cal_pnt: int = 1,
-            f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+            f_state_cal_pt_cw: int = 1,  # 1 is the one listed as rX12 in `mw_lutman`
             nr_flux_dance: int = None,
             flux_cw_list: List[str] = None
     ) -> None:
@@ -587,9 +589,10 @@ class OqlProgram:
                 k.gate('rx180', [q0])
             elif comb[0] == '2':
                 k.gate('rx180', [q0])
-                # FIXME: this is a workaround
-                # k.gate('rx12', [q0])
-                k.gate('cw_31', [q0])
+                # LDC 2022/10/23
+                k.gate('rx12', [q0])
+                # original
+                #k.gate('cw_31', [q0])
 
             if comb[1] == '0':
                 k.gate('i', [q1])
@@ -597,9 +600,10 @@ class OqlProgram:
                 k.gate('rx180', [q1])
             elif comb[1] == '2':
                 k.gate('rx180', [q1])
-                # FIXME: this is a workaround
-                # k.gate('rx12', [q1])
-                k.gate('cw_31', [q1])
+                # LDC 2022/10/23
+                k.gate('rx12', [q1])
+                # original
+                #k.gate('cw_31', [q1])
             if comb[0] == 'P' and comb[-1] == '0':
                 k.gate('i', [q2])
             elif comb[0] == 'P' and comb[-1] == '1':

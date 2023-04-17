@@ -264,8 +264,24 @@ class HAL_ShimMQ(Instrument):
         self.find_instrument("UHFQC_1").qas_0_result_averages(1)
         self.find_instrument("UHFQC_2").qas_0_result_averages(1)
 
-        self.find_instrument(self.instr_MC()).soft_avg(1)
+        self.find_instrument(self.instr_MC()).soft_avg(1)   
+
+        # RDC 06-04-2023
+        # Save the metadata with PrepInspi
+        from pycqed.measurement import measurement_control
+        MC = self.find_instrument(self.instr_MC())
         
+        name = 'System_snapshot'
+        MC._set_measurement_name(name)
+        # FIXME: Replace absolute data directory path
+        MC.datadir('D:\Experiments\Demonstrator_Execute_Data\Data')
+        ######################
+        with measurement_control.h5d.Data(
+            name=MC._get_measurement_name(), datadir=MC.datadir()
+        ) as MC.data_object:
+            MC._get_measurement_begintime()
+            MC._save_instrument_settings(MC.data_object)
+
         return True
 
     ##########################################################################
@@ -347,6 +363,7 @@ class HAL_ShimMQ(Instrument):
     def get_int_logging_detector(
             self,
             qubits=None,
+            integration_length = 1e-6,
             result_logging_mode='raw'
     ) -> Multi_Detector:
         # FIXME: qubits passed to but not used in function
@@ -376,6 +393,7 @@ class HAL_ShimMQ(Instrument):
             # channel_dict = {}
             # for q in qubits:
 
+            # added by rdc 07/03/2023
             UHFQC = self.find_instrument(acq_instr_name)
             int_log_dets.append(
                 det.UHFQC_integration_logging_det(
@@ -429,7 +447,7 @@ class HAL_ShimMQ(Instrument):
         return input_average_detector
 
 
-    def get_int_avg_det(self, **kw) -> Multi_Detector:
+    def get_int_avg_det(self, integration_length = 1e-6,**kw) -> Multi_Detector:
         """
         Create an multi detector based integration average detector.
 
@@ -457,6 +475,7 @@ class HAL_ShimMQ(Instrument):
                 CC = self.instr_CC.get_instr()
             else:
                 CC = None
+
             int_avg_dets.append(
                 det.UHFQC_integrated_average_detector(
                     channels=list(acq_ch_map[acq_instr_name].values()),
@@ -624,6 +643,27 @@ class HAL_ShimMQ(Instrument):
                       "independent of codeword received.",
             parameter_class=ManualParameter,
             vals=vals.Bool(),
+        )
+
+        # ADDED BY RDC 22-03-2023
+        self.add_parameter(
+            "hidden_init",
+            docstring="If true, it does postselection using the hidden initialization "
+                      "in execution.py.",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value = True,
+        )
+
+        # ADDED BY RDC 04-04-2023
+        self.add_parameter(
+            "disable_metadata_online",
+            docstring="If true, it does NOT save metadata for quantum inspire" 
+                      "shots when the system is online"
+                      "in execution.py.",
+            parameter_class=ManualParameter,
+            vals=vals.Bool(),
+            initial_value = False,
         )
 
     def _add_parameters(self):

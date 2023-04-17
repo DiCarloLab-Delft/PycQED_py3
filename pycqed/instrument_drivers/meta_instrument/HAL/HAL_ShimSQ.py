@@ -713,7 +713,7 @@ class HAL_ShimSQ(Qubit):
         self.add_parameter(
             'ro_pulse_type',
             initial_value='simple',
-            vals=vals.Enum('gated', 'simple', 'up_down_down', 'up_down_down_final'),
+            vals=vals.Enum('gated', 'simple', 'up_down_down', 'up_down_down_final', 'up_4_down', 'up_up'),
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -755,6 +755,12 @@ class HAL_ShimSQ(Qubit):
             initial_value=1e-9,
             parameter_class=ManualParameter)
         self.add_parameter(
+            'ro_pulse_down_length2',
+            unit='s',
+            vals=vals.Numbers(1e-9, 2000e-9),
+            initial_value=1e-9,
+            parameter_class=ManualParameter)
+        self.add_parameter(
             'ro_pulse_down_amp0',
             unit='V',
             initial_value=0,
@@ -776,16 +782,73 @@ class HAL_ShimSQ(Qubit):
             initial_value=0,
             parameter_class=ManualParameter)
         self.add_parameter(
+            'ro_pulse_down_amp2',
+            unit='V',
+            initial_value=0,
+            vals=vals.Numbers(-1, 1), 
+            parameter_class=ManualParameter)
+        self.add_parameter(
             'ro_pulse_down_phi1',
             unit='deg',
             initial_value=0,
             parameter_class=ManualParameter)
+        self.add_parameter(
+            'ro_pulse_down_phi2',
+            unit='deg',
+            initial_value=0,
+            # vals=vals.Numbers(0, 360),              
+            parameter_class=ManualParameter)
+
+        ## RDC 12-01-2023
+        # parameters ring-up 0
+        self.add_parameter(
+            'ro_pulse_up_amp_p0',
+            unit='V',
+            vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter,
+            initial_value=0.1
+        )
+        self.add_parameter(
+            'ro_pulse_up_length_p0',
+            unit='s',
+            vals=vals.Numbers(1e-9, 8000e-9),
+            parameter_class=ManualParameter,
+            initial_value=200.0e-9
+        )
+        self.add_parameter(
+            'ro_pulse_up_phi_p0',
+            unit='deg',
+            parameter_class=ManualParameter,
+            initial_value=180.0
+        )
+        # parameters ring-up 1
+        self.add_parameter(
+            'ro_pulse_up_amp_p1',
+            unit='V',
+            vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter,
+            initial_value=0.1
+        )
+        self.add_parameter(
+            'ro_pulse_up_length_p1',
+            unit='s',
+            vals=vals.Numbers(1e-9, 8000e-9),
+            parameter_class=ManualParameter,
+            initial_value=200.0e-9
+        )
+        self.add_parameter(
+            'ro_pulse_up_phi_p1',
+            unit='deg',
+            parameter_class=ManualParameter,
+            initial_value=180.0
+        )
+
         ### The following parameters added by LDC on 2022/09/16.
         ### They were missing.
         self.add_parameter(
             'ro_pulse_final_amp',
             unit='V',
-            vals=vals.Numbers(0, 1),
+            vals=vals.Numbers(-1, 1),
             parameter_class=ManualParameter,
             initial_value=0.1
             )
@@ -1173,6 +1236,20 @@ class HAL_ShimSQ(Qubit):
             ro_lm.set('M_final_amp_R{}'.format(idx), self.ro_pulse_final_amp())
             ro_lm.set('M_final_length_R{}'.format(idx), self.ro_pulse_final_length())
             ro_lm.set('M_final_delay_R{}'.format(idx), self.ro_pulse_final_delay())
+
+            ### Added by RDC. 2023/12/12
+            ro_lm.set('M_down_length2_R{}'.format(idx), self.ro_pulse_down_length2())
+            ro_lm.set('M_down_amp2_R{}'.format(idx), self.ro_pulse_down_amp2())
+            ro_lm.set('M_down_phi2_R{}'.format(idx), self.ro_pulse_down_phi2())
+
+            ### Added by RDC. 2023/01/12
+            ro_lm.set('M_up_length_p0_R{}'.format(idx), self.ro_pulse_up_length_p0())
+            ro_lm.set('M_up_amp_p0_R{}'.format(idx), self.ro_pulse_up_amp_p0())
+            ro_lm.set('M_up_phi_p0_R{}'.format(idx), self.ro_pulse_up_phi_p0())
+
+            ro_lm.set('M_up_length_p1_R{}'.format(idx), self.ro_pulse_up_length_p1())
+            ro_lm.set('M_up_amp_p1_R{}'.format(idx), self.ro_pulse_up_amp_p1())
+            ro_lm.set('M_up_phi_p1_R{}'.format(idx), self.ro_pulse_up_phi_p1())
 
 
             # propagate acquisition delay (NB: affects all resonators)

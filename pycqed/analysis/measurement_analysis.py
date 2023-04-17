@@ -39,6 +39,8 @@ from scipy.ndimage.filters import gaussian_filter
 from scipy.signal import argrelmax, argrelmin
 from scipy.constants import *
 
+from scipy import signal
+
 
 reload(dm_tools)
 
@@ -57,6 +59,8 @@ class MeasurementAnalysis(object):
         self.fit_results = []
         self.cmap_chosen = cmap_chosen
         self.no_of_columns = no_of_columns
+        # Tries to retrieve cal_points since it is being used in self.run_default_analysis.
+        self.cal_points = kw.get('cal_points', None)
 
         # for retrieving correct values of qubit parameters from data file
         self.qb_name = qb_name
@@ -975,7 +979,6 @@ class OptimizationAnalysis(MeasurementAnalysis):
                 textstr += '\n   %s: %.4g %s' % (self.parameter_names[j],
                                                  self.sweep_points[j][-1],
                                                  self.parameter_units[j])
-
             # y coord 0.4 ensures there is no overlap for both maximizing and
             # minim
             if i == 0:
@@ -1097,6 +1100,7 @@ class TD_Analysis(MeasurementAnalysis):
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, plot_cal_points=True,
                  for_ef=False, qb_name=None, **kw):
+        kw['cal_points'] = cal_points
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1110,11 +1114,13 @@ class TD_Analysis(MeasurementAnalysis):
         self.plot_cal_points = plot_cal_points
         self.for_ef = for_ef
 
+        # Always call parent class constructor before assigning attributes.
         super(TD_Analysis, self).__init__(qb_name=qb_name, **kw)
 
     def rotate_and_normalize_data(self):
         if len(self.measured_values) == 1:
             # if only one weight function is used rotation is not required
+            # In case, only I or Q component is present.
             self.norm_data_to_cal_points()
             return
 
@@ -2346,6 +2352,7 @@ class Echo_analysis_V15(TD_Analysis):
     def __init__(self, label='echo', phase_sweep_only=False, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
+
         self.phase_sweep_only = phase_sweep_only
         self.artificial_detuning = kw.pop('artificial_detuning', 0)
         if self.artificial_detuning == 0:
@@ -2363,6 +2370,14 @@ class Echo_analysis_V15(TD_Analysis):
             kw['make_fig'] = False
 
         super().__init__(**kw)
+
+    # RDC 06-04-2023
+    # @property
+    # def qubit(self):
+    #     import pycqed.instrument_drivers.meta_instrument.qubit_objects.HAL_Transmon as ct
+    #     qubit = ct.HAL_Transmon('{q}'.format(q = self.qb_name))
+    #     return qubit
+    ############
 
     def fit_Echo(self, x, y, **kw):
         self.add_analysis_datagroup_to_file()
@@ -2532,15 +2547,23 @@ class Echo_analysis_V15(TD_Analysis):
             close_main_figure=True, save_fig=False, **kw)
 
         verbose = kw.get('verbose', False)
-        # Get old values for qubit frequency
-        instr_set = self.data_file['Instrument settings']
+
+        ########################################
+        ############ RDC 06-04-2023 ############
+        ########################################
+
+        # allow to ru the analysis with disable_metadata = True
         try:
             if self.for_ef:
+                # Get old values for qubit frequency
+                instr_set = self.data_file['Instrument settings']
                 self.qubit_freq_spec = \
                     float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             elif 'freq_qubit' in kw.keys():
                 self.qubit_freq_spec = kw['freq_qubit']
             else:
+                # Get old values for qubit frequency
+                instr_set = self.data_file['Instrument settings']
                 try:
                     self.qubit_freq_spec = \
                         float(instr_set[self.qb_name].attrs['f_qubit'])
@@ -2553,6 +2576,9 @@ class Echo_analysis_V15(TD_Analysis):
                             'value of the qubit frequency to 0. New qubit '
                             'frequency might be incorrect.')
             self.qubit_freq_spec = 0
+        #######################
+        ##### END #############
+        #######################
 
         self.scale = 1e6
 
@@ -4972,15 +4998,17 @@ class Ramsey_Analysis(TD_Analysis):
             close_main_figure=True, save_fig=False, **kw)
 
         verbose = kw.get('verbose', False)
-        # Get old values for qubit frequency
-        instr_set = self.data_file['Instrument settings']
         try:
             if self.for_ef:
+                # Get old values for qubit frequency
+                instr_set = self.data_file['Instrument settings']
                 self.qubit_freq_spec = \
                     float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             elif 'freq_qubit' in kw.keys():
                 self.qubit_freq_spec = kw['freq_qubit']
             else:
+                # Get old values for qubit frequency
+                instr_set = self.data_file['Instrument settings']
                 try:
                     self.qubit_freq_spec = \
                         float(instr_set[self.qb_name].attrs['f_qubit'])
@@ -7507,6 +7535,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                                log=colorplot_log,
                                transpose=transpose,
                                normalize=normalize,
+                               title = fig_title,
                                **kw)
 
             set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
@@ -10236,7 +10265,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     offset_Q = np.mean(data_file.measured_values[1][-offset_calibration_samples:])
     
     # for diagnostics only
-    print('Offset I for ket0: {}, Offset Q for ket0: {}'.format(offset_I, offset_Q))
+    # print('Offset I for ket0: {}, Offset Q for ket0: {}'.format(offset_I, offset_Q))
     
     # subtract offset from transients
     y1 = data_file.measured_values[0] - offset_I
@@ -10262,7 +10291,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     offset_Q = np.mean(data_file.measured_values[1][-offset_calibration_samples:])
 
     # for diagnostics only
-    print('Offset I for ket1: {}, Offset Q for ket1: {}'.format(offset_I, offset_Q))
+    # print('Offset I for ket1: {}, Offset Q for ket1: {}'.format(offset_I, offset_Q))
 
     y1 = data_file.measured_values[0] - offset_I
     y2 = data_file.measured_values[1] - offset_Q
@@ -10330,6 +10359,20 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     def rms(x):
         return np.sqrt(x.dot(x) / x.size)
 
+    # Filtering the weigth functions
+    from scipy.signal import medfilt
+    # b_I, a_I = signal.butter(1, 10e6, btype = 'low', analog = False, fs = Fsampling)
+    # weight_I = signal.filtfilt(b_I, a_I, weight_I)
+
+    # b_Q, a_Q = signal.butter(1, 10e6, btype = 'low', analog = False, fs = Fsampling)
+    # weight_Q = signal.filtfilt(b_Q, a_Q, weight_Q)
+
+    weight_I = medfilt(weight_I, 31)
+    weight_Q = medfilt(weight_Q, 31)
+
+    # print(weight_I)
+    
+
     if optimization_window != None:
         optimization_start = optimization_window[0]
         optimization_stop = optimization_window[-1]
@@ -10338,6 +10381,60 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         shift_w = 0e-9
         start_sample_w = int((optimization_start - shift_w) * Fsampling)
         stop_sample_w = int((optimization_stop - shift_w) * Fsampling)
+
+        if 0:
+            weight_I[start_sample:stop_sample] = weight_I[start_sample:stop_sample] * 2
+            weight_Q[start_sample:stop_sample] = weight_Q[start_sample:stop_sample] * 2
+
+        if 0:
+            stop_sample_extra = int(1100e-9 * Fsampling)
+            weight_I[start_sample:stop_sample_extra] = weight_I[start_sample:stop_sample_extra] * 1.5
+            weight_Q[start_sample:stop_sample_extra] = weight_Q[start_sample:stop_sample_extra] * 1.5
+
+        if 0:
+            b_I, a_I = signal.butter(1, 10e6, btype = 'low', analog = False, fs = Fsampling)
+            weight_I[start_sample:stop_sample_extra] = signal.filtfilt(b_I, a_I, weight_I[start_sample:stop_sample_extra])
+
+            b_Q, a_Q = signal.butter(1, 10e6, btype = 'low', analog = False, fs = Fsampling)
+            weight_Q[start_sample:stop_sample_extra] = signal.filtfilt(b_Q, a_Q, weight_Q[start_sample:stop_sample_extra])
+            
+            # weight_I = medfilt(weight_I, 31)
+            # weight_Q = medfilt(weight_Q, 31)
+
+        I0 = medfilt(I0, 31)
+        Q0 = medfilt(Q0, 31)
+        I1 = medfilt(I1, 31)
+        Q1 = medfilt(Q1, 31)
+
+        if 0:
+            I0[start_sample:stop_sample] = I0[start_sample:stop_sample] * 2
+            Q0[start_sample:stop_sample] = Q0[start_sample:stop_sample] * 2
+            I1[start_sample:stop_sample] = I1[start_sample:stop_sample] * 2
+            Q1[start_sample:stop_sample] = Q1[start_sample:stop_sample] * 2
+
+        if 0:
+            stop_sample_extra = int(1100e-9 * Fsampling)
+            I0[start_sample:stop_sample_extra] = I0[start_sample:stop_sample_extra] * 1.5
+            Q0[start_sample:stop_sample_extra] = Q0[start_sample:stop_sample_extra] * 1.5
+            I1[start_sample:stop_sample_extra] = I1[start_sample:stop_sample_extra] * 1.5
+            Q1[start_sample:stop_sample_extra] = Q1[start_sample:stop_sample_extra] * 1.5
+
+            b_I0, a_I0 = signal.butter(1, 10e6, btype = 'low', analog = False, fs = Fsampling)
+            I0[start_sample:stop_sample_extra] = signal.filtfilt(b_I0, a_I0, I0[start_sample:stop_sample_extra])
+
+            b_Q0, a_Q0 = signal.butter(1, 10e6, btype = 'low', analog = False, fs = Fsampling)
+            Q0[start_sample:stop_sample_extra] = signal.filtfilt(b_Q0, a_Q0, Q0[start_sample:stop_sample_extra])
+
+            b_I1, a_I1 = signal.butter(1, 10e6, btype = 'low', analog = False, fs = Fsampling)
+            I1[start_sample:stop_sample_extra] = signal.filtfilt(b_I1, a_I1, I1[start_sample:stop_sample_extra])
+
+            b_Q1, a_Q1 = signal.butter(1, 10e6, btype = 'low', analog = False, fs = Fsampling)
+            Q1[start_sample:stop_sample_extra] = signal.filtfilt(b_Q1, a_Q1, Q1[start_sample:stop_sample_extra])
+            
+            # I0 = medfilt(I0, 31)
+            # Q0 = medfilt(Q0, 31)
+            # I1 = medfilt(I1, 31)
+            # Q1 = medfilt(Q1, 31)
 
         # # computing depletion cost using demodulated transients
         # print('Using demodulated transients')
@@ -10357,8 +10454,8 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         depletion_cost_w = 10 * np.mean(rms(I1_no_demod[start_sample_w:stop_sample_w] - I0_no_demod[start_sample_w:stop_sample_w]) +
                                         rms(Q1_no_demod[start_sample_w:stop_sample_w] - Q0_no_demod[start_sample_w:stop_sample_w]))  
                                         
-
-        depletion_cost = depletion_cost_d + depletion_cost_w
+        arbitrary_weight: float = 10
+        depletion_cost = (depletion_cost_d + depletion_cost_w) * arbitrary_weight
     else:
         depletion_cost = 0
 
@@ -10644,3 +10741,169 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
     I = np.multiply(Ivals, cosI) - np.multiply(Qvals, sinI)
     Q = np.multiply(Ivals, sinI) + np.multiply(Qvals, cosI)
     return I, Q
+
+
+
+########################
+## RUGGERO 10-11-2022 ##
+########################
+# Thumbs up from SvdM
+
+
+class AllXY_Analysis_depletion_fast(TD_Analysis):
+    '''
+    Performs a rotation and normalization on the data and calculates a
+    deviation from the expected ideal data.
+
+    Automatically works for the standard AllXY sequences of 42 and 21 points.
+    Optional keyword arguments can be used to specify
+    'ideal_data': np.array equal in lenght to the data
+    '''
+
+    def __init__(self, label='AllXY_depletion_fast', zero_coord=None, one_coord=None,
+                 make_fig=True, prepend_msmt=False, **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'  # Read write mode, file must exist
+        self.zero_coord = zero_coord
+        self.one_coord = one_coord
+        self.make_fig = make_fig
+        self.prepend_msmt = prepend_msmt
+
+        super(self.__class__, self).__init__(**kw)
+
+    def run_default_analysis(self, print_fit_results=False,
+                             close_main_fig=True, flip_axis=False, **kw):
+        close_file = kw.pop('close_file', True)
+        self.flip_axis = flip_axis
+        self.cal_points = kw.pop('cal_points', None)
+        self.add_analysis_datagroup_to_file()
+        self.get_naming_and_values()
+
+        if self.prepend_msmt:
+            # print(self.measured_values)
+            # print(np.array(self.measured_values).shape)
+            self.measured_values = [self.measured_values[0][1::2]]
+            # print(self.measured_values)
+            # print(np.array(self.measured_values).shape)
+            # print(self.sweep_points)
+            # print(np.array(self.sweep_points).shape)
+            self.sweep_points = self.sweep_points[1::2]
+
+
+        if len(self.measured_values[0]) == 42:
+            ideal_data = np.concatenate((0 * np.ones(10), 0.5 * np.ones(24),
+                                         np.ones(8)))
+        else:
+            ideal_data = np.concatenate((0 * np.ones(1), 0.5 * np.ones(8),
+                                         np.ones(2)))
+
+        self.rotate_and_normalize_data()
+        self.add_dataset_to_analysisgroup('Corrected data',
+                                          self.corr_data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
+        # extra deviation if the xy and yx points cross 0.5
+        ext_dev = 0
+        if (0.52 - self.corr_data[2]) < 0:
+            ext_dev += 20
+        if (0.47 - self.corr_data[1]) > 0:
+            ext_dev += 20
+
+        ext_dev1 = 0
+        if (0.52 - self.corr_data[4]) < 0:
+            ext_dev1 += 20
+        if (0.47 - self.corr_data[3]) > 0:
+            ext_dev1 += 20
+
+        ext_dev2 = 0
+        if (0.52 - self.corr_data[6]) < 0:
+            ext_dev2 += 20
+        if (0.47 - self.corr_data[5]) > 0:
+            ext_dev2 += 20
+
+        if abs(self.corr_data[1] - self.corr_data[2]) + 0.05 <= abs(self.corr_data[3] - self.corr_data[4]):
+            ext_dev += 20
+        if abs(self.corr_data[3] - self.corr_data[4]) + 0.05 <= abs(self.corr_data[5] - self.corr_data[6]):
+            ext_dev1 += 20
+        if abs(self.corr_data[1] - self.corr_data[2]) + 0.05 <= abs(self.corr_data[5] - self.corr_data[6]):
+            ext_dev2 += 20
+        if abs(self.corr_data[5] - self.corr_data[6]) + 0.05 <= abs(self.corr_data[7] - self.corr_data[8]):
+            ext_dev += 20
+
+        # data_error = np.mean(abs(self.corr_data[1] - ideal_data[1])) + np.mean(abs(self.corr_data[2] - ideal_data[2])) + 1 * np.mean(abs(self.corr_data[3] - ideal_data[3])) + 1 * np.mean(abs(self.corr_data[4] - ideal_data[4])) + 1 * np.mean(abs(self.corr_data[5] - ideal_data[5])) + 1.5 * np.mean(abs(self.corr_data[6] - ideal_data[6])) + 1.5 * np.mean(abs(self.corr_data[7] - ideal_data[7])) + 2 * np.mean(abs(self.corr_data[8] - ideal_data[8])) + 10 * np.mean(abs(self.corr_data[9] - ideal_data[9])) 
+        data_error = ext_dev + abs(self.corr_data[1] - self.corr_data[2]) + ext_dev1 + 1 * abs(self.corr_data[3] - self.corr_data[4]) + ext_dev2 + 1 * abs(self.corr_data[5] - self.corr_data[6]) + 2 * abs(self.corr_data[7] - self.corr_data[8]) + 10 * np.mean(abs(self.corr_data[9] - ideal_data[9]))
+        # print(self.corr_data)
+        self.deviation_total = np.mean(abs(data_error)) #+ abs(self.corr_data[2] - self.corr_data[3])
+        # Plotting
+        if self.make_fig:
+            self.make_figures(ideal_data=ideal_data,
+                              close_main_fig=close_main_fig, **kw)
+        if close_file:
+            self.data_file.close()
+        return self.deviation_total
+
+    def make_figures(self, ideal_data, close_main_fig, **kw):
+        fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
+        for i in range(len(self.value_names)):
+            if len(self.value_names) == 2:
+                ax = axarray[i]
+            else:
+                ax = axarray
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            marker='o-',
+                                            fig=fig2, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str(self.value_names[i]),
+                                            save=False, label="Measurement")
+        ax1.set_ylim(min(self.corr_data) - .1, max(self.corr_data) + .1)
+        if self.flip_axis:
+            ylabel = r'$F$ $|0 \rangle$'
+        else:
+            ylabel = r'$F$ $|1 \rangle$'
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.corr_data,
+                                        marker='o-',
+                                        fig=fig1, ax=ax1,
+                                        xlabel='',
+                                        ylabel=ylabel,
+                                        save=False, label="Measurement")
+        ax1.plot(self.sweep_points, ideal_data, label="Ideal")
+        labels = [item.get_text() for item in ax1.get_xticklabels()]
+        if len(self.measured_values[0]) == 42:
+            locs = self.sweep_points[1::2] #np.arange(1, 42, 2)
+        else:
+            locs = self.sweep_points #np.arange(0, 21, 1)
+        labels = ['II_cal', 'xy', 'yx', 'xy_2', 'yx_2', 'xy_4', 'yx_4', 'xy_6', 'yx_6', 'XI', 'XI_cal']
+
+        ax1.xaxis.set_ticks(locs)
+        ax1.set_xticklabels(labels, rotation=60)
+
+        if kw.pop("plot_deviation", True):
+            deviation_text = r'Deviation: %.5f' % self.deviation_total
+            ax1.text(1, 1.05, deviation_text, fontsize=11,
+                     bbox=self.box_props)
+        legend_loc = "lower right"
+        if len(self.value_names) > 1:
+            [ax.legend(loc=legend_loc) for ax in axarray]
+        else:
+            axarray.legend(loc=legend_loc)
+
+        ax1.legend(loc=legend_loc)
+
+        if not close_main_fig:
+            # Hacked in here, good idea to only show the main fig but can
+            # be optimized somehow
+            self.save_fig(fig1, ylabel='Amplitude (normalized)',
+                          close_fig=False, **kw)
+        else:
+            self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
+        self.save_fig(fig2, ylabel='Amplitude', **kw)
+
+
+
+
+
+
+
+

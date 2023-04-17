@@ -258,7 +258,7 @@ def Msmt_induced_dephasing_ramsey(
     for i, angle in enumerate(angles):
         for meas in [False, True]:
             for state in ['0', '1']:
-                cw_idx = angle//20 + 9
+                cw_idx = angle//20 + 32 #9
                 k = p.create_kernel(f"Ramsey_meas_{meas}_{angle}_{state}")
 
                 for q in q_rams:
@@ -527,7 +527,7 @@ def residual_coupling_sequence(
 
         # Transform ramsey qubit state to preferred basis
         # angle = (i*40) % 360
-        # cw_idx = angle//20 + 9
+        # cw_idx = angle//20 + 32 #9
         # k.gate('cw_{:02}'.format(cw_idx), [q0])
         k.gate('ry90', [q0])
         # k.gate('rxm90', [q0])
@@ -591,20 +591,19 @@ def Cryoscope(
         twoq_pair=[2, 0],
         platf_cfg: str = '',
         cc: str = 'CC',
+        wait_time_flux: int = 0,
         double_projections: bool = True
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
-
     Input pars:
         times:          the list of waiting times for each Ramsey element
        q0idx,q1idx      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
     Returns:
         p:              OpenQL Program object containing
-
     """
 
     p = OqlProgram("Cryoscope", platf_cfg)
@@ -623,10 +622,12 @@ def Cryoscope(
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
+    k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('sf_square', [q_idx])
     k.barrier([])  # alignment workaround
+    k.gate('wait', [], wait_time_flux)
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
     k.barrier([])
@@ -639,10 +640,12 @@ def Cryoscope(
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
+    k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('sf_square', [q_idx])
     k.barrier([])  # alignment workaround
+    k.gate('wait', [], wait_time_flux)
     for q_idx in qubit_idxs:
         k.gate('ry90', [q_idx])
     k.barrier([])
@@ -656,10 +659,12 @@ def Cryoscope(
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('rx90', [q_idx])
+        k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('sf_square', [q_idx])
         k.barrier([])  # alignment workaround
+        k.gate('wait', [], wait_time_flux)
         for q_idx in qubit_idxs:
             k.gate('rxm90', [q_idx])
         k.barrier([])
@@ -672,10 +677,12 @@ def Cryoscope(
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('rx90', [q_idx])
+        k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('sf_square', [q_idx])
         k.barrier([])  # alignment workaround
+        k.gate('wait', [], wait_time_flux)
         for q_idx in qubit_idxs:
             k.gate('rym90', [q_idx])
         k.barrier([])
@@ -685,7 +692,6 @@ def Cryoscope(
 
     p.compile()
     return p
-
 
 # FIXME: not really used
 def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str) -> OqlProgram:
@@ -1685,7 +1691,7 @@ def conditional_oscillation_seq(
 
             # cw_idx corresponds to special hardcoded angles in the lutman
             # special because the cw phase pulses go in mult of 20 deg
-            cw_idx = angle // 20 + 9
+            cw_idx = angle // 20 + 32 #9
             phi_gate = None
             if angle == 90:
                 phi_gate = 'ry90'
@@ -1860,7 +1866,7 @@ def conditional_oscillation_seq_multi(
 
             # cw_idx corresponds to special hardcoded angles in the lutman
             # special because the cw phase pulses go in mult of 20 deg
-            cw_idx = angle // 20 + 9
+            cw_idx = angle // 20 + 32 #9
             phi_gate = None
             phi_gate = 'cw_{:02}'.format(cw_idx)
 
@@ -2017,7 +2023,7 @@ def parity_check_flux_dance(
 
             # cw_idx corresponds to special hardcoded angles in the lutman
             # special because the cw phase pulses go in mult of 20 deg
-            cw_idx = angle // 20 + 9
+            cw_idx = angle // 20 + 32 # 9
             phi_gate = None
             phi_gate = 'cw_{:02}'.format(cw_idx)
 
@@ -2851,7 +2857,7 @@ def sliding_flux_pulses_seq(
     q1 = qubits[-2]
 
     for i, angle in enumerate(angles):
-        cw_idx = angle // 20 + 9
+        cw_idx = angle // 20 + 32 #9
 
         k.prepz(q0)
         k.gate(flux_codeword_a, [2, 0])  # edge hardcoded because of openql
@@ -3339,7 +3345,7 @@ def Ramsey_cross(
     p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)  # FIXME: duplicate name, does not match function name
 
     for i, angle in enumerate(angles[:-4]):
-        cw_idx = angle // 20 + 9
+        cw_idx = angle // 20 + 32 #9
         k = p.create_kernel("Ramsey_azi_" + str(angle))
 
         k.prepz(q_rams)
@@ -3554,7 +3560,7 @@ def multi_qubit_Echo(times, qubits_idx: list, platf_cfg: str) -> OqlProgram:
             # we increase the phase linearly in steps of 40 deg.
             angle = (i * 40) % 360
             # find the codeword corresponding to the angle
-            cw_idx = angle // 20 + 9
+            cw_idx = angle // 20 + 32 #9
             if angle == 0:
                 k.gate('rx90', [qubit])
             else:
