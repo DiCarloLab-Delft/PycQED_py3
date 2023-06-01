@@ -744,9 +744,20 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         self.LutMan_parameter.set(10**(val/20))
         if self.run:
             self.LutMan.AWG.get_instr().awgs_0_enable(False)
-        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+
+        # Wrap DIO load with a 5 ns fixed delay for the AWG (UHFQC) to update.
+        now: float = time.time()  # ns
+        timeout: int = 5
+        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC(
+            timeout=timeout
+        )
+        wait_dio_time = max(0.0, timeout - (time.time() - now))  # ns
+        time.sleep(wait_dio_time)  # ns
+
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
+        # Retrieve parameter to ensure setting is complete.
+        self.LutMan_parameter.get()
 
 
 @deprecated(version='0.4', reason='not used within pyqed')
