@@ -1381,14 +1381,21 @@ class Qubit(Instrument):
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,
                                    close_file=False)
-            if test_beating and a.fit_res.chisqr > 0.4:
+            print(a.fit_res.chisqr)
+            if test_beating and a.fit_res.chisqr > 0.1:
                 logging.warning('Found double frequency in Ramsey: large '
                                 'deviation found in single frequency fit.'
                                 'Returning True to continue automation. Retry '
                                 'with test_beating=False to ignore.')
-
-                return True
-            fitted_freq = a.fit_res.params['frequency'].value
+                # If Double beating is found in Ramsey, the chosen frequency
+                # will be set to the average of the two frequencies.
+                b = ma.DoubleFrequency()
+                fitted_freq = (b.fit_res.params['freq_1'].value+\
+                               b.fit_res.params['freq_2'].value)/2
+                b.T2_star = {'T2_star': (b.fit_res.params['tau_1'].value+\
+                                        b.fit_res.params['tau_2'].value)/2}
+            else:
+                fitted_freq = a.fit_res.params['frequency'].value
             measured_detuning = fitted_freq-artificial_detuning
             cur_freq = a.qubit_frequency
 

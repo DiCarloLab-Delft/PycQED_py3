@@ -1071,7 +1071,6 @@ class flux_t_middle_sweep(Soft_Sweep):
             fl_lm.set('vcz_time_single_sq_{}'.format(which_gate[i]), time_sq[i])
             fl_lm.set('vcz_time_middle_{}'.format(which_gate[i]), time_mid)
             fl_lm.set('vcz_time_pad_{}'.format(which_gate[i]), time_pad[i])
-            fl_lm.set('vcz_amp_fine_{}'.format(which_gate[i]), .5)
             fl_lm.load_waveform_onto_AWG_lookuptable(
                 wave_id=f'cz_{which_gate[i]}', regenerate_waveforms=True)
         # set flux lutman parameters of Park qubits
@@ -1268,4 +1267,19 @@ class SweepAlong2DContour(Soft_Sweep):
         self.par_A(val_par_A)
         self.par_B(val_par_B)
 
+        return val
+
+
+class LRU_freq_sweep(Soft_Sweep):
+    def __init__(self, qubit):
+        super().__init__()
+        self.qubit = qubit
+        self.LRU_LO = qubit.instr_LO_LRU.get_instr()
+        self.name = 'LRU pulse frequency'
+        self.parameter_name = 'LRU pulse frequency'
+        self.unit = 'Hz'
+
+    def set_parameter(self, val):
+        LO_freq = val - self.qubit.LRU_freq_mod()
+        self.LRU_LO.frequency(LO_freq)
         return val

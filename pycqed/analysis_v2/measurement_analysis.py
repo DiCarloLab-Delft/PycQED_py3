@@ -59,6 +59,8 @@ import pycqed.analysis_v2.Parity_benchmark_analysis as pba
 reload(pba)
 import pycqed.analysis_v2.Two_qubit_gate_analysis as tqg
 reload(tqg)
+import pycqed.analysis_v2.GBT_analysis as gbta
+reload(gbta)
 
 import pycqed.analysis_v2.fluxing_analysis as fla
 reload(fla)

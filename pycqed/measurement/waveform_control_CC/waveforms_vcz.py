@@ -133,25 +133,35 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         initial_value=False,
         label="Use asymmetric SNZ pulse amplitudes",
     )
+    # this_flux_lm.add_parameter(
+    #     "vcz_amp_pos_%s" % which_gate,
+    #     docstring="Amplitude of positive part of SNZ pulse, "
+    #     "used only if vcz_use_asymmetric_amp is true.",
+    #     parameter_class=ManualParameter,
+    #     vals=vals.Numbers(0.0, 10.0),
+    #     initial_value=1.0,
+    #     unit="a.u.",
+    #     label="Positive SNZ amplitude, if asymmetric is used.",
+    # )
+    # this_flux_lm.add_parameter(
+    #     "vcz_amp_neg_%s" % which_gate,
+    #     docstring="Amplitude of negative part of SNZ pulse, "
+    #     "used only if vcz_use_asymmetric_amp is true.",
+    #     parameter_class=ManualParameter,
+    #     vals=vals.Numbers(0.0, 10.0),
+    #     initial_value=1.0,
+    #     unit="a.u.",
+    #     label="Negative SNZ amplitude, if asymmetric is used.",
+    # )
     this_flux_lm.add_parameter(
-        "vcz_amp_pos_%s" % which_gate,
-        docstring="Amplitude of positive part of SNZ pulse, "
+        "vcz_asymmetry_%s" % which_gate,
+        docstring="Asymmetry of SNZ pulse, "
         "used only if vcz_use_asymmetric_amp is true.",
         parameter_class=ManualParameter,
-        vals=vals.Numbers(0.0, 10.0),
-        initial_value=1.0,
+        vals=vals.Numbers(-1.0, 1.0),
+        initial_value=0.0,
         unit="a.u.",
-        label="Positive SNZ amplitude, if asymmetric is used.",
-    )
-    this_flux_lm.add_parameter(
-        "vcz_amp_neg_%s" % which_gate,
-        docstring="Amplitude of negative part of SNZ pulse, "
-        "used only if vcz_use_asymmetric_amp is true.",
-        parameter_class=ManualParameter,
-        vals=vals.Numbers(0.0, 10.0),
-        initial_value=1.0,
-        unit="a.u.",
-        label="Negative SNZ amplitude, if asymmetric is used.",
+        label="Asymmetry of SNZ pulse, if asymmetric is used.",
     )
 
     for specificity in ["coarse", "fine"]:
@@ -316,8 +326,10 @@ def vcz_waveform(
 
     if use_asymmetric_NZ:
         # build asymmetric SNZ amplitudes
-        norm_amp_pos = fluxlutman.get("vcz_amp_pos_{}".format(which_gate))
-        norm_amp_neg = fluxlutman.get("vcz_amp_neg_{}".format(which_gate))
+        # norm_amp_pos = fluxlutman.get("vcz_amp_pos_{}".format(which_gate))
+        # norm_amp_neg = fluxlutman.get("vcz_amp_neg_{}".format(which_gate))
+        norm_amp_pos = 1+fluxlutman.get("vcz_asymmetry_{}".format(which_gate))
+        norm_amp_neg = 1-fluxlutman.get("vcz_asymmetry_{}".format(which_gate))
         pos_sq_amps = np.full(int(time_sqr / dt), norm_amp_pos)
         neg_sq_amps = np.full(int(time_sqr / dt), norm_amp_neg)
 

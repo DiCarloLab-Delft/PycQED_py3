@@ -2788,3 +2788,121 @@ def PTM_plotfn(
         props = dict(boxstyle='round', facecolor='white', alpha=1)
         ax.text(1.05, 1., text, transform=ax.transAxes,
                 verticalalignment='top', bbox=props)
+
+
+class LRU_frequency_sweep_Analysis(ba.BaseDataAnalysis):
+    """
+    Analysis for LRU frequency sweep experiment.
+    """
+    def __init__(self,
+                 t_start: str = None, 
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        self.qubit = (data_fp.split('.')[0]).split('_')[-1]
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        # Sort raw data
+        Frequency = self.raw_data_dict['data'][:,0]
+        P_0 = self.raw_data_dict['data'][:,1]
+        P_1 = self.raw_data_dict['data'][:,2]
+        P_2 = self.raw_data_dict['data'][:,3]
+        # Mark with np.Nan unphysical results
+        _P0 = np.array([ p if (p>-0.07 and p<1.05) else np.nan for p in P_0 ])
+        _P1 = np.array([ p if (p>-0.07 and p<1.05) else np.nan for p in P_1 ])
+        _P2 = np.array([ p if (p>-0.07 and p<1.05) else np.nan for p in P_2 ])
+        # Write cost function
+        CF = (1-_P0)**2 + 10*(_P1)**2 + (_P2)**2
+        # Find frequency that minimizes P_2
+        f_opt = Frequency[np.nanargmin(CF)]
+        # Store parameters
+        self.proc_data_dict['Frequency'] = Frequency
+        self.proc_data_dict['Population_0'] = P_0
+        self.proc_data_dict['Population_1'] = P_1
+        self.proc_data_dict['Population_2'] = P_2
+        self.qoi = {'f_optimal': f_opt}
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, axs = plt.subplots(figsize=(8,6), nrows=3, sharex=True, dpi=100)
+        # fig.patch.set_alpha(0)
+        self.axs_dict['LRU_frequency_sweep'] = axs[0]
+        self.figs['LRU_frequency_sweep'] = fig
+        self.plot_dicts['LRU_frequency_sweep'] = {
+            'plotfn': LRU_frequency_sweep_plotfn,
+            'ax_id': 'LRU_frequency_sweep',
+            'Frequency': self.proc_data_dict['Frequency'],
+            'Population_0': self.proc_data_dict['Population_0'],
+            'Population_1': self.proc_data_dict['Population_1'],
+            'Population_2': self.proc_data_dict['Population_2'],
+            'f_optimal': self.qoi['f_optimal'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamp
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def LRU_frequency_sweep_plotfn(
+    Frequency,
+    Population_0,
+    Population_1,
+    Population_2,
+    f_optimal,
+    timestamp,
+    qubit,
+    ax,
+    **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+    # Plot quantities
+    axs[0].plot(Frequency*1e-9, Population_0*100, 'C0-')
+    axs[1].plot(Frequency*1e-9, Population_1*100, 'C3-')
+    axs[2].plot(Frequency*1e-9, Population_2*100, 'C2-')
+    axs[0].axvline(f_optimal*1e-9, color='k', ls='--', lw=1)
+    axs[1].axvline(f_optimal*1e-9, color='k', ls='--', lw=1)
+    axs[2].axvline(f_optimal*1e-9, color='k', ls='--', lw=1)
+    # Set limits
+    axs[0].set_xlim(Frequency[0]*1e-9, Frequency[-1]*1e-9)
+    axs[0].set_ylim(bottom=-0.5)
+    axs[2].set_ylim(top=100.5)
+    # Plot optimal frequency
+    for i in range(3):
+        lims = axs[i].get_ylim()
+        axs[i].text(f_optimal*1e-9, np.mean(lims),
+            f'${f_optimal*1e-9:.4f}$ GHz',
+            ha='center', va='center', rotation=90, size=8,
+            bbox=dict(boxstyle='round', facecolor='white', edgecolor='None'))
+    # Format labels
+    axs[0].set_ylabel('$P_{|0\\rangle}$ (%)')
+    axs[1].set_ylabel('$P_{|1\\rangle}$ (%)')
+    axs[2].set_ylabel('$P_{|2\\rangle}$ (%)')
+    axs[2].set_xlabel('Frequency (GHz)')
+    axs[0].set_title(f'{timestamp}\n{qubit} LRU pulse frequency sweep')

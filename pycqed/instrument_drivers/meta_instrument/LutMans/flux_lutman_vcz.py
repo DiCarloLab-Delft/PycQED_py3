@@ -803,6 +803,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         _coefs = self.q_polycoeffs_freq_01_det()
         return np.polyval(_coefs, _out_amp)
 
+    def calc_gate_freq(self, direction:str):
+        _gain = self.cfg_awg_channel_amplitude()
+        _rang = self.cfg_awg_channel_range()
+        _dac  = self.get(f'vcz_amp_dac_at_11_02_{direction}')
+        _fac  = self.get(f'vcz_amp_sq_{direction}')
+        _out_amp = _gain*_dac*_fac*_rang/2
+
+        _coefs = self.q_polycoeffs_freq_01_det()
+        return np.polyval(_coefs, _out_amp)
+
 
     #################################
     #  Waveform loading methods     #

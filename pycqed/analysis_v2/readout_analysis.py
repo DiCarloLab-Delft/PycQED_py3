@@ -3803,6 +3803,12 @@ class measurement_butterfly_analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['classifier'] = classifier
             self.proc_data_dict['dec_bounds'] = dec_bounds
             self.qoi['fit_res'] = fit_res
+            # Calculate assignment fidelity matrix
+            Ass_matrix = np.sum(self.qoi['fit_res']['butter_prob'], axis=2)
+            self.qoi['Ass_matrix'] = Ass_matrix
+            # Calculate QNDness matrix
+            QND_matrix = np.sum(self.qoi['fit_res']['butter_prob'], axis=1)
+            self.qoi['QND_matrix'] = QND_matrix
 
     def prepare_plots(self):
 
@@ -3843,6 +3849,30 @@ class measurement_butterfly_analysis(ba.BaseDataAnalysis):
                 'classifier': self.proc_data_dict['classifier'],
                 'dec_bounds': self.proc_data_dict['dec_bounds'],
                 'Fid_dict': self.qoi['fit_res']['fidelity'],
+                'qubit': self.qubit,
+                'timestamp': self.timestamp
+            }
+
+            fig, ax = plt.subplots(figsize=(3,3), dpi=100)
+            # fig.patch.set_alpha(0)
+            self.axs_dict['Assignment_matrix'] = ax
+            self.figs['Assignment_matrix'] = fig
+            self.plot_dicts['Assignment_matrix'] = {
+                'plotfn': assignment_matrix_plotfn,
+                'ax_id': 'Assignment_matrix',
+                'M': self.qoi['Ass_matrix'],
+                'qubit': self.qubit,
+                'timestamp': self.timestamp
+            }
+
+            fig, ax = plt.subplots(figsize=(3,3), dpi=100)
+            # fig.patch.set_alpha(0)
+            self.axs_dict['QND_matrix'] = ax
+            self.figs['QND_matrix'] = fig
+            self.plot_dicts['QND_matrix'] = {
+                'plotfn': QND_matrix_plotfn,
+                'ax_id': 'QND_matrix',
+                'M': self.qoi['QND_matrix'],
                 'qubit': self.qubit,
                 'timestamp': self.timestamp
             }
@@ -4007,6 +4037,38 @@ def ssro_IQ_projection_plotfn2(
     props = dict(boxstyle='round', facecolor='gray', alpha=.2)
     axs[0].text(1.05, 1, text, transform=axs[0].transAxes,
                 verticalalignment='top', bbox=props)
+
+def QND_matrix_plotfn(
+    M,
+    qubit,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    im = ax.imshow(M, cmap=plt.cm.YlGn, vmin=0, vmax=1)
+    n = len(M)
+    for i in range(n):
+        for j in range(n):
+            c = M[j,i]
+            if abs(c) > .5:
+                ax.text(i, j, '{:.2f}'.format(c), va='center', ha='center',
+                             color = 'white')
+            else:
+                ax.text(i, j, '{:.2f}'.format(c), va='center', ha='center')
+    ax.set_xticks(np.arange(n))
+    ax.set_xticklabels([f'$|{i}\\rangle$' for i in range(n)])
+    ax.set_xlabel('Output state')
+    ax.set_yticks(np.arange(n))
+    ax.set_yticklabels([f'$|{i}\\rangle$' for i in range(n)])
+    ax.set_ylabel('Input state')
+    name = qubit
+    if n==3:
+        name = 'Qutrit'
+    elif n==4:
+        name = 'Ququat'
+    ax.set_title(f'{timestamp}\n{name} QNDness matrix qubit {qubit}')
+    cbar_ax = fig.add_axes([.95, .15, .03, .7])
+    cb = fig.colorbar(im, cax=cbar_ax)
+    cb.set_label('transfer probability')
 
 
 class Depletion_AllXY_analysis(ba.BaseDataAnalysis):
@@ -4684,7 +4746,7 @@ def mux_assignment_matrix_plotfn(
                         size=8)
     ax.set_xticks(np.arange(n))
     ax.set_yticks(np.arange(n))
-    _labels = [''.join([f'{comb[i]}_\mathrm{{{Qubits[i]}}}' for i in range(3)]) for comb in combinations]
+    _labels = [''.join([f'{comb[i]}_\mathrm{{{Qubits[i]}}}' for i in range(len(Qubits))]) for comb in combinations]
     ax.set_xticklabels([f'${label}$' for label in _labels], size=8, rotation=90)
     ax.set_yticklabels([f'${label}$' for label in _labels], size=8)
     ax.set_xlabel(f'Assigned state')

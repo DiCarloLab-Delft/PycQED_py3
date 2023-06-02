@@ -2539,8 +2539,8 @@ class Echo_analysis_V15(TD_Analysis):
 
         verbose = kw.get('verbose', False)
         # Get old values for qubit frequency
-        instr_set = self.data_file['Instrument settings']
         try:
+            instr_set = self.data_file['Instrument settings']
             if self.for_ef:
                 self.qubit_freq_spec = \
                     float(instr_set[self.qb_name].attrs['f_ef_qubit'])
@@ -4705,9 +4705,9 @@ class T1_Analysis(TD_Analysis):
 
             units = SI_prefix_and_scale_factor(val=max(abs(self.ax.get_xticks())),
                                                unit=self.sweep_unit[0])[1]
-            # Get old values
-            instr_set = self.data_file['Instrument settings']
             try:
+                # Get old values
+                instr_set = self.data_file['Instrument settings']
                 if self.for_ef:
                     T1_old = float(
                         instr_set[self.qb_name].attrs['T1_ef']) * 1e6
@@ -4786,7 +4786,8 @@ class Ramsey_Analysis(TD_Analysis):
     Most kw parameters for Rabi_Analysis are also used here.
     """
 
-    def __init__(self, label='Ramsey', phase_sweep_only=False, **kw):
+    def __init__(self, label='Ramsey', phase_sweep_only=False,
+                 **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         self.phase_sweep_only = phase_sweep_only
@@ -4978,15 +4979,17 @@ class Ramsey_Analysis(TD_Analysis):
             close_main_figure=True, save_fig=False, **kw)
 
         verbose = kw.get('verbose', False)
-        # Get old values for qubit frequency
-        instr_set = self.data_file['Instrument settings']
         try:
             if self.for_ef:
+                # Get old values for qubit frequency
+                instr_set = self.data_file['Instrument settings']
                 self.qubit_freq_spec = \
                     float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             elif 'freq_qubit' in kw.keys():
                 self.qubit_freq_spec = kw['freq_qubit']
             else:
+                # Get old values for qubit frequency
+                instr_set = self.data_file['Instrument settings']
                 try:
                     self.qubit_freq_spec = \
                         float(instr_set[self.qb_name].attrs['f_qubit'])

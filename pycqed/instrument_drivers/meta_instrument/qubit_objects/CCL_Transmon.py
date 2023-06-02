@@ -33,6 +33,8 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 import pycqed.measurement.composite_detector_functions as cdf
+from pycqed.utilities import learner1D_minimizer as l1dm
+
 import pytest
 from math import ceil
 
@@ -367,8 +369,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter, initial_value=1)
 
         # Mixer offsets correction, qubit drive
-        self.add_parameter('mw_mixer_offs_GI',
-                           unit='V',
+        self.add_parameter('mw_mixer_offs_GI',unit='V',
                            parameter_class=ManualParameter, initial_value=0)
         self.add_parameter('mw_mixer_offs_GQ', unit='V',
                            parameter_class=ManualParameter, initial_value=0)
@@ -534,6 +535,10 @@ class CCLight_Transmon(Qubit):
                            initial_value=30e-9,
                            label='LRU pulse rise duration', unit='s',
                            parameter_class=ManualParameter)
+        self.add_parameter('lru_mixer_offs_GI',unit='V',
+                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('lru_mixer_offs_GQ', unit='V',
+                           parameter_class=ManualParameter, initial_value=0)
 
     def _using_QWG(self):
         """
@@ -1008,7 +1013,7 @@ class CCLight_Transmon(Qubit):
         return int_avg_det
 
     def _prep_ro_sources(self):
-        if self.instr_LutMan_RO.get_instr().LO_freq is not None:
+        if self.instr_LutMan_RO.get_instr().LO_freq() is not None:
             log.info('Warning: This qubit is using a fixed RO LO frequency.')
             LO = self.instr_LO_ro.get_instr()
             ro_Lutman = self.instr_LutMan_RO.get_instr()
@@ -1261,11 +1266,12 @@ class CCLight_Transmon(Qubit):
             self.instr_LO_LRU.get_instr().pulsemod_state(False)
             # If the lutman type is MW
             if isinstance(LRU_lutman,
-                    pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman.AWG8_MW_LutMan):
+                    pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman.LRU_MW_LutMan):
                 if LRU_lutman.cfg_sideband_mode() == 'static':
                     # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
                     self.instr_LO_LRU.get_instr().frequency.set(
                         self.LRU_freq.get() - self.LRU_freq_mod.get())
+                    LRU_lutman.mw_lru_modulation(self.LRU_freq_mod.get())
                 elif LRU_lutman.cfg_sideband_mode() == 'real-time':
                     # For historic reasons, will maintain the change qubit frequency here in
                     # _prep_td_sources, even for real-time mode, where it is only changed in the HDAWG
@@ -1274,6 +1280,7 @@ class CCLight_Transmon(Qubit):
                     self.LRU_freq_mod(self.LRU_freq.get() - self.instr_LO_LRU.get_instr().frequency.get())
                     LRU_lutman.AWG.get_instr().set('oscs_{}_freq'.format((LRU_lutman.channel_I()-1)//2),
                         self.LRU_freq_mod.get())
+                    LRU_lutman.mw_lru_modulation(self.LRU_freq_mod.get())
                 else:
                     raise ValueError('Unexpected value for parameter LRU cfg_sideband_mode.')
             # If the lutman type is FLUX
@@ -1286,6 +1293,28 @@ class CCLight_Transmon(Qubit):
                                       cannot be negative. Change LRU LO frequency.')
                 else:
                     self.LRU_freq_mod(_mw_mod)
+        # If qubit does not have Lutman but has LRU LO.
+        # (This is meant to handle cases where the LRU pulse is generated
+        # from the AWG of another qubit. In these cases we want to update
+        # the frequency of the LO based on the modulation frequency).
+        elif self.instr_LO_LRU():
+            # Since these qubits are using the pulse from another qubit
+            # AWG, the modulation frequency of their LRU pulse is inherited.
+            # This makes the preparation of their LO kinda of tricky. To
+            # solve it, we hardcode their modulation frequencies here.
+            self.find_instrument('D1').LRU_freq_mod(self.find_instrument('D4').LRU_freq_mod())
+            self.find_instrument('D2').LRU_freq_mod(self.find_instrument('D6').LRU_freq_mod())
+            self.find_instrument('D3').LRU_freq_mod(self.find_instrument('D4').LRU_freq_mod())
+            self.find_instrument('D7').LRU_freq_mod(self.find_instrument('D6').LRU_freq_mod())
+            self.find_instrument('D8').LRU_freq_mod(self.find_instrument('D5').LRU_freq_mod())
+            self.find_instrument('D9').LRU_freq_mod(self.find_instrument('D5').LRU_freq_mod())
+            self.find_instrument('X1').LRU_freq_mod(self.find_instrument('X4').LRU_freq_mod())
+            self.find_instrument('X2').LRU_freq_mod(self.find_instrument('Z1').LRU_freq_mod())
+            # Prepare LO source frequency
+            LO_source = self.instr_LO_LRU.get_instr()
+            LO_source.frequency(self.LRU_freq()-self.LRU_freq_mod())
+            LO_source.on()
+            LO_source.pulsemod_state(False)
 
     def _prep_mw_pulses(self):
         # 1. Gets instruments and prepares cases
@@ -1395,18 +1424,17 @@ class CCLight_Transmon(Qubit):
         AWG = LRU_LutMan.AWG.get_instr()
         lutman_type = str(type(LRU_LutMan))
         # Check types of Lutman:
-        # Doing this like this is probably a terrible idea,
+        # Doing stuff like this is probably a terrible idea,
         # however, you can do this by using the isinstance command
         # since you'll just get False always
-        mw_type = str(pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman.AWG8_MW_LutMan)
+        mw_type = str(pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman.LRU_MW_LutMan)
         fl_type = str(pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman_vcz.LRU_Flux_LutMan)
         # If the lutman type is MW
         if lutman_type == mw_type:
             # 2. Prepares map and parameters for waveforms
             LRU_LutMan.channel_amp(self.LRU_channel_amp())
             LRU_LutMan.channel_range(self.LRU_channel_range())
-            LRU_LutMan.mw_modulation(self.LRU_freq_mod())
-            LRU_LutMan.mw_amp180(1)
+            LRU_LutMan.mw_lru_modulation(self.LRU_freq_mod())
             LRU_LutMan.mixer_phi(0)
             LRU_LutMan.mixer_alpha(1)
 
@@ -1415,14 +1443,15 @@ class CCLight_Transmon(Qubit):
             LRU_LutMan.mw_lru_rise_duration(self.LRU_duration_rise())
             # Set all waveforms to be LRU pulse
             # to ensure same waveform duration. 
-            _lm = {i: {'name': 'lru', 'type': 'lru'} for i in range(64)}
+            _lm = { 0: {'name': 'I', 'type': 'lru_idle'},
+                    1: {'name': 'lru', 'type': 'lru'}}
             LRU_LutMan.LutMap(_lm)
-            # # TO DO: implement mixer corrections on LRU lutman
-            # # N.B. This part is AWG8 specific
-            # AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
-            #         self.mw_mixer_offs_GI())
-            # AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
-            #         self.mw_mixer_offs_GQ())
+            # TO DO: implement mixer corrections on LRU lutman
+            # N.B. This part is AWG8 specific
+            AWG.set('sigouts_{}_offset'.format(LRU_LutMan.channel_I()-1),
+                    self.lru_mixer_offs_GI())
+            AWG.set('sigouts_{}_offset'.format(LRU_LutMan.channel_I()+0),
+                    self.lru_mixer_offs_GQ())
             # 4. reloads the waveforms
             LRU_LutMan.load_waveforms_onto_AWG_lookuptable()
             # 5. upload commandtable for virtual-phase gates
@@ -1514,10 +1543,10 @@ class CCLight_Transmon(Qubit):
                 self.name, self.fl_dc_I0()/1e-3))
         fluxcurrent[self.fl_dc_ch()](self.fl_dc_I0())
         return True
+    
     ####################################################
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
-
     def find_frequency_adaptive(self, f_start=None, f_span=1e9, f_step=0.5e6,
                                 MC=None, update=True, use_max=False,
                                 spec_mode='pulsed_marked', verbose=True):
@@ -1917,7 +1946,8 @@ class CCLight_Transmon(Qubit):
         print('CCL program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True, motzois=None):
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True, motzois=None,
+                         disable_metadata=False, prepare_for_timedomain=True):
         """
         Calibrates the DRAG coeffcieint value, named motzoi (after Felix Motzoi)
         for legacy reasons.
@@ -1931,7 +1961,9 @@ class CCLight_Transmon(Qubit):
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
-        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True)
+        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True,
+                                prepare_for_timedomain=prepare_for_timedomain,
+                                disable_metadata=disable_metadata)
         opt_motzoi = a.get_intersect()[0]
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
             if verbose:
@@ -1970,9 +2002,10 @@ class CCLight_Transmon(Qubit):
         # turn relevant channels on
 
         using_VSM = self.cfg_with_vsm()
+        
         MW_LutMan = self.instr_LutMan_MW.get_instr()
-        AWG = MW_LutMan.AWG.get_instr()
 
+        AWG = MW_LutMan.AWG.get_instr()
         if using_VSM:
             if AWG.__class__.__name__ == 'QuTech_AWG_Module':
                 chGI_par = AWG.parameters['ch1_offset']
@@ -2059,6 +2092,7 @@ class CCLight_Transmon(Qubit):
                 AWG.set('sigouts_{}_on'.format(awg_ch+0), 1)
                 chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
                 chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
+                
                 offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
                     SH=self.instr_SH.get_instr(),
                     source=self.instr_LO_mw.get_instr(),
@@ -2066,18 +2100,182 @@ class CCLight_Transmon(Qubit):
                     chI_par=chGI_par, chQ_par=chGQ_par,
                     label='Mixer_offsets_drive'+self.msmt_suffix,
                     ftarget=ftarget, maxiter=maxiter)
+
                 if update:
                     self.mw_mixer_offs_GI(offset_I)
                     self.mw_mixer_offs_GQ(offset_Q)
 
         return True
 
+    def calibrate_mixer_offsets_RO(self, update: bool = True,
+                                   ftarget=-110) -> bool:
+        """
+        Calibrates the mixer offset and updates the I and Q offsets in
+        the qubit object.
+
+        Args:
+            update (bool):
+                if True updates values in the qubit object.
+
+            ftarget (float): power of the signal at the LO frequency
+                for which the optimization is terminated
+
+        Return:
+            success (bool):
+                returns True if succesful. Currently always
+                returns True (i.e., no sanity check implemented)
+        """
+
+        chI_par = self.instr_acquisition.get_instr().sigouts_0_offset
+        chQ_par = self.instr_acquisition.get_instr().sigouts_1_offset
+
+        offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
+            SH=self.instr_SH.get_instr(), 
+            source=self.instr_LO_ro.get_instr(),
+            MC=self.instr_MC.get_instr(),
+            chI_par=chI_par, 
+            chQ_par=chQ_par, 
+            x0=(0.05, 0.05),
+            ftarget=ftarget)
+
+        if update:
+            self.ro_pulse_mixer_offs_I(offset_I)
+            self.ro_pulse_mixer_offs_Q(offset_Q)
+        return True
+
+    def calibrate_mixer_offsets_LRU(self,
+                                    mixer_channels: list =['G', 'D'],
+                                    update: bool = True,
+                                    ftarget: int = -110,
+                                    maxiter: int = 300,
+                                    disable_metadata: bool = False)-> bool:
+        """
+        Calibrates the mixer offset and updates the I and Q offsets in
+        the qubit object.
+
+        Args:
+            mixer_channels (list):
+                No use in no-VSM case
+                With VSM specifies whether to calibrate offsets for both
+                gaussuan 'G' and derivarive 'D' channel
+
+            update (bool):
+                should optimal values be set in the qubit object
+
+            ftarget (float): power of the signal at the LO frequency
+                for which the optimization is terminated
+        """
+
+        # turn relevant channels on
+        
+        MW_LutMan = self.instr_LutMan_LRU.get_instr()
+        AWG = MW_LutMan.AWG.get_instr()
+        awg_ch = MW_LutMan.channel_I()
+        AWG.stop()
+        AWG.set('sigouts_{}_on'.format(awg_ch-1), 1)
+        AWG.set('sigouts_{}_on'.format(awg_ch+0), 1)
+        chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
+        chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
+        
+        offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
+            SH=self.instr_SH.get_instr(),
+            source=self.instr_LO_LRU.get_instr(),
+            MC=self.instr_MC.get_instr(),
+            chI_par=chGI_par, chQ_par=chGQ_par,
+            label='Mixer_offsets_drive'+self.msmt_suffix,
+            ftarget=ftarget, maxiter=maxiter,
+            disable_metadata=disable_metadata)
+
+        if update:
+            self.lru_mixer_offs_GI(offset_I)
+            self.lru_mixer_offs_GQ(offset_Q)
+
+        return True
+
+    def calibrate_mixer_offset_LRU_single_channel(
+            self,
+            ch_par,
+            currents: list = np.arange(-10e-3, 10e-3, .5e-3),
+            update: bool = True,
+            adaptive_sampling: bool = False,
+            ftarget: int =-100,
+            prepare: bool = True,
+            disable_metadata=False):
+        '''
+        Calibrate mixer offset for single AWG with a 
+        current source. This was developed for the 
+        LRU signals in the Pagani setup.
+        "ch_par" should the current source parameter
+        associated to the qubit.
+        '''
+        if prepare:
+            self.prepare_for_timedomain()
+        #turn the relevant soruce on 
+        source = self.instr_LO_LRU.get_instr()
+        source.on()
+        frequency = source.frequency()
+        SH = self.instr_SH.get_instr()
+        MC = self.instr_MC.get_instr()
+        detector = det.Signal_Hound_fixed_frequency(
+            SH, frequency=(source.frequency()),
+            Navg=5, delay=0.0, prepare_for_each_point=False)
+        MC.set_sweep_function(ch_par)
+        MC.set_detector_function(detector)
+        if adaptive_sampling:
+            goal = l1dm.mk_min_threshold_goal_func(
+                max_pnts_beyond_threshold=10)
+            minimize = True
+            loss = l1dm.mk_minimization_loss_func(
+                # Just in case it is ever changed to maximize
+                threshold=(-1) ** (minimize + 1) * ftarget,
+                interval_weight=50.0,
+            )
+            adaptive_num_pnts_uniform=0
+            adaptive_num_pts_max = 50
+            bounds = (np.min(currents), np.max(currents))
+            # adaptive sampler
+            # par_idx = 1 # Moved to method's arguments
+            adaptive_pars = {
+                "adaptive_function": l1dm.Learner1D_Minimizer,
+                "goal": lambda l: goal(l) or l.npoints > adaptive_num_pts_max,
+                "bounds": bounds,
+                "loss_per_interval": loss,
+                "minimize": minimize,
+                # A few uniform points to make more likely to find the peak
+                "X0": np.linspace(
+                    np.min(bounds),
+                    np.max(bounds),
+                    adaptive_num_pnts_uniform + 2)[1:-1]
+            }
+            MC.set_sweep_function(ch_par)
+            MC.set_adaptive_function_parameters(adaptive_pars)
+            MC.set_sweep_points(currents)
+            label = f'Offset_calibration_LRU_single_channel_{self.name}'
+            MC.run(label, mode="adaptive",
+                disable_snapshot_metadata = disable_metadata)
+        else:
+            # Just single 1D sweep
+            MC.set_sweep_points(currents)
+            label = f'Offset_calibration_LRU_single_channel_{self.name}'
+            MC.run(label, mode="1D",
+                disable_snapshot_metadata = disable_metadata)
+        # Run analysis 
+        a = ma2.Basic1DAnalysis()
+        powers = a.raw_data_dict['measured_values'][0]
+        currents = a.raw_data_dict['xvals'][0]
+        opt_curr = currents[np.argmin(powers)]
+        if update:
+            self.lru_mixer_offs_GI(opt_curr)
+            ch_par(opt_curr)
+            return True
+
     def calibrate_mixer_skewness_drive(self, MC=None,
                                        mixer_channels: list = ['G', 'D'],
                                        x0: list = [1.0, 0.0],
-                                       cma_stds: list = [.15, 10],
+                                       cma_stds = None,
                                        maxfevals: int = 250,
-                                       update: bool = True)-> bool:
+                                       update: bool = True,
+                                       prepare=True)-> bool:
         """
         Calibrates the mixer skewness and updates values in the qubit object.
 
@@ -2103,6 +2301,8 @@ class CCLight_Transmon(Qubit):
         if MC == None:
             MC = self.instr_MC.get_instr()
 
+        if prepare:
+            self.prepare_for_timedomain()
         # Load the sequence
         CCL = self.instr_CC.get_instr()
         p = sqo.CW_tone(
@@ -2111,6 +2311,8 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         CCL.start()
 
+        if cma_stds is None:
+            cma_stds = [1/self.mw_channel_amp(), 10] 
         if self.cfg_with_vsm():
             # Open the VSM channel
             VSM = self.instr_VSM.get_instr()
@@ -2160,8 +2362,10 @@ class CCLight_Transmon(Qubit):
 
                     # Codeword 10 is hardcoded in the generate CCL config
                     # mw_lutman.load_waveform_realtime(wave_id='square')
-                    mw_lutman.load_waveforms_onto_AWG_lookuptable(
-                        force_load_sequencer_program=False)
+                    # mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                    #     force_load_sequencer_program=False)
+                    mw_lutman.load_waveform_onto_AWG_lookuptable(
+                        wave_id='square', regenerate_waveforms=True)
                     AWG.start()
                 prepare_function = load_square
                 prepare_function_kwargs = {}
@@ -2202,7 +2406,8 @@ class CCLight_Transmon(Qubit):
 
         return True
 
-    def calibrate_mixer_skewness_RO(self, update=True):
+    def calibrate_mixer_skewness_RO(self, update=True, prepare=True,
+                                    maxfevals = 150):
         """
         Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
         see calibration toolbox for details
@@ -2217,6 +2422,8 @@ class CCLight_Transmon(Qubit):
                 returns True (i.e., no sanity check implemented)
         """
         CCL = self.instr_CC.get_instr()
+        if prepare:
+            self.prepare_for_timedomain()
         p = sqo.CW_RO_sequence(
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
@@ -2259,7 +2466,7 @@ class CCLight_Transmon(Qubit):
                         'initial_step': [.15, 10],
                         'no_improve_break': 15,
                         'minimize': True,
-                        'maxiter': 500}
+                        'maxiter': maxfevals}
         MC.set_sweep_functions([S1, S2])
         MC.set_detector_function(detector)  # sets test_detector
         MC.set_adaptive_function_parameters(ad_func_pars)
@@ -2273,42 +2480,6 @@ class CCLight_Transmon(Qubit):
             self.ro_pulse_mixer_alpha.set(alpha)
             LutMan.mixer_alpha(alpha)
             LutMan.mixer_phi(phi)
-
-    def calibrate_mixer_offsets_RO(self, update: bool = True,
-                                   ftarget=-110) -> bool:
-        """
-        Calibrates the mixer offset and updates the I and Q offsets in
-        the qubit object.
-
-        Args:
-            update (bool):
-                if True updates values in the qubit object.
-
-            ftarget (float): power of the signal at the LO frequency
-                for which the optimization is terminated
-
-        Return:
-            success (bool):
-                returns True if succesful. Currently always
-                returns True (i.e., no sanity check implemented)
-        """
-
-        chI_par = self.instr_acquisition.get_instr().sigouts_0_offset
-        chQ_par = self.instr_acquisition.get_instr().sigouts_1_offset
-
-        offset_I, offset_Q = cal_toolbox.mixer_carrier_cancellation(
-            SH=self.instr_SH.get_instr(), 
-            source=self.instr_LO_ro.get_instr(),
-            MC=self.instr_MC.get_instr(),
-            chI_par=chI_par, 
-            chQ_par=chQ_par, 
-            x0=(0.05, 0.05),
-            ftarget=ftarget)
-
-        if update:
-            self.ro_pulse_mixer_offs_I(offset_I)
-            self.ro_pulse_mixer_offs_Q(offset_Q)
-        return True
 
     def calibrate_mw_pulses_basic(self,
                                   cal_steps=['offsets', 'amp_coarse', 'freq',
@@ -2789,7 +2960,6 @@ class CCLight_Transmon(Qubit):
     #####################################################
     # "measure_" methods below
     #####################################################
-
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True,
                                         label=''):
@@ -3892,10 +4062,11 @@ class CCLight_Transmon(Qubit):
         d = self.int_log_det
         d.nr_shots = nr_shots
         MC.set_detector_function(d)
+        if label == '':
+            label = 'f'
         MC.run('SSRO_{}{}'.format(label, self.msmt_suffix),
                disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(old_plot_setting)
-
         a = ma2.ra.Singleshot_Readout_Analysis(
             qubit=self.name,
             qubit_freq=self.freq_qubit(),
@@ -5317,6 +5488,7 @@ class CCLight_Transmon(Qubit):
             update=True,
             close_fig=True,
             analyze=True,
+            disable_metadata: bool = False,
             MC=None,
             ):
         """
@@ -5346,7 +5518,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('T1'+self.msmt_suffix)
+        MC.run('T1'+self.msmt_suffix,disable_snapshot_metadata=disable_metadata)
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
             if update:
@@ -5689,6 +5861,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True,
+                     disable_metadata: bool = False,
                      label: str = '', prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
@@ -5736,7 +5909,8 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('echo'+label+self.msmt_suffix)
+        MC.run('echo'+label+self.msmt_suffix,
+               disable_snapshot_metadata=disable_metadata)
         if analyze:
             # N.B. v1.5 analysis
             a = ma.Echo_analysis_V15(label='echo', auto=True, close_fig=True)
@@ -6031,6 +6205,7 @@ class CCLight_Transmon(Qubit):
         self, 
         number_of_flips=np.arange(0, 61, 2), 
         equator=True,
+        prepare_for_timedomain=True,
         MC=None, 
         analyze=True, 
         close_fig=True, 
@@ -6081,12 +6256,12 @@ class CCLight_Transmon(Qubit):
         nf = np.array(number_of_flips)
         dn = nf[1] - nf[0]
         nf = np.concatenate([nf,
-                                (nf[-1]+1*dn,
-                                nf[-1]+2*dn,
-                                nf[-1]+3*dn,
-                                nf[-1]+4*dn) ])
-
-        self.prepare_for_timedomain()
+                            (nf[-1]+1*dn,
+                            nf[-1]+2*dn,
+                            nf[-1]+3*dn,
+                            nf[-1]+4*dn) ])
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
         p = sqo.flipping(number_of_flips=nf,
                          equator=equator,
                          flip_ef=flip_ef,
@@ -6124,12 +6299,15 @@ class CCLight_Transmon(Qubit):
 
             if abs(scale_factor-1) < 1e-3:
                 print('Pulse amplitude accurate within 0.1%. Amplitude not updated.')
-                return a
+                return True
 
             if angle == '180':
                 if flip_ef:
                     amp_old = self.mw_ef_amp()
-                    self.mw_ef_amp(scale_factor*amp_old)
+                    if scale_factor*amp_old > 1:
+                        self.mw_ef_amp(1)
+                    else:
+                        self.mw_ef_amp(scale_factor*amp_old)
                 elif flip_fh:
                     amp_old = self.mw_fh_amp()
                     self.mw_fh_amp(scale_factor*amp_old)
@@ -6164,7 +6342,8 @@ class CCLight_Transmon(Qubit):
 
     def measure_motzoi(self, motzoi_amps=None,
                        prepare_for_timedomain: bool = True,
-                       MC=None, analyze=True, close_fig=True):
+                       MC=None, analyze=True, close_fig=True,
+                       disable_metadata=False):
         """
         Sweeps the amplitude of the DRAG coefficients looking for leakage reduction
         and optimal correction for the phase error due to stark shift resulting
@@ -6233,7 +6412,8 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(motzoi_amps)
         MC.set_detector_function(d)
 
-        MC.run('Motzoi_XY'+self.msmt_suffix)
+        MC.run('Motzoi_XY'+self.msmt_suffix,
+               disable_snapshot_metadata=disable_metadata)
         if analyze:
             if self.ro_acq_weight_type() == 'optimal':
                 a = ma2.Intersect_Analysis(
@@ -6254,9 +6434,12 @@ class CCLight_Transmon(Qubit):
             self, nr_cliffords=2**np.arange(12),
             nr_seeds=100,
             MC=None,
-            recompile: bool = 'as needed', prepare_for_timedomain: bool = True,
-            ignore_f_cal_pts: bool = False, compile_only: bool = False,
-            rb_tasks=None):
+            recompile: bool = 'as needed', 
+            prepare_for_timedomain: bool = True,
+            ignore_f_cal_pts: bool = False, 
+            compile_only: bool = False,
+            rb_tasks=None,
+            disable_metadata=False):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -6290,24 +6473,12 @@ class CCLight_Transmon(Qubit):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # Settings that have to be changed....
-        old_weight_type = self.ro_acq_weight_type()
-        old_digitized = self.ro_acq_digitized()
-        self.ro_acq_weight_type('optimal IQ')
-        self.ro_acq_digitized(False)
+        assert 'IQ' in self.ro_acq_weight_type()
+        assert self.ro_acq_digitized()==False
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
-        else:
-            self.prepare_readout()
         MC.soft_avg(1)
-        # set back the settings
-        self.ro_acq_weight_type(old_weight_type)
-        self.ro_acq_digitized(old_digitized)
-
-        # Load pulses to the ef transition
-        mw_lutman = self.instr_LutMan_MW.get_instr()
-        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
 
         net_cliffords = [0, 3]  # always measure double sided
 
@@ -6365,7 +6536,7 @@ class CCLight_Transmon(Qubit):
         d = self.int_log_det
         d.prepare_function = load_range_of_oql_programs_from_filenames
         d.prepare_function_kwargs = prepare_function_kwargs
-        reps_per_seed = 4094 // len(sweep_points)
+        reps_per_seed = 2**13 // len(sweep_points)
         d.nr_shots = reps_per_seed * len(sweep_points)
 
         s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
@@ -6374,7 +6545,8 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
         MC.set_detector_function(d)
         MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix,
-               exp_metadata={'bins': sweep_points})
+               exp_metadata={'bins': sweep_points},
+               disable_snapshot_metadata=disable_metadata)
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
             label='RB_',
@@ -6507,6 +6679,7 @@ class CCLight_Transmon(Qubit):
                         recovery_pulse: bool = True,
                         MC=None, label: str = '',
                         measure_3rd_state: bool = False,
+                        disable_metadata: bool = False,
                         analyze=True, close_fig=True,
                         prepare_for_timedomain=True):
         """
@@ -6546,7 +6719,8 @@ class CCLight_Transmon(Qubit):
                 _title = 'fh_rabi'
             else:
                 _title = 'ef_rabi'
-            MC.run(_title+label+self.msmt_suffix)
+            MC.run(_title+label+self.msmt_suffix,
+                    disable_snapshot_metadata = disable_metadata)
             mw_lutman.set_default_lutmap()
         except:
             print_exception()
@@ -6559,6 +6733,7 @@ class CCLight_Transmon(Qubit):
                         amps: list = np.linspace(-.8, .8, 18),
                         recovery_pulse: bool = True,
                         MC=None, label: str = '',
+                        disable_metadata = False,
                         measure_3rd_state: bool = False,
                         analyze=True, close_fig=True,
                         prepare_for_timedomain=True, update=True):
@@ -6575,6 +6750,7 @@ class CCLight_Transmon(Qubit):
             a2 = self.measure_ef_rabi(amps = amps,
                     recovery_pulse = recovery_pulse,
                     MC = MC, label = label,
+                    disable_metadata = disable_metadata,
                     measure_3rd_state = measure_3rd_state,
                     analyze = analyze, close_fig = close_fig,
                     prepare_for_timedomain = prepare_for_timedomain)
@@ -6585,10 +6761,12 @@ class CCLight_Transmon(Qubit):
             mw_lutman.set_default_lutmap()
         if update:
             ef_pi_amp = a2.proc_data_dict['ef_pi_amp']
+            if ef_pi_amp > 1:
+                ef_pi_amp = 1
             if measure_3rd_state:
-                self.mw_fh_amp(a2.proc_data_dict['ef_pi_amp'])
+                self.mw_fh_amp(ef_pi_amp)
             else:
-                self.mw_ef_amp(a2.proc_data_dict['ef_pi_amp'])
+                self.mw_ef_amp(ef_pi_amp)
 
     def measure_gst_1Q(self,
                        shots_per_meas: int,
@@ -6758,6 +6936,7 @@ class CCLight_Transmon(Qubit):
             prepare_for_timedomain: bool = True,
             reduced_prepare: bool = False,
             analyze: bool = True,
+            extract_only: bool = False,
             disable_metadata: bool = False):
         '''
         Function to measure 2-state fraction removed by LRU pulse.
@@ -6816,7 +6995,8 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma2.lrua.LRU_experiment_Analysis(qubit=self.name,
                                                  h_state=h_state,
-                                                 heralded_init=heralded_init)
+                                                 heralded_init=heralded_init,
+                                                 extract_only=extract_only)
             return a.qoi
 
     def measure_LRU_repeated_experiment(self,
@@ -6945,6 +7125,190 @@ class CCLight_Transmon(Qubit):
             mw_lm = self.instr_LutMan_MW.get_instr()
             phase = mw_lm.LRU_virtual_q_ph_corr()
             mw_lm.LRU_virtual_q_ph_corr(np.mod(phase-angle, 360))
+
+    def calibrate_LRU_frequency(self,
+            frequencies: list, 
+            nr_shots_per_point: int = 2**10,
+            heralded_init: bool = False,
+            prepare_for_timedomain: bool = True,
+            update: bool = True,
+            disable_metadata: bool = False):
+        '''
+        Sweeps the frequency of the LRU pulse while measuring the
+        leakage removal fration. Updates frequency of LRU choosing
+        the value that maximizes leakage removal fraction.
+        '''
+        assert self.instr_LutMan_LRU() != None, 'LRU lutman is required.'
+        assert self.ro_acq_digitized() == False, 'Analog readout required.'
+        assert 'IQ' in self.ro_acq_weight_type(), 'IQ readout is required.'
+        nested_MC = self.instr_nested_MC.get_instr()
+        # Save initial LO frequency (to be reset in the end)
+        lru_lo = self.instr_LO_LRU.get_instr() 
+        current_lo_freq = lru_lo.frequency()
+        # prepare for experiment
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        # wrapper function to be used as detector
+        def wrapper(nr_shots_per_case,
+                    heralded_init):
+          results = self.measure_LRU_experiment(
+            nr_shots_per_case=nr_shots_per_case,
+            heralded_init=heralded_init,
+            disable_metadata=True,
+            prepare_for_timedomain=False,
+            extract_only=True,
+            analyze=True)
+          out_dict = {'Population 0': results['pop_vec'][0],
+                      'Population 1': results['pop_vec'][1],
+                      'Population 2': results['pop_vec'][2]}
+          return out_dict
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'nr_shots_per_case': nr_shots_per_point,
+                     'heralded_init': heralded_init},
+            result_keys=['Population 0', 'Population 1', 'Population 2'],
+            value_names=['Population 0', 'Population 1', 'Population 2'],
+            value_units=['fraction', 'fraction', 'fraction'])
+        nested_MC.set_detector_function(d)
+        sweep_function = swf.LRU_freq_sweep(self)
+        nested_MC.set_sweep_function(sweep_function)
+        nested_MC.set_sweep_points(frequencies)
+        try:
+            nested_MC.run(f'LRU_frequency_sweep_{self.name}',
+                          disable_snapshot_metadata=disable_metadata)
+            a = ma2.lrua.LRU_frequency_sweep_Analysis(
+                label='LRU_frequency_sweep')
+            # reset LO frequency
+            lru_lo.frequency(current_lo_freq)
+            if update:
+                self.LRU_freq(a.qoi['f_optimal'])
+                return True
+        except:
+            # reset LO frequency
+            lru_lo.frequency(current_lo_freq)
+            print_exception()
+            return False
+
+    def measure_flux_frequency_timedomain(
+        self,
+        amplitude: float = None,
+        times: list = np.arange(20e-9, 40e-9, 1/2.4e9),
+        wait_time_flux: int = 0,
+        disable_metadata: bool = False,
+        analyze: bool = True,
+        prepare_for_timedomain: bool = True,
+        ):
+        """
+        Performs a cryoscope experiment to measure frequency
+        detuning for a given flux pulse amplitude.
+        Args:
+            Times: 
+                Flux pulse durations used for cryoscope trace.
+            Amplitudes: 
+                Amplitude of flux pulse used for cryoscope trace.
+        Note on analysis: The frequency is calculated based on 
+        a FFT of the cryoscope trace. This means the frequency
+        resolution of this measurement will be given by the duration
+        of the cryoscope trace. To minimize the duration of this 
+        measurement we obtain the center frequency of the FFT by
+        fitting it to a Lorentzian, which circumvents the frequency
+        sampling.
+        """
+        assert self.ro_acq_weight_type()=='optimal'
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        fl_lutman = self.instr_LutMan_Flux.get_instr()
+        if amplitude:
+            fl_lutman.sq_amp(amplitude)
+        out_voltage = fl_lutman.sq_amp()*\
+            fl_lutman.cfg_awg_channel_amplitude()*\
+            fl_lutman.cfg_awg_channel_range()/2
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+            fl_lutman.load_waveforms_onto_AWG_lookuptable()
+        p = mqo.Cryoscope(
+            qubit_idxs=[self.cfg_qubit_nr()],
+            flux_cw="fl_cw_06",
+            wait_time_flux=wait_time_flux,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            cc=self.instr_CC.get_instr().name,
+            double_projections=False,
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
+        sw_function = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
+                                  waveform_name="square")
+        MC.set_sweep_function(sw_function)
+        MC.set_sweep_points(times)
+        values_per_point = 2
+        values_per_point_suffex = ["cos", "sin"]
+        d = self.get_int_avg_det(
+            values_per_point=values_per_point,
+            values_per_point_suffex=values_per_point_suffex,
+            single_int_avg=True,
+            always_prepare=False
+        )
+        MC.set_detector_function(d)
+        label = f'Voltage_to_frequency_{out_voltage:.2f}V_{self.name}'
+        MC.run(label,disable_snapshot_metadata=disable_metadata)
+        # Run analysis
+        if analyze:
+            a = ma2.cv2.Time_frequency_analysis(
+                label='Voltage_to_frequency')
+            return a
+
+    def calibrate_flux_arc(
+        self,
+        Times: list = np.arange(20e-9, 40e-9, 1/2.4e9),
+        Amplitudes: list = [-0.4, -0.35, -0.3, 0.3, 0.35, 0.4],
+        update: bool = True,
+        disable_metadata: bool = False,
+        prepare_for_timedomain: bool = True):
+        """
+        Calibrates the polynomial coeficients for flux (voltage) 
+        to frequency conversion. Does so by measuring cryoscope traces
+        at different amplitudes.
+        Args:
+            Times: 
+                Flux pulse durations used to measure each
+                cryoscope trace.
+            Amplitudes: 
+                DAC amplitudes of flux pulse used for each
+                cryoscope trace.
+        """
+        assert self.ro_acq_weight_type()=='optimal'
+        nested_MC = self.instr_nested_MC.get_instr()
+        fl_lutman = self.instr_LutMan_Flux.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+            fl_lutman.load_waveforms_onto_AWG_lookuptable()
+        sw_function = swf.FLsweep(fl_lutman, fl_lutman.sq_amp,
+                          waveform_name="square")
+        nested_MC.set_sweep_function(sw_function)
+        nested_MC.set_sweep_points(Amplitudes)
+        def wrapper():
+            a = self.measure_flux_frequency_timedomain(
+                times = Times,
+                disable_metadata=True,
+                prepare_for_timedomain=False)
+            return {'detuning':a.proc_data_dict['detuning']}
+        d = det.Function_Detector(
+            wrapper,
+            result_keys=['detuning'],
+            value_names=['detuning'],
+            value_units=['Hz'])
+        nested_MC.set_detector_function(d)
+        label = f'Voltage_frequency_arc_{self.name}'
+        nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
+        a = ma2.cv2.Flux_arc_analysis(label='Voltage_frequency_arc',
+                    channel_amp=fl_lutman.cfg_awg_channel_amplitude(),
+                    channel_range=fl_lutman.cfg_awg_channel_range())
+        # Update detuning polynomial coeficients
+        if update:
+            p_coefs = a.qoi['P_coefs']
+            fl_lutman.q_polycoeffs_freq_01_det(p_coefs)
+        return a
+
     ###########################################################################
     # Dep graph check functions
     ###########################################################################
