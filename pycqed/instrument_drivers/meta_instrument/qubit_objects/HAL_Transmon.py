@@ -2449,8 +2449,8 @@ class HAL_Transmon(HAL_ShimSQ):
         # fixme: deviding the weight functions by four to not have overflow in
         # thresholding of the UHFQC
         weight_scale_factor = 1. / (4 * np.max([maxI, maxQ]))
-        optimized_weights_I = np.array(weight_scale_factor * optimized_weights_I)
-        optimized_weights_Q = np.array(weight_scale_factor * optimized_weights_Q)
+        W_func_I = np.array(weight_scale_factor * optimized_weights_I)
+        W_func_Q = np.array(weight_scale_factor * optimized_weights_Q)
 
         # Smooth optimal weight functions
         T = np.arange(len(W_func_I))/1.8e9
