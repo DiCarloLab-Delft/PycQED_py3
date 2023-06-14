@@ -46,24 +46,39 @@ class WitnessResAnalysis(ba.BaseDataAnalysis):
         'Qe': ('Analysis/reso_fit/params/Qe', 'attr:value'),
         'f0': ('Analysis/reso_fit/params/f0', 'attr:value'),
         'phi_0': ('Analysis/reso_fit/params/phi_0', 'attr:value'),
-        'phi_v': ('Analysis/reso_fit/params/phi_v', 'attr:value'),
-        'slope': ('Analysis/reso_fit/params/slope', 'attr:value'),
+        # 'phi_v': ('Analysis/reso_fit/params/phi_v', 'attr:value'),
+        # 'slope': ('Analysis/reso_fit/params/slope', 'attr:value'),
         'theta': ('Analysis/reso_fit/params/theta', 'attr:value'),
-        'power': ('Instrument settings/VNA', 'attr:power')}
+        # 'power': ('Instrument settings/VNA', 'attr:power')
+                      }
 
         fit_individual_linescans = self.options_dict.get('fit_individual_linescans', False)
 
         for ts in self.timestamps:
 
             if fit_individual_linescans:
-                a = ma2.VNA_analysis(auto=True,
+                a = VNA_analysis(auto=True,
                      t_start=ts,
                      options_dict={'fit_options':{'model':'complex'},
                                    'plot_init': False})
 
             data_fp = a_tools.get_datafilepath_from_timestamp(ts)
 
+            if data_fp.split('_')[-3][0] == 'm' and data_fp.split('_')[-3][1] == '0':
+                power = 0
+            elif data_fp.split('_')[-3][0] == 'm':
+                power = -1*float(data_fp.split('_')[-3][1:3])
+            elif data_fp.split('_')[-3][0] == '0':
+                power = 0
+            else:
+                power = float(data_fp.split('_')[-3][:2])
+
             self.raw_data_dict[ts] = h5d.extract_pars_from_datafile(data_fp, param_spec)
+            self.raw_data_dict[ts]['power'] = power
+
+
+
+            # power = data_fp
 
         # Parts added to be compatible with base analysis data requirements
         self.raw_data_dict['timestamps'] = self.timestamps
@@ -162,6 +177,242 @@ class WitnessResAnalysis(ba.BaseDataAnalysis):
                 'label': self.labels[0]
             }
 
+class VNA_analysis(ma2.complex_spectroscopy):
+    '''
+    Performs as fit to the resonance using data acquired using VNA R&S ZNB 20
+
+    eg. to use complex model:
+    ma2.VNA_analysis(t_start='20010101_213600',
+            options_dict={'fit_options': {'model': 'complex'}})
+    '''
+    def __init__(self, t_start,
+                 options_dict=None,
+                 t_stop=None,
+                 do_fitting=True,
+                 extract_only=False,
+                 auto=True):
+        super(VNA_analysis, self).__init__(t_start, t_stop=t_stop,
+                                           options_dict=options_dict,
+                                           extract_only=extract_only,
+                                           auto=auto,
+                                           do_fitting=do_fitting)
+
+    def process_data(self):
+        super(VNA_analysis, self).process_data()
+
+    def run_fitting(self):
+        super().run_fitting()
+
+        freq = self.fit_dicts['reso_fit']['fit_res'].params['f0']
+        Q = self.fit_dicts['reso_fit']['fit_res'].params['Q']
+        Qe = self.fit_dicts['reso_fit']['fit_res'].params['Qe']
+        theta = self.fit_dicts['reso_fit']['fit_res'].params['theta']
+
+        Qc = 1/np.real(1/(Qe.value*np.exp(1j*theta.value)))
+        Qi = 1/(1/Q.value - 1/Qc)
+        # FIXME: replace if statement with .format_value string which can handle None values as stderr
+        if ((freq.stderr==None)):
+            msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.value/1e6)
+            msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.value/1e3)
+            msg += '\n'
+            msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+            msg += '\n'
+            msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+            msg += '\n'
+            msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
+
+            self.proc_data_dict['complex_fit_msg'] = msg
+            # print('Fitting went wrong')
+        else:
+            msg = '$f_0 = {:.6g}\pm{:.2g}$ MHz\n'.format(freq.value/1e6,freq.stderr/1e6)
+            msg += r'$Q = {:.4g}\pm{:.2g}$ $\times 10^3$'.format(Q.value/1e3,Q.stderr/1e3)
+            msg += '\n'
+            msg += r'$Q_c = {:.4g}$ $\times 10^3$'.format(Qc/1e3)
+            msg += '\n'
+            msg += r'$Q_e = {:.4g}$ $\times 10^3$'.format(Qe.value/1e3)
+            msg += '\n'
+            msg += r'$Q_i = {:.4g}$ $\times 10^3$'.format(Qi/1e3)
+
+            self.proc_data_dict['complex_fit_msg'] = msg
+
+    def prepare_plots(self):
+        super(VNA_analysis, self).prepare_plots()
+        if self.do_fitting:
+            self.plot_dicts['reso_fit_amp'] = {
+                'ax_id': 'amp',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
+                'output_mod_fn':np.abs,
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'hanger',
+                'line_kws': {'color': 'r'},
+                'do_legend': True}
+
+            self.plot_dicts['reso_fit_real'] = {
+                'ax_id': 'real',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
+                'output_mod_fn':np.real,
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'hanger',
+                'line_kws': {'color': 'r'},
+                'do_legend': True}
+
+            self.plot_dicts['reso_fit_imag'] = {
+                'ax_id': 'imag',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
+                'output_mod_fn':np.imag,
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'hanger',
+                'line_kws': {'color': 'r'},
+                'do_legend': True}
+
+            self.plot_dicts['reso_fit_phase'] = {
+                'ax_id': 'phase',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
+                'output_mod_fn':lambda a: np.unwrap(np.angle(a)),
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'hanger',
+                'line_kws': {'color': 'r'},
+                'do_legend': True}
+
+            self.plot_dicts['reso_fit_plane'] = {
+                'ax_id': 'plane',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
+                'output_mod_fn': np.imag,
+                'output_mod_fn_x': np.real,
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'hanger',
+                'line_kws': {'color': 'r'},
+                'do_legend': True}
+
+            self.plot_dicts['plane_text'] = {
+                                        'plotfn': self.plot_text,
+                                        'text_string': self.proc_data_dict['complex_fit_msg'],
+                                        'xpos': 1.05, 'ypos': .6, 'ax_id': 'plane',
+                                        'horizontalalignment': 'left'}
+
+
+    def prepare_fitting(self):
+        # Fitting function for one data trace. The fitted data can be
+        # either complex, amp(litude) or phase. The fitting models are
+        # HangerFuncAmplitude, HangerFuncComplex,
+        # PolyBgHangerFuncAmplitude, SlopedHangerFuncAmplitude,
+        # SlopedHangerFuncComplex.
+        fit_options = self.options_dict.get('fit_options', None)
+        subtract_background = self.options_dict.get(
+            'subtract_background', False)
+        if fit_options is None:
+            fitting_model = 'hanger'
+        else:
+            fitting_model = fit_options['model']
+        if subtract_background:
+            self.do_subtract_background(thres=self.options_dict['background_thres'],
+                                        back_dict=self.options_dict['background_dict'])
+        if fitting_model == 'hanger':
+            fit_fn = fit_mods.SlopedHangerFuncAmplitude
+            fit_guess_fn = fit_mods.SlopedHangerFuncAmplitudeGuess
+        elif fitting_model == 'simple_hanger':
+            fit_fn = fit_mods.HangerFuncAmplitude
+            raise NotImplementedError(
+                'This functions guess function is not coded up yet')
+            # TODO HangerFuncAmplitude Guess
+        elif fitting_model == 'lorentzian':
+            raise NotImplementedError(
+                'This functions guess function is not coded up yet')
+            fit_fn = fit_mods.Lorentzian
+            # TODO LorentzianGuess
+        elif fitting_model == 'complex':
+            ## TODO makes something that returns guesspars
+
+            hanger_fit = VNA_analysis(self.timestamps,
+                                         do_fitting= True,
+                                         options_dict= {'fit_options':
+                                                        {'model':'hanger'}},
+                                         extract_only= True)
+            hanger_fit_res = hanger_fit.fit_dicts['reso_fit']['fit_res']
+
+            complex_guess = {key:{'value':val} for key,val in hanger_fit_res.best_values.items()}
+            complex_guess['f0'] = {'value':complex_guess['f0']['value']*1e9,
+                        'min':self.proc_data_dict['plot_frequency'][0],
+                        'max':self.proc_data_dict['plot_frequency'][-1], 'vary': False}
+            complex_guess['Q'] = {'value':complex_guess['Q']['value'],
+                        'min':complex_guess['Q']['value']*0.5,
+                        'max':complex_guess['Q']['value']*2, 'vary': True}
+
+            complex_guess['Qe']['vary'] = True
+            complex_guess['theta']['vary'] = True
+            complex_guess['A']['vary'] = True
+
+            # '''
+            # Here we estimate the phase velocity and the initial phase based
+            # on the first and last 5% of data points in the scan
+            # '''
+            # num_fit_points = int(len(self.proc_data_dict['plot_frequency'])/100.)
+            # phase_data = np.hstack([np.unwrap(self.proc_data_dict['plot_phase'])[:num_fit_points],
+            #                 np.unwrap(self.proc_data_dict['plot_phase'][-num_fit_points:])])
+            # freq_data = np.hstack([self.proc_data_dict['plot_frequency'][:num_fit_points],
+            #                 self.proc_data_dict['plot_frequency'][-num_fit_points:]])
+            # lin_pars = np.polyfit(freq_data,phase_data,1)
+            # phase_v, phase_0 = lin_pars
+            #
+            # if np.sign(phase_v)==-1:
+            #     min_phase_v = -1.05*np.abs(phase_v)
+            #     max_phase_v = -0.95*np.abs(phase_v)
+            # else:
+            #     min_phase_v = 0.95*np.abs(phase_v)
+            #     max_phase_v = 1.05*np.abs(phase_v)
+            complex_guess['phi_0'] = {'value':-np.pi/2, 'min':-2*np.pi,
+                                            'max':2*np.pi, 'vary': True}
+
+            # complex_guess['phi_v'] = {'value': phase_v, 'min': min_phase_v,
+            #                           'max': max_phase_v, 'vary':False}
+            # complex_guess['phi_0'] = {'value': phase_0%(2*np.pi), 'min': -2 * np.pi,
+            #                           'max': 2 * np.pi, 'vary':False}
+            del complex_guess['slope']
+
+            def test_func(f, f0, Q, Qe,A, theta, phi_0):
+
+                slope_corr = 1# (1 + slope * (f - f0) / f0)
+                # propagation_delay_corr = np.exp(1j * (phi_v * f + phi_0))
+                propagation_delay_corr = np.exp(1j * (phi_0))
+                hanger_contribution = (1 - Q / Qe * np.exp(1j * theta) /
+                                       (1 + 2.j * Q * (f - f0) / f0))
+                S21 = A * slope_corr * hanger_contribution * propagation_delay_corr
+
+                return S21
+
+            # fit_fn = fit_mods.hanger_func_complex_SI
+            fit_fn = test_func
+
+
+        if len(self.raw_data_dict['timestamps']) == 1:
+            if fitting_model == 'complex':
+                ### do the initial guess
+                complex_data = np.add(self.proc_data_dict['real'],1.j*self.proc_data_dict['imag'])
+                self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
+                                              'guess_dict':complex_guess,
+                                              'fit_yvals': {'data': complex_data},
+                                              'fit_xvals': {'f': self.proc_data_dict['plot_frequency']},
+                                              'fitting_type':'minimize'}
+            else:
+                self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
+                                              'fit_guess_fn': fit_guess_fn,
+                                              'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
+                                              'fit_xvals': {'f': self.proc_data_dict['plot_frequency']}
+                                              }
+        else:
+            self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
+                                          'fit_guess_fn': fit_guess_fn,
+                                          'fit_yvals': [{'data': np.squeeze(tt)} for tt in self.plot_amp],
+                                          'fit_xvals': np.squeeze([{'f': tt[0]} for tt in self.plot_frequency])}
+
+    def analyze_fit_results(self):
+        pass
+
 
 
 def power_Q_plots(Power,
@@ -181,7 +432,7 @@ def power_Q_plots(Power,
 
     axs.plot(Power[:],Intrinsic_Q[:],marker='o',label = 'Qi')
     axs.plot(Power,Coupling_Q,marker='o',label = 'Qc')
-    axs.set_ylim(.5e5,3e6)
+    axs.set_ylim(.5e5,10e6)
     axs.set_yscale('log')
     axs.legend(fontsize=12)
     axs.set_xlabel('VNA power (dBm)', fontsize=13)
@@ -190,10 +441,11 @@ def power_Q_plots(Power,
     axs.yaxis.set_label_position('left')
     fig.suptitle(f'Power dependency of quality factor for {label}\nts_start = {t_start} to ts_stop = {t_stop}')
     text_str = f'$f_0$ = {freq/1e9:.4f} GHz\n$Q_i$ @ {min(Power)} dBm = {Qi_low_pow/1e3:.1f}k\n$Q_i$ @ {max(Power)} dBm = {Qi_high_pow/1e3:.1f}k\n$Q_c$ = {Qc/1e3:.1f}k'
-    func_str = r'$\mathrm{S}_{21}(f) = A \left(1+\alpha\frac{f-f_0}{f_0}\right)\left(1 - \frac{Q\mathrm{e}^{i\theta}}{Q_e(1+2iQ(f-f_0)/f_0)}\right)\mathrm{e}^{i(\phi_v f + \phi_0)}$'
+    # func_str = r'$\mathrm{S}_{21}(f) = A \left(1+\alpha\frac{f-f_0}{f_0}\right)\left(1 - \frac{Q\mathrm{e}^{i\theta}}{Q_e(1+2iQ(f-f_0)/f_0)}\right)\mathrm{e}^{i(\phi_v f + \phi_0)}$'
+    func_str = r'$\mathrm{S}_{21}(f) = A \left(1 - \frac{Q\mathrm{e}^{i\theta}}{Q_e(1+2iQ(f-f_0)/f_0)}\right)\mathrm{e}^{i\phi_0}$'
     fig.text(0.8, 0, text_str, horizontalalignment='center', verticalalignment='top', fontsize=12, bbox=dict(boxstyle='round', pad=.4,
                                     facecolor='white', alpha=0.5))
-    fig.text(0.03, -0.05, func_str, horizontalalignment='left', verticalalignment='top', fontsize=11)
+    fig.text(0.1, -0.05, func_str, horizontalalignment='left', verticalalignment='top', fontsize=11)
     fig.tight_layout()
 
 
@@ -215,7 +467,7 @@ def photnum_Q_plots(Photon_number,
 
     axs.plot(Photon_number[:],Intrinsic_Q[:],marker='o',label = 'Qi')
     axs.plot(Photon_number,Coupling_Q,marker='o',label = 'Qc')
-    axs.set_ylim(.5e5,3e6)
+    axs.set_ylim(.5e5,10e6)
     axs.set_yscale('log')
     axs.set_xscale('log')
     axs.legend(fontsize=12)
@@ -225,9 +477,10 @@ def photnum_Q_plots(Photon_number,
     axs.yaxis.set_label_position('left')
     fig.suptitle(f'Photon number dependency of quality factor for {label}\nTotal feedline attenuation = {att} dBm\nts_start = {t_start} to ts_stop = {t_stop}')
     text_str = f'$f_0$ = {freq/1e9:.4f} GHz\n$Q_i$ @ 1 photon = {Qi_single_photon/1e3:.1f}k\n$Q_c$ @ 1 photon = {Qc_single_photon/1e3:.1f}k\n'+r'$P_{VNA}$'+f' @ 1 photon = {Pow_single_photon} dBm'
-    func_str = r'$\mathrm{S}_{21}(f) = A \left(1+\alpha\frac{f-f_0}{f_0}\right)\left(1 - \frac{Q\mathrm{e}^{i\theta}}{Q_e(1+2iQ(f-f_0)/f_0)}\right)\mathrm{e}^{i(\phi_v f + \phi_0)}$'
+    # func_str = r'$\mathrm{S}_{21}(f) = A \left(1+\alpha\frac{f-f_0}{f_0}\right)\left(1 - \frac{Q\mathrm{e}^{i\theta}}{Q_e(1+2iQ(f-f_0)/f_0)}\right)\mathrm{e}^{i(\phi_v f + \phi_0)}$'
+    func_str = r'$\mathrm{S}_{21}(f) = A \left(1 - \frac{Q\mathrm{e}^{i\theta}}{Q_e(1+2iQ(f-f_0)/f_0)}\right)\mathrm{e}^{i\phi_0}$'
     fig.text(0.8, 0, text_str, horizontalalignment='center', verticalalignment='top', fontsize=12, bbox=dict(boxstyle='round', pad=.4,
                                     facecolor='white', alpha=0.5))
-    fig.text(0.03, -0.05, func_str, horizontalalignment='left', verticalalignment='top', fontsize=10.5)
+    fig.text(0.1, -0.05, func_str, horizontalalignment='left', verticalalignment='top', fontsize=10.5)
     
     fig.tight_layout()

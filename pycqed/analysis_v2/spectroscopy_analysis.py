@@ -219,6 +219,7 @@ class complex_spectroscopy(Spectroscopy):
                                                    extract_only=extract_only,
                                                    auto=False,
                                                    do_fitting=do_fitting)
+
         self.params_dict = {'freq_label': 'sweep_name',
                             'freq_unit': 'sweep_unit',
                             'measurementstring': 'measurementstring',
@@ -248,10 +249,20 @@ class complex_spectroscopy(Spectroscopy):
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
-        self.raw_data_dict['real'] = [
-            self.raw_data_dict['measured_values'][0][2]]
-        self.raw_data_dict['imag'] = [
-            self.raw_data_dict['measured_values'][0][3]]
+
+        if len(self.raw_data_dict['measured_values'][0]) > 2:
+            self.raw_data_dict['real'] = [
+                self.raw_data_dict['measured_values'][0][2]]
+            self.raw_data_dict['imag'] = [
+                self.raw_data_dict['measured_values'][0][3]]
+        else:
+
+            self.raw_data_dict['real'] = [10 ** (self.raw_data_dict['measured_values'][0][0] / 20) * np.cos(
+                self.raw_data_dict['measured_values'][0][1])]
+            self.raw_data_dict['imag'] = [10 ** (self.raw_data_dict['measured_values'][0][0] / 20) * np.sin(
+                self.raw_data_dict['measured_values'][0][1])]
+            self.proc_data_dict['plot_amp'] = 10**(self.proc_data_dict['plot_amp']/20)
+            self.proc_data_dict['amp_label']
         self.proc_data_dict['real'] = np.array(self.raw_data_dict['real'][0])
         self.proc_data_dict['imag'] = np.array(self.raw_data_dict['imag'][0])
         self.proc_data_dict['plot_real'] = self.proc_data_dict['real']
@@ -525,7 +536,6 @@ class VNA_analysis(complex_spectroscopy):
                                             'max':2*np.pi}
 
             fit_fn = fit_mods.hanger_func_complex_SI
-
 
 
         if len(self.raw_data_dict['timestamps']) == 1:
