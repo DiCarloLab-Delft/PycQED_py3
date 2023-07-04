@@ -4062,7 +4062,7 @@ class CCLight_Transmon(Qubit):
         d = self.int_log_det
         d.nr_shots = nr_shots
         MC.set_detector_function(d)
-        if label == '':
+        if f_state:
             label = 'f'
         MC.run('SSRO_{}{}'.format(label, self.msmt_suffix),
                disable_snapshot_metadata=disable_metadata)
@@ -4433,7 +4433,6 @@ class CCLight_Transmon(Qubit):
         MC.live_plot_enabled(False)
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
-        print(nr_shots)
         MC.set_detector_function(d)
         MC.run(
             f"Measurement_butterfly_{self.name}_{f_state}",
@@ -5489,6 +5488,7 @@ class CCLight_Transmon(Qubit):
             close_fig=True,
             analyze=True,
             disable_metadata: bool = False,
+            T1_VS_flux : bool = False,
             MC=None,
             ):
         """
@@ -5509,6 +5509,7 @@ class CCLight_Transmon(Qubit):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         p = sqo.T1(qubit_idx=self.cfg_qubit_nr(),
+                    T1_VS_flux = T1_VS_flux,
                     platf_cfg=self.cfg_openql_platform_fn(),
                     times=times)
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -5564,12 +5565,10 @@ class CCLight_Transmon(Qubit):
             times: List[float]=None, 
             artificial_detuning: float=None,
             freq_qubit: float=None,
-            nr_cz_instead_of_idle_time: List[int]=None,
-            qb_cz_instead_of_idle_time: str=None,
-            cw_cz_instead_of_idle_time: str='cz',
             label: str='',
             MC=None,
             prepare_for_timedomain=True,
+            T2_VS_flux : bool = False,
             analyze=True, 
             update=True,
             double_fit=False,
@@ -5583,31 +5582,15 @@ class CCLight_Transmon(Qubit):
         # the CCL transmon.
 
         """
-        # if times and nr_cz_instead_of_idle_time.all():
-        #     raise ValueError("Either idle time or CZ mode must be chosen!")
-
-        if nr_cz_instead_of_idle_time is not None \
-                and not qb_cz_instead_of_idle_time \
-                and cw_cz_instead_of_idle_time.lower() == 'cz':
-            raise ValueError("If CZ instead of idle time should be used, qubit to apply CZ to must be given!")
-        
-        if qb_cz_instead_of_idle_time:
-            qb_cz_idx = self.find_instrument(qb_cz_instead_of_idle_time).cfg_qubit_nr()
-
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         if times is None:
-            if nr_cz_instead_of_idle_time is not None:
-                # convert given numbers of CZs into time
-                # NOTE: CZ time hardcoded to 40ns!
-                times = np.array(nr_cz_instead_of_idle_time) * 40e-9
-            else:
-                # funny default is because there is no real time sideband modulation
-                stepsize = max( (self.T2_star()*4/61)//abs(self.cfg_cycle_time())*abs(self.cfg_cycle_time()), 
-                                40e-9)
-                # default timing: 4 x current T2*
-                times = np.arange(0, self.T2_star()*4, stepsize)
+            # funny default is because there is no real time sideband modulation
+            stepsize = max( (self.T2_star()*4/61)//abs(self.cfg_cycle_time())*abs(self.cfg_cycle_time()), 
+                            40e-9)
+            # default timing: 4 x current T2*
+            times = np.arange(0, self.T2_star()*4, stepsize)
 
         # append the calibration points, times are for location in plot
         dt = times[1] - times[0]
@@ -5635,9 +5618,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.Ramsey(qubit_idx=self.cfg_qubit_nr(),
                         platf_cfg=self.cfg_openql_platform_fn(),
                         times=times,
-                        nr_cz_instead_of_idle_time=nr_cz_instead_of_idle_time,
-                        qb_cz_idx=qb_cz_idx if qb_cz_instead_of_idle_time else None,
-                        cw_cz_instead_of_idle_time=cw_cz_instead_of_idle_time)
+                        T2_VS_flux=T2_VS_flux)
 
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),

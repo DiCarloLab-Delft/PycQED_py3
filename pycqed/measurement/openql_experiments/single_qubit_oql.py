@@ -355,7 +355,7 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
             k.prepz(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
-            k.gate('wait', [qubit_idx], 300)
+            k.gate('wait', [qubit_idx], 1000) # Time for UHFQC to re-trigger
             k.measure(qubit_idx)
             p.add_kernel(k)
 
@@ -364,7 +364,7 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
             k.measure(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
-            k.gate('wait', [qubit_idx], 300)
+            k.gate('wait', [qubit_idx], 1000) # Time for UHFQC to re-trigger
             k.measure(qubit_idx)
             p.add_kernel(k)
 
@@ -373,7 +373,7 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
             k.gate('rx180', [qubit_idx])
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
-            k.gate('wait', [qubit_idx], 300)
+            k.gate('wait', [qubit_idx], 1000) # Time for UHFQC to re-trigger
             k.measure(qubit_idx)
             p.add_kernel(k)
 
@@ -383,7 +383,7 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
             k.measure(qubit_idx)
             k.gate(xy[0], [qubit_idx])
             k.gate(xy[1], [qubit_idx])
-            k.gate('wait', [qubit_idx], 300)
+            k.gate('wait', [qubit_idx], 1000) # Time for UHFQC to re-trigger
             k.measure(qubit_idx)
             p.add_kernel(k)
 
@@ -392,7 +392,8 @@ def depletion_AllXY(qubit_idx: int, platf_cfg: str):
 
 
 def T1(qubit_idx: int,
-        platf_cfg: str, 
+        platf_cfg: str,
+        T1_VS_flux : bool, 
         times: List[float]):
     """
     Single qubit T1 sequence.
@@ -414,9 +415,16 @@ def T1(qubit_idx: int,
         k = p.create_kernel('T1_{}'.format(i))
         k.prepz(qubit_idx)
         k.gate('rx180', [qubit_idx])
-
         wait_nanoseconds = int(round(time/1e-9))
-        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        # check if one want T1 Vs. freq or not
+        if not T1_VS_flux:
+            k.gate("wait", [qubit_idx], wait_nanoseconds)
+        else:
+            # print(f'number of flux cw = {int(wait_nanoseconds/60)}')
+            for i in range(int(wait_nanoseconds/60)):
+                k.gate("sf_park", [qubit_idx])
+                k.gate("i", [qubit_idx])
+            k.gate("wait", [qubit_idx], 0)
         
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -475,10 +483,8 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str) -> OqlProgram
 def Ramsey(
         qubit_idx: int, 
         platf_cfg: str,
-        times: List[float], 
-        nr_cz_instead_of_idle_time: List[int]=None,
-        qb_cz_idx: str=None,
-        cw_cz_instead_of_idle_time: str='cz'
+        times: List[float],
+        T2_VS_flux : bool,
     ):
     """
     Single qubit Ramsey sequence.
@@ -499,18 +505,15 @@ def Ramsey(
         k = p.create_kernel("Ramsey_{}".format(i))
         k.prepz(qubit_idx)
         k.gate('rx90', [qubit_idx])
-
-        if nr_cz_instead_of_idle_time is not None:
-            for n in range(nr_cz_instead_of_idle_time[i]):
-                if cw_cz_instead_of_idle_time.lower() is 'cz':
-                    k.gate("cz", [qubit_idx, qb_cz_idx])
-                else:
-                    k.gate(cw_cz_instead_of_idle_time, [0])
-            k.gate("wait", [], 0)  # alignment 
-        else:
-            wait_nanoseconds = int(round(time/1e-9))
+        wait_nanoseconds = int(round(time/1e-9))
+        if not T2_VS_flux:
             k.gate("wait", [qubit_idx], wait_nanoseconds)
-
+        else:
+            # print(f'number of flux cw = {int(wait_nanoseconds/60)}')
+            for i in range(int(wait_nanoseconds/60)):
+                k.gate("sf_park", [qubit_idx])
+                k.gate("i", [qubit_idx])
+            k.gate("wait", [qubit_idx], 0)
         k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -1649,7 +1652,10 @@ def LRU_experiment(
     k.gate("wait", [])
     for qb_idx in [qubit_idx]:
     # for qb_idx in [15,13,16,7,14,12,10]:
-        k.gate('lru', [qb_idx])
+        # k.gate('lru', [qb_idx])
+        # k.gate('i', [qb_idx])
+        # k.gate('i', [qb_idx])
+        k.gate('sf_park', [qb_idx])
     k.gate("wait", [], LRU_duration_ns-20)
     k.measure(qubit_idx)
     p.add_kernel(k)

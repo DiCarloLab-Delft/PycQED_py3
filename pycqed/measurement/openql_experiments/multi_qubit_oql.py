@@ -883,25 +883,19 @@ def Chevron(
     if flux_cw is None:
         flux_cw = 2
     flux_cw_name = _def_lm_flux[flux_cw]['name'].lower()
-
     k = p.create_kernel("Chevron")
     k.prepz(qubit_idx)
     k.prepz(qubit_idx_spec)
-
     spec_gate_dict = {
         "ramsey": "rx90",
         "excited": "rx180",
         "ground": "i"
     }
-
     spec_gate = spec_gate_dict[target_qubit_sequence]
-
     k.gate(spec_gate, [qubit_idx_spec])
     k.gate('rx180', [qubit_idx])
-
     if buffer_nanoseconds > 0:
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
-
     # For CCLight
     if cc.upper() == 'CCL':
         k.barrier([])  # alignment workaround
@@ -920,12 +914,10 @@ def Chevron(
         k.barrier([])  # alignment workaround
     else:
         raise ValueError('CC type not understood: {}'.format(cc))
-
     if buffer_nanoseconds2 > 0:
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
-
     k.gate('rx180', [qubit_idx])
-    k.gate('rx180', [qubit_idx_spec])
+    k.gate(spec_gate, [qubit_idx_spec])
 
     if recover_q_spec:
         k.gate(spec_gate, [qubit_idx_spec])
@@ -3756,7 +3748,7 @@ def repeated_stabilizer_data_measurement_sequence(
                 k.measure(q)
             for q in _remaining_ancillas+[Q_anc]:
                 k.measure(q)
-            k.gate('wait', [], 300)
+            k.gate('wait', [], 360)
             if initial_state_qubits:
                 for q_name in initial_state_qubits:
                     k.gate('rx180', [data_qubit_map[q_name]])
@@ -3816,7 +3808,11 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
                         k.gate('rX180', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -3985,10 +3981,19 @@ def repeated_stabilizer_data_measurement_sequence(
                 k.measure(q)
             for q in _remaining_ancillas+[Q_anc]:
                 k.measure(q)
-            k.gate('wait', [], 300)
+            k.gate('wait', [], 360)
             if initial_state_qubits:
-                for q_name in initial_state_qubits:
-                    k.gate('rx180', [data_qubit_map[q_name]])
+                if stabilizer_type == 'Z':
+                    for q_name in initial_state_qubits:
+                        k.gate('rx180', [data_qubit_map[q_name]])
+                elif stabilizer_type == 'X':
+                    if q_name in data_qubit_map.keys():
+                        for q_name in initial_state_qubits:
+                            k.gate('ry90', [data_qubit_map[q_name]])
+                    else: 
+                        k.gate('rym90', [data_qubit_map[q_name]])
+                else:
+                    raise ValueError('Only Z and X type allowed.')
                 k.barrier([])
             # QEC Rounds 
             for i in range(n_rounds):
@@ -4042,11 +4047,9 @@ def repeated_stabilizer_data_measurement_sequence(
                 else:
                     for q in data_idxs:
                         # Measurement Echo
-                        if q == 13 or q == 15 or q == 16:
-                            k.gate('cw_10', [q])
-                        else:
-                            k.gate('i', [q])
-                        # k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -4067,9 +4070,10 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
                 k.gate("wait", [], 0)
             p.add_kernel(k)
-
 
         if 'surface_13_LRU' in experiments:
             k = p.create_kernel(f'Surface_13_LRU_seq_{n_rounds}rounds')
@@ -4325,7 +4329,7 @@ def repeated_stabilizer_data_measurement_sequence(
         k.measure(q)
     for q in _remaining_ancillas+[Q_anc]:
         k.measure(q)
-    k.gate('wait', [], 300)
+    k.gate('wait', [], 360)
     for q in data_idxs:
         k.measure(q)
     for q in _remaining_ancillas+[Q_anc]:
@@ -4338,7 +4342,7 @@ def repeated_stabilizer_data_measurement_sequence(
         k.measure(q)
     for q in _remaining_ancillas+[Q_anc]:
         k.measure(q)
-    k.gate('wait', [], 300)
+    k.gate('wait', [], 360)
     for q in data_idxs+_remaining_ancillas+[Q_anc]:
         k.gate('rx180', [q])
         k.measure(q)
@@ -4352,7 +4356,7 @@ def repeated_stabilizer_data_measurement_sequence(
         k.measure(q)
     for q in _remaining_ancillas+[Q_anc]:
         k.measure(q)
-    k.gate('wait', [], 300)
+    k.gate('wait', [], 360)
     for q in data_idxs+_remaining_ancillas+[Q_anc]:
         k.gate('rx180', [q])
         k.gate('rx12', [q])

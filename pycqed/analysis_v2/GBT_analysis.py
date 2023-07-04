@@ -177,6 +177,9 @@ class SingleQubitGBT_analysis(ba.BaseDataAnalysis):
 				'row': 5,
 				'n': _n,
 			}
+		n_plts = len(self.Qubits)
+		fig.suptitle(f'{self.timestamp}\nSingle-qubit performance', x=0.125+n_plts/2*0.775*1.3, y=2.8, size=18)
+
 
 	def run_post_extract(self):
 		self.prepare_plots()  # specify default plots
@@ -480,7 +483,7 @@ class TwoQubitGBT_analysis(ba.BaseDataAnalysis):
 			X1_int = a.raw_data_dict['analyses']['int'].proc_data_dict['X1']['2Q']
 			TQG_err = a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].nominal_value
 			L1_err = a.proc_data_dict['quantities_of_interest']['L1_CZ'].nominal_value
-			self.raw_data_dict[(q0, q1)] = {'N_clf':N_clf, 'M_ref':M_ref, 'M_int':M_int, 'TQG_err':TQG_err,
+			self.raw_data_dict[(q0, q1)] = {'N_clf':N_clf, 'M_ref':M_ref, 'M_int':M_int, 'TQG_err':abs(TQG_err),
 											'X1_ref':X1_ref, 'X1_int':X1_int, 'L1_err':L1_err,}
 
 	def process_data(self):
@@ -519,6 +522,8 @@ class TwoQubitGBT_analysis(ba.BaseDataAnalysis):
 				'row': 1,
 				'n': _n,
 			}
+		n_plts = len(self.Qubit_pairs)
+		fig.suptitle(f'{self.timestamp}\nTwo-qubit gate performance', x=0.125+n_plts/2*0.775*1.3, y=1.35, size=18)
 
 	def run_post_extract(self):
 		self.prepare_plots()  # specify default plots
@@ -532,7 +537,6 @@ def _add_twoQ_plot(Qubits, n, fig, axs):
     n_plts = len(axs.keys()) 
     ax = fig.add_subplot(10,10,n_plts+1)
     _pos = ax.get_position()
-    # pos = [_pos.x0 + n_plts*_pos.width*1.3, _pos.y0, _pos.width, _pos.width/3*n]
     pos = [0.125 + n_plts*0.775*1.3, 0.11, 0.775, 0.775/3*n]
     ax.set_position(pos)
     axs[Qubits] = ax

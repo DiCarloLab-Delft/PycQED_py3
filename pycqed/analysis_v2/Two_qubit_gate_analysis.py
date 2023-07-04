@@ -2,12 +2,15 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pycqed.analysis_v2.base_analysis as ba
-from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
+from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp,\
+                                             get_timestamps_in_range
 import pycqed.measurement.hdf5_data as h5d
 from matplotlib.colors import to_rgba, LogNorm
 from pycqed.analysis.tools.plotting import hsluv_anglemap45
 import itertools
 from pycqed.analysis.analysis_toolbox import set_xlabel
+from pycqed.utilities.general import get_gate_directions, get_parking_qubits
+from pycqed.utilities.general import print_exception
 
 
 def Chevron(delta, t, g, delta_0, a, b, phi):
@@ -106,8 +109,9 @@ class Chevron_Analysis(ba.BaseDataAnalysis):
         x, y = np.meshgrid(Detunings, Times)
         z = Pop_L
         # initial guess
+        idx_det0 = np.argmax(np.mean(z, axis=0))
         p0 = [11e6,                 # g
-              np.mean(Detunings),   # delta_0
+              Detunings[idx_det0],  # delta_0
               np.max(z)-np.min(z),  # a
               np.min(z),            # b
               0,                    # phi
@@ -243,6 +247,140 @@ def Chevron_plotfn(
                      linewidths=[1], linestyles=['--'], alpha=alpha)
 
     fig.suptitle(f'{ts}\nChevron {qH}, {qL}', y=.95)
+    fig.tight_layout()
+
+
+class TLS_landscape_Analysis(ba.BaseDataAnalysis):
+    """
+    Analysis for TLS landscape
+    """
+    def __init__(self,
+                 Q_freq: float,
+                 Poly_coefs: float,
+                 Out_range: float = 5,
+                 DAC_amp: float = 0.5,
+                 interaction_freqs: dict = None,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True):
+
+        super().__init__(t_start=t_start, 
+                         t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.Out_range = Out_range
+        self.DAC_amp = DAC_amp
+        self.Poly_coefs = Poly_coefs
+        self.Q_freq = Q_freq
+        self.interaction_freqs = interaction_freqs
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+                             data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        # Get qubit names
+        self.Q_name = self.raw_data_dict['folder'].split(' ')[-3]
+        self.proc_data_dict = {}
+        # Sort data
+        Amps = np.unique(self.raw_data_dict['data'][:,0])
+        Times = np.unique(self.raw_data_dict['data'][:,1])
+        Pop = self.raw_data_dict['data'][:,2]
+        nx, ny = len(Amps), len(Times)
+        Pop = Pop.reshape(ny, nx)
+        # Convert amplitude to detuning (frequency)
+        P_func = np.poly1d(self.Poly_coefs)
+        Out_voltage = Amps*self.DAC_amp*self.Out_range/2
+        Detunings = P_func(Out_voltage)
+        # Save data
+        self.proc_data_dict['Out_voltage'] = Out_voltage
+        self.proc_data_dict['Detunings'] = Detunings
+        self.proc_data_dict['Times'] = Times
+        self.proc_data_dict['Pop'] = Pop
+    
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, ax = plt.subplots(figsize=(10,4), dpi=100)
+        self.figs[f'TLS_landscape'] = fig
+        self.axs_dict[f'TLS_landscape'] = ax
+        self.plot_dicts[f'TLS_landscape']={
+            'plotfn': TLS_landscape_plotfn,
+            'ax_id': f'TLS_landscape',
+            'Detunings' : self.proc_data_dict['Detunings'],
+            'Out_voltage' : self.proc_data_dict['Out_voltage'],
+            'Times' : self.proc_data_dict['Times'],
+            'Pop' : self.proc_data_dict['Pop'],
+            'Q_name' : self.Q_name,
+            'Q_freq' : self.Q_freq,
+            'interaction_freqs' : self.interaction_freqs,
+            'ts' : self.timestamp,
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def TLS_landscape_plotfn(
+    ax,
+    Q_name, 
+    Q_freq,
+    Detunings,
+    Out_voltage,
+    Times,
+    Pop,
+    ts,
+    interaction_freqs=None,
+    **kw):
+    fig = ax.get_figure()
+    # Chevrons plot
+    def get_plot_axis(vals, rang=None):
+        if len(vals)>1:
+            dx = vals[1]-vals[0]
+            X = np.concatenate((vals, [vals[-1]+dx])) - dx/2
+        else:
+            X = vals
+        return X
+    Detunings = get_plot_axis(Detunings)
+    Times = get_plot_axis(Times)
+    # Frequency qubit population
+    vmax = min([1, np.max(Pop)])
+    vmax = max([vmax, 0.15])
+    im = ax.pcolormesh(Detunings*1e-6, Times*1e9, Pop, vmax=vmax)
+    fig.colorbar(im, ax=ax, label='Population')
+    # plot two-qubit gate frequencies:
+    if interaction_freqs:
+        for gate, freq in interaction_freqs.items():
+            if freq > 10e6:
+                ax.axvline(freq*1e-6, color='w', ls='--')
+                ax.text(freq*1e-6, np.mean(Times)*1e9,
+                        f'CZ {gate}', va='center', ha='right',
+                        color='w', rotation=90)
+    ax.set_xlabel(f'{Q_name} detuning (MHz)')
+    ax.set_ylabel('Duration (ns)')
+    ax.set_title(f'Population {Q_name}')
+    axt0 = ax.twiny()
+    axt0.set_xlim((Q_freq*1e-6-np.array(ax.get_xlim()))*1e-3)
+    axt0.set_xlabel(f'{Q_name} Frequency (GHz)')
+    fig.suptitle(f'{ts}\nTLS landscape {Q_name}', y=.95)
     fig.tight_layout()
 
 
@@ -2647,6 +2785,561 @@ def Asymmetry_sweep_plotfn(
     fig.tight_layout()
 
 
+def avoided_crossing_fit_func(x, alpha, J):
+    x_rad = x*2*np.pi
+    J_rad = J*2*np.pi
+    alpha_rad = alpha*2*np.pi
+    w_err = 2*J_rad**2/(x_rad-alpha_rad)
+    # rad_err = np.pi*w_err/(2*np.sqrt(2)*J_rad)
+    rad_err = w_err/(2*J_rad)
+    deg_err = rad_err*180/np.pi
+    return np.mod(deg_err+180 , 360) - 180
+
+class Park_frequency_sweep_analysis(ba.BaseDataAnalysis):
+    """
+    Analysis 
+    """
+    def __init__(self,
+                 qH: str,
+                 qL: str,
+                 qP: str,
+                 Parking_distances: list,
+                 freq_qH: float = None,
+                 alpha_qH: float = None,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True):
+        super().__init__(t_start=t_start, 
+                         t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qH = qH
+        self.qL = qL
+        self.qP = qP
+        self.Parking_distances = Parking_distances
+        self.alpha_qH = alpha_qH
+        self.freq_qH = freq_qH
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+                             data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        self.proc_data_dict = {}
+        self.qoi = {}
+        # Sort data
+        Amps = self.raw_data_dict['data'][:,0]
+        # qH single qubit phases with qP in 0 or 1 ("_s") 
+        Phi   = self.raw_data_dict['data'][:,1]
+        Phi_s = self.raw_data_dict['data'][:,2]
+        Delta_phi = self.raw_data_dict['data'][:,3]
+        # Conditional phases between qH and qL with qP in 0 or 1 ("_s")
+        Phi_cond   = self.raw_data_dict['data'][:,4]
+        Phi_cond_s = self.raw_data_dict['data'][:,5]
+        Delta_phi_cond = self.raw_data_dict['data'][:,6]
+        # Missing fraction of qL with qP in 0 or 1 ("_s")
+        Miss_frac   = self.raw_data_dict['data'][:,7]
+        Miss_frac_s = self.raw_data_dict['data'][:,8]
+        Delta_miss_frac = self.raw_data_dict['data'][:,9]
+        # Fit avoided crossing
+        from scipy.optimize import curve_fit
+        _x = self.Parking_distances[30:]*1+0
+        _y = Delta_phi_cond[30:]*1+0
+        p0 = [600e6, 20e6, 20e6]
+        popt, pcov = curve_fit(avoided_crossing_fit_func, _x, _y,
+                               p0 = p0, bounds=([ _x[0],  5e6,  5e6],
+                                                [_x[-1], 50e6, 50e6]))
+        print(pcov)
+        print(popt)
+        # popt = p0
+        self.proc_data_dict['popt'] = popt
+        # Save data in processed data dict
+        self.proc_data_dict['Phi'] = Phi
+        self.proc_data_dict['Phi_s'] = Phi_s
+        self.proc_data_dict['Delta_phi'] = Delta_phi
+        self.proc_data_dict['Phi_cond'] = Phi_cond
+        self.proc_data_dict['Phi_cond_s'] = Phi_cond_s
+        self.proc_data_dict['Delta_phi_cond'] = Delta_phi_cond
+        self.proc_data_dict['Miss_frac'] = Miss_frac
+        self.proc_data_dict['Miss_frac_s'] = Miss_frac_s
+        self.proc_data_dict['Delta_miss_frac'] = Delta_miss_frac
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, axs = plt.subplots(figsize=(5,5), nrows=2, ncols=2, dpi=100)
+        axs = axs.flatten()
+        self.figs[f'Park_sweep_gate_{self.qH}_{self.qL}_park_{self.qP}'] = fig
+        self.axs_dict['plot_1'] = axs[0]
+        # fig.patch.set_alpha(0)
+        self.plot_dicts[f'Park_sweep_gate_{self.qH}_{self.qL}_park_{self.qP}']={
+                'plotfn': park_sweep_plotfn,
+                'ax_id': 'plot_1',
+                'qH': self.qH,
+                'qL': self.qL,
+                'qP': self.qP,
+                'Parking_distances': self.Parking_distances,
+                'Phi' : self.proc_data_dict['Phi'],
+                'Phi_s' : self.proc_data_dict['Phi_s'],
+                'Delta_phi' : self.proc_data_dict['Delta_phi'],
+                'Phi_cond' : self.proc_data_dict['Phi_cond'],
+                'Phi_cond_s' : self.proc_data_dict['Phi_cond_s'],
+                'Delta_phi_cond' : self.proc_data_dict['Delta_phi_cond'],
+                'Miss_frac' : self.proc_data_dict['Miss_frac'],
+                'Miss_frac_s' : self.proc_data_dict['Miss_frac_s'],
+                'Delta_miss_frac' : self.proc_data_dict['Delta_miss_frac'],
+                'alpha_qH': self.alpha_qH,
+                'popt': self.proc_data_dict['popt'],
+                'timestamp': self.timestamps[0]}
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def park_sweep_plotfn(
+    ax,
+    qH, qL, qP,
+    Parking_distances,
+    Phi, Phi_s, Delta_phi,
+    Phi_cond, Phi_cond_s, Delta_phi_cond,
+    Miss_frac, Miss_frac_s, Delta_miss_frac,
+    timestamp, alpha_qH, popt,
+    **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+    # Plot of single-qubit phase of qH
+    axs[0].plot(Parking_distances*1e-6, Phi_cond, 'C0.')
+    if alpha_qH:
+        axs[0].axvline(-alpha_qH*1e-6, ls='--', color='k', lw=1)
+        axs[0].text(-alpha_qH*1e-6, 180, f'$-\\alpha_{{{qH}}}$',
+                    va='center', ha='center', size=8,
+                    bbox=dict(boxstyle='round', facecolor='w', alpha=1, lw=0))
+    axs[0].set_ylim(-90+180, 90+180)
+    axs[0].set_ylabel(f'$\\phi_\\mathrm{{cond}}^\\mathrm{{{qH},{qL}}}$ (deg)')
+    axs[0].axhline(180, ls='--', color='k', lw=1, alpha=.25, zorder=10)
+    # Plot of qH-qL conditional phase
+    axs[2].plot(Parking_distances*1e-6, Delta_phi, 'C0.')
+    if alpha_qH:
+        axs[2].axvline(-alpha_qH*1e-6, ls='--', color='k', lw=1)
+        axs[2].text(-alpha_qH*1e-6, 0, f'$-\\alpha_{{{qH}}}$',
+                    va='center', ha='center', size=8,
+                    bbox=dict(boxstyle='round', facecolor='w', alpha=1, lw=0))
+    axs[2].set_ylim(-90, 90)
+    axs[2].set_ylabel(f'$\\delta \\phi_\\mathrm{{{qH}}}$ (deg)')
+    axs[2].set_xlabel(f'$\\Delta_\\mathrm{{{qH},{qP}}}$ (MHz)')
+    axs[2].axhline(0, ls='--', color='k', lw=1, alpha=.25, zorder=10)
+    # Plot of qH-qL conditional phase difference for different qP states
+    axs[1].plot(Parking_distances*1e-6, 
+                avoided_crossing_fit_func(Parking_distances, *popt), 'k--')
+    axs[1].plot(Parking_distances*1e-6, Delta_phi_cond, 'C0.')
+    axs[1].set_ylim(-90, 90)
+    axs[1].set_ylabel('$\\delta \\phi_\\mathrm{cond}}$ (deg)')
+    axs[1].axhline(0, ls='--', color='k', lw=1, alpha=.25, zorder=10)
+    # Plot of Missing fractions
+    axs[3].plot(Parking_distances*1e-6, Miss_frac/2, 'C0-', alpha=.25, label='$L_{{1_{{|0\\rangle_P}}}}$')
+    axs[3].plot(Parking_distances*1e-6, Miss_frac_s/2, 'C3-', alpha=.25, label='$L_{{1_{{|1\\rangle_P}}}}$')
+    axs[3].plot(Parking_distances*1e-6, np.abs(Delta_miss_frac)/2, 'C0.')
+    axs[3].set_xlabel(f'$\\Delta_\\mathrm{{{qH},{qP}}}$ (MHz)')
+    axs[3].set_ylabel('$|\\delta L_1|$')
+    axs[3].legend(frameon=False)
+    # twin axes for qL-qP detuning
+    ax0 = axs[0].twiny()
+    ax0.set_xlim(np.array(axs[0].get_xlim())-300)
+    ax0.set_xlabel(f'$\\Delta_\\mathrm{{{qL},{qP}}}$ (MHz)')
+    ax1 = axs[1].twiny()
+    ax1.set_xlim(np.array(axs[1].get_xlim())-300)
+    ax1.set_xlabel(f'$\\Delta_\\mathrm{{{qL},{qP}}}$ (MHz)')
+    ax2 = axs[2].twiny()
+    ax2.set_xlim(np.array(axs[2].get_xlim()))
+    ax2.set_xticklabels([])
+    ax3 = axs[3].twiny()
+    ax3.set_xlim(np.array(axs[3].get_xlim()))
+    ax3.set_xticklabels([])
+    # Adjust positions of axis
+    pos = axs[0].get_position()
+    axs[0].set_position([pos.x0, pos.y0, pos.width, pos.height])
+    pos = axs[1].get_position()
+    axs[1].set_position([pos.x0+.1, pos.y0, pos.width, pos.height])
+    pos = axs[2].get_position()
+    axs[2].set_position([pos.x0, pos.y0+.02, pos.width, pos.height])
+    pos = axs[3].get_position()
+    axs[3].set_position([pos.x0+.1, pos.y0+.02, pos.width, pos.height])
+    axs[0].set_xticklabels([])
+    axs[1].set_xticklabels([])
+    # Drawing of two-qubit gate scheme
+    from matplotlib.patches import Circle
+    ax = fig.add_subplot(221)
+    pos = ax.get_position()
+    ax.set_position([pos.x0+pos.width*(1-.425*1.1-.05), pos.y0+pos.height*(1-.45*1.1+.03),
+                     pos.width*.425*1.1, pos.height*.45*1.1])
+    patch = Circle((0, 0.5), radius=.3, color='C0', lw=1, ec='k')
+    ax.add_patch(patch)
+    patch = Circle((0.75, -0.5), radius=.3, color='C0', lw=1, ec='k')
+    ax.add_patch(patch)
+    patch = Circle((-0.75, -0.5), radius=.3, color='C3', lw=1, ec='k')
+    ax.add_patch(patch)
+    ax.plot([0, .75], [.5, -.5], c='k', zorder=-1, lw=3)
+    ax.plot([0, -.75], [.5, -.5], c='k', zorder=-1, lw=3, ls=(.1,(1,.5)), alpha=.5)
+    ax.text(0, .5, qH, va='center', ha='center', color='w')
+    ax.text(.75, -.5, qL, va='center', ha='center', color='w')
+    ax.text(-.75, -.5, qP, va='center', ha='center', color='w')
+    ax.set_xlim(-1.1,1.1)
+    ax.set_ylim(-1.1,1.1)
+    ax.axis('off')
+    # Title
+    fig.suptitle(f'{timestamp}\nPark sweep {qP} gate {qH},{qL}', y=1.075)
+
+
+def convert_amp_to_freq(poly_coefs, ch_range, ch_amp, dac_amp):
+    '''
+    Helper function to convert flux pulse amp to frequency detuning.
+    '''
+    poly_func = np.poly1d(poly_coefs)
+    out_volt = dac_amp*ch_amp*ch_range/2
+    freq_det = poly_func(out_volt)
+    return freq_det
+
+def vcz_waveform(sampling_rate,
+                 amp_at_int_11_02,
+                 norm_amp_fine,
+                 asymmetry,
+                 time_sqr,
+                 time_middle,
+                 time_pad):
+    '''
+    Trace SNZ waveform.
+    '''
+    amp_at_sweetspot = 0.0
+    dt = 1
+    norm_amp_sq = 1
+    time_sqr = time_sqr * sampling_rate
+    time_middle = time_middle * sampling_rate
+    time_pad = time_pad * sampling_rate
+    # This is to avoid numerical issues when the user would run sweeps with
+    # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
+    # instead of `time_at_swtspt = np.arange(0, 42, 2) / 2.4e9` and get
+    # bad results for specific combinations of parameters
+    time_middle = np.round(time_middle / dt) * dt
+    time_sqr = np.round(time_sqr / dt) * dt
+    time_pad = np.round(time_pad / dt) * dt
+    pad_amps = np.full(int(time_pad / dt), 0)
+    sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
+    amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)
+    # build asymmetric SNZ amplitudes
+    norm_amp_pos = 1+asymmetry
+    norm_amp_neg = 1-asymmetry
+    pos_sq_amps = np.full(int(time_sqr / dt), norm_amp_pos)
+    neg_sq_amps = np.full(int(time_sqr / dt), norm_amp_neg)
+    # slope amp will be using the same scaling factor as in the symmetric case, 
+    # but relative to pos and neg amplitudes 
+    # such that this amp is in the range [0, 1]
+    slope_amp_pos = np.array([norm_amp_fine * norm_amp_pos])
+    slope_amp_neg = np.array([norm_amp_fine * norm_amp_neg])
+    pos_NZ_amps = np.concatenate((pos_sq_amps, slope_amp_pos))
+    neg_NZ_amps = np.concatenate((slope_amp_neg, neg_sq_amps))
+    amp = np.concatenate(
+        ([amp_at_sweetspot],
+        pad_amps,
+        pos_NZ_amps,
+        amps_middle,
+        -neg_NZ_amps,
+        pad_amps,
+        [amp_at_sweetspot])
+    )
+    amp = amp_at_int_11_02 * amp
+    tlist = np.cumsum(np.full(len(amp) - 1, dt))
+    tlist = np.concatenate(([0.0], tlist))  # Set first point to have t=0
+    return amp
+
+def gen_park(sampling_rate, park_length, park_pad_length, park_amp):
+    '''
+    Trace parking waveform.
+    '''
+    ones = np.ones(int(park_length * sampling_rate / 2))
+    zeros = np.zeros(int(park_pad_length * sampling_rate))
+    pulse_pos = park_amp * ones
+    return np.concatenate((zeros, pulse_pos, - pulse_pos, zeros))
+
+class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
+    """
+    Analysis 
+    """
+    def __init__(self,
+                 Qubit_pairs: list,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True):
+        super().__init__(t_start=t_start, 
+                         t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.Qubit_pairs = Qubit_pairs
+        self.Qubits = np.unique(Qubit_pairs)
+        for qH, qL in Qubit_pairs:
+            Q_parks = get_parking_qubits(qH, qL)
+            for q in Q_parks:
+                if not (q in self.Qubits):
+                    self.Qubits = np.concatenate((self.Qubits, [q]))
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        '''
+        Extract all relevant waveform information to trace
+        frequency trajectory of qubit during two-qubit gate.
+        '''
+        data = {q:{} for q in self.Qubits}
+        for q in self.Qubits:
+            # Qubit parameters
+            param_spec =  {'poly_coefs': (f'Instrument settings/flux_lm_{q}', 'attr:q_polycoeffs_freq_01_det'),
+                           'ch_range': (f'Instrument settings/flux_lm_{q}', 'attr:cfg_awg_channel_range'),
+                           'ch_amp': (f'Instrument settings/flux_lm_{q}', 'attr:cfg_awg_channel_amplitude'),
+                           'frequency': (f'Instrument settings/{q}', f'attr:freq_qubit'),
+                           'anharmonicity': (f'Instrument settings/{q}', f'attr:anharmonicity')}
+            # Gate parameters
+            for d in ['NW', 'NE', 'SW', 'SE']:
+                # Amplitudes
+                param_spec[f'amp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_dac_at_11_02_{d}')
+                param_spec[f'B_amp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_fine_{d}')
+                param_spec[f'asymmetry_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_asymmetry_{d}')
+                # Durations
+                param_spec[f'tp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_single_sq_{d}')
+                param_spec[f'tmid_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_middle_{d}')
+                param_spec[f'tpad_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_pad_{d}')
+            # Park parameters
+            param_spec['park_amp'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_amp')
+            param_spec['t_park'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_length')
+            param_spec['tpad_park'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_pad_length')
+            # extract data
+            data[q] = h5d.extract_pars_from_datafile(data_fp, param_spec)
+            # Sort and parse extracted quantities
+            p_coefs = data[q]['poly_coefs'][1:-1].split(' ')
+            while '' in p_coefs:
+                p_coefs.remove('')
+            data[q]['poly_coefs'] = list(eval(','.join(p_coefs)))
+            data[q]['ch_range'] = eval(data[q]['ch_range'])
+            data[q]['ch_amp'] = eval(data[q]['ch_amp'])
+            data[q]['frequency'] = eval(data[q]['frequency'])
+            data[q]['anharmonicity'] = eval(data[q]['anharmonicity'])
+            for d in ['NW', 'NE', 'SW', 'SE']:
+                data[q][f'amp_{d}'] = eval(data[q][f'amp_{d}'])
+                data[q][f'B_amp_{d}'] = eval(data[q][f'B_amp_{d}'])
+                data[q][f'asymmetry_{d}'] = eval(data[q][f'asymmetry_{d}'])
+                data[q][f'tp_{d}'] = eval(data[q][f'tp_{d}'])
+                data[q][f'tmid_{d}'] = eval(data[q][f'tmid_{d}'])
+                data[q][f'tpad_{d}'] = eval(data[q][f'tpad_{d}'])
+            data[q]['park_amp'] = eval(data[q]['park_amp'])
+            data[q]['t_park'] = eval(data[q]['t_park'])
+            data[q]['tpad_park'] = eval(data[q]['tpad_park'])
+        # Get TLS landscapes
+        self.TLS_analysis = {}
+        for q in self.Qubits:
+            label = f'Chevron {q} D1 ground'
+            try:
+                # Try to find TLS landscapes for relevant qubits
+                TS = get_timestamps_in_range(
+                        timestamp_start='20000101_000000',
+                        label=label)
+                for ts in TS[::-1]:
+                    # Try runing TLS analysis for each timestamp
+                    # until it is successful.
+                    try:
+                        a = TLS_landscape_Analysis(
+                                t_start = ts,
+                                Q_freq = data[q]['frequency'],
+                                Poly_coefs = data[q]['poly_coefs'],
+                                extract_only=True)
+                        assert len(a.proc_data_dict['Times'])>3, \
+                            'Not enough time steps in Chevron\nTrying other timestamp...'
+                        self.TLS_analysis[q] = a
+                        break
+                    except:
+                        print_exception()
+            except:
+                print_exception()
+                print(f'No valid TLS landscape data found for {q}')
+        # save data in raw data dictionary
+        self.raw_data_dict = data
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        data = self.raw_data_dict
+        self.proc_data_dict = {q : {} for q in self.Qubits}
+        for q in self.Qubits:
+            self.proc_data_dict[q]['frequency'] = data[q]['frequency']
+            # estimate detunings at each amplitude
+            for d in ['NW', 'NE', 'SW', 'SE']:
+                # Trace CZ waveform
+                _wf = vcz_waveform(sampling_rate = 2.4e9,
+                                   amp_at_int_11_02 = data[q][f'amp_{d}'],
+                                   norm_amp_fine = data[q][f'B_amp_{d}'],
+                                   asymmetry = data[q][f'asymmetry_{d}'],
+                                   time_sqr = data[q][f'tp_{d}'],
+                                   time_middle = data[q][f'tmid_{d}'],
+                                   time_pad = data[q][f'tpad_{d}'])
+                self.proc_data_dict[q][f'cz_waveform_{d}'] = _wf
+                # Convert CZ waveform into frequency trajectory
+                _Ftrajectory = -convert_amp_to_freq(data[q]['poly_coefs'],
+                                                    data[q]['ch_range'],
+                                                    data[q]['ch_amp'], _wf)
+                _Ftrajectory += data[q]['frequency']
+                self.proc_data_dict[q][f'cz_freq_trajectory_{d}'] = _Ftrajectory
+            # Parking trajectories
+            _wf = gen_park(sampling_rate = 2.4e9,
+                           park_length = data[q]['t_park'],
+                           park_pad_length = data[q]['tpad_park'],
+                           park_amp = data[q]['park_amp'])
+            self.proc_data_dict[q]['park_waveform'] = _wf
+            _Ftrajectory = -convert_amp_to_freq(data[q]['poly_coefs'],
+                                                data[q]['ch_range'],
+                                                data[q]['ch_amp'], _wf)
+            _Ftrajectory += data[q]['frequency']
+            self.proc_data_dict[q]['park_freq_trajectory'] = _Ftrajectory
+            # Idling trajectory
+            n_points = len(_Ftrajectory)
+            self.proc_data_dict[q]['idle_freq_trajectory'] = np.full(n_points, data[q]['frequency'])
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        for qH, qL in self.Qubit_pairs:
+
+            fig, ax = plt.subplots(figsize=(4,4), dpi=100)
+            self.figs[f'{qH}_{qL}_Gate_frequency_trajectory'] = fig
+            self.axs_dict[f'plot_{qH}_{qL}'] = ax
+            # fig.patch.set_alpha(0)
+            self.plot_dicts[f'{qH}_{qL}_Gate_frequency_trajectory']={
+                    'plotfn': CZ_frequency_trajectory_plotfn,
+                    'ax_id': f'plot_{qH}_{qL}',
+                    'data': self.proc_data_dict,
+                    'qH': qH,
+                    'qL': qL,
+
+                    'TLS_analysis_dict': self.TLS_analysis,
+                    'timestamp': self.timestamps[0]}
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def CZ_frequency_trajectory_plotfn(
+    ax,
+    data, qH, qL,
+    timestamp,
+    TLS_analysis_dict,
+    include_TLS_landscape=True,
+    **kw):
+    fig = ax.get_figure()
+    # Compile all relevant freq. trajectories
+    directions = get_gate_directions(qH, qL)
+    parked_qubits = get_parking_qubits(qH, qL)
+    wf = { qH: f'cz_freq_trajectory_{directions[0]}',
+           qL: f'cz_freq_trajectory_{directions[1]}' }
+    for q in parked_qubits:
+        if not 'X' in q:
+            wf[q] = 'park_freq_trajectory'
+    # Draw CZ trajectories
+    for q, _wf in wf.items():
+        if q in parked_qubits:
+            ax.plot(data[q][_wf]*1e-9, '--', markersize=3, lw=1, label=f'{q}')
+        else:
+            ax.plot(data[q][_wf]*1e-9, '.-', markersize=3, lw=1, label=f'{q}')
+        # labels
+        ax.text(5, data[q][_wf][5]*1e-9+.015, f'{q}')
+    # settings of plot
+    ax.set_title(f'{timestamp}\n{qH}, {qL} Gate')
+    ax.set_ylabel('Frequency (GHz)')
+    ax.set_xlabel('Time (# samples)')
+    ax.grid(ls='--', alpha=.5)
+    # Side plots for TLS landscapes
+    if include_TLS_landscape:
+        axR = fig.add_subplot(111)
+        pos = axR.get_position()
+        axR.set_position([pos.x0+pos.width*1.005, pos.y0, pos.width*0.2, pos.height])
+        def get_plot_axis(vals, rang=None):
+            if len(vals)>1:
+                dx = vals[1]-vals[0]
+                X = np.concatenate((vals, [vals[-1]+dx])) - dx/2
+            else:
+                X = vals
+            return X
+        Detunings = data[qH]['frequency'] - get_plot_axis(TLS_analysis_dict[qH].proc_data_dict['Detunings'])
+        Times = get_plot_axis(TLS_analysis_dict[qH].proc_data_dict['Times'])
+        Pop = TLS_analysis_dict[qH].proc_data_dict['Pop'] 
+        # Frequency qubit population
+        vmax = min([1, np.max(Pop)])
+        vmax = max([vmax, 0.15])
+        im = axR.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
+        axR.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, qH, ha='center', va='top', color='w')
+        axR.set_title('Gate qubits', size=7)
+        if qL in TLS_analysis_dict.keys():
+            Detunings = data[qL]['frequency'] - get_plot_axis(TLS_analysis_dict[qL].proc_data_dict['Detunings'])
+            Pop = TLS_analysis_dict[qL].proc_data_dict['Pop'] 
+            # Frequency qubit population
+            vmax = min([1, np.max(Pop)])
+            vmax = max([vmax, 0.15])
+            im = axR.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
+            axR.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, qL, ha='center', va='top', color='w')
+            axR.axhline(Detunings[0]*1e-9, color='w')
+        axR.set_ylim(ax.get_ylim())
+        axR.yaxis.tick_right()
+        axR.set_xticks([])
+        axR.axis('off')
+        # Parked qubit plots
+        i = 0
+        for q in parked_qubits:
+            if q in TLS_analysis_dict.keys():
+                axP = fig.add_subplot(221+i)
+                # using previous axis position <pos>
+                axP.set_position([pos.x0+pos.width*(1.21 + i*.205), pos.y0,
+                                  pos.width*0.2, pos.height])
+                
+                Detunings = data[q]['frequency'] - get_plot_axis(TLS_analysis_dict[q].proc_data_dict['Detunings'])
+                Pop = TLS_analysis_dict[q].proc_data_dict['Pop'] 
+                # Frequency qubit population
+                vmax = min([1, np.max(Pop)])
+                vmax = max([vmax, 0.15])
+                im = axP.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
+                axP.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, q, ha='center', va='top', color='w')
+                
+                axP.set_title('Park qubits', size=7)
+                axP.set_ylim(ax.get_ylim())
+                axP.yaxis.tick_right()
+                axP.set_xticks([])
+                axP.axis('off')
+                i += 1
+
+
 class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
     """
     Analysis 
@@ -2957,6 +3650,7 @@ def Phases_plotfn(
     axs[0].plot(cases_sorted, np.zeros(len(cases_sorted))+180, 'k--')
     axs[0].plot(cases_sorted, np.zeros(len(cases_sorted)), 'k--')
     axs[0].plot(cases_sorted, [Phases[q][c] for c in cases_sorted], 'o-')
+    axs[0].set_xticks(axs[0].get_xticks())
     axs[0].set_xticklabels([fr'$|{c}\rangle$' for c in cases_sorted], rotation=90, fontsize=7)
     axs[0].set_yticks([0, 45, 90, 135, 180])
     axs[0].set_xlabel(fr'Control qubit states $|${",".join(Q_control)}$\rangle$')
@@ -2965,6 +3659,7 @@ def Phases_plotfn(
     
     axs[1].bar(cases_sorted, phase_err_sorted, zorder=10)
     axs[1].grid(ls='--', zorder=-10)
+    axs[1].set_xticks(axs[1].get_xticks())
     axs[1].set_xticklabels([fr'$|{c}\rangle$' for c in cases_sorted], rotation=90, fontsize=7)
     axs[1].set_xlabel(fr'Control qubit states $|${",".join(Q_control)}$\rangle$')
     axs[1].set_ylabel(f'{q_target} Phase error (deg)')
@@ -3257,136 +3952,6 @@ def gate_calibration_plotfn(
     fig.tight_layout()
 
 
-class Parity_check_park_analysis(ba.BaseDataAnalysis):
-    """
-    Analysis 
-    """
-    def __init__(self,
-                 Q_park_target: str,
-                 Q_spectator: str,
-                 t_start: str = None,
-                 t_stop: str = None,
-                 label: str = '',
-                 options_dict: dict = None, 
-                 extract_only: bool = False,
-                 auto=True):
-        super().__init__(t_start=t_start, 
-                         t_stop=t_stop,
-                         label=label,
-                         options_dict=options_dict,
-                         extract_only=extract_only)
-        self.Q_park_target = Q_park_target
-        self.Q_spectator = Q_spectator
-        if auto:
-            self.run_analysis()
-
-    def extract_data(self):
-        self.get_timestamps()
-        self.timestamp = self.timestamps[0]
-
-        data_fp = get_datafilepath_from_timestamp(self.timestamp)
-        param_spec = {'data': ('Experimental Data/Data', 'dset'),
-                      'value_names': ('Experimental Data', 'attr:value_names'),
-                      'poly_coefs': (f'Instrument settings/flux_lm_{self.Q_park_target}',
-                                     'attr:q_polycoeffs_freq_01_det'),
-                      'channel_range': (f'Instrument settings/flux_lm_{self.Q_park_target}',
-                                        'attr:cfg_awg_channel_range'),
-                      'channel_amp': (f'Instrument settings/flux_lm_{self.Q_park_target}',
-                                      'attr:cfg_awg_channel_amplitude')}
-        self.raw_data_dict = h5d.extract_pars_from_datafile(
-                             data_fp, param_spec)
-        # Parts added to be compatible with base analysis data requirements
-        self.raw_data_dict['timestamps'] = self.timestamps
-        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
-
-    def process_data(self):
-        self.proc_data_dict = {}
-        self.qoi = {}
-        # Sort data
-        Amps = self.raw_data_dict['data'][:,0]
-        L0 = self.raw_data_dict['data'][:,1]
-        L1 = self.raw_data_dict['data'][:,2]
-        # Calculate frequency axis
-        poly_coefs = [float(n) for n in self.raw_data_dict['poly_coefs'][1:-1].split(' ') if n != '' ]
-        channel_range = float(self.raw_data_dict['channel_range'])
-        channel_amp = float(self.raw_data_dict['channel_amp'])
-        Freqs = np.poly1d(poly_coefs)(Amps*channel_amp*channel_range/2)
-        # Calculate optimal parking amp
-        idx_opt = np.argmin(L0+L1)
-        Amp_opt = Amps[idx_opt]
-        Freq_opt = Freqs[idx_opt]
-        # Save stuff
-        self.proc_data_dict['L0'] = L0
-        self.proc_data_dict['L1'] = L1
-        self.proc_data_dict['Amps'] = Amps
-        self.proc_data_dict['Freqs'] = Freqs
-        self.qoi['Freq_opt'] = Freq_opt
-        self.qoi['Amp_opt'] = Amp_opt
-
-    def prepare_plots(self):
-        self.axs_dict = {}
-        fig, axs = plt.subplots(figsize=(6,6), nrows=2, dpi=100)
-        self.figs[f'Park_amplitude_sweep_{self.Q_park_target}'] = fig
-        self.axs_dict['plot_1'] = axs[0]
-        # fig.patch.set_alpha(0)
-        self.plot_dicts[f'Park_amplitude_sweep_{self.Q_park_target}']={
-                'plotfn': park_sweep_plotfn,
-                'ax_id': 'plot_1',
-                'Amps' : self.proc_data_dict['Amps'],
-                'Freqs' : self.proc_data_dict['Freqs'],
-                'L0' : self.proc_data_dict['L0'],
-                'L1' : self.proc_data_dict['L1'],
-                'Amp_opt' : self.qoi['Amp_opt'],
-                'Freq_opt' : self.qoi['Freq_opt'],
-                'qubit' : self.Q_park_target,
-                'q_spec' : self.Q_spectator,
-                'timestamp': self.timestamps[0]}
-
-    def run_post_extract(self):
-        self.prepare_plots()  # specify default plots
-        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
-        if self.options_dict.get('save_figs', False):
-            self.save_figures(
-                close_figs=self.options_dict.get('close_figs', True),
-                tag_tstamp=self.options_dict.get('tag_tstamp', True))
-
-def park_sweep_plotfn(
-    ax,
-    Amps,
-    Freqs,
-    L0,
-    L1,
-    Amp_opt,
-    Freq_opt,
-    qubit,
-    q_spec,
-    timestamp,
-    **kw):
-    fig = ax.get_figure()
-    axs = fig.get_axes()
-
-    qubit_string = '{'+qubit[0]+'_'+qubit[1]+'}'
-    spec_string = '{'+q_spec[0]+'_'+q_spec[1]+'}'
-    q2_string = '{'+q_spec[0]+'_'+q_spec[1]+qubit[0]+'_'+qubit[1]+'}'
-    axs[0].plot(Freqs*1e-6, L0, 'C0.-', label=rf'$|01\rangle_\mathrm{q2_string}$')
-    axs[0].plot(Freqs*1e-6, L1, 'C3.-', label=rf'$|11\rangle_\mathrm{q2_string}$')
-    axs[0].axvline(Freq_opt*1e-6, color='k', ls='--', lw=1, label='Opt. freq.')
-    axs[0].set_xlabel(f'Parking frequency $\mathrm{qubit_string}$ (MHz)')
-    axs[0].set_ylabel(rf'Qubit $\mathrm{qubit_string}$'+' $\mathrm{P_{excited}}$')
-    axs[0].set_title(f'{timestamp}\nParking amplitude sweep $\mathrm{qubit_string}$ '+\
-                     f'with spectator $\mathrm{spec_string}$')
-
-    axs[1].plot(Amps, L0, 'C0.-', label=rf'$|01\rangle_\mathrm{q2_string}$')
-    axs[1].plot(Amps, L1, 'C3.-', label=rf'$|11\rangle_\mathrm{q2_string}$')
-    axs[1].axvline(Amp_opt, color='k', ls='--', lw=1, label='Opt. amp.')
-    axs[1].set_xlabel(f'Parking Amplitude $\mathrm{qubit_string}$ (MHz)')
-    axs[1].set_ylabel(rf'Qubit $\mathrm{qubit_string}$'+' $\mathrm{P_{excited}}$')
-
-    fig.tight_layout()
-    axs[0].legend(frameon=False, bbox_to_anchor=(1.02, 1))
-    axs[1].legend(frameon=False, bbox_to_anchor=(1.02, 1))
-
-
 class Parity_check_fidelity_analysis(ba.BaseDataAnalysis):
     """
     Analysis 
@@ -3423,7 +3988,8 @@ class Parity_check_fidelity_analysis(ba.BaseDataAnalysis):
                  'value_names': ('Experimental Data', 'attr:value_names')}
         _thrs = {f'threshold_{q}': (f'Instrument settings/{q}', 'attr:ro_acq_threshold')
                  for q in qubit_list}
-        param_spec = {**_data, **_thrs}
+        # param_spec = {**_data, **_thrs}
+        param_spec = {**_data}
         self.raw_data_dict = h5d.extract_pars_from_datafile(
                              data_fp, param_spec)
         # Parts added to be compatible with base analysis data requirements

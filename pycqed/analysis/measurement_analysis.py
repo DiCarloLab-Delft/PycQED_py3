@@ -4705,24 +4705,11 @@ class T1_Analysis(TD_Analysis):
 
             units = SI_prefix_and_scale_factor(val=max(abs(self.ax.get_xticks())),
                                                unit=self.sweep_unit[0])[1]
-            try:
-                # Get old values
-                instr_set = self.data_file['Instrument settings']
-                if self.for_ef:
-                    T1_old = float(
-                        instr_set[self.qb_name].attrs['T1_ef']) * 1e6
-                else:
-                    T1_old = float(instr_set[self.qb_name].attrs['T1']) * 1e6
-                old_vals = '\nold $T_1$ = {:.5f} '.format(T1_old) + units
-            except (TypeError, KeyError, ValueError):
-                logging.warning('qb_name is None. Old parameter values will '
-                                'not be retrieved.')
-                old_vals = ''
 
             textstr = ('$T_1$ = {:.5f} '.format(T1_micro_sec) +
                        units +
                        ' $\pm$ {:.5f} '.format(T1_err_micro_sec) +
-                       units + old_vals)
+                       units)
 
             self.fig.text(0.5, -0.2, textstr, transform=self.ax.transAxes,
                           fontsize=self.font_size,

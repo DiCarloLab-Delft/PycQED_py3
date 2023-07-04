@@ -258,11 +258,11 @@ class OqlProgram:
         }
 
         if recompile is False:
-            if _recompile is True:
-                log.warning(
-                    "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
-                    " want to compile?".format(self._platf_cfg, clifford_rb_oql)
-                )
+            # if _recompile is True:
+            #     log.warning(
+            #         "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
+            #         " want to compile?".format(self._platf_cfg, clifford_rb_oql)
+            #     )
             res_dict["recompile"] = False
         elif recompile is True:
             # Enforce recompilation
