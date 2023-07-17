@@ -365,21 +365,21 @@ class HAL_Device(HAL_ShimMQ):
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=list_qubits_used)
 
-        for i, q in enumerate(np.concatenate([ramsey_qubits])):
-            # only on the CZ qubits we add the ef pulses
-            mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+            for i, q in enumerate(np.concatenate([ramsey_qubits])):
+                # only on the CZ qubits we add the ef pulses
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
 
-            lm = mw_lutman.LutMap()
-            # FIXME: we hardcode the X on the ef transition to CW 31 here.
-            lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
-            # load_phase_pulses will also upload other waveforms
-            if phase_offsets == None:
-                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
-            else:
-                mw_lutman.load_phase_pulses_to_AWG_lookuptable(
-                    phases=np.arange(0, 360, 20) + phase_offsets[i])
-            mw_lutman.load_waveforms_onto_AWG_lookuptable(
-                regenerate_waveforms=True)
+                lm = mw_lutman.LutMap()
+                # FIXME: we hardcode the X on the ef transition to CW 31 here.
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                # load_phase_pulses will also upload other waveforms
+                if phase_offsets == None:
+                    mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+                else:
+                    mw_lutman.load_phase_pulses_to_AWG_lookuptable(
+                        phases=np.arange(0, 360, 20) + phase_offsets[i])
+                mw_lutman.load_waveforms_onto_AWG_lookuptable(
+                    regenerate_waveforms=True)
 
         # FIXME: These are hardcoded angles in the mw_lutman for the AWG8
         # only x2 and x3 downsample_swp_points available
@@ -2006,20 +2006,21 @@ class HAL_Device(HAL_ShimMQ):
         adaptive_sampling_pts=None,
         adaptive_pars: dict = None,
         prepare_for_timedomain=True,
-        MC: Optional[MeasurementControl] = None,
+        MC=None,
         freq_tone=6e9,
         pow_tone=-10,
         spec_tone=False,
         target_qubit_sequence: str = "ramsey",
         waveform_name="square",
         recover_q_spec: bool = False,
-    ):
+        disable_metadata: bool = False,
+        ):
         """
         Measure a chevron patter of esulting from swapping of the excitations
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
         close to the interaction zone using (usually) a rectangular pulse.
         Meanwhile q1 is prepared in 0, 1 or superposition state. If it is in 0
-    state flipping between 01-10 can be observed. It if is in 1 state flipping
+        state flipping between 01-10 can be observed. It if is in 1 state flipping
         between 11-20 as well as 11-02 show up. In superpostion everything is visible.
 
         Args:
@@ -2080,7 +2081,6 @@ class HAL_Device(HAL_ShimMQ):
             q0    -x180-flux-x180-RO-
             qspec ----------------RO- (target_qubit_sequence='ground')
         """
-
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -2117,25 +2117,16 @@ class HAL_Device(HAL_ShimMQ):
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q_spec])
 
-        if 1:
-            amp_par = self.hal_get_flux_amp_parameter(q0)
-        else:
-            # FIXME: HW dependency
-            awg = fl_lutman.AWG.get_instr()
-            using_QWG = isinstance(awg, QuTech_AWG_Module)
-            if using_QWG:
-                awg_ch = fl_lutman.cfg_awg_channel()
-                amp_par = awg.parameters["ch{}_amp".format(awg_ch)]
-            else:
-                awg_ch = (
-                    fl_lutman.cfg_awg_channel() - 1
-                )  # -1 is to account for starting at 1
-                ch_pair = awg_ch % 2
-                awg_nr = awg_ch // 2
+        awg = fl_lutman.AWG.get_instr()
+        awg_ch = (
+            fl_lutman.cfg_awg_channel() - 1
+        )  # -1 is to account for starting at 1
+        ch_pair = awg_ch % 2
+        awg_nr = awg_ch // 2
 
-                amp_par = awg.parameters[
-                    "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
-                ]
+        amp_par = awg.parameters[
+            "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
+        ]
 
         sw = swf.FLsweep(fl_lutman, length_par, waveform_name=waveform_name)
 
@@ -2149,11 +2140,12 @@ class HAL_Device(HAL_ShimMQ):
             platf_cfg=self.cfg_openql_platform_fn(),
             target_qubit_sequence=target_qubit_sequence,
             cc=self.instr_CC.get_instr().name,
-            recover_q_spec=recover_q_spec
+            recover_q_spec=recover_q_spec,
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
+        
         d = self.get_correlation_detector(
             qubits=[q0, q_spec],
             single_int_avg=True,
@@ -2170,8 +2162,8 @@ class HAL_Device(HAL_ShimMQ):
         if not adaptive_sampling:
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
-            MC.run(label, mode="2D")
-
+            MC.run(label, mode="2D",
+                   disable_snapshot_metadata=disable_metadata)
             ma.TwoD_Analysis()
         else:
             if adaptive_pars is None:
@@ -2182,7 +2174,6 @@ class HAL_Device(HAL_ShimMQ):
                 }
             MC.set_adaptive_function_parameters(adaptive_pars)
             MC.run(label + " adaptive", mode="adaptive")
-
             ma2.Basic2DInterpolatedAnalysis()
 
 
@@ -6148,13 +6139,17 @@ class HAL_Device(HAL_ShimMQ):
         T_mids,
         A_ranges,
         A_points: int,
-        Q_parks: list = [],
+        Q_parks: list = None,
         Tp : float = None,
-        flux_codeword: str = 'cz'):
+        flux_codeword: str = 'cz',
+        flux_pulse_duration: float = 60e-9,
+        prepare_for_timedomain: bool = True,
+        disable_metadata: bool = False):
         """
         Perform 2D sweep of amplitude and wave parameter while measuring 
         conditional phase and missing fraction via the "conditional 
         oscillation" experiment.
+
         Q0 : High frequency qubit(s). Can be given as single qubit or list.
         Q1 : Low frequency qubit(s). Can be given as single qubit or list.
         T_mids : list of vcz "T_mid" values to sweep.
@@ -6172,31 +6167,44 @@ class HAL_Device(HAL_ShimMQ):
         nested_MC = self.instr_nested_MC.get_instr()
         # get gate directions
         directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
-        # Prepare for time domain
-        self.prepare_for_timedomain(
-            qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
-            bypass_flux=True)
         Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
         Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
         Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
-        for i, lm in enumerate(Flux_lm_0):
-            print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
-            print(f'Setting {Q0[i]} vcz_amp_fine_{directions[i][0]} to 0.5')
-            print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
-            lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
-            lm.set(f'vcz_amp_fine_{directions[i][0]}', .5)
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-        for i, lm in enumerate(Flux_lm_1):
-            print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+        # Prepare for time domain
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(
+                qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+                bypass_flux=True)
+            for i, lm in enumerate(Flux_lm_0):
+                print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
+                print(f'Setting {Q0[i]} vcz_amp_fine_{directions[i][0]} to 0.5')
+                print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
+                lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
+                lm.set(f'vcz_amp_fine_{directions[i][0]}', .5)
+                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
+            for i, lm in enumerate(Flux_lm_1):
+                print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
         # Look for Tp values
         if Tp:
-            if isinstance(Tp, float):
+            if isinstance(Tp, str):
                 Tp = [Tp]
         else:
             Tp = [lm.get(f'vcz_time_single_sq_{directions[i][0]}')*2 for i, lm in enumerate(Flux_lm_0)]
         assert len(Q0) == len(Tp)
-
+        #######################
+        # Load phase pulses
+        #######################
+        if prepare_for_timedomain:
+            for i, q in enumerate(Q0):
+                # only on the CZ qubits we add the ef pulses 
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                lm = mw_lutman.LutMap()
+                # we hardcode the X on the ef transition to CW 31 here.
+                lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                # load_phase_pulses will also upload other waveforms
+                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         # Wrapper function for conditional oscillation detector function.
         def wrapper(Q0, Q1,
                     prepare_for_timedomain,
@@ -6243,14 +6251,15 @@ class HAL_Device(HAL_ShimMQ):
                              for i in range(len(Q0))]).flatten()), 
             fl_lm_park = Flux_lms_park,
             which_gate = list(np.array(directions).flatten()),
-            t_pulse = Tp)
+            t_pulse = Tp,
+            duration = flux_pulse_duration)
         nested_MC.set_sweep_function(swf1)
         nested_MC.set_sweep_points(np.arange(A_points))
         nested_MC.set_sweep_function_2D(swf2)
         nested_MC.set_sweep_points_2D(T_mids)
         MC.live_plot_enabled(False)
         nested_MC.run(f'VCZ_Amp_vs_Tmid_{Q0}_{Q1}_{Q_parks}',
-                      mode='2D')
+                      mode='2D', disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(True)
         ma2.tqg.VCZ_tmid_Analysis(Q0=Q0, Q1=Q1,
                                   A_ranges=A_ranges,
@@ -6258,19 +6267,20 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_vcz_A_B_landscape(
         self, 
-        Q0,
-        Q1,
+        Q0, Q1,
         A_ranges,
         A_points: int,
         B_amps: list,
         Q_parks: list = None,
         update_flux_params: bool = False,
-        cost_function_L1_weight = .5,
-        flux_codeword: str = 'cz'):
+        flux_codeword: str = 'cz',
+        prepare_for_timedomain: bool = True,
+        disable_metadata: bool = False):
         """
         Perform 2D sweep of amplitude and wave parameter while measuring 
         conditional phase and missing fraction via the "conditional 
         oscillation" experiment.
+
         Q0 : High frequency qubit(s). Can be given as single qubit or list.
         Q1 : Low frequency qubit(s). Can be given as single qubit or list.
         T_mids : list of vcz "T_mid" values to sweep.
@@ -6283,35 +6293,49 @@ class HAL_Device(HAL_ShimMQ):
         if isinstance(Q1, str):
             Q1 = [Q1]
         assert len(Q0) == len(Q1)
-
         MC = self.instr_MC.get_instr()
         nested_MC = self.instr_nested_MC.get_instr()
         # get gate directions
         directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
-        
-        # Time-domain preparation
-        self.prepare_for_timedomain(
-            qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
-            bypass_flux=True)
         Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
         Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
         Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
-        for i, lm in enumerate(Flux_lm_0):
-            print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
-            print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
-            lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-        for i, lm in enumerate(Flux_lm_1):
-            print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
-
+        # Prepare for time domain
+        if prepare_for_timedomain:
+            # Time-domain preparation
+            self.prepare_for_timedomain(
+                qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+                bypass_flux=True)
+            for i, lm in enumerate(Flux_lm_0):
+                print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
+                print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
+                lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
+                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
+            for i, lm in enumerate(Flux_lm_1):
+                print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+        # Update two qubit gate parameters
         if update_flux_params:
             # List of current flux lutman amplitudes
             Amps_11_02 = [{ d: lm.get(f'vcz_amp_dac_at_11_02_{d}')\
                          for d in ['NW', 'NE', 'SW', 'SE']} for lm in Flux_lm_0]
+            # List of parking amplitudes
+            Amps_park = [ lm.get('park_amp') for lm in Flux_lm_0 ]
             # List of current flux lutman channel gains
             Old_gains = [ lm.get('cfg_awg_channel_amplitude') for lm in Flux_lm_0]
-
+        ###########################
+        # Load phase pulses
+        ###########################
+        if prepare_for_timedomain:
+            for i, q in enumerate(Q0):
+                # only on the CZ qubits we add the ef pulses 
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                lm = mw_lutman.LutMap()
+                # we hardcode the X on the ef transition to CW 31 here.
+                lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                # load_phase_pulses will also upload other waveforms
+                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
         # Wrapper function for conditional oscillation detector function.
         def wrapper(Q0, Q1,
                     prepare_for_timedomain,
@@ -6363,12 +6387,17 @@ class HAL_Device(HAL_ShimMQ):
         nested_MC.set_sweep_function_2D(swf2)
         nested_MC.set_sweep_points_2D(B_amps)
 
+        MC.live_plot_enabled(False)
         nested_MC.run(f'VCZ_Amp_vs_B_{Q0}_{Q1}_{Q_parks}',
-                      mode='2D')
+                      mode='2D', disable_snapshot_metadata=disable_metadata)
+        MC.live_plot_enabled(True)
         a = ma2.tqg.VCZ_B_Analysis(Q0=Q0, Q1=Q1,
                                    A_ranges=A_ranges,
                                    directions=directions,
                                    label='VCZ_Amp_vs_B')
+        ###################################
+        # Update flux parameters
+        ###################################
         if update_flux_params:
             print('Updating flux lutman parameters:')
             def _set_amps_11_02(amps, lm, verbose=True):
@@ -6392,6 +6421,7 @@ class HAL_Device(HAL_ShimMQ):
                     for d in ['NW', 'NE', 'SW', 'SE']:
                         Amps_11_02[i][d] *= Old_gains[i]/Opt_gains[i]
                     Amps_11_02[i][directions[i][0]] = 0.5
+                    Amps_park[i] *= Old_gains[i]/Opt_gains[i]
                 # If new channel gain is lower than old gain, then choose
                 # dac value for measured gate based on old gain
                 else:
@@ -6401,8 +6431,263 @@ class HAL_Device(HAL_ShimMQ):
                 # Set flux_lutman amplitudes
                 _set_amps_11_02(Amps_11_02[i], Flux_lm_0[i])
                 Flux_lm_0[i].set(f'vcz_amp_fine_{directions[i][0]}', Opt_Bvals[i])
-        return True
+                Flux_lm_0[i].set(f'park_amp', Amps_park[i])
+        return a.qoi
 
+    def measure_parity_check_ramsey(
+        self,
+        Q_target: list,
+        Q_control: list,
+        flux_cw_list: list,
+        control_cases: list = None,
+        Q_spectator: list = None,
+        pc_repetitions: int = 1,
+        downsample_angle_points: int = 1,
+        prepare_for_timedomain: bool = True,
+        disable_metadata: bool = False,
+        extract_only: bool = False,
+        analyze: bool = True,
+        solve_for_phase_gate_model: bool = False,
+        update_mw_phase: bool = False,
+        mw_phase_param: str = 'vcz_virtual_q_ph_corr_step_1',
+        wait_time_before_flux: int = 0,
+        wait_time_after_flux: int = 0):
+        """
+        Perform conditional oscillation like experiment in the context of a
+        parity check.
+
+        Q_target : Ancilla qubit where parity is projected.
+        Q_control : List of control qubits in parity check.
+        Q_spectator : Similar to control qubit, but will be treated as 
+                      spectator in analysis.
+        flux_cw_list : list of flux codewords to be played during the parity
+                       check.
+        Control_cases : list of different control qubit states. Defaults to all
+                        possible combinations of states.
+        """
+        # assert len(Q_target) == 1
+        assert self.ro_acq_weight_type().lower() == 'optimal'
+        MC = self.instr_MC.get_instr()
+        if Q_spectator:
+            Q_control += Q_spectator
+        if control_cases == None:
+            control_cases = ['{:0{}b}'.format(i, len(Q_control))\
+                              for i in range(2**len(Q_control))]
+            solve_for_phase_gate_model = True
+        else:
+            for case in control_cases:
+                assert len(case) == len(Q_control)
+
+        qubit_list = Q_target + Q_control
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubit_list)
+            for q in Q_target:
+                mw_lm = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                mw_lm.set_default_lutmap()
+                mw_lm.load_phase_pulses_to_AWG_lookuptable()
+        Q_target_idx = [self.find_instrument(q).cfg_qubit_nr() for q in Q_target]
+        Q_control_idx = [self.find_instrument(q).cfg_qubit_nr() for q in Q_control]
+        # These are hardcoded angles in the mw_lutman for the AWG8
+        # only x2 and x3 downsample_swp_points available
+        angles = np.arange(0, 341, 20 * downsample_angle_points)
+        p = mqo.parity_check_ramsey(
+            Q_idxs_target = Q_target_idx,
+            Q_idxs_control = Q_control_idx,
+            control_cases = control_cases,
+            flux_cw_list = flux_cw_list,
+            platf_cfg = self.cfg_openql_platform_fn(),
+            angles = angles,
+            nr_spectators = len(Q_spectator) if Q_spectator else 0,
+            pc_repetitions=pc_repetitions,
+            wait_time_before_flux = wait_time_before_flux,
+            wait_time_after_flux = wait_time_after_flux
+            )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name="Cases",
+            unit="a.u."
+            )
+        d = self.get_int_avg_det(qubits=qubit_list)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_detector_function(d)
+        label = f'Parity_check_ramsey_{"_".join(qubit_list)}'
+        if pc_repetitions != 1:
+            label += f'_x{pc_repetitions}'
+        MC.run(label, disable_snapshot_metadata=disable_metadata)
+        if analyze:
+            a = ma2.tqg.Parity_check_ramsey_analysis(
+                label=label,
+                Q_target = Q_target,
+                Q_control = Q_control,
+                Q_spectator = Q_spectator,
+                control_cases = control_cases,
+                angles = angles,
+                solve_for_phase_gate_model = solve_for_phase_gate_model,
+                extract_only = extract_only)
+            if update_mw_phase:
+                if type(mw_phase_param) is str:
+                    mw_phase_param = [mw_phase_param for q in Q_target]
+                for q, param in zip(Q_target, mw_phase_param):
+                    # update single qubit phase
+                    Q = self.find_instrument(q)
+                    mw_lm = Q.instr_LutMan_MW.get_instr()
+                    # Make sure mw phase parameter is valid
+                    assert param in mw_lm.parameters.keys()
+                    # Calculate new virtual phase
+                    phi0 = mw_lm.get(param)
+                    phi_new = list(a.qoi['Phase_model'][Q.name].values())[0]
+                    phi = np.mod(phi0+phi_new, 360)
+                    mw_lm.set(param, phi)
+                    print(f'{Q.name}.{param} changed to {phi} deg.')
+            return a.qoi
+
+    def calibrate_parity_check_phase(
+        self,
+        Q_ancilla: list,
+        Q_control: list,
+        Q_pair_target: list,
+        flux_cw_list: list,
+        B_amps: list = None,
+        control_cases: list = None,
+        pc_repetitions: int = 1,
+        downsample_angle_points: int = 1,
+        prepare_for_timedomain: bool = True,
+        extract_only: bool = False,
+        update_flux_param: bool = True,
+        update_mw_phase: bool = True,
+        mw_phase_param: str = 'vcz_virtual_q_ph_corr_step_1'):
+        """
+        Calibrate the phase of a gate in a parity-check by performing a sweep 
+        of the SNZ B parameter while measuring the parity check phase gate
+        coefficients.
+
+        Q_ancilla : Ancilla qubit of the parity check.
+        Q_control : List of control qubits in parity check.
+        Q_pair_target : list of two qubits involved in the two qubit gate. Must
+                        be given in the order [<high_freq_q>, <low_freq_q>]
+        flux_cw_list : list of flux codewords to be played during the parity
+                       check.
+        B_amps : List of B parameters to sweep through.
+        Control_cases : list of different control qubit states. Defaults to all
+                        possible combinations of states.
+        """
+        assert self.ro_acq_weight_type().lower() == 'optimal'
+        assert len(Q_ancilla) == 1
+        qubit_list = Q_ancilla + Q_control
+        assert Q_pair_target[0] in qubit_list
+        assert Q_pair_target[1] in qubit_list
+
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+
+        # get gate directions of two-qubit gate codewords
+        directions = get_gate_directions(Q_pair_target[0],
+                                         Q_pair_target[1])
+        fl_lm = self.find_instrument(Q_pair_target[0]).instr_LutMan_Flux.get_instr()
+        fl_par = f'vcz_amp_fine_{directions[0]}'
+        B0 = fl_lm.get(fl_par)
+        if B_amps is None:
+            B_amps = np.linspace(-.1, .1, 3)+B0
+            if np.min(B_amps) < 0:
+                B_amps -= np.min(B_amps)
+            if np.max(B_amps) > 1:
+                B_amps -= np.max(B_amps)-1
+
+        # Prepare for timedomain
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubit_list)
+            for q in Q_ancilla:
+                mw_lm = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                mw_lm.set_default_lutmap()
+                mw_lm.load_phase_pulses_to_AWG_lookuptable()
+        # Wrapper function for parity check ramsey detector function.
+        def wrapper(Q_target, Q_control,
+                    flux_cw_list,
+                    downsample_angle_points,
+                    extract_only):
+            a = self.measure_parity_check_ramsey(
+                Q_target = Q_target,
+                Q_control = Q_control,
+                flux_cw_list = flux_cw_list,
+                control_cases = None,
+                downsample_angle_points = downsample_angle_points,
+                prepare_for_timedomain = False,
+                pc_repetitions=pc_repetitions,
+                solve_for_phase_gate_model = True,
+                disable_metadata = True,
+                extract_only = extract_only)
+            pm = { f'Phase_model_{op}' : a['Phase_model'][Q_ancilla[0]][op]\
+                   for op in a['Phase_model'][Q_ancilla[0]].keys()}
+            mf = { f'missing_fraction_{q}' : a['Missing_fraction'][q]\
+                  for q in Q_control }
+            return { **pm, **mf} 
+        n = len(Q_control)
+        Operators = ['{:0{}b}'.format(i, n).replace('0','I').replace('1','Z')\
+                     for i in range(2**n)]
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q_target' : Q_ancilla,
+                     'Q_control' : Q_control,
+                     'flux_cw_list': flux_cw_list,
+                     'downsample_angle_points': downsample_angle_points,
+                     'extract_only': extract_only},
+            result_keys=[f'Phase_model_{op}' for op in Operators]+\
+                        [f'missing_fraction_{q}' for q in Q_control],
+            value_names=[f'Phase_model_{op}' for op in Operators]+\
+                        [f'missing_fraction_{q}' for q in Q_control],
+            value_units=['deg' for op in Operators]+\
+                        ['fraction' for q in Q_control])
+        nested_MC.set_detector_function(d)
+        # Set sweep function
+        swf1 = swf.FLsweep(
+            lm = fl_lm,
+            par = fl_lm.parameters[fl_par],
+            waveform_name = f'cz_{directions[0]}')
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(B_amps)
+
+        MC.live_plot_enabled(False)
+        label = f'Parity_check_calibration_gate_{"_".join(Q_pair_target)}'
+        nested_MC.run(label)
+        MC.live_plot_enabled(True)
+
+        a = ma2.tqg.Parity_check_calibration_analysis(
+            Q_ancilla = Q_ancilla,
+            Q_control = Q_control,
+            Q_pair_target = Q_pair_target,
+            B_amps = B_amps,
+            label = label)
+        if update_flux_param:
+            try :
+                if (a.qoi['Optimal_B']>0) and (a.qoi['Optimal_B']<1):
+                    # update flux parameter
+                    fl_lm.set(fl_par, a.qoi['Optimal_B'])
+                elif a.qoi['Optimal_B']<0:
+                    fl_lm.set(fl_par, 0)
+                elif a.qoi['Optimal_B']>1:
+                    fl_lm.set(fl_par, 1)
+            except:
+                fl_lm.set(fl_par, B0)
+                raise ValueError(f'B amplitude {a.qoi["Optimal_B"]:.3f} not valid. '+\
+                                 f'Resetting {fl_par} to {B0:.3f}.')
+        else:
+            fl_lm.set(fl_par, B0)
+            print(f'Resetting {fl_par} to {B0:.3f}.')
+
+        if update_mw_phase:
+            # update single qubit phase
+            Qa = self.find_instrument(Q_ancilla[0])
+            mw_lm = Qa.instr_LutMan_MW.get_instr()
+            # Make sure mw phase parameter is valid
+            assert mw_phase_param in mw_lm.parameters.keys()
+            # Calculate new virtual phase
+            phi0 = mw_lm.get(mw_phase_param)
+            phi = np.mod(phi0+a.qoi['Phase_offset'], 360)
+            mw_lm.set(mw_phase_param, phi)
+
+        return a.qoi
 
     ########################################################
     # other methods
