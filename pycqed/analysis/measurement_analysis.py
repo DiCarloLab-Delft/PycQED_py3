@@ -10432,16 +10432,15 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         #                            rms(I1[start_sample:stop_sample]) +
         #                            rms(Q1[start_sample:stop_sample]))
         # depletion_cost_w = 10 * np.mean(rms(I1[start_sample_w:stop_sample_w] - I0[start_sample_w:stop_sample_w]) +
-        #                                 rms(Q1[start_sample_w:stop_sample_w] - Q0[start_sample_w:stop_sample_w]))  
-                                        
+        #                                 rms(Q1[start_sample_w:stop_sample_w] - Q0[start_sample_w:stop_sample_w]))
+
         # computing depletion cost using non-demodulated transients
-        print('Using no_demod transients')
         depletion_cost_d = np.mean(rms(I0_no_demod[start_sample:stop_sample]) +
                                    rms(Q0_no_demod[start_sample:stop_sample]) +
                                    rms(I1_no_demod[start_sample:stop_sample]) +
                                    rms(Q1_no_demod[start_sample:stop_sample]))
         depletion_cost_w = 10 * np.mean(rms(I1_no_demod[start_sample_w:stop_sample_w] - I0_no_demod[start_sample_w:stop_sample_w]) +
-                                        rms(Q1_no_demod[start_sample_w:stop_sample_w] - Q0_no_demod[start_sample_w:stop_sample_w]))  
+                                        rms(Q1_no_demod[start_sample_w:stop_sample_w] - Q0_no_demod[start_sample_w:stop_sample_w]))
                                         
         arbitrary_weight: float = 10
         depletion_cost = (depletion_cost_d + depletion_cost_w) * arbitrary_weight

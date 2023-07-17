@@ -2084,6 +2084,83 @@ def parity_check_flux_dance(
 
     return p
 
+def parity_check_ramsey(
+        Q_idxs_target,
+        Q_idxs_control,
+        control_cases,
+        flux_cw_list,
+        platf_cfg,
+        angles,
+        nr_spectators: int=0,
+        pc_repetitions: int=1,
+        wait_time_before_flux: int = 0,
+        wait_time_after_flux: int = 0
+        ):
+
+    p = OqlProgram("Parity_check_ramsey", platf_cfg)
+
+    for case in control_cases:    
+        for i, angle in enumerate(angles):
+            k = p.create_kernel("{}_{}".format(case, angle))
+            # Preparation
+            for q in Q_idxs_target+Q_idxs_control:
+                k.prepz(q)
+            k.barrier([])
+            # Single qubit gates
+            for j, state in enumerate(case):
+                if state == '1':
+                    k.gate("rx180", [Q_idxs_control[j]])
+                elif state == '2':
+                    k.gate("rx180", [Q_idxs_control[j]])
+                    k.gate("rx12", [Q_idxs_control[j]])
+            for q in Q_idxs_target:
+                k.gate("rx90", [q])
+            k.barrier([]) # alignment workaround
+            # Flux pulses
+            k.gate('wait', [], wait_time_before_flux)
+            for j in range(pc_repetitions): 
+                for l, flux_cw in enumerate(flux_cw_list):
+                    if 'cz' in flux_cw:
+                        if len(flux_cw_list) == len(Q_idxs_control)-nr_spectators:
+                            k.gate(flux_cw, [Q_idxs_target[0], Q_idxs_control[l]])
+                        elif len(flux_cw_list) == len(Q_idxs_target):
+                            k.gate(flux_cw, [Q_idxs_target[l], Q_idxs_control[0]])
+                        else:
+                            raise('Flux cw list is not valid.')
+                    else:
+                        k.gate(flux_cw, [0])
+            k.gate('wait', [], wait_time_after_flux)
+            k.barrier([])
+            # Single qubit gates
+            for j, state in enumerate(case):
+                if state == '1':
+                    k.gate("rx180", [Q_idxs_control[j]])
+            # cw_idx corresponds to special hardcoded angles in the lutman
+            # special because the cw phase pulses go in mult of 20 deg
+            cw_idx = angle // 20 + 9
+            phi_gate = 'cw_{:02}'.format(cw_idx)
+            for q in Q_idxs_target:
+                k.gate(phi_gate, [q])
+            k.barrier([])
+            # Measurement
+            for q in Q_idxs_target+Q_idxs_control:
+                k.measure(q)
+            k.barrier([])
+
+            p.add_kernel(k)
+
+    qubits = Q_idxs_target + Q_idxs_control
+    cal_states =  ['{:0{}b}'.format(i, len(qubits)) for i in range(2**len(qubits))]
+    p.add_multi_q_cal_points(
+        qubits=qubits,
+        combinations=cal_states
+        )
+    p.compile()
+
+    cal_pts_idx = np.arange(len(control_cases),len(cal_states)+len(control_cases))
+    p.sweep_points = np.concatenate([np.repeat(np.arange(len(control_cases)), len(angles)), 
+                                    cal_pts_idx])
+    return p
 
 def parity_check_fidelity(
         Q_idxs_target: List[str],
