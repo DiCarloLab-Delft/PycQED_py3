@@ -1830,7 +1830,8 @@ class DeviceCCL(Instrument):
             qb = self.find_instrument(qubit)
             mwl = qb.instr_LutMan_MW.get_instr()
             mwl.set_default_lutmap()
-        self.prepare_for_timedomain(qubits = qubits)
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits = qubits)
 
         # get qubit idx 
         Q_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
@@ -1872,7 +1873,7 @@ class DeviceCCL(Instrument):
         MC.live_plot_enabled(False)
         label = f'MUX_SSRO_{"_".join(qubits)}'
         MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
-        MC.live_plot_enabled(True)
+        # MC.live_plot_enabled(True)
         # Analysis
         if analyze:
             ma2.ra.Multiplexed_Readout_Analysis(
@@ -2112,7 +2113,7 @@ class DeviceCCL(Instrument):
                              CCL=self.instr_CC.get_instr())
         MC = self.instr_MC.get_instr()
         MC.soft_avg(1)
-        MC.live_plot_enabled(True)
+        # MC.live_plot_enabled(True)
         MC.set_sweep_function(s)
         sw_pts = np.concatenate((np.repeat(np.arange(0, 360, 20), 6), 
                                  np.array([360, 361, 362, 364])))
@@ -3369,7 +3370,7 @@ class DeviceCCL(Instrument):
             MC.run(label+self.msmt_suffix, disable_snapshot_metadata=disable_metadata)
         except:
             print_exception()
-            MC.live_plot_enabled(True)
+            # MC.live_plot_enabled(True)
         # Analysis
         ma2.tomoa.Gate_process_tomo_Analysis(qubit=q_meas.name, label='Gate_process')
 
@@ -4182,7 +4183,7 @@ class DeviceCCL(Instrument):
         MC.live_plot_enabled(False)
         nested_MC.run(f'VCZ_Amp_vs_Tmid_{Q0}_{Q1}_{Q_parks}',
                       mode='2D', disable_snapshot_metadata=disable_metadata)
-        MC.live_plot_enabled(True)
+        # MC.live_plot_enabled(True)
         ma2.tqg.VCZ_tmid_Analysis(Q0=Q0, Q1=Q1,
                                   A_ranges=A_ranges,
                                   label='VCZ_Amp_vs_Tmid')
@@ -4311,7 +4312,7 @@ class DeviceCCL(Instrument):
         MC.live_plot_enabled(False)
         nested_MC.run(f'VCZ_Amp_vs_B_{Q0}_{Q1}_{Q_parks}',
                       mode='2D', disable_snapshot_metadata=disable_metadata)
-        MC.live_plot_enabled(True)
+        # MC.live_plot_enabled(True)
         a = ma2.tqg.VCZ_B_Analysis(Q0=Q0, Q1=Q1,
                                    A_ranges=A_ranges,
                                    directions=directions,
@@ -4574,7 +4575,7 @@ class DeviceCCL(Instrument):
         MC.live_plot_enabled(False)
         label = f'Parity_check_calibration_gate_{"_".join(Q_pair_target)}'
         nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
-        MC.live_plot_enabled(True)
+        # MC.live_plot_enabled(True)
 
         a = ma2.tqg.Parity_check_calibration_analysis(
             Q_ancilla = Q_ancilla,
@@ -4747,7 +4748,7 @@ class DeviceCCL(Instrument):
         except:
             print_exception()
         self.msmt_suffix = '_device'
-        MC.live_plot_enabled(True)
+        # MC.live_plot_enabled(True)
         # Run analysis
         a = ma2.tqg.Park_frequency_sweep_analysis(
             label=label,
@@ -5071,7 +5072,9 @@ class DeviceCCL(Instrument):
         wait_time_after_flux_ns: int = 0
         ):
         '''
-        Measures parity check fidelity by preparing each
+        Measures parity check fidelity by preparing each.
+        Note: When using heralded initialization, Q_control has
+        to be given in ascending order
         '''
         assert self.ro_acq_weight_type().lower() == 'optimal'
         assert len(Q_ancilla) == 1

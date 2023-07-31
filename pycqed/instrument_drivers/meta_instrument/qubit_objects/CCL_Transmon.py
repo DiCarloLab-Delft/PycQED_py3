@@ -4335,7 +4335,7 @@ class CCLight_Transmon(Qubit):
             frequencies: list,
             amplitudes: list,
             calibrate_optimal_weights: bool=False,
-            use_rx12:bool=False,
+            # use_rx12:bool=False,
             update_ro_params: bool = True):
         '''
         Sweeps readout frequency and amplitude while measuring
@@ -4360,7 +4360,7 @@ class CCLight_Transmon(Qubit):
                      'disable_metadata' : True,
                      'calibrate_optimal_weights':calibrate_optimal_weights,
                      'nr_max_acq' : 2**15,
-                     'use_rx12':use_rx12,
+                     # 'use_rx12':use_rx12,
                      'no_figs' : False},
             result_keys=['Fidelity', 'P_QND', 'P_QNDp'],
             value_names=['Fidelity', 'P_QND', 'P_QNDp'],

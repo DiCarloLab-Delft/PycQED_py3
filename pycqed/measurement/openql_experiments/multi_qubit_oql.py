@@ -1888,11 +1888,12 @@ def parity_check_ramsey(
             for q in Q_idxs_target:
                 k.gate(phi_gate, [q])
             k.barrier([])
+            # k.gate('wait', [], 40)
+
             # Measurement
             for q in Q_idxs_target+Q_idxs_control:
                 k.measure(q)
             k.barrier([])
-
             p.add_kernel(k)
 
     qubits = Q_idxs_target + Q_idxs_control
@@ -3748,10 +3749,19 @@ def repeated_stabilizer_data_measurement_sequence(
                 k.measure(q)
             for q in _remaining_ancillas+[Q_anc]:
                 k.measure(q)
-            k.gate('wait', [], 360)
+            k.gate('wait', [], 400)
             if initial_state_qubits:
-                for q_name in initial_state_qubits:
-                    k.gate('rx180', [data_qubit_map[q_name]])
+                if stabilizer_type == 'Z':
+                    for q_name in initial_state_qubits:
+                        k.gate('rx180', [data_qubit_map[q_name]])
+                elif stabilizer_type == 'X':
+                    if q_name in data_qubit_map.keys():
+                        for q_name in initial_state_qubits:
+                            k.gate('ry90', [data_qubit_map[q_name]])
+                    else: 
+                        k.gate('rym90', [data_qubit_map[q_name]])
+                else:
+                    raise ValueError('Only Z and X type allowed.')
                 k.barrier([])
             # QEC Rounds 
             for i in range(n_rounds):
@@ -3834,10 +3844,19 @@ def repeated_stabilizer_data_measurement_sequence(
                 k.measure(q)
             for q in _remaining_ancillas+[Q_anc]:
                 k.measure(q)
-            k.gate('wait', [], 300)
+            k.gate('wait', [], 400)
             if initial_state_qubits:
-                for q_name in initial_state_qubits:
-                    k.gate('rx180', [data_qubit_map[q_name]])
+                if stabilizer_type == 'Z':
+                    for q_name in initial_state_qubits:
+                        k.gate('rx180', [data_qubit_map[q_name]])
+                elif stabilizer_type == 'X':
+                    if q_name in data_qubit_map.keys():
+                        for q_name in initial_state_qubits:
+                            k.gate('ry90', [data_qubit_map[q_name]])
+                    else: 
+                        k.gate('rym90', [data_qubit_map[q_name]])
+                else:
+                    raise ValueError('Only Z and X type allowed.')
                 k.barrier([])
             # QEC Rounds 
             for i in range(n_rounds):
@@ -3916,6 +3935,8 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
                         k.gate('rX180', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -3923,6 +3944,8 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         # LRU Echo
+                        k.gate('i', [q])
+                        k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -3981,7 +4004,7 @@ def repeated_stabilizer_data_measurement_sequence(
                 k.measure(q)
             for q in _remaining_ancillas+[Q_anc]:
                 k.measure(q)
-            k.gate('wait', [], 360)
+            k.gate('wait', [], 400)
             if initial_state_qubits:
                 if stabilizer_type == 'Z':
                     for q_name in initial_state_qubits:
@@ -4035,6 +4058,7 @@ def repeated_stabilizer_data_measurement_sequence(
                     for q in X_anci_idxs:
                         k.gate("rym90", [q])
                 k.barrier([])
+                k.gate('wait', [],20)
                 # Measurement of ancillas
                 k.measure(Q_anc)
                 for q in _remaining_ancillas:
@@ -4073,6 +4097,7 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                 k.gate("wait", [], 0)
+                k.gate('wait', [], 20)
             p.add_kernel(k)
 
         if 'surface_13_LRU' in experiments:
@@ -4084,10 +4109,19 @@ def repeated_stabilizer_data_measurement_sequence(
                 k.measure(q)
             for q in _remaining_ancillas+[Q_anc]:
                 k.measure(q)
-            k.gate('wait', [], 300)
+            k.gate('wait', [], 400)
             if initial_state_qubits:
-                for q_name in initial_state_qubits:
-                    k.gate('rx180', [data_qubit_map[q_name]])
+                if stabilizer_type == 'Z':
+                    for q_name in initial_state_qubits:
+                        k.gate('rx180', [data_qubit_map[q_name]])
+                elif stabilizer_type == 'X':
+                    if q_name in data_qubit_map.keys():
+                        for q_name in initial_state_qubits:
+                            k.gate('ry90', [data_qubit_map[q_name]])
+                    else: 
+                        k.gate('rym90', [data_qubit_map[q_name]])
+                else:
+                    raise ValueError('Only Z and X type allowed.')
                 k.barrier([])
             # QEC Rounds 
             for i in range(n_rounds):
@@ -4129,6 +4163,7 @@ def repeated_stabilizer_data_measurement_sequence(
                     for q in X_anci_idxs:
                         k.gate("rym90", [q])
                 k.barrier([])
+                k.gate('wait', [], 20)
                 # Measurement of ancillas
                 k.measure(Q_anc)
                 for q in _remaining_ancillas:
@@ -4157,11 +4192,13 @@ def repeated_stabilizer_data_measurement_sequence(
                     k.gate('wait', [17, 18, 19], 200)
                     for q in data_idxs:
                         # Measurement Echo
-                        if q == 13 or q == 15 or q == 16:
-                            k.gate('cw_10', [q])
-                        else:
-                            k.gate('i', [q])
-                        # k.gate('i', [q])
+                        # if q == 13 or q == 15 or q == 16:
+                        #     k.gate('cw_10', [q])
+                        # else:
+                        #     k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -4183,6 +4220,8 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         # LRU Echo
+                        k.gate('i', [q])
+                        k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -4231,6 +4270,7 @@ def repeated_stabilizer_data_measurement_sequence(
                         #     k.gate('i', [q])
 
                 k.gate("wait", [], )
+                k.gate('wait', [], 20)
             p.add_kernel(k)
 
         if 'surface_17' in experiments:
@@ -4329,7 +4369,7 @@ def repeated_stabilizer_data_measurement_sequence(
         k.measure(q)
     for q in _remaining_ancillas+[Q_anc]:
         k.measure(q)
-    k.gate('wait', [], 360)
+    k.gate('wait', [], 400)
     for q in data_idxs:
         k.measure(q)
     for q in _remaining_ancillas+[Q_anc]:
@@ -4342,7 +4382,7 @@ def repeated_stabilizer_data_measurement_sequence(
         k.measure(q)
     for q in _remaining_ancillas+[Q_anc]:
         k.measure(q)
-    k.gate('wait', [], 360)
+    k.gate('wait', [], 400)
     for q in data_idxs+_remaining_ancillas+[Q_anc]:
         k.gate('rx180', [q])
         k.measure(q)
@@ -4356,7 +4396,7 @@ def repeated_stabilizer_data_measurement_sequence(
         k.measure(q)
     for q in _remaining_ancillas+[Q_anc]:
         k.measure(q)
-    k.gate('wait', [], 360)
+    k.gate('wait', [], 400)
     for q in data_idxs+_remaining_ancillas+[Q_anc]:
         k.gate('rx180', [q])
         k.gate('rx12', [q])

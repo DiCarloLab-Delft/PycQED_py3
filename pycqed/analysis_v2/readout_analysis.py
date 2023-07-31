@@ -25,6 +25,9 @@ from pycqed.utilities.general import format_value_string
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.measurement.hdf5_data as h5d
 import matplotlib.patches as patches
+import matplotlib.pylab as pl
+from pycqed.analysis.tools.plotting import cmap_to_alpha, cmap_first_to_alpha
+from matplotlib.colors import LinearSegmentedColormap
 
 import pathlib
 from copy import copy, deepcopy
@@ -892,23 +895,38 @@ def _decision_boundary_points(coefs, intercepts):
     Other classifiers might have diferent bound models.
     '''
     points = {}
-    # Cycle through model coeficients
-    # and intercepts.
-    n = len(intercepts)
-    if n == 3:
-        _bounds = [[0,1], [1,2], [0,2]]
-    if n == 4:
-        _bounds = [[0,1], [1,2], [2,3], [3,0]]
-    for i, j in _bounds:
-        c_i = coefs[i]
-        int_i = intercepts[i]
-        c_j = coefs[j]
-        int_j = intercepts[j]
-        x =  (- int_j/c_j[1] + int_i/c_i[1])/(-c_i[0]/c_i[1] + c_j[0]/c_j[1])
-        y = -c_i[0]/c_i[1]*x - int_i/c_i[1]
-        points[f'{i}{j}'] = (x, y)
-    # Find mean point
-    points['mean'] = np.mean([ [x, y] for (x, y) in points.values()], axis=0)
+    # Cycle through model coeficientsand intercepts.
+    # 2-state classifier
+    if len(intercepts) == 1:
+        m = -coefs[0][0] / coefs[0][1]
+        _X = np.array([-10, 10])
+        _Y = m*_X - intercepts[0]/coefs[0][1]
+        points['left'] = np.array([_X[0], _Y[0]])
+        points['right'] = np.array([_X[1], _Y[1]])
+    # 3-state classifier
+    elif len(intercepts) == 3:
+        for i, j in [[0,1], [1,2], [0,2]]:
+            c_i = coefs[i]
+            int_i = intercepts[i]
+            c_j = coefs[j]
+            int_j = intercepts[j]
+            x =  (- int_j/c_j[1] + int_i/c_i[1])/(-c_i[0]/c_i[1] + c_j[0]/c_j[1])
+            y = -c_i[0]/c_i[1]*x - int_i/c_i[1]
+            points[f'{i}{j}'] = (x, y)
+        # Find mean point
+        points['mean'] = np.mean([ [x, y] for (x, y) in points.values()], axis=0)
+    # 4-state classifier
+    elif len(intercepts) == 4:
+        for i, j in [[0,1], [1,2], [2,3], [3,0]]:
+            c_i = coefs[i]
+            int_i = intercepts[i]
+            c_j = coefs[j]
+            int_j = intercepts[j]
+            x =  (- int_j/c_j[1] + int_i/c_i[1])/(-c_i[0]/c_i[1] + c_j[0]/c_j[1])
+            y = -c_i[0]/c_i[1]*x - int_i/c_i[1]
+            points[f'{i}{j}'] = (x, y)
+    else:
+        raise ValueError('No valid data input.')
     return points
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
@@ -4180,21 +4198,360 @@ def plot_depletion_allxy(qubit, timestamp,
     fig.suptitle(timestamp+'\nDepletion_ALLXY_'+qubit, y=1.0)
 
 
+def _rotate_and_center_data(I, Q, vec0, vec1, phi=0):
+    '''
+    Rotate <I>, <Q> shots in IQ plane around axis defined by <vec0> - <vec1>
+    '''
+    vector = vec1-vec0
+    angle = np.arctan(vector[1]/vector[0])
+    rot_matrix = np.array([[ np.cos(-angle+phi),-np.sin(-angle+phi)],
+                           [ np.sin(-angle+phi), np.cos(-angle+phi)]])
+    proc = np.array((I, Q))
+    proc = np.dot(rot_matrix, proc)
+    return proc.transpose()
+
+def _Classify_qubit_calibration_shots(Shots_0, Shots_1):
+    '''
+    Train linear discriminant classifier
+    to classify Qubit shots in IQ space.
+    '''
+    data = np.concatenate((Shots_0, Shots_1))
+    labels = [0 for s in Shots_0]+[1 for s in Shots_1]
+    from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+    clf = LinearDiscriminantAnalysis()
+    clf.fit(data, labels)
+    dec_bounds = _decision_boundary_points(clf.coef_, clf.intercept_)
+    Fid_dict = {}
+    for state, shots in zip([    '0',     '1'],
+                            [Shots_0, Shots_1]):
+        _res = clf.predict(shots)
+        _fid = np.mean(_res == int(state))
+        Fid_dict[state] = _fid
+    Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+    # Get assignment fidelity matrix
+    M = np.zeros((2,2))
+    for i, shots in enumerate([Shots_0, Shots_1]):
+        for j, state in enumerate(['0', '1']):
+            _res = clf.predict(shots)
+            M[i][j] = np.mean(_res == int(state))
+    return clf, Fid_dict, M, dec_bounds
+
+def _Classify_qutrit_calibration_shots(Shots_0, Shots_1, Shots_2):
+    '''
+    Train linear discriminant classifier
+    to classify Qutrit shots in IQ space.
+    '''
+    data = np.concatenate((Shots_0, Shots_1, Shots_2))
+    labels = [0 for s in Shots_0]+[1 for s in Shots_1]+[2 for s in Shots_2]
+    from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+    clf = LinearDiscriminantAnalysis()
+    clf.fit(data, labels)
+    dec_bounds = _decision_boundary_points(clf.coef_, clf.intercept_)
+    Fid_dict = {}
+    for state, shots in zip([    '0',     '1',     '2'],
+                            [Shots_0, Shots_1, Shots_2]):
+        _res = clf.predict(shots)
+        _fid = np.mean(_res == int(state))
+        Fid_dict[state] = _fid
+    Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
+    # Get assignment fidelity matrix
+    M = np.zeros((3,3))
+    for i, shots in enumerate([Shots_0, Shots_1, Shots_2]):
+        for j, state in enumerate(['0', '1', '2']):
+            _res = clf.predict(shots)
+            M[i][j] = np.mean(_res == int(state))
+    return clf, Fid_dict, M, dec_bounds
+
 def calc_assignment_prob_matrix(combinations, digitized_data):
-
+    first_key = next(iter(digitized_data))
+    n_shots = len(digitized_data[first_key][next(iter(digitized_data[first_key]))])
+    # set up empty assignment matrix
     assignment_prob_matrix = np.zeros((len(combinations), len(combinations)))
-
+    # Loop through different input and assigned states
     for i, input_state in enumerate(combinations):
         for j, outcome in enumerate(combinations):
-            first_key = next(iter(digitized_data))
-            Check = np.ones(len(digitized_data[first_key][input_state]))
+            Check = np.ones(n_shots)
+            # loop through different qubits
             for k, ch in enumerate(digitized_data.keys()):
+                # Check if measured state matches the current assigned state
                 check = digitized_data[ch][input_state] == int(outcome[k])
                 Check *= check
-
-            assignment_prob_matrix[i][j] = sum(Check)/len(Check)
-
+            assignment_prob_matrix[i][j] = sum(Check)/n_shots
     return assignment_prob_matrix
+
+def calc_cross_fidelity_matrix(combinations, assignment_prob_matrix):
+    n = int(np.log2(len(combinations)))
+    C = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            # idxs where qubit i is was assigned in ground <g> or excited <e> state
+            combs_gi = [ idx for idx, comb in enumerate(combinations) if comb[i]=='0' ]
+            combs_ei = [ idx for idx, comb in enumerate(combinations) if comb[i]=='1' ]
+            # idxs where qubit j is was prepared in ground <I> or excited <P> (pi-pulsed)
+            combs_Ij = [ idx for idx, comb in enumerate(combinations) if comb[j]=='0' ]
+            combs_Pj = [ idx for idx, comb in enumerate(combinations) if comb[j]=='1' ]# calculate conditional probabilities
+            # calculate conditional probabilities
+            P_ei_Ij = np.sum(assignment_prob_matrix[combs_ei][:,combs_Ij])
+            P_gi_Pj = np.sum(assignment_prob_matrix[combs_gi][:,combs_Pj])
+            # Normalize probabilities
+            normalization_factor = (len(combinations)/2)
+            P_ei_Ij = P_ei_Ij/normalization_factor
+            P_gi_Pj = P_gi_Pj/normalization_factor
+            # Add entry to cross fidelity matrix
+            Fc = 1 - P_ei_Ij - P_gi_Pj
+            C[j,i] = Fc
+    return C
+
+def _calculate_fid_and_threshold(x0, n0, x1, n1):
+    """
+    Calculate fidelity and threshold from histogram data:
+    x0, n0 is the histogram data of shots 0 (value and occurences),
+    x1, n1 is the histogram data of shots 1 (value and occurences).
+    """
+    # Build cumulative histograms of shots 0 
+    # and 1 in common bins by interpolation.
+    all_x = np.unique(np.sort(np.concatenate((x0, x1))))
+    cumsum0, cumsum1 = np.cumsum(n0), np.cumsum(n1)
+    ecumsum0 = np.interp(x=all_x, xp=x0, fp=cumsum0, left=0)
+    necumsum0 = ecumsum0/np.max(ecumsum0)
+    ecumsum1 = np.interp(x=all_x, xp=x1, fp=cumsum1, left=0)
+    necumsum1 = ecumsum1/np.max(ecumsum1)
+    # Calculate optimal threshold and fidelity
+    F_vs_th = (1-(1-abs(necumsum0 - necumsum1))/2)
+    opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
+    opt_idx = int(round(np.average(opt_idxs)))
+    F_assignment_raw = F_vs_th[opt_idx]
+    threshold_raw = all_x[opt_idx]
+    return F_assignment_raw, threshold_raw
+
+def _gauss_pdf(x, x0, sigma):
+    return np.exp(-((x-x0)/sigma)**2/2)
+
+def double_gauss(x, x0, x1, sigma0, sigma1, A, r):
+    _dist0 = A*( (1-r)*_gauss_pdf(x, x0, sigma0) + r*_gauss_pdf(x, x1, sigma1) )
+    return _dist0
+
+def _double_gauss_joint(x, x0, x1, sigma0, sigma1, A0, A1, r0, r1):
+    _dist0 = double_gauss(x, x0, x1, sigma0, sigma1, A0, r0)
+    _dist1 = double_gauss(x, x1, x0, sigma1, sigma0, A1, r1)
+    return np.concatenate((_dist0, _dist1))
+
+def _fit_double_gauss(x_vals, hist_0, hist_1):
+    '''
+    Fit two histograms to a double gaussian with
+    common parameters. From fitted parameters,
+    calculate SNR, Pe0, Pg1, Teff, Ffit and Fdiscr.
+    '''
+    from scipy.optimize import curve_fit
+    # Double gaussian model for fitting
+    def _gauss_pdf(x, x0, sigma):
+        return np.exp(-((x-x0)/sigma)**2/2)
+    global double_gauss
+    def double_gauss(x, x0, x1, sigma0, sigma1, A, r):
+        _dist0 = A*( (1-r)*_gauss_pdf(x, x0, sigma0) + r*_gauss_pdf(x, x1, sigma1) )
+        return _dist0
+    # helper function to simultaneously fit both histograms with common parameters
+    def _double_gauss_joint(x, x0, x1, sigma0, sigma1, A0, A1, r0, r1):
+        _dist0 = double_gauss(x, x0, x1, sigma0, sigma1, A0, r0)
+        _dist1 = double_gauss(x, x1, x0, sigma1, sigma0, A1, r1)
+        return np.concatenate((_dist0, _dist1))
+    # Guess for fit
+    pdf_0 = hist_0/np.sum(hist_0) # Get prob. distribution
+    pdf_1 = hist_1/np.sum(hist_1) # 
+    _x0_guess = np.sum(x_vals*pdf_0) # calculate mean
+    _x1_guess = np.sum(x_vals*pdf_1) #
+    _sigma0_guess = np.sqrt(np.sum((x_vals-_x0_guess)**2*pdf_0)) # calculate std
+    _sigma1_guess = np.sqrt(np.sum((x_vals-_x1_guess)**2*pdf_1)) #
+    _r0_guess = 0.01
+    _r1_guess = 0.05
+    _A0_guess = np.max(hist_0)
+    _A1_guess = np.max(hist_1)
+    p0 = [_x0_guess, _x1_guess, _sigma0_guess, _sigma1_guess, _A0_guess, _A1_guess, _r0_guess, _r1_guess]
+    # Bounding parameters
+    _x0_bound = (-np.inf,np.inf)
+    _x1_bound = (-np.inf,np.inf)
+    _sigma0_bound = (0,np.inf)
+    _sigma1_bound = (0,np.inf)
+    _r0_bound = (0,1)
+    _r1_bound = (0,1)
+    _A0_bound = (0,np.inf)
+    _A1_bound = (0,np.inf)
+    bounds = np.array([_x0_bound, _x1_bound, _sigma0_bound, _sigma1_bound,
+                       _A0_bound, _A1_bound, _r0_bound, _r1_bound])
+    # Fit parameters within bounds
+    popt, pcov = curve_fit(
+        _double_gauss_joint, x_vals,
+        np.concatenate((hist_0, hist_1)),
+        p0=p0, bounds=bounds.transpose())
+    popt0 = popt[[0,1,2,3,4,6]]
+    popt1 = popt[[1,0,3,2,5,7]]
+    # Calculate quantities of interest
+    SNR = abs(popt0[0] - popt1[0])/((abs(popt0[2])+abs(popt1[2]))/2)
+    P_e0 = popt0[5]
+    P_g1 = popt1[5]
+    # Fidelity from fit
+    _range = (np.min(x_vals), np.max(x_vals))
+    _x_data = np.linspace(*_range, 10001)
+    _h0 = double_gauss(_x_data, *popt0)# compute distrubition from
+    _h1 = double_gauss(_x_data, *popt1)# fitted parameters.
+    Fid_fit, threshold_fit = _calculate_fid_and_threshold(_x_data, _h0, _x_data, _h1)
+    # Discrimination fidelity
+    _h0 = double_gauss(_x_data, *popt0[:-1], 0)# compute distrubition without residual
+    _h1 = double_gauss(_x_data, *popt1[:-1], 0)# excitation of relaxation.
+    Fid_discr, threshold_discr = _calculate_fid_and_threshold(_x_data, _h0, _x_data, _h1)
+    # return results
+    qoi = { 'SNR': SNR,
+            'P_e0': P_e0, 'P_g1': P_g1,
+            'Fid_fit': Fid_fit, 'Fid_discr': Fid_discr }
+    return popt0, popt1, qoi
+
+def _Analyse_qubit_shots_along_decision_boundaries(
+    qubit,
+    Shots_0, Shots_1,
+    dec_bounds, proc_data_dict):
+    '''
+    Project readout data along axis perpendicular
+    to the decision boundaries of classifier and computes
+    quantities of interest. These are saved in the <proc_data_dict>. 
+    '''
+    ############################
+    # Projection along 01 axis.
+    ############################
+    # Rotate shots over 01 axis
+    shots_0 = _rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['left'],dec_bounds['right'],phi=np.pi/2)
+    shots_1 = _rotate_and_center_data(Shots_1[:,0],Shots_1[:,1],dec_bounds['left'],dec_bounds['right'],phi=np.pi/2)
+    # Take relavant quadrature
+    shots_0 = shots_0[:,0]
+    shots_1 = shots_1[:,0]
+    n_shots_1 = len(shots_1)
+    # find range
+    _all_shots = np.concatenate((shots_0, shots_1))
+    _range = (np.min(_all_shots), np.max(_all_shots))
+    # Sort shots in unique values
+    x0, n0 = np.unique(shots_0, return_counts=True)
+    x1, n1 = np.unique(shots_1, return_counts=True)
+    Fid_01, threshold_01 = _calculate_fid_and_threshold(x0, n0, x1, n1)
+    # Histogram of shots for 1 and 2
+    h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
+    h1, bin_edges = np.histogram(shots_1, bins=100, range=_range)
+    bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+    popt0, popt1, params_01 = _fit_double_gauss(bin_centers, h0, h1)
+    # Save processed data
+    proc_data_dict[qubit]['projection_qubit'] = {}
+    proc_data_dict[qubit]['projection_qubit']['h0'] = h0
+    proc_data_dict[qubit]['projection_qubit']['h1'] = h1
+    proc_data_dict[qubit]['projection_qubit']['bin_centers'] = bin_centers
+    proc_data_dict[qubit]['projection_qubit']['popt0'] = popt0
+    proc_data_dict[qubit]['projection_qubit']['popt1'] = popt1
+    proc_data_dict[qubit]['projection_qubit']['SNR'] = params_01['SNR']
+    proc_data_dict[qubit]['projection_qubit']['Fid'] = Fid_01
+    proc_data_dict[qubit]['projection_qubit']['threshold'] = threshold_01
+
+def _Analyse_qutrit_shots_along_decision_boundaries(
+    qubit,
+    Shots_0, Shots_1, Shots_2,
+    dec_bounds, proc_data_dict):
+    '''
+    Project readout data along axis perpendicular
+    to the decision boundaries of classifier and computes
+    quantities of interest. These are saved in the <proc_data_dict>. 
+    '''
+    ############################
+    # Projection along 01 axis.
+    ############################
+    # Rotate shots over 01 axis
+    shots_0 = _rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['01'],phi=np.pi/2)
+    shots_1 = _rotate_and_center_data(Shots_1[:,0],Shots_1[:,1],dec_bounds['mean'],dec_bounds['01'],phi=np.pi/2)
+    # Take relavant quadrature
+    shots_0 = shots_0[:,0]
+    shots_1 = shots_1[:,0]
+    n_shots_1 = len(shots_1)
+    # find range
+    _all_shots = np.concatenate((shots_0, shots_1))
+    _range = (np.min(_all_shots), np.max(_all_shots))
+    # Sort shots in unique values
+    x0, n0 = np.unique(shots_0, return_counts=True)
+    x1, n1 = np.unique(shots_1, return_counts=True)
+    Fid_01, threshold_01 = _calculate_fid_and_threshold(x0, n0, x1, n1)
+    # Histogram of shots for 1 and 2
+    h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
+    h1, bin_edges = np.histogram(shots_1, bins=100, range=_range)
+    bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+    popt0, popt1, params_01 = _fit_double_gauss(bin_centers, h0, h1)
+    # Save processed data
+    proc_data_dict[qubit]['projection_01'] = {}
+    proc_data_dict[qubit]['projection_01']['h0'] = h0
+    proc_data_dict[qubit]['projection_01']['h1'] = h1
+    proc_data_dict[qubit]['projection_01']['bin_centers'] = bin_centers
+    proc_data_dict[qubit]['projection_01']['popt0'] = popt0
+    proc_data_dict[qubit]['projection_01']['popt1'] = popt1
+    proc_data_dict[qubit]['projection_01']['SNR'] = params_01['SNR']
+    proc_data_dict[qubit]['projection_01']['Fid'] = Fid_01
+    proc_data_dict[qubit]['projection_01']['threshold'] = threshold_01
+    ############################
+    # Projection along 12 axis.
+    ############################
+    # Rotate shots over 12 axis
+    shots_1 = _rotate_and_center_data(Shots_1[:,0],Shots_1[:,1],dec_bounds['mean'], dec_bounds['12'], phi=np.pi/2)
+    shots_2 = _rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'], dec_bounds['12'], phi=np.pi/2)
+    # Take relavant quadrature
+    shots_1 = shots_1[:,0]
+    shots_2 = shots_2[:,0]
+    n_shots_2 = len(shots_2)
+    # find range
+    _all_shots = np.concatenate((shots_1, shots_2))
+    _range = (np.min(_all_shots), np.max(_all_shots))
+    # Sort shots in unique values
+    x1, n1 = np.unique(shots_1, return_counts=True)
+    x2, n2 = np.unique(shots_2, return_counts=True)
+    Fid_12, threshold_12 = _calculate_fid_and_threshold(x1, n1, x2, n2)
+    # Histogram of shots for 1 and 2
+    h1, bin_edges = np.histogram(shots_1, bins=100, range=_range)
+    h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
+    bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+    popt1, popt2, params_12 = _fit_double_gauss(bin_centers, h1, h2)
+    # Save processed data
+    proc_data_dict[qubit]['projection_12'] = {}
+    proc_data_dict[qubit]['projection_12']['h1'] = h1
+    proc_data_dict[qubit]['projection_12']['h2'] = h2
+    proc_data_dict[qubit]['projection_12']['bin_centers'] = bin_centers
+    proc_data_dict[qubit]['projection_12']['popt1'] = popt1
+    proc_data_dict[qubit]['projection_12']['popt2'] = popt2
+    proc_data_dict[qubit]['projection_12']['SNR'] = params_12['SNR']
+    proc_data_dict[qubit]['projection_12']['Fid'] = Fid_12
+    proc_data_dict[qubit]['projection_12']['threshold'] = threshold_12
+    ############################
+    # Projection along 02 axis.
+    ############################
+    # Rotate shots over 02 axis
+    shots_0 = _rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
+    shots_2 = _rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
+    # Take relavant quadrature
+    shots_0 = shots_0[:,0]
+    shots_2 = shots_2[:,0]
+    n_shots_2 = len(shots_2)
+    # find range
+    _all_shots = np.concatenate((shots_0, shots_2))
+    _range = (np.min(_all_shots), np.max(_all_shots))
+    # Sort shots in unique values
+    x0, n0 = np.unique(shots_0, return_counts=True)
+    x2, n2 = np.unique(shots_2, return_counts=True)
+    Fid_02, threshold_02 = _calculate_fid_and_threshold(x0, n0, x2, n2)
+    # Histogram of shots for 1 and 2
+    h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
+    h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
+    bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
+    popt0, popt2, params_02 = _fit_double_gauss(bin_centers, h0, h2)
+    # Save processed data
+    proc_data_dict[qubit]['projection_02'] = {}
+    proc_data_dict[qubit]['projection_02']['h0'] = h0
+    proc_data_dict[qubit]['projection_02']['h2'] = h2
+    proc_data_dict[qubit]['projection_02']['bin_centers'] = bin_centers
+    proc_data_dict[qubit]['projection_02']['popt0'] = popt0
+    proc_data_dict[qubit]['projection_02']['popt2'] = popt2
+    proc_data_dict[qubit]['projection_02']['SNR'] = params_02['SNR']
+    proc_data_dict[qubit]['projection_02']['Fid'] = Fid_02
+    proc_data_dict[qubit]['projection_02']['threshold'] = threshold_02
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     """
@@ -4269,31 +4626,49 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             if self.f_state:
                 self.proc_data_dict[q]['shots_2_IQ'] = []
             for i, comb in enumerate(combinations):
+                _idx = (1+self.heralded_init)*i+self.heralded_init
                 if comb[q_idx] == '0':
-                    self.proc_data_dict[q]['shots_0_IQ'] += list(raw_shots[q][i::_cycle])
+                    self.proc_data_dict[q]['shots_0_IQ'] += list(raw_shots[q][_idx::_cycle])
                 elif comb[q_idx] == '1':
-                    self.proc_data_dict[q]['shots_1_IQ'] += list(raw_shots[q][i::_cycle])
+                    self.proc_data_dict[q]['shots_1_IQ'] += list(raw_shots[q][_idx::_cycle])
                 elif (comb[q_idx] == '2') and self.f_state:
-                    self.proc_data_dict[q]['shots_2_IQ'] += list(raw_shots[q][i::_cycle])
+                    self.proc_data_dict[q]['shots_2_IQ'] += list(raw_shots[q][_idx::_cycle])
             # Convert list into array
             self.proc_data_dict[q]['shots_0_IQ'] = np.array(self.proc_data_dict[q]['shots_0_IQ'])
             self.proc_data_dict[q]['shots_1_IQ'] = np.array(self.proc_data_dict[q]['shots_1_IQ'])
             if self.f_state:
                 self.proc_data_dict[q]['shots_2_IQ'] = np.array(self.proc_data_dict[q]['shots_2_IQ'])
+        #####################################################
+        # From this point onward raw shots has shape 
+        # (nr_shots, nr_quadratures).
+        # Post select based on heralding measurement result.
+        #####################################################
+        if self.heralded_init:
+            # pass # Not implemented yet
+            # Post-selection mask
+            _mask = np.ones(len(raw_shots[self.qubits[0]][0::2]))
+            for q_idx, q in enumerate(self.qubits):
+                # Train classifier for qubit
+                Shots_0 = self.proc_data_dict[q]['shots_0_IQ'] # Parse data for
+                Shots_1 = self.proc_data_dict[q]['shots_1_IQ'] # classifier
+                clf, _, _, _ = _Classify_qubit_calibration_shots(Shots_0, Shots_1)
+                # Sort heralding measurement shots 
+                _ps_shots = raw_shots[q][0::2]
+                _ps_shots_dig = clf.predict(_ps_shots)
+                _mask *= np.array([1 if s == 0 else np.nan for s in _ps_shots_dig])
+            # Remove heralding measurement shots
+            for q_idx, q in enumerate(self.qubits):    
+                raw_shots[q] = raw_shots[q][1::2]
+        else:
+            _mask = np.ones(len(raw_shots[self.qubits[0]]))
+
+        # Sort shots after handling post-selection
+        for q_idx, q in enumerate(self.qubits):
             # Rotate data along 01
             center_0 = np.mean(self.proc_data_dict[q]['shots_0_IQ'], axis=0)
             center_1 = np.mean(self.proc_data_dict[q]['shots_1_IQ'], axis=0)
-            def rotate_and_center_data(I, Q, vec0, vec1, phi=0):
-                vector = vec1-vec0
-                angle = np.arctan(vector[1]/vector[0])
-                rot_matrix = np.array([[ np.cos(-angle+phi),-np.sin(-angle+phi)],
-                                       [ np.sin(-angle+phi), np.cos(-angle+phi)]])
-                proc = np.array((I, Q))
-                proc = np.dot(rot_matrix, proc)
-                return proc.transpose()
-            raw_shots[q] = rotate_and_center_data(
+            raw_shots[q] = _rotate_and_center_data(
                     raw_shots[q][:,0], raw_shots[q][:,1], center_0, center_1)
-
             self.proc_data_dict[q]['Shots_0'] = []
             self.proc_data_dict[q]['Shots_1'] = []
             if self.f_state:
@@ -4301,29 +4676,24 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             for i, comb in enumerate(combinations):
                 self.proc_data_dict[q][f'shots_{comb}'] = raw_shots[q][i::_cycle]
                 if comb[q_idx] == '0':
-                    self.proc_data_dict[q]['Shots_0'] += list(raw_shots[q][i::_cycle])
+                    self.proc_data_dict[q]['Shots_0'] += list(raw_shots[q][i::_cycle][~np.isnan(_mask[i::_cycle])])
                 elif comb[q_idx] == '1':
-                    self.proc_data_dict[q]['Shots_1'] += list(raw_shots[q][i::_cycle])
+                    self.proc_data_dict[q]['Shots_1'] += list(raw_shots[q][i::_cycle][~np.isnan(_mask[i::_cycle])])
                 elif (comb[q_idx] == '2') and self.f_state:
-                    self.proc_data_dict[q]['Shots_2'] += list(raw_shots[q][i::_cycle])
+                    self.proc_data_dict[q]['Shots_2'] += list(raw_shots[q][i::_cycle][~np.isnan(_mask[i::_cycle])])
             # Convert list into array
             self.proc_data_dict[q]['Shots_0'] = np.array(self.proc_data_dict[q]['Shots_0'])
             self.proc_data_dict[q]['Shots_1'] = np.array(self.proc_data_dict[q]['Shots_1'])
             if self.f_state:
                 self.proc_data_dict[q]['Shots_2'] = np.array(self.proc_data_dict[q]['Shots_2'])
-            #####################################################
-            # From this point onward raw shots has shape 
-            # (nr_shots, nr_quadratures).
-            # Post select based on heralding measurement result.
-            #####################################################
-            if self.heralded_init:
-                pass # Not implemented yet        
-            ##############################################################
-            # From this point onward Shots_<i> contains post-selected
-            # shots of state <i> and has shape (nr_ps_shots, nr_quadtrs).
-            # Next we will analyze shots projected along axis and 
-            # therefore use a single quadrature. shots_<i> will be used
-            # to denote that array of shots.
+        ##################################################################
+        # From this point onward Shots_<i> contains post-selected
+        # shots of state <i> and has shape (nr_ps_shots, nr_quadtrs).
+        # Next we will analyze shots projected along axis and 
+        # therefore use a single quadrature. shots_<i> will be used
+        # to denote that array of shots.
+        ##################################################################
+        for q_idx, q in enumerate(self.qubits):
             ##############################################################
             # Analyse data in quadrature of interest
             # (01 projection axis)
@@ -4340,102 +4710,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             x0, n0 = np.unique(shots_0, return_counts=True)
             x1, n1 = np.unique(shots_1, return_counts=True)
             # Calculate fidelity and optimal threshold
-            def _calculate_fid_and_threshold(x0, n0, x1, n1):
-                """
-                Calculate fidelity and threshold from histogram data:
-                x0, n0 is the histogram data of shots 0 (value and occurences),
-                x1, n1 is the histogram data of shots 1 (value and occurences).
-                """
-                # Build cumulative histograms of shots 0 
-                # and 1 in common bins by interpolation.
-                all_x = np.unique(np.sort(np.concatenate((x0, x1))))
-                cumsum0, cumsum1 = np.cumsum(n0), np.cumsum(n1)
-                ecumsum0 = np.interp(x=all_x, xp=x0, fp=cumsum0, left=0)
-                necumsum0 = ecumsum0/np.max(ecumsum0)
-                ecumsum1 = np.interp(x=all_x, xp=x1, fp=cumsum1, left=0)
-                necumsum1 = ecumsum1/np.max(ecumsum1)
-                # Calculate optimal threshold and fidelity
-                F_vs_th = (1-(1-abs(necumsum0 - necumsum1))/2)
-                opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
-                opt_idx = int(round(np.average(opt_idxs)))
-                F_assignment_raw = F_vs_th[opt_idx]
-                threshold_raw = all_x[opt_idx]
-                return F_assignment_raw, threshold_raw
             Fid_raw, threshold_raw = _calculate_fid_and_threshold(x0, n0, x1, n1)
             ######################
             # Fit data
             ######################
-            def _fit_double_gauss(x_vals, hist_0, hist_1):
-                '''
-                Fit two histograms to a double gaussian with
-                common parameters. From fitted parameters,
-                calculate SNR, Pe0, Pg1, Teff, Ffit and Fdiscr.
-                '''
-                from scipy.optimize import curve_fit
-                # Double gaussian model for fitting
-                def _gauss_pdf(x, x0, sigma):
-                    return np.exp(-((x-x0)/sigma)**2/2)
-                global double_gauss
-                def double_gauss(x, x0, x1, sigma0, sigma1, A, r):
-                    _dist0 = A*( (1-r)*_gauss_pdf(x, x0, sigma0) + r*_gauss_pdf(x, x1, sigma1) )
-                    return _dist0
-                # helper function to simultaneously fit both histograms with common parameters
-                def _double_gauss_joint(x, x0, x1, sigma0, sigma1, A0, A1, r0, r1):
-                    _dist0 = double_gauss(x, x0, x1, sigma0, sigma1, A0, r0)
-                    _dist1 = double_gauss(x, x1, x0, sigma1, sigma0, A1, r1)
-                    return np.concatenate((_dist0, _dist1))
-                # Guess for fit
-                pdf_0 = hist_0/np.sum(hist_0) # Get prob. distribution
-                pdf_1 = hist_1/np.sum(hist_1) # 
-                _x0_guess = np.sum(x_vals*pdf_0) # calculate mean
-                _x1_guess = np.sum(x_vals*pdf_1) #
-                _sigma0_guess = np.sqrt(np.sum((x_vals-_x0_guess)**2*pdf_0)) # calculate std
-                _sigma1_guess = np.sqrt(np.sum((x_vals-_x1_guess)**2*pdf_1)) #
-                _r0_guess = 0.01
-                _r1_guess = 0.05
-                _A0_guess = np.max(hist_0)
-                _A1_guess = np.max(hist_1)
-                p0 = [_x0_guess, _x1_guess, _sigma0_guess, _sigma1_guess, _A0_guess, _A1_guess, _r0_guess, _r1_guess]
-                # Bounding parameters
-                _x0_bound = (-np.inf,np.inf)
-                _x1_bound = (-np.inf,np.inf)
-                _sigma0_bound = (0,np.inf)
-                _sigma1_bound = (0,np.inf)
-                _r0_bound = (0,1)
-                _r1_bound = (0,1)
-                _A0_bound = (0,np.inf)
-                _A1_bound = (0,np.inf)
-                bounds = np.array([_x0_bound, _x1_bound, _sigma0_bound, _sigma1_bound, _A0_bound, _A1_bound, _r0_bound, _r1_bound])
-                # Fit parameters within bounds
-                popt, pcov = curve_fit(
-                    _double_gauss_joint, bin_centers,
-                    np.concatenate((hist_0, hist_1)),
-                    p0=p0, bounds=bounds.transpose())
-                popt0 = popt[[0,1,2,3,4,6]]
-                popt1 = popt[[1,0,3,2,5,7]]
-                # Calculate quantities of interest
-                SNR = abs(popt0[0] - popt1[0])/((abs(popt0[2])+abs(popt1[2]))/2)
-                P_e0 = popt0[5]*popt0[2]/(popt0[2]*popt0[5] + popt0[3]*(1-popt0[5]))
-                P_g1 = popt1[5]*popt1[2]/(popt1[2]*popt1[5] + popt1[3]*(1-popt1[5]))
-                # # Effective qubit temperature
-                # h = 6.62607004e-34
-                # kb = 1.38064852e-23
-                # T_eff = h*self.qubit_freq/(kb*np.log((1-P_e0)/P_e0))
-                # Fidelity from fit
-                _x_data = np.linspace(*_range, 10001)
-                _h0 = double_gauss(_x_data, *popt0)# compute distrubition from
-                _h1 = double_gauss(_x_data, *popt1)# fitted parameters.
-                Fid_fit, threshold_fit = _calculate_fid_and_threshold(_x_data, _h0, _x_data, _h1)
-                # Discrimination fidelity
-                _h0 = double_gauss(_x_data, *popt0[:-1], 0)# compute distrubition without residual
-                _h1 = double_gauss(_x_data, *popt1[:-1], 0)# excitation of relaxation.
-                Fid_discr, threshold_discr = _calculate_fid_and_threshold(_x_data, _h0, _x_data, _h1)
-                # return results
-                qoi = { 'SNR': SNR,
-                        'P_e0': P_e0, 'P_g1': P_g1, 
-                        # 'T_eff': T_eff, 
-                        'Fid_fit': Fid_fit, 'Fid_discr': Fid_discr }
-                return popt0, popt1, qoi
             # Histogram of shots for 0 and 1
             h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
             h1, bin_edges = np.histogram(shots_1, bins=100, range=_range)
@@ -4466,166 +4744,92 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             # to assign states in the IQ plane and 
             # calculate qutrit fidelity.
             ############################################
-            if self.f_state:
+            if not self.f_state:
                 # Parse data for classifier
                 Shots_0 = self.proc_data_dict[q]['Shots_0']
                 Shots_1 = self.proc_data_dict[q]['Shots_1']
-                Shots_2 = self.proc_data_dict[q]['Shots_2']
-                data = np.concatenate((Shots_0, Shots_1, Shots_2))
-                labels = [0 for s in Shots_0]+[1 for s in Shots_1]+[2 for s in Shots_2]
-                from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-                clf = LinearDiscriminantAnalysis()
-                clf.fit(data, labels)
-                dec_bounds = _decision_boundary_points(clf.coef_, clf.intercept_)
-                Fid_dict = {}
-                for state, shots in zip([    '0',     '1',     '2'],
-                                        [Shots_0, Shots_1, Shots_2]):
-                    _res = clf.predict(shots)
-                    _fid = np.mean(_res == int(state))
-                    Fid_dict[state] = _fid
-                Fid_dict['avg'] = np.mean([f for f in Fid_dict.values()])
-                # Get assignment fidelity matrix
-                M = np.zeros((3,3))
-                for i, shots in enumerate([Shots_0, Shots_1, Shots_2]):
-                    for j, state in enumerate(['0', '1', '2']):
-                        _res = clf.predict(shots)
-                        M[i][j] = np.mean(_res == int(state))
+                clf, Fid_dict, M, dec_bounds = _Classify_qubit_calibration_shots(Shots_0, Shots_1)
+                # Save outcome
                 self.proc_data_dict[q]['classifier'] = clf
                 self.proc_data_dict[q]['dec_bounds'] = dec_bounds
                 self.proc_data_dict[q]['Fid_dict'] = Fid_dict
                 self.qoi[q]['Fid_dict'] = Fid_dict
                 self.qoi[q]['Assignment_matrix'] = M
-                #########################################
-                # Project data along axis perpendicular
-                # to the decision boundaries.
-                #########################################
-                ############################
-                # Projection along 10 axis.
-                ############################
-                # Rotate shots over 01 decision boundary axis
-                shots_0 = rotate_and_center_data(Shots_0[:,0],Shots_0[:,1], dec_bounds['mean'], dec_bounds['01'], phi=np.pi/2)
-                shots_1 = rotate_and_center_data(Shots_1[:,0],Shots_1[:,1], dec_bounds['mean'], dec_bounds['01'], phi=np.pi/2)
-                # Take relavant quadrature
-                shots_0 = shots_0[:,0]
-                shots_1 = shots_1[:,0]
-                n_shots_1 = len(shots_1)
-                # find range
-                _all_shots = np.concatenate((shots_0, shots_1))
-                _range = (np.min(_all_shots), np.max(_all_shots))
-                # Sort shots in unique values
-                x0, n0 = np.unique(shots_0, return_counts=True)
-                x1, n1 = np.unique(shots_1, return_counts=True)
-                Fid_01, threshold_01 = _calculate_fid_and_threshold(x0, n0, x1, n1)
-                # Histogram of shots for 1 and 2
-                h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
-                h1, bin_edges = np.histogram(shots_1, bins=100, range=_range)
-                bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
-                popt0, popt1, params_01 = _fit_double_gauss(bin_centers, h0, h1)
-                # Save processed data
-                self.proc_data_dict[q]['projection_01'] = {}
-                self.proc_data_dict[q]['projection_01']['h0'] = h0
-                self.proc_data_dict[q]['projection_01']['h1'] = h1
-                self.proc_data_dict[q]['projection_01']['bin_centers'] = bin_centers
-                self.proc_data_dict[q]['projection_01']['popt0'] = popt0
-                self.proc_data_dict[q]['projection_01']['popt1'] = popt1
-                self.proc_data_dict[q]['projection_01']['SNR'] = params_01['SNR']
-                self.proc_data_dict[q]['projection_01']['Fid'] = Fid_01
-                self.proc_data_dict[q]['projection_01']['threshold'] = threshold_01
-                ############################
-                # Projection along 12 axis.
-                ############################
-                # Rotate shots over 12 decision boundary axis
-                shots_1 = rotate_and_center_data(Shots_1[:,0],Shots_1[:,1],dec_bounds['mean'], dec_bounds['12'], phi=np.pi/2)
-                shots_2 = rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'], dec_bounds['12'], phi=np.pi/2)
-                # Take relavant quadrature
-                shots_1 = shots_1[:,0]
-                shots_2 = shots_2[:,0]
-                n_shots_2 = len(shots_2)
-                # find range
-                _all_shots = np.concatenate((shots_1, shots_2))
-                _range = (np.min(_all_shots), np.max(_all_shots))
-                # Sort shots in unique values
-                x1, n1 = np.unique(shots_1, return_counts=True)
-                x2, n2 = np.unique(shots_2, return_counts=True)
-                Fid_12, threshold_12 = _calculate_fid_and_threshold(x1, n1, x2, n2)
-                # Histogram of shots for 1 and 2
-                h1, bin_edges = np.histogram(shots_1, bins=100, range=_range)
-                h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
-                bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
-                popt1, popt2, params_12 = _fit_double_gauss(bin_centers, h1, h2)
-                # Save processed data
-                self.proc_data_dict[q]['projection_12'] = {}
-                self.proc_data_dict[q]['projection_12']['h1'] = h1
-                self.proc_data_dict[q]['projection_12']['h2'] = h2
-                self.proc_data_dict[q]['projection_12']['bin_centers'] = bin_centers
-                self.proc_data_dict[q]['projection_12']['popt1'] = popt1
-                self.proc_data_dict[q]['projection_12']['popt2'] = popt2
-                self.proc_data_dict[q]['projection_12']['SNR'] = params_12['SNR']
-                self.proc_data_dict[q]['projection_12']['Fid'] = Fid_12
-                self.proc_data_dict[q]['projection_12']['threshold'] = threshold_12
-                ############################
-                # Projection along 02 axis.
-                ############################
-                # Rotate shots over 02 decision boundary axis
-                shots_0 = rotate_and_center_data(Shots_0[:,0],Shots_0[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
-                shots_2 = rotate_and_center_data(Shots_2[:,0],Shots_2[:,1],dec_bounds['mean'],dec_bounds['02'], phi=np.pi/2)
-                # Take relavant quadrature
-                shots_0 = shots_0[:,0]
-                shots_2 = shots_2[:,0]
-                n_shots_2 = len(shots_2)
-                # find range
-                _all_shots = np.concatenate((shots_0, shots_2))
-                _range = (np.min(_all_shots), np.max(_all_shots))
-                # Sort shots in unique values
-                x0, n0 = np.unique(shots_0, return_counts=True)
-                x2, n2 = np.unique(shots_2, return_counts=True)
-                Fid_02, threshold_02 = _calculate_fid_and_threshold(x0, n0, x2, n2)
-                # Histogram of shots for 1 and 2
-                h0, bin_edges = np.histogram(shots_0, bins=100, range=_range)
-                h2, bin_edges = np.histogram(shots_2, bins=100, range=_range)
-                bin_centers = (bin_edges[1:]+bin_edges[:-1])/2
-                popt0, popt2, params_02 = _fit_double_gauss(bin_centers, h0, h2)
-                # Save processed data
-                self.proc_data_dict[q]['projection_02'] = {}
-                self.proc_data_dict[q]['projection_02']['h0'] = h0
-                self.proc_data_dict[q]['projection_02']['h2'] = h2
-                self.proc_data_dict[q]['projection_02']['bin_centers'] = bin_centers
-                self.proc_data_dict[q]['projection_02']['popt0'] = popt0
-                self.proc_data_dict[q]['projection_02']['popt2'] = popt2
-                self.proc_data_dict[q]['projection_02']['SNR'] = params_02['SNR']
-                self.proc_data_dict[q]['projection_02']['Fid'] = Fid_02
-                self.proc_data_dict[q]['projection_02']['threshold'] = threshold_02
+                # Analyze shots
+                _Analyse_qubit_shots_along_decision_boundaries(
+                    qubit=q,
+                    Shots_0=Shots_0, Shots_1=Shots_1,
+                    dec_bounds=dec_bounds, 
+                    proc_data_dict=self.proc_data_dict)
+            else:
+                # Parse data for classifier
+                Shots_0 = self.proc_data_dict[q]['Shots_0']
+                Shots_1 = self.proc_data_dict[q]['Shots_1']
+                Shots_2 = self.proc_data_dict[q]['Shots_2']
+                clf, Fid_dict, M, dec_bounds = _Classify_qutrit_calibration_shots(Shots_0, Shots_1, Shots_2)
+                # Save outcome
+                self.proc_data_dict[q]['classifier'] = clf
+                self.proc_data_dict[q]['dec_bounds'] = dec_bounds
+                self.proc_data_dict[q]['Fid_dict'] = Fid_dict
+                self.qoi[q]['Fid_dict'] = Fid_dict
+                self.qoi[q]['Assignment_matrix'] = M
+                # Analyze shots
+                _Analyse_qutrit_shots_along_decision_boundaries(
+                    qubit=q,
+                    Shots_0=Shots_0, Shots_1=Shots_1, Shots_2=Shots_2,
+                    dec_bounds=dec_bounds, 
+                    proc_data_dict=self.proc_data_dict)
+
         ############################################
         # Calculate Mux assignment fidelity matrix #
         ############################################
-        # Get assignment fidelity matrix
-        # M = np.zeros((len(self.combinations),len(self.combinations)))
-        # # Calculate population vector for each input state
-        # for i, comb in enumerate(self.combinations):
-        #     _res = []
-        #     # Assign shots for each qubit
-        #     for q in self.qubits:
-        #         _clf = self.proc_data_dict[q]['classifier']
-        #         _res.append(_clf.predict(self.proc_data_dict[q][f'shots_{comb}']).astype(str))
-        #     # <res> holds the outcome of shots for each qubit
-        #     res = np.array(_res).T
-        #     for j, comb in enumerate(self.combinations):
-        #         M[i][j] = np.mean(np.logical_and(*(res == list(comb)).T))
-        # Calculate population vector for each input state
-        if self.f_state:
-            _res = { q : {} for q in self.qubits}
-            for i, comb_i in enumerate(self.combinations):
-                # Assign shots for each qubit
-                for q in self.qubits:
-                    _clf = self.proc_data_dict[q]['classifier']
-                    _res[q][comb_i] = np.array(_clf.predict(self.proc_data_dict[q][f'shots_{comb_i}']).astype(int))
-                # <_res> holds the outcome of shots for each qubit
-            M = calc_assignment_prob_matrix(self.combinations,_res)
-            self.proc_data_dict['Mux_assignment_matrix'] = M
+        # Assign readout shots for each input state
+        _res = { q : {} for q in self.qubits}
+        for i, comb_i in enumerate(self.combinations):
+            # Assign shots for each qubit
+            for q in self.qubits:
+                _clf = self.proc_data_dict[q]['classifier']
+                _res[q][comb_i] = np.array(_clf.predict(self.proc_data_dict[q][f'shots_{comb_i}']).astype(float))
+                # mark post-selected shots
+                _res[q][comb_i] *= _mask[i::_cycle]
+        # _res now holds the outcome of shots for each qubit
+        __res = [None for comb in self.combinations]
+        for i, comb in enumerate(self.combinations):
+            nr_shots_per_case = len(self.proc_data_dict[self.qubits[0]][f'shots_{comb}'])
+            # Convert to matrix of shape [qubit, shot]
+            _aux = np.vstack([_res[q][comb] for q in _res.keys() ])
+            # Convert to list of multiplexed assigned outcomes
+            __res[i] = [ ''.join(_aux[:,k].astype(int).astype(str)) \
+                         if all(~np.isnan(_aux[:,k])) else np.nan \
+                         for k in range(nr_shots_per_case)]
+        # __res now holds the mux assigned outcome of shots (as strings)
+        if len(self.qubits) > 4:
+            # Print message as this might take a while...
+            print('Computing assignment fidelity matrix...')
+        # Compute assignment fidelity matrix
+        nr_shots_per_case = np.array([ np.sum(np.array(r)!='nan') for r in __res ])
+        M = np.zeros((len(self.combinations), len(self.combinations)))
+        for j, assigned_state in enumerate(self.combinations):
+            M[:, j] = np.nansum(np.array(__res) == assigned_state, axis=1)/\
+                      nr_shots_per_case
+            print(j/len(self.combinations))
+        self.proc_data_dict['Mux_assignment_matrix'] = M
+        ############################################
+        # Calculate Mux cross-fidelity matrix #
+        ############################################
+        if not self.f_state:
+            if len(self.qubits) > 4:
+                # Print message as this might take a while...
+                print('Computing cross-fidelity matrix...')
+            C = calc_cross_fidelity_matrix(self.combinations, M)
+            self.proc_data_dict['Cross_fidelity_matrix'] = C
+
+            print('done')
 
     def prepare_plots(self):
         self.axs_dict = {}
         for q in self.qubits:
+            # Projected data histogram
             fig, ax = plt.subplots(figsize=(5,4), dpi=100)
             # fig.patch.set_alpha(0)
             self.axs_dict[f'main_{q}'] = ax
@@ -4651,7 +4855,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 'qubit': q,
                 'timestamp': self.timestamp
             }
-
+            # IQ plane histogram
             fig, ax = plt.subplots(figsize=(4,4), dpi=100)
             # fig.patch.set_alpha(0)
             self.axs_dict[f'main2_{q}'] = ax
@@ -4667,6 +4871,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 'timestamp': self.timestamp
             }
             if self.f_state:
+                # IQ plane histogram with classifier
                 fig = plt.figure(figsize=(8,4), dpi=100)
                 axs = [fig.add_subplot(121),
                        fig.add_subplot(322),
@@ -4690,31 +4895,32 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     'qubit': q,
                     'timestamp': self.timestamp
                 }
-                fig, ax = plt.subplots(figsize=(3,3), dpi=100)
-                # fig.patch.set_alpha(0)
-                self.axs_dict[f'Assignment_matrix_{q}'] = ax
-                self.figs[f'Assignment_matrix_{q}'] = fig
-                self.plot_dicts[f'Assignment_matrix_{q}'] = {
-                    'plotfn': assignment_matrix_plotfn,
-                    'ax_id': f'Assignment_matrix_{q}',
-                    'M': self.qoi[q]['Assignment_matrix'],
-                    'qubit': q,
-                    'timestamp': self.timestamp
-                }
 
-        if self.f_state:
-
-            fig, ax = plt.subplots(figsize=(6,6), dpi=100)
-            # fig.patch.set_alpha(0)
-            self.axs_dict[f'Mux_assignment_matrix'] = ax
-            self.figs[f'Mux_assignment_matrix'] = fig
-            self.plot_dicts[f'Mux_assignment_matrix'] = {
-                'plotfn': mux_assignment_matrix_plotfn,
-                'ax_id': 'Mux_assignment_matrix',
-                'M': self.proc_data_dict['Mux_assignment_matrix'],
-                'Qubits': self.qubits,
-                'combinations': self.combinations,
-                'timestamp': self.timestamp
+        # Assignment fidelity matrix (only plot if qubits are less than 5)
+        fig, ax = plt.subplots(figsize=(8,8), dpi=1200)
+        # fig.patch.set_alpha(0)
+        self.axs_dict[f'Mux_assignment_matrix'] = ax
+        self.figs[f'Mux_assignment_matrix'] = fig
+        self.plot_dicts[f'Mux_assignment_matrix'] = {
+            'plotfn': mux_assignment_matrix_plotfn,
+            'ax_id': 'Mux_assignment_matrix',
+            'M': self.proc_data_dict['Mux_assignment_matrix'],
+            'Qubits': self.qubits,
+            'combinations': self.combinations,
+            'timestamp': self.timestamp
+        }
+        # Cross-fidelity matrix
+        figsize = np.array(np.shape(self.proc_data_dict['Cross_fidelity_matrix']))*1
+        fig, ax = plt.subplots(figsize=figsize, dpi=100)
+        # fig.patch.set_alpha(0)
+        self.axs_dict[f'Cross_fidelity_matrix'] = ax
+        self.figs[f'Cross_fidelity_matrix'] = fig
+        self.plot_dicts[f'Cross_fidelity_matrix'] = {
+            'plotfn': cross_fidelity_matrix_plotfn,
+            'ax_id': 'Cross_fidelity_matrix',
+            'C': self.proc_data_dict['Cross_fidelity_matrix'],
+            'Qubits': self.qubits,
+            'timestamp': self.timestamp
         }
 
     def run_post_extract(self):
@@ -4733,28 +4939,104 @@ def mux_assignment_matrix_plotfn(
     ax, **kw):
 
     fig = ax.get_figure()
-
-    im = ax.imshow(M*100, cmap='Reds', vmin=0, vmax=100)
+    # Plot diagonal terms
+    M_aux = np.diag(np.diag(M))
+    vmin = min([np.min(np.diag(M)), .90])
+    im1 = ax.matshow(M_aux*100, cmap='Blues', vmin=vmin*100, vmax=100)
+    # Plot off-diagonal terms
+    M_aux = M * (np.diag(np.ones(M.shape[0])*np.nan)+1) # make diagonal np.nan
+    vmax = max([np.nanmax(M_aux), .05])
+    im = ax.matshow(M_aux*100, cmap='Reds', vmax=vmax*100, vmin=0)
+    # Write numbers
     n = len(combinations)
-    for i in range(n):
-        for j in range(n):
-            c = M[j,i]
-            if abs(c) > .5:
-                ax.text(i, j, '{:.0f}'.format(c*100), va='center', ha='center',
-                        color = 'white', size=8)
-            elif abs(c)>.01:
-                ax.text(i, j, '{:.0f}'.format(c*100), va='center', ha='center',
-                        size=8)
-    ax.set_xticks(np.arange(n))
-    ax.set_yticks(np.arange(n))
-    _labels = [''.join([f'{comb[i]}_\mathrm{{{Qubits[i]}}}' for i in range(len(Qubits))]) for comb in combinations]
-    ax.set_xticklabels([f'${label}$' for label in _labels], size=8, rotation=90)
-    ax.set_yticklabels([f'${label}$' for label in _labels], size=8)
-    ax.set_xlabel(f'Assigned state')
-    ax.set_ylabel('Input state')
+    if n < 2**6:
+        for i in range(n):
+            for j in range(n):
+                c = M[j,i]
+                # diagonal terms
+                if i==j:
+                    if abs(c) > (1+vmin)/2:
+                        ax.text(i, j, '{:.0f}'.format(c*100), va='center', ha='center',
+                                color = 'white', size=8)
+                    else:
+                        ax.text(i, j, '{:.0f}'.format(c*100), va='center', ha='center',
+                                size=8)
+                # off-diagonal terms
+                else:
+                    if abs(c) > vmax/2:
+                        ax.text(i, j, '{:.0f}'.format(c*100), va='center', ha='center',
+                                color = 'white', size=8)
+                    elif abs(c)>.01:
+                        ax.text(i, j, '{:.0f}'.format(c*100), va='center', ha='center',
+                                size=8)
+        ax.set_xticks(np.arange(n))
+        ax.set_yticks(np.arange(n))
+        _labels = [''.join([f'{comb[i]}' for i in range(len(Qubits))]) for comb in combinations]
+        ax.set_xticklabels([f'${label}$' for label in _labels], size=8, rotation=90)
+        ax.set_yticklabels([f'${label}$' for label in _labels], size=8)
+    else:
+        _list = list(np.arange(n)[::n//8])+[n-1]
+        _combinations = combinations[::n//8] + combinations[-1:]
+        ax.set_xticks(_list)
+        ax.set_yticks(_list)
+        _labels = [''.join([f'{comb[i]}' for i in range(len(Qubits))]) for comb in _combinations]
+        ax.set_xticklabels([f'${label}$' for label in _labels], size=8, rotation=90)
+        ax.set_yticklabels([f'${label}$' for label in _labels], size=8)
+    ax.tick_params(axis="x", bottom=True, labelbottom=True, top=False, labeltop=False)
+    ax.set_xlabel(f'Assigned state $<'+''.join([f'S_\mathrm{{{Qubits[i]}}}' for i in range(len(Qubits))])+'>$')
+    ax.set_ylabel('Input state $<'+''.join([f'S_\mathrm{{{Qubits[i]}}}' for i in range(len(Qubits))])+'>$')
     cb = fig.colorbar(im, orientation='vertical', aspect=35)
+    cb1 = fig.colorbar(im1, orientation='vertical', aspect=35)
+    cb1.ax.yaxis.set_ticks_position('left')
     pos = ax.get_position()
-    pos = [ pos.x0+.65, pos.y0, pos.width, pos.height ]
+    pos = [ pos.x0+.6, pos.y0, pos.width, pos.height ]
+    fig.axes[-2].set_position(pos)
+    pos = ax.get_position()
+    pos = [ pos.x0+.575, pos.y0, pos.width, pos.height ]
     fig.axes[-1].set_position(pos)
     cb.set_label('Assignment probability (%)', rotation=-90, labelpad=15)
-    ax.set_title(f'{timestamp}\nMultiplexed qutrit assignment matrix {" ".join(Qubits)}')
+    ax.set_title(f'{timestamp}\nMultiplexed assignment probability matrix\n{" ".join(Qubits)}')
+
+def cross_fidelity_matrix_plotfn(
+    C,
+    Qubits,
+    timestamp,
+    ax=None, **kw):
+    f = ax.get_figure()
+    alpha_reds = cmap_to_alpha(cmap=pl.cm.Reds)
+    colors = [(0.58, 0.404, 0.741), (0, 0, 0)]
+    cm = LinearSegmentedColormap.from_list('my_purple', colors)
+    alpha_blues = cmap_first_to_alpha(cmap=cm)
+    # red_im = ax.matshow(C*100,
+    #                     cmap=alpha_reds, clim=(-10., 10))
+    red_im = ax.matshow(C*100,
+                        cmap='RdBu', clim=(-10., 10))
+    blue_im = ax.matshow(C*100,
+                         cmap=alpha_blues, clim=(90, 100))
+    caxb = f.add_axes([0.91, 0.58, 0.02, 0.3])
+    caxr = f.add_axes([0.91, 0.11, 0.02, 0.3])
+    ax.figure.colorbar(red_im, ax=ax, cax=caxr)
+    ax.figure.colorbar(blue_im, ax=ax, cax=caxb)
+    rows, cols = np.shape(C)
+    for i in range(rows):
+        for j in range(cols):
+            c = C[i, j]
+            if c > .05 or c <-0.05:
+                col = 'white'
+            else:
+                col = 'black'
+            ax.text(j, i, '{:.1f}'.format(c*100),
+                    va='center', ha='center', color=col)
+    ax.set_xticklabels(Qubits)
+    ax.set_xticks(np.arange(len(Qubits)))
+    ax.set_yticklabels(Qubits)
+    ax.set_yticks(np.arange(len(Qubits)))
+    ax.set_ylim(len(Qubits)-.5, -.5)
+    # matrix[i,j] => i = column, j = row
+    ax.set_ylabel(r'Prepared qubit, $q_i$')
+    ax.set_xlabel(r'Classified qubit $q_j$')
+    ax.tick_params(axis="x", bottom=True, labelbottom=True, top=False, labeltop=False)
+    qubit_labels_str = ', '.join(Qubits)
+    txtstr = f'{timestamp}\nCross fidelity matrix '+qubit_labels_str
+
+    ax.set_title(txtstr)

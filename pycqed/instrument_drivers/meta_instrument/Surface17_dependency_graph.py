@@ -564,8 +564,10 @@ def Flipping_wrapper(qubit:str, station):
 	Returns True if successful calibration otherwise
 	returns False.
 	'''
-	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
+	Q_inst = station.components[qubit]
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal')
 	Q_inst.ro_acq_averages(2**11)
@@ -610,8 +612,10 @@ def Motzoi_wrapper(qubit:str, station):
 	Returns True if successful calibration otherwise
 	returns False.
 	'''
-	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
+	Q_inst = station.components[qubit]
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal')
 	Q_inst.ro_acq_averages(2**11)
@@ -653,8 +657,10 @@ def AllXY_wrapper(qubit:str, station):
 	Returns True if successful calibration otherwise
 	returns False.
 	'''
-	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
+	Q_inst = station.components[qubit]
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal')
 	Q_inst.ro_acq_averages(2**12)
@@ -690,8 +696,10 @@ def SSRO_wrapper(qubit:str, station):
 	Returns True if successful calibration otherwise
 	returns False.
 	'''
-	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
+	Q_inst = station.components[qubit]
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal IQ')
 	Q_inst.ro_acq_digitized(False)
@@ -716,6 +724,7 @@ def SSRO_wrapper(qubit:str, station):
 	Q_inst._prep_mw_pulses()
 	Q_inst.measure_ssro(
 		f_state=True,
+		post_select=True,
 		nr_shots_per_case=2**15,
 		disable_metadata=True,
 		prepare=False)
@@ -765,8 +774,10 @@ def T1_wrapper(qubit:str, station):
 	Returns True if successful calibration otherwise
 	returns False.
 	'''
-	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
+	Q_inst = station.components[qubit]
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal IQ')
 	Q_inst.ro_acq_digitized(False)
@@ -796,8 +807,10 @@ def T2_wrapper(qubit:str, station):
 	Returns True if successful calibration otherwise
 	returns False.
 	'''
-	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
+	Q_inst = station.components[qubit]
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal IQ')
 	Q_inst.ro_acq_digitized(False)
@@ -827,8 +840,10 @@ def Randomized_benchmarking_wrapper(qubit:str, station):
 	Returns True if successful calibration otherwise
 	returns False.
 	'''
-	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
+	Q_inst = station.components[qubit]
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal IQ')
 	Q_inst.ro_acq_averages(2**10) # Not used in RB
@@ -892,116 +907,6 @@ def drive_mixer_wrapper(qubit:str, station):
 					maxfevals=120)
 	return True
 
-
-def T1_Vs_frequency_wrapper(Qubit, station,
-			                detuning = None):
-	'''
-	Wrapper function for measurement of T1 Vs. freq by replacing idling wiht 
-	repeated parking CW for the same amount of time. 
-	Args:
-	    Qubit: fluxed qubit.
-	'''
-	file_cfg = gc.generate_config(in_filename=input_file,
-								out_filename=config_fn,
-								mw_pulse_duration=20,
-								ro_duration=800,
-								flux_pulse_duration=40,
-								init_duration=200000)
-	# Setup for measurement
-	# station.components['MC'].live_plot_enabled(False)
-	# station.components['nested_MC'].live_plot_enabled(False)
-	q = station.components[Qubit]
-	Flux_lm_q = station.components[Qubit].instr_LutMan_Flux.get_instr()
-	if detuning == None:
-		if Qubit in ['D4', 'D5', 'D6']:
-			detuning = np.arange(0, 750e6, 5e6)
-		else:
-			detuning = np.arange(0, 1500e6, 5e6)
-	# Convert detuning to list of amplitudes
-	current_park_amp = Flux_lm_q.park_amp()
-	current_park_pad = Flux_lm_q.park_pad_length()
-	current_park_time = Flux_lm_q.park_length()
-	current_cfg_amp = Flux_lm_q.cfg_awg_channel_amplitude()
-	try:
-		Flux_lm_q.park_amp(0.5)
-		Flux_lm_q.park_pad_length(0)
-		Flux_lm_q.park_length(60e-9)
-		Amps = [ get_Ch_amp_frequency(det, Flux_lm_q, DAC_param='park_amp')\
-				 for  det in detuning ]
-		q.ro_acq_averages(2**8)
-		q.prepare_for_timedomain()
-		for i, amp in enumerate(Amps):
-			Flux_lm_q.cfg_awg_channel_amplitude(amp)
-			q.msmt_suffix = f'_{Qubit}_detune_{detuning[i]*1e-6:0.1f} MHz'
-			q.measure_T1(prepare_for_timedomain = False, disable_metadata = True,
-						  T1_VS_flux = True, times = np.linspace(0,30e-6,41))
-	except:
-		print_exception()
-	q.msmt_suffix = f'_{Qubit}'
-	station.components['MC'].live_plot_enabled(True)
-	station.components['nested_MC'].live_plot_enabled(True)
-	Flux_lm_q.park_amp(current_park_amp)
-	Flux_lm_q.park_length(current_park_time)
-	Flux_lm_q.park_pad_length(current_park_pad)
-	Flux_lm_q.cfg_awg_channel_amplitude(current_cfg_amp)
-	load_single_waveform_on_HDAWG(Flux_lm_q, 'park')
-	return True
-
-
-def T2_Vs_frequency_wrapper(Qubit, station,
-			                detuning = None):
-	'''
-	Wrapper function for measurement of T2 Vs. freq by replacing idling wiht 
-	repeated parking CW for the same amount of time. 
-	Args:
-	    Qubit: fluxed qubit.
-	'''
-	file_cfg = gc.generate_config(in_filename=input_file,
-								out_filename=config_fn,
-								mw_pulse_duration=20,
-								ro_duration=800,
-								flux_pulse_duration=40,
-								init_duration=200000)
-	# Setup for measurement
-	# station.components['MC'].live_plot_enabled(False)
-	# station.components['nested_MC'].live_plot_enabled(False)
-	q = station.components[Qubit]
-	Flux_lm_q = station.components[Qubit].instr_LutMan_Flux.get_instr()
-	if detuning == None:
-		if Qubit in ['D4', 'D5', 'D6']:
-			detuning = np.arange(0, 750e6, 5e6)
-		else:
-			detuning = np.arange(0, 1500e6, 5e6)
-	# Convert detuning to list of amplitudes
-	current_park_amp = Flux_lm_q.park_amp()
-	current_park_pad = Flux_lm_q.park_pad_length()
-	current_park_time = Flux_lm_q.park_length()
-	current_cfg_amp = Flux_lm_q.cfg_awg_channel_amplitude()
-	try:
-		Flux_lm_q.park_amp(0.5)
-		Flux_lm_q.park_pad_length(0)
-		Flux_lm_q.park_length(60e-9)
-		Amps = [ get_Ch_amp_frequency(det, Flux_lm_q, DAC_param='park_amp')\
-				 for  det in detuning ]
-		q.ro_acq_averages(2**8)
-		q.prepare_for_timedomain()
-		for i, amp in enumerate(Amps):
-			Flux_lm_q.cfg_awg_channel_amplitude(amp)
-			q.msmt_suffix = f'_{Qubit}_detune_{detuning[i]*1e-6:0.1f} MHz'
-			q.measure_ramsey(times = np.linspace(0,10e-6,41),
-							 T2_VS_flux = True, prepare_for_timedomain = False,
-							 disable_metadata = True)
-	except:
-		print_exception()
-	q.msmt_suffix = f'_{Qubit}'
-	station.components['MC'].live_plot_enabled(True)
-	station.components['nested_MC'].live_plot_enabled(True)
-	Flux_lm_q.park_amp(current_park_amp)
-	Flux_lm_q.park_length(current_park_time)
-	Flux_lm_q.park_pad_length(current_park_pad)
-	Flux_lm_q.cfg_awg_channel_amplitude(current_cfg_amp)
-	load_single_waveform_on_HDAWG(Flux_lm_q, 'park')
-	return True
 
 ###############################################################################
 # Two qubit gate calibration graph
@@ -1242,12 +1147,12 @@ def Flux_arc_wrapper(Qubit, station):
 	                              ro_duration=1000,
 	                              flux_pulse_duration=60,
 	                              init_duration=200000)
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Setup measurement
 	Q_inst = station.components[Qubit]
 	Q_inst.ro_acq_averages(2**7)
 	Q_inst.ro_acq_weight_type('optimal')
-	station.components['MC'].live_plot_enabled(False)
-	station.components['nested_MC'].live_plot_enabled(False)
 	# Q_inst.prepare_readout()
 	# Set microwave lutman
 	Q_mlm = Q_inst.instr_LutMan_MW.get_instr()
@@ -2133,6 +2038,21 @@ def Parking_experiment_wrapper(qH, qL, qP, station):
 		disable_metadata=False)	
 	return True
 
+
+def Tune_CZ_interaction_frequency(qH, qL, qL_detunings, station):
+	'''
+	Calibrates and benchmarks two-qubit gate at different
+	qL detunings. 
+	'''
+	for qL_det in qL_detunings:
+	    Chevron_wrapper(qH=qH, qL=qL, station=station, qL_det=qL_det)
+	    SNZ_tmid_wrapper(qH=qH, qL=qL, station=station)
+	    SNZ_AB_wrapper(qH=qH, qL=qL, station=station)
+	    Asymmetry_wrapper(qH=qH, qL=qL, station=station)
+	    Single_qubit_phase_calibration_wrapper(qH=qH, qL=qL, station=station)
+	    TwoQ_Randomized_benchmarking_wrapper(qH=qH, qL=qL, station=station)
+
+	
 ###############################################################################
 # Parity check calibration graph
 ###############################################################################
@@ -2283,6 +2203,8 @@ def Horizontal_calibration_wrapper(stabilizer_qubit, station,
 	Wrapper function to calibrate parity check CZ phases
 	returns True
 	'''
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**8)
@@ -2334,6 +2256,8 @@ def Measure_parity_check_phase_wrapper(stabilizer_qubit, station,
 	Wrapper function to measure pairty checks 
 	returns True
 	'''
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**8)
@@ -2370,6 +2294,8 @@ def Data_qubit_phase_calibration_wrapper(stabilizer_qubit, station,
 	Wrapper function to calibrate single qubit phases of data-qubits in pairty checks 
 	returns True
 	'''
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**8)
@@ -2411,10 +2337,18 @@ def Parity_check_fidelity_wrapper(stabilizer_qubit, station,
 	Wrapper function to measure pairty checks 
 	returns True
 	'''
+	file_cfg = gc.generate_config(in_filename=input_file,
+                              out_filename=config_fn,
+                              mw_pulse_duration=20,
+                              ro_duration=500,
+                              flux_pulse_duration=40,
+                              init_duration=200000)
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**10)
-	device.ro_acq_integration_length(420e-9)
+	device.ro_acq_integration_length(500e-9)
 	prepare_for_parity_check(stabilizer_qubit, station)
 	# Parity check settings
 	Q_ancilla = [stabilizer_qubit]
@@ -2451,13 +2385,15 @@ def Parity_check_repeatability_wrapper(stabilizer_qubit, station,
 	file_cfg = gc.generate_config(in_filename=input_file,
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
-	                              ro_duration=420,
+	                              ro_duration=500,
 	                              flux_pulse_duration=40,
 	                              init_duration=200000)
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**10)
-	device.ro_acq_integration_length(420e-9)
+	device.ro_acq_integration_length(500e-9)
 	prepare_for_parity_check(stabilizer_qubit, station)
 	Q_data = list(get_nearest_neighbors(stabilizer_qubit).keys())
 	if flux_cw_list == None:
@@ -2482,7 +2418,7 @@ def Parity_check_repeatability_wrapper(stabilizer_qubit, station,
 	return True
 
 
-def Surface_13_wrapper(station):
+def Surface_13_wrapper(station, log_zero = None):
 	'''
 	Wrapper routine to measure the surface-13 experiment. 
 	'''
@@ -2496,8 +2432,10 @@ def Surface_13_wrapper(station):
 	                              ro_duration=500,
 	                              flux_pulse_duration=40,
 	                              init_duration=200000)
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	device = station.components['device']
-	device.ro_acq_integration_length(540e-9)
+	device.ro_acq_integration_length(500e-9)
 	# Get qubits directly involved in parity check
 	Data_qubits = ['D1', 'D2', 'D3',
 				   'D4', 'D5', 'D6',
@@ -2507,42 +2445,42 @@ def Surface_13_wrapper(station):
 	# Prepare qubits
 	import time
 	# prepare readout
-	t_ro = time.time()
-	# prepapare readout detectors
-	device.ro_acq_weight_type('custom')
-	# ordered_ro_list = ['Z3', 'D4', 'D5', 'D1', 'D2', 'D3', 'D7', 'Z1', 'D6',
-	# 				   'D8', 'D9', 'Z2', 'Z4']
-	ordered_ro_list = ['Z3', 'D4', 'D5', 'X2', 'D1', 'X1', 'D2', 'D3', 'D7',
-					   'X3', 'Z1', 'D6', 'D8', 'D9', 'Z2', 'Z4']
-	ordered_ro_dict = {q: 'optimal IQ' for q in ordered_ro_list}
-	acq_ch_map = device._prep_ro_assign_weights(qubits=ordered_ro_list,
-		qubit_int_weight_type_dict = ordered_ro_dict)
-	device._prep_ro_integration_weights(qubits=ordered_ro_list,
-		qubit_int_weight_type_dict = ordered_ro_dict)
-	device._prep_ro_instantiate_detectors(qubits=ordered_ro_list,
-										  acq_ch_map=acq_ch_map)
-	# Prepare readout pulses with custom channel map
-	RO_lutman_1 = station.components['RO_lutman_1']
-	RO_lutman_2 = station.components['RO_lutman_2']
-	RO_lutman_3 = station.components['RO_lutman_3']
-	RO_lutman_4 = station.components['RO_lutman_4']
-	if [11] not in RO_lutman_1.resonator_combinations():
-		RO_lutman_1.resonator_combinations([[11], 
-			RO_lutman_1.resonator_combinations()[0]])
-	RO_lutman_1.load_waveforms_onto_AWG_lookuptable()
-	if [3, 7] not in RO_lutman_2.resonator_combinations():
-		RO_lutman_2.resonator_combinations([[3, 7],
-			RO_lutman_2.resonator_combinations()[0]])
-	RO_lutman_2.load_waveforms_onto_AWG_lookuptable()
-	if [8, 12] not in RO_lutman_4.resonator_combinations():
-		RO_lutman_4.resonator_combinations([[8, 12],
-			RO_lutman_4.resonator_combinations()[0]])
-	RO_lutman_4.load_waveforms_onto_AWG_lookuptable()
-	if [14, 10] not in RO_lutman_3.resonator_combinations():
-		RO_lutman_3.resonator_combinations([[14, 10], 
-			RO_lutman_3.resonator_combinations()[0]])
-	RO_lutman_3.load_waveforms_onto_AWG_lookuptable()
-	t_ro = time.time()-t_ro
+	# t_ro = time.time()
+	# # prepapare readout detectors
+	# device.ro_acq_weight_type('custom')
+	# # ordered_ro_list = ['Z3', 'D4', 'D5', 'D1', 'D2', 'D3', 'D7', 'Z1', 'D6',
+	# # 				   'D8', 'D9', 'Z2', 'Z4']
+	# ordered_ro_list = ['Z3', 'D4', 'D5', 'X2', 'D1', 'X1', 'D2', 'D3', 'D7',
+	# 				   'X3', 'Z1', 'D6', 'D8', 'D9', 'Z2', 'Z4']
+	# ordered_ro_dict = {q: 'optimal IQ' for q in ordered_ro_list}
+	# acq_ch_map = device._prep_ro_assign_weights(qubits=ordered_ro_list,
+	# 	qubit_int_weight_type_dict = ordered_ro_dict)
+	# device._prep_ro_integration_weights(qubits=ordered_ro_list,
+	# 	qubit_int_weight_type_dict = ordered_ro_dict)
+	# device._prep_ro_instantiate_detectors(qubits=ordered_ro_list,
+	# 									  acq_ch_map=acq_ch_map)
+	# # Prepare readout pulses with custom channel map
+	# RO_lutman_1 = station.components['RO_lutman_1']
+	# RO_lutman_2 = station.components['RO_lutman_2']
+	# RO_lutman_3 = station.components['RO_lutman_3']
+	# RO_lutman_4 = station.components['RO_lutman_4']
+	# if [11] not in RO_lutman_1.resonator_combinations():
+	# 	RO_lutman_1.resonator_combinations([[11], 
+	# 		RO_lutman_1.resonator_combinations()[0]])
+	# RO_lutman_1.load_waveforms_onto_AWG_lookuptable()
+	# if [3, 7] not in RO_lutman_2.resonator_combinations():
+	# 	RO_lutman_2.resonator_combinations([[3, 7],
+	# 		RO_lutman_2.resonator_combinations()[0]])
+	# RO_lutman_2.load_waveforms_onto_AWG_lookuptable()
+	# if [8, 12] not in RO_lutman_4.resonator_combinations():
+	# 	RO_lutman_4.resonator_combinations([[8, 12],
+	# 		RO_lutman_4.resonator_combinations()[0]])
+	# RO_lutman_4.load_waveforms_onto_AWG_lookuptable()
+	# if [14, 10] not in RO_lutman_3.resonator_combinations():
+	# 	RO_lutman_3.resonator_combinations([[14, 10], 
+	# 		RO_lutman_3.resonator_combinations()[0]])
+	# RO_lutman_3.load_waveforms_onto_AWG_lookuptable()
+	# t_ro = time.time()-t_ro
 	# prepare flux pulses
 	t_fl = time.time()
 	# Set Flux pulse amplitudes
@@ -2580,12 +2518,12 @@ def Surface_13_wrapper(station):
 	for q in All_qubits:
 		Q = station.components[q]
 		Q._prep_td_sources()
-		if check_prepare_mw(q, station):
+		if check_prepare_mw(q, station, lutmap='default_lutmap'):
 			mw_lm = Q.instr_LutMan_MW.get_instr()
 			mw_lm.set_default_lutmap()
 			Q._prep_mw_pulses()
 	t_mw = time.time()-t_mw
-	print(f'Preparation time RO:\t{t_ro}')
+	# print(f'Preparation time RO:\t{t_ro}')
 	print(f'Preparation time FL:\t{t_fl}')
 	print(f'Preparation time TIM:\t{t_tim}')
 	print(f'Preparation time MW:\t{t_mw}')
@@ -2593,11 +2531,13 @@ def Surface_13_wrapper(station):
 	device.measure_defect_rate(
 			ancilla_qubit='Z3',
 			data_qubits=['D4', 'D7'],
-			experiments=['surface_13'],
-			Rounds=[10],
-			repetitions = 1,
+			# experiments=['surface_13'],
+			experiments=['surface_13', 'surface_13_LRU'],
+			Rounds= [1, 2, 4, 6, 10, 15, 20, 30],
+			lru_qubits=['D4','D5','D6','Z1','Z2','Z3','Z4'],
+			repetitions = 10,
 			prepare_for_timedomain = False,
-			prepare_readout = False,
+			prepare_readout = True,
 			heralded_init = True,
 			stabilizer_type = 'X',
 			initial_state_qubits = None,
@@ -2606,43 +2546,59 @@ def Surface_13_wrapper(station):
 	a = ma2.pba.Repeated_stabilizer_measurements(
 		ancilla_qubit = Ancilla_qubits,
 		data_qubits = Data_qubits,
-		Rounds = [10],
+		Rounds = [1, 2, 4, 6, 10, 15, 20, 30],
 		heralded_init = True,
-		number_of_kernels =  1,
+		number_of_kernels =  2,
 		Pij_matrix = True,
-		experiments = ['surface_13'],
+		# experiments = ['surface_13'],
+		experiments = ['surface_13', 'surface_13_LRU'],
 		extract_only = False)
-	# Surface_13 experiment
-	for state in [
-				 [],
-				 ['D3','D6'], 
-				 ['D4','D7'],
-				 ['D1','D2','D4','D5'],
-				 ['D5','D6','D8','D9'],
-				 ['D1','D2','D5','D7'],
-				 ['D3','D4','D6','D7'],
-				 ['D3','D5','D8','D9'],
-				 ['D1','D2','D3','D4','D5','D6'],
-				 ['D1','D2','D3','D7','D8','D9'],
-				 ['D4','D5','D6','D7','D8','D9'],
-				 ['D1','D2','D3','D5','D6','D7'],
-				 ['D1','D2','D4','D6','D8','D9'],
-				 ['D1','D2','D3','D4','D8','D9'],
-				 ['D1','D2','D6','D7','D8','D9'],
-				 ['D3','D4','D5','D7','D8','D9']
-				 ]:
-		device.measure_defect_rate(
-				ancilla_qubit='Z3',
-				data_qubits=['D4', 'D7'],
-				experiments=['surface_13'],
-				Rounds=[1, 2, 4, 6, 10, 15],
-				repetitions = 5,
-				prepare_for_timedomain = False,
-				prepare_readout = False,
-				heralded_init = True,
-				stabilizer_type = 'Z',
-				initial_state_qubits = state,
-				analyze = True)
+	# # Surface_13 experiment
+	if log_zero: 
+		for state in [
+			 [],							  # I
+			 ['D1','D2'], 					  # X1
+			 ['D8','D9'], 					  # X4
+			 ['D2','D3','D5','D6'], 		  # X2
+			 ['D4','D5','D7','D8'], 		  # X3
+			 ['D1','D3','D5','D6'], 		  # X1 X2
+			 ['D4','D5','D7','D9'], 		  # X3 X4
+			 ['D1','D2','D8','D9'], 		  # X1 X4
+			 ['D2','D3','D4','D6','D7','D8'], # X2 X3 
+			 ['D1','D2','D4','D5','D7','D8'], # X1 X3
+			 ['D2','D3','D5','D6','D8','D9'], # X2 X4
+			 ['D1','D3','D4','D6','D7','D8'], # X1 X2 X3
+			 ['D2','D3','D4','D6','D7','D9'], # X2 X3 X4
+			 ['D1','D3','D5','D6','D8','D9'], # X1 X2 X4
+			 ['D1','D2','D4','D5','D7','D9'], # X1 X3 X4
+			 ['D1','D3','D4','D6','D7','D9']  # X1 X2 X3 X4
+					 ]:
+			device.measure_defect_rate(
+					ancilla_qubit='Z3',
+					data_qubits=['D4', 'D7'],
+					# experiments=['surface_13'],
+					experiments=['surface_13', 'surface_13_LRU'],
+					Rounds=[1, 2, 4, 6, 10, 15],
+					lru_qubits=['D4','D5','D6','Z1','Z2','Z3','Z4'],
+					repetitions = 10,
+					prepare_for_timedomain = False,
+					prepare_readout = False,
+					heralded_init = True,
+					stabilizer_type = 'Z',
+					initial_state_qubits = state,
+					analyze = False)
+			# Run Pij matrix analysis
+			# a = ma2.pba.Repeated_stabilizer_measurements(
+			# 	ancilla_qubit = Ancilla_qubits,
+			# 	experiments=['surface_13'],
+			# 	# experiments=['surface_13', 'surface_13_LRU'],
+			# 	data_qubits = Data_qubits,
+			# 	Rounds = [1, 2, 4, 6, 10, 15],
+			# 	# lru_qubits=['D4','D5','D6','Z1','Z2','Z3','Z4'],
+			# 	heralded_init = True,
+			# 	number_of_kernels =  1,
+			# 	Pij_matrix = True,
+			# 	extract_only = False)
 
 
 def Spectator_data_qubits_wrapper(data_qubits, station, 
@@ -2693,8 +2649,12 @@ def Spectator_data_qubits_wrapper(data_qubits, station,
 	return True
 
 
-def DIO_calibration(station, reset_waveforms = None):
-
+def DIO_calibration(station):
+	'''
+	Checks for DIO errors in all instruments and calibrates
+	them if error is found.
+	'''
+	# Get all intruments
 	cc = station.components['cc']
 	UHFQC_1 = station.components['UHFQC_1']
 	UHFQC_2 = station.components['UHFQC_2']
@@ -2709,157 +2669,271 @@ def DIO_calibration(station, reset_waveforms = None):
 	AWG8_8279 = station.components['AWG8_8279']
 	AWG8_8071 = station.components['AWG8_8071']
 	device = station.components['device']
-	
-	Failed_devices = []
-	for i in range(2):
+	# Helper function
+	def _prep_awg(awg):
+		'''
+		Helper function to prepare AWG.
+		This needs to be performed after DIO calibration.
+		'''
+		for k in station.components.keys():
+			if ('MW_lutman' in k) or ('flux_lm' in k):
+				lutman = station.components[k]
+				if lutman.AWG() == awg:
+					qubit_name = lutman.name.split('_')[-1]
+					# qubit = station.components[qubit_name]
+					# lutman.load_waveforms_onto_AWG_lookuptable()
+					device.prepare_for_timedomain(qubits=[qubit_name],
+												  prepare_for_readout=False)
+	############################################
+	# UHFQC DIO calibration
+	############################################
+	# UHFQC_1
+	UHFQC_1.check_errors()
+	_errors = UHFQC_1._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		UHFQC_1._errors = {}
+		print(f'Calibrating DIO on UHFQC_1.')
 		try:
 			DIO.calibrate(sender=cc,receiver=UHFQC_1,sender_dio_mode='uhfqa')
-			print(UHFQC_1.name, UHFQC_1._get_dio_calibration_delay(), 7)
+			print(UHFQC_1.name, UHFQC_1._get_dio_calibration_delay(), 8)
 		except:
 			print(f'Failed DIO calibration on {UHFQC_1.name}!')
-			Failed_devices.append(UHFQC_1.name)
-	UHFQC_1._set_dio_calibration_delay(7)
-	try:
-		DIO.calibrate(sender=cc,receiver=UHFQC_2,sender_dio_mode='uhfqa')
-		print(UHFQC_2.name, UHFQC_2._get_dio_calibration_delay(), 2)
-	except:
-		print(f'Failed DIO calibration on {UHFQC_2.name}!')
-		Failed_devices.append(UHFQC_2.name)
-	try:
-		DIO.calibrate(sender=cc,receiver=UHFQC_3,sender_dio_mode='uhfqa')
-		print(UHFQC_3.name, UHFQC_3._get_dio_calibration_delay(), 2)
-	except:
-		print(f'Failed DIO calibration on {UHFQC_3.name}!')
-		Failed_devices.append(UHFQC_3.name)
-	try:
-		DIO.calibrate(sender=cc,receiver=UHFQC_4,sender_dio_mode='uhfqa')
-		print(UHFQC_4.name, UHFQC_4._get_dio_calibration_delay(), 7)
-	except:
-		print(f'Failed DIO calibration on {UHFQC_4.name}!')
-		Failed_devices.append(UHFQC_4.name)
+		UHFQC_1._set_dio_calibration_delay(8)
+		UHFQC_1.clear_errors()
+		UHFQC_1.sigins_0_range(0.2)
+		UHFQC_1.sigins_1_range(0.2)
+		station.components['RO_lutman_1'].load_DIO_triggered_sequence_onto_UHFQC()
+	# UHFQC_2
+	UHFQC_2.check_errors()
+	_errors = UHFQC_2._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		UHFQC_2._errors = {}
+		print(f'Calibrating DIO on UHFQC_2.')
+		try:
+			DIO.calibrate(sender=cc,receiver=UHFQC_2,sender_dio_mode='uhfqa')
+			print(UHFQC_2.name, UHFQC_2._get_dio_calibration_delay(), 2)
+		except:
+			print(f'Failed DIO calibration on {UHFQC_2.name}!')
+		UHFQC_2._set_dio_calibration_delay(2)
+		UHFQC_2.clear_errors()
+		UHFQC_2.sigins_0_range(0.3)
+		UHFQC_2.sigins_1_range(0.3)
+		station.components['RO_lutman_2'].load_DIO_triggered_sequence_onto_UHFQC()
+	# UHFQC_3
+	UHFQC_3.check_errors()
+	_errors = UHFQC_3._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		UHFQC_3._errors = {}
+		print(f'Calibrating DIO on UHFQC_3.')
+		try:
+			DIO.calibrate(sender=cc,receiver=UHFQC_3,sender_dio_mode='uhfqa')
+			print(UHFQC_3.name, UHFQC_3._get_dio_calibration_delay(), 2)
+		except:
+			print(f'Failed DIO calibration on {UHFQC_3.name}!')
+		UHFQC_3._set_dio_calibration_delay(2)
+		UHFQC_3.clear_errors()
+		UHFQC_3.sigins_0_range(0.5)
+		UHFQC_3.sigins_1_range(0.5)
+		station.components['RO_lutman_3'].load_DIO_triggered_sequence_onto_UHFQC()
+	# UHFQC_4
+	UHFQC_4.check_errors()
+	_errors = UHFQC_4._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		UHFQC_4._errors = {}
+		print(f'Calibrating DIO on UHFQC_4.')
+		try:
+			DIO.calibrate(sender=cc,receiver=UHFQC_4,sender_dio_mode='uhfqa')
+			print(UHFQC_4.name, UHFQC_4._get_dio_calibration_delay(), 7)
+		except:
+			print(f'Failed DIO calibration on {UHFQC_4.name}!')
+		UHFQC_4._set_dio_calibration_delay(7)
+		UHFQC_4.clear_errors()
+		UHFQC_4.sigins_0_range(0.4)
+		UHFQC_4.sigins_1_range(0.4)
+		station.components['RO_lutman_4'].load_DIO_triggered_sequence_onto_UHFQC()
 	
-	AWG8_8481.set('dios_0_interface', 0)
-	AWG8_8481.set('dios_0_interface', 1)
-	AWG8_8481.clear_errors()
-	try:
-		DIO.calibrate(sender=cc,receiver=AWG8_8481,sender_dio_mode='awg8-mw-direct-iq')
-		print(AWG8_8481.name, AWG8_8481._get_dio_calibration_delay(), 6)
-	except:
-		print(f'Failed DIO calibration on {AWG8_8481.name}!')
-		Failed_devices.append(AWG8_8481.name)
-	AWG8_8481._set_dio_calibration_delay(6)
-	AWG8_8481.clear_errors()
-	
-	AWG8_8068.set('dios_0_interface', 0)
-	AWG8_8068.set('dios_0_interface', 1)
-	AWG8_8068.clear_errors()
-	try:
-		DIO.calibrate(sender=cc,receiver=AWG8_8068,sender_dio_mode='awg8-mw-direct-iq')
-		print(AWG8_8068.name, AWG8_8068._get_dio_calibration_delay(), 4)
-	except:
-		print(f'Failed DIO calibration on {AWG8_8068.name}!')
-		Failed_devices.append(AWG8_8068.name)
-	AWG8_8068._set_dio_calibration_delay(4)
-	AWG8_8068.clear_errors()
-	
-	AWG8_8074.set('dios_0_interface', 0)
-	AWG8_8074.set('dios_0_interface', 1)
-	AWG8_8074.clear_errors()
-	try:
-		DIO.calibrate(sender=cc,receiver=AWG8_8074,sender_dio_mode='awg8-mw-direct-iq')
-		print(AWG8_8074.name, AWG8_8074._get_dio_calibration_delay(), 6)
-	except:
-		print(f'Failed DIO calibration on {AWG8_8074.name}!')
-		Failed_devices.append(AWG8_8074.name)
-	AWG8_8074._set_dio_calibration_delay(6)
-	AWG8_8074.clear_errors()
-	
-	AWG8_8076.set('dios_0_interface', 0)
-	AWG8_8076.set('dios_0_interface', 1)
-	AWG8_8076.clear_errors()
-	try:
-		DIO.calibrate(sender=cc,receiver=AWG8_8076,sender_dio_mode='awg8-mw-direct-iq')
-		print(AWG8_8076.name, AWG8_8076._get_dio_calibration_delay(), 4)
-	except:
-		print(f'Failed DIO calibration on {AWG8_8076.name}!')
-		Failed_devices.append(AWG8_8076.name)
-	AWG8_8076._set_dio_calibration_delay(4)
-	AWG8_8076.clear_errors()
-	
-	AWG8_8499.set('dios_0_interface', 0)
-	AWG8_8499.set('dios_0_interface', 1)
-	AWG8_8499.clear_errors()
-	try:
-		DIO.calibrate(sender=cc,receiver=AWG8_8499,sender_dio_mode='awg8-mw-direct-iq')
-		print(AWG8_8499.name, AWG8_8499._get_dio_calibration_delay(), 6)
-	except:
-		print(f'Failed DIO calibration on {AWG8_8499.name}!')
-		Failed_devices.append(AWG8_8499.name)
-	AWG8_8499._set_dio_calibration_delay(6)
-	AWG8_8499.clear_errors()
-	
-	AWG8_8279.set('dios_0_interface', 0)
-	AWG8_8279.set('dios_0_interface', 1)
-	AWG8_8279.clear_errors()
-	try:
-		DIO.calibrate(sender=cc,receiver=AWG8_8279,sender_dio_mode='awg8-flux')
-		print(AWG8_8279.name, AWG8_8279._get_dio_calibration_delay(), 6)
-	except:
-		print(f'Failed DIO calibration on {AWG8_8279.name}!')
-		Failed_devices.append(AWG8_8279.name)
-	AWG8_8279._set_dio_calibration_delay(6)
-	AWG8_8279_channels = [0, 1, 2, 3, 4, 5, 6, 7]
-	for this_ch in AWG8_8279_channels:
-		AWG8_8279.setd('sigouts/%d/precompensation/enable'%(int(this_ch)),True)
-		AWG8_8279.setd('sigouts/%d/precompensation/exponentials/0/enable'%(int(this_ch)),True)
-		AWG8_8279.setd('sigouts/%d/precompensation/exponentials/1/enable'%(int(this_ch)),True)
-		AWG8_8279.setd('sigouts/%d/precompensation/exponentials/2/enable'%(int(this_ch)),True)
-		AWG8_8279.setd('sigouts/%d/precompensation/exponentials/3/enable'%(int(this_ch)),True)
-		AWG8_8279.setd('sigouts/%d/precompensation/fir/enable'%(int(this_ch)),True)
-		AWG8_8279.set('sigouts_{}_delay'.format(int(this_ch)), 0e-9) 
-	AWG8_8279.clear_errors()
-	
-	AWG8_8320.set('dios_0_interface', 0)
-	AWG8_8320.set('dios_0_interface', 1)
-	AWG8_8320.clear_errors()
-	try:
-		DIO.calibrate(sender=cc,receiver=AWG8_8320,sender_dio_mode='awg8-flux')
-		print(AWG8_8320.name, AWG8_8320._get_dio_calibration_delay(), 1)
-	except:
-		print(f'Failed DIO calibration on {AWG8_8320.name}!')
-		Failed_devices.append(AWG8_8320.name)
-	AWG8_8320._set_dio_calibration_delay(1)
-	AWG8_8320_channels = [0, 1, 2, 3, 4, 5, 6, 7]
-	for this_ch in AWG8_8320_channels:
-		AWG8_8320.setd('sigouts/%d/precompensation/enable'%(int(this_ch)),True)
-		AWG8_8320.setd('sigouts/%d/precompensation/exponentials/0/enable'%(int(this_ch)),True)
-		AWG8_8320.setd('sigouts/%d/precompensation/exponentials/1/enable'%(int(this_ch)),True)
-		AWG8_8320.setd('sigouts/%d/precompensation/exponentials/2/enable'%(int(this_ch)),True)
-		AWG8_8320.setd('sigouts/%d/precompensation/exponentials/3/enable'%(int(this_ch)),True)
-		AWG8_8320.setd('sigouts/%d/precompensation/fir/enable'%(int(this_ch)),True)
-		AWG8_8320.set('sigouts_{}_delay'.format(int(this_ch)), 18e-9) 
-	AWG8_8320.clear_errors()
-	
-	AWG8_8071.set('dios_0_interface', 0)
-	AWG8_8071.set('dios_0_interface', 1)
-	AWG8_8071.clear_errors()
-	try:
-		DIO.calibrate(sender=cc,receiver=AWG8_8071,sender_dio_mode='awg8-flux')
-		print(AWG8_8071.name, AWG8_8071._get_dio_calibration_delay(), 6)
-	except:
-		print(f'Failed DIO calibration on {AWG8_8071.name}!')
-		Failed_devices.append(AWG8_8071.name)
-	AWG8_8071._set_dio_calibration_delay(6)
-	AWG8_8071_channels = [0, 1, 2, 3, 4, 5, 6, 7]
-	for this_ch in AWG8_8071_channels:
-		AWG8_8071.setd('sigouts/%d/precompensation/enable'%(int(this_ch)),True)
-		AWG8_8071.setd('sigouts/%d/precompensation/exponentials/0/enable'%(int(this_ch)),True)
-		AWG8_8071.setd('sigouts/%d/precompensation/exponentials/1/enable'%(int(this_ch)),True)
-		AWG8_8071.setd('sigouts/%d/precompensation/exponentials/2/enable'%(int(this_ch)),True)
-		AWG8_8071.setd('sigouts/%d/precompensation/exponentials/3/enable'%(int(this_ch)),True)
-		AWG8_8071.setd('sigouts/%d/precompensation/fir/enable'%(int(this_ch)),True)
-		AWG8_8071.set('sigouts_{}_delay'.format(int(this_ch)), 7e-9) 
-	AWG8_8071.clear_errors()
+	############################################
+	# MW HDAWG DIO calibration
+	############################################
+	# AWG8_8481
+	AWG8_8481.check_errors()
+	_errors = AWG8_8481._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		AWG8_8481._errors = {}
+		print(f'Calibrating DIO on AWG8_8481.')
+		AWG8_8481.set('dios_0_interface', 0)
+		AWG8_8481.set('dios_0_interface', 1)
+		AWG8_8481.clear_errors()
+		try:
+			DIO.calibrate(sender=cc,receiver=AWG8_8481,sender_dio_mode='awg8-mw-direct-iq')
+			print(AWG8_8481.name, AWG8_8481._get_dio_calibration_delay(), 6)
+		except:
+			print(f'Failed DIO calibration on {AWG8_8481.name}!')
+		AWG8_8481._set_dio_calibration_delay(6)
+		AWG8_8481.clear_errors()
+		_prep_awg('AWG8_8481')
+	# AWG8_8068
+	AWG8_8068.check_errors()
+	_errors = AWG8_8068._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		AWG8_8068._errors = {}
+		print(f'Calibrating DIO on AWG8_8068.')
+		AWG8_8068.set('dios_0_interface', 0)
+		AWG8_8068.set('dios_0_interface', 1)
+		AWG8_8068.clear_errors()
+		try:
+			DIO.calibrate(sender=cc,receiver=AWG8_8068,sender_dio_mode='awg8-mw-direct-iq')
+			print(AWG8_8068.name, AWG8_8068._get_dio_calibration_delay(), 4)
+		except:
+			print(f'Failed DIO calibration on {AWG8_8068.name}!')
+		AWG8_8068._set_dio_calibration_delay(4)
+		AWG8_8068.clear_errors()
+		_prep_awg('AWG8_8068')
+	# AWG8_8074
+	AWG8_8074.check_errors()
+	_errors = AWG8_8074._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		AWG8_8074._errors = {}
+		print(f'Calibrating DIO on AWG8_8074.')	
+		AWG8_8074.set('dios_0_interface', 0)
+		AWG8_8074.set('dios_0_interface', 1)
+		AWG8_8074.clear_errors()
+		try:
+			DIO.calibrate(sender=cc,receiver=AWG8_8074,sender_dio_mode='awg8-mw-direct-iq')
+			print(AWG8_8074.name, AWG8_8074._get_dio_calibration_delay(), 6)
+		except:
+			print(f'Failed DIO calibration on {AWG8_8074.name}!')
+		AWG8_8074._set_dio_calibration_delay(6)
+		AWG8_8074.clear_errors()
+		_prep_awg('AWG8_8074')
+	# AWG8_8076
+	AWG8_8076.check_errors()
+	_errors = AWG8_8076._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		AWG8_8076._errors = {}
+		print(f'Calibrating DIO on AWG8_8076.')	
+		AWG8_8076.set('dios_0_interface', 0)
+		AWG8_8076.set('dios_0_interface', 1)
+		AWG8_8076.clear_errors()
+		try:
+			DIO.calibrate(sender=cc,receiver=AWG8_8076,sender_dio_mode='awg8-mw-direct-iq')
+			print(AWG8_8076.name, AWG8_8076._get_dio_calibration_delay(), 4)
+		except:
+			print(f'Failed DIO calibration on {AWG8_8076.name}!')
+		AWG8_8076._set_dio_calibration_delay(4)
+		AWG8_8076.clear_errors()
+		_prep_awg('AWG8_8076')
+	# AWG8_8499
+	AWG8_8499.check_errors()
+	_errors = AWG8_8499._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		AWG8_8499._errors = {}
+		print(f'Calibrating DIO on AWG8_8499.')	
+		AWG8_8499.set('dios_0_interface', 0)
+		AWG8_8499.set('dios_0_interface', 1)
+		AWG8_8499.clear_errors()
+		try:
+			DIO.calibrate(sender=cc,receiver=AWG8_8499,sender_dio_mode='awg8-mw-direct-iq')
+			print(AWG8_8499.name, AWG8_8499._get_dio_calibration_delay(), 6)
+		except:
+			print(f'Failed DIO calibration on {AWG8_8499.name}!')
+		AWG8_8499._set_dio_calibration_delay(6)
+		AWG8_8499.clear_errors()
+		_prep_awg('AWG8_8499')
+
+	############################################
+	# Flux HDAWG DIO calibration
+	############################################
+	# AWG8_8279
+	AWG8_8279.check_errors()
+	_errors = AWG8_8279._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		AWG8_8279._errors = {}
+		print(f'Calibrating DIO on AWG8_8279.')
+		AWG8_8279.set('dios_0_interface', 0)
+		AWG8_8279.set('dios_0_interface', 1)
+		AWG8_8279.clear_errors()
+		try:
+			DIO.calibrate(sender=cc,receiver=AWG8_8279,sender_dio_mode='awg8-flux')
+			print(AWG8_8279.name, AWG8_8279._get_dio_calibration_delay(), 6)
+		except:
+			print(f'Failed DIO calibration on {AWG8_8279.name}!')
+		AWG8_8279._set_dio_calibration_delay(6)
+		AWG8_8279_channels = [0, 1, 2, 3, 4, 5, 6, 7]
+		for this_ch in AWG8_8279_channels:
+			AWG8_8279.setd('sigouts/%d/precompensation/enable'%(int(this_ch)),True)
+			AWG8_8279.setd('sigouts/%d/precompensation/exponentials/0/enable'%(int(this_ch)),True)
+			AWG8_8279.setd('sigouts/%d/precompensation/exponentials/1/enable'%(int(this_ch)),True)
+			AWG8_8279.setd('sigouts/%d/precompensation/exponentials/2/enable'%(int(this_ch)),True)
+			AWG8_8279.setd('sigouts/%d/precompensation/exponentials/3/enable'%(int(this_ch)),True)
+			AWG8_8279.setd('sigouts/%d/precompensation/fir/enable'%(int(this_ch)),True)
+			AWG8_8279.set('sigouts_{}_delay'.format(int(this_ch)), 0e-9) 
+		AWG8_8279.clear_errors()
+		_prep_awg('AWG8_8279')
+	# AWG8_8320
+	AWG8_8320.check_errors()
+	_errors = AWG8_8320._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		AWG8_8320._errors = {}
+		print(f'Calibrating DIO on AWG8_8320.')
+		AWG8_8320.set('dios_0_interface', 0)
+		AWG8_8320.set('dios_0_interface', 1)
+		AWG8_8320.clear_errors()
+		try:
+			DIO.calibrate(sender=cc,receiver=AWG8_8320,sender_dio_mode='awg8-flux')
+			print(AWG8_8320.name, AWG8_8320._get_dio_calibration_delay(), 1)
+		except:
+			print(f'Failed DIO calibration on {AWG8_8320.name}!')
+		AWG8_8320._set_dio_calibration_delay(1)
+		AWG8_8320_channels = [0, 1, 2, 3, 4, 5, 6, 7]
+		for this_ch in AWG8_8320_channels:
+			AWG8_8320.setd('sigouts/%d/precompensation/enable'%(int(this_ch)),True)
+			AWG8_8320.setd('sigouts/%d/precompensation/exponentials/0/enable'%(int(this_ch)),True)
+			AWG8_8320.setd('sigouts/%d/precompensation/exponentials/1/enable'%(int(this_ch)),True)
+			AWG8_8320.setd('sigouts/%d/precompensation/exponentials/2/enable'%(int(this_ch)),True)
+			AWG8_8320.setd('sigouts/%d/precompensation/exponentials/3/enable'%(int(this_ch)),True)
+			AWG8_8320.setd('sigouts/%d/precompensation/fir/enable'%(int(this_ch)),True)
+			AWG8_8320.set('sigouts_{}_delay'.format(int(this_ch)), 18e-9) 
+		AWG8_8320.clear_errors()
+		_prep_awg('AWG8_8320')
+	# AWG8_8071
+	AWG8_8071.check_errors()
+	_errors = AWG8_8071._errors
+	# if 'AWGDIOTIMING' in _errors.keys():
+	if _errors != {}:
+		AWG8_8071._errors = {}
+		print(f'Calibrating DIO on AWG8_8071.')
+		AWG8_8071.set('dios_0_interface', 0)
+		AWG8_8071.set('dios_0_interface', 1)
+		AWG8_8071.clear_errors()
+		try:
+			DIO.calibrate(sender=cc,receiver=AWG8_8071,sender_dio_mode='awg8-flux')
+			print(AWG8_8071.name, AWG8_8071._get_dio_calibration_delay(), 6)
+		except:
+			print(f'Failed DIO calibration on {AWG8_8071.name}!')
+		AWG8_8071._set_dio_calibration_delay(6)
+		AWG8_8071_channels = [0, 1, 2, 3, 4, 5, 6, 7]
+		for this_ch in AWG8_8071_channels:
+			AWG8_8071.setd('sigouts/%d/precompensation/enable'%(int(this_ch)),True)
+			AWG8_8071.setd('sigouts/%d/precompensation/exponentials/0/enable'%(int(this_ch)),True)
+			AWG8_8071.setd('sigouts/%d/precompensation/exponentials/1/enable'%(int(this_ch)),True)
+			AWG8_8071.setd('sigouts/%d/precompensation/exponentials/2/enable'%(int(this_ch)),True)
+			AWG8_8071.setd('sigouts/%d/precompensation/exponentials/3/enable'%(int(this_ch)),True)
+			AWG8_8071.setd('sigouts/%d/precompensation/fir/enable'%(int(this_ch)),True)
+			AWG8_8071.set('sigouts_{}_delay'.format(int(this_ch)), 7e-9) 
+		AWG8_8071.clear_errors()
+		_prep_awg('AWG8_8071')
 	# apply the right delays 
 	device.tim_flux_latency_0(-240e-9)#8320
 	device.tim_flux_latency_1(-240e-9)#8279
@@ -2870,26 +2944,6 @@ def DIO_calibration(station, reset_waveforms = None):
 	device.tim_mw_latency_3(5e-9) # 8068
 	device.tim_mw_latency_4(-10e-9) # 8481
 	device.prepare_timing()
-	
-	if reset_waveforms:
-		AWG8_8068.reset_waveforms_zeros()
-		AWG8_8071.reset_waveforms_zeros()
-		AWG8_8074.reset_waveforms_zeros()
-		AWG8_8076.reset_waveforms_zeros()
-		AWG8_8279.reset_waveforms_zeros()
-		AWG8_8320.reset_waveforms_zeros()
-		AWG8_8481.reset_waveforms_zeros()
-		AWG8_8499.reset_waveforms_zeros()
-		Qubits = [
-			'D1', 'D2', 'D3',
-			'D4', 'D5', 'D6',
-			'D7', 'D8', 'D9',
-			'Z1', 'Z2', 'Z3', 'Z4',
-			'X1', 'X2', 'X3', 'X4',
-				]
-		device.prepare_for_timedomain(qubits = Qubits)
-		print(f'Failed DIO cal on devices: {" ".join(Failed_devices)}.')
-
 	return True
 
 # Dictionary for necessary parking for each interaction
@@ -3213,7 +3267,8 @@ def check_prepare_readout(qubits, station):
 		check_list.append(resonators_in_lm[ro_lm.name] in res_combs)
 	return not all(check_list)
 
-def check_prepare_mw(qubit, station):
+def check_prepare_mw(qubit, station,
+					 lutmap='phase_lutmap'):
 	'''
 	Function to assess weather mw pulses have to be 
 	reuploaded. This is done by looking at each uploaded
@@ -3223,48 +3278,84 @@ def check_prepare_mw(qubit, station):
 	returns False).
 	'''
 	# Required lutmap for parity check experiments
-	required_lutmap = {0: {'name': 'I', 'theta': 0, 'phi': 0, 'type': 'ge'},
-					   1: {'name': 'rX180', 'theta': 180, 'phi': 0, 'type': 'ge'},
-					   2: {'name': 'rY180', 'theta': 180, 'phi': 90, 'type': 'ge'},
-					   3: {'name': 'rX90', 'theta': 90, 'phi': 0, 'type': 'ge'},
-					   4: {'name': 'rY90', 'theta': 90, 'phi': 90, 'type': 'ge'},
-					   5: {'name': 'rXm90', 'theta': -90, 'phi': 0, 'type': 'ge'},
-					   6: {'name': 'rYm90', 'theta': -90, 'phi': 90, 'type': 'ge'},
-					   7: {'name': 'rPhi90', 'theta': 90, 'phi': 0, 'type': 'ge'},
-					   8: {'name': 'spec', 'type': 'spec'},
-					   9: {'name': 'rPhi90', 'theta': 90, 'phi': 0, 'type': 'ge'},
-					   10: {'name': 'rPhi90', 'theta': 90, 'phi': 20, 'type': 'ge'},
-					   11: {'name': 'rPhi90', 'theta': 90, 'phi': 40, 'type': 'ge'},
-					   12: {'name': 'rPhi90', 'theta': 90, 'phi': 60, 'type': 'ge'},
-					   13: {'name': 'rPhi90', 'theta': 90, 'phi': 80, 'type': 'ge'},
-					   14: {'name': 'rPhi90', 'theta': 90, 'phi': 100, 'type': 'ge'},
-					   15: {'name': 'rPhi90', 'theta': 90, 'phi': 120, 'type': 'ge'},
-					   16: {'name': 'rPhi90', 'theta': 90, 'phi': 140, 'type': 'ge'},
-					   27: {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'},
-					   30: {'name': 'rX23', 'theta': 180, 'phi': 0, 'type': 'fh'},
-					   51: {'name': 'phaseCorrLRU', 'type': 'phase'},
-					   52: {'name': 'phaseCorrStep1', 'type': 'phase'},
-					   53: {'name': 'phaseCorrStep2', 'type': 'phase'},
-					   54: {'name': 'phaseCorrStep3', 'type': 'phase'},
-					   55: {'name': 'phaseCorrStep4', 'type': 'phase'},
-					   56: {'name': 'phaseCorrStep5', 'type': 'phase'},
-					   57: {'name': 'phaseCorrStep6', 'type': 'phase'},
-					   58: {'name': 'phaseCorrStep7', 'type': 'phase'},
-					   59: {'name': 'phaseCorrStep8', 'type': 'phase'},
-					   60: {'name': 'phaseCorrNW', 'type': 'phase'},
-					   61: {'name': 'phaseCorrNE', 'type': 'phase'},
-					   62: {'name': 'phaseCorrSW', 'type': 'phase'},
-					   63: {'name': 'phaseCorrSE', 'type': 'phase'},
-					   17: {'name': 'rPhi90', 'theta': 90, 'phi': 160, 'type': 'ge'},
-					   18: {'name': 'rPhi90', 'theta': 90, 'phi': 180, 'type': 'ge'},
-					   19: {'name': 'rPhi90', 'theta': 90, 'phi': 200, 'type': 'ge'},
-					   20: {'name': 'rPhi90', 'theta': 90, 'phi': 220, 'type': 'ge'},
-					   21: {'name': 'rPhi90', 'theta': 90, 'phi': 240, 'type': 'ge'},
-					   22: {'name': 'rPhi90', 'theta': 90, 'phi': 260, 'type': 'ge'},
-					   23: {'name': 'rPhi90', 'theta': 90, 'phi': 280, 'type': 'ge'},
-					   24: {'name': 'rPhi90', 'theta': 90, 'phi': 300, 'type': 'ge'},
-					   25: {'name': 'rPhi90', 'theta': 90, 'phi': 320, 'type': 'ge'},
-					   26: {'name': 'rPhi90', 'theta': 90, 'phi': 340, 'type': 'ge'}}
+	if lutmap == 'phase_lutmap':
+		required_lutmap = {0: {'name': 'I', 'theta': 0, 'phi': 0, 'type': 'ge'},
+						   1: {'name': 'rX180', 'theta': 180, 'phi': 0, 'type': 'ge'},
+						   2: {'name': 'rY180', 'theta': 180, 'phi': 90, 'type': 'ge'},
+						   3: {'name': 'rX90', 'theta': 90, 'phi': 0, 'type': 'ge'},
+						   4: {'name': 'rY90', 'theta': 90, 'phi': 90, 'type': 'ge'},
+						   5: {'name': 'rXm90', 'theta': -90, 'phi': 0, 'type': 'ge'},
+						   6: {'name': 'rYm90', 'theta': -90, 'phi': 90, 'type': 'ge'},
+						   7: {'name': 'rPhi90', 'theta': 90, 'phi': 0, 'type': 'ge'},
+						   8: {'name': 'spec', 'type': 'spec'},
+						   9: {'name': 'rPhi90', 'theta': 90, 'phi': 0, 'type': 'ge'},
+						   10: {'name': 'rPhi90', 'theta': 90, 'phi': 20, 'type': 'ge'},
+						   11: {'name': 'rPhi90', 'theta': 90, 'phi': 40, 'type': 'ge'},
+						   12: {'name': 'rPhi90', 'theta': 90, 'phi': 60, 'type': 'ge'},
+						   13: {'name': 'rPhi90', 'theta': 90, 'phi': 80, 'type': 'ge'},
+						   14: {'name': 'rPhi90', 'theta': 90, 'phi': 100, 'type': 'ge'},
+						   15: {'name': 'rPhi90', 'theta': 90, 'phi': 120, 'type': 'ge'},
+						   16: {'name': 'rPhi90', 'theta': 90, 'phi': 140, 'type': 'ge'},
+						   27: {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'},
+						   30: {'name': 'rX23', 'theta': 180, 'phi': 0, 'type': 'fh'},
+						   51: {'name': 'phaseCorrLRU', 'type': 'phase'},
+						   52: {'name': 'phaseCorrStep1', 'type': 'phase'},
+						   53: {'name': 'phaseCorrStep2', 'type': 'phase'},
+						   54: {'name': 'phaseCorrStep3', 'type': 'phase'},
+						   55: {'name': 'phaseCorrStep4', 'type': 'phase'},
+						   56: {'name': 'phaseCorrStep5', 'type': 'phase'},
+						   57: {'name': 'phaseCorrStep6', 'type': 'phase'},
+						   58: {'name': 'phaseCorrStep7', 'type': 'phase'},
+						   59: {'name': 'phaseCorrStep8', 'type': 'phase'},
+						   60: {'name': 'phaseCorrNW', 'type': 'phase'},
+						   61: {'name': 'phaseCorrNE', 'type': 'phase'},
+						   62: {'name': 'phaseCorrSW', 'type': 'phase'},
+						   63: {'name': 'phaseCorrSE', 'type': 'phase'},
+						   17: {'name': 'rPhi90', 'theta': 90, 'phi': 160, 'type': 'ge'},
+						   18: {'name': 'rPhi90', 'theta': 90, 'phi': 180, 'type': 'ge'},
+						   19: {'name': 'rPhi90', 'theta': 90, 'phi': 200, 'type': 'ge'},
+						   20: {'name': 'rPhi90', 'theta': 90, 'phi': 220, 'type': 'ge'},
+						   21: {'name': 'rPhi90', 'theta': 90, 'phi': 240, 'type': 'ge'},
+						   22: {'name': 'rPhi90', 'theta': 90, 'phi': 260, 'type': 'ge'},
+						   23: {'name': 'rPhi90', 'theta': 90, 'phi': 280, 'type': 'ge'},
+						   24: {'name': 'rPhi90', 'theta': 90, 'phi': 300, 'type': 'ge'},
+						   25: {'name': 'rPhi90', 'theta': 90, 'phi': 320, 'type': 'ge'},
+						   26: {'name': 'rPhi90', 'theta': 90, 'phi': 340, 'type': 'ge'}}
+	elif lutmap == 'default_lutmap':
+		required_lutmap = {0: {'name': 'I', 'theta': 0, 'phi': 0, 'type': 'ge'},
+						   1: {'name': 'rX180', 'theta': 180, 'phi': 0, 'type': 'ge'},
+						   2: {'name': 'rY180', 'theta': 180, 'phi': 90, 'type': 'ge'},
+						   3: {'name': 'rX90', 'theta': 90, 'phi': 0, 'type': 'ge'},
+						   4: {'name': 'rY90', 'theta': 90, 'phi': 90, 'type': 'ge'},
+						   5: {'name': 'rXm90', 'theta': -90, 'phi': 0, 'type': 'ge'},
+						   6: {'name': 'rYm90', 'theta': -90, 'phi': 90, 'type': 'ge'},
+						   7: {'name': 'rPhi90', 'theta': 90, 'phi': 0, 'type': 'ge'},
+						   8: {'name': 'spec', 'type': 'spec'},
+						   9: {'name': 'rX12', 'theta': 180, 'phi': 0, 'type': 'ef'},
+						   10: {'name': 'square', 'type': 'square'},
+						   11: {'name': 'rY45', 'theta': 45, 'phi': 90, 'type': 'ge'},
+						   12: {'name': 'rYm45', 'theta': -45, 'phi': 90, 'type': 'ge'},
+						   13: {'name': 'rX45', 'theta': 45, 'phi': 0, 'type': 'ge'},
+						   14: {'name': 'rXm45', 'theta': -45, 'phi': 0, 'type': 'ge'},
+						   15: {'name': 'rX12_90', 'theta': 90, 'phi': 0, 'type': 'ef'},
+						   16: {'name': 'rX23_90', 'theta': 90, 'phi': 0, 'type': 'fh'},
+						   27: {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'},
+						   30: {'name': 'rX23', 'theta': 180, 'phi': 0, 'type': 'fh'},
+						   51: {'name': 'phaseCorrLRU', 'type': 'phase'},
+						   52: {'name': 'phaseCorrStep1', 'type': 'phase'},
+						   53: {'name': 'phaseCorrStep2', 'type': 'phase'},
+						   54: {'name': 'phaseCorrStep3', 'type': 'phase'},
+						   55: {'name': 'phaseCorrStep4', 'type': 'phase'},
+						   56: {'name': 'phaseCorrStep5', 'type': 'phase'},
+						   57: {'name': 'phaseCorrStep6', 'type': 'phase'},
+						   58: {'name': 'phaseCorrStep7', 'type': 'phase'},
+						   59: {'name': 'phaseCorrStep8', 'type': 'phase'},
+						   60: {'name': 'phaseCorrNW', 'type': 'phase'},
+						   61: {'name': 'phaseCorrNE', 'type': 'phase'},
+						   62: {'name': 'phaseCorrSW', 'type': 'phase'},
+						   63: {'name': 'phaseCorrSE', 'type': 'phase'}}
+	else:
+		raise ValueError("Accepted lutmaps are 'phase_lutmap' and 'default_lutmap'.")
 	# Assess uploaded lutmap
 	Q = station.components[qubit]
 	mw_lm = Q.instr_LutMan_MW.get_instr()
@@ -3589,7 +3680,7 @@ def prepare_for_LRU_calibration(qubit:str, station):
 	station.components['MW_LO_15'].power(15) # X1
 	# Low frequency
 	station.components['MW_LO_11'].power(6) # D1
-	station.components['MW_LO_9'].power(10) # D2
+	station.components['MW_LO_9'].power(8) # D2
 	station.components['MW_LO_12'].power(10) # D3
 	station.components['MW_LO_8'].power(10) # D7
 	station.components['MW_LO_14'].power(10) # D8

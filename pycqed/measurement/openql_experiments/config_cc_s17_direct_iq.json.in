@@ -184,8 +184,8 @@
                 {
                     "name": "mw_0",
                     "qubits": [                                             // data qubits:
-                        [9],
                         [1],
+                        [9],
                         [5],
                         [0]
                     ],
@@ -295,7 +295,7 @@
                 },
                 {
                     "name": "flux_2",
-                    "qubits": [[11], [], [22], [20], [24], [21], [25], [23]],
+                    "qubits": [[11], [], [22], [24], [20], [21], [25], [23]],
                     "signal_type": "flux",
                     "ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-flux",

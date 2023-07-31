@@ -62,7 +62,7 @@ class SingleQubitGBT_analysis(ba.BaseDataAnalysis):
 			M0 = rb.proc_data_dict['M0']
 			X1 = rb.proc_data_dict['X1']
 			_err_key = [k for k in rb.proc_data_dict['quantities_of_interest'].keys()\
-						if 'eps_simple' in k ][0]
+						if 'eps_g' in k ][0]
 			_L1_key = [k for k in rb.proc_data_dict['quantities_of_interest'].keys()\
 					   if 'L1' in k ][0]
 			SQG_err = rb.proc_data_dict['quantities_of_interest'][_err_key]
@@ -80,7 +80,7 @@ class SingleQubitGBT_analysis(ba.BaseDataAnalysis):
 						label=label_ssro,
 						qubit=q,
 						qubit_freq=6e9,
-						heralded_init=False,
+						heralded_init=True,
 						f_state=True,
 						extract_only=True)
 			self.raw_data_dict[q]['RO_err'] = 1-ssro.qoi['F_a']

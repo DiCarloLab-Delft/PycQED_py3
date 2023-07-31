@@ -425,7 +425,6 @@ def T1(qubit_idx: int,
                 k.gate("sf_park", [qubit_idx])
                 k.gate("i", [qubit_idx])
             k.gate("wait", [qubit_idx], 0)
-        
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -1652,10 +1651,10 @@ def LRU_experiment(
     k.gate("wait", [])
     for qb_idx in [qubit_idx]:
     # for qb_idx in [15,13,16,7,14,12,10]:
-        # k.gate('lru', [qb_idx])
+        k.gate('lru', [qb_idx])
         # k.gate('i', [qb_idx])
         # k.gate('i', [qb_idx])
-        k.gate('sf_park', [qb_idx])
+        # k.gate('sf_park', [qb_idx])
     k.gate("wait", [], LRU_duration_ns-20)
     k.measure(qubit_idx)
     p.add_kernel(k)
@@ -1729,7 +1728,7 @@ def LRU_repeated_experiment(
         k.gate('lru', [13]) # D5
         k.gate('lru', [15]) # D4
         k.gate('lru', [16]) # D6
-        k.gate("wait", [20, 21, 24, 25, 22, 23], LRU_duration_ns-40)
+        k.gate("wait", [21, 22, 23, 24], LRU_duration_ns-40)
         k.gate("wait", [17, 18, 19], LRU_duration_ns-20)
         # for q in [6,2,0,15,13,16,1,5,4]:
         # for q in [6,2,0,15,13,1,5,4]:
@@ -1872,8 +1871,8 @@ def LRU_process_tomograhpy(
                 k.gate('lru', [10]) # Z4
                 k.gate('lru', [7])  # Z1
                 k.gate('lru', [14]) # Z2
-                k.gate('lru', [3])  # X3
-                k.gate('lru', [9])  # X4
+                # k.gate('lru', [3])  # X3
+                # k.gate('lru', [9])  # X4
             k.gate('wait', [20, 21, 22, 23, 24, 25], LRU_duration_ns-40)
             k.gate('wait', [17, 18, 19], LRU_duration_ns-20)
             k.gate('wait', [], 20)

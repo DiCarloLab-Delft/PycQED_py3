@@ -361,6 +361,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
         fr_rb_simple_dict = self.fit_res["rb_decay_simple_" + fit_input_tag]
         eps_simple = safe_get_par_from_fit_result(fr_rb_simple_dict, "eps")
+        eps_g = safe_get_par_from_fit_result(fr_rb_simple_dict, "eps_g")
 
         fr_dec = self.fit_res["leakage_decay_" + fit_input_tag]
         L1 = safe_get_par_from_fit_result(fr_dec, "L1")
@@ -379,6 +380,9 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         qoi = pdd["quantities_of_interest"]
         qoi["eps_simple_" + fit_input_tag] = ufloat(
             eps_simple.value, eps_simple.stderr or np.NaN
+        )
+        qoi["eps_g_" + fit_input_tag] = ufloat(
+            eps_g.value, eps_g.stderr or np.NaN
         )
         qoi["eps_X1_" + fit_input_tag] = ufloat(eps.value, eps.stderr or np.NaN)
         qoi["L1_" + fit_input_tag] = ufloat(L1.value, L1.stderr or np.NaN)
