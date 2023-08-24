@@ -1714,7 +1714,8 @@ class VCZ_tmid_Analysis(ba.BaseDataAnalysis):
                  label: str = '',
                  options_dict: dict = None, 
                  extract_only: bool = False,
-                 auto=True):
+                 auto=True,
+                 asymmetry: float = 0):
 
         super().__init__(t_start=t_start, 
                          t_stop=t_stop,
@@ -1729,6 +1730,7 @@ class VCZ_tmid_Analysis(ba.BaseDataAnalysis):
         self.Out_range = Out_range
         self.DAC_amp = DAC_amp
         self.Q0_freq = Q0_freq
+        self.asymmetry = asymmetry
         if auto:
             self.run_analysis()
 
@@ -1756,7 +1758,7 @@ class VCZ_tmid_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['Tmid'] = Tmid
         if self.Poly_coefs:
             P_funcs = [ np.poly1d(coefs) for coefs in self.Poly_coefs ]
-            Detunings = [ P_funcs[i](Amps_list[i]*self.DAC_amp*self.Out_range/2) \
+            Detunings = [ P_funcs[i](Amps_list[i]*self.DAC_amp*self.Out_range/2*(1+self.asymmetry)) \
                           for i in range(len(self.Q0)) ]
             self.proc_data_dict['Detunings'] = Detunings
         for i, q0 in enumerate(self.Q0):
@@ -1923,6 +1925,34 @@ class VCZ_tmid_Analysis(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
+def find_contours(Array, value=180):
+    '''
+    array: 2D array on which to search
+    value: values of the contours desired
+    '''
+    # Find points close to value
+    _points = []
+    for i in range(Array.shape[0]):
+        idxs = np.where(np.abs(Array[i,:]-value)<0.99)
+        for j in idxs[0]:
+            _points.append([i,j])
+    # Sort points in different contours
+    _contours = [[_points[0]]]
+    for point in _points[1:]:
+        p_distance = Array.shape[0]
+        for contour in _contours:
+            for p in contour:
+                _distance = np.sqrt( np.sum( (np.array(point) - np.array(p))**2 ) )
+                p_distance = min(_distance, _distance)
+            if p_distance < 10:
+                contour.append(point)
+                break
+        if p_distance < 10:
+            pass
+        else:
+            _contours.append([point])
+    return _contours
+
 def VCZ_Tmid_landscape_plotfn(
     ax, 
     Amps, Tmid, 
@@ -1983,9 +2013,9 @@ def VCZ_Tmid_landscape_plotfn(
             axt1.set_xlim((q0_freq-np.array(axs[1+2*n].get_xlim()))*1e-9)
             axt1.set_xlabel(f'{q0} Frequency (GHz)')
             # Plot SNZ leakage fitting contours
-            _X = np.linspace(X[0], X[-1], 201)
-            _Y = np.linspace(Y[0], Y[-1], 201)
-            _X, _Y = np.meshgrid(_X, _Y)
+            _x = np.linspace(X[0], X[-1], 201)
+            _y = np.linspace(Y[0], Y[-1], 201)
+            _X, _Y = np.meshgrid(_x, _y)
             # Get interpolated landscape from fit
             # fit params
             tp_factor, g, delta_0, det11_02, n_dist, a, b = fit_params
@@ -2003,9 +2033,12 @@ def VCZ_Tmid_landscape_plotfn(
                     axs[i+2*n].contour(_X, _Y, Pop20, [c], colors=['w'],
                                   linewidths=[1], linestyles=['--'], alpha=a_)
                 # Plot 180 cphase contours
-                CS = axs[i+2*n].contour(_X, _Y, Cphase, [180], colors=['w'],
-                                   linewidths=[1.5], linestyles=['--'], alpha=1)
-                axs[i+2*n].clabel(CS, CS.levels, inline=True, fmt='$%i^\\circ$', fontsize=10)
+                # CS = axs[i+2*n].contour(_X, _Y, Cphase, [180], colors=['w'],
+                #                    linewidths=[1.5], linestyles=['--'], alpha=1)
+                # axs[i+2*n].clabel(CS, CS.levels, inline=True, fmt='$%i^\\circ$', fontsize=10)
+                Contours_180 = find_contours(Cphase, value=180)   
+                for c, contour in enumerate(Contours_180):
+                    axs[i+2*n].plot(_x[np.array(contour)[:,1]], _y[np.array(contour)[:,0]], f'w--', lw=2)
                 # Plot optimal parameters
                 for opt_det, opt_tmid in Opt_params[:-1]:
                     axs[i+2*n].plot([opt_det], [opt_tmid], '*', markersize=12, 
@@ -2125,7 +2158,8 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
                  label: str = '',
                  options_dict: dict = None, 
                  extract_only: bool = False,
-                 auto=True):
+                 auto=True,
+                 asymmetry: float = 0):
 
         super().__init__(t_start=t_start, 
                          t_stop=t_stop,
@@ -2142,6 +2176,7 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
         self.DAC_amp = DAC_amp
         self.Q0_freq = Q0_freq
         self.tmid = tmid
+        self.asymmetry = asymmetry
         if auto:
             self.run_analysis()
 
@@ -2169,7 +2204,7 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['Bamps'] = Bamps
         if self.Poly_coefs:
             P_funcs = [ np.poly1d(coefs) for coefs in self.Poly_coefs ]
-            Detunings = [ P_funcs[i](Amps_list[i]*self.DAC_amp*self.Out_range/2) \
+            Detunings = [ P_funcs[i](Amps_list[i]*self.DAC_amp*self.Out_range/2*(1+self.asymmetry)) \
                           for i in range(len(self.Q0)) ]
             self.proc_data_dict['Detunings'] = Detunings
         # Calculate cost function to find optimal
@@ -2416,30 +2451,31 @@ def VCZ_B_landscape_plotfn(
         axt2 = axs[2+3*n].twiny()
         axt2.set_xlim((q0_freq-np.array(axs[2+3*n].get_xlim()))*1e-9)
         axt2.set_xlabel(f'{q0} Frequency (GHz)')
-        # Plot SNZ leakage fitting contours
-        _X = np.linspace(X[0], X[-1], 201)
-        _Y = np.linspace(Y[0], Y[-1], 201)
-        _X, _Y = np.meshgrid(_X, _Y)
-        # Get interpolated landscape from fit
-        # fit params
-        print(fit_params)
-        tp_factor, tmid, g, delta_0, det11_02, n_dist, a, b = fit_params
-        Pop20, Pop11, Cphase = SNZ2(delta=_X, B_amp=_Y,
-                                    tp=tp_factor/(4*g),
-                                    tmid=tmid,
-                                    g=g,
-                                    delta_0=delta_0,
-                                    det11_02=det11_02,
-                                    n_dist=n_dist)
-        for i in range(2):
-            # Plot leakage contours
-            for c, a_ in zip([.05, .2, .6, .8], [.5, .7, .85, 1]):
-                axs[i+2*n].contour(_X, _Y, Pop20, [c], colors=['w'],
-                              linewidths=[1], linestyles=['--'], alpha=a_)
-            # # Plot 180 cphase contours
-            # CS = axs[i+2*n].contour(_X, _Y, Cphase, [180], colors=['w'],
-            #                    linewidths=[1.5], linestyles=['--'], alpha=1)
-            # axs[i+2*n].clabel(CS, CS.levels, inline=True, fmt='$%i^\\circ$', fontsize=10)
+        # # This fit is not accurate !
+        # # Plot SNZ leakage fitting contours
+        # _X = np.linspace(X[0], X[-1], 201)
+        # _Y = np.linspace(Y[0], Y[-1], 201)
+        # _X, _Y = np.meshgrid(_X, _Y)
+        # # Get interpolated landscape from fit
+        # # fit params
+        # # print(fit_params)
+        # tp_factor, tmid, g, delta_0, det11_02, n_dist, a, b = fit_params
+        # Pop20, Pop11, Cphase = SNZ2(delta=_X, B_amp=_Y,
+        #                             tp=tp_factor/(4*g),
+        #                             tmid=tmid,
+        #                             g=g,
+        #                             delta_0=delta_0,
+        #                             det11_02=det11_02,
+        #                             n_dist=n_dist)
+        # for i in range(2):
+        #     # Plot leakage contours
+        #     for c, a_ in zip([.05, .2, .6, .8], [.5, .7, .85, 1]):
+        #         axs[i+2*n].contour(_X, _Y, Pop20, [c], colors=['w'],
+        #                       linewidths=[1], linestyles=['--'], alpha=a_)
+        #     # # Plot 180 cphase contours
+        #     # CS = axs[i+2*n].contour(_X, _Y, Cphase, [180], colors=['w'],
+        #     #                    linewidths=[1.5], linestyles=['--'], alpha=1)
+        #     # axs[i+2*n].clabel(CS, CS.levels, inline=True, fmt='$%i^\\circ$', fontsize=10)
 
     # Plot 180 cphase contour
     # unwrap phase so contour is correctly estimated
@@ -3019,10 +3055,14 @@ def convert_amp_to_freq(poly_coefs, ch_range, ch_amp, dac_amp):
 def vcz_waveform(sampling_rate,
                  amp_at_int_11_02,
                  norm_amp_fine,
+                 amp_pad,
                  asymmetry,
                  time_sqr,
                  time_middle,
-                 time_pad):
+                 time_pad,
+                 use_asymmety,
+                 use_net_zero_pulse
+    ):
     '''
     Trace SNZ waveform.
     '''
@@ -3039,12 +3079,21 @@ def vcz_waveform(sampling_rate,
     time_middle = np.round(time_middle / dt) * dt
     time_sqr = np.round(time_sqr / dt) * dt
     time_pad = np.round(time_pad / dt) * dt
-    pad_amps = np.full(int(time_pad / dt), 0)
+    # build padding part of waveform
+    pad_amps = np.full(int(time_pad / dt), 0) + amp_pad*2
+    for _i in range(len(pad_amps)):
+        if _i<12:
+            pad_amps[_i] = 0
+    # pad_amps = np.full(int(time_pad / dt), 0)
     sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
     amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)
     # build asymmetric SNZ amplitudes
-    norm_amp_pos = 1+asymmetry
-    norm_amp_neg = 1-asymmetry
+    if use_asymmety:
+        norm_amp_pos = 1+asymmetry
+        norm_amp_neg = 1-asymmetry
+    else:
+        norm_amp_pos = 1
+        norm_amp_neg = 1
     pos_sq_amps = np.full(int(time_sqr / dt), norm_amp_pos)
     neg_sq_amps = np.full(int(time_sqr / dt), norm_amp_neg)
     # slope amp will be using the same scaling factor as in the symmetric case, 
@@ -3059,8 +3108,8 @@ def vcz_waveform(sampling_rate,
         pad_amps,
         pos_NZ_amps,
         amps_middle,
-        -neg_NZ_amps,
-        pad_amps,
+        (1-use_net_zero_pulse*2)*neg_NZ_amps,
+        pad_amps[::-1],
         [amp_at_sweetspot])
     )
     amp = amp_at_int_11_02 * amp
@@ -3068,14 +3117,19 @@ def vcz_waveform(sampling_rate,
     tlist = np.concatenate(([0.0], tlist))  # Set first point to have t=0
     return amp
 
-def gen_park(sampling_rate, park_length, park_pad_length, park_amp):
+def gen_park(sampling_rate, park_length, park_pad_length, park_amp,
+             park_double_sided):
     '''
     Trace parking waveform.
     '''
-    ones = np.ones(int(park_length * sampling_rate / 2))
     zeros = np.zeros(int(park_pad_length * sampling_rate))
-    pulse_pos = park_amp * ones
-    return np.concatenate((zeros, pulse_pos, - pulse_pos, zeros))
+    if park_double_sided:
+        ones = np.ones(int(park_length * sampling_rate / 2))
+        pulse_pos = park_amp * ones
+        return np.concatenate((zeros, pulse_pos, - pulse_pos, zeros))
+    else:
+        pulse_pos = park_amp*np.ones(int(park_length*sampling_rate))
+        return np.concatenate((zeros, pulse_pos, zeros))
 
 class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
     """
@@ -3127,11 +3181,15 @@ class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
                 param_spec[f'amp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_dac_at_11_02_{d}')
                 param_spec[f'B_amp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_fine_{d}')
                 param_spec[f'asymmetry_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_asymmetry_{d}')
+                param_spec[f'amp_pad_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_pad_{d}')
+                param_spec[f'use_asymmetry_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_use_asymmetric_amp_{d}')
+                param_spec[f'use_net_zero_pulse_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_use_net_zero_pulse_{d}')
                 # Durations
                 param_spec[f'tp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_single_sq_{d}')
                 param_spec[f'tmid_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_middle_{d}')
                 param_spec[f'tpad_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_pad_{d}')
             # Park parameters
+            param_spec['park_double_sided'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_double_sided')
             param_spec['park_amp'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_amp')
             param_spec['t_park'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_length')
             param_spec['tpad_park'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_pad_length')
@@ -3148,11 +3206,15 @@ class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
             data[q]['anharmonicity'] = eval(data[q]['anharmonicity'])
             for d in ['NW', 'NE', 'SW', 'SE']:
                 data[q][f'amp_{d}'] = eval(data[q][f'amp_{d}'])
+                data[q][f'amp_pad_{d}'] = eval(data[q][f'amp_pad_{d}'])
                 data[q][f'B_amp_{d}'] = eval(data[q][f'B_amp_{d}'])
                 data[q][f'asymmetry_{d}'] = eval(data[q][f'asymmetry_{d}'])
                 data[q][f'tp_{d}'] = eval(data[q][f'tp_{d}'])
                 data[q][f'tmid_{d}'] = eval(data[q][f'tmid_{d}'])
                 data[q][f'tpad_{d}'] = eval(data[q][f'tpad_{d}'])
+                data[q][f'use_asymmetry_{d}'] = eval(data[q][f'use_asymmetry_{d}'])
+                data[q][f'use_net_zero_pulse_{d}'] = eval(data[q][f'use_net_zero_pulse_{d}'])
+            data[q]['park_double_sided'] = eval(data[q]['park_double_sided'])
             data[q]['park_amp'] = eval(data[q]['park_amp'])
             data[q]['t_park'] = eval(data[q]['t_park'])
             data[q]['tpad_park'] = eval(data[q]['tpad_park'])
@@ -3194,16 +3256,21 @@ class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
         self.proc_data_dict = {q : {} for q in self.Qubits}
         for q in self.Qubits:
             self.proc_data_dict[q]['frequency'] = data[q]['frequency']
+            self.proc_data_dict[q]['anharmonicity'] = data[q]['anharmonicity']
             # estimate detunings at each amplitude
             for d in ['NW', 'NE', 'SW', 'SE']:
                 # Trace CZ waveform
-                _wf = vcz_waveform(sampling_rate = 2.4e9,
-                                   amp_at_int_11_02 = data[q][f'amp_{d}'],
-                                   norm_amp_fine = data[q][f'B_amp_{d}'],
-                                   asymmetry = data[q][f'asymmetry_{d}'],
-                                   time_sqr = data[q][f'tp_{d}'],
-                                   time_middle = data[q][f'tmid_{d}'],
-                                   time_pad = data[q][f'tpad_{d}'])
+                _wf = vcz_waveform(
+                    sampling_rate = 2.4e9,
+                    amp_at_int_11_02 = data[q][f'amp_{d}'],
+                    norm_amp_fine = data[q][f'B_amp_{d}'],
+                    amp_pad = data[q][f'amp_pad_{d}'],
+                    asymmetry = data[q][f'asymmetry_{d}'],
+                    time_sqr = data[q][f'tp_{d}'],
+                    time_middle = data[q][f'tmid_{d}'],
+                    time_pad = data[q][f'tpad_{d}'],
+                    use_asymmety = data[q][f'use_asymmetry_{d}'],
+                    use_net_zero_pulse = data[q][f'use_net_zero_pulse_{d}'])
                 self.proc_data_dict[q][f'cz_waveform_{d}'] = _wf
                 # Convert CZ waveform into frequency trajectory
                 _Ftrajectory = -convert_amp_to_freq(data[q]['poly_coefs'],
@@ -3215,7 +3282,8 @@ class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
             _wf = gen_park(sampling_rate = 2.4e9,
                            park_length = data[q]['t_park'],
                            park_pad_length = data[q]['tpad_park'],
-                           park_amp = data[q]['park_amp'])
+                           park_amp = data[q]['park_amp'],
+                           park_double_sided = data[q]['park_double_sided'])
             self.proc_data_dict[q]['park_waveform'] = _wf
             _Ftrajectory = -convert_amp_to_freq(data[q]['poly_coefs'],
                                                 data[q]['ch_range'],
@@ -3266,14 +3334,16 @@ def CZ_frequency_trajectory_plotfn(
     wf = { qH: f'cz_freq_trajectory_{directions[0]}',
            qL: f'cz_freq_trajectory_{directions[1]}' }
     for q in parked_qubits:
-        if not 'X' in q:
-            wf[q] = 'park_freq_trajectory'
+        wf[q] = 'park_freq_trajectory'
     # Draw CZ trajectories
     for q, _wf in wf.items():
         if q in parked_qubits:
             ax.plot(data[q][_wf]*1e-9, '--', markersize=3, lw=1, label=f'{q}')
         else:
             ax.plot(data[q][_wf]*1e-9, '.-', markersize=3, lw=1, label=f'{q}')
+            # if q == qH: # plot 02 level
+            #     ax.plot((data[q][_wf]+data[q]['anharmonicity'])*1e-9, 'C0.-', 
+            #             alpha=.5, markersize=3, lw=1, label=f'{q}')
         # labels
         ax.text(5, data[q][_wf][5]*1e-9+.015, f'{q}')
     # settings of plot
@@ -3595,7 +3665,8 @@ def Ramsey_curves_plotfn(
                 for j, _q in enumerate(Q_control):
                     _case_str += f'{case[j]}_'+'{'+_q+'}'
                 _label = '$|'+_case_str+rf'\rangle$ : {Fit_res[q][case][0]:.1f}'
-                axs[i].plot(angles, func(angles, *Fit_res[q][case]),
+                _angles = np.linspace(angles[0], angles[-1], 101)
+                axs[i].plot(_angles, func(_angles, *Fit_res[q][case]),
                             '--', color=Colors[case], alpha=1 if len(control_cases)==2 else .5,
                             label=_label)
             axs[i].plot(angles, Ramsey_curves[q][case],

@@ -798,7 +798,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
             t = cryoscope_no_dist.ca.time
             a = cryoscope_no_dist.ca.get_amplitudes()
             baseline_start = 50
-            baseline_stop = 100
+            baseline_stop = -1
             norm = np.mean(a[baseline_start:baseline_stop])
             a /= norm
             if np.std(a) < 1e-6: # UHF is switching channels
@@ -813,7 +813,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                     t = cryoscope_no_dist.ca.time
                     a = cryoscope_no_dist.ca.get_amplitudes()
                     baseline_start = 50
-                    baseline_stop = 100
+                    baseline_stop = -1
                     norm = np.mean(a[baseline_start:baseline_stop])
                     a /= norm
 
@@ -1015,6 +1015,7 @@ class Flux_arc_analysis(ba.BaseDataAnalysis):
     def __init__(self,
                  channel_amp:float,
                  channel_range:float,
+                 fix_zero_detuning:bool = True,
                  t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
@@ -1028,6 +1029,7 @@ class Flux_arc_analysis(ba.BaseDataAnalysis):
                          extract_only=extract_only)
         self.ch_amp = channel_amp
         self.ch_range = channel_range
+        self.fix_zero_detuning = fix_zero_detuning
         if auto:
             self.run_analysis()
 
@@ -1052,9 +1054,16 @@ class Flux_arc_analysis(ba.BaseDataAnalysis):
         # Sort data
         self.qubit = self.raw_data_dict['folder'].split('_')[-1]
         Amps = self.raw_data_dict['data'][:,0]*self.ch_amp*self.ch_range/2
-        Freqs = np.abs(self.raw_data_dict['data'][:,1])
-        _Amps = np.array(list(Amps)+[0])
-        _Freqs = np.array(list(Freqs)+[0])
+        Freqs = self.raw_data_dict['data'][:,1]
+        # Amps = Amps[:-1]
+        # Freqs = Freqs[:-1]
+        # add a point of zero detuning at zero flux amplitude
+        if self.fix_zero_detuning:
+            _Amps = np.array(list(Amps)+[0])
+            _Freqs = np.array(list(Freqs)+[0])
+        else:
+            _Amps = np.array(list(Amps))
+            _Freqs = np.array(list(Freqs))
         P_coefs = np.polyfit(_Amps, _Freqs, deg=2)
         # Save processed data
         self.proc_data_dict['Amps'] = Amps

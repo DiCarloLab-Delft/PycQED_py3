@@ -497,6 +497,15 @@ class DeviceCCL(Instrument):
                                           " in {}".format(awg_chs[0], lat_fine, AWG.name))
                                 AWG.set("sigouts_{}_delay".format(awg_chs[0]-1), lat_fine+extra_delay)
                                 AWG.set("sigouts_{}_delay".format(awg_chs[1]-1), lat_fine+extra_delay)
+                            if self.find_instrument(qubit).instr_LutMan_LRU():
+                                 q_obj = self.find_instrument(qubit)
+                                 MW_lm_LRU = self.find_instrument(q_obj.instr_LutMan_LRU())
+                                 if AWG_name == MW_lm_LRU.AWG():
+                                    awg_chs     = MW_lm_LRU.channel_I(), MW_lm_LRU.channel_Q()
+                                    log.debug("Setting `sigouts_{}_delay` to {:4g}"
+                                              " in {}".format(awg_chs[0], lat_fine, AWG.name))
+                                    AWG.set("sigouts_{}_delay".format(awg_chs[0]-1), lat_fine)
+                                    AWG.set("sigouts_{}_delay".format(awg_chs[1]-1), lat_fine)
                         AWG.start()
                         # All channels are set globally from the device object.
                         # for i in range(8):  # assumes the AWG is an HDAWG
@@ -5051,7 +5060,7 @@ class DeviceCCL(Instrument):
         ################################
         for i, flux_lm in enumerate(Flux_lm_0):
             param = flux_lm.parameters[f'vcz_asymmetry_{directions[i][0]}']
-            if update_params and abs(a.qoi[f'asymmetry_opt_{i}'])<.05:
+            if update_params:
                 param(a.qoi[f'asymmetry_opt_{i}'])
                 print(f'Updated {param.name} to {a.qoi[f"asymmetry_opt_{i}"]*100:.3f}%')
             else:
@@ -5330,6 +5339,7 @@ class DeviceCCL(Instrument):
             heralded_init: bool = True,
             stabilizer_type: str = 'X',
             initial_state_qubits: list = None,
+            measurement_time_ns: int = 500,
             analyze: bool = True,
             ):
         # assert self.ro_acq_weight_type() == 'optimal IQ'
@@ -5451,7 +5461,8 @@ class DeviceCCL(Instrument):
                 experiments = experiments,
                 Rounds = Rounds,
                 stabilizer_type=stabilizer_type,
-                initial_state_qubits=initial_state_qubits)
+                initial_state_qubits=initial_state_qubits,
+                measurement_time_ns=measurement_time_ns)
         # Set up nr_shots on detector
         d = self.int_log_det
         uhfqc_max_avg = 2**19

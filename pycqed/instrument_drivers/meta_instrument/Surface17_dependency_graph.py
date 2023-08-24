@@ -206,7 +206,7 @@ class Full_calibration(AutoDepGraph_DAG):
 			('Z1', 'D2') : 250e6,#400e6,
 			('Z1', 'D1') : 400e6,
 			('Z4', 'D8') : 100e6,
-			('Z4', 'D9') : 100e6,
+			# ('Z4', 'D9') : 100e6,
 			('X3', 'D7') : 100e6,
 			('X3', 'D8') : 100e6,
 		}
@@ -351,6 +351,7 @@ class Full_calibration(AutoDepGraph_DAG):
 				calibrate_function=module_name+'.save_snapshot_metadata',
 				calibrate_function_args={
 					'station': self.station,
+					'parity_check': True,
 					})
 		##############################
 		# Node depdendencies
@@ -571,19 +572,19 @@ def Flipping_wrapper(qubit:str, station):
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal')
 	Q_inst.ro_acq_averages(2**11)
-	# # Check if RO pulse has been uploaded onto UHF
-	# # (We do this by checking if the resonator 
-	# # combinations of the RO lutman contain
-	# # exclusively this qubit).
-	# RO_lm = Q_inst.instr_LutMan_RO.get_instr()
-	# _res_combs = RO_lm.resonator_combinations()
-	# if _res_combs != [[Q_inst.cfg_qubit_nr()]]:
-	# 	Q_inst.prepare_readout()
-	# else:
-	# 	# Just update detector functions (for avg and IQ)
-	# 	Q_inst._prep_ro_integration_weights()
-	# 	Q_inst._prep_ro_instantiate_detectors()
-	Q_inst.prepare_for_timedomain()
+	# Check if RO pulse has been uploaded onto UHF
+	# (We do this by checking if the resonator 
+	# combinations of the RO lutman contain
+	# exclusively this qubit).
+	RO_lm = Q_inst.instr_LutMan_RO.get_instr()
+	_res_combs = RO_lm.resonator_combinations()
+	if _res_combs != [[Q_inst.cfg_qubit_nr()]]:
+		Q_inst.prepare_readout()
+	else:
+		# Just update detector functions (for avg and IQ)
+		Q_inst._prep_ro_integration_weights()
+		Q_inst._prep_ro_instantiate_detectors()
+	# Q_inst.prepare_for_timedomain()
 	# Run loop of experiments
 	nr_repetitions = 4
 	for i in range(nr_repetitions):
@@ -731,43 +732,6 @@ def SSRO_wrapper(qubit:str, station):
 	return True
 
 
-# def Butterfly_wrapper(qubit:str, station):
-# 	'''
-# 	Wrapper function around AllXY measurement.
-# 	Returns True if successful calibration otherwise
-# 	returns False.
-# 	'''
-# 	Q_inst = station.components[qubit]
-# 	# Set initial parameters for calibration
-# 	Q_inst.ro_soft_avg(1)
-# 	Q_inst.ro_acq_weight_type('optimal IQ')
-# 	Q_inst.ro_acq_digitized(False)
-# 	Q_inst.ro_acq_averages(2**10)
-# 	# Check if RO pulse has been uploaded onto UHF
-# 	# (We do this by checking if the resonator 
-# 	# combinations of the RO lutman contain
-# 	# exclusively this qubit).
-# 	RO_lm = Q_inst.instr_LutMan_RO.get_instr()
-# 	_res_combs = RO_lm.resonator_combinations()
-# 	if _res_combs != [[Q_inst.cfg_qubit_nr()]]:
-# 		Q_inst.prepare_readout()
-# 	else:
-# 		# Just update detector functions (for avg and IQ)
-# 		Q_inst._prep_ro_integration_weights()
-# 		Q_inst._prep_ro_instantiate_detectors()
-# 	# Set microwave lutman
-# 	Q_lm = Q_inst.instr_LutMan_MW.get_instr()
-# 	Q_lm.set_default_lutmap()
-# 	# Prepare for timedomain
-# 	Q_inst._prep_td_sources()
-# 	Q_inst._prep_mw_pulses()
-# 	Q_inst.measure_msmt_butterfly(
-# 		f_state=True,
-# 		disable_metadata=True,
-# 		prepare_for_timedomain=False)
-# 	return True
-
-
 def T1_wrapper(qubit:str, station):
 	'''
 	Wrapper function around AllXY measurement.
@@ -867,7 +831,7 @@ def Randomized_benchmarking_wrapper(qubit:str, station):
 	Q_inst._prep_mw_pulses()
 	# measurement
 	Q_inst.measure_single_qubit_randomized_benchmarking(
-		nr_cliffords=2**np.arange(12), # should change to 11
+		nr_cliffords=2**np.arange(11),
 	    nr_seeds=15,
 	    recompile=False, 
 	    prepare_for_timedomain=False,
@@ -983,7 +947,7 @@ class Two_qubit_gate_calibration(AutoDepGraph_DAG):
 			('Z1', 'D2') : 250e6,#400e6,
 			('Z1', 'D1') : 400e6,
 			('Z4', 'D8') : 100e6,
-			('Z4', 'D9') : 100e6,
+			# ('Z4', 'D9') : 100e6,
 			('X3', 'D7') : 100e6,
 			('X3', 'D8') : 100e6,
 		}
@@ -1082,18 +1046,20 @@ class Two_qubit_gate_calibration(AutoDepGraph_DAG):
 		print('Dependency graph created at ' + url)
 
 
-def Cryoscope_wrapper(Qubit, station, detuning=None, update_FIRs=False):
+def Cryoscope_wrapper(Qubit, station, detuning=None, update_FIRs=False,
+					  max_duration: float = 60e-9):
 	'''
 	Wrapper function for measurement of Cryoscope.
 	This will update the required polynomial coeficients
 	for detuning to voltage conversion.
 	'''
 	# Set gate duration
+	flux_duration_ns = int(max_duration*1e9) + 100
 	file_cfg = gc.generate_config(in_filename=input_file,
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
 	                              ro_duration=1000,
-	                              flux_pulse_duration=60,
+	                              flux_pulse_duration=flux_duration_ns,
 	                              init_duration=200000)
 	# Setup measurement
 	Q_inst = station.components[Qubit]
@@ -1108,6 +1074,9 @@ def Cryoscope_wrapper(Qubit, station, detuning=None, update_FIRs=False):
 	# Q_mlm.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 	# Set flux lutman
 	Q_flm = Q_inst.instr_LutMan_Flux.get_instr()
+	if max_duration > 60e-9:
+		Q_flm.cfg_max_wf_length(max_duration)
+		Q_flm.AWG.get_instr().reset_waveforms_zeros()
 	Q_flm.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 	# Q_inst.prepare_for_timedomain()
 	# Find amplitudes corresponding to specified frequency detunings
@@ -1127,14 +1096,18 @@ def Cryoscope_wrapper(Qubit, station, detuning=None, update_FIRs=False):
 	device.ro_acq_weight_type('optimal')
 	device.measure_cryoscope(
 		qubits=[Qubit],
-		times = np.arange(0e-9, 60e-9, 1/2.4e9),
+		times = np.arange(0e-9, max_duration, 1/2.4e9),
 		wait_time_flux = 20,
 		update_FIRs = update_FIRs)
-	# If not successful after 3 attempts fail node
+	# Reset wavform duration
+	if max_duration > 60e-9:
+		Q_flm.cfg_max_wf_length(60e-9)
+		Q_flm.AWG.get_instr().reset_waveforms_zeros()
 	return True
 
 
-def Flux_arc_wrapper(Qubit, station):
+def Flux_arc_wrapper(Qubit, station,
+					 fix_zero_detuning:bool=True):
 	'''
 	Wrapper function for measurement of flux arcs.
 	This will update the required polynomial coeficients
@@ -1168,15 +1141,19 @@ def Flux_arc_wrapper(Qubit, station):
 		Detunings = [600e6, 200e6]
 		# Detunings = [600e6, 400e6, 200e6]
 	else:
-		Detunings = [900e6, 500e6]
+		Detunings =  [900e6, 500e6]
 		# Detunings = [900e6, 700e6, 500e6]
 	if all(Q_flm.q_polycoeffs_freq_01_det() != None):
 		Amps = [ 0, 0, 0, 0]
 		# Amps = [ 0, 0, 0, 0, 0, 0]
+		# To avoid updates to the channel gain during this step
+		# we calculate all the amplitudes before setting them
+		for det in Detunings:
+			get_DAC_amp_frequency(det, Q_flm, negative_amp=True)
+			get_DAC_amp_frequency(det, Q_flm)
 		for j, det in enumerate(Detunings):
-			sq_amp = get_DAC_amp_frequency(det, Q_flm)
-			Amps[j] = -sq_amp
-			Amps[-(j+1)] = sq_amp
+			Amps[j] = get_DAC_amp_frequency(det, Q_flm, negative_amp=True)
+			Amps[-(j+1)] = get_DAC_amp_frequency(det, Q_flm)
 	# If not, try some random amplitudes
 	else:
 		Amps = [-0.4, -0.35, -0.3, 0.3, 0.35, 0.4]
@@ -1187,7 +1164,8 @@ def Flux_arc_wrapper(Qubit, station):
 			Times = np.arange(20e-9, 40e-9, 1/2.4e9),
 			update=True,
 			disable_metadata=True,
-			prepare_for_timedomain=False)
+			prepare_for_timedomain=False,
+			fix_zero_detuning=fix_zero_detuning)
 		max_freq = np.max(a.proc_data_dict['Freqs'])
 		# If flux arc spans 750 MHz
 		if max_freq>np.max(Detunings)-150e6:
@@ -1203,9 +1181,10 @@ def Flux_arc_wrapper(Qubit, station):
 
 
 def Chevron_wrapper(qH, qL, station,
-					avoided_crossing:str = '11-02',
+					avoided_crossing: str = '11-02',
 					qL_det: float = 0,
-					park_distance: float = 700e6):
+					park_distance: float = 700e6,
+					negative_amp: bool = False):
 	'''
 	Wrapper function for measurement of Chevrons.
 	Using voltage to detuning information, we predict the 
@@ -1227,20 +1206,23 @@ def Chevron_wrapper(qH, qL, station,
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
 	                              ro_duration=1000,
-	                              flux_pulse_duration=60,
+	                              flux_pulse_duration=80,
 	                              init_duration=200000)
 	# Setup for measurement
 	station.components['MC'].live_plot_enabled(False)
 	station.components['nested_MC'].live_plot_enabled(False)
-	# Perform measurement of 11_02 avoided crossing
 	device = station.components['device']
 	device.ro_acq_weight_type('optimal')
 	device.ro_acq_averages(2**9)
+	# Perform measurement of 11_02 avoided crossing
 	Q_H = station.components[qH]
 	Q_L = station.components[qL]
 	flux_lm_H = Q_H.instr_LutMan_Flux.get_instr()
 	flux_lm_L = Q_L.instr_LutMan_Flux.get_instr()
-	flux_lm_H.sq_amp(.5)
+	if negative_amp:
+		flux_lm_H.sq_amp(-.5)
+	else:
+		flux_lm_H.sq_amp(.5)
 	# Set frequency of low frequency qubit
 	if qL_det < 10e6:
 		sq_amp_L = 0 # avoids error near 0 in the flux arc.
@@ -1294,9 +1276,20 @@ def Chevron_wrapper(qH, qL, station,
 		('D4', 'Z1'): 1.75e-08,
 		('D6', 'Z2'): 1.75e-08,
 		('Z4', 'D8'): 2.0833333333333335e-08,
-		('Z2', 'D3'): 2.1666666666666665e-08,
+		('Z2', 'D3'): 2.1666666666666665e-08+1/2.4e9,
 		('Z1', 'D1'): 2.5416666666666666e-08,
 		('D5', 'Z4'): 1.875e-08,
+		('X1', 'D1'): 2e-08,
+		('X1', 'D2'): 2.2083333333333333e-08+2/2.4e9,
+		('D5', 'X2'): 1.875e-08-3/2.4e9,
+		('D6', 'X2'): 1.9583333333333333e-08-2/2.4e9,
+		('D4', 'X3'): 2.2083333333333333e-08-2/2.4e9,
+		('X2', 'D2'): 2.25e-08+4/2.4e9,
+		('X2', 'D3'): 2.0416666666666668e-08,
+		('X3', 'D7'): 20e-9,
+		('X3', 'D8'): 2.2083333333333333e-08-2/2.4e9,
+		('X4', 'D8'): 2.1666666666666665e-08,
+		('X4', 'D9'): 2.0416666666666668e-08,
 	}
 	# Run measurement
 	# !PROBLEM! prepare for readout is not enough 
@@ -1348,7 +1341,11 @@ def Chevron_wrapper(qH, qL, station,
 
 
 def SNZ_tmid_wrapper(qH, qL, station,
-					 park_distance: float = 700e6):
+					 park_distance: float = 700e6,
+					 apply_parking_settings: bool = True,
+					 asymmetry_compensation: bool = False,
+					 tmid_offset_samples: int = 0,
+					 **kw):
 	'''
 	Wrapper function for measurement of of SNZ landscape.
 	Using voltage to detuning information, we set the 
@@ -1366,19 +1363,23 @@ def SNZ_tmid_wrapper(qH, qL, station,
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
 	                              ro_duration=1000,
-	                              flux_pulse_duration=40,
+	                              flux_pulse_duration=80,
 	                              init_duration=200000)
+	if 'live_plot_enabled' in kw.keys():
+		_live_plot = kw['live_plot_enabled']
+	else:
+		_live_plot = False
+	station.components['MC'].live_plot_enabled(_live_plot)
+	station.components['nested_MC'].live_plot_enabled(_live_plot)
 	# Setup for measurement
 	dircts = get_gate_directions(qH, qL)
-	station.components['MC'].live_plot_enabled(False)
-	station.components['nested_MC'].live_plot_enabled(False)
 	Q_H = station.components[qH]
 	Q_L = station.components[qL]
 	flux_lm_H = Q_H.instr_LutMan_Flux.get_instr()
 	flux_lm_L = Q_L.instr_LutMan_Flux.get_instr()
 	flux_lm_H.set(f'vcz_amp_sq_{dircts[0]}', 1)
 	flux_lm_H.set(f'vcz_amp_fine_{dircts[0]}', 0.5)
-	flux_lm_H.set(f'vcz_amp_dac_at_11_02_{dircts[0]}', 0.5)
+	flux_lm_H.set(f'vcz_amp_dac_at_11_02_{dircts[0]}', 0.3)
 	# Set frequency of low frequency qubit
 	qL_det = flux_lm_L.get(f'q_freq_10_{dircts[1]}') # detuning at gate
 	if qL_det < 10e6:
@@ -1389,26 +1390,56 @@ def SNZ_tmid_wrapper(qH, qL, station,
 	flux_lm_L.set(f'vcz_amp_fine_{dircts[1]}', 0)
 	flux_lm_L.set(f'vcz_amp_dac_at_11_02_{dircts[1]}', sq_amp_L)
 	# Set frequency of parked qubits
-	park_freq = Q_L.freq_qubit()-qL_det-park_distance
 	Parked_qubits = get_parking_qubits(qH, qL)
-	for q in Parked_qubits:
-		Q_inst = station.components[q]
-		flux_lm_p = Q_inst.instr_LutMan_Flux.get_instr()
-		park_det = Q_inst.freq_qubit()-park_freq
-		# Only park if the qubit is closer than then 350 MHz
-		if park_det>20e6:
-			amp_park = get_DAC_amp_frequency(park_det, flux_lm_p)
-			flux_lm_p.park_amp(amp_park)
-		else:
-			flux_lm_p.park_amp(0)
+	if apply_parking_settings:
+		park_freq = Q_L.freq_qubit()-qL_det-park_distance
+		for q in Parked_qubits:
+			Q_inst = station.components[q]
+			flux_lm_p = Q_inst.instr_LutMan_Flux.get_instr()
+			park_det = Q_inst.freq_qubit()-park_freq
+			# Only park if the qubit is closer than <park_distance>
+			if park_det>20e6:
+				amp_park = get_DAC_amp_frequency(park_det, flux_lm_p)
+				flux_lm_p.park_amp(amp_park)
+			else:
+				flux_lm_p.park_amp(0)
 	# Estimating scan ranges based on frequency range
 	scan_range = 40e6
 	_det = flux_lm_H.get(f'q_freq_10_{dircts[0]}') # detuning at gate
-	A_range = []
-	for r in [-scan_range/2, scan_range/2]:
-		_ch_amp = get_Ch_amp_frequency(_det+r, flux_lm_H,
-						   DAC_param=f'vcz_amp_dac_at_11_02_{dircts[0]}')
-		A_range.append(_ch_amp)
+	# Predict required gate asymetry
+	if asymmetry_compensation:
+		# We use the sq_amp to calculate positive and negative amps for the pulse.
+		# (vcz_amp_dac_at_11_02 does not allow negative values).
+		flux_lm_H.sq_amp(+0.5)
+		gain_high = get_Ch_amp_frequency(_det, flux_lm_H, DAC_param='sq_amp')
+		flux_lm_H.sq_amp(-0.5)
+		gain_low  = get_Ch_amp_frequency(_det, flux_lm_H, DAC_param='sq_amp')
+		gain = (gain_high+gain_low)/2
+		asymmetry = (gain_high-gain_low)/(gain_high+gain_low)
+		flux_lm_H.set(f'vcz_use_asymmetric_amp_{dircts[0]}', True)
+		flux_lm_H.set(f'vcz_asymmetry_{dircts[0]}', asymmetry)
+		# flux_lm_H.set(f'cfg_awg_channel_amplitude', gain)
+		# Set new detunning corresponding to average gain
+		ch_amp_0 = get_Ch_amp_frequency(_det, flux_lm_H, DAC_param=f'sq_amp')
+		delta_ch_amp_p = get_Ch_amp_frequency(_det+scan_range/2, flux_lm_H,
+											  DAC_param=f'sq_amp') - ch_amp_0
+		delta_ch_amp_m = get_Ch_amp_frequency(_det-scan_range/2, flux_lm_H,
+											  DAC_param=f'sq_amp') - ch_amp_0
+		A_range = [gain+delta_ch_amp_m, gain+delta_ch_amp_p]
+	# Predict range without asymmetry
+	else:
+		A_range = []
+		for r in [-scan_range/2, scan_range/2]:
+			_ch_amp = get_Ch_amp_frequency(_det+r, flux_lm_H,
+							   DAC_param=f'vcz_amp_dac_at_11_02_{dircts[0]}')
+			A_range.append(_ch_amp)
+	# Assess if unipolar pulse is required
+	if qH in Offset_qubits:
+		flux_lm_H.set(f'vcz_use_net_zero_pulse_{dircts[0]}', False)
+		# Setting pading amplitude to ensure net-zero waveform
+		make_unipolar_pulse_net_zero(flux_lm_H, f'cz_{dircts[0]}')
+		if tmid_offset_samples == 0:
+			tmid_offset_samples = 1
 	# Perform measurement of 11_02 avoided crossing
 	device = station['device']
 	device.ro_acq_averages(2**8)
@@ -1418,21 +1449,24 @@ def SNZ_tmid_wrapper(qH, qL, station,
 	device.measure_vcz_A_tmid_landscape(
 		Q0 = [qH],
 		Q1 = [qL],
-		T_mids = np.arange(10),
+		T_mids = np.arange(10) + tmid_offset_samples,
 		A_ranges = [A_range],
 		A_points = 11,
 		Q_parks = Parked_qubits,
 		flux_codeword = 'cz',
 		prepare_for_timedomain=False,
-		disable_metadata=False)
+		disable_metadata=True)
 	a = ma2.tqg.VCZ_tmid_Analysis(Q0=[qH], Q1=[qL],
-          A_ranges=[A_range],
-          Poly_coefs = [flux_lm_H.q_polycoeffs_freq_01_det()],
-          DAC_amp = flux_lm_H.get(f'vcz_amp_dac_at_11_02_{dircts[0]}'),
-          Out_range = flux_lm_H.cfg_awg_channel_range(),
-          Q0_freq = Q_H.freq_qubit(),
-          label=f'VCZ_Amp_vs_Tmid_{[qH]}_{[qL]}_{Parked_qubits}')
+		A_ranges=[A_range],
+		Poly_coefs = [flux_lm_H.q_polycoeffs_freq_01_det()],
+		DAC_amp = flux_lm_H.get(f'vcz_amp_dac_at_11_02_{dircts[0]}'),
+		Out_range = flux_lm_H.cfg_awg_channel_range(),
+		Q0_freq = Q_H.freq_qubit(),
+		asymmetry = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')\
+					if asymmetry_compensation else 0,
+		label=f'VCZ_Amp_vs_Tmid_{[qH]}_{[qL]}_{Parked_qubits}')
 	opt_det, opt_tmid = a.qoi['opt_params_0']
+	# opt_tmid = 3
 	# Set new interaction frequency
 	flux_lm_H.set(f'q_freq_10_{dircts[0]}', opt_det)
 	# round tmid to th sampling point
@@ -1444,15 +1478,18 @@ def SNZ_tmid_wrapper(qH, qL, station,
 		fl_lm_tm =  [flux_lm_H, flux_lm_L], 
 		fl_lm_park = Flux_lm_ps,
 		which_gate = list(dircts),
-		duration=60e-9,
-		time_park=60e-9-(8/2.4e9),
+		duration=100e-9,
+		time_park=100e-9-(8/2.4e9),
 		t_pulse = [flux_lm_H.get(f'vcz_time_single_sq_{dircts[0]}')*2])
 	tmid_swf.set_parameter(opt_tmid)
 	return True
 
 
 def SNZ_AB_wrapper(qH, qL, station,
-				   park_distance: float = 700e6):
+				   park_distance: float = 700e6,
+				   apply_parking_settings: bool = True,
+				   asymmetry_compensation: bool = False,
+				   **kw):
 	'''
 	Wrapper function for measurement of of SNZ landscape.
 	Using voltage to detuning information, we set the 
@@ -1470,19 +1507,28 @@ def SNZ_AB_wrapper(qH, qL, station,
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
 	                              ro_duration=1000,
-	                              flux_pulse_duration=40,
+	                              flux_pulse_duration=80,
 	                              init_duration=200000)
+	if 'live_plot_enabled' in kw.keys():
+		_live_plot = kw['live_plot_enabled']
+	else:
+		_live_plot = False
+	station.components['MC'].live_plot_enabled(_live_plot)
+	station.components['nested_MC'].live_plot_enabled(_live_plot)
 	# Setup for measurement
 	dircts = get_gate_directions(qH, qL)
-	station.components['MC'].live_plot_enabled(False)
-	station.components['nested_MC'].live_plot_enabled(False)
 	Q_H = station.components[qH]
 	Q_L = station.components[qL]
 	flux_lm_H = Q_H.instr_LutMan_Flux.get_instr()
 	flux_lm_L = Q_L.instr_LutMan_Flux.get_instr()
 	flux_lm_H.set(f'vcz_amp_sq_{dircts[0]}', 1)
 	flux_lm_H.set(f'vcz_amp_fine_{dircts[0]}', 0.5)
-	flux_lm_H.set(f'vcz_amp_dac_at_11_02_{dircts[0]}', 0.5)
+	flux_lm_H.set(f'vcz_amp_dac_at_11_02_{dircts[0]}', 0.3)
+	# Assess if unipolar pulse is required
+	if qH in Offset_qubits:
+		flux_lm_H.set(f'vcz_use_net_zero_pulse_{dircts[0]}', False)
+		# Setting pading amplitude to ensure net-zero waveform
+		make_unipolar_pulse_net_zero(flux_lm_H, f'cz_{dircts[0]}')
 	# Set frequency of low frequency qubit
 	qL_det = flux_lm_L.get(f'q_freq_10_{dircts[1]}') # detuning at gate
 	if qL_det < 10e6:
@@ -1493,26 +1539,45 @@ def SNZ_AB_wrapper(qH, qL, station,
 	flux_lm_L.set(f'vcz_amp_fine_{dircts[1]}', 0)
 	flux_lm_L.set(f'vcz_amp_dac_at_11_02_{dircts[1]}', sq_amp_L)
 	# Set frequency of parked qubits
-	park_freq = Q_L.freq_qubit()-qL_det-park_distance
 	Parked_qubits = get_parking_qubits(qH, qL)
-	for q in Parked_qubits:
-		Q_inst = station.components[q]
-		flux_lm_p = Q_inst.instr_LutMan_Flux.get_instr()
-		park_det = Q_inst.freq_qubit()-park_freq
-		# Only park if the qubit is closer than then 350 MHz
-		if park_det>20e6:
-			amp_park = get_DAC_amp_frequency(park_det, flux_lm_p)
-			flux_lm_p.park_amp(amp_park)
-		else:
-			flux_lm_p.park_amp(0)
+	if apply_parking_settings:
+		park_freq = Q_L.freq_qubit()-qL_det-park_distance
+		for q in Parked_qubits:
+			Q_inst = station.components[q]
+			flux_lm_p = Q_inst.instr_LutMan_Flux.get_instr()
+			park_det = Q_inst.freq_qubit()-park_freq
+			# Only park if the qubit is closer than then 350 MHz
+			if park_det>20e6:
+				amp_park = get_DAC_amp_frequency(park_det, flux_lm_p)
+				flux_lm_p.park_amp(amp_park)
+			else:
+				flux_lm_p.park_amp(0)
 	# Estimating scan ranges based on frequency range
 	scan_range = 30e6
 	_det = flux_lm_H.get(f'q_freq_10_{dircts[0]}') # detuning at gate
-	A_range = []
-	for r in [-scan_range/2, scan_range/2]:
-		_ch_amp = get_Ch_amp_frequency(_det+r, flux_lm_H,
-						   DAC_param=f'vcz_amp_dac_at_11_02_{dircts[0]}')
-		A_range.append(_ch_amp)
+	# Predict required range taking into account pulse asymmetry
+	if asymmetry_compensation:
+		# We use the sq_amp to calculate positive and negative amps for the pulse.
+		# (vcz_amp_dac_at_11_02 does not allow negative values).
+		flux_lm_H.sq_amp(+0.3)
+		gain_high = get_Ch_amp_frequency(_det, flux_lm_H, DAC_param='sq_amp')
+		flux_lm_H.sq_amp(-0.3)
+		gain_low  = get_Ch_amp_frequency(_det, flux_lm_H, DAC_param='sq_amp')
+		gain = (gain_high+gain_low)/2
+		# Set new detunning corresponding to average gain
+		ch_amp_0 = get_Ch_amp_frequency(_det, flux_lm_H, DAC_param=f'sq_amp')
+		delta_ch_amp_p = get_Ch_amp_frequency(_det+scan_range/2, flux_lm_H,
+											  DAC_param=f'sq_amp') - ch_amp_0
+		delta_ch_amp_m = get_Ch_amp_frequency(_det-scan_range/2, flux_lm_H,
+											  DAC_param=f'sq_amp') - ch_amp_0
+		A_range = [gain+delta_ch_amp_m, gain+delta_ch_amp_p]
+	# Predict range without asymmetry
+	else:
+		A_range = []
+		for r in [-scan_range/2, scan_range/2]:
+			_ch_amp = get_Ch_amp_frequency(_det+r, flux_lm_H,
+							   DAC_param=f'vcz_amp_dac_at_11_02_{dircts[0]}')
+			A_range.append(_ch_amp)
 	# Perform measurement of 11_02 avoided crossing
 	device = station['device']
 	device.ro_acq_weight_type('optimal')
@@ -1529,7 +1594,7 @@ def SNZ_AB_wrapper(qH, qL, station,
 		flux_codeword = 'cz',
 		update_flux_params = False,
 		prepare_for_timedomain=False,
-		disable_metadata=False)
+		disable_metadata=True)
 	# Run frequency based analysis
 	a = ma2.tqg.VCZ_B_Analysis(Q0=[qH], Q1=[qL],
 			A_ranges=[A_range],
@@ -1538,12 +1603,15 @@ def SNZ_AB_wrapper(qH, qL, station,
 			DAC_amp = flux_lm_H.get(f'vcz_amp_dac_at_11_02_{dircts[0]}'),
 			Out_range = flux_lm_H.cfg_awg_channel_range(),
 			Q0_freq = Q_H.freq_qubit(),
+			asymmetry = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')\
+						if asymmetry_compensation else 0,
 			tmid = flux_lm_H.get(f'vcz_time_middle_{dircts[0]}'),
 			label=f'VCZ_Amp_vs_B_{[qH]}_{[qL]}_{Parked_qubits}')
-	tp_factor = a.qoi['tp_factor_0']
-	tmid_H = flux_lm_H.get(f'vcz_time_middle_{dircts[0]}')*2.4e9
-	Flux_lm_ps = [ device.find_instrument(q).instr_LutMan_Flux.get_instr()\
-				   for q in Parked_qubits ]
+	# tp_factor = a.qoi['tp_factor_0']
+	# tmid_H = flux_lm_H.get(f'vcz_time_middle_{dircts[0]}')*2.4e9
+	# Flux_lm_ps = [ device.find_instrument(q).instr_LutMan_Flux.get_instr()\
+	# 			   for q in Parked_qubits ]
+	# # Attempt to apply tp correction from fit (not reliable)
 	# if tp_factor<0.98:
 	# 	tp = flux_lm_H.get(f'vcz_time_single_sq_{dircts[0]}')
 	# 	tp_dig = (np.ceil((tp)*2.4e9)+2)/2.4e9
@@ -1572,7 +1640,7 @@ def Asymmetry_wrapper(qH, qL, station):
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
 	                              ro_duration=800,
-	                              flux_pulse_duration=40,
+	                              flux_pulse_duration=80,
 	                              init_duration=200000)
 	# Setup for measurement
 	dircts = get_gate_directions(qH, qL)
@@ -1587,6 +1655,10 @@ def Asymmetry_wrapper(qH, qL, station):
 	det_qL = flux_lm_L.get(f'q_freq_10_{dircts[1]}')
 	amp_qH = get_DAC_amp_frequency(det_qH, flux_lm_H)
 	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L)
+	# Compensate for asymmetry of cz pulse
+	_asymmetry = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')
+	if abs(_asymmetry)> .075:
+		amp_qH = amp_qH/(1+flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}'))
 	for i, det, amp, flux_lm in zip([        0,			1],
 								 	[	det_qH,    det_qL],
 								 	[	amp_qH,    amp_qL],
@@ -1609,14 +1681,18 @@ def Asymmetry_wrapper(qH, qL, station):
 	    mw1.load_phase_pulses_to_AWG_lookuptable()
 	flux_lm_H.set(f'vcz_use_asymmetric_amp_{dircts[0]}',True)
 	# Estimating asymmetry ranges based on frequency range
-	scan_range = 10e6
-	_det = flux_lm_H.get(f'q_freq_10_{dircts[0]}') # detuning at gate
-	# Get DAC amplitudes for each detuning
-	sq_amp_0 = get_DAC_amp_frequency(_det, flux_lm_H)
-	sq_amp_1 = get_DAC_amp_frequency(_det+scan_range/2, flux_lm_H)
-	# Estimate asymmetry based required DAC amps
-	asymetry_r = 1 - sq_amp_1/sq_amp_0
-	asymmetries = np.linspace(-asymetry_r, asymetry_r, 7)
+	if qH in ['X2', 'X3', 'X4']:
+		_asym = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')
+		asymmetries = np.linspace(-.5e-2, .5e-2, 7)+_asym
+	else: 
+		scan_range = 10e6
+		_det = flux_lm_H.get(f'q_freq_10_{dircts[0]}') # detuning at gate
+		# Get DAC amplitudes for each detuning
+		sq_amp_0 = get_DAC_amp_frequency(_det, flux_lm_H)
+		sq_amp_1 = get_DAC_amp_frequency(_det+scan_range/2, flux_lm_H)
+		# Estimate asymmetry based required DAC amps
+		asymetry_r = 1 - sq_amp_1/sq_amp_0
+		asymmetries = np.linspace(-asymetry_r, asymetry_r, 7)
 	# Measure
 	device.calibrate_vcz_asymmetry( 
 	    Q0 = qH, 
@@ -1632,7 +1708,9 @@ def Asymmetry_wrapper(qH, qL, station):
 
 
 def Single_qubit_phase_calibration_wrapper(qH, qL, station,
-										   park_distance=700e6):
+										   park_distance=700e6,
+										   apply_parking_settings: bool = True,
+										   fine_cphase_calibration: bool = True):
 	'''
 	Wrapper function for fine-tunig CP 180 phase, SQ phase updates of 360, and verification. 
 	Returns True if successful calibration otherwise
@@ -1643,7 +1721,7 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
 	                              ro_duration=800,
-	                              flux_pulse_duration=40,
+	                              flux_pulse_duration=80,
 	                              init_duration=200000)
 	# Setup for measurement
 	dircts = get_gate_directions(qH, qL)
@@ -1660,6 +1738,10 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 	det_qL = flux_lm_L.get(f'q_freq_10_{dircts[1]}')
 	amp_qH = get_DAC_amp_frequency(det_qH, flux_lm_H)
 	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L)
+	# Compensate for asymmetry of cz pulse
+	_asymmetry = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')
+	if abs(_asymmetry)> .075:
+		amp_qH = amp_qH/(1+flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}'))
 	for i, det, amp, flux_lm in zip([        0,			1],
 								 	[	det_qH,    det_qL],
 								 	[	amp_qH,    amp_qL],
@@ -1668,20 +1750,26 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 			flux_lm.set(f'vcz_amp_dac_at_11_02_{dircts[i]}', 0)
 		else:
 			flux_lm.set(f'vcz_amp_dac_at_11_02_{dircts[i]}', amp)
+	# Assess if unipolar pulse is required
+	if qH in Offset_qubits:
+		flux_lm_H.set(f'vcz_use_net_zero_pulse_{dircts[0]}', False)
+		# Setting pading amplitude to ensure net-zero waveform
+		make_unipolar_pulse_net_zero(flux_lm_H, f'cz_{dircts[0]}')
 	# Set frequency of parked qubits
 	qL_det = flux_lm_L.get(f'q_freq_10_{dircts[1]}') # detuning at gate
-	park_freq = Q_L.freq_qubit()-qL_det-park_distance
 	Parked_qubits = get_parking_qubits(qH, qL)
 	for q in Parked_qubits:
+		park_freq = Q_L.freq_qubit()-qL_det-park_distance
 		Q_inst = station.components[q]
 		flux_lm_p = Q_inst.instr_LutMan_Flux.get_instr()
 		park_det = Q_inst.freq_qubit()-park_freq
-		# Only park if the qubit is closer than then 350 MHz
-		if park_det>20e6:
-			amp_park = get_DAC_amp_frequency(park_det, flux_lm_p)
-			flux_lm_p.park_amp(amp_park)
-		else:
-			flux_lm_p.park_amp(0)
+		if apply_parking_settings:
+			# Only park if the qubit is closer than then 350 MHz
+			if park_det>20e6:
+				amp_park = get_DAC_amp_frequency(park_det, flux_lm_p)
+				flux_lm_p.park_amp(amp_park)
+			else:
+				flux_lm_p.park_amp(0)
 		load_single_waveform_on_HDAWG(flux_lm_p, 'park')
 	# Set preparation params
 	device = station['device']
@@ -1689,16 +1777,16 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 	device.ro_acq_weight_type('optimal')
 	device.ro_acq_averages(2**10)
 	# Prepare readout
-	# if check_prepare_readout(qubits=[qH, qL], station=station):
-	# 	device.prepare_readout(qubits=[qH, qL])
-	# else:
-	# 	# if preparation is not deemed necessary try just updating detectors
-	# 	try:
-	# 		acq_ch_map = device._acq_ch_map
-	# 		device._prep_ro_instantiate_detectors(qubits=[qH, qL], acq_ch_map=acq_ch_map)
-	# 	except:
-	# 		device.prepare_readout(qubits=[qH, qL])
-	device.prepare_readout(qubits=[qH, qL])
+	if check_prepare_readout(qubits=[qH, qL], station=station):
+		device.prepare_readout(qubits=[qH, qL])
+	else:
+		# if preparation is not deemed necessary try just updating detectors
+		try:
+			acq_ch_map = device._acq_ch_map
+			device._prep_ro_instantiate_detectors(qubits=[qH, qL], acq_ch_map=acq_ch_map)
+		except:
+			device.prepare_readout(qubits=[qH, qL])
+	# device.prepare_readout(qubits=[qH, qL])
 	# Load flux waveforms
 	load_single_waveform_on_HDAWG(flux_lm_H, f'cz_{dircts[0]}')
 	load_single_waveform_on_HDAWG(flux_lm_L, f'cz_{dircts[1]}')
@@ -1715,19 +1803,18 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 			mw_lm.set_default_lutmap()
 			mw_lm.load_phase_pulses_to_AWG_lookuptable()
 	# Calibrate conditional phase
-	device.calibrate_parity_check_phase(
-	    Q_ancilla = [qH],
-	    Q_control = [qL],
-	    Q_pair_target = [qH, qL],
-	    flux_cw_list = [flux_cw],
-	    downsample_angle_points = 3,
-	    prepare_for_timedomain = False,
-	    update_mw_phase=False,
-	    mw_phase_param = f'vcz_virtual_q_ph_corr_{dircts[0]}',
-	    disable_metadata=True)
-	# device.prepare_for_timedomain(qubits=[qH, qL])
-	load_single_waveform_on_HDAWG(flux_lm_H, f'cz_{dircts[0]}')
-	# Assess two-qubit phase and calibrate 
+	if fine_cphase_calibration:
+		device.calibrate_parity_check_phase(
+		    Q_ancilla = [qH],
+		    Q_control = [qL],
+		    Q_pair_target = [qH, qL],
+		    flux_cw_list = [flux_cw],
+		    downsample_angle_points = 3,
+		    prepare_for_timedomain = False,
+		    update_mw_phase=False,
+		    mw_phase_param = f'vcz_virtual_q_ph_corr_{dircts[0]}',
+		    disable_metadata=True)
+		load_single_waveform_on_HDAWG(flux_lm_H, f'cz_{dircts[0]}')
 	# single-qubit phase of high frequency qubit
 	device.measure_parity_check_ramsey(
 	    Q_target = [qH],
@@ -1753,7 +1840,7 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 	return True
 
 
-def TwoQ_Randomized_benchmarking_wrapper(qH, qL, station):
+def TwoQ_Randomized_benchmarking_wrapper(qH, qL, station, **kw):
 	'''
 	Wrapper function around Randomized benchmarking.
 	Returns True if successful calibration otherwise
@@ -1764,7 +1851,7 @@ def TwoQ_Randomized_benchmarking_wrapper(qH, qL, station):
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
 	                              ro_duration=800,
-	                              flux_pulse_duration=40,
+	                              flux_pulse_duration=80,
 	                              init_duration=200000)
 	# Setup for measurement
 	station.components['MC'].live_plot_enabled(False)
@@ -1781,6 +1868,10 @@ def TwoQ_Randomized_benchmarking_wrapper(qH, qL, station):
 	det_qL = flux_lm_L.get(f'q_freq_10_{dircts[1]}')
 	amp_qH = get_DAC_amp_frequency(det_qH, flux_lm_H)
 	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L)
+	# Compensate for asymmetry of cz pulse
+	_asymmetry = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')
+	if abs(_asymmetry)> .075:
+		amp_qH = amp_qH/(1+flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}'))
 	for i, det, amp, flux_lm in zip([       0,			1],
 								 	[	det_qH,    det_qL],
 								 	[	amp_qH,    amp_qL],
@@ -1794,6 +1885,7 @@ def TwoQ_Randomized_benchmarking_wrapper(qH, qL, station):
 	flux_cw = 'cz'
 	device.ro_acq_weight_type('optimal IQ')
 	device.ro_acq_averages(2**10)
+	device.ro_acq_digitized(False)
 	# Set preparation params 
 	mw_lutman_H.set_default_lutmap()
 	mw_lutman_L.set_default_lutmap()
@@ -1801,16 +1893,21 @@ def TwoQ_Randomized_benchmarking_wrapper(qH, qL, station):
 	# Load flux waveforms
 	load_single_waveform_on_HDAWG(flux_lm_H, f'cz_{dircts[0]}')
 	load_single_waveform_on_HDAWG(flux_lm_L, f'cz_{dircts[1]}')
+	# Assess recompilation
+	if 'recompile' in kw.keys():
+		_recompile = kw['recompile']
+	else:
+		_recompile = False
 	# measurement
 	device.measure_two_qubit_interleaved_randomized_benchmarking(
-	    qubits = [qH, qL],
-	    nr_seeds = 20,
-	    measure_idle_flux = False,
-	    prepare_for_timedomain=False,
-	    recompile=False,
-	    nr_cliffords = np.array([1., 3., 5., 7., 9., 11., 15.,
-	                             20., 30., 50.]),
-	    flux_codeword = flux_cw)
+		qubits = [qH, qL],
+		nr_seeds = 20,
+		measure_idle_flux = False,
+		prepare_for_timedomain = False,
+		recompile = _recompile,
+		nr_cliffords = np.array([1., 3., 5., 7., 9., 11., 15.,
+								 20., 30., 50.]),
+		flux_codeword = flux_cw)
 	return True
 
 
@@ -2039,18 +2136,81 @@ def Parking_experiment_wrapper(qH, qL, qP, station):
 	return True
 
 
-def Tune_CZ_interaction_frequency(qH, qL, qL_detunings, station):
+def Calibrate_CZ_gate(qH, qL, station,
+					  qL_det: float = 0,
+					  park_distance: float = 700e6,
+					  apply_parking_settings: bool = True,
+					  asymmetry_compensation: bool = False,
+					  calibrate_asymmetry: bool = True,
+					  benchmark: bool = True,
+					  tmid_offset_samples: int = 0,
+					  calibration_type: str = 'full',
+					  **kw):
 	'''
-	Calibrates and benchmarks two-qubit gate at different
-	qL detunings. 
+	Calibrates and benchmarks two-qubit gate.
+	Calibration types:
+		Full : Performs full cz calibration.
+		Express: Only single qubit-phase calibration.
+		Fine: Fine cphase calibration using Bamp sweep.
+				 
 	'''
-	for qL_det in qL_detunings:
-	    Chevron_wrapper(qH=qH, qL=qL, station=station, qL_det=qL_det)
-	    SNZ_tmid_wrapper(qH=qH, qL=qL, station=station)
-	    SNZ_AB_wrapper(qH=qH, qL=qL, station=station)
+	# Parse calibration steps
+	calibration_steps = []
+	if 'full' in calibration_type.lower():
+		calibration_steps.append('Chevron')
+		calibration_steps.append('Tmid')
+		calibration_steps.append('AB')
+		if 'no chevron' in calibration_type.lower():
+			if 'Chevron' in calibration_steps:
+				calibration_steps.remove('Chevron')
+	else:
+		if 'tmid' in calibration_type.lower():
+			calibration_steps.append('Tmid')
+		if 'ab' in calibration_type.lower():
+			calibration_steps.append('AB')
+
+	# Calibrate for asymmetryc cz pulse?
+	use_negative_amp=False
+	if asymmetry_compensation:
+		use_negative_amp=True
+	if 'fine' in calibration_type.lower():
+		fine_calibration = True
+	else:
+		fine_calibration = False
+	# Perform calibration steps
+	if 'Chevron' in calibration_steps:
+		# Measure interaction Chevron
+		Chevron_wrapper(qH=qH, qL=qL, station=station, 
+						qL_det=qL_det,
+						park_distance=park_distance,
+						negative_amp=use_negative_amp)
+	if 'Tmid' in calibration_steps:
+		# SNZ A vs Tmid landscape
+		SNZ_tmid_wrapper(qH=qH, qL=qL, station=station,
+		                 apply_parking_settings=apply_parking_settings,
+						 park_distance=park_distance,
+						 asymmetry_compensation=asymmetry_compensation,
+						 tmid_offset_samples=tmid_offset_samples,
+						 **kw)
+	if 'AB' in calibration_steps:
+		# SNZ A vs B landscape
+		SNZ_AB_wrapper(qH=qH, qL=qL, station=station,
+		               apply_parking_settings=apply_parking_settings,
+					   park_distance=park_distance,
+					   asymmetry_compensation=asymmetry_compensation,
+					   **kw)
+	# Pulse asymmetry calibration
+	if calibrate_asymmetry:
 	    Asymmetry_wrapper(qH=qH, qL=qL, station=station)
-	    Single_qubit_phase_calibration_wrapper(qH=qH, qL=qL, station=station)
-	    TwoQ_Randomized_benchmarking_wrapper(qH=qH, qL=qL, station=station)
+	# Single qubit phase calibration
+	Single_qubit_phase_calibration_wrapper(
+		qH=qH, qL=qL, station=station,
+		apply_parking_settings=apply_parking_settings,
+		park_distance=park_distance,
+		fine_cphase_calibration=fine_calibration)
+	# Interleaved randomized benchmarking
+	if benchmark:
+	    TwoQ_Randomized_benchmarking_wrapper(qH=qH, qL=qL, station=station, **kw)
 
 	
 ###############################################################################
@@ -2191,12 +2351,14 @@ def Prepare_for_parity_check_wrapper(station):
 	a stabilizer.
 	'''
 	# Prepare for timedomain of parity check
-	for q in ['Z1', 'Z2', 'Z3', 'Z4']:
+	for q in ['Z1', 'Z2', 'Z3', 'Z4',
+			  'X1', 'X2', 'X3', 'X4']:
 		prepare_for_parity_check(q, station)
 	return True
 
 
-def Horizontal_calibration_wrapper(stabilizer_qubit, station, 
+def Horizontal_calibration_wrapper(stabilizer_qubit, station,
+								   Data_qubits:list = None,
 								   flux_cw_list = None,
 								   mw_phase_param = None):
 	'''
@@ -2208,19 +2370,25 @@ def Horizontal_calibration_wrapper(stabilizer_qubit, station,
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**8)
+	device.ro_acq_digitized(False)
 	prepare_for_parity_check(stabilizer_qubit, station)
 	Q_ancilla = [stabilizer_qubit]
 	Q_control = list(get_nearest_neighbors(stabilizer_qubit).keys())
 	# Parity check settings
 	if flux_cw_list == None:
-		flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
+		if 'X' in stabilizer_qubit:
+			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
+		else:
+			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
 		# flux_cw_list = ['cz' for q in Q_control]
 	if mw_phase_param == None:
 		mw_phase_param = 'vcz_virtual_q_ph_corr_step_8'
 		# dircts = get_gate_directions(q0 = stabilizer_qubit, q1 = Q_control[0])
 		# mw_phase_param = f'vcz_virtual_q_ph_corr_{dircts[0]}'
 	# Calibrate CZ with each data qubit
-	for q in Q_control:
+	if not Data_qubits:
+		Data_qubits = Q_control
+	for q in Data_qubits:
 		# If high frequency qubit
 		if q in ['D4','D5','D6']:
 			# Order of qubits requires high freq. qubit first
@@ -2261,15 +2429,22 @@ def Measure_parity_check_phase_wrapper(stabilizer_qubit, station,
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**8)
+	device.ro_acq_digitized(False)
 	prepare_for_parity_check(stabilizer_qubit, station)
 	# Parity check settings
 	Q_ancilla = [stabilizer_qubit]
 	Q_control = list(get_nearest_neighbors(stabilizer_qubit).keys())
 	if flux_cw_list == None:
-		flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
+		if 'X' in stabilizer_qubit:
+			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
+		else:
+			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
 		# flux_cw_list = ['cz' for q in Q_control]
 	if mw_phase_param == None:
-		mw_phase_param = 'vcz_virtual_q_ph_corr_step_8'
+		if 'X' in stabilizer_qubit:
+			mw_phase_param = 'vcz_virtual_q_ph_corr_step_4'
+		else:
+			mw_phase_param = 'vcz_virtual_q_ph_corr_step_8'
 		# dircts = get_gate_directions(q0 = stabilizer_qubit, q1 = Q_control[0])
 		# mw_phase_param = f'vcz_virtual_q_ph_corr_{dircts[0]}'
 	# Measure
@@ -2299,15 +2474,22 @@ def Data_qubit_phase_calibration_wrapper(stabilizer_qubit, station,
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**8)
+	device.ro_acq_digitized(False)
 	prepare_for_parity_check(stabilizer_qubit, station)
 	# Parity check settings
 	Q_ancilla = [stabilizer_qubit]
 	Q_data = list(get_nearest_neighbors(stabilizer_qubit).keys())
 	if flux_cw_list == None:
-		flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
-		# flux_cw_list = ['cz' for q in Q_data]
+		if 'X' in stabilizer_qubit:
+			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
+		else:
+			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
+		# flux_cw_list = ['cz' for q in Q_control]
 	if mw_phase_param == None:
-		mw_phase_param = 'vcz_virtual_q_ph_corr_step_8'
+		if 'X' in stabilizer_qubit:
+			mw_phase_param = 'vcz_virtual_q_ph_corr_step_4'
+		else:
+			mw_phase_param = 'vcz_virtual_q_ph_corr_step_8'
 		# mw_phase_param = []
 		# for q in Q_data:
 		# 	dircts = get_gate_directions(q0 = q, q1 = stabilizer_qubit)
@@ -2348,13 +2530,17 @@ def Parity_check_fidelity_wrapper(stabilizer_qubit, station,
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**10)
+	device.ro_acq_digitized(False)
 	device.ro_acq_integration_length(500e-9)
 	prepare_for_parity_check(stabilizer_qubit, station)
 	# Parity check settings
 	Q_ancilla = [stabilizer_qubit]
 	Q_data = list(get_nearest_neighbors(stabilizer_qubit).keys())
 	if flux_cw_list == None:
-		flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
+		if 'X' in stabilizer_qubit:
+			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
+		else:
+			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
 		# flux_cw_list = ['cz' for q in Q_data]
 	if not heralded_init:
 		device.prepare_readout(qubits=Q_ancilla)
@@ -2393,11 +2579,15 @@ def Parity_check_repeatability_wrapper(stabilizer_qubit, station,
 	# Prepare for timedomain of parity check
 	device = station.components['device']
 	device.ro_acq_averages(2**10)
+	device.ro_acq_digitized(False)
 	device.ro_acq_integration_length(500e-9)
 	prepare_for_parity_check(stabilizer_qubit, station)
 	Q_data = list(get_nearest_neighbors(stabilizer_qubit).keys())
 	if flux_cw_list == None:
-		flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
+		if 'X' in stabilizer_qubit:
+			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
+		else:
+			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
 		# flux_cw_list = ['cz' for q in Q_data]
 	# can't avoid preparaing for timedomain here as it orders the qubits
 	if n_rounds == None:
@@ -2418,24 +2608,28 @@ def Parity_check_repeatability_wrapper(stabilizer_qubit, station,
 	return True
 
 
-def Surface_13_wrapper(station, log_zero = None):
+def Surface_13_wrapper(station, log_zero = None,
+					   measurement_time_ns: int = 500,
+					   prepare_LRU_pulses: bool = True):
 	'''
 	Wrapper routine to measure the surface-13 experiment. 
 	'''
 	#######################################################
 	# Preparation
 	#######################################################
+	assert (measurement_time_ns-20)%20 == 0, 'Not a valid measurement time!'
 	# Set configuration
 	file_cfg = gc.generate_config(in_filename=input_file,
 	                              out_filename=config_fn,
 	                              mw_pulse_duration=20,
-	                              ro_duration=500,
+	                              ro_duration=measurement_time_ns,
 	                              flux_pulse_duration=40,
 	                              init_duration=200000)
 	station.components['MC'].live_plot_enabled(False)
 	station.components['nested_MC'].live_plot_enabled(False)
 	device = station.components['device']
-	device.ro_acq_integration_length(500e-9)
+	integration_time = measurement_time_ns-20
+	device.ro_acq_integration_length(integration_time*1e-9)
 	# Get qubits directly involved in parity check
 	Data_qubits = ['D1', 'D2', 'D3',
 				   'D4', 'D5', 'D6',
@@ -2518,11 +2712,51 @@ def Surface_13_wrapper(station, log_zero = None):
 	for q in All_qubits:
 		Q = station.components[q]
 		Q._prep_td_sources()
+		mw_lm = Q.instr_LutMan_MW.get_instr()
+		mw_lm.upload_single_qubit_phase_corrections()
 		if check_prepare_mw(q, station, lutmap='default_lutmap'):
 			mw_lm = Q.instr_LutMan_MW.get_instr()
 			mw_lm.set_default_lutmap()
 			Q._prep_mw_pulses()
 	t_mw = time.time()-t_mw
+
+	# Prepare LRUs if desired
+	if prepare_LRU_pulses:
+		LRU_duration = measurement_time_ns-20
+		Z_LRU_duration = measurement_time_ns//3-20
+		# Set LRU LO triggering
+		MW_LO_6 = station.components['MW_LO_6']
+		MW_LO_6.pulsemod_state(True)
+		MW_LO_6.pulsemod_source('INT')
+		MW_LO_6.visa_handle.write('pulm:delay 160 ns')
+		MW_LO_6.visa_handle.write(f'pulm:width {measurement_time_ns+Z_LRU_duration} ns')
+		MW_LO_6.visa_handle.write('pulm:trig:mode EXT')
+		MW_LO_6.visa_handle.write('conn:trig:omod PETR')
+		MW_LO_7 = station.components['MW_LO_7']
+		MW_LO_7.pulsemod_state(True)
+		MW_LO_7.pulsemod_source('INT')
+		MW_LO_7.visa_handle.write('pulm:delay 390 ns')
+		MW_LO_7.visa_handle.write('pulm:width 140 ns')
+		MW_LO_7.visa_handle.write('pulm:trig:mode EXT')
+		MW_LO_7.visa_handle.write('conn:trig:omod PETR')
+		# for D4, D5, D6
+		station.components['D4'].LRU_duration(LRU_duration*1e-9+Z_LRU_duration*1e-9)
+		station.components['D5'].LRU_duration(LRU_duration*1e-9+Z_LRU_duration*1e-9)
+		station.components['D6'].LRU_duration(LRU_duration*1e-9+Z_LRU_duration*1e-9)
+		station.components['D6'].LRU_duration(Z_LRU_duration*1e-9)
+		station.components['Z1'].LRU_duration(Z_LRU_duration*1e-9)
+		station.components['Z2'].LRU_duration(Z_LRU_duration*1e-9)
+		station.components['Z3'].LRU_duration(Z_LRU_duration*1e-9)
+		station.components['Z4'].LRU_duration(Z_LRU_duration*1e-9)
+		# upload pulses
+		station.components['D4']._prep_LRU_pulses()
+		station.components['D5']._prep_LRU_pulses()
+		station.components['D6']._prep_LRU_pulses()
+		station.components['Z1']._prep_LRU_pulses()
+		station.components['Z2']._prep_LRU_pulses()
+		station.components['Z2']._prep_LRU_pulses()
+		station.components['Z4']._prep_LRU_pulses()
+
 	# print(f'Preparation time RO:\t{t_ro}')
 	print(f'Preparation time FL:\t{t_fl}')
 	print(f'Preparation time TIM:\t{t_tim}')
@@ -2531,26 +2765,25 @@ def Surface_13_wrapper(station, log_zero = None):
 	device.measure_defect_rate(
 			ancilla_qubit='Z3',
 			data_qubits=['D4', 'D7'],
-			# experiments=['surface_13'],
-			experiments=['surface_13', 'surface_13_LRU'],
-			Rounds= [1, 2, 4, 6, 10, 15, 20, 30],
-			lru_qubits=['D4','D5','D6','Z1','Z2','Z3','Z4'],
-			repetitions = 10,
+			experiments=['surface_13', 'surface_13_LRU',],
+			Rounds= [15],
+			repetitions = 2,
+			lru_qubits = ['D4', 'D5', 'D6', 'Z1', 'Z2', 'Z3', 'Z4'],
 			prepare_for_timedomain = False,
 			prepare_readout = True,
 			heralded_init = True,
 			stabilizer_type = 'X',
 			initial_state_qubits = None,
+			measurement_time_ns = measurement_time_ns,
 			analyze = False)
 	# Run Pij matrix analysis
 	a = ma2.pba.Repeated_stabilizer_measurements(
 		ancilla_qubit = Ancilla_qubits,
 		data_qubits = Data_qubits,
-		Rounds = [1, 2, 4, 6, 10, 15, 20, 30],
+		Rounds = [15],
 		heralded_init = True,
 		number_of_kernels =  2,
 		Pij_matrix = True,
-		# experiments = ['surface_13'],
 		experiments = ['surface_13', 'surface_13_LRU'],
 		extract_only = False)
 	# # Surface_13 experiment
@@ -2576,29 +2809,28 @@ def Surface_13_wrapper(station, log_zero = None):
 			device.measure_defect_rate(
 					ancilla_qubit='Z3',
 					data_qubits=['D4', 'D7'],
-					# experiments=['surface_13'],
 					experiments=['surface_13', 'surface_13_LRU'],
-					Rounds=[1, 2, 4, 6, 10, 15],
-					lru_qubits=['D4','D5','D6','Z1','Z2','Z3','Z4'],
-					repetitions = 10,
+					Rounds=[1, 2, 4, 8, 16],
+					lru_qubits = ['D4', 'D5', 'D6', 'Z1', 'Z2', 'Z3', 'Z4'],
+					repetitions = 20,
 					prepare_for_timedomain = False,
 					prepare_readout = False,
 					heralded_init = True,
 					stabilizer_type = 'Z',
 					initial_state_qubits = state,
+					measurement_time_ns = measurement_time_ns,
 					analyze = False)
 			# Run Pij matrix analysis
-			# a = ma2.pba.Repeated_stabilizer_measurements(
-			# 	ancilla_qubit = Ancilla_qubits,
-			# 	experiments=['surface_13'],
-			# 	# experiments=['surface_13', 'surface_13_LRU'],
-			# 	data_qubits = Data_qubits,
-			# 	Rounds = [1, 2, 4, 6, 10, 15],
-			# 	# lru_qubits=['D4','D5','D6','Z1','Z2','Z3','Z4'],
-			# 	heralded_init = True,
-			# 	number_of_kernels =  1,
-			# 	Pij_matrix = True,
-			# 	extract_only = False)
+			a = ma2.pba.Repeated_stabilizer_measurements(
+				ancilla_qubit = Ancilla_qubits,
+				# experiments=['surface_13'],
+				experiments=['surface_13', 'surface_13_LRU'],
+				data_qubits = Data_qubits,
+				Rounds = [1, 2, 4, 8, 16],
+				heralded_init = True,
+				number_of_kernels =  2,
+				Pij_matrix = True,
+				extract_only = False)
 
 
 def Spectator_data_qubits_wrapper(data_qubits, station, 
@@ -2973,6 +3205,8 @@ Park_dict = {
 			 ('X2', 'D3'): ['D2'],
 			 ('Z2', 'D3'): []
 			 }
+
+Offset_qubits = ['X2', 'X3', 'D7', 'D9', 'X4']
 ###########################################
 # Helper functions for theory predictions #
 ###########################################
@@ -3047,7 +3281,7 @@ def get_frequency_waveform(wave_par, flux_lutman):
 	freq = poly_func(out_volt)
 	return freq
 
-def get_DAC_amp_frequency(freq, flux_lutman):
+def get_DAC_amp_frequency(freq, flux_lutman, negative_amp:bool=False):
 	'''
 	Function to calculate DAC amp corresponding 
 	to frequency detuning.
@@ -3056,10 +3290,13 @@ def get_DAC_amp_frequency(freq, flux_lutman):
 	out_range = flux_lutman.cfg_awg_channel_range()
 	ch_amp = flux_lutman.cfg_awg_channel_amplitude()
 	poly_func = np.poly1d(poly_coefs)
-	out_volt = max((poly_func-freq).roots)
+	if negative_amp:
+		out_volt = min((poly_func-freq).roots)
+	else:
+		out_volt = max((poly_func-freq).roots)
 	sq_amp = out_volt/(ch_amp*out_range/2)
 	# Safe check in case amplitude exceeds maximum
-	if sq_amp>1:
+	if abs(sq_amp)>1:
 		print(f'WARNING had to increase gain of {flux_lutman.name} to {ch_amp}!')
 		flux_lutman.cfg_awg_channel_amplitude(ch_amp*1.5)
 		# Can't believe Im actually using recursion!!!
@@ -3075,7 +3312,10 @@ def get_Ch_amp_frequency(freq, flux_lutman, DAC_param='sq_amp'):
 	out_range = flux_lutman.cfg_awg_channel_range()
 	dac_amp = flux_lutman.get(DAC_param)
 	poly_func = np.poly1d(poly_coefs)
-	out_volt = max((poly_func-freq).roots)
+	if dac_amp < 0: # if negative amplitude
+		out_volt = min((poly_func-freq).roots)
+	else: # if positive amplitude
+		out_volt = max((poly_func-freq).roots)
 	ch_amp = out_volt/(dac_amp*out_range/2)
 	if isinstance(ch_amp, complex):
 		print('Warning: Complex amplitude estimated, setting it to zero.')
@@ -3127,7 +3367,7 @@ def set_combined_waveform_amplitudes(flux_lutman):
 	# Find waveform with maximum detuning
 	max_wf = max(Detunings, key=Detunings.get)
 	# Set amplitude of DAC to 0.5 and scale gain accordingly
-	flux_lutman.set(max_wf, 0.5)
+	flux_lutman.set(max_wf, 0.3)
 	max_wf_gain = get_Ch_amp_frequency(Detunings[max_wf], flux_lutman,
 									   DAC_param = max_wf)
 	flux_lutman.cfg_awg_channel_amplitude(max_wf_gain)
@@ -3231,6 +3471,7 @@ def prepare_for_parity_check(stabilizer_qubit, station):
 			mw_lm = Q.instr_LutMan_MW.get_instr()
 			mw_lm.set_default_lutmap()
 			mw_lm.load_phase_pulses_to_AWG_lookuptable()
+			mw_lm.upload_single_qubit_phase_corrections()
 	t_mw = time.time()-t_mw
 	print(f'Preparation time RO:\t{t_ro}')
 	print(f'Preparation time FL:\t{t_fl}')
@@ -3400,7 +3641,31 @@ def check_flux_wf_upload(flux_lutman, wave_id):
 	elif "cz" in wave_id:
 		which_gate = wave_id.split('_')[-1]
 		new_wf = flux_lutman._gen_cz(which_gate=which_gate)
-	return not all(new_wf == present_wf)
+	# Check if waveform lengths are the same
+	if len(new_wf) == len(present_wf):
+		# If so, check if all points in waveforms match
+		return not all(new_wf == present_wf)
+	else:
+		return False
+
+def make_unipolar_pulse_net_zero(flux_lutman, wave_id):
+	'''
+	Adds appropritate padding amplitude to pulse in 
+	order to achieve net zero area of cz waveform.
+	'''
+	assert 'cz' in wave_id, 'Only meant for cz waveforms'
+	# Look for waveform
+	dirct = wave_id.split('_')[-1]
+	flux_lutman.set(f'vcz_amp_pad_{dirct}', 0)
+	flux_lutman.generate_standard_waveforms()
+	wf = flux_lutman._wave_dict[wave_id]
+	# Set amplitude of padding to achieve net-zeroness
+	net_area = np.trapz(wf)*1/2.4e9
+	time_pad = (flux_lutman.get(f'vcz_time_pad_{dirct}') - 12/2.4e9)*2
+	amp_pad = -(net_area)/time_pad
+	# # Ensure amplitude is lower than avoided crossing amp
+	# assert amp_pad < 0.5
+	flux_lutman.set(f'vcz_amp_pad_{dirct}', amp_pad)
 
 def plot_wave_dicts(qH: list, 
 					qL: list,
@@ -3458,10 +3723,13 @@ def plot_wave_dicts(qH: list,
 	plt.close('all')
 
 def save_snapshot_metadata(station, Qubits=None, Qubit_pairs = None,
-						   analyze=True, Two_qubit_freq_trajectories=False,
+						   analyze=True, parity_check=False, 
+						   Two_qubit_freq_trajectories=False,
 						   name=None):
 	'''
-	Save snapshot of system.
+	Save snapshot of system and run compile analysis with
+	summary of performances for single- and two-qubit gates,
+	parity checks and two-qubit frequency trajectories.
 	'''
 	MC = station.components['MC']
 	if not name:
@@ -3478,41 +3746,46 @@ def save_snapshot_metadata(station, Qubits=None, Qubit_pairs = None,
 			'D4', 'D5', 'D6',
 			'D7', 'D8', 'D9',
 			'Z1', 'Z2', 'Z3', 'Z4',
-			# 'X1', 'X2', 'X3', 'X4',
+			'X1', 'X2', 'X3', 'X4',
 			]
 
 	if Qubit_pairs == None:
 		Qubit_pairs = [
-			['Z3', 'D7'], 
-			['D5', 'Z1'], 
-			['Z4', 'D9'],
-			['Z1', 'D2'], 
-			['D4', 'Z3'], 
-			['D6', 'Z4'],
-			['Z4', 'D8'], 
 			['D4', 'Z1'], 
+			['D5', 'Z1'], 
+			['Z1', 'D1'], 
+			['Z1', 'D2'], 
 			['D6', 'Z2'],
 			['Z2', 'D3'], 
-			['Z1', 'D1'], 
+			['D4', 'Z3'], 
+			['Z3', 'D7'], 
 			['D5', 'Z4'],
-			# ['X1', 'D2'], 
-			# ['D6', 'X2'], 
+			['D6', 'Z4'],
+			['Z4', 'D8'], 
+			['Z4', 'D9'],
+			['X1', 'D1'], 
+			['X1', 'D2'], 
+			['D6', 'X2'], 
+			['D5', 'X2'], 
+			['X2', 'D3'],
+			['X2', 'D2'],
+			['D5', 'X3'], 
+			['D4', 'X3'], 
 			# ['X3', 'D8'],
-			# ['X1', 'D1'], 
-			# ['D5', 'X2'], 
 			# ['X3', 'D7'],
 			# ['X4', 'D9'], 
-			# ['D5', 'X3'], 
-			# ['X2', 'D3'],
 			# ['X4', 'D8'], 
-			# ['D4', 'X3'], 
-			# ['X2', 'D2'],
 						]
+	# Plot single- and two-qubit gate benchmarks
 	if analyze:
 		ma2.gbta.SingleQubitGBT_analysis(Qubits=Qubits)
 		ma2.gbta.TwoQubitGBT_analysis(Qubit_pairs=Qubit_pairs)
+	# Plot two-qubit gate frequency trajectories
 	if Two_qubit_freq_trajectories:
 		ma2.tqg.TwoQubitGate_frequency_trajectory_analysis(Qubit_pairs=Qubit_pairs)
+	# Plot parity-check benchmarks
+	if parity_check:
+		ma2.gbta.ParityCheckGBT_analysis(Stabilizers=['Z1', 'Z2', 'Z3', 'Z4'])
 	return True
 
 ###############################################################################
@@ -3619,6 +3892,9 @@ def prepare_for_LRU_calibration(qubit:str, station):
 		'D4': {'ch_range': 5, 'ch_amp': 0.95},
 		'D5': {'ch_range': 3, 'ch_amp': 1.00},
 		'D6': {'ch_range': 5, 'ch_amp': 0.80},
+		# 'D4': {'ch_range': 3, 'ch_amp': 1.00},
+		# 'D5': {'ch_range': 3, 'ch_amp': 1.00},
+		# 'D6': {'ch_range': 3, 'ch_amp': 1.00},
 		# Low frequency qubits (these parameters are not used)
 		'D1': {'ch_range': .8, 'ch_amp': 1}, 
 		'D2': {'ch_range': .8, 'ch_amp': 1},
@@ -3629,8 +3905,8 @@ def prepare_for_LRU_calibration(qubit:str, station):
 		# Mid frequency qubits
 		'Z1': {'ch_range': 5, 'ch_amp': 0.85},
 		'Z2': {'ch_range': 5, 'ch_amp': 0.60},
-		'Z3': {'ch_range': 5, 'ch_amp': 0.50},
-		'Z4': {'ch_range': 5, 'ch_amp': 0.50},
+		'Z3': {'ch_range': 5, 'ch_amp': 0.60},
+		'Z4': {'ch_range': 5, 'ch_amp': 0.80},
 		'X1': {'ch_range': 5, 'ch_amp': 0.50},
 		'X2': {'ch_range': 5, 'ch_amp': 0.50},
 		'X3': {'ch_range': 5, 'ch_amp': 0.50},
@@ -3643,8 +3919,8 @@ def prepare_for_LRU_calibration(qubit:str, station):
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal IQ')
 	Q_inst.ro_acq_digitized(False)
-	station.components['MC'].live_plot_enabled(True)
-	station.components['nested_MC'].live_plot_enabled(True)
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Check if RO pulse has been uploaded onto UHF
 	# (We do this by checking if the resonator 
 	# combinations of the RO lutman contain
@@ -3672,19 +3948,19 @@ def prepare_for_LRU_calibration(qubit:str, station):
 	station.components['MW_LO_6'].power(25) 		 # [D4, D5, D6]
 	station.components['MW_LO_6'].frequency(5.192e9) # 
 	# Mid frequency
-	station.components['MW_LO_7'].power(23) 		 # [Z2, Z3, Z4, X3]
+	station.components['MW_LO_7'].power(25) 		 # [Z2, Z3, Z4, X3]
 	station.components['MW_LO_7'].frequency(3.888e9) # 
-	station.components['MW_LO_10'].power(23) 		  # [Z1, X4]
+	station.components['MW_LO_10'].power(25) 		  # [Z1, X4]
 	station.components['MW_LO_10'].frequency(4.095e9) # 
-	station.components['MW_LO_15'].power(15) # X2
-	station.components['MW_LO_15'].power(15) # X1
-	# Low frequency
-	station.components['MW_LO_11'].power(6) # D1
-	station.components['MW_LO_9'].power(8) # D2
-	station.components['MW_LO_12'].power(10) # D3
-	station.components['MW_LO_8'].power(10) # D7
-	station.components['MW_LO_14'].power(10) # D8
-	station.components['MW_LO_13'].power(9) # D9
+	# station.components['MW_LO_15'].power(15) # X2
+	# station.components['MW_LO_15'].power(15) # X1
+	# # Low frequency
+	# station.components['MW_LO_11'].power(6) # D1
+	# station.components['MW_LO_9'].power(8) # D2
+	# station.components['MW_LO_12'].power(10) # D3
+	# station.components['MW_LO_8'].power(10) # D7
+	# station.components['MW_LO_14'].power(10) # D8
+	# station.components['MW_LO_13'].power(9) # D9
 	############################################
 	# Prepare for timedomain
 	############################################
@@ -3713,6 +3989,8 @@ def LRU_frequency_wrapper(qubit:str, station):
 	returns False.
 	'''
 	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_weight_type('optimal IQ')
@@ -3734,6 +4012,8 @@ def LRU_mixer_offset_wrapper(qubit:str, station):
 	returns False.
 	'''
 	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set initial parameters for calibration
 	Q_inst.ro_soft_avg(1)
 	Q_inst._prep_td_sources()
@@ -3764,6 +4044,8 @@ def measure_LRU_wrapper(qubit:str, station):
 	Wrapper function around LRU measurement.
 	'''
 	Q_inst = station.components[qubit]
+	station.components['MC'].live_plot_enabled(False)
+	station.components['nested_MC'].live_plot_enabled(False)
 	# Set parameters for measurement
 	Q_inst.ro_soft_avg(1)
 	Q_inst.ro_acq_averages(2**12)

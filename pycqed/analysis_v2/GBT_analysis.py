@@ -628,3 +628,442 @@ def _plot_TQG_leakage(
     ax.fill_between(_x*0.3+.025,
                     (_yref+.1)*(1/3)/(1+2*.1)+(n-1-row*1.4)/3,
                     (0+.1)*(1/3)/(1+2*.1)+(n-1-row*1.4)/3, color=f'{_color}', alpha=.1, lw=0)
+
+
+class ParityCheckGBT_analysis(ba.BaseDataAnalysis):
+	"""
+	Analysis for Chevron routine
+	"""
+	def __init__(self,
+				 Stabilizers: list,
+				 t_start: str = None,
+				 t_stop: str = None,
+				 label: str = '',
+				 options_dict: dict = None, 
+				 extract_only: bool = False,
+				 auto=True):
+
+		super().__init__(t_start=t_start, 
+						 t_stop=t_stop,
+						 label=label,
+						 options_dict=options_dict,
+						 extract_only=extract_only)
+		self.Stabilizers = Stabilizers
+		if auto:
+			self.run_analysis()
+
+	def extract_data(self):
+		self.raw_data_dict = {}
+		self.get_timestamps()
+		self.timestamp = self.timestamps[0]
+		data_fp = get_datafilepath_from_timestamp(self.timestamp)
+		self.raw_data_dict['timestamps'] = self.timestamps
+		self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+		# Extract last measured metrics
+		for stab in self.Stabilizers:
+			self.raw_data_dict[stab] = {}
+			# Analyse parity check ramsey
+			fp_ramsey = ma.a_tools.latest_data(contains=f"Parity_check_ramsey_{stab}",
+											   older_than=self.timestamp)
+			label_ramsey = fp_ramsey.split('\\')[-1]
+			Data_qubits = label_ramsey.split(f'ramsey_{stab}_')[-1]
+			Data_qubits = Data_qubits.split('_device')[0]
+			Data_qubits = Data_qubits.split('_')
+			control_cases = ['{:0{}b}'.format(i, len(Data_qubits))\
+							 for i in range(2**len(Data_qubits))]
+			a = ma2.tqg.Parity_check_ramsey_analysis(
+				label=label_ramsey,
+				Q_target = [stab],
+				Q_control = Data_qubits,
+				Q_spectator = [],
+				control_cases = control_cases,
+				angles = np.arange(0, 341, 20),
+				solve_for_phase_gate_model = False,
+				extract_only = True)
+			self.raw_data_dict[stab]['ramsey_curves'] = a.proc_data_dict['Ramsey_curves'][stab]
+			self.raw_data_dict[stab]['ramsey_fit'] = a.proc_data_dict['Fit_res'][stab]
+			self.raw_data_dict[stab]['missing_fraction'] = a.proc_data_dict['Missing_fraction']
+			# Analyse parity assignment fidelity
+			fp_fidelity = ma.a_tools.latest_data(contains=f"Parity_check_fidelity_{stab}",
+												 older_than=self.timestamp)
+			label_fidelity = fp_fidelity.split('\\')[-1]
+			Data_qubits = fp_fidelity.split(f'fidelity_{stab}_')[-1]
+			Data_qubits = Data_qubits.split('_device')[0]
+			Data_qubits = Data_qubits.split('_')
+			control_cases = ['{:0{}b}'.format(i, len(Data_qubits))\
+							 for i in range(2**len(Data_qubits))]
+			a = ma2.tqg.Parity_check_fidelity_analysis(
+				label=label_fidelity,
+				Q_ancilla=stab,
+				Q_control=Data_qubits,
+				control_cases=control_cases,
+				post_selection=False,
+				extract_only=True)
+			self.raw_data_dict[stab]['P_dist'] = a.proc_data_dict['P']
+			self.raw_data_dict[stab]['P_dist_id'] = a.proc_data_dict['P_ideal']
+			self.raw_data_dict[stab]['assignment_fidelity'] = a.qoi['fidelity']
+			# Analyse parity check tomography
+			fp_tomo = ma.a_tools.latest_data(contains=f"parity_tomography_{stab}",
+											 older_than=self.timestamp)
+			label_tomo = fp_tomo.split('\\')[-1]
+			Data_qubits = fp_tomo.split(f'tomography_{stab}_')[-1]
+			Data_qubits = Data_qubits.split('_sim')[0]
+			Data_qubits = Data_qubits.split('_')
+			if stab == 'Z1':
+				exc_qubits = ['D1']
+			elif stab == 'Z2':
+				exc_qubits = ['D3']
+			elif stab == 'Z3':
+				exc_qubits = []
+			elif stab == 'Z4':
+				exc_qubits = ['D5']
+			else:
+			    raise ValueError('exception qubits must be given to analysis')
+			a = ma2.pba.Weight_n_parity_tomography(
+				label = label_tomo,
+				sim_measurement=True,
+				n_rounds=2,
+				exception_qubits=exc_qubits,
+				post_selection=False,
+				extract_only=True)
+			self.raw_data_dict[stab]['rho_0'] = a.proc_data_dict['rho_0']
+			self.raw_data_dict[stab]['rho_1'] = a.proc_data_dict['rho_1']
+			self.raw_data_dict[stab]['fidelity_0'] = a.proc_data_dict['Fid_0']
+			self.raw_data_dict[stab]['fidelity_1'] = a.proc_data_dict['Fid_1']
+			self.raw_data_dict[stab]['M1'] = a.proc_data_dict['M1']
+			self.raw_data_dict[stab]['M2'] = a.proc_data_dict['M2']
+			self.raw_data_dict[stab]['repeatability'] = a.proc_data_dict['repeatability']
+
+	def process_data(self):
+		pass
+
+	def prepare_plots(self):
+		self.axs_dict = {}
+		fig = plt.figure(figsize=(3,3), dpi=120)
+		axs = {}
+		n_metrics = 4 # [Ramsey, ass. fid., tomox2, repeatability]
+		_n = 1.4*n_metrics
+		self.figs['Parity_check_performance_overview'] = fig
+		for stab in self.Stabilizers:
+			ax = _add_PC_plot(stab, _n, fig, axs)
+			self.axs_dict[f'{stab}'] = ax
+			# Plot ancilla ramsey curves
+			self.plot_dicts[f'{stab}_ramsey']={
+				'plotfn': _plot_ramsey_curves,
+				'ax_id': f'{stab}',
+				'qubit': stab,
+				'Ramsey_curves': self.raw_data_dict[stab]['ramsey_curves'],
+				'Fit_res': self.raw_data_dict[stab]['ramsey_fit'],
+				'Missing_fraction': self.raw_data_dict[stab]['missing_fraction'],
+				'row': 0,
+				'_n': _n,
+			}
+			# Plot parity check assignment fidelity
+			self.plot_dicts[f'{stab}_fidelity']={
+				'plotfn': _plot_parity_fidelity,
+				'ax_id': f'{stab}',
+				'qubit': stab,
+				'P_dist': self.raw_data_dict[stab]['P_dist'],
+				'P_dist_ideal': self.raw_data_dict[stab]['P_dist_id'],
+				'fidelity': self.raw_data_dict[stab]['assignment_fidelity'],
+				'row': 1,
+				'_n': _n,
+			}
+			# Plot data-qubit tomography
+			self.plot_dicts[f'{stab}_tomography']={
+				'plotfn': _plot_tomo_fidelity,
+				'ax_id': f'{stab}',
+				'qubit': stab,
+			    'rho_0': self.raw_data_dict[stab]['rho_0'],
+			    'rho_1': self.raw_data_dict[stab]['rho_1'],
+			    'fidelity_0': self.raw_data_dict[stab]['fidelity_0'],
+			    'fidelity_1': self.raw_data_dict[stab]['fidelity_1'],
+				'row': 2,
+				'_n': _n,
+			}
+			# Plot repeatability
+			self.plot_dicts[f'{stab}_repeatability']={
+				'plotfn': _plot_repeatability,
+				'ax_id': f'{stab}',
+				'qubit': stab,
+			    'M1' : self.raw_data_dict[stab]['M1'],
+			    'M2' : self.raw_data_dict[stab]['M2'],
+			    'repeatability' : self.raw_data_dict[stab]['repeatability'],
+				'row': 4,
+				'_n': _n,
+			}
+		n_plts = len(self.Stabilizers)
+		fig.suptitle(f'{self.timestamp}\nParity check performance', x=0.125+n_plts/2*0.775*1.3, y=2, size=14)
+
+	def run_post_extract(self):
+		self.prepare_plots()  # specify default plots
+		self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+		if self.options_dict.get('save_figs', False):
+			self.save_figures(
+				close_figs=self.options_dict.get('close_figs', True),
+				tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def _add_PC_plot(stabilizer, n, fig, axs):
+    n_plts = len(axs.keys()) 
+    ax = fig.add_subplot(10,10,n_plts+1)
+    _pos = ax.get_position()
+    pos = [0.125 + n_plts*0.775*1.3, 0.11, 0.775, 0.775/3*n]
+    ax.set_position(pos)
+    axs[stabilizer] = ax
+    axs[stabilizer].text(0, n/3+.2, f'$\\mathrm{{{stabilizer[0]}_{stabilizer[1]}}}$',
+	                     va='center', ha='left', size=40)
+    ax.set_xlim(0,1)
+    ax.set_ylim(0,n/3)
+    ax.axis('off')
+    ax.patch.set_alpha(0)
+    return ax
+    
+def _plot_ramsey_curves(
+	ax,
+    qubit,
+    Ramsey_curves,
+    Fit_res,
+    Missing_fraction,
+    _n,
+    row = 0,
+	**kw):
+	# State conditions
+	mf = np.array(list(Missing_fraction.values()))
+	if np.all(mf < .035):
+		_color = 'C2'
+	elif np.all(mf < .07):
+		_color = 'goldenrod'
+	else:
+		_color = 'C3'
+	# definitions
+	def func(x, phi, A, B):
+		return A*(np.cos( (x+phi)/360 *2*np.pi )+1)/2 + B
+	# Label
+	ax.text(.4, (_n-row*1.4)/3, 'Missing fraction', ha='left', size=11.5)
+	# Ramsey plot
+	for state in Ramsey_curves.keys():
+		# Plot ramsey data
+		_x = np.linspace(0.02, .35, 51)
+		_y = func(np.linspace(0,340,51), *Fit_res[state])
+		ax.plot(_x, (_y+.1)*(1.2/3)/(1+2*.1)+(_n-1-row*1.4)/3,
+						marker='', ls='--', color=_color, lw=1, alpha=.5,
+						clip_on=False)
+		# Plot ramsey fits
+		_x = np.linspace(0.02, .35, 18)
+		_y = Ramsey_curves[state]
+		ax.plot(_x, (_y+.1)*(1.2/3)/(1+2*.1)+(_n-1-row*1.4)/3,
+						marker='.', ls='', markersize=1, color=_color,
+						clip_on=False)
+	# Plot Missing fraction
+	from matplotlib.colors import to_rgba
+	n = len(Missing_fraction.keys())
+	for _x, q in zip(np.linspace(.41, .94, 2*n+1)[1::2], Missing_fraction.keys()):
+		# Qubit labels and missing fraction values
+		ax.text(_x, (_n-row*1.4)/3-.265, f'$\\mathrm{{{q[0]}_{q[1]}}}$', ha='center', size=9)
+		ax.text(_x, (_n-row*1.4)/3-.15, f'{Missing_fraction[q]*100:.1f}',
+						ha='center', size=8)
+	# Bar plot for missing fractions
+	_x = np.linspace(.41, .94, 2*n+1)[1::2]
+	_y = np.array(list(Missing_fraction.values()))*10
+	ax.bar(_x, (_y)*(1/3)/(1+2*.1),
+					bottom = (.2)*(1/3)/(1+2*.1)+(_n-1-row*1.4)/3,
+					width = (.5-.025*n)/(n),
+					ec=_color, fc=to_rgba(_color,.1),
+					clip_on=False)
+
+def _plot_parity_fidelity(
+		ax,
+		qubit,
+		P_dist,
+		P_dist_ideal,
+		fidelity,
+		_n,
+		row = 1,
+		**kw):
+	# weight-4 stabilizer condition
+	if len(P_dist) == 16:
+		if 1-fidelity < 0.10:
+			_color = 'C2'
+		elif 1-fidelity < 0.125:
+			_color = 'goldenrod'
+		else:
+			_color = 'C3'
+	# weight-2 stabilizer condition
+	elif len(P_dist) == 4:
+		if 1-fidelity < 0.05:
+			_color = 'C2'
+		elif 1-fidelity < 0.075:
+			_color = 'goldenrod'
+		else:
+			_color = 'C3'
+	# definitions
+	def func(x, phi, A, B):
+		return A*(np.cos( (x+phi)/360 *2*np.pi )+1)/2 + B
+	# Label
+	ax.text(.4, (_n-row*1.4)/3-.05, 'Avg. parity assign.', ha='left', size=11.5)
+	ax.text(.86, (_n-row*1.4)/3-.13, 'error', ha='left', size=11.5)
+	ax.text(.375+.475, (_n-row*1.4)/3-.3, f'{(1-fidelity)*100:.3g}', ha='right', size=35)
+	ax.text(.375+.475, (_n-row*1.4)/3-.3, f'{(1-fidelity)*100:.3g}', ha='right', size=35,
+    		color=_color, alpha=.65) # Overlay to give color
+	ax.text(.85, (_n-row*1.4)/3-.3, '%', ha='left', size=20)
+	# Bar plot
+	idx_sort = np.argsort([ s.count('1') for s in P_dist.keys() ])
+	from matplotlib.colors import to_rgba
+	n = len(P_dist.keys())
+	# Bar plot for missing fractions
+	_x = np.linspace(0, .35, 2*n+1)[1::2]
+	_y = np.array(list(P_dist.values()))[idx_sort]
+	ax.bar(_x, (_y)*(1/3)/(1+2*.1),
+			bottom = .1*(1/3)/(1+2*.1)+(_n-1-row*1.4)/3,
+			width = 0.016 if n == 16 else .07,
+			clip_on=False,
+			ec=None, fc=to_rgba(_color,.4))
+	_y = np.array(list(P_dist_ideal.values()))[idx_sort]
+	ax.bar(_x, (_y)*(1/3)/(1+2*.1),
+			bottom = .1*(1/3)/(1+2*.1)+(_n-1-row*1.4)/3,
+			width = 0.016 if n == 16 else .07,
+			clip_on=False,
+			ec=_color, fc=to_rgba('k', 0), ls='-', lw=.5)
+    
+def _plot_tomo_fidelity(
+	ax,
+	qubit,
+    rho_0,
+    rho_1,
+    fidelity_0,
+    fidelity_1,
+    _n,
+    row=2,
+    **kw):
+	if qubit in ['Z2', 'Z3', 'X1', 'X4']:
+		if 1-np.mean([fidelity_0,fidelity_1]) < .20:
+			_color = 'C2'
+		elif 1-np.mean([fidelity_0,fidelity_1]) < .25:
+			_color = 'goldenrod'
+		else:
+			_color = 'C3'
+	else:
+		if 1-np.mean([fidelity_0,fidelity_1]) < .30:
+			_color = 'C2'
+		elif 1-np.mean([fidelity_0,fidelity_1]) < .40:
+			_color = 'goldenrod'
+		else:
+			_color = 'C3'
+	# Label
+	ax.text(.4, (_n-row*1.4)/3-.05, 'GHZ state infidelity', ha='left', size=11.5)
+	ax.text(.55, (_n-row*1.4)/3-.15, 'ancilla state $|0\\rangle$', ha='left', size=10)
+	ax.text(.375+.15, (_n-row*1.4)/3-.4, f'{(1-fidelity_0)*100:.2g}', ha='left', size=40)
+	ax.text(.375+.15, (_n-row*1.4)/3-.4, f'{(1-fidelity_0)*100:.2g}', ha='left', size=40,
+			color=_color, alpha=.65)
+	ax.text(.85, (_n-row*1.4)/3-.4, '%', ha='left', size=20)
+	ax.text(.55, (_n-row*1.4)/3-.15-.375, 'ancilla state $|1\\rangle$', ha='left', size=10)
+	ax.text(.375+.15, (_n-row*1.4)/3-.4-.375, f'{(1-fidelity_1)*100:.2g}', ha='left', size=40)
+	ax.text(.375+.15, (_n-row*1.4)/3-.4-.375, f'{(1-fidelity_1)*100:.2g}', ha='left', size=40,
+			color=_color, alpha=.65)
+	ax.text(.85, (_n-row*1.4)/3-.4-.375, '%', ha='left', size=20)
+	# Ideal density matrices
+	rho_id_0 = np.zeros(rho_0.shape)
+	rho_id_0[ 0, 0] = .5
+	rho_id_0[ 0,-1] = .5
+	rho_id_0[-1, 0] = .5
+	rho_id_0[-1,-1] = .5
+	rho_id_1 = np.zeros(rho_1.shape)
+	rho_id_1[ 0, 0] = .5
+	rho_id_1[ 0,-1] = -.5
+	rho_id_1[-1, 0] = -.5
+	rho_id_1[-1,-1] = .5
+	for i, rho, rho_id in zip([0,1], [rho_0, rho_1], [rho_id_0, rho_id_1]):
+		# Tomography axis
+		fig = ax.get_figure()
+		pos = ax.get_position()
+		axt = fig.add_subplot(111, projection='3d', azim=-35, elev=30)
+		_pos = axt.get_position()
+		axt.set_position([pos.x0, _pos.y0-(i-1)*.325+.075, _pos.width/2, _pos.height/2])
+		# turn background transparent
+		axt.xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+		axt.yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+		axt.zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+		axt.patch.set_alpha(0)
+		# make the grid lines transparent
+		axt.xaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+		axt.yaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+		axt.zaxis._axinfo["grid"]['color'] =  (1,1,1,0)
+		# Plot density matrix
+		n = len(rho)
+		xedges = np.linspace(0, 1, n+1)
+		yedges = np.linspace(0, 1, n+1)
+		xpos, ypos = np.meshgrid(xedges[:-1], yedges[:-1], indexing="ij")
+		xpos = xpos.ravel()
+		ypos = ypos.ravel()
+		zpos = 0
+		dx = dy = 1/n*0.8
+		dz = np.abs(rho).ravel()
+		import matplotlib
+		from matplotlib.colors import to_rgba
+		cmap = matplotlib.colors.LinearSegmentedColormap.from_list("", ["C3",'darkseagreen',"C0",'antiquewhite',"C3"])
+		norm = matplotlib.colors.Normalize(vmin=-np.pi, vmax=np.pi)
+		color=cmap(norm([np.angle(e) for e in rho.ravel()]))
+		color_id=cmap(norm([np.angle(e) for e in rho_id.ravel()]))
+		dz1 = np.abs(rho_id).ravel()
+		axt.bar3d(xpos, ypos, zpos, dx, dy, dz, zsort='max',
+				 color=color, alpha=1, edgecolor='black', linewidth=.1)
+		# selector
+		s = [k for k in range(len(dz1)) if dz1[k] > .15]
+		colors = [ to_rgba(color_id[k], .25) if dz1[k] > dz[k] else to_rgba(color_id[k], 1) for k in s ]
+		Z = [ dz[k] if dz1[k] > dz[k] else dz1[k] for k in s ]
+		DZ= [ dz1[k]-dz[k] if dz1[k] > dz[k] else dz[k]-dz1[k] for k in s ]
+		axt.bar3d(xpos[s], ypos[s], Z, dx, dy, dz=DZ, zsort='min',
+				 color=colors, edgecolor=to_rgba('black', .25), linewidth=.4)
+		axt.set_xticklabels([])
+		axt.set_yticklabels([])
+		axt.set_zticklabels([])
+        
+def _plot_repeatability(
+	ax,
+    qubit,
+    M1,
+    M2,
+    repeatability,
+    _n,
+    state='good',
+    row = 4,
+    **kw):
+	if qubit in ['Z2', 'Z3', 'X1', 'X4']:
+		if 1-repeatability < .10:
+			_color = 'C2'
+		elif 1-repeatability < .15:
+			_color = 'goldenrod'
+		else:
+			_color = 'C3'
+	else:
+		if 1-repeatability < .20:
+			_color = 'C2'
+		elif 1-repeatability < .25:
+			_color = 'goldenrod'
+		else:
+			_color = 'C3'
+	# definitions
+	def func(x, phi, A, B):
+		return A*(np.cos( (x+phi)/360 *2*np.pi )+1)/2 + B
+	# Label
+	ax.text(.4, (_n-row*1.4)/3-.05, 'Repeatability err.', ha='left', size=11.5)
+	ax.text(.375+.5, (_n-row*1.4)/3-.275, f'{(1-repeatability)*100:.1f}', ha='right', size=35)
+	ax.text(.375+.5, (_n-row*1.4)/3-.275, f'{(1-repeatability)*100:.1f}', ha='right', size=35,
+    		color=_color, alpha=.65)
+	ax.text(.875, (_n-row*1.4)/3-.275, '%', ha='left', size=20)
+	# Bar plot for missing fractions
+	from matplotlib.colors import to_rgba
+	_x = np.linspace(0, .35, 5)[1::2]
+	_y = (np.array([M1, M2])+1)/2
+	ax.bar(_x, (_y+.2-.7)*(1/3)/(1+2*.1),
+			bottom = (.7)*(1/3)/(1+2*.1)+(_n-1-row*1.4)/3,
+			width = .15,
+			ec=None, fc=to_rgba(_color,.5),
+			clip_on=False)
+
+	_y = (np.array([0, 1])+1)/2
+	ax.bar(_x, (_y+.2-.7)*(1/3)/(1+2*.1),
+			bottom = (.7)*(1/3)/(1+2*.1)+(_n-1-row*1.4)/3,
+			width = .15,
+			ec=_color, fc=to_rgba(_color,0),
+			clip_on=False)

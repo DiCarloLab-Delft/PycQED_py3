@@ -1263,7 +1263,7 @@ class CCLight_Transmon(Qubit):
         if self.instr_LutMan_LRU():
             LRU_lutman = self.instr_LutMan_LRU.get_instr()
             self.instr_LO_LRU.get_instr().on()
-            self.instr_LO_LRU.get_instr().pulsemod_state(False)
+            # self.instr_LO_LRU.get_instr().pulsemod_state(False)
             # If the lutman type is MW
             if isinstance(LRU_lutman,
                     pycqed.instrument_drivers.meta_instrument.LutMans.mw_lutman.LRU_MW_LutMan):
@@ -3262,6 +3262,11 @@ class CCLight_Transmon(Qubit):
                 dac_par = IVVI.parameters['dac{}'.format(self.fl_dc_ch())]
             else:
                 dac_par = IVVI.parameters[fluxChan]
+        elif 'AWG8' in self.instr_FluxCtrl():
+            # Biasing directly through HDAWG
+            HDAWG = self.instr_FluxCtrl.get_instr()
+            dac_par = HDAWG.parameters[self.fl_dc_ch()]
+            fluxcontrol = self.instr_FluxCtrl.get_instr()
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
@@ -7056,7 +7061,7 @@ class CCLight_Transmon(Qubit):
                 h_state=h_state)
 
     def measure_LRU_process_tomo(self,
-            nr_shots_per_case: int = 2**15,
+            nr_shots_per_case: int = 2**13,
             prepare_for_timedomain: bool = True,
             reduced_prepare: bool = False,
             idle: bool = False,
@@ -7244,7 +7249,8 @@ class CCLight_Transmon(Qubit):
         Amplitudes: list = [-0.4, -0.35, -0.3, 0.3, 0.35, 0.4],
         update: bool = True,
         disable_metadata: bool = False,
-        prepare_for_timedomain: bool = True):
+        prepare_for_timedomain: bool = True,
+        fix_zero_detuning: bool = True):
         """
         Calibrates the polynomial coeficients for flux (voltage) 
         to frequency conversion. Does so by measuring cryoscope traces
@@ -7256,6 +7262,10 @@ class CCLight_Transmon(Qubit):
             Amplitudes: 
                 DAC amplitudes of flux pulse used for each
                 cryoscope trace.
+            fix_zero_detuning:
+                Used to force the extracted flux arc detuning
+                be zero at zero amplitude. This should be enabled
+                when operating qubits at the sweetspot. 
         """
         assert self.ro_acq_weight_type()=='optimal'
         nested_MC = self.instr_nested_MC.get_instr()
@@ -7283,7 +7293,8 @@ class CCLight_Transmon(Qubit):
         nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
         a = ma2.cv2.Flux_arc_analysis(label='Voltage_frequency_arc',
                     channel_amp=fl_lutman.cfg_awg_channel_amplitude(),
-                    channel_range=fl_lutman.cfg_awg_channel_range())
+                    channel_range=fl_lutman.cfg_awg_channel_range(),
+                    fix_zero_detuning=fix_zero_detuning)
         # Update detuning polynomial coeficients
         if update:
             p_coefs = a.qoi['P_coefs']

@@ -1649,12 +1649,7 @@ def LRU_experiment(
     k.gate('rx180', [qubit_idx])
     k.gate('rx12', [qubit_idx])
     k.gate("wait", [])
-    for qb_idx in [qubit_idx]:
-    # for qb_idx in [15,13,16,7,14,12,10]:
-        k.gate('lru', [qb_idx])
-        # k.gate('i', [qb_idx])
-        # k.gate('i', [qb_idx])
-        # k.gate('sf_park', [qb_idx])
+    k.gate('lru', [qubit_idx])
     k.gate("wait", [], LRU_duration_ns-20)
     k.measure(qubit_idx)
     p.add_kernel(k)
@@ -1719,19 +1714,20 @@ def LRU_repeated_experiment(
         k.measure(qubit_idx)
         k.gate("wait", [])
         # k.gate('lru', [qubit_idx])  # X3
-        k.gate('lru', [12]) # Z3
-        k.gate('lru', [10]) # Z4
+        # k.gate('lru', [12]) # Z3
+        # k.gate('lru', [10]) # Z4
         # k.gate('lru', [9])  # X4
-        k.gate('lru', [7])  # Z1
-        k.gate('lru', [14]) # Z2
+        # k.gate('lru', [7])  # Z1
+        # k.gate('lru', [14]) # Z2
         # LRU Data qubits
         k.gate('lru', [13]) # D5
         k.gate('lru', [15]) # D4
         k.gate('lru', [16]) # D6
         k.gate("wait", [21, 22, 23, 24], LRU_duration_ns-40)
         k.gate("wait", [17, 18, 19], LRU_duration_ns-20)
+        k.gate('update_ph_LRU', [qubit_idx])
         # for q in [6,2,0,15,13,16,1,5,4]:
-        # for q in [6,2,0,15,13,1,5,4]:
+        # # for q in [6,2,0,15,13,1,5,4]:
         #     k.gate("i", [q])
         #     k.gate("i", [q])
         #     k.gate("i", [q])
@@ -1854,7 +1850,7 @@ def LRU_process_tomograhpy(
             k.prepz(qubit_idx)
             k.gate(states[state], [qubit_idx])
             # LRU gate
-            k.gate('wait', [])
+            k.gate('wait', [], 0)
             if idle:
                 k.gate('wait', [], 20)
             else:
@@ -1863,18 +1859,19 @@ def LRU_process_tomograhpy(
             #     # k.gate('update_ph_LRU', [qubit_idx])
             # k.gate('wait', [], LRU_duration_ns-20)
                 # Multi qubit LRUs
-                k.gate('update_ph_LRU', [qubit_idx])
                 k.gate('lru', [13]) # D5
                 k.gate('lru', [15]) # D4
                 k.gate('lru', [16]) # D6
-                k.gate('lru', [12]) # Z3
-                k.gate('lru', [10]) # Z4
-                k.gate('lru', [7])  # Z1
-                k.gate('lru', [14]) # Z2
+                # k.gate('lru', [12]) # Z3
+                # k.gate('lru', [10]) # Z4
+                # k.gate('lru', [7])  # Z1
+                # k.gate('lru', [14]) # Z2
                 # k.gate('lru', [3])  # X3
                 # k.gate('lru', [9])  # X4
             k.gate('wait', [20, 21, 22, 23, 24, 25], LRU_duration_ns-40)
             k.gate('wait', [17, 18, 19], LRU_duration_ns-20)
+            k.gate('update_ph_LRU', [qubit_idx])
+            # k.gate("wait", [], )
             k.gate('wait', [], 20)
             # Measurement in basis
             k.gate(meas_bases[basis], [qubit_idx])

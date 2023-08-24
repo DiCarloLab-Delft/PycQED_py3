@@ -553,7 +553,7 @@ class Base_MW_LutMan(Base_LutMan):
         if mod_freqs is None:
             mod_freqs = [self.mw_ef_modulation()]*len(amps)
         elif len(mod_freqs) == 1:
-            mod_freqs = [mod_freqs]*len(amps)
+            mod_freqs = mod_freqs*len(amps)
 
         # 2. Generate a LutMap for the ef-pulses
         # FIXME: hardcoded indices must match OpenQL definitions

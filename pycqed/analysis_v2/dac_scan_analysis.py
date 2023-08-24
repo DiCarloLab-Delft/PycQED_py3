@@ -676,13 +676,14 @@ class DAC_analysis(ma.TwoD_Analysis):
                  do_fitting=True,
                  extract_only=False,
                  auto=True,
+                 use_phase:bool=False,
                  **kw):
         super(ma.TwoD_Analysis, self).__init__(options_dict=options_dict,
                                                extract_only=extract_only,
                                                auto=auto,
                                                do_fitting=do_fitting,
                                                **kw)
-        linecut_fit_result = self.fit_linecuts()
+        linecut_fit_result = self.fit_linecuts(use_phase)
         self.linecut_fit_result = linecut_fit_result
         f0s = []
         for res in self.linecut_fit_result:
@@ -693,9 +694,12 @@ class DAC_analysis(ma.TwoD_Analysis):
         self.sweet_spot_value = self.dac_fit_res['sweetspot_dac']
         self.plot_fit_result(**kw)
 
-    def fit_linecuts(self):
-        linecut_mag = np.array(self.measured_values)[0].T
-        sweep_points = self.sweep_points
+    def fit_linecuts(self, use_phase):
+        if use_phase:
+            linecut_mag = np.array(self.measured_values)[1].T[:]
+        else:
+            linecut_mag = np.array(self.measured_values)[0].T[:]
+        sweep_points = self.sweep_points[:]
         fit_result = []
         for linecut in linecut_mag:
             fit_result.append(self.qubit_fit(sweep_points, linecut))
@@ -708,7 +712,7 @@ class DAC_analysis(ma.TwoD_Analysis):
         Does not support 2nd peak fitting, as it does not seem necessary.
         """
         frequency_guess = kw.get('frequency_guess', None)
-        percentile = kw.get('percentile', 20)
+        percentile = kw.get('percentile', 2.5)
         num_sigma_threshold = kw.get('num_sigma_threshold', 4)
         window_len_filter = kw.get('window_len_filter', 3)
         optimize = kw.pop('optimize', True)
@@ -802,9 +806,10 @@ class DAC_analysis(ma.TwoD_Analysis):
         return fit_res
 
     def fit_dac_arc(self):
-        DAC_values = self.sweep_points_2D
-        f0s = self.f0s
-
+        DAC_values = self.sweep_points_2D[1:-1]
+        f0s = self.f0s[1:-1]
+        # DAC_values = self.sweep_points_2D
+        # f0s = self.f0s
         polycoeffs = np.polyfit(DAC_values, f0s, 2)
         sweetspot_dac = -polycoeffs[1]/(2*polycoeffs[0])
         fit_res = {}

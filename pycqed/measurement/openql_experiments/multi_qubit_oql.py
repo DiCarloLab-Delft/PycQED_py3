@@ -3593,22 +3593,9 @@ def gate_process_tomograhpy(
             k.gate(states[state], [meas_qubit_idx])
             # Play gate
             k.gate('wait', [])
-            # k.gate(gate_name, [gate_qubit_idx])
             for q in gate_qubit_idx:
-                if gate_name == 'XY':
-                    for cycle in range(int(720/6/20)):
-                        k.gate('i', [q])
-                        k.gate('rX180', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('rY180', [q])
-                        k.gate('i', [q])
-                else:
-                    k.gate(gate_name, [q])
+                k.gate(gate_name, [q])
             k.gate('wait', [], wait_after_gate_ns)
-            # k.gate('wait', [], 60)
-            # k.gate('rx180', [meas_qubit_idx])
-            # k.gate('wait', [], 100)
             # Measurement in basis
             k.gate(meas_bases[basis], [meas_qubit_idx])
             k.measure(meas_qubit_idx)
@@ -3718,6 +3705,7 @@ def repeated_stabilizer_data_measurement_sequence(
         experiments: list,
         stabilizer_type: str = 'X',
         initial_state_qubits: list = [],
+        measurement_time_ns: int = 500,
         ):
     p = OqlProgram("Repeated_stabilizer_seq", platf_cfg)
     Valid_experiments = ['single_stabilizer', 'single_stabilizer_LRU',
@@ -4058,7 +4046,6 @@ def repeated_stabilizer_data_measurement_sequence(
                     for q in X_anci_idxs:
                         k.gate("rym90", [q])
                 k.barrier([])
-                k.gate('wait', [],20)
                 # Measurement of ancillas
                 k.measure(Q_anc)
                 for q in _remaining_ancillas:
@@ -4070,40 +4057,28 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.measure(q)
                 else:
                     for q in data_idxs:
-                        # Measurement Echo
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
+                        # Single measurement Echo
+                        idle_time = (measurement_time_ns-20)//2
+                        nr_idles = idle_time//20
+                        for idle in range(nr_idles):
+                            k.gate('i', [q])
                         k.gate('rX180', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
+                        for idle in range(nr_idles):
+                            k.gate('i', [q])
+
+                        # for cycle in range(int(480/6/20)):
+                        #     k.gate('i', [q])
+                        #     k.gate('rX180', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('rY180', [q])
+                        #     k.gate('i', [q])
                 k.gate("wait", [], 0)
-                k.gate('wait', [], 20)
             p.add_kernel(k)
 
         if 'surface_13_LRU' in experiments:
             k = p.create_kernel(f'Surface_13_LRU_seq_{n_rounds}rounds')
             # Preparation & heralded_init
-            # for q in data_idxs+[Q_anc]:
             for q in data_idxs:
                 k.prepz(q)
                 k.measure(q)
@@ -4137,7 +4112,7 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate("ry90", [q])
                 k.barrier([])
                 # Flux dance
-                k.gate('wait', [], 0)
+                # k.gate('wait', [], 20)
                 if 'Z' == target_stab[:1]:
                     ## Z Flux dances
                     k.gate(f'flux_dance_5', [0])
@@ -4163,7 +4138,7 @@ def repeated_stabilizer_data_measurement_sequence(
                     for q in X_anci_idxs:
                         k.gate("rym90", [q])
                 k.barrier([])
-                k.gate('wait', [], 20)
+                k.gate('wait', [], 0)
                 # Measurement of ancillas
                 k.measure(Q_anc)
                 for q in _remaining_ancillas:
@@ -4178,99 +4153,29 @@ def repeated_stabilizer_data_measurement_sequence(
                     for q in lru_idxs:
                         k.gate('lru', [q])
                     # LRU ancillas
-                    # k.gate('lru', [3])  # X3
-                    # k.gate('lru', [12]) # Z3
-                    # k.gate('lru', [10]) # Z4
-                    # k.gate('lru', [9])  # X4
-                    # k.gate('lru', [7])  # Z1
-                    # k.gate('lru', [14]) # Z2
-                    # LRU Data qubits
-                    # k.gate('lru', [13]) # D5
-                    # k.gate('lru', [15]) # D4
-                    # k.gate('lru', [16]) # D6
-                    k.gate('wait', [20, 21, 22, 23, 24, 25], 180)
-                    k.gate('wait', [17, 18, 19], 200)
+                    # evaluate LRU idle time
+                    idle_LRU = measurement_time_ns - 20
+                    Z_idle_LRU = measurement_time_ns//3-20
+                    k.gate('wait', [17, 18, 19], idle_LRU+Z_idle_LRU+20)
+                    k.gate('wait', [21, 22, 23, 24], Z_idle_LRU-20)
                     for q in data_idxs:
-                        # Measurement Echo
-                        # if q == 13 or q == 15 or q == 16:
-                        #     k.gate('cw_10', [q])
-                        # else:
-                        #     k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
+                        # Single measurement Echo
+                        idle_time = (measurement_time_ns-20)//2
+                        nr_idles = idle_time//20
+                        nr_idles_Z = (measurement_time_ns//3-20)//40
+                        for idle in range(nr_idles+nr_idles_Z):
+                            k.gate('i', [q])
                         k.gate('rX180', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        # LRU Echo
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('update_ph_LRU', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        k.gate('i', [q])
-                        # else:
-                        #     # Measurement Echo
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
+                        for idle in range(nr_idles+nr_idles_Z):
+                            k.gate('i', [q])
+                        # for cycle in range(int(480/6/20)):
                         #     k.gate('i', [q])
                         #     k.gate('rX180', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
+                        #     k.gate('rY180', [q])
                         #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     # LRU Echo
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('rX180', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-                        #     k.gate('i', [q])
-
                 k.gate("wait", [], )
-                k.gate('wait', [], 20)
             p.add_kernel(k)
 
         if 'surface_17' in experiments:
@@ -4386,8 +4291,6 @@ def repeated_stabilizer_data_measurement_sequence(
     for q in data_idxs+_remaining_ancillas+[Q_anc]:
         k.gate('rx180', [q])
         k.measure(q)
-    # for q in _remaining_ancillas:
-    #     k.measure(q)
     p.add_kernel(k)
     # Calibration 222
     k = p.create_kernel('Cal_twos')
@@ -4401,8 +4304,6 @@ def repeated_stabilizer_data_measurement_sequence(
         k.gate('rx180', [q])
         k.gate('rx12', [q])
         k.measure(q)
-    # for q in _remaining_ancillas:
-    #     k.measure(q)
     p.add_kernel(k)
 
     p.compile()

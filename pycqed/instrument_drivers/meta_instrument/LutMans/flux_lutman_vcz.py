@@ -193,15 +193,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         )
 
     def _gen_park(self):
+        zeros = np.zeros(int(self.park_pad_length() * self.sampling_rate()))
         if self.park_double_sided():
             ones = np.ones(int(self.park_length() * self.sampling_rate() / 2))
-            zeros = np.zeros(int(self.park_pad_length() * self.sampling_rate()))
             pulse_pos = self.park_amp() * ones
             return np.concatenate((zeros, pulse_pos, - pulse_pos, zeros))
         else:
-            return self.park_amp() * np.ones(
+            pulse_pos = self.park_amp() * np.ones(
                 int(self.park_length() * self.sampling_rate())
             )
+            return np.concatenate((zeros, pulse_pos, zeros))
 
     def _add_qubit_parameters(self):
         """

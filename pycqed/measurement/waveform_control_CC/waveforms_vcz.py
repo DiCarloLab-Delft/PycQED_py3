@@ -126,6 +126,14 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         label="Time before correction",
     )
     this_flux_lm.add_parameter(
+        "vcz_use_net_zero_pulse_%s" % which_gate,
+        docstring="Flag to turn on the net-zero character of the SNZ pulse",
+        parameter_class=ManualParameter,
+        vals=vals.Bool(),
+        initial_value=True,
+        label="Use net-zero pulse amplitudes",
+    )
+    this_flux_lm.add_parameter(
         "vcz_use_asymmetric_amp_%s" % which_gate,
         docstring="Flag to turn on asymmetric amplitudes of the SNZ pulse",
         parameter_class=ManualParameter,
@@ -163,33 +171,42 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         unit="a.u.",
         label="Asymmetry of SNZ pulse, if asymmetric is used.",
     )
+    this_flux_lm.add_parameter(
+        "vcz_amp_pad_%s" % which_gate,
+        docstring="Amplitude padded part of SNZ pulse",
+        parameter_class=ManualParameter,
+        vals=vals.Numbers(-1.0, 1.0),
+        initial_value=0.0,
+        unit="a.u.",
+        label="Amplitude padded part of SNZ pulse.",
+    )
 
-    for specificity in ["coarse", "fine"]:
-        this_flux_lm.add_parameter(
-            "vcz_{}_optimal_hull_{}".format(specificity, which_gate),
-            initial_value=np.array([]),
-            label="{} hull".format(specificity),
-            docstring=(
-                "Stores the boundary points of a optimal region 2D region "
-                "generated from a landscape. Intended for data points "
-                "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`)"
-            ),
-            parameter_class=ManualParameter,
-            vals=vals.Arrays(),
-        )
-        this_flux_lm.add_parameter(
-            "vcz_{}_cond_phase_contour_{}".format(specificity, which_gate),
-            initial_value=np.array([]),
-            label="{} contour".format(specificity),
-            docstring=(
-                "Stores the points for an optimal conditional phase "
-                "contour generated from a landscape. Intended for data points "
-                "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`) "
-                "typically for the 180 deg cond. phase."
-            ),
-            parameter_class=ManualParameter,
-            vals=vals.Arrays(),
-        )
+    # for specificity in ["coarse", "fine"]:
+    #     this_flux_lm.add_parameter(
+    #         "vcz_{}_optimal_hull_{}".format(specificity, which_gate),
+    #         initial_value=np.array([]),
+    #         label="{} hull".format(specificity),
+    #         docstring=(
+    #             "Stores the boundary points of a optimal region 2D region "
+    #             "generated from a landscape. Intended for data points "
+    #             "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`)"
+    #         ),
+    #         parameter_class=ManualParameter,
+    #         vals=vals.Arrays(),
+    #     )
+    #     this_flux_lm.add_parameter(
+    #         "vcz_{}_cond_phase_contour_{}".format(specificity, which_gate),
+    #         initial_value=np.array([]),
+    #         label="{} contour".format(specificity),
+    #         docstring=(
+    #             "Stores the points for an optimal conditional phase "
+    #             "contour generated from a landscape. Intended for data points "
+    #             "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`) "
+    #             "typically for the 180 deg cond. phase."
+    #         ),
+    #         parameter_class=ManualParameter,
+    #         vals=vals.Arrays(),
+    #     )
 
 
 
@@ -274,7 +291,7 @@ def vcz_waveform(
     which_gate: str = None,
     sim_ctrl_cz=None,
     return_dict=False
-):
+    ):
     amp_at_sweetspot = 0.0
     if which_gate is None and sim_ctrl_cz is not None:
         which_gate = sim_ctrl_cz.which_gate()
@@ -289,6 +306,8 @@ def vcz_waveform(
     # we might need to use asymmetric pulse amplitudes for the NZ pulse
     # if the qubit is operated off-sweetspot and interaction points are at different distances
     use_asymmetric_NZ = fluxlutman.get("vcz_use_asymmetric_amp_{}".format(which_gate))
+    # if one wants to use unipolar pulses instead
+    use_net_zero_pulse = fluxlutman.get("vcz_use_net_zero_pulse_{}".format(which_gate))
 
     # single qubit phase correction parameters
     correct_q_phase = fluxlutman.get("vcz_correct_q_phase_{}".format(which_gate))
@@ -320,7 +339,13 @@ def vcz_waveform(
     half_time_q_ph_corr = np.round(time_q_ph_corr / 2 / dt) * dt
     time_pad = np.round(time_pad / dt) * dt
 
-    pad_amps = np.full(int(time_pad / dt), 0)
+    # Added pading amplitude by Jorge 22/08/2023
+    pad_amp = fluxlutman.get("vcz_amp_pad_{}".format(which_gate))
+    pad_amps = np.full(int(time_pad / dt), 0) + pad_amp/amp_at_int_11_02
+    for _i in range(len(pad_amps)):
+        if _i<12:
+            pad_amps[_i] = 0
+    # pad_amps = np.full(int(time_pad / dt), 0)    
     sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
     amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)
 
@@ -350,8 +375,8 @@ def vcz_waveform(
             pad_amps,
             pos_NZ_amps,
             amps_middle,
-            -neg_NZ_amps,
-            pad_amps,
+            (1-use_net_zero_pulse*2)*neg_NZ_amps,
+            pad_amps[::-1],
             [amp_at_sweetspot])
         )
     else:
@@ -368,8 +393,8 @@ def vcz_waveform(
             pad_amps,
             half_NZ_amps,
             amps_middle,
-            -half_NZ_amps[::-1],
-            pad_amps,
+            (1-use_net_zero_pulse*2)*half_NZ_amps[::-1],
+            pad_amps[::-1],
             [amp_at_sweetspot])
         )
 
