@@ -677,6 +677,7 @@ class DAC_analysis(ma.TwoD_Analysis):
                  extract_only=False,
                  auto=True,
                  use_phase:bool=False,
+                 ignore_idxs: list=[0, -1],
                  **kw):
         super(ma.TwoD_Analysis, self).__init__(options_dict=options_dict,
                                                extract_only=extract_only,
@@ -685,6 +686,7 @@ class DAC_analysis(ma.TwoD_Analysis):
                                                **kw)
         linecut_fit_result = self.fit_linecuts(use_phase)
         self.linecut_fit_result = linecut_fit_result
+        self.ignore_idxs = ignore_idxs
         f0s = []
         for res in self.linecut_fit_result:
             f0s.append(res.values['f0'])
@@ -806,8 +808,13 @@ class DAC_analysis(ma.TwoD_Analysis):
         return fit_res
 
     def fit_dac_arc(self):
-        DAC_values = self.sweep_points_2D[1:-1]
-        f0s = self.f0s[1:-1]
+        DAC_values = list(self.sweep_points_2D)
+        f0s = list(self.f0s)
+        self.ignore_idxs = [x if x>0 else x%len(DAC_values) for x in self.ignore_idxs]
+        print(self.ignore_idxs)
+        # remove ignored indexes
+        DAC_values = [x for i, x in enumerate(DAC_values) if i not in self.ignore_idxs]
+        f0s = [x for i, x in enumerate(f0s) if i not in self.ignore_idxs]
         # DAC_values = self.sweep_points_2D
         # f0s = self.f0s
         polycoeffs = np.polyfit(DAC_values, f0s, 2)

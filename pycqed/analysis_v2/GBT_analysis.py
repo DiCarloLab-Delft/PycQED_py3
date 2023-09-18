@@ -8,6 +8,79 @@ from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 
+import numpy as np
+import matplotlib
+from matplotlib import patches, path, pyplot as plt
+from matplotlib.colors import to_rgba
+
+map_qubits = {
+	'Z3' : [-2,-1],
+	'D9' : [ 0, 2],
+	'X4' : [-1, 2],
+	'D8' : [-1, 1],
+	'Z4' : [ 0, 1],
+	'D6' : [ 1, 1],
+	'D7' : [-2, 0],
+	'X3' : [-1, 0],
+	'D5' : [ 0, 0],
+	'X2' : [ 1, 0],
+	'D3' : [ 2, 0],
+	'D4' : [-1,-1],
+	'Z1' : [ 0,-1],
+	'D2' : [ 1,-1],
+	'X1' : [ 1,-2],
+	'Z2' : [ 2, 1],
+	'D1' : [ 0,-2]
+             }
+
+def draw_square(ax, X, l, c, alpha=1):
+    rect = patches.Rectangle((X[0]-l/2, X[1]-l/2), l, l, linewidth=0, facecolor=c, alpha=alpha)
+    ax.add_patch(rect)
+
+def plot_1Qmetric(values, 
+                ax, vmax=None, vmin=None, 
+                colorbar=True, factor=1,
+                metric='T1', units='$\mu s$', digit=2,
+                **kw):
+    
+    if vmax is None:
+        vmax = np.max([v*factor for v in values.values() if v != None])
+    if vmin is None:
+        vmin = np.min([v*factor for v in values.values() if v != None])
+    
+    cmap = matplotlib.colors.ListedColormap(plt.cm.viridis.colors[::])
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    for qubit in values.keys():
+        if values[qubit] != None:
+            c = cmap(norm(values[qubit]*factor))
+            if values[qubit]*factor > (vmax-vmin)/2 + vmin :
+                c_text = 'k'
+            else:
+                c_text = 'white'
+            string = r'{:.'+str(digit)+r'f}'
+            string = string.format(values[qubit]*factor)
+        
+        else:
+            c = 'lightgray'
+            c_text = 'white'
+            string = ''
+            
+        draw_square(ax, map_qubits[qubit], l=.96, c=c)
+        ax.text(map_qubits[qubit][0], map_qubits[qubit][1], 
+                string, 
+                ha='center', va='center', size=10, color=c_text)
+        ax.text(map_qubits[qubit][0], map_qubits[qubit][1]+.25, 
+                qubit, ha='center', va='center', size=6, color=c_text)
+
+    ax.set_xlim(-2.5, 2.5)
+    ax.set_ylim(-2.5, 2.5)
+    ax.axis('off')
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    if colorbar:
+        fig = ax.get_figure()
+        pos = ax.get_position()
+        cb = fig.colorbar(sm, label=f'{metric} ({units})')
+        ax.set_position([pos.x0-.2, pos.y0, pos.width, pos.height])
 
 class SingleQubitGBT_analysis(ba.BaseDataAnalysis):
 	"""
@@ -180,6 +253,24 @@ class SingleQubitGBT_analysis(ba.BaseDataAnalysis):
 		n_plts = len(self.Qubits)
 		fig.suptitle(f'{self.timestamp}\nSingle-qubit performance', x=0.125+n_plts/2*0.775*1.3, y=2.8, size=18)
 
+		# Plot metric map
+		SQG_error = { q : self.raw_data_dict[q]['SQG_err'] \
+					  if q in self.Qubits else None \
+					  for q in map_qubits.keys() }
+		fig, ax = plt.subplots(figsize=(3.5,3.5), dpi=200)
+		self.figs['Single_qubit_RB'] = fig
+		self.axs_dict['Single_qubit_RB'] = ax
+		# Plot single qubit gate error
+		self.plot_dicts['Single_qubit_RB']={
+			'plotfn': plot_1Qmetric,
+			'ax_id': 'Single_qubit_RB',
+			'values': SQG_error,
+			'metric': 'Single qubit gate error',
+			'units': '%',
+			'digit': 2,
+			'factor': 100
+		}
+		fig.suptitle(f'{self.timestamp}\n')
 
 	def run_post_extract(self):
 		self.prepare_plots()  # specify default plots
@@ -432,6 +523,142 @@ def _plot_SSRO(
             (_n1+.1)*(1/3)/(1+2*.1)+(n-1-row*1.4)/3, f'{_color}')    
 
 
+class RoundedPolygon(patches.PathPatch):
+    def __init__(self, xy, pad, **kwargs):
+        p = path.Path(*self.__round(xy=xy, pad=pad))
+        super().__init__(path=p, **kwargs)
+
+    def __round(self, xy, pad):
+        n = len(xy)
+
+        for i in range(0, n):
+
+            x0, x1, x2 = np.atleast_1d(xy[i - 1], xy[i], xy[(i + 1) % n])
+
+            d01, d12 = x1 - x0, x2 - x1
+            d01, d12 = d01 / np.linalg.norm(d01), d12 / np.linalg.norm(d12)
+
+            x00 = x0 + pad * d01
+            x01 = x1 - pad * d01
+            x10 = x1 + pad * d12
+            x11 = x2 - pad * d12
+
+            if i == 0:
+                verts = [x00, x01, x1, x10]
+            else:
+                verts += [x01, x1, x10]
+        codes = [path.Path.MOVETO] + n*[path.Path.LINETO, path.Path.CURVE3, path.Path.CURVE3]
+
+        return np.atleast_1d(verts, codes)
+    
+def draw_tqg(x, y, ax, vertical, qubit_1, qubit_2, color, c_text, number=None, digit=2):
+    l = .3
+    if vertical:
+        xy = np.array([(x+l,  y+(.5-l)),
+                       (  x, y+.5),
+                       (x-l,  y+(.5-l)),
+                       (x-l,  y-(.5-l)),
+                       (  x, y-.5),
+                       (x+l,  y-(.5-l))])
+        ax.text(x,y+.3, qubit_1, color=c_text, va='center', ha='center', size=4., rotation=0)
+        ax.text(x,y-.3, qubit_2, color=c_text, va='center', ha='center', size=4., rotation=0)
+    else:
+        xy = np.array([(x+(.5-l), y+l),
+                       (x+.5,   y),
+                       ( x+(.5-l), y-l),
+                       ( x-(.5-l), y-l),
+                       (x-.5,   y),
+                       ( x-(.5-l), y+l)])
+        ax.text(x-.3,y, qubit_1, color=c_text, va='center', ha='center', size=4., rotation=0)
+        ax.text(x+.3,y, qubit_2, color=c_text, va='center', ha='center', size=4., rotation=0)
+    if number:
+        string = r'{:.'+str(digit)+r'f}'
+        string = string.format(number)
+        ax.text(x,y, string, color=c_text, va='center', ha='center', size=6, rotation=0)
+    ax.add_patch(RoundedPolygon(xy=xy, pad=0.05, facecolor=color, edgecolor='white', lw=1, zorder=1.5)) 
+
+Qubit_pairs = [ ('D7', 'Z3'),
+                ('Z3', 'D4'),
+                ('X4', 'D9'),
+                ('D9', 'Z4'),
+                ('X4', 'D8'),
+                ('D8', 'Z4'),
+                ('D8', 'X3'),
+                ('Z4', 'D6'),
+                ('Z4', 'D5'),
+                ('D6', 'X2'),
+                ('D6', 'Z2'),
+                ('D7', 'X3'),
+                ('X3', 'D5'),
+                ('X3', 'D4'),
+                ('D5', 'X2'),
+                ('D5', 'Z1'),
+                ('X2', 'D3'),
+                ('X2', 'D2'),
+                ('Z2', 'D3'),
+                ('D4', 'Z1'),
+                ('Z1', 'D2'),
+                ('Z1', 'D1'),
+                ('D2', 'X1'),
+                ('D1', 'X1')]
+
+def plot_2Qmetric(values, 
+                  ax, vmax=None, vmin=None, 
+                  colorbar=True, factor=1,
+                  metric='T1', units='$\mu s$', digit=2,
+                  **kw):
+	# Setup plot params
+    if vmax is None:
+        vmax = np.max([v for v in values.values() if v != None])*factor
+    if vmin is None:
+        vmin = np.min([v for v in values.values() if v != None])*factor
+    cmap = matplotlib.colors.ListedColormap(plt.cm.viridis.colors[::])
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    fig = ax.get_figure()
+    # Draw two-qubit patch
+    for pair in Qubit_pairs:
+        x1 , y1 = map_qubits[pair[0]]
+        x2 , y2 = map_qubits[pair[1]]
+        if not pair in values.keys():
+            _pair = (pair[1], pair[0])
+            if not _pair in values.keys():
+            	values[_pair] = None
+        else:
+        	_pair = pair
+        if values[_pair] is None:
+            if ((abs(x1-x2) == 0) and (abs(y1-y2) == 1)):
+                x, y = np.mean([x1, x2]), np.mean([y1, y2])
+                draw_tqg(x, y, ax, vertical=True, qubit_1=pair[0], qubit_2=pair[1],
+                         number=None, color=to_rgba('gray', .5), c_text='white')
+            elif ((abs(x1-x2) == 1) and (abs(y1-y2) == 0)):
+                x, y = np.mean([x1, x2]), np.mean([y1, y2])
+                draw_tqg(x, y, ax, vertical=False, qubit_1=pair[0], qubit_2=pair[1],
+                         number=None, color=to_rgba('gray', .5), c_text='white')
+        else:
+            c = cmap(norm(values[_pair]*factor))
+            if values[_pair]*factor > vmin+(vmax-vmin)/2 :
+                c_text = 'k'
+            else:
+                c_text = 'white'
+            if ((abs(x1-x2) == 0) and (abs(y1-y2) == 1)):
+                x, y = np.mean([x1, x2]), np.mean([y1, y2])
+                draw_tqg(x, y, ax, vertical=True, qubit_1=pair[0], qubit_2=pair[1],
+                         number=values[_pair]*factor, color=c, c_text=c_text, digit=digit)
+            elif ((abs(x1-x2) == 1) and (abs(y1-y2) == 0)):
+                x, y = np.mean([x1, x2]), np.mean([y1, y2])
+                draw_tqg(x, y, ax, vertical=False, qubit_1=pair[0], qubit_2=pair[1],
+                         number=values[_pair]*factor, color=c, c_text=c_text, digit=digit)
+    ax.set_xlim(-2.5, 2.5)
+    ax.set_ylim(-2.5, 2.5)
+    ax.axis('off')
+    if colorbar:
+        pos = ax.get_position()
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        cb = fig.colorbar(sm, label=f'{metric} ({units})')
+        ax.set_position([pos.x0-.15, pos.y0, pos.width, pos.height])
+    ax.patch.set_visible(False)
+    fig.patch.set_visible(False)
+
 class TwoQubitGBT_analysis(ba.BaseDataAnalysis):
 	"""
 	Analysis for Chevron routine
@@ -523,7 +750,26 @@ class TwoQubitGBT_analysis(ba.BaseDataAnalysis):
 				'n': _n,
 			}
 		n_plts = len(self.Qubit_pairs)
-		fig.suptitle(f'{self.timestamp}\nTwo-qubit gate performance', x=0.125+n_plts/2*0.775*1.3, y=1.35, size=18)
+		fig.suptitle(f'{self.timestamp}\nTwo-qubit gate performance', 
+			x=0.125+n_plts/2*0.775*1.3, y=1.35, size=18)
+		# Plot metric map
+		TQG_error = { (q0, q1) : self.raw_data_dict[(q0, q1)]['TQG_err'] \
+					  if (q0, q1) in self.raw_data_dict.keys() else None \
+					  for (q0, q1) in self.Qubit_pairs }
+		fig, ax = plt.subplots(figsize=(4, 4), dpi=200)
+		self.figs['Two_qubit_RB'] = fig
+		self.axs_dict['Two_qubit_RB'] = ax
+		# Plot single qubit gate error
+		self.plot_dicts['Two_qubit_RB']={
+			'plotfn': plot_2Qmetric,
+			'ax_id': 'Two_qubit_RB',
+			'values': TQG_error,
+			'metric': 'Two qubit gate error',
+			'units': '%',
+			'digit': 2,
+			'factor': 100
+		}
+		fig.suptitle(f'{self.timestamp}\n')
 
 	def run_post_extract(self):
 		self.prepare_plots()  # specify default plots

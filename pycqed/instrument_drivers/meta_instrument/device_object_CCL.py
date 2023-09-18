@@ -2337,6 +2337,7 @@ class DeviceCCL(Instrument):
         double_projections: bool = False,
         wait_time_flux: int = 0,
         update_FIRs: bool=False,
+        update_IIRs: bool=False,
         waveform_name: str = "square",
         max_delay=None,
         twoq_pair=[2, 0],
@@ -2371,8 +2372,9 @@ class DeviceCCL(Instrument):
                 calls self.prepare_for_timedomain on start
         """
         assert self.ro_acq_weight_type() == 'optimal'
-        if update_FIRs:
-            assert analyze==True, 'Analsis has to run for FIR update'
+        assert not (update_FIRs and update_IIRs), 'Can only either update IIRs or FIRs' 
+        if update_FIRs or update_IIRs:
+            assert analyze==True, 'Analsis has to run for filter update'
         if MC is None:
             MC = self.instr_MC.get_instr()
         if nested_MC is None:
@@ -2392,12 +2394,12 @@ class DeviceCCL(Instrument):
             Sw_functions = [swf.FLsweep(lutman, lutman.sq_length,
                             waveform_name="square") for lutman in Fl_lutmans]
             swfs = swf.multi_sweep_function(Sw_functions)
-            flux_cw = "fl_cw_06"
+            flux_cw = "sf_square"
         elif waveform_name == "custom_wf":
             Sw_functions = [swf.FLsweep(lutman, lutman.custom_wf_length, 
                             waveform_name="custom_wf") for lutman in Fl_lutmans]
             swfs = swf.multi_sweep_function(Sw_functions)
-            flux_cw = "fl_cw_05"
+            flux_cw = "sf_custom_wf"
         else:
             raise ValueError(
                 'waveform_name "{}" should be either '
@@ -2442,6 +2444,7 @@ class DeviceCCL(Instrument):
         if analyze:
             a = ma2.cv2.multi_qubit_cryoscope_analysis(
                 label='Cryoscope',
+                update_IIRs=update_IIRs,
                 update_FIRs=update_FIRs)
         if update_FIRs:
             for qubit, fltr in a.proc_data_dict['conv_filters'].items():
@@ -2449,7 +2452,25 @@ class DeviceCCL(Instrument):
                 filter_dict = {'params': {'weights': fltr},
                                'model': 'FIR', 'real-time': True }
                 lin_dist_kern.filter_model_04(filter_dict)
-
+        elif update_IIRs:
+            for qubit, fltr in a.proc_data_dict['exponential_filter'].items():
+                lin_dist_kern = self.find_instrument(f'lin_dist_kern_{qubit}')
+                filter_dict = {'params': fltr,
+                               'model': 'exponential', 'real-time': True }
+                if fltr['amp'] > 0:
+                    print('Amplitude of filter is positive (overfitting).')
+                    print('Filter not updated.')
+                    return True
+                else:
+                    # Check wich is the first empty exponential filter
+                    for i in range(4):
+                        _fltr = lin_dist_kern.get(f'filter_model_0{i}')
+                        if _fltr == {}:
+                            lin_dist_kern.set(f'filter_model_0{i}', filter_dict)
+                            return True
+                        else:
+                            print(f'filter_model_0{i} used.')
+                    print('All exponential filter tabs are full. Filter not updated.')
         return True
 
     def measure_cryoscope_vs_amp(
@@ -3484,13 +3505,16 @@ class DeviceCCL(Instrument):
         self._dag = dag
         return dag
 
-    def measure_multi_AllXY(self, qubits: list = None ,MC=None, 
+    def measure_multi_AllXY(self, qubits: list = None ,MC=None,
+                            prepare_for_timedomain: bool = True,
+                            disable_metadata: bool = False,
                             double_points =True,termination_opt=0.08):
 
         if qubits is None:
             qubits = self.qubits()
-        self.ro_acq_weight_type('optimal')
-        self.prepare_for_timedomain(qubits=qubits, bypass_flux=True)
+        if prepare_for_timedomain:
+            self.ro_acq_weight_type('optimal')
+            self.prepare_for_timedomain(qubits=qubits, bypass_flux=True)
 
         qubits_idx = []
         for q in qubits:
@@ -3510,7 +3534,8 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
-        MC.run('Multi_AllXY_'+'_'.join(qubits))
+        MC.run('Multi_AllXY_'+'_'.join(qubits),
+               disable_snapshot_metadata = disable_metadata)
         a = ma2.Multi_AllXY_Analysis()
 
         dev = 0
@@ -4759,6 +4784,7 @@ class DeviceCCL(Instrument):
         self.msmt_suffix = '_device'
         # MC.live_plot_enabled(True)
         # Run analysis
+        # if False:
         a = ma2.tqg.Park_frequency_sweep_analysis(
             label=label,
             qH=qH, qL=qL, qP=qP,
@@ -5066,6 +5092,100 @@ class DeviceCCL(Instrument):
             else:
                 param(0)
                 print(f'Reset {param.name} to 0%')
+
+    def calibrate_cz_pad_samples(
+        self,
+        Q_ramsey: str,
+        Q_control: str,
+        flux_cw: str = 'cz',
+        Sample_points: list = None,
+        downsample_angle_points: int = 1,
+        update: bool = True,
+        prepare_for_timedomain: bool = True,
+        disable_metadata: bool = False,
+        extract_only: bool = True):
+        """
+        Dont forget to write a description for this function.
+        """
+        assert self.ro_acq_weight_type().lower() == 'optimal'
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        # get gate directions of two-qubit gate codewords
+        directions = get_gate_directions(Q_ramsey, Q_control)
+        fl_lm = self.find_instrument(Q_control).instr_LutMan_Flux.get_instr()
+        fl_par = f'vcz_amp_pad_samples_{directions[1]}'
+        # Calculate sweep points
+        _sample_rate = fl_lm.sampling_rate()
+        _time_pad = fl_lm.get(f'vcz_time_pad_{directions[1]}')
+        max_samples = int(_time_pad*_sample_rate)
+        if Sample_points is None:
+            Sample_points = np.arange(1, max_samples)
+        # Prepare for timedomain
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=[Q_ramsey, Q_control])
+            for q in [Q_ramsey]:
+                mw_lm = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                mw_lm.set_default_lutmap()
+                mw_lm.load_phase_pulses_to_AWG_lookuptable()
+        # Wrapper function for parity check ramsey detector function.
+        def wrapper(Q_target, Q_control,
+                    flux_cw,
+                    downsample_angle_points,
+                    extract_only):
+            a = self.measure_parity_check_ramsey(
+                Q_target = [Q_target],
+                Q_control = [Q_control],
+                flux_cw_list = [flux_cw],
+                control_cases = None,
+                downsample_angle_points = downsample_angle_points,
+                prepare_for_timedomain = False,
+                pc_repetitions=1,
+                solve_for_phase_gate_model = False,
+                disable_metadata = True,
+                extract_only = extract_only)
+            pm = { f'Phase_model_{op}' : a['Phase_model'][Q_target][op]\
+                   for op in a['Phase_model'][Q_target].keys()}
+            mf = { f'missing_fraction_{q}' : a['Missing_fraction'][q]\
+                  for q in [Q_control] }
+            return { **pm, **mf} 
+        # n = len([Q_control])
+        # Operators = ['{:0{}b}'.format(i, n).replace('0','I').replace('1','Z')\
+        #              for i in range(2**n)]
+        Operators = ['I', 'Z']
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q_target' : Q_ramsey,
+                     'Q_control' : Q_control,
+                     'flux_cw': flux_cw,
+                     'downsample_angle_points': downsample_angle_points,
+                     'extract_only': extract_only},
+            result_keys=[f'Phase_model_{op}' for op in Operators]+\
+                        [f'missing_fraction_{Q_control}'],
+            value_names=[f'Phase_model_{op}' for op in Operators]+\
+                        [f'missing_fraction_{Q_control}'],
+            value_units=['deg' for op in Operators]+\
+                        ['fraction'])
+        nested_MC.set_detector_function(d)
+        # Set sweep function
+        swf1 = swf.flux_make_pulse_netzero(
+            flux_lutman = fl_lm,
+            wave_id = f'cz_{directions[1]}')
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(Sample_points)
+
+        MC.live_plot_enabled(False)
+        label = f'Pad_samples_calibration_{"_".join([Q_ramsey, Q_control])}'
+        nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
+        # Run analysis
+        a = ma2.Basic1DAnalysis(label=label)
+        # get minimum missing fraction
+        mf = a.raw_data_dict['measured_values_ord_dict'][f'missing_fraction_{Q_control}'][0]
+        sample_points = a.raw_data_dict['xvals'][0]
+        min_idx = np.argmin(mf)
+        opt_val = sample_points[min_idx]
+        if update:
+            fl_lm.set(f'vcz_amp_pad_samples_{directions[1]}', opt_val)
+        return a
 
     def measure_parity_check_fidelity(
         self,

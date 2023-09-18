@@ -2485,6 +2485,17 @@
             }
         },
         
+        "sf_custom_wf": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_custom_wf",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [7]
+            }
+        },
+        
         "sf_cz_aux": {
             "duration": @FLUX_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],

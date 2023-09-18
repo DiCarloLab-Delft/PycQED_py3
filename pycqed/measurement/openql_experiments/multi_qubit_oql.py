@@ -612,24 +612,27 @@ def Cryoscope(
 
     p = OqlProgram("Cryoscope", platf_cfg)
 
-    # FIXME: the variables created here are effectively unused
-    if cc.upper() == 'CCL':
-        flux_target = twoq_pair
-    elif cc.upper() == 'QCC' or cc.upper() == 'CC':
-        cw_idx = int(flux_cw[-2:])
-        flux_cw = 'sf_{}'.format(_def_lm_flux[cw_idx]['name'].lower())
-    else:
-        raise ValueError('CC type not understood: {}'.format(cc))
+    # # FIXME: the variables created here are effectively unused
+    # if cc.upper() == 'CCL':
+    #     flux_target = twoq_pair
+    # elif cc.upper() == 'QCC' or cc.upper() == 'CC':
+    #     cw_idx = int(flux_cw[-2:])
+    #     flux_cw = 'sf_{}'.format(_def_lm_flux[cw_idx]['name'].lower())
+    # else:
+    #     raise ValueError('CC type not understood: {}'.format(cc))
 
     k = p.create_kernel("RamZ_X")
     k.prepz(qubit_idxs[0])
     k.barrier([])  # alignment workaround
+    # for i in range(3):
+    #     k.gate(flux_cw, [qubit_idxs[0]])
+    # k.barrier([])
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
     k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
-        k.gate('sf_square', [q_idx])
+        k.gate(flux_cw, [q_idx])
     k.barrier([])  # alignment workaround
     k.gate('wait', [], wait_time_flux)
     for q_idx in qubit_idxs:
@@ -642,12 +645,15 @@ def Cryoscope(
     k = p.create_kernel("RamZ_Y")
     k.prepz(qubit_idxs[0])
     k.barrier([])  # alignment workaround
+    # for i in range(3):
+    #     k.gate(flux_cw, [qubit_idxs[0]])
+    # k.barrier([])
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
     k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
-        k.gate('sf_square', [q_idx])
+        k.gate(flux_cw, [q_idx])
     k.barrier([])  # alignment workaround
     k.gate('wait', [], wait_time_flux)
     for q_idx in qubit_idxs:
@@ -666,7 +672,7 @@ def Cryoscope(
         k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
-            k.gate('sf_square', [q_idx])
+            k.gate(flux_cw, [q_idx])
         k.barrier([])  # alignment workaround
         k.gate('wait', [], wait_time_flux)
         for q_idx in qubit_idxs:
@@ -684,7 +690,7 @@ def Cryoscope(
         k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
-            k.gate('sf_square', [q_idx])
+            k.gate(flux_cw, [q_idx])
         k.barrier([])  # alignment workaround
         k.gate('wait', [], wait_time_flux)
         for q_idx in qubit_idxs:
@@ -1493,6 +1499,8 @@ def conditional_oscillation_seq(
 
             k.barrier([])  # alignment workaround
 
+            k.gate('wait', [q0], 1000000)
+            k.barrier([])
             # #################################################################
             # Single qubit ** parallel ** gates before flux pulses
             # #################################################################

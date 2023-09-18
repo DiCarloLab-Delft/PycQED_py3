@@ -314,7 +314,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             unit="s",
             label="Parking pulse padding duration (single-sided)",
             initial_value=0,
-            vals=vals.Numbers(0, 20e-9),
+            vals=vals.Numbers(0, 100e-6),
             parameter_class=ManualParameter,
         )
         self.add_parameter(
@@ -814,11 +814,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         _coefs = self.q_polycoeffs_freq_01_det()
         return np.polyval(_coefs, _out_amp)
 
-
     #################################
     #  Waveform loading methods     #
     #################################
-
     def load_waveform_onto_AWG_lookuptable(
         self, wave_id: str, regenerate_waveforms: bool = False
         ):
@@ -902,8 +900,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Helper method to ensure waveforms have the desired length
         """
         length_samples = roundup1024(
-            int(self.sampling_rate() * self.cfg_max_wf_length())
-        )
+            int(self.sampling_rate() * self.cfg_max_wf_length()),
+            self.cfg_max_wf_length()
+            )
         extra_samples = length_samples - len(waveform)
         if extra_samples >= 0:
             y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
@@ -940,7 +939,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             distorted_waveform = k.distort_waveform(
                 waveform,
                 length_samples=int(
-                    roundup1024(self.cfg_max_wf_length() * self.sampling_rate())
+                    roundup1024(self.cfg_max_wf_length() * self.sampling_rate(),
+                    self.cfg_max_wf_length())
                 ),
                 inverse=inverse,
             )
@@ -956,7 +956,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     #################################
     #  Plotting methods            #
     #################################
-
     def plot_cz_trajectory(self, axs=None, show=True, which_gate="NE"):
         """
         Plots the cz trajectory in frequency space.
@@ -1431,7 +1430,8 @@ class LRU_Flux_LutMan(Base_Flux_LutMan):
         Helper method to ensure waveforms have the desired length
         """
         length_samples = roundup1024(
-            int(self.sampling_rate() * self.cfg_max_wf_length())
+            int(self.sampling_rate() * self.cfg_max_wf_length()),
+            self.cfg_max_wf_length()
         )
         extra_samples = length_samples - len(waveform)
         if extra_samples >= 0:
@@ -1503,5 +1503,6 @@ class LRU_Flux_LutMan(Base_Flux_LutMan):
 #########################################################################
 
 
-def roundup1024(n):
-    return int(np.ceil(n / 144) * 144)
+def roundup1024(n, waveform_length):
+    n_samples = int(waveform_length*2.4e9)
+    return int(np.ceil(n / n_samples) * n_samples)

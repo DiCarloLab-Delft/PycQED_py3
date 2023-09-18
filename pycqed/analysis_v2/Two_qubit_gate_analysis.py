@@ -2821,7 +2821,7 @@ def Asymmetry_sweep_plotfn(
     fig.tight_layout()
 
 
-def avoided_crossing_fit_func(x, alpha, J):
+def avoided_crossing_fit_func(x, J, alpha):
     x_rad = x*2*np.pi
     J_rad = J*2*np.pi
     alpha_rad = alpha*2*np.pi
@@ -2896,12 +2896,13 @@ class Park_frequency_sweep_analysis(ba.BaseDataAnalysis):
         _x = self.Parking_distances[30:]*1+0
         _y = Delta_phi_cond[30:]*1+0
         p0 = [600e6, 20e6, 20e6]
-        popt, pcov = curve_fit(avoided_crossing_fit_func, _x, _y,
-                               p0 = p0, bounds=([ _x[0],  5e6,  5e6],
-                                                [_x[-1], 50e6, 50e6]))
-        print(pcov)
-        print(popt)
-        # popt = p0
+        # popt, pcov = curve_fit(avoided_crossing_fit_func, _x, _y,
+        #                        p0 = p0, bounds=([ _x[0],  5e6,  5e6],
+        #                                         [_x[-1], 50e6, 50e6])
+        #                        )
+        # print(pcov)
+        # print(popt)
+        popt = p0
         self.proc_data_dict['popt'] = popt
         # Save data in processed data dict
         self.proc_data_dict['Phi'] = Phi
@@ -2982,8 +2983,8 @@ def park_sweep_plotfn(
     axs[2].set_xlabel(f'$\\Delta_\\mathrm{{{qH},{qP}}}$ (MHz)')
     axs[2].axhline(0, ls='--', color='k', lw=1, alpha=.25, zorder=10)
     # Plot of qH-qL conditional phase difference for different qP states
-    axs[1].plot(Parking_distances*1e-6, 
-                avoided_crossing_fit_func(Parking_distances, *popt), 'k--')
+    # axs[1].plot(Parking_distances*1e-6, 
+    #             avoided_crossing_fit_func(Parking_distances, *popt), 'k--')
     axs[1].plot(Parking_distances*1e-6, Delta_phi_cond, 'C0.')
     axs[1].set_ylim(-90, 90)
     axs[1].set_ylabel('$\\delta \\phi_\\mathrm{cond}}$ (deg)')
@@ -3056,12 +3057,13 @@ def vcz_waveform(sampling_rate,
                  amp_at_int_11_02,
                  norm_amp_fine,
                  amp_pad,
+                 amp_pad_samples,
                  asymmetry,
                  time_sqr,
                  time_middle,
                  time_pad,
                  use_asymmety,
-                 use_net_zero_pulse
+                 use_net_zero_pulse,
     ):
     '''
     Trace SNZ waveform.
@@ -3082,7 +3084,7 @@ def vcz_waveform(sampling_rate,
     # build padding part of waveform
     pad_amps = np.full(int(time_pad / dt), 0) + amp_pad*2
     for _i in range(len(pad_amps)):
-        if _i<12:
+        if _i<amp_pad_samples:
             pad_amps[_i] = 0
     # pad_amps = np.full(int(time_pad / dt), 0)
     sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
@@ -3182,6 +3184,7 @@ class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
                 param_spec[f'B_amp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_fine_{d}')
                 param_spec[f'asymmetry_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_asymmetry_{d}')
                 param_spec[f'amp_pad_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_pad_{d}')
+                param_spec[f'amp_pad_samples_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_pad_samples_{d}')
                 param_spec[f'use_asymmetry_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_use_asymmetric_amp_{d}')
                 param_spec[f'use_net_zero_pulse_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_use_net_zero_pulse_{d}')
                 # Durations
@@ -3207,6 +3210,7 @@ class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
             for d in ['NW', 'NE', 'SW', 'SE']:
                 data[q][f'amp_{d}'] = eval(data[q][f'amp_{d}'])
                 data[q][f'amp_pad_{d}'] = eval(data[q][f'amp_pad_{d}'])
+                data[q][f'amp_pad_samples_{d}'] = eval(data[q][f'amp_pad_samples_{d}'])
                 data[q][f'B_amp_{d}'] = eval(data[q][f'B_amp_{d}'])
                 data[q][f'asymmetry_{d}'] = eval(data[q][f'asymmetry_{d}'])
                 data[q][f'tp_{d}'] = eval(data[q][f'tp_{d}'])
@@ -3265,6 +3269,7 @@ class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
                     amp_at_int_11_02 = data[q][f'amp_{d}'],
                     norm_amp_fine = data[q][f'B_amp_{d}'],
                     amp_pad = data[q][f'amp_pad_{d}'],
+                    amp_pad_samples = data[q][f'amp_pad_samples_{d}'],
                     asymmetry = data[q][f'asymmetry_{d}'],
                     time_sqr = data[q][f'tp_{d}'],
                     time_middle = data[q][f'tmid_{d}'],

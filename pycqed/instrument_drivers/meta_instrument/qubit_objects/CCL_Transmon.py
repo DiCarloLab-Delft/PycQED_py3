@@ -7214,7 +7214,7 @@ class CCLight_Transmon(Qubit):
             fl_lutman.load_waveforms_onto_AWG_lookuptable()
         p = mqo.Cryoscope(
             qubit_idxs=[self.cfg_qubit_nr()],
-            flux_cw="fl_cw_06",
+            flux_cw="sf_square",
             wait_time_flux=wait_time_flux,
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC.get_instr().name,

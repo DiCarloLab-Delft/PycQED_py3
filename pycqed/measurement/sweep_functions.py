@@ -1085,6 +1085,44 @@ class flux_t_middle_sweep(Soft_Sweep):
         return val
 
 
+class flux_make_pulse_netzero(Soft_Sweep):
+
+    def __init__(self, 
+            flux_lutman, 
+            wave_id: str
+        ):
+        super().__init__()
+        self.name = 'amp_pad_samples'
+        self.parameter_name = 'amp_pad_samples'
+        self.unit = 'samples'
+        self.flux_lutman = flux_lutman
+        self.wave_id = wave_id
+
+    def set_parameter(self, val):
+        # Look for waveform
+        flux_lutman = self.flux_lutman
+        dirct = self.wave_id.split('_')[-1]
+        # generate unpadded waveform
+        flux_lutman.set(f'vcz_amp_pad_{dirct}', 0)
+        flux_lutman.generate_standard_waveforms()
+        wf = flux_lutman._wave_dict[self.wave_id]
+        flux_lutman.set(f'vcz_amp_pad_samples_{dirct}', val)
+        n_samples = val
+        # Set amplitude of padding to achieve net-zeroness
+        net_area = np.trapz(wf)*1/2.4e9
+        time_pad = (flux_lutman.get(f'vcz_time_pad_{dirct}') - n_samples/2.4e9)*2
+        amp_pad = -(net_area)/time_pad
+        # update parameters and upload waveforms
+        AWG = flux_lutman.AWG()
+        flux_lutman.find_instrument(AWG).stop()
+        # set flux lutman parameters of CZ qubits
+        flux_lutman.set(f'vcz_amp_pad_{dirct}', amp_pad)
+        flux_lutman.load_waveform_onto_AWG_lookuptable(
+                wave_id=self.wave_id, regenerate_waveforms=True)
+        flux_lutman.find_instrument(AWG).start()
+        return val
+
+
 class Nested_resonator_tracker(Soft_Sweep):
     """
     Sets a parameter and performs a "find_resonator_frequency" measurement

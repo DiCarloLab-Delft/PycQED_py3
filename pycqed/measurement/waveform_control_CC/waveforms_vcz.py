@@ -24,7 +24,7 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         "interaction point. NB: the units might be different for some "
         "other AWG that is distinct from the HDAWG.",
         parameter_class=ManualParameter,
-        vals=vals.Numbers(0.0, 10.0),
+        vals=vals.Numbers(-10.0, 10.0),
         initial_value=0.5,
         unit="a.u.",
         label="DAC amp. at the interaction point",
@@ -180,6 +180,15 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         unit="a.u.",
         label="Amplitude padded part of SNZ pulse.",
     )
+    this_flux_lm.add_parameter(
+        "vcz_amp_pad_samples_%s" % which_gate,
+        docstring="Nr of padded samples part of SNZ pulse",
+        parameter_class=ManualParameter,
+        vals=vals.Numbers(0, 200),
+        initial_value=12,
+        unit="nr of samples",
+        label="Nr of padded samples part of SNZ pulse.",
+    )
 
     # for specificity in ["coarse", "fine"]:
     #     this_flux_lm.add_parameter(
@@ -325,6 +334,7 @@ def vcz_waveform(
     # padding time at each side of the pulse, to fill to the cycle length
     time_pad = fluxlutman.get("vcz_time_pad_{}".format(which_gate))
     time_pad = time_pad * sampling_rate
+    n_pad_samples = fluxlutman.get("vcz_amp_pad_samples_{}".format(which_gate))
 
     # normalized to the amplitude at the CZ interaction point
     norm_amp_sq = fluxlutman.get("vcz_amp_sq_{}".format(which_gate))
@@ -341,11 +351,15 @@ def vcz_waveform(
 
     # Added pading amplitude by Jorge 22/08/2023
     pad_amp = fluxlutman.get("vcz_amp_pad_{}".format(which_gate))
-    pad_amps = np.full(int(time_pad / dt), 0) + pad_amp/amp_at_int_11_02
-    for _i in range(len(pad_amps)):
-        if _i<12:
-            pad_amps[_i] = 0
-    # pad_amps = np.full(int(time_pad / dt), 0)    
+    # Only add padding if amplitude is > 0
+    if abs(amp_at_int_11_02) > 1e-3:
+        pad_amps = np.full(int(time_pad / dt), 0) + pad_amp/amp_at_int_11_02
+        for _i in range(len(pad_amps)):
+            if _i<n_pad_samples:
+                pad_amps[_i] = 0
+    # If not, just add zero padding.
+    else:
+        pad_amps = np.full(int(time_pad / dt), 0)    
     sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
     amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)
 

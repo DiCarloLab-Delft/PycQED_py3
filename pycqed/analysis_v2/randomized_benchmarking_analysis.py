@@ -455,18 +455,18 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             fit_input_tag = val_name_I
 
             val_names = rdd["value_names"]
-            for i, val_name in enumerate(val_names):
-                self.plot_dicts["binned_data_{}".format(val_name)] = {
-                    "plotfn": self.plot_line,
-                    "xvals": rdd["bins"],
-                    "yvals": np.nanmean(rdd["binned_vals"][val_name], axis=1),
-                    "yerr": sem(rdd["binned_vals"][val_name], axis=1),
-                    "xlabel": "Number of Cliffords",
-                    "xunit": "#",
-                    "ylabel": val_name,
-                    "yunit": rdd["value_units"][i],
-                    "title": rdd["timestamp_string"] + "\n" + rdd["measurementstring"],
-                }
+            # for i, val_name in enumerate(val_names):
+                # self.plot_dicts["binned_data_{}".format(val_name)] = {
+                #     "plotfn": self.plot_line,
+                #     "xvals": rdd["bins"],
+                #     "yvals": np.nanmean(rdd["binned_vals"][val_name], axis=1),
+                #     "yerr": sem(rdd["binned_vals"][val_name], axis=1),
+                #     "xlabel": "Number of Cliffords",
+                #     "xunit": "#",
+                #     "ylabel": val_name,
+                #     "yunit": rdd["value_units"][i],
+                #     "title": rdd["timestamp_string"] + "\n" + rdd["measurementstring"],
+                # }
 
             fs = plt.rcParams["figure.figsize"]
 
@@ -496,72 +496,72 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                 "plotsize": (fs[0] * 1.5, fs[1]),
             }
 
-            num_cal_pnts = len(pdd["cal_triangle"])
-            fig_id_RB_on_IQ = "rb_on_iq_{}".format(val_name_I)
-            for ax_id in [fig_id_hex, fig_id_RB_on_IQ]:
-                self.plot_dicts[ax_id + "_cal_pnts"] = {
-                    "plotfn": self.plot_line,
-                    "ax_id": ax_id,
-                    "xvals": pdd["cal_triangle"].T[0].reshape(num_cal_pnts, 1),
-                    "yvals": pdd["cal_triangle"].T[1].reshape(num_cal_pnts, 1),
-                    "setlabel": [
-                        r"V$_{\left |" + str(i) + r"\right >}$"
-                        for i in range(num_cal_pnts)
-                    ],
-                    "marker": "d",
-                    "line_kws": {"markersize": 14, "markeredgecolor": "white"},
-                    "do_legend": True,
-                    # "legend_title": "Calibration points",
-                    "legend_ncol": 3,
-                    "linestyle": "",
-                }
+            # num_cal_pnts = len(pdd["cal_triangle"])
+            # fig_id_RB_on_IQ = "rb_on_iq_{}".format(val_name_I)
+            # for ax_id in [fig_id_hex, fig_id_RB_on_IQ]:
+            #     self.plot_dicts[ax_id + "_cal_pnts"] = {
+            #         "plotfn": self.plot_line,
+            #         "ax_id": ax_id,
+            #         "xvals": pdd["cal_triangle"].T[0].reshape(num_cal_pnts, 1),
+            #         "yvals": pdd["cal_triangle"].T[1].reshape(num_cal_pnts, 1),
+            #         "setlabel": [
+            #             r"V$_{\left |" + str(i) + r"\right >}$"
+            #             for i in range(num_cal_pnts)
+            #         ],
+            #         "marker": "d",
+            #         "line_kws": {"markersize": 14, "markeredgecolor": "white"},
+            #         "do_legend": True,
+            #         # "legend_title": "Calibration points",
+            #         "legend_ncol": 3,
+            #         "linestyle": "",
+            #     }
 
             # define figure and axes here to have custom layout
-            self.figs[fig_id_RB_on_IQ], axs = plt.subplots(
-                ncols=2, figsize=(fs[0] * 2.0, fs[1])
-            )
-            self.figs[fig_id_RB_on_IQ].patch.set_alpha(0)
-            self.axs[fig_id_RB_on_IQ] = axs[0]
-            fig_id_RB_on_IQ_det = fig_id_RB_on_IQ + "_detailed"
-            self.axs[fig_id_RB_on_IQ_det] = axs[1]
-            axs[1].yaxis.set_label_position("right")
-            axs[1].yaxis.tick_right()
+            # self.figs[fig_id_RB_on_IQ], axs = plt.subplots(
+            #     ncols=2, figsize=(fs[0] * 2.0, fs[1])
+            # )
+            # self.figs[fig_id_RB_on_IQ].patch.set_alpha(0)
+            # self.axs[fig_id_RB_on_IQ] = axs[0]
+            # fig_id_RB_on_IQ_det = fig_id_RB_on_IQ + "_detailed"
+            # self.axs[fig_id_RB_on_IQ_det] = axs[1]
+            # axs[1].yaxis.set_label_position("right")
+            # axs[1].yaxis.tick_right()
 
-            close_triangle = list(range(num_cal_pnts)) + [0]
-            self.plot_dicts[fig_id_RB_on_IQ] = {
-                "ax_id": fig_id_RB_on_IQ,
-                "plotfn": self.plot_line,
-                "xvals": pdd["cal_triangle"].T[0][close_triangle],
-                "yvals": pdd["cal_triangle"].T[1][close_triangle],
-                "xlabel": val_names[self.rates_I_quad_ch_idx],
-                "xunit": rdd["value_units"][0],
-                "ylabel": val_names[self.rates_Q_quad_ch_idx],
-                "yunit": rdd["value_units"][1],
-                "title": rdd["timestamp_string"]
-                + "\n"
-                + rdd["measurementstring"]
-                + " hexbin plot",
-                "marker": "",
-                "color": "black",
-                "line_kws": {"linewidth": 1},
-                "setlabel": "NONE",
-            }
+            # close_triangle = list(range(num_cal_pnts)) + [0]
+            # self.plot_dicts[fig_id_RB_on_IQ] = {
+            #     "ax_id": fig_id_RB_on_IQ,
+            #     "plotfn": self.plot_line,
+            #     "xvals": pdd["cal_triangle"].T[0][close_triangle],
+            #     "yvals": pdd["cal_triangle"].T[1][close_triangle],
+            #     "xlabel": val_names[self.rates_I_quad_ch_idx],
+            #     "xunit": rdd["value_units"][0],
+            #     "ylabel": val_names[self.rates_Q_quad_ch_idx],
+            #     "yunit": rdd["value_units"][1],
+            #     "title": rdd["timestamp_string"]
+            #     + "\n"
+            #     + rdd["measurementstring"]
+            #     + " hexbin plot",
+            #     "marker": "",
+            #     "color": "black",
+            #     "line_kws": {"linewidth": 1},
+            #     "setlabel": "NONE",
+            # }
 
-            self.plot_dicts[fig_id_RB_on_IQ_det] = {
-                "ax_id": fig_id_RB_on_IQ_det,
-                "plotfn": self.plot_line,
-                "xvals": pdd["cal_triangle"].T[0][:2],
-                "yvals": pdd["cal_triangle"].T[1][:2],
-                "xlabel": val_names[self.rates_I_quad_ch_idx],
-                "xunit": rdd["value_units"][0],
-                "ylabel": val_names[self.rates_Q_quad_ch_idx],
-                "yunit": rdd["value_units"][1],
-                "title": r"Detailed view",
-                "marker": "",
-                "color": "black",
-                "line_kws": {"linewidth": 1},
-                "setlabel": "NONE",
-            }
+            # self.plot_dicts[fig_id_RB_on_IQ_det] = {
+            #     "ax_id": fig_id_RB_on_IQ_det,
+            #     "plotfn": self.plot_line,
+            #     "xvals": pdd["cal_triangle"].T[0][:2],
+            #     "yvals": pdd["cal_triangle"].T[1][:2],
+            #     "xlabel": val_names[self.rates_I_quad_ch_idx],
+            #     "xunit": rdd["value_units"][0],
+            #     "ylabel": val_names[self.rates_Q_quad_ch_idx],
+            #     "yunit": rdd["value_units"][1],
+            #     "title": r"Detailed view",
+            #     "marker": "",
+            #     "color": "black",
+            #     "line_kws": {"linewidth": 1},
+            #     "setlabel": "NONE",
+            # }
 
             val_name_Q = rdd["value_names"][self.rates_Q_quad_ch_idx]
             rb_SI = (pdd["SI"][val_name_I], pdd["SI"][val_name_Q])
@@ -575,40 +575,40 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
             cols = ["royalblue", "dodgerblue", "red", "salmon"]
             mks = [8, 4, 8, 4]
-            for ax_id, do_legend in zip(
-                [fig_id_RB_on_IQ, fig_id_RB_on_IQ_det], [True, False]
-            ):
-                for S, col, mk_size, ID, label in zip(sigs, cols, mks, ids, labels):
-                    self.plot_dicts[ax_id + "_{}".format(ID)] = {
-                        "plotfn": self.plot_line,
-                        "ax_id": ax_id,
-                        "xvals": S[0],
-                        "yvals": S[1],
-                        "setlabel": label,
-                        "marker": "o",
-                        "line_kws": {"markersize": mk_size},
-                        "color": col,
-                        "do_legend": do_legend,
-                        "legend_ncol": 3,
-                        "linestyle": "",
-                    }
+            # for ax_id, do_legend in zip(
+            #     [fig_id_RB_on_IQ, fig_id_RB_on_IQ_det], [True, False]
+            # ):
+            #     for S, col, mk_size, ID, label in zip(sigs, cols, mks, ids, labels):
+            #         self.plot_dicts[ax_id + "_{}".format(ID)] = {
+            #             "plotfn": self.plot_line,
+            #             "ax_id": ax_id,
+            #             "xvals": S[0],
+            #             "yvals": S[1],
+            #             "setlabel": label,
+            #             "marker": "o",
+            #             "line_kws": {"markersize": mk_size},
+            #             "color": col,
+            #             "do_legend": do_legend,
+            #             "legend_ncol": 3,
+            #             "linestyle": "",
+            #         }
 
-            for idx in [self.rates_I_quad_ch_idx, self.rates_Q_quad_ch_idx]:
-                val_name = rdd["value_names"][idx]
-                self.plot_dicts["raw_RB_curve_data_{}".format(val_name)] = {
-                    "plotfn": plot_raw_RB_curve,
-                    "ncl": pdd["ncl"],
-                    "SI": pdd["SI"][val_name],
-                    "SX": pdd["SX"][val_name],
-                    "V0": pdd["V0"][val_name],
-                    "V1": pdd["V1"][val_name],
-                    "V2": pdd["V2"][val_name],
-                    "xlabel": "Number of Cliffords",
-                    "xunit": "#",
-                    "ylabel": val_name,
-                    "yunit": pdd["value_units"][idx],
-                    "title": pdd["timestamp_string"] + "\n" + pdd["measurementstring"],
-                }
+            # for idx in [self.rates_I_quad_ch_idx, self.rates_Q_quad_ch_idx]:
+            #     val_name = rdd["value_names"][idx]
+            #     self.plot_dicts["raw_RB_curve_data_{}".format(val_name)] = {
+            #         "plotfn": plot_raw_RB_curve,
+            #         "ncl": pdd["ncl"],
+            #         "SI": pdd["SI"][val_name],
+            #         "SX": pdd["SX"][val_name],
+            #         "V0": pdd["V0"][val_name],
+            #         "V1": pdd["V1"][val_name],
+            #         "V2": pdd["V2"][val_name],
+            #         "xlabel": "Number of Cliffords",
+            #         "xunit": "#",
+            #         "ylabel": val_name,
+            #         "yunit": pdd["value_units"][idx],
+            #         "title": pdd["timestamp_string"] + "\n" + pdd["measurementstring"],
+            #     }
 
             self.plot_dicts["rb_rate_eq_pops_{}".format(val_name_I)] = {
                 "plotfn": plot_populations_RB_curve,
