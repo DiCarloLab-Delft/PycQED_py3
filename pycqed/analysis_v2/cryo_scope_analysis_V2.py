@@ -190,7 +190,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
     def amp_to_freq(self, amp):
         return np.polyval(self.polycoeffs_freq_conv, amp)
 
-    def freq_to_amp(self, freq, positive_branch=True):
+    def freq_to_amp(self, freq, positive_branch=False): # HACKED hacked #True):
         return ct.freq_to_amp_root_parabola(freq,
                                             poly_coeffs=self.polycoeffs_freq_conv,
                                             positive_branch=positive_branch)

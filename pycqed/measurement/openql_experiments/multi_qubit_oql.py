@@ -624,8 +624,8 @@ def Cryoscope(
     k = p.create_kernel("RamZ_X")
     k.prepz(qubit_idxs[0])
     k.barrier([])  # alignment workaround
-    # for i in range(3):
-    #     k.gate(flux_cw, [qubit_idxs[0]])
+    # for i in range(20):
+    #     k.gate('sf_cz_sw', [qubit_idxs[0]])
     # k.barrier([])
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
@@ -702,6 +702,32 @@ def Cryoscope(
 
     p.compile()
     return p
+
+
+def Cryoscope_long(
+    qubit: int,
+    times_ns: list,
+    t_total_ns: int,
+    platf_cfg: str = None):
+    '''
+    Implements sequence for Spectrocopy type cryoscope.
+    '''
+    p = OqlProgram("Cryoscope_long", platf_cfg)
+    for t_ns in times_ns:
+        k = p.create_kernel(f"wait_time_{t_ns}ns")
+        # Preparation
+        k.prepz(qubit)
+        # In this routine, we want to trigger flux codeword 1
+        # as of the time of writting this, <sf_cz_ne> points to fl_cw 01
+        k.gate('sf_cz_ne', [qubit])
+        k.gate("wait", [qubit], t_ns)
+        k.gate('ry180', [qubit])
+        k.gate("wait", [qubit], t_total_ns-t_ns+1000)
+        k.measure(qubit)
+        p.add_kernel(k)
+    p.compile()
+    return p
+    
 
 # FIXME: not really used
 def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str) -> OqlProgram:
@@ -1756,6 +1782,11 @@ def conditional_oscillation_seq_multi(
                     if flux_codeword is 'cz':
                         for q0, q1 in zip(Q_idxs_target, Q_idxs_control):
                             k.gate(flux_codeword, [q0, q1])
+                    elif flux_codeword is 'sf_square':
+                        for q0, q1 in zip(Q_idxs_target, Q_idxs_control):
+                            k.gate(flux_codeword, [q0])
+                        for q in Q_idxs_parked:
+                            k.gate('sf_park', [q])
                     else:
                         k.gate(flux_codeword, [0])
                         # k.gate('sf_cz_ne', [3])

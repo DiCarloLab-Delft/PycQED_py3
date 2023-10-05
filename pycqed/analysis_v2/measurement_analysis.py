@@ -106,6 +106,8 @@ from pycqed.analysis_v2.syndrome_analysis import (
 from pycqed.analysis_v2.cryo_scope_analysis import RamZFluxArc, \
     SlidingPulses_Analysis, Cryoscope_Analysis
 
+import pycqed.analysis_v2.cryo_scope_analysis_V2
+reload(pycqed.analysis_v2.cryo_scope_analysis_V2)
 from pycqed.analysis_v2.cryo_scope_analysis_V2 import RamZFluxArc, \
     SlidingPulses_Analysis, Cryoscope_Analysis
 

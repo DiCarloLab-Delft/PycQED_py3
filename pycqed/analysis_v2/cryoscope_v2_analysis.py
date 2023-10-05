@@ -10,6 +10,7 @@ from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 import pycqed.analysis_v2.base_analysis as ba
+from pycqed.utilities.general import print_exception
 import pycqed.measurement.hdf5_data as hd5
 from collections import OrderedDict
 from uncertainties import ufloat
@@ -737,7 +738,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                  extract_only: bool = False,
                  auto=True,
                  poly_params: dict = None,
-                 derivative_window_length: float=5e-9,
+                 derivative_window_length: float=3e-9,
                 ):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
@@ -865,7 +866,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                 Times = self.proc_data_dict['time']
                 Trace = self.proc_data_dict['Traces'][i]
                 # Look at signal after 50 ns
-                initial_idx = np.argmin(np.abs(Times-50e-9))
+                initial_idx = np.argmin(np.abs(Times-20e-9))
                 Times = Times[initial_idx:]
                 Trace = Trace[initial_idx:]
                 # Fit exponential to trace
@@ -900,7 +901,7 @@ def optimize_fir_software(y, baseline_start=100,
         yc = signal.lfilter(x, 1, y)
         return np.mean(np.abs(yc[1+start_sample:stop_sample] - baseline))/np.abs(baseline)
     return cma.fmin2(objective_function_fir, x0, cma_target,
-                     options={'ftarget':5e-4, 'maxfevals': 1e5})[0]
+                     options={'ftarget':1e-4, 'maxfevals': 2e5})[0]
 
 def plot_cryoscope_trace(trace, 
                          time, 
@@ -1153,7 +1154,7 @@ def Voltage_arc_plotfn(
     timestamp,
     ax, **kw):
     fig = ax.get_figure()
-    _Amps = np.linspace(Amps[0]*1.1, Amps[-1]*1.1)
+    _Amps = np.linspace(np.min(Amps)*1.1, np.max(Amps)*1.1)
     Arc = np.poly1d(P_coefs)
     ax.plot(_Amps, Arc(_Amps)*1e-6, 'C0-')
     ax.plot(Amps, Freqs*1e-6, 'C3.')
@@ -1200,9 +1201,11 @@ class Cryoscope_long_analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['timestamps'] = self.timestamps
         self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
         # Extrac poly coefficients of flux arc
-        self.qubit = self.raw_data_dict['folder'].split('_')[-1]
+        self.qubit = self.raw_data_dict['folder'].split('_')[-2]
         data_params = {'polycoeff': (f'Instrument settings/flux_lm_{self.qubit}', 
                                            'attr:q_polycoeffs_freq_01_det'),
+                       'sq_amp': (f'Instrument settings/flux_lm_{self.qubit}', 
+                                           'attr:sq_amp'),
                        'frequency': (f'Instrument settings/{self.qubit}', 
                                            'attr:freq_qubit'),
                        'freq_mod': (f'Instrument settings/{self.qubit}', 
@@ -1212,6 +1215,7 @@ class Cryoscope_long_analysis(ba.BaseDataAnalysis):
                             _dict['polycoeff'][1:-1].split(' ') if n != '' ]
         self.frequency = eval(_dict['frequency'])
         self.freq_mod = eval(_dict['freq_mod'])
+        self.sq_amp = eval(_dict['sq_amp'])
 
     def process_data(self):
         # Sort time axis
@@ -1240,7 +1244,7 @@ class Cryoscope_long_analysis(ba.BaseDataAnalysis):
         for i in range(n_time):
             _x = Frequencies
             _y = Data[:,i]
-            p0 = [np.mean(_x)-np.std(Frequencies)/2, np.std(Frequencies)/2, 0, np.max(_y), np.min(_y)]
+            p0 = [_x[np.argmax(_y)], np.std(Frequencies)/2, 0, np.max(_y), np.min(_y)]
             popt, pcov = curve_fit(skewed_gauss, _x, _y, p0=p0)
             # Get maximum of function
             _xx = np.linspace(Frequencies[0], Frequencies[-1], 201)
@@ -1249,14 +1253,31 @@ class Cryoscope_long_analysis(ba.BaseDataAnalysis):
             # Convert frequency into voltage output
             detuning = self.frequency-Center_freqs[i]
             flux_arc = np.poly1d(self.poly_coeffs)
-            Voltage[i] = max((flux_arc-detuning).roots)
+            # Calculate corresponding voltage corresponding to detuning
+            if self.sq_amp > 0:
+                # Choose positive voltage
+                Voltage[i] = max((flux_arc-detuning).roots)
+            else:
+                # Choose negative voltage
+                Voltage[i] = min((flux_arc-detuning).roots)
         # Trace = Voltage/np.mean(Voltage[-6:])
-        Trace = Voltage/np.mean(Voltage[:20])
+        Trace = Voltage/np.mean(Voltage[-1:])
         # Fit exponential to trace
         if self.update_IIR:
-            p0 = [-.001, 500e-9, 1]
-            p0 = [+.001, 10e-6, 1]
-            popt, pcov = curve_fit(filter_func, Time[2:]*1e-9, Trace[2:], p0=p0)
+            try:
+                p0 = [-.01, 100e-9, 1.0085]
+                popt, pcov = curve_fit(filter_func, Time[:]*1e-9, Trace[:], p0=p0)
+            except:
+                print_exception()
+                print('Fit failed. Trying new initial guess')
+                p0 = [-.01, 2e-6, 1.003]
+                # try:
+                popt, pcov = curve_fit(filter_func, Time[6:]*1e-9, Trace[6:], p0=p0)
+                print('Fit converged!')
+                # except:
+                #     print_exception()
+                #     popt=p0
+                #     print('Fit failed')
             filtr = {'amp': popt[0], 'tau': popt[1]}
             self.proc_data_dict['filter_pars'] = popt
             self.proc_data_dict['exponential_filter'] = filtr
@@ -1318,8 +1339,10 @@ def Cryoscope_long_plotfn(Time,
     # Spectroscopy plot
     if Time[-1] > 2000:
         _Time = Time/1e3
+    else:
+        _Time = Time
     ax.pcolormesh(_Time, Frequencies*1e-9, Data, shading='nearest')
-    ax.plot(_Time, Center_freqs*1e-9, '.C3')
+    ax.plot(_Time, Center_freqs*1e-9, 'w-', lw=1)
     axt = ax.twinx()
     _lim = ax.get_ylim()
     _lim = (qubit_freq*1e-9-np.array(_lim))*1e3

@@ -190,6 +190,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             length=self.sq_length(),
             sampling_rate=self.sampling_rate(),
             delay=self.sq_delay(),
+            gauss_sigma=self.sq_gauss_sigma(),
         )
 
     def _gen_park(self):
@@ -356,6 +357,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             "sq_delay",
             unit="s",
             label="Square pulse delay",
+            initial_value=0e-9,
+            vals=vals.Numbers(0, 100e-6),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "sq_gauss_sigma",
+            unit="s",
+            label="Sigma for gaussian filter",
             initial_value=0e-9,
             vals=vals.Numbers(0, 100e-6),
             parameter_class=ManualParameter,

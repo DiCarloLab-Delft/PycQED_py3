@@ -2153,6 +2153,7 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
                  tmid: float = None,
                  Q0_freq:float = None,
                  Q_parks: str = None,
+                 l1_coef: float = 1,
                  t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
@@ -2177,6 +2178,7 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
         self.Q0_freq = Q0_freq
         self.tmid = tmid
         self.asymmetry = asymmetry
+        self.l1_coef = l1_coef
         if auto:
             self.run_analysis()
 
@@ -2223,7 +2225,7 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
         for i, q0 in enumerate(self.Q0):
             CP = self.raw_data_dict['data'][:,2*i+2].reshape(ny, nx)
             MF = self.raw_data_dict['data'][:,2*i+3].reshape(ny, nx)
-            CF = cost_function(CP, MF)
+            CF = cost_function(CP, MF, l1_coef=self.l1_coef)
             # Find minimum of cost function
             idxs_min = np.unravel_index(np.argmin(CF), CF.shape)
             A_min, B_min = Amps_list[i][idxs_min[1]], Bamps[idxs_min[0]]
@@ -2239,33 +2241,33 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
             self.qoi[f'Gate_perf_{q0}'] = CP_min, L1_min
         # Fit SNZ landscapes using SNZ 
         # landscape parametrization
-        if self.Poly_coefs:
-            for i, q0 in enumerate(self.Q0):
-                # Define fit function
-                from scipy.optimize import curve_fit
-                def fit_func(xy, tp_factor, tmid, g, delta_0, det11_02, n_dist, a, b):
-                    '''
-                    Fit function helper for SNZ gate landscape.
-                    '''
-                    delta, bamp = xy
-                    tp = tp_factor/(4*g)
-                    pop20, pop11, cphase = SNZ2(delta, tmid, tp, g, delta_0, det11_02, n_dist, B_amp=bamp)
-                    outcome = a*pop20 + b
-                    return outcome.ravel()
-                # sort fit data
-                _detunings = self.proc_data_dict['Detunings'][i]
-                _Bamps = self.proc_data_dict['Bamps']
-                x, y = np.meshgrid(_detunings, _Bamps)
-                # Multiply missing fraction by two to get population.
-                z = 2*self.proc_data_dict[f'MF_{i}']
-                # initial fit guess
-                #    tp_factor,      tmid,    g,            delta_0,              det_11_02, n_dist,   a,   b
-                p0 = [       1, self.tmid, 12e6, np.mean(Detunings), np.mean(Detunings)*1.1,     .5,   1,   0]
-                bounds = ((0.9,         0, 10e6,                  0,                      0,      0, 0.1, -.1),
-                          (1.1,  12/2.4e9, 13e6,             np.inf,                 np.inf,      2, 1.1,  .1))
-                popt, pcov = curve_fit(fit_func, (x,y), z.ravel(), p0=p0, bounds=bounds)
-                self.proc_data_dict[f'Fit_params_{i}'] = popt
-                self.qoi[f'tp_factor_{i}'] = popt[0]
+        # if self.Poly_coefs:
+        #     for i, q0 in enumerate(self.Q0):
+        #         # Define fit function
+        #         from scipy.optimize import curve_fit
+        #         def fit_func(xy, tp_factor, tmid, g, delta_0, det11_02, n_dist, a, b):
+        #             '''
+        #             Fit function helper for SNZ gate landscape.
+        #             '''
+        #             delta, bamp = xy
+        #             tp = tp_factor/(4*g)
+        #             pop20, pop11, cphase = SNZ2(delta, tmid, tp, g, delta_0, det11_02, n_dist, B_amp=bamp)
+        #             outcome = a*pop20 + b
+        #             return outcome.ravel()
+        #         # sort fit data
+        #         _detunings = self.proc_data_dict['Detunings'][i]
+        #         _Bamps = self.proc_data_dict['Bamps']
+        #         x, y = np.meshgrid(_detunings, _Bamps)
+        #         # Multiply missing fraction by two to get population.
+        #         z = 2*self.proc_data_dict[f'MF_{i}']
+        #         # initial fit guess
+        #         #    tp_factor,      tmid,    g,            delta_0,              det_11_02, n_dist,   a,   b
+        #         p0 = [       1, self.tmid, 12e6, np.mean(Detunings), np.mean(Detunings)*1.1,     .5,   1,   0]
+        #         bounds = ((0.9,         0, 10e6,                  0,                      0,      0, 0.1, -.1),
+        #                   (1.1,  12/2.4e9, 13e6,             np.inf,                 np.inf,      2, 1.1,  .1))
+        #         popt, pcov = curve_fit(fit_func, (x,y), z.ravel(), p0=p0, bounds=bounds)
+        #         self.proc_data_dict[f'Fit_params_{i}'] = popt
+        #         self.qoi[f'tp_factor_{i}'] = popt[0]
 
     def prepare_plots(self):
         self.axs_dict = {}
@@ -2328,8 +2330,8 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
                          else None,
                 'opt' : (self.qoi[f'Optimal_det_{q0}'], self.qoi[f'Optimal_amps_{q0}'][1])\
                         if self.Poly_coefs else self.qoi[f'Optimal_amps_{q0}'],
-                'fit_params' : self.proc_data_dict[f'Fit_params_{i}'] if self.Poly_coefs\
-                               else None,
+                # 'fit_params' : self.proc_data_dict[f'Fit_params_{i}'] if self.Poly_coefs\
+                #                else None,
                 }
 
             self.figs[f'VCZ_Leakage_contour_{q0}_{self.Q1[i]}'] = plt.figure(figsize=(9,4), dpi=100)

@@ -421,6 +421,10 @@
         // "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_cz_sw q9","sf_park q4", "barrier q9, q5, q4"],
         "cz q9, q5": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_cz_sw q9","sf_park q4", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
         "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_cz_sw q9","sf_park q4", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
+        // "cz q9, q5": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_square q9","sf_park q4", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
+        // "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_square q9","sf_park q4", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
+        // "cz q9, q5": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_square q9", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
+        // "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_square q9", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
         // Edge 1/25
         // "cz q9, q4": ["barrier q9, q4, q5", "sf_cz_nw q4", "sf_cz_se q9","sf_park q5", "barrier q9, q4, q5"],
         // "cz q4, q9": ["barrier q9, q4, q5", "sf_cz_nw q4", "sf_cz_se q9","sf_park q5", "barrier q9, q4, q5"],
@@ -446,6 +450,8 @@
         // "cz q3, q1": ["barrier q1, q3, q5", "sf_cz_nw q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5"],
         "cz q1, q3": ["barrier q1, q3, q5", "sf_cz_nw q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5", "update_ph_nw q3", "update_ph_se q1", "barrier q1, q3, q5"],
         "cz q3, q1": ["barrier q1, q3, q5", "sf_cz_nw q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5", "update_ph_nw q3", "update_ph_se q1", "barrier q1, q3, q5"],
+        // "cz q1, q3": ["barrier q1, q3, q5", "sf_square q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5", "update_ph_nw q3", "update_ph_se q1", "barrier q1, q3, q5"],
+        // "cz q3, q1": ["barrier q1, q3, q5", "sf_square q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5", "update_ph_nw q3", "update_ph_se q1", "barrier q1, q3, q5"],
         // Edge 4/28
         // "cz q3, q5": ["barrier q3, q5, q1", "sf_cz_ne q3", "sf_cz_sw q5","sf_park q1", "barrier q3, q5, q1"],
         // "cz q5, q3": ["barrier q3, q5, q1", "sf_cz_ne q5", "sf_cz_sw q3","sf_park q1", "barrier q3, q5, q1"],

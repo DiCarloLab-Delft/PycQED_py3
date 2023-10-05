@@ -2473,6 +2473,264 @@ class DeviceCCL(Instrument):
                     print('All exponential filter tabs are full. Filter not updated.')
         return True
 
+    def measure_cryoscope_long(
+        self,
+        qubit: str,
+        times: list,
+        frequencies: list,
+        MC = None,
+        nested_MC = None,
+        analyze: bool = True,
+        update_IIRs: bool = False,
+        prepare_for_timedomain: bool = True,
+        ):
+        """
+        Performs a cryoscope experiment to measure the shape of a flux pulse.
+        This long version of cryoscope, uses a spectroscopy type experiment to
+        probe the frequency of the qubit for pulses longer than those allowed
+        by conventional ramsey measurements:
+                   t     __                 _____________
+        MW  :  |<----->_/  \_              |             |
+                ________________________   | Measurement |    
+        Flux: _|                        |_ |_____________|
+
+        Args:
+            qubit  (list):
+                target qubit
+
+            times   (array):
+                array of measurment times
+
+            prepare_for_timedomain (bool):
+                calls self.prepare_for_timedomain on start
+        """
+        assert self.ro_acq_weight_type() == 'optimal'
+        assert self.ro_acq_digitized() == True
+        if update_IIRs:
+            assert analyze
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+        # Setup sweep times of experiment
+        max_length = np.max(times) + 200e-9
+        Times_ns = times*1e9
+        # Get instruments
+        Q_inst = self.find_instrument(qubit)
+        flux_lm = Q_inst.instr_LutMan_Flux.get_instr()
+        HDAWG_inst = flux_lm.AWG.get_instr()
+        MW_LO_inst = Q_inst.instr_LO_mw.get_instr()
+        # Save previous operating parameters
+        LO_frequency = MW_LO_inst.frequency()
+        mw_gauss_width = Q_inst.mw_gauss_width() 
+        mw_channel_amp = Q_inst.mw_channel_amp()
+        cfg_max_length = flux_lm.cfg_max_wf_length()
+        # For spectroscopy, we'll use a 80 ns qubit pi pulse.
+        # (we increase the duration of the pulse to probe 
+        # a narrower frequency spectrum)
+        Q_inst.mw_gauss_width(20e-9)
+        Q_inst.mw_channel_amp(mw_channel_amp/2*1.3)
+        # Prepare for the experiment:
+        # Additional to the normal qubit preparation, this requires
+        # changing the driver of the HDAWG to allow for longer flux
+        # pulses without running out of memory. To do this, we hack
+        # the HDAWG by changing a method of the ZIHDAWG class at 
+        # runtime. THEREFORE THIS ROUTINE MUST BE USED CAUTIOUSLY. 
+        # MAKING SURE THAT THE METHOD OF CLASS IS RESET AT THE END 
+        # OF THE ROUTINE IS NECESSARY FOR THE HDAWG TO WORK NORMALLY
+        # AFTER COMPLETION!!!
+        if prepare_for_timedomain:
+            # HACK HDAWG to upload long square pulses
+            from functools import partial
+            import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
+            # Define new waveform table method
+            def _get_waveform_table_new(self, awg_nr: int):
+                '''
+                Replaces the "_get_waveform_table" method of the HDAWG
+                '''
+                ch = awg_nr*2
+                wf_table = []
+                if 'flux' in self.cfg_codeword_protocol():
+                    for cw_r in range(1):
+                        for cw_l in range(1):
+                            wf_table.append((zibase.gen_waveform_name(ch, cw_l),
+                                             zibase.gen_waveform_name(ch+1, cw_r)))
+                    
+                    is_odd_channel = flux_lm.cfg_awg_channel()%2
+                    if is_odd_channel: 
+                        for cw_r in range(1):
+                            for cw_l in range(1,2):
+                                wf_table.append((zibase.gen_waveform_name(ch, cw_l),
+                                                 zibase.gen_waveform_name(ch+1, cw_r)))
+                    else:
+                        for cw_r in range(1,2):
+                            for cw_l in range(1):
+                                wf_table.append((zibase.gen_waveform_name(ch, cw_l),
+                                                 zibase.gen_waveform_name(ch+1, cw_r)))
+                print('WARNING THIS HDAWG IS HACKED!!!!')
+                print(wf_table)
+                return wf_table
+            # Store old method
+            HDAWG_inst._original_method = HDAWG_inst._get_waveform_table
+            # Replace to new method
+            HDAWG_inst._get_waveform_table = partial(_get_waveform_table_new,
+                                                     HDAWG_inst)
+            # Define new codeword table method
+            def _codeword_table_preamble_new(self, awg_nr):
+                """
+                Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
+                The generated code depends on the instrument type. For the HDAWG instruments, we use the seWaveDIO
+                function.
+                """
+                program = ''
+
+                wf_table = self._get_waveform_table(awg_nr=awg_nr)
+                is_odd_channel = flux_lm.cfg_awg_channel()%2 #this only works if wf_table has a length of 2 
+                if is_odd_channel:
+                    dio_cws = [0, 1]
+                else:
+                    dio_cws = [0, 8]
+                # for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
+                # Assuming wf_table looks like this: [('wave_ch7_cw000', 'wave_ch8_cw000'), ('wave_ch7_cw000', 'wave_ch8_cw001')]
+                for dio_cw, (wf_l, wf_r) in zip(dio_cws, wf_table):# hardcoded for long cryoscope on even awg channels
+                    csvname_l = self.devname + '_' + wf_l
+                    csvname_r = self.devname + '_' + wf_r
+
+                    # FIXME: Unfortunately, 'static' here also refers to configuration required for flux HDAWG8
+                    if self.cfg_sideband_mode() == 'static' or self.cfg_codeword_protocol() == 'flux':
+                        # program += 'assignWaveIndex(\"{}\", \"{}\", {});\n'.format(
+                        #     csvname_l, csvname_r, dio_cw)
+                        program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
+                            dio_cw, csvname_l, csvname_r)
+                    elif self.cfg_sideband_mode() == 'real-time' and self.cfg_codeword_protocol() == 'novsm_microwave':
+                        # program += 'setWaveDIO({}, 1, 2, \"{}\", 1, 2, \"{}\");\n'.format(
+                        #     dio_cw, csvname_l, csvname_r)
+                        program += 'assignWaveIndex(1, 2, \"{}\", 1, 2, \"{}\", {});\n'.format(
+                            csvname_l, csvname_r, dio_cw)
+                    else:
+                        raise Exception("Unknown modulation type '{}' and codeword protocol '{}'" \
+                                            .format(self.cfg_sideband_mode(), self.cfg_codeword_protocol()))
+
+                if self.cfg_sideband_mode() == 'real-time':
+                    program += '// Initialize the phase of the oscillators\n'
+                    program += 'executeTableEntry(1023);\n'
+                return program
+            # Store old method
+            HDAWG_inst._original_codeword_method = HDAWG_inst._codeword_table_preamble
+            # Replace to new method
+            HDAWG_inst._codeword_table_preamble = partial(_codeword_table_preamble_new,
+                                                     HDAWG_inst)
+            # Prepare flux pulse
+            flux_lm.sq_length(max_length)
+            flux_lm.cfg_max_wf_length(max_length)
+            # Change LutMap accordingly to only upload one waveform
+            flux_lm.LutMap({0: {'name': 'i', 'type': 'idle'}, # idle always required
+                            1: {'name': 'square', 'type': 'square'}})
+            try:
+                # Load flux waveform
+                flux_lm.AWG.get_instr().stop()
+                flux_lm.load_waveform_onto_AWG_lookuptable(regenerate_waveforms=True, wave_id='square')
+                flux_lm.cfg_awg_channel_amplitude()
+                flux_lm.cfg_awg_channel_range()
+                flux_lm.AWG.get_instr().start()
+                self.prepare_for_timedomain(qubits=[qubit])
+                Q_inst.prepare_readout()
+            except:
+                print_exception()
+                print('Execution failed. Reseting HDAWG and flux lutman...')
+                # Reset old method in HDAWG
+                if prepare_for_timedomain:
+                    # HDAWG_inst._get_waveform_table = partial(HDAWG_inst._original_method, HDAWG_inst)
+                    HDAWG_inst._get_waveform_table = HDAWG_inst._original_method
+                    HDAWG_inst._codeword_table_preamble = HDAWG_inst._original_codeword_method
+                    del HDAWG_inst._original_method
+                    del HDAWG_inst._original_codeword_method
+                # Reset mw settings
+                MW_LO_inst.frequency(LO_frequency)
+                Q_inst.mw_gauss_width(mw_gauss_width)
+                Q_inst.mw_channel_amp(mw_channel_amp)
+                # Reset flux settings
+                flux_lm.sq_length(20e-9)
+                flux_lm.cfg_max_wf_length(cfg_max_length)
+                HDAWG_inst.reset_waveforms_zeros()
+                for i in range(4):
+                    HDAWG_inst._clear_dirty_waveforms(i)
+                flux_lm.set_default_lutmap()
+                flux_lm.load_waveforms_onto_AWG_lookuptable()
+                # Raise error
+                raise RuntimeError('Preparation failed.')
+        # Compile experiment sequence
+        p = mqo.Cryoscope_long(
+            qubit = Q_inst.cfg_qubit_nr(),
+            times_ns = Times_ns,
+            t_total_ns=max_length*1e9,
+            platf_cfg = Q_inst.cfg_openql_platform_fn())
+        # Sweep functions
+        d = Q_inst.int_avg_det
+        # d = self.get_int_avg_det(qubits=[qubit]) # this should be the right detector
+        swf1 = swf.OpenQL_Sweep(openql_program=p,
+                     CCL=self.instr_CC.get_instr())
+        swf2 = MW_LO_inst.frequency
+        sweep_freqs = frequencies-Q_inst.mw_freq_mod()
+        # Setup measurement control
+        MC.soft_avg(1)
+        MC.live_plot_enabled(True)
+        MC.set_sweep_function(swf1)
+        MC.set_sweep_function_2D(swf2)
+        MC.set_sweep_points(Times_ns)
+        MC.set_sweep_points_2D(sweep_freqs)
+        MC.set_detector_function(d)
+        try:
+            label = f"Cryoscope_long_{Q_inst.name}"
+            _max_length = max_length - 200e-9
+            if _max_length > 1e-6:
+                label += f"_{_max_length*1e6:.0f}us"
+            else:
+                label += f"_{_max_length*1e9:.0f}ns"
+            # Analysis relies on snapshot
+            MC.run(label, mode='2D',
+                    disable_snapshot_metadata=False)
+        except:
+            analyze = False
+            print_exception()
+        print('Reseting HDAWG and flux lutman...')
+        # Reset operating parameters
+        MW_LO_inst.frequency(LO_frequency)
+        Q_inst.mw_gauss_width(mw_gauss_width)
+        Q_inst.mw_channel_amp(mw_channel_amp)
+        # Reset old method in HDAWG
+        if prepare_for_timedomain:
+            # HDAWG_inst._get_waveform_table = partial(HDAWG_inst._original_method, HDAWG_inst)
+            HDAWG_inst._get_waveform_table = HDAWG_inst._original_method
+            HDAWG_inst._codeword_table_preamble = HDAWG_inst._original_codeword_method
+            del HDAWG_inst._original_method
+            del HDAWG_inst._original_codeword_method
+        # Reset flux settings
+        flux_lm.sq_length(20e-9)
+        flux_lm.cfg_max_wf_length(cfg_max_length)
+        HDAWG_inst.reset_waveforms_zeros()
+        for i in range(4):
+            HDAWG_inst._clear_dirty_waveforms(i)
+        flux_lm.set_default_lutmap()
+        flux_lm.load_waveforms_onto_AWG_lookuptable()
+        # Run analysis
+        if analyze:
+            a = ma2.cv2.Cryoscope_long_analysis(update_IIR=update_IIRs)
+            if update_IIRs:
+                lin_dist_kern = flux_lm.instr_distortion_kernel.get_instr()
+                filtr = {'params': a.proc_data_dict['exponential_filter'],
+                         'model': 'exponential', 'real-time': True }
+                # Check wich is the first empty exponential filter
+                for i in [0,1,2,3,5,6,7,8]:
+                    _fltr = lin_dist_kern.get(f'filter_model_0{i}')
+                    if _fltr == {}:
+                        lin_dist_kern.set(f'filter_model_0{i}', filtr)
+                        return True
+                    else:
+                        print(f'filter_model_0{i} used.')
+                print('All exponential filter tabs are full. Filter not updated.')
+        return True
+
     def measure_cryoscope_vs_amp(
         self,
         q0: str,
@@ -4388,6 +4646,128 @@ class DeviceCCL(Instrument):
                 _set_amps_11_02(Amps_11_02[i], Flux_lm_0[i])
                 Flux_lm_0[i].set(f'vcz_amp_fine_{directions[i][0]}', Opt_Bvals[i])
                 Flux_lm_0[i].set(f'park_amp', Amps_park[i])
+        return a.qoi
+
+    def measure_unipolar_A_t_landscape(
+        self, 
+        Q0, Q1,
+        A_ranges,
+        A_points: int,
+        times: list,
+        Q_parks: list = None,
+        update_flux_params: bool = False,
+        flux_codeword: str = 'sf_square',
+        prepare_for_timedomain: bool = True,
+        disable_metadata: bool = False):
+        """
+        Perform 2D sweep of amplitude and wave parameter while measuring 
+        conditional phase and missing fraction via the "conditional 
+        oscillation" experiment.
+
+        Q0 : High frequency qubit(s). Can be given as single qubit or list.
+        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
+        T_mids : list of vcz "T_mid" values to sweep.
+        A_ranges : list of tuples containing ranges of amplitude sweep.
+        A_points : Number of points to sweep for amplitude range.
+        Q_parks : list of qubits parked during operation.
+        """
+        if isinstance(Q0, str):
+            Q0 = [Q0]
+        if isinstance(Q1, str):
+            Q1 = [Q1]
+        assert len(Q0) == len(Q1)
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        # get gate directions
+        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
+        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
+        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
+        # Prepare for time domain
+        if prepare_for_timedomain:
+            # Time-domain preparation
+            self.prepare_for_timedomain(
+                qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+                bypass_flux=True)
+            for i, lm in enumerate(Flux_lm_0):
+                print(f'Setting {Q0[i]} sq_amp to -.5')
+                lm.set(f'sq_amp', -0.5)
+        ###########################
+        # Load phase pulses
+        ###########################
+        for i, q in enumerate(Q0):
+            # only on the CZ qubits we add the ef pulses 
+            mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+            lm = mw_lutman.LutMap()
+            # we hardcode the X on the ef transition to CW 31 here.
+            lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+            lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+            # load_phase_pulses will also upload other waveforms
+            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+        # Wrapper function for conditional oscillation detector function.
+        def wrapper(Q0, Q1,
+                    prepare_for_timedomain,
+                    downsample_swp_points,
+                    extract_only,
+                    disable_metadata):
+            a = self.measure_conditional_oscillation_multi(
+                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+                    parked_qbs=Q_parks,
+                    flux_codeword=flux_codeword,
+                    prepare_for_timedomain=prepare_for_timedomain,
+                    downsample_swp_points=downsample_swp_points,
+                    extract_only=extract_only,
+                    disable_metadata=disable_metadata,
+                    verbose=False)
+            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
+                  for i in range(len(Q0)) }
+            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
+                  for i in range(len(Q0)) }
+            return { **cp, **mf} 
+            
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
+                     'prepare_for_timedomain' : False,
+                     'downsample_swp_points': 3,
+                     'extract_only': True,
+                     'disable_metadata': True},
+            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_units=list(np.array([['deg', '%']\
+                                   for i in range(len(Q0))]).flatten()))
+        nested_MC.set_detector_function(d)
+
+        swf1 = swf.multi_sweep_function_ranges(
+            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude
+                             for i in range(len(Q0))],
+            sweep_ranges= A_ranges,
+            n_points=A_points)
+        swfs = [swf.FLsweep(lm = lm,
+                            par = lm.parameters['sq_length'],
+                            waveform_name = 'square')
+                for i, lm in enumerate(Flux_lm_0) ]
+        swf2 = swf.multi_sweep_function(sweep_functions=swfs)
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(np.arange(A_points))
+        nested_MC.set_sweep_function_2D(swf2)
+        nested_MC.set_sweep_points_2D(times)
+
+        MC.live_plot_enabled(False)
+        nested_MC.run(f'Unipolar_Amp_vs_t_{Q0}_{Q1}_{Q_parks}',
+                      mode='2D', disable_snapshot_metadata=disable_metadata)
+        # MC.live_plot_enabled(True)
+        a = ma2.tqg.VCZ_B_Analysis(Q0=Q0, Q1=Q1,
+                                   A_ranges=A_ranges,
+                                   directions=directions,
+                                   label='Unipolar_Amp_vs_t')
+        ###################################
+        # Update flux parameters
+        ###################################
+        if update_flux_params:
+            pass
         return a.qoi
 
     def measure_parity_check_ramsey(

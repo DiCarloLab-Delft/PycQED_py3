@@ -104,7 +104,8 @@ def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
     return pulse_I, pulse_Q
 
 
-def single_channel_block(amp, length, sampling_rate=2e8, delay=0):
+def single_channel_block(amp, length, sampling_rate=2e8, delay=0,
+                         gauss_sigma=0):
     '''
     Generates a block pulse.
         amp in V
@@ -119,6 +120,15 @@ def single_channel_block(amp, length, sampling_rate=2e8, delay=0):
     block = amp * np.ones(int(pulse_samples))
     Zeros = np.zeros(int(delay_samples))
     pulse = np.array(list(Zeros) + list(block))
+
+    # # Added for gaussian convolution (Jorge/Hany)
+    # from scipy.ndimage import gaussian_filter1d
+    # gauss_samples = int(np.round(gauss_sigma * sampling_rate))
+    # padding_samples = 144-len(pulse)
+    # # padding_samples = int(np.round((length + 200e-9) * sampling_rate))  # 144-len(pulse)
+    # pulse = np.array(list(pulse)+list(np.zeros(padding_samples)))
+    # if gauss_samples > 0:
+    #     pulse = gaussian_filter1d(pulse, sigma=gauss_samples)
     return pulse
 
 
