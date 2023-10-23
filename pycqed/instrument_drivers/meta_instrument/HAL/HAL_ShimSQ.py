@@ -632,6 +632,27 @@ class HAL_ShimSQ(Qubit):
             initial_value=0,
             parameter_class=ManualParameter)
 
+        # added by RDC 16/09/2023, PPC
+        self.add_parameter(
+            'cancellation_phase',
+            initial_value=180,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'pump_freq',
+            initial_value=5e9,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'pump_power',
+            initial_value=-20,
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'cancellation_attenuation',
+            initial_value=0,
+            parameter_class=ManualParameter)
+
         #############################
         # RO acquisition parameters #
         #############################
@@ -1122,6 +1143,12 @@ class HAL_ShimSQ(Qubit):
             ro_lm.set('M_down_length1_R{}'.format(idx), self.ro_pulse_down_length1())
             ro_lm.set('M_down_amp1_R{}'.format(idx), self.ro_pulse_down_amp1())
             ro_lm.set('M_down_phi1_R{}'.format(idx), self.ro_pulse_down_phi1())
+            
+            # # Added by RDC 16/06/2023, PPC
+            ro_lm.set('cancellation_phase{}'.format(idx), self.cancellation_phase())
+            ro_lm.set('cancellation_attenuation{}'.format(idx), self.cancellation_attenuation())
+            ro_lm.set('pump_freq{}'.format(idx), self.pump_freq())
+            ro_lm.set('pump_power{}'.format(idx), self.pump_power())
 
             # propagate acquisition delay (NB: affects all resonators)
             ro_lm.acquisition_delay(self.ro_acq_delay())  # FIXME: better located in _prep_ro_integration_weights?
@@ -1332,3 +1359,34 @@ class HAL_ShimSQ(Qubit):
         VSM.set('mod{}_ch{}_gaussian_phase'.format(self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_phase())
 
         self.instr_CC.get_instr().set('vsm_channel_delay{}'.format(self.cfg_qubit_nr()), self.mw_vsm_delay())
+
+
+    # ADDED BY RDC on 25-09-2023
+
+    import sys, os, time
+    import numpy as np
+    import zhinst.core as ziapi
+    from zhinst.toolkit import Session
+    from threading import Thread, Event
+    import matplotlib.pyplot as plt
+
+    def prepare_PPC(self,
+                    device_SHFPPC = None,
+                    paramp_channel = 0):
+        """
+        Initializes the SHFPPC device. The device has four available channels the TWPA pump tone generation, and the
+        generation of the respective cancellation tones. At the moment we use only two of the channels, 0 (described 
+        as Channel 1 on the SHFPPC) and 1 (described as Channel 2 on the SHFPPC).
+
+        Arguments
+        ---------
+        device_SHFPPC : Any
+            Device class.
+        paramp_channel : int (0 or 1, 2 and 3 are terminated)
+            SHFPPC channel; either communicates with Channel 1 (paramp_channel = 0) 
+            or Channel 2 (paramp_channel = 1).
+        """
+        device_SHFPPC.ppchannels[paramp_channel].synthesizer.pump.freq(self.pump_freq())
+        device_SHFPPC.ppchannels[paramp_channel].synthesizer.pump.power(self.pump_power())
+        device_SHFPPC.ppchannels[paramp_channel].cancellation.phaseshift(self.cancellation_phase())
+        device_SHFPPC.ppchannels[paramp_channel].cancellation.attenuation(self.cancellation_attenuation())
