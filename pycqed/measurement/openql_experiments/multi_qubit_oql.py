@@ -875,7 +875,8 @@ def Chevron(
         platf_cfg: str,
         target_qubit_sequence: str = 'ramsey',
         cc: str = 'CCL',
-        recover_q_spec: bool = False
+        recover_q_spec: bool = False,
+        second_excited_state: bool = False,
     ) -> OqlProgram:
     """
     Writes output files to the directory specified in openql.
@@ -893,6 +894,7 @@ def Chevron(
             or excite it iat the beginning of the sequnce ('excited')
         recover_q_spec (bool): applies the first gate of qspec at the end
             as well if `True`
+        second_excited_state (bool): Applies f12 transition pulse before flux pulse.
     Returns:
         p:              OpenQL Program object containing
 
@@ -907,6 +909,8 @@ def Chevron(
         q0    -x180-flux-x180-RO-
         qspec ----------------RO- (target_qubit_sequence='ground')
 
+        q0    -x180-x12-flux-x12-x180-RO-
+        qspec ------------------------RO- (second_excited_state=True)
     """
     p = OqlProgram("Chevron", platf_cfg)
 
@@ -926,6 +930,8 @@ def Chevron(
     spec_gate = spec_gate_dict[target_qubit_sequence]
     k.gate(spec_gate, [qubit_idx_spec])
     k.gate('rx180', [qubit_idx])
+    if second_excited_state:
+        k.gate('rx12', [qubit_idx])
     if buffer_nanoseconds > 0:
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
     # For CCLight
@@ -948,6 +954,8 @@ def Chevron(
         raise ValueError('CC type not understood: {}'.format(cc))
     if buffer_nanoseconds2 > 0:
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+    if second_excited_state:
+        k.gate('rx12', [qubit_idx])
     k.gate('rx180', [qubit_idx])
     k.gate(spec_gate, [qubit_idx_spec])
 
