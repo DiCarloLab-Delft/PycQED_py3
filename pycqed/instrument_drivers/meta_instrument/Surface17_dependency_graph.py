@@ -2162,7 +2162,7 @@ def TLS_density_wrapper(Qubit, station,
 	amp_0 = -p_coefs[1]/(2*p_coefs[0])
 	det_0 = freq_func(amp_0)
 	# det_0 = Flux_lm_q.q_polycoeffs_freq_01_det()[-1]
-	if detuning == None:
+	if detuning is None:
 		detuning = np.arange(det_0, 1500e6, 5e6)
 	# Convert detuning to list of amplitudes
 	Flux_lm_q.sq_amp(0.5)
