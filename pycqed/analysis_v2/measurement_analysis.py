@@ -144,3 +144,4 @@ from pycqed.analysis_v2.multi_analysis import (Multi_AllXY_Analysis, plot_Multi_
     Multi_T1_Analysis, plot_Multi_T1, Multi_Echo_Analysis, plot_Multi_Echo,
     Multi_Flipping_Analysis, Multi_Motzoi_Analysis)
 
+from pycqed.analysis_v2.resZZ_analysis import ResZZAnalysis

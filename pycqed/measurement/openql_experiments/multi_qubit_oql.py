@@ -484,8 +484,8 @@ def residual_coupling_sequence(
     Sequence to measure the residual (ZZ) interaction between two qubits.
     Procedure is described in M18TR.
 
-        (q0) --X90----(tau)---Y180-(tau)-Y90---RO
-        (qs) --[X180]-(tau)-[X180]-(tau)-------RO
+        (q0) --X90-(tau)--Y180--(tau)--Y90---RO
+        (qs) ------(tau)-[X180]-(tau)-[X180]---RO
 
     Input pars:
         times:           the list of waiting times in s for each Echo element
@@ -545,7 +545,7 @@ def residual_coupling_sequence(
     # adding the calibration points
     p.add_multi_q_cal_points(
         qubits=all_qubits,
-        combinations=['0' * n_qubits, '1' * n_qubits])
+        combinations=['0' * n_qubits, '0' * n_qubits, '1' * n_qubits, '1' * n_qubits])
 
     p.compile()
     return p
