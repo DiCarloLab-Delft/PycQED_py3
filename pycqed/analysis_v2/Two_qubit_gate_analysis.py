@@ -3663,8 +3663,8 @@ def Ramsey_curves_plotfn(
         Colors = { case : color for color, case in zip(['C2', 'C3'],control_cases)}
     else:
         from matplotlib.cm import hsv
-        Colors = { case : hsv(x) for x, case in \
-                   zip(np.linspace(0,1,len(control_cases)), control_cases)}
+        # Attempts to create distinguishable colors, using hsv color mapping [0, 1].
+        Colors = { case : hsv(x) for x, case in zip(np.linspace(0,1 - 1/len(control_cases),len(control_cases)), control_cases)}
     for i, q in enumerate(Q_target+Q_control):
         for case in control_cases:
             if q in Q_target:
