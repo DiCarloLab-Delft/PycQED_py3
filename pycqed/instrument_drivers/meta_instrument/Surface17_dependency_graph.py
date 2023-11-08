@@ -1443,7 +1443,7 @@ def SNZ_tmid_wrapper(qH, qL, station,
 				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p,
 													 negative_amp=True)
 				amp_park = np.max(np.abs([amp_park_pos, amp_park_neg]))
-				flux_lm_p.park_amp(amp_park)
+				flux_lm_p.park_amp(amp_park)  # Update parking amplitude in lookup table
 			else:
 				flux_lm_p.park_amp(0)
 			# Check wf duration of park qubits
@@ -1617,6 +1617,7 @@ def SNZ_AB_wrapper(qH, qL, station,
 				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p,
 													 negative_amp=True)
 				amp_park = np.max(np.abs([amp_park_pos, amp_park_neg]))
+				flux_lm_p.park_amp(amp_park)  # Update parking amplitude in lookup table
 			else:
 				flux_lm_p.park_amp(0)
 			# Check wf duration of park qubits
@@ -1943,6 +1944,7 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p,
 													 negative_amp=True)
 				amp_park = np.max(np.abs([amp_park_pos, amp_park_neg]))
+				flux_lm_p.park_amp(amp_park)  # Update parking amplitude in lookup table
 			else:
 				flux_lm_p.park_amp(0)
 		load_single_waveform_on_HDAWG(flux_lm_p, 'park')
