@@ -2598,6 +2598,7 @@ def Horizontal_calibration_wrapper(stabilizer_qubit, station,
 			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
 		else:
 			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
+		flux_cw_list = ['cz' for q in Q_control]
 	if mw_phase_param == None:
 		if 'X' in stabilizer_qubit:
 			mw_phase_param = 'vcz_virtual_q_ph_corr_step_4'
@@ -2657,7 +2658,7 @@ def Measure_parity_check_phase_wrapper(stabilizer_qubit, station,
 			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
 		else:
 			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
-		# flux_cw_list = ['cz' for q in Q_control]
+		flux_cw_list = ['cz' for q in Q_control]
 	if mw_phase_param == None:
 		if 'X' in stabilizer_qubit:
 			mw_phase_param = 'vcz_virtual_q_ph_corr_step_4'
@@ -2702,7 +2703,7 @@ def Data_qubit_phase_calibration_wrapper(stabilizer_qubit, station,
 			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
 		else:
 			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
-		# flux_cw_list = ['cz' for q in Q_control]
+		flux_cw_list = ['cz' for q in Q_data]
 	if mw_phase_param == None:
 		if 'X' in stabilizer_qubit:
 			mw_phase_param = 'vcz_virtual_q_ph_corr_step_4'
@@ -2759,7 +2760,7 @@ def Parity_check_fidelity_wrapper(stabilizer_qubit, station,
 			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
 		else:
 			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
-		# flux_cw_list = ['cz' for q in Q_data]
+		flux_cw_list = ['cz' for q in Q_data]
 	if not heralded_init:
 		device.prepare_readout(qubits=Q_ancilla)
 	# Measure
@@ -2800,7 +2801,7 @@ def Parity_check_repeatability_wrapper(stabilizer_qubit, station,
 			flux_cw_list = [f'flux_dance_{i}' for i in [1, 2, 3, 4]]
 		else:
 			flux_cw_list = [f'flux_dance_{i}' for i in [5, 6, 7, 8]]
-		# flux_cw_list = ['cz' for q in Q_data]
+		flux_cw_list = ['cz' for q in Q_data]
 	# can't avoid preparaing for timedomain here as it orders the qubits
 	if n_rounds == None:
 		# n_rounds = [1, 2]
