@@ -1255,12 +1255,13 @@ def Chevron_wrapper(qH, qL, station,
 		flux_lm_H.sq_amp(.5)
 	flux_lm_H.sq_delay(0)
 	# Set frequency of low frequency qubit
-	if qL_det < 10e6:
+	if abs(qL_det) < 10e6:
 		sq_amp_L = 0 # avoids error near 0 in the flux arc.
 	else:
 		dircts = get_gate_directions(qH, qL)
 		flux_lm_L.set(f'q_freq_10_{dircts[1]}', qL_det)
-		sq_amp_L = get_DAC_amp_frequency(qL_det, flux_lm_L)
+		sq_amp_L = get_DAC_amp_frequency(qL_det, flux_lm_L,
+						 negative_amp=True if qL in OFFSET_QUBITS else False)
 	flux_lm_L.sq_amp(sq_amp_L)
 	flux_lm_L.sq_length(60e-9)
 	flux_lm_L.sq_delay(0)
@@ -1419,10 +1420,11 @@ def SNZ_tmid_wrapper(qH, qL, station,
 		flux_lm_H.set(f'vcz_amp_dac_at_11_02_{dircts[0]}', -0.5)
 	# Set frequency of low frequency qubit
 	qL_det = flux_lm_L.get(f'q_freq_10_{dircts[1]}') # detuning at gate
-	if qL_det < 10e6:
+	if abs(qL_det) < 10e6:
 		sq_amp_L = 0 # avoids error near 0 in the flux arc.
 	else:
-		sq_amp_L = get_DAC_amp_frequency(qL_det, flux_lm_L)
+		sq_amp_L = get_DAC_amp_frequency(qL_det, flux_lm_L,
+						 negative_amp=True if qL in OFFSET_QUBITS else False)
 	flux_lm_L.set(f'vcz_amp_sq_{dircts[1]}', 1)
 	flux_lm_L.set(f'vcz_amp_fine_{dircts[1]}', 0)
 	flux_lm_L.set(f'vcz_amp_dac_at_11_02_{dircts[1]}', sq_amp_L)
@@ -1438,12 +1440,14 @@ def SNZ_tmid_wrapper(qH, qL, station,
 			flux_lm_p = Q_inst.instr_LutMan_Flux.get_instr()
 			park_det = Q_inst.freq_qubit()-park_freq
 			# Only park if the qubit is closer than <park_distance>
-			if park_det>20e6:
+			if park_det>10e6:
 				amp_park_pos = get_DAC_amp_frequency(park_det, flux_lm_p)
-				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p,
+				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p, 
 													 negative_amp=True)
-				amp_park = np.max(np.abs([amp_park_pos, amp_park_neg]))
-				flux_lm_p.park_amp(amp_park)  # Update parking amplitude in lookup table
+				_Amps = [amp_park_pos, amp_park_neg]
+				amp_park_idx = np.argmax(np.abs(_Amps))
+				# Update parking amplitude in lookup table
+				flux_lm_p.park_amp(_Amps[amp_park_idx])
 			else:
 				flux_lm_p.park_amp(0)
 			# Check wf duration of park qubits
@@ -1467,10 +1471,8 @@ def SNZ_tmid_wrapper(qH, qL, station,
 		# flux_lm_H.set(f'cfg_awg_channel_amplitude', gain)
 		# Set new detunning corresponding to average gain
 		ch_amp_0 = get_Ch_amp_frequency(_det, flux_lm_H, DAC_param=f'sq_amp')
-		delta_ch_amp_p = get_Ch_amp_frequency(_det+scan_range/2, flux_lm_H,
-											  DAC_param=f'sq_amp') - ch_amp_0
-		delta_ch_amp_m = get_Ch_amp_frequency(_det-scan_range/2, flux_lm_H,
-											  DAC_param=f'sq_amp') - ch_amp_0
+		delta_ch_amp_p = get_Ch_amp_frequency(_det+scan_range/2, flux_lm_H, DAC_param=f'sq_amp') - ch_amp_0
+		delta_ch_amp_m = get_Ch_amp_frequency(_det-scan_range/2, flux_lm_H, DAC_param=f'sq_amp') - ch_amp_0
 		A_range = [gain+delta_ch_amp_m, gain+delta_ch_amp_p]
 	# Predict range without asymmetry
 	else:
@@ -1593,10 +1595,11 @@ def SNZ_AB_wrapper(qH, qL, station,
 	# 	make_unipolar_pulse_net_zero(flux_lm_H, f'cz_{dircts[0]}')
 	# Set frequency of low frequency qubit
 	qL_det = flux_lm_L.get(f'q_freq_10_{dircts[1]}') # detuning at gate
-	if qL_det < 10e6:
+	if abs(qL_det) < 10e6:
 		sq_amp_L = 0 # avoids error near 0 in the flux arc.
 	else:
-		sq_amp_L = get_DAC_amp_frequency(qL_det, flux_lm_L)
+		sq_amp_L = get_DAC_amp_frequency(qL_det, flux_lm_L,
+						 negative_amp=True if qL in OFFSET_QUBITS else False)
 	flux_lm_L.set(f'vcz_amp_sq_{dircts[1]}', 1)
 	flux_lm_L.set(f'vcz_amp_fine_{dircts[1]}', 0)
 	flux_lm_L.set(f'vcz_amp_dac_at_11_02_{dircts[1]}', sq_amp_L)
@@ -1612,12 +1615,14 @@ def SNZ_AB_wrapper(qH, qL, station,
 			flux_lm_p = Q_inst.instr_LutMan_Flux.get_instr()
 			park_det = Q_inst.freq_qubit()-park_freq
 			# Only park if the qubit is closer than then 350 MHz
-			if park_det>20e6:
+			if park_det>10e6:
 				amp_park_pos = get_DAC_amp_frequency(park_det, flux_lm_p)
 				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p,
 													 negative_amp=True)
-				amp_park = np.max(np.abs([amp_park_pos, amp_park_neg]))
-				flux_lm_p.park_amp(amp_park)  # Update parking amplitude in lookup table
+				_Amps = [amp_park_pos, amp_park_neg]
+				amp_park_idx = np.argmax(np.abs(_Amps))
+				# Update parking amplitude in lookup table
+				flux_lm_p.park_amp(_Amps[amp_park_idx])
 			else:
 				flux_lm_p.park_amp(0)
 			# Check wf duration of park qubits
@@ -1728,7 +1733,7 @@ def Unipolar_wrapper(qH, qL, station,
 		flux_lm_H.set('sq_amp', -0.5)
 	# Set frequency of low frequency qubit
 	qL_det = flux_lm_L.get(f'q_freq_10_{dircts[1]}') # detuning at gate
-	if qL_det < 10e6:
+	if abs(qL_det) < 10e6:
 		sq_amp_L = 0 # avoids error near 0 in the flux arc.
 	else:
 		sq_amp_L = get_DAC_amp_frequency(qL_det, flux_lm_L)
@@ -1749,7 +1754,10 @@ def Unipolar_wrapper(qH, qL, station,
 				amp_park_pos = get_DAC_amp_frequency(park_det, flux_lm_p)
 				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p,
 													 negative_amp=True)
-				amp_park = np.max(np.abs([amp_park_pos, amp_park_neg]))
+				_Amps = [amp_park_pos, amp_park_neg]
+				amp_park_idx = np.argmax(np.abs(_Amps))
+				# Update parking amplitude in lookup table
+				flux_lm_p.park_amp(_Amps[amp_park_idx])
 			else:
 				flux_lm_p.park_amp(0)
 			# Check wf duration of park qubits
@@ -1820,11 +1828,10 @@ def Asymmetry_wrapper(qH, qL, station):
 	# Set DAC amplitude for 2Q gate 
 	det_qH = flux_lm_H.get(f'q_freq_10_{dircts[0]}')
 	det_qL = flux_lm_L.get(f'q_freq_10_{dircts[1]}')
-	if qH in OFFSET_QUBITS:
-		amp_qH = get_DAC_amp_frequency(det_qH, flux_lm_H, negative_amp=True)
-	else:
-		amp_qH = get_DAC_amp_frequency(det_qH, flux_lm_H)
-	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L)
+	amp_qH = get_DAC_amp_frequency(det_qH, flux_lm_H,
+						 negative_amp=True if qH in OFFSET_QUBITS else False)
+	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L,
+						 negative_amp=True if qL in OFFSET_QUBITS else False)
 	# Compensate for asymmetry of cz pulse
 	_asymmetry = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')
 	if abs(_asymmetry)> .075:
@@ -1833,7 +1840,7 @@ def Asymmetry_wrapper(qH, qL, station):
 								 	[	det_qH,    det_qL],
 								 	[	amp_qH,    amp_qL],
 								 	[flux_lm_H, flux_lm_L]):
-		if det < 20e6:
+		if abs(det) < 10e6:
 			flux_lm.set(f'vcz_amp_dac_at_11_02_{dircts[i]}', 0)
 		else:
 			flux_lm.set(f'vcz_amp_dac_at_11_02_{dircts[i]}', amp)
@@ -1912,7 +1919,8 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 	det_qL = flux_lm_L.get(f'q_freq_10_{dircts[1]}')
 	amp_qH = get_DAC_amp_frequency(det_qH, flux_lm_H, 
 						negative_amp=True if qH in OFFSET_QUBITS else False)
-	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L)
+	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L,
+						negative_amp=True if qL in OFFSET_QUBITS else False)
 	# Compensate for asymmetry of cz pulse
 	_asymmetry = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')
 	if abs(_asymmetry)> .075:
@@ -1921,7 +1929,7 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 								 	[	det_qH,    det_qL],
 								 	[	amp_qH,    amp_qL],
 								 	[flux_lm_H, flux_lm_L]):
-		if det < 20e6:
+		if abs(det) < 10e6:
 			flux_lm.set(f'vcz_amp_dac_at_11_02_{dircts[i]}', 0)
 		else:
 			flux_lm.set(f'vcz_amp_dac_at_11_02_{dircts[i]}', amp)
@@ -1940,11 +1948,14 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 		if apply_parking_settings:
 			# Only park if the qubit is closer than then 350 MHz
 			if park_det>20e6:
+				# Choose sign of parking waveform (necessary for off-sweetspot qubits)
 				amp_park_pos = get_DAC_amp_frequency(park_det, flux_lm_p)
-				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p,
+				amp_park_neg = get_DAC_amp_frequency(park_det, flux_lm_p, 
 													 negative_amp=True)
-				amp_park = np.max(np.abs([amp_park_pos, amp_park_neg]))
-				flux_lm_p.park_amp(amp_park)  # Update parking amplitude in lookup table
+				_Amps = [amp_park_pos, amp_park_neg]
+				amp_park_idx = np.argmax(np.abs(_Amps))
+				# Update parking amplitude in lookup table
+				flux_lm_p.park_amp(_Amps[amp_park_idx])
 			else:
 				flux_lm_p.park_amp(0)
 		load_single_waveform_on_HDAWG(flux_lm_p, 'park')
@@ -2061,7 +2072,8 @@ def TwoQ_Randomized_benchmarking_wrapper(qH, qL, station, **kw):
 	det_qL = flux_lm_L.get(f'q_freq_10_{dircts[1]}')
 	amp_qH = get_DAC_amp_frequency(det_qH, flux_lm_H, 
 						negative_amp=True if qH in OFFSET_QUBITS else False)
-	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L)
+	amp_qL = get_DAC_amp_frequency(det_qL, flux_lm_L,
+						negative_amp=True if qL in OFFSET_QUBITS else False)
 	# Compensate for asymmetry of cz pulse
 	_asymmetry = flux_lm_H.get(f'vcz_asymmetry_{dircts[0]}')
 	if abs(_asymmetry)> .075:
@@ -2070,7 +2082,7 @@ def TwoQ_Randomized_benchmarking_wrapper(qH, qL, station, **kw):
 								 	[	det_qH,    det_qL],
 								 	[	amp_qH,    amp_qL],
 								 	[flux_lm_H, flux_lm_L]):
-		if det < 20e6:
+		if abs(det) < 10e6:
 			flux_lm.set(f'vcz_amp_dac_at_11_02_{dircts[i]}', 0)
 		else:
 			flux_lm.set(f'vcz_amp_dac_at_11_02_{dircts[i]}', amp)
