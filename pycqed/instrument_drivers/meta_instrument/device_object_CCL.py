@@ -5746,19 +5746,21 @@ class DeviceCCL(Instrument):
         res_combs = {}
         for lm in RO_lms:
             res_combs[lm] = []
-            comb1= []
-            comb2= []
+            comb1= [] # comb used for MUX of all qubits (final meas.)
+            comb2= [] # comb used for MUX of just data qubits (final meas.) 
             # ancilla + data qubits resonators
             for idx in [ancilla_idx]+data_idxs:
-                  if qubit_RO_lm[idx][1] == lm:
-                        comb1+= [idx]
-                        comb2+= [idx]
+                if qubit_RO_lm[idx][1] == lm:
+                    comb1+= [idx]
+                    comb2+= [idx]
             res_combs[lm] += [comb1]
             if qubit_RO_lm[ancilla_idx][1] == lm:
-                  res_combs[lm] += [[ancilla_idx]]
-                  comb2.remove(ancilla_idx)
-                  res_combs[lm] += [comb2]
-                  main_qubits = [qubit_RO_lm[idx][0] for idx in comb1]
+                if not ([ancilla_idx] in res_combs[lm]):
+                    res_combs[lm] += [[ancilla_idx]] # comb of just anc. qubit
+                comb2.remove(ancilla_idx)
+                if comb2 != []:
+                    res_combs[lm] += [comb2]
+                main_qubits = [qubit_RO_lm[idx][0] for idx in comb1]
             else:
                   exception_qubits += [qubit_RO_lm[idx][0] for idx in comb1]
         # Time-domain preparation
