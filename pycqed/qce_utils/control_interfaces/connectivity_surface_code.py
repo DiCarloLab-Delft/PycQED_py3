@@ -491,6 +491,19 @@ class Repetition9Layer(ISurfaceCodeLayer, metaclass=SingletonABCMeta):
             ).id
             for data_id in parity_group.data_ids
         ]
+
+    def get_parity_data_identifiers(self, ancilla_qubits: List[str]) -> List[str]:
+        """
+        Iterates over provided ancilla qubit ID's.
+        Construct corresponding IQubitID's.
+        Obtain corresponding IParityGroup's.
+        Flatten list of (unique) data qubit ID's part of these parity groups.
+        :return: Array-like of (unique) data qubit ID's part of ancilla qubit parity groups.
+        """
+        ancilla_qubit_ids: List[IQubitID] = [QubitIDObj(ancilla_qubit) for ancilla_qubit in ancilla_qubits]
+        parity_groups: List[IParityGroup] = [self.get_parity_group(element=qubit_id) for qubit_id in ancilla_qubit_ids]
+        data_qubit_ids: List[IQubitID] = [qubit_id for parity_group in parity_groups for qubit_id in parity_group.data_ids]
+        return [unique_qubit_id.id for unique_qubit_id in set(data_qubit_ids)]
     # endregion
 
 
