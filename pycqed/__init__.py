@@ -2,6 +2,7 @@
 
 from pycqed.version import __version__
 import sys
+import warnings
 
 if 1:   # FIXME: hack should be removed
     module_name = "qcodes"
@@ -13,7 +14,12 @@ if 1:   # FIXME: hack should be removed
             "NB: Any `qcodes` submodule must also be imported after pycqed.")
     # We need to import this here so that any later imports of `QtPlot` from qcodes
     # KEEP ABOVE any QtPlot import!!!
-    from pycqed.measurement import qcodes_QtPlot_monkey_patching
+    warnings.warn(message="Attempts to apply qcodes QtPlot monkey patch.")
+    try:
+        from qcodes import plots
+        from pycqed.measurement import qcodes_QtPlot_monkey_patching
+    except ImportError as e:
+        warnings.warn(message="Failed to apply qcodes QtPlot monkey patch.")
 
 # from pycqed import measurement
 # from pycqed import analysis
