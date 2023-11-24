@@ -3756,7 +3756,8 @@ def repeated_stabilizer_data_measurement_sequence(
         ):
     p = OqlProgram("Repeated_stabilizer_seq", platf_cfg)
     Valid_experiments = ['single_stabilizer', 'single_stabilizer_LRU',
-                         'surface_13', 'surface_13_LRU', 'surface_17']
+                         'surface_13', 'surface_13_LRU', 'surface_17',
+                         'repetition_code']
     for exp in experiments:
         assert exp in Valid_experiments, f'Experiment {exp} not a valid experiment'
     assert stabilizer_type in ['X', 'Z'], '"stabilizer_type" must be "X" or "Z"'
@@ -3764,6 +3765,8 @@ def repeated_stabilizer_data_measurement_sequence(
     data_qubit_map = { "D1":  6, "D2":  2, "D3":  0,
                        "D4": 15, "D5": 13, "D7":  1,
                        "D6": 16, "D8":  5, "D9":  4 }
+    ancilla_qubit_map = {"Z1":  7, "Z2": 14, "Z3": 12, "Z4": 10,
+                         "X1": 11, "X2":  8, "X3":  3, "X4":  9}
     if initial_state_qubits:
         for q_name in initial_state_qubits:
             assert q_name in data_qubit_map.keys(), f'qubit {q_name} not a valid qubit.'
@@ -3855,7 +3858,7 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
-                        k.gate('rX180', [q])
+                        k.gate('rx180', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -3972,7 +3975,7 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
-                        k.gate('rX180', [q])
+                        k.gate('rx180', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -4004,7 +4007,7 @@ def repeated_stabilizer_data_measurement_sequence(
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
-                        #     k.gate('rX180', [q])
+                        #     k.gate('rx180', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
@@ -4021,7 +4024,7 @@ def repeated_stabilizer_data_measurement_sequence(
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
-                        #     k.gate('rX180', [q])
+                        #     k.gate('rx180', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
@@ -4109,13 +4112,13 @@ def repeated_stabilizer_data_measurement_sequence(
                         nr_idles = idle_time//20
                         for idle in range(nr_idles):
                             k.gate('i', [q])
-                        k.gate('rX180', [q])
+                        k.gate('rx180', [q])
                         for idle in range(nr_idles):
                             k.gate('i', [q])
 
                         # for cycle in range(int(480/6/20)):
                         #     k.gate('i', [q])
-                        #     k.gate('rX180', [q])
+                        #     k.gate('rx180', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
                         #     k.gate('rY180', [q])
@@ -4212,12 +4215,12 @@ def repeated_stabilizer_data_measurement_sequence(
                         nr_idles_Z = (measurement_time_ns//3-20)//40
                         for idle in range(nr_idles+nr_idles_Z):
                             k.gate('i', [q])
-                        k.gate('rX180', [q])
+                        k.gate('rx180', [q])
                         for idle in range(nr_idles+nr_idles_Z):
                             k.gate('i', [q])
                         # for cycle in range(int(480/6/20)):
                         #     k.gate('i', [q])
-                        #     k.gate('rX180', [q])
+                        #     k.gate('rx180', [q])
                         #     k.gate('i', [q])
                         #     k.gate('i', [q])
                         #     k.gate('rY180', [q])
@@ -4297,7 +4300,7 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
-                        k.gate('rX180', [q])
+                        k.gate('rx180', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
@@ -4308,6 +4311,83 @@ def repeated_stabilizer_data_measurement_sequence(
                         k.gate('i', [q])
                         k.gate('i', [q])
                         k.gate('i', [q])
+                k.gate("wait", [], 0)
+            p.add_kernel(k)
+
+        if 'repetition_code' in experiments:
+            k = p.create_kernel(f'Repetition_code_seq_{n_rounds}rounds')        
+            # Preparation & heralded_init
+            for q in data_idxs:
+                k.prepz(q)
+                k.measure(q)
+            for q in _remaining_ancillas+[Q_anc]:
+                k.measure(q)
+            k.gate('wait', [], 400)  # to avoid UHF trigger holdoff!
+            # TODO: Add arbitrary state initialization
+            k.barrier([])
+            # QEC Rounds 
+            for i in range(n_rounds):
+                # First Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in Q_D:
+                        k.gate("ry90", [q])
+                # for q in Z_anci_idxs+X_anci_idxs:
+                for q in [Q_anc]:
+                    if q in [ancilla_qubit_map[qa] for qa in \
+                             ['X3', 'Z1', 'X1', 'Z2']]:
+                        k.gate("ry90", [q])
+                # Flux dance
+                k.gate('wait', [])
+                k.gate(f'repetition_code_1', [0])
+                k.gate(f'repetition_code_2', [0])
+                k.gate('wait', [])
+                # Second Pi/2 pulse
+                # for q in Z_anci_idxs+X_anci_idxs:
+                for q in [Q_anc]:
+                    if q in [ancilla_qubit_map[qa] for qa in \
+                             ['X3', 'Z1', 'X1', 'Z2']]:
+                        k.gate("rym90", [q])
+                    # First Pi/2 pulse
+                    # elif q in [ancilla_qubit_map[qa] for qa in \
+                    #            ['Z3', 'X4', 'Z4', 'X2']]:
+                    #     k.gate("ry90", [q])
+                # Flux dance
+                # k.gate('wait', [])
+                # k.gate(f'repetition_code_3', [0])
+                # k.gate(f'repetition_code_4', [0])
+                k.gate('wait', [])
+                # Second Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in Q_D:
+                        k.gate("rym90", [q])
+                # for q in Z_anci_idxs+X_anci_idxs:
+                for q in [Q_anc]:
+                    if q in [ancilla_qubit_map[qa] for qa in \
+                             ['Z3', 'X4', 'Z4', 'X2']]:
+                        k.gate("rym90", [q])
+                k.gate('wait', [])
+                # Measurement of ancillas
+                for q in [Q_anc]:
+                    k.measure(q)
+                # Measure remaining ancillas
+                for q in _remaining_ancillas:
+                    k.measure(q)
+                # Measure data qubits only at the last round
+                if i == n_rounds-1:
+                    for q in data_idxs:
+                        if stabilizer_type == 'X':
+                            k.gate('rym90', [q])
+                        k.measure(q)
+                else:
+                    for q in Q_D:
+                        # Single measurement Echo
+                        idle_time = (measurement_time_ns-20)//2
+                        nr_idles = idle_time//20
+                        for idle in range(nr_idles):
+                            k.gate('i', [q])
+                        k.gate('rx180', [q])
+                        for idle in range(nr_idles):
+                            k.gate('i', [q])
                 k.gate("wait", [], 0)
             p.add_kernel(k)
 

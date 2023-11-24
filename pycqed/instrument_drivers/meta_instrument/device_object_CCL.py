@@ -5847,7 +5847,8 @@ class DeviceCCL(Instrument):
         # assert self.ro_acq_weight_type() == 'optimal IQ'
         assert self.ro_acq_digitized() == False
         Valid_experiments = ['single_stabilizer', 'single_stabilizer_LRU',
-                             'surface_13', 'surface_13_LRU', 'surface_17']
+                             'surface_13', 'surface_13_LRU', 'surface_17',
+                             'repetition_code']
         for exp in experiments:
             assert exp in Valid_experiments, f'Experiment {exp} not a valid experiment'
         number_of_kernels = len(experiments)
@@ -5988,18 +5989,21 @@ class DeviceCCL(Instrument):
         else:
             _title = f'Repeated_stab_meas_{"_".join([str(r) for r in Rounds])}rounds'+\
                      f'_{ancilla_qubit}_{data_qubits}_data_qubit_measurement'
-        # try:
-        MC.run(_title)
-        if analyze:
-            a = ma2.pba.Repeated_stabilizer_measurements(
-                ancilla_qubit=ancilla_qubit,
-                data_qubits = data_qubits,
-                Rounds=Rounds,
-                heralded_init=heralded_init,
-                number_of_kernels=number_of_kernels,
-                experiments=experiments,
-                label=_title)
-        self.ro_acq_weight_type('optimal')
-        # except:
-        #     print_exception()
-        #     self.ro_acq_weight_type('optimal')
+        try:
+            MC.run(_title)
+            a = None
+            if analyze:
+                a = ma2.pba.Repeated_stabilizer_measurements(
+                    ancilla_qubit=ancilla_qubit,
+                    data_qubits = data_qubits,
+                    Rounds=Rounds,
+                    heralded_init=heralded_init,
+                    number_of_kernels=number_of_kernels,
+                    experiments=experiments,
+                    label=_title)
+            self.ro_acq_weight_type('optimal')
+        except:
+            print_exception()
+            self.ro_acq_weight_type('optimal')
+            raise ValueError('Somtehing happened!')
+        return a
