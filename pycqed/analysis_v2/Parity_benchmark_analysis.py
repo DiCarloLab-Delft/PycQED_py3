@@ -2537,11 +2537,10 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
                 fig = plt.figure(figsize=(11,3))
             elif qa in ['Z1', 'Z4', 'X2', 'X3']:
                 fig = plt.figure(figsize=(12,3))
-            Data_qubits = list(get_nearest_neighbors(qa).keys())
-            gs = fig.add_gridspec(1, 2+len([qa]+Data_qubits))
+            gs = fig.add_gridspec(1, 2+len([qa]+self.data_qubits))
             axs = []
             axs.append(fig.add_subplot(gs[0, 0:2]))
-            for i, q in enumerate([qa]+Data_qubits):
+            for i, q in enumerate([qa]+self.data_qubits):
                 axs.append(fig.add_subplot(gs[0, 2+i:3+i]))
             self.axs_dict[f'Deffect_rate_plot_{qa}'] = axs[0]
             self.figs[f'Deffect_rate_plot_{qa}'] = fig
@@ -2554,6 +2553,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
                 'Population': self.proc_data_dict['Population_f'],
                 'experiments': self.experiments,
                 'qubit': qa,
+                'data_qubits': self.data_qubits,
                 'timestamp': self.timestamp
             }
 
@@ -2585,6 +2585,7 @@ def defect_rate_k_plotfn(
     Population, 
     timestamp,
     qubit,
+    data_qubits,
     experiments,
     ax, **kw):
     fig = ax.get_figure()
@@ -2609,9 +2610,8 @@ def defect_rate_k_plotfn(
     axs[1].set_xlabel('rounds')
     axs[1].set_title(qubit)
     axs[1].grid(ls='--')
-    
-    Data_qubits = list(get_nearest_neighbors(qubit).keys())
-    for i, q in enumerate(Data_qubits):
+
+    for i, q in enumerate(data_qubits):
         for k in Population.keys():
             axs[2+i].plot(Rounds, (Population[k][q])*100, f'C{k}.-', label=experiments[k])
         # axs[2+i].set_ylabel(r'Leakage population (%)')
