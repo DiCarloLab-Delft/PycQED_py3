@@ -173,17 +173,10 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
     # helper for parameter 'dio{}_out_delay'
     def _set_dio_delay(self, ccio: int, cnt_in_20ns_steps: int) -> None:
-        if 1:
-            self.set_seqbar_cnt(ccio, cnt_in_20ns_steps)
-        else:  # FIXME: cleanup old seq_bar support once we're all on CC v0.2.0
-            # FIXME: assumes Q1 was running, and has valid program
-            self.stop()
-            self.set_q1_reg(ccio, self._Q1REG_DIO_DELAY, cnt_in_20ns_steps)
-            self.start()
+        self.set_seqbar_cnt(ccio, cnt_in_20ns_steps)
 
     ##########################################################################
     # overrides for CalInterface interface
-    # FIXME: move to CCCore? or CC_DIOCAL
     ##########################################################################
 
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
@@ -227,7 +220,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
             repeat:
                     move		$cw_31_01,R0
-                    move		$loopCnt,R1               	# loop counter
+                    move		$loopCnt,R1             # loop counter
             inner:	seq_out		R0,$duration
                     add		    R0,$incr,R0
                     loop		R1,@inner
@@ -243,7 +236,6 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
 
         elif dio_mode == "awg8-mw-direct-iq" or dio_mode == "novsm_microwave":
-
             cc_prog = """
             ### DIO protocol definition:
             # DIO           QWG             AWG8        note
@@ -274,7 +266,7 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
             repeat:
                     move        $cw,R0
-                    move        $loopCnt,R1                 # loop counter
+                    move        $loopCnt,R1            # loop counter
             inner:  seq_out     R0,$duration
                     add         R0,$incr,R0
                     loop        R1,@inner
@@ -290,8 +282,6 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
 
         elif dio_mode == "awg8-flux" or dio_mode == "flux":
-            # based on ZI_HDAWG8.py::_prepare_CC_dio_calibration_hdawg and examples/CC_examples/flux_calibration.vq1asm
-            # FIXME: hardcoded slots, this is OpenQL output
             cc_prog = """
             mainLoop:
                         seq_out         0x00000000,20           # 00000000000000000000000000000000
@@ -316,7 +306,6 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
 
         elif dio_mode == "uhfqa":  # FIXME: no official mode yet
-            # Based on UHFQuantumController.py::_prepare_CC_dio_calibration_uhfqa and  and examples/CC_examples/uhfqc_calibration.vq1asm
             cc_prog = inspect.cleandoc("""
             mainLoop:   seq_out         0x03FF0000,1        # TRIG=0x00010000, CW[8:0]=0x03FE0000
                         seq_out         0x00000000,10
@@ -325,6 +314,15 @@ class CC(CCCore, Instrument, DIO.CalInterface):
 
             dio_mask = 0x03ff0000
 
+        elif dio_mode == "shfqa":
+            dio_mask = 0x7fff0000
+            cc_prog = inspect.cleandoc(
+                f"""
+            mainLoop:   seq_out         {hex(dio_mask)},1
+                        seq_out         0x00000000,1
+                        jmp             @mainLoop
+            """
+            )
         else:
             raise ValueError(f"unsupported DIO mode '{dio_mode}'")
 

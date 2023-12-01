@@ -8,6 +8,27 @@ Legend:
 ! Known issue / missing feature
 . Generic bullet
 
+v0.4 - Work In Progress
+. removed support for CCL and then reinstated it (commit d410e85)
+# removed support for QCC
+. openql_helpers:
+    + created class OqlProgram to separate the OpenQl 'Program' from our additional data
+    + added support for cqasm compilation
+* removed calls to OpenQL's Program.set_sweep_points (which generate an unused ".json" file) from *_oql.py
+. added package 'deprecated' to streamline deprecation, and marked many unused functions as deprecated
+    . if you find these in error, please file an issue or pull request
+* split off hardware support, as a first step towards a Hardware Abstraction Layer
+    . split CCLight_Transmon into HAL_Transmon and HAL_ShimSQ
+        . new code should use HAL_Transmon, added compatibility import to still allow CCLight_Transmon
+    . split DeviceCCL into HAL_Device and HAL_ShimMQ
+        . new code should use HAL_Device, added compatibility import to still allow DeviceCCL
+    . split off UHF related detector functions from detector_functions.py
++ added 'make' support to Base_LutMan to automate efficient uploading (not yet integrated into existing code)
+* cleanup
+    . many repairs to test suite
+    . fixed many deprecation warnings from libraries used
+    - fixed many unused imports
+. set maximum line length to 120 to improve readability (old limit of 80 was violated in many places anyway)
 
 v0.3 - 20211119
 # redesigned DIO timing calibration interface (PR #621):

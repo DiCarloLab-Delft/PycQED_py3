@@ -2,7 +2,7 @@ import numpy as np
 from pycqed.simulations.pauli_transfer_matrices import I, X, Y, Z, S, S2, H, CZ
 '''
 Decomposition of the single qubit clifford group as per
-Eptstein et al. Phys. Rev. A 89, 062321 (2014)
+Epstein et al. Phys. Rev. A 89, 062321 (2014)
 '''
 
 clifford_group_single_qubit = [np.empty([4, 4])]*(24)

@@ -234,6 +234,7 @@ class BaseDataAnalysis(object):
         # Save quantities of interest switch               #
         ####################################################
         self.save_qois = save_qois
+        plt.ioff()
 
     def run_analysis(self):
         """
@@ -461,15 +462,15 @@ class BaseDataAnalysis(object):
             if self.presentation_mode:
                 savename = os.path.join(
                     savedir, key + tstag + 'presentation' + '.' + fmt)
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
+                self.figs[key].savefig(savename, bbox_inches='tight', format=fmt)
                 savename = os.path.join(
                     savedir, key + tstag + 'presentation' + '.svg')
                 self.figs[key].savefig(
-                    savename, bbox_inches='tight', fmt='svg')
+                    savename, bbox_inches='tight', format='svg')
             else:
                 savename = os.path.join(
                     savedir, key + tstag + '.' + fmt)
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
+                self.figs[key].savefig(savename, bbox_inches='tight', format=fmt)
             if close_figs:
                 plt.close(self.figs[key])
 
@@ -790,7 +791,7 @@ class BaseDataAnalysis(object):
         if axs_dict is not None:
             for key, val in list(axs_dict.items()):
                 self.axs[key] = val
-        if key_list is 'auto':
+        if key_list == 'auto':
             key_list = self.auto_keys
         if key_list is None:
             key_list = self.plot_dicts.keys()
@@ -809,6 +810,7 @@ class BaseDataAnalysis(object):
                 # This fig variable should perhaps be a different
                 # variable for each plot!!
                 # This might fix a bug.
+                plt.ioff()
                 self.figs[pdict['ax_id']], self.axs[pdict['ax_id']] = plt.subplots(
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),

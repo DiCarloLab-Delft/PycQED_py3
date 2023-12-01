@@ -1744,7 +1744,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         sim_control_CZ_par_name = "instr_sim_control_CZ_{}".format(which_gate)
         sim_control_CZ_name = self.get(sim_control_CZ_par_name)
         found_name = sim_control_CZ_name is not None
-        found_instr = self._all_instruments.get(sim_control_CZ_name) is not None
+        found_instr = self._all_lutmans.get(sim_control_CZ_name) is not None
         if found_name and found_instr:
             sim_control_CZ = self.find_instrument(sim_control_CZ_name)
             assert which_gate == sim_control_CZ.which_gate()
@@ -1804,7 +1804,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             label = "auto_{}_{}".format(sim_control_CZ.name, time_string)
 
         if sweep_mode == "linear":
-            n_pnts_per_dim = np.int(np.ceil(np.sqrt(n_points)))
+            n_pnts_per_dim = int(np.ceil(np.sqrt(n_points)))
             MC.set_sweep_points(np.linspace(*theta_f_lims, n_pnts_per_dim))
             MC.set_sweep_points_2D(np.linspace(*lambda_2_lims, n_pnts_per_dim))
             MC.run(label, mode="2D")

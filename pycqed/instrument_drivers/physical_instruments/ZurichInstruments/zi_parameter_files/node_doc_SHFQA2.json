@@ -1,0 +1,4139 @@
+{
+    "clockbase": {
+        "Description": "Returns the internal clock frequency of the device.",
+        "Node": "clockbase",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "dios/0/drive": {
+        "Description": "When on (1), the corresponding 8-bit bus is in output mode. When off (0), it is in input mode. Bit 0 corresponds to the least significant byte. For example, the value 1 drives the least significant byte, the value 8 drives the most significant byte.",
+        "Node": "dios/0/drive",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "dios/0/input": {
+        "Description": "Gives the value of the DIO input for those bytes where drive is disabled.",
+        "Node": "dios/0/input",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "dios/0/interface": {
+        "Description": "Selects the interface standard to use on the 32-bit DIO interface. A value of 0 means that a 3.3 V CMOS interface is used. A value of 1 means that an LVDS compatible interface is used.",
+        "Node": "dios/0/interface",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "dios/0/mode": {
+        "Description": "Select DIO mode",
+        "Node": "dios/0/mode",
+        "Options": {
+            "0": "\"manual\": Enables manual control of the DIO output bits.",
+            "16": "\"qa_result\": Sends discriminated readout results to the DIO.",
+            "32": "\"chan0seq\", \"channel0_sequencer\": Enables control of DIO values by the sequencer of channel 1.",
+            "33": "\"chan1seq\", \"channel1_sequencer\": Enables control of DIO values by the sequencer of channel 2."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "dios/0/output": {
+        "Description": "Sets the value of the DIO output for those bytes where 'drive' is enabled.",
+        "Node": "dios/0/output",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "features/code": {
+        "Description": "Node providing a mechanism to write feature codes.",
+        "Node": "features/code",
+        "Properties": "Write",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "features/devtype": {
+        "Description": "Returns the device type.",
+        "Node": "features/devtype",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "features/options": {
+        "Description": "Returns enabled options.",
+        "Node": "features/options",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "features/serial": {
+        "Description": "Device serial number.",
+        "Node": "features/serial",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "qachannels/0/centerfreq": {
+        "Description": "The Center Frequency of the analysis band.",
+        "Node": "qachannels/0/centerfreq",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "qachannels/0/generator/auxtriggers/0/channel": {
+        "Description": "Selects the source of the digital Trigger.",
+        "Node": "qachannels/0/generator/auxtriggers/0/channel",
+        "Options": {
+            "0": "\"chan0trigin0\", \"channel0_trigger_input0\": Channel 1, Trigger Input A.",
+            "1": "\"chan0trigin1\", \"channel0_trigger_input1\": Channel 1, Trigger Input B.",
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "128": "\"chan0rod\", \"channel0_readout_done\": Channel 1, Readout done.",
+            "129": "\"chan1rod\", \"channel1_readout_done\": Channel 2, Readout done.",
+            "2": "\"chan1trigin0\", \"channel1_trigger_input0\": Channel 2, Trigger Input A.",
+            "3": "\"chan1trigin1\", \"channel1_trigger_input1\": Channel 2, Trigger Input B.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/auxtriggers/1/channel": {
+        "Description": "Selects the source of the digital Trigger.",
+        "Node": "qachannels/0/generator/auxtriggers/1/channel",
+        "Options": {
+            "0": "\"chan0trigin0\", \"channel0_trigger_input0\": Channel 1, Trigger Input A.",
+            "1": "\"chan0trigin1\", \"channel0_trigger_input1\": Channel 1, Trigger Input B.",
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "128": "\"chan0rod\", \"channel0_readout_done\": Channel 1, Readout done.",
+            "129": "\"chan1rod\", \"channel1_readout_done\": Channel 2, Readout done.",
+            "2": "\"chan1trigin0\", \"channel1_trigger_input0\": Channel 2, Trigger Input A.",
+            "3": "\"chan1trigin1\", \"channel1_trigger_input1\": Channel 2, Trigger Input B.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/clearwave": {
+        "Description": "Clears all waveforms in each slot and resets their length to 0.",
+        "Node": "qachannels/0/generator/clearwave",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/delay": {
+        "Description": "Sets a common delay for the start of the playback for all Waveform Memories. The resolution is 2 ns.",
+        "Node": "qachannels/0/generator/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "qachannels/0/generator/dio/data": {
+        "Description": "A vector of 32-bit integers representing the values on the DIO interface.",
+        "Node": "qachannels/0/generator/dio/data",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/dio/valid/index": {
+        "Description": "Select the DIO bit to use as the VALID signal to indicate that a valid input is available.",
+        "Node": "qachannels/0/generator/dio/valid/index",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/dio/valid/polarity": {
+        "Description": "Polarity of the VALID bit that indicates that a valid input is available.",
+        "Node": "qachannels/0/generator/dio/valid/polarity",
+        "Options": {
+            "0": "\"none\": None: VALID bit is ignored.",
+            "1": "\"low\": Low: VALID bit must be logical zero.",
+            "2": "\"high\": High: VALID bit must be logical high.",
+            "3": "\"both\": Both: VALID bit may be logical high or zero."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/elf/data": {
+        "Description": "Content of the uploaded ELF file.",
+        "Node": "qachannels/0/generator/elf/data",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/elf/length": {
+        "Description": "Length of the compiled ELF file.",
+        "Node": "qachannels/0/generator/elf/length",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/elf/name": {
+        "Description": "Name of the uploaded ELF file.",
+        "Node": "qachannels/0/generator/elf/name",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/elf/progress": {
+        "Description": "Percentage of the Sequencer program already uploaded to the device.",
+        "Node": "qachannels/0/generator/elf/progress",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "%"
+    },
+    "qachannels/0/generator/enable": {
+        "Description": "Enables the Sequencer.",
+        "Node": "qachannels/0/generator/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/ready": {
+        "Description": "The Sequencer has a compiled program and is ready to be enabled.",
+        "Node": "qachannels/0/generator/ready",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/reset": {
+        "Description": "Clears the configured Sequencer program and resets the state to not ready.",
+        "Node": "qachannels/0/generator/reset",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/rtlogger/clear": {
+        "Description": "[empty]",
+        "Node": "qachannels/0/generator/rtlogger/clear",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/rtlogger/data": {
+        "Description": "[empty]",
+        "Node": "qachannels/0/generator/rtlogger/data",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/rtlogger/enable": {
+        "Description": "[empty]",
+        "Node": "qachannels/0/generator/rtlogger/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/rtlogger/input": {
+        "Description": "[empty]",
+        "Node": "qachannels/0/generator/rtlogger/input",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/rtlogger/mode": {
+        "Description": "[empty]",
+        "Node": "qachannels/0/generator/rtlogger/mode",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/rtlogger/starttimestamp": {
+        "Description": "[empty]",
+        "Node": "qachannels/0/generator/rtlogger/starttimestamp",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/rtlogger/status": {
+        "Description": "[empty]",
+        "Node": "qachannels/0/generator/rtlogger/status",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/rtlogger/timebase": {
+        "Description": "[empty]",
+        "Node": "qachannels/0/generator/rtlogger/timebase",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/sequencer/assembly": {
+        "Description": "Displays the current sequence program in compiled form. Every line corresponds to one hardware instruction and requires one clock cycle (4.0 ns) for execution.",
+        "Node": "qachannels/0/generator/sequencer/assembly",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/sequencer/memoryusage": {
+        "Description": "Size of the current Sequencer program relative to the available instruction memory of 16384 instructions.",
+        "Node": "qachannels/0/generator/sequencer/memoryusage",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/sequencer/program": {
+        "Description": "Displays the source code of the current Sequencer program.",
+        "Node": "qachannels/0/generator/sequencer/program",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/sequencer/status": {
+        "Description": "Status of the Sequencer on the instrument. Bit 0: Sequencer is running; Bit 1: reserved; Bit 2: Sequencer is waiting for a trigger to arrive; Bit 3: Sequencer has detected an error.",
+        "Node": "qachannels/0/generator/sequencer/status",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/sequencer/triggered": {
+        "Description": "When at value 1, indicates that the Sequencer has been triggered.",
+        "Node": "qachannels/0/generator/sequencer/triggered",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/single": {
+        "Description": "Puts the Sequencer into single-shot mode.",
+        "Node": "qachannels/0/generator/single",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/0": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/1": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/10": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/10",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/11": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/11",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/12": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/12",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/13": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/13",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/14": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/14",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/15": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/15",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/2": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/2",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/3": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/3",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/4": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/4",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/5": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/5",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/6": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/6",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/7": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/7",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/8": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/8",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/userregs/9": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/0/generator/userregs/9",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/0/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/0/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/0/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/0/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/1/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/1/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/1/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/1/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/10/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/10/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/10/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/10/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/11/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/11/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/11/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/11/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/12/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/12/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/12/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/12/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/13/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/13/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/13/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/13/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/14/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/14/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/14/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/14/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/15/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/15/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/15/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/15/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/2/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/2/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/2/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/2/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/3/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/3/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/3/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/3/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/4/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/4/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/4/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/4/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/5/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/5/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/5/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/5/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/6/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/6/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/6/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/6/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/7/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/7/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/7/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/7/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/8/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/8/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/8/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/8/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/9/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/0/generator/waveforms/9/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/generator/waveforms/9/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/0/generator/waveforms/9/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/input/on": {
+        "Description": "Enables the Signal Input.",
+        "Node": "qachannels/0/input/on",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/input/overrangecount": {
+        "Description": "Indicates the number of times the Signal Input was in an overrange condition within the last 200 ms. It is checked for an overrange condition every 10 ms.",
+        "Node": "qachannels/0/input/overrangecount",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/input/range": {
+        "Description": "Sets the maximal Range of the Signal Input power. The instrument selects the closest available Range with a resolution of 5 dBm.",
+        "Node": "qachannels/0/input/range",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "dBm"
+    },
+    "qachannels/0/markers/0/source": {
+        "Description": "Selects the source for the marker output.",
+        "Node": "qachannels/0/markers/0/source",
+        "Options": {
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "128": "\"chan0rod\", \"channel0_readout_done\": Channel 1, Readout done.",
+            "129": "\"chan1rod\", \"channel1_readout_done\": Channel 2, Readout done.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/markers/1/source": {
+        "Description": "Selects the source for the marker output.",
+        "Node": "qachannels/0/markers/1/source",
+        "Options": {
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "128": "\"chan0rod\", \"channel0_readout_done\": Channel 1, Readout done.",
+            "129": "\"chan1rod\", \"channel1_readout_done\": Channel 2, Readout done.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/mode": {
+        "Description": "Selects between Spectroscopy and Qubit Readout mode.",
+        "Node": "qachannels/0/mode",
+        "Options": {
+            "0": "\"spectroscopy\": In Spectroscopy mode, the Signal Output is connected to the Oscillator, with which also the measured signals are correlated.",
+            "1": "\"readout\": In Qubit Readout mode, the Signal Output is connected to the Readout Pulse Generator, and the measured signals are correlated with the Integration Weights before state discrimination."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/oscs/0/freq": {
+        "Description": "Controls the frequency of each digital Oscillator.",
+        "Node": "qachannels/0/oscs/0/freq",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "qachannels/0/oscs/0/gain": {
+        "Description": "Controls the gain of each digital Oscillator. The gain is defined relative to the Output Range of the Readout Channel.",
+        "Node": "qachannels/0/oscs/0/gain",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/output/filter": {
+        "Description": "Reads the selected analog filter before the Signal Output.",
+        "Node": "qachannels/0/output/filter",
+        "Options": {
+            "0": "\"lowpass_1500\": Low-pass filter of 1.5 GHz.",
+            "1": "\"lowpass_3000\": Low-pass filter of 3 GHz.",
+            "2": "\"bandpass_3000_6000\": Band-pass filter between 3 GHz - 6 GHz",
+            "3": "\"bandpass_6000_10000\": Band-pass filter between 6 GHz - 10 GHz"
+        },
+        "Properties": "Read",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/output/on": {
+        "Description": "Enables the Signal Output.",
+        "Node": "qachannels/0/output/on",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/output/overrangecount": {
+        "Description": "Indicates the number of times the Signal Output was in an overrange condition within the last 200 ms. It is checked for an overrange condition every 10 ms.",
+        "Node": "qachannels/0/output/overrangecount",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/output/range": {
+        "Description": "Sets the maximal Range of the Signal Output power. The instrument selects the closest available Range with a resolution of 5 dBm.",
+        "Node": "qachannels/0/output/range",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "dBm"
+    },
+    "qachannels/0/readout/discriminators/0/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/0/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/1/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/1/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/10/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/10/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/11/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/11/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/12/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/12/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/13/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/13/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/14/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/14/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/15/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/15/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/2/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/2/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/3/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/3/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/4/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/4/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/5/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/5/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/6/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/6/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/7/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/7/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/8/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/8/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/discriminators/9/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/0/readout/discriminators/9/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/clearweight": {
+        "Description": "Clears all integration weights by setting them to 0.",
+        "Node": "qachannels/0/readout/integration/clearweight",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/delay": {
+        "Description": "Sets a common delay for the start of the readout integration for all Integration Weights with respect to the time when the trigger is received. The resolution is 2 ns.",
+        "Node": "qachannels/0/readout/integration/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "qachannels/0/readout/integration/length": {
+        "Description": "Sets the length of all Integration Weights in number of samples. A maximum of 4096 samples can be integrated, which corresponds to 2.05 us.",
+        "Node": "qachannels/0/readout/integration/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/0/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/0/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/1/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/1/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/10/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/10/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/11/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/11/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/12/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/12/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/13/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/13/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/14/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/14/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/15/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/15/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/2/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/2/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/3/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/3/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/4/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/4/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/5/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/5/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/6/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/6/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/7/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/7/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/8/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/8/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/integration/weights/9/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/0/readout/integration/weights/9/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/acquired": {
+        "Description": "Indicates the index of the acquisition that will be performed on the next trigger.",
+        "Node": "qachannels/0/readout/result/acquired",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/averages": {
+        "Description": "Number of measurements that are averaged. Only powers of 2 are valid, other values are rounded down to the next power of 2. 1 means no averaging. The maximum setting is 32768.",
+        "Node": "qachannels/0/readout/result/averages",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/0/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/0/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/1/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/1/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/10/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/10/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/11/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/11/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/12/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/12/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/13/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/13/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/14/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/14/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/15/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/15/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/2/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/2/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/3/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/3/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/4/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/4/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/5/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/5/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/6/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/6/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/7/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/7/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/8/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/8/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/data/9/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/0/readout/result/data/9/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/enable": {
+        "Description": "Enables the acquisition of readout results.",
+        "Node": "qachannels/0/readout/result/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/errors": {
+        "Description": "Number of hold-off errors detected since last reset.",
+        "Node": "qachannels/0/readout/result/errors",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/length": {
+        "Description": "Number of data points to record. One data point corresponds to a single averaged result value of the selected source.",
+        "Node": "qachannels/0/readout/result/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/mode": {
+        "Description": "Selects the averaging order of the result.",
+        "Node": "qachannels/0/readout/result/mode",
+        "Options": {
+            "0": "\"cyclic\": Cyclic averaging: a sequence of multiple results is recorded first, then averaged with the next repetition of the same sequence.",
+            "1": "\"sequential\": Sequential averaging: each result is recorded and averaged first, before the next result is recorded and averaged."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/overdio": {
+        "Description": "Number of DIO interface overflows during readout. This can happen if readouts are triggered faster than the maximum possible data-rate of the DIO interface.",
+        "Node": "qachannels/0/readout/result/overdio",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/readout/result/source": {
+        "Description": "Selects the signal source of the Result Logger.",
+        "Node": "qachannels/0/readout/result/source",
+        "Options": {
+            "1": "\"result_of_integration\": Complex-valued integration results of the Weighted Integration in Qubit Readout mode.",
+            "3": "\"result_of_discrimination\": The results after state discrimination."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/delay": {
+        "Description": "Sets the delay of the integration in Spectroscopy mode with respect to the Trigger signal. The resolution is 2 ns.",
+        "Node": "qachannels/0/spectroscopy/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "qachannels/0/spectroscopy/envelope/delay": {
+        "Description": "Sets the delay of the envelope waveform in Spectroscopy mode with respect to the Trigger signal. The resolution is 2 ns.",
+        "Node": "qachannels/0/spectroscopy/envelope/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "qachannels/0/spectroscopy/envelope/enable": {
+        "Description": "Enables the modulation of the oscillator signal with the complex envelope waveform.",
+        "Node": "qachannels/0/spectroscopy/envelope/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/envelope/length": {
+        "Description": "Length of the uploaded envelope waveform in number of complex samples.",
+        "Node": "qachannels/0/spectroscopy/envelope/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/envelope/wave": {
+        "Description": "Contains the envelope waveform as a vector of complex samples.",
+        "Node": "qachannels/0/spectroscopy/envelope/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/length": {
+        "Description": "Sets the integration length in Spectroscopy mode in number of samples. Up to 33.5 MSa (2^25 samples) can be recorded, which corresponds to 16.7 ms.",
+        "Node": "qachannels/0/spectroscopy/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/result/acquired": {
+        "Description": "Indicates the index of the acquisition that will be performed on the next trigger.",
+        "Node": "qachannels/0/spectroscopy/result/acquired",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/result/averages": {
+        "Description": "Number of measurements that are averaged. Only powers of 2 are valid, other values are rounded down to the next power of 2. 1 means no averaging. The maximum setting is 32768.",
+        "Node": "qachannels/0/spectroscopy/result/averages",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/result/data/wave": {
+        "Description": "Acquired complex spectroscopy result data.",
+        "Node": "qachannels/0/spectroscopy/result/data/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/result/enable": {
+        "Description": "Enables the acquisition of spectroscopy results.",
+        "Node": "qachannels/0/spectroscopy/result/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/result/errors": {
+        "Description": "Number of hold-off errors detected since last reset.",
+        "Node": "qachannels/0/spectroscopy/result/errors",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/result/length": {
+        "Description": "Number of data points to record. One data point corresponds to a single averaged result value of the selected source.",
+        "Node": "qachannels/0/spectroscopy/result/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/result/mode": {
+        "Description": "Selects the averaging order of the result.",
+        "Node": "qachannels/0/spectroscopy/result/mode",
+        "Options": {
+            "0": "\"cyclic\": Cyclic averaging: a sequence of multiple results is recorded first, then averaged with the next repetition of the same sequence.",
+            "1": "\"sequential\": Sequential averaging: each result is recorded and averaged first, before the next result is recorded and averaged."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/spectroscopy/trigger/channel": {
+        "Description": "Selects the source of the trigger for the integration and envelope in Spectroscopy mode.",
+        "Node": "qachannels/0/spectroscopy/trigger/channel",
+        "Options": {
+            "0": "\"chan0trigin0\", \"channel0_trigger_input0\": Channel 1, Trigger Input A.",
+            "1": "\"chan0trigin1\", \"channel0_trigger_input1\": Channel 1, Trigger Input B.",
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "2": "\"chan1trigin0\", \"channel1_trigger_input0\": Channel 2, Trigger Input A.",
+            "3": "\"chan1trigin1\", \"channel1_trigger_input1\": Channel 2, Trigger Input B.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/triggers/0/imp50": {
+        "Description": "Trigger Input impedance: When on, the Trigger Input impedance is 50 Ohm; when off, 1 kOhm.",
+        "Node": "qachannels/0/triggers/0/imp50",
+        "Options": {
+            "0": "\"1_kOhm\": OFF: 1 k Ohm",
+            "1": "\"50_Ohm\": ON: 50 Ohm"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/triggers/0/level": {
+        "Description": "Defines the analog Trigger level.",
+        "Node": "qachannels/0/triggers/0/level",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "qachannels/0/triggers/0/value": {
+        "Description": "Shows the value of the digital Trigger Input. The value is integrated over a period of 100 ms. Values are: 1: low; 2: high; 3: was low and high in the period.",
+        "Node": "qachannels/0/triggers/0/value",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/0/triggers/1/imp50": {
+        "Description": "Trigger Input impedance: When on, the Trigger Input impedance is 50 Ohm; when off, 1 kOhm.",
+        "Node": "qachannels/0/triggers/1/imp50",
+        "Options": {
+            "0": "\"1_kOhm\": OFF: 1 k Ohm",
+            "1": "\"50_Ohm\": ON: 50 Ohm"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/0/triggers/1/level": {
+        "Description": "Defines the analog Trigger level.",
+        "Node": "qachannels/0/triggers/1/level",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "qachannels/0/triggers/1/value": {
+        "Description": "Shows the value of the digital Trigger Input. The value is integrated over a period of 100 ms. Values are: 1: low; 2: high; 3: was low and high in the period.",
+        "Node": "qachannels/0/triggers/1/value",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/centerfreq": {
+        "Description": "The Center Frequency of the analysis band.",
+        "Node": "qachannels/1/centerfreq",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "qachannels/1/generator/auxtriggers/0/channel": {
+        "Description": "Selects the source of the digital Trigger.",
+        "Node": "qachannels/1/generator/auxtriggers/0/channel",
+        "Options": {
+            "0": "\"chan0trigin0\", \"channel0_trigger_input0\": Channel 1, Trigger Input A.",
+            "1": "\"chan0trigin1\", \"channel0_trigger_input1\": Channel 1, Trigger Input B.",
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "128": "\"chan0rod\", \"channel0_readout_done\": Channel 1, Readout done.",
+            "129": "\"chan1rod\", \"channel1_readout_done\": Channel 2, Readout done.",
+            "2": "\"chan1trigin0\", \"channel1_trigger_input0\": Channel 2, Trigger Input A.",
+            "3": "\"chan1trigin1\", \"channel1_trigger_input1\": Channel 2, Trigger Input B.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/auxtriggers/1/channel": {
+        "Description": "Selects the source of the digital Trigger.",
+        "Node": "qachannels/1/generator/auxtriggers/1/channel",
+        "Options": {
+            "0": "\"chan0trigin0\", \"channel0_trigger_input0\": Channel 1, Trigger Input A.",
+            "1": "\"chan0trigin1\", \"channel0_trigger_input1\": Channel 1, Trigger Input B.",
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "128": "\"chan0rod\", \"channel0_readout_done\": Channel 1, Readout done.",
+            "129": "\"chan1rod\", \"channel1_readout_done\": Channel 2, Readout done.",
+            "2": "\"chan1trigin0\", \"channel1_trigger_input0\": Channel 2, Trigger Input A.",
+            "3": "\"chan1trigin1\", \"channel1_trigger_input1\": Channel 2, Trigger Input B.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/clearwave": {
+        "Description": "Clears all waveforms in each slot and resets their length to 0.",
+        "Node": "qachannels/1/generator/clearwave",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/delay": {
+        "Description": "Sets a common delay for the start of the playback for all Waveform Memories. The resolution is 2 ns.",
+        "Node": "qachannels/1/generator/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "qachannels/1/generator/dio/data": {
+        "Description": "A vector of 32-bit integers representing the values on the DIO interface.",
+        "Node": "qachannels/1/generator/dio/data",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/dio/valid/index": {
+        "Description": "Select the DIO bit to use as the VALID signal to indicate that a valid input is available.",
+        "Node": "qachannels/1/generator/dio/valid/index",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/dio/valid/polarity": {
+        "Description": "Polarity of the VALID bit that indicates that a valid input is available.",
+        "Node": "qachannels/1/generator/dio/valid/polarity",
+        "Options": {
+            "0": "\"none\": None: VALID bit is ignored.",
+            "1": "\"low\": Low: VALID bit must be logical zero.",
+            "2": "\"high\": High: VALID bit must be logical high.",
+            "3": "\"both\": Both: VALID bit may be logical high or zero."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/elf/data": {
+        "Description": "Content of the uploaded ELF file.",
+        "Node": "qachannels/1/generator/elf/data",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/elf/length": {
+        "Description": "Length of the compiled ELF file.",
+        "Node": "qachannels/1/generator/elf/length",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/elf/name": {
+        "Description": "Name of the uploaded ELF file.",
+        "Node": "qachannels/1/generator/elf/name",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/elf/progress": {
+        "Description": "Percentage of the Sequencer program already uploaded to the device.",
+        "Node": "qachannels/1/generator/elf/progress",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "%"
+    },
+    "qachannels/1/generator/enable": {
+        "Description": "Enables the Sequencer.",
+        "Node": "qachannels/1/generator/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/ready": {
+        "Description": "The Sequencer has a compiled program and is ready to be enabled.",
+        "Node": "qachannels/1/generator/ready",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/reset": {
+        "Description": "Clears the configured Sequencer program and resets the state to not ready.",
+        "Node": "qachannels/1/generator/reset",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/rtlogger/clear": {
+        "Description": "[empty]",
+        "Node": "qachannels/1/generator/rtlogger/clear",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/rtlogger/data": {
+        "Description": "[empty]",
+        "Node": "qachannels/1/generator/rtlogger/data",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/rtlogger/enable": {
+        "Description": "[empty]",
+        "Node": "qachannels/1/generator/rtlogger/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/rtlogger/input": {
+        "Description": "[empty]",
+        "Node": "qachannels/1/generator/rtlogger/input",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/rtlogger/mode": {
+        "Description": "[empty]",
+        "Node": "qachannels/1/generator/rtlogger/mode",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/rtlogger/starttimestamp": {
+        "Description": "[empty]",
+        "Node": "qachannels/1/generator/rtlogger/starttimestamp",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/rtlogger/status": {
+        "Description": "[empty]",
+        "Node": "qachannels/1/generator/rtlogger/status",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/rtlogger/timebase": {
+        "Description": "[empty]",
+        "Node": "qachannels/1/generator/rtlogger/timebase",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/sequencer/assembly": {
+        "Description": "Displays the current sequence program in compiled form. Every line corresponds to one hardware instruction and requires one clock cycle (4.0 ns) for execution.",
+        "Node": "qachannels/1/generator/sequencer/assembly",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/sequencer/memoryusage": {
+        "Description": "Size of the current Sequencer program relative to the available instruction memory of 16384 instructions.",
+        "Node": "qachannels/1/generator/sequencer/memoryusage",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/sequencer/program": {
+        "Description": "Displays the source code of the current Sequencer program.",
+        "Node": "qachannels/1/generator/sequencer/program",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/sequencer/status": {
+        "Description": "Status of the Sequencer on the instrument. Bit 0: Sequencer is running; Bit 1: reserved; Bit 2: Sequencer is waiting for a trigger to arrive; Bit 3: Sequencer has detected an error.",
+        "Node": "qachannels/1/generator/sequencer/status",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/sequencer/triggered": {
+        "Description": "When at value 1, indicates that the Sequencer has been triggered.",
+        "Node": "qachannels/1/generator/sequencer/triggered",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/single": {
+        "Description": "Puts the Sequencer into single-shot mode.",
+        "Node": "qachannels/1/generator/single",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/0": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/1": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/10": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/10",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/11": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/11",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/12": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/12",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/13": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/13",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/14": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/14",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/15": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/15",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/2": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/2",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/3": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/3",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/4": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/4",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/5": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/5",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/6": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/6",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/7": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/7",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/8": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/8",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/userregs/9": {
+        "Description": "Integer user register value. The sequencer has read and write access to the user register values during runtime.",
+        "Node": "qachannels/1/generator/userregs/9",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/0/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/0/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/0/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/0/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/1/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/1/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/1/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/1/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/10/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/10/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/10/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/10/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/11/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/11/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/11/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/11/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/12/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/12/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/12/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/12/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/13/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/13/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/13/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/13/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/14/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/14/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/14/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/14/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/15/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/15/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/15/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/15/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/2/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/2/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/2/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/2/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/3/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/3/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/3/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/3/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/4/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/4/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/4/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/4/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/5/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/5/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/5/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/5/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/6/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/6/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/6/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/6/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/7/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/7/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/7/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/7/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/8/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/8/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/8/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/8/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/9/length": {
+        "Description": "Length of the uploaded waveform in number of complex samples.",
+        "Node": "qachannels/1/generator/waveforms/9/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/generator/waveforms/9/wave": {
+        "Description": "Contains the generators waveforms as a vector of complex samples",
+        "Node": "qachannels/1/generator/waveforms/9/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/input/on": {
+        "Description": "Enables the Signal Input.",
+        "Node": "qachannels/1/input/on",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/input/overrangecount": {
+        "Description": "Indicates the number of times the Signal Input was in an overrange condition within the last 200 ms. It is checked for an overrange condition every 10 ms.",
+        "Node": "qachannels/1/input/overrangecount",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/input/range": {
+        "Description": "Sets the maximal Range of the Signal Input power. The instrument selects the closest available Range with a resolution of 5 dBm.",
+        "Node": "qachannels/1/input/range",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "dBm"
+    },
+    "qachannels/1/markers/0/source": {
+        "Description": "Selects the source for the marker output.",
+        "Node": "qachannels/1/markers/0/source",
+        "Options": {
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "128": "\"chan0rod\", \"channel0_readout_done\": Channel 1, Readout done.",
+            "129": "\"chan1rod\", \"channel1_readout_done\": Channel 2, Readout done.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/markers/1/source": {
+        "Description": "Selects the source for the marker output.",
+        "Node": "qachannels/1/markers/1/source",
+        "Options": {
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "128": "\"chan0rod\", \"channel0_readout_done\": Channel 1, Readout done.",
+            "129": "\"chan1rod\", \"channel1_readout_done\": Channel 2, Readout done.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/mode": {
+        "Description": "Selects between Spectroscopy and Qubit Readout mode.",
+        "Node": "qachannels/1/mode",
+        "Options": {
+            "0": "\"spectroscopy\": In Spectroscopy mode, the Signal Output is connected to the Oscillator, with which also the measured signals are correlated.",
+            "1": "\"readout\": In Qubit Readout mode, the Signal Output is connected to the Readout Pulse Generator, and the measured signals are correlated with the Integration Weights before state discrimination."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/oscs/0/freq": {
+        "Description": "Controls the frequency of each digital Oscillator.",
+        "Node": "qachannels/1/oscs/0/freq",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "qachannels/1/oscs/0/gain": {
+        "Description": "Controls the gain of each digital Oscillator. The gain is defined relative to the Output Range of the Readout Channel.",
+        "Node": "qachannels/1/oscs/0/gain",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/output/filter": {
+        "Description": "Reads the selected analog filter before the Signal Output.",
+        "Node": "qachannels/1/output/filter",
+        "Options": {
+            "0": "\"lowpass_1500\": Low-pass filter of 1.5 GHz.",
+            "1": "\"lowpass_3000\": Low-pass filter of 3 GHz.",
+            "2": "\"bandpass_3000_6000\": Band-pass filter between 3 GHz - 6 GHz",
+            "3": "\"bandpass_6000_10000\": Band-pass filter between 6 GHz - 10 GHz"
+        },
+        "Properties": "Read",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/output/on": {
+        "Description": "Enables the Signal Output.",
+        "Node": "qachannels/1/output/on",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/output/overrangecount": {
+        "Description": "Indicates the number of times the Signal Output was in an overrange condition within the last 200 ms. It is checked for an overrange condition every 10 ms.",
+        "Node": "qachannels/1/output/overrangecount",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/output/range": {
+        "Description": "Sets the maximal Range of the Signal Output power. The instrument selects the closest available Range with a resolution of 5 dBm.",
+        "Node": "qachannels/1/output/range",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "dBm"
+    },
+    "qachannels/1/readout/discriminators/0/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/0/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/1/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/1/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/10/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/10/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/11/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/11/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/12/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/12/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/13/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/13/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/14/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/14/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/15/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/15/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/2/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/2/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/3/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/3/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/4/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/4/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/5/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/5/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/6/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/6/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/7/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/7/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/8/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/8/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/discriminators/9/threshold": {
+        "Description": "Sets the threshold level for the 2-state discriminator on the real signal axis in Vs.",
+        "Node": "qachannels/1/readout/discriminators/9/threshold",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/clearweight": {
+        "Description": "Clears all integration weights by setting them to 0.",
+        "Node": "qachannels/1/readout/integration/clearweight",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/delay": {
+        "Description": "Sets a common delay for the start of the readout integration for all Integration Weights with respect to the time when the trigger is received. The resolution is 2 ns.",
+        "Node": "qachannels/1/readout/integration/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "qachannels/1/readout/integration/length": {
+        "Description": "Sets the length of all Integration Weights in number of samples. A maximum of 4096 samples can be integrated, which corresponds to 2.05 us.",
+        "Node": "qachannels/1/readout/integration/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/0/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/0/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/1/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/1/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/10/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/10/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/11/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/11/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/12/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/12/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/13/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/13/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/14/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/14/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/15/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/15/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/2/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/2/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/3/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/3/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/4/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/4/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/5/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/5/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/6/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/6/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/7/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/7/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/8/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/8/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/integration/weights/9/wave": {
+        "Description": "Contains the complex-valued waveform of the Integration Weight. The valid range is between -1.0 and +1.0 for both the real and imaginary part.",
+        "Node": "qachannels/1/readout/integration/weights/9/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/acquired": {
+        "Description": "Indicates the index of the acquisition that will be performed on the next trigger.",
+        "Node": "qachannels/1/readout/result/acquired",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/averages": {
+        "Description": "Number of measurements that are averaged. Only powers of 2 are valid, other values are rounded down to the next power of 2. 1 means no averaging. The maximum setting is 32768.",
+        "Node": "qachannels/1/readout/result/averages",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/0/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/0/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/1/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/1/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/10/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/10/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/11/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/11/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/12/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/12/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/13/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/13/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/14/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/14/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/15/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/15/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/2/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/2/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/3/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/3/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/4/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/4/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/5/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/5/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/6/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/6/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/7/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/7/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/8/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/8/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/data/9/wave": {
+        "Description": "Acquired result data. Depending on the source of the data, the data can be complex- or integer-valued.",
+        "Node": "qachannels/1/readout/result/data/9/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/enable": {
+        "Description": "Enables the acquisition of readout results.",
+        "Node": "qachannels/1/readout/result/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/errors": {
+        "Description": "Number of hold-off errors detected since last reset.",
+        "Node": "qachannels/1/readout/result/errors",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/length": {
+        "Description": "Number of data points to record. One data point corresponds to a single averaged result value of the selected source.",
+        "Node": "qachannels/1/readout/result/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/mode": {
+        "Description": "Selects the averaging order of the result.",
+        "Node": "qachannels/1/readout/result/mode",
+        "Options": {
+            "0": "\"cyclic\": Cyclic averaging: a sequence of multiple results is recorded first, then averaged with the next repetition of the same sequence.",
+            "1": "\"sequential\": Sequential averaging: each result is recorded and averaged first, before the next result is recorded and averaged."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/overdio": {
+        "Description": "Number of DIO interface overflows during readout. This can happen if readouts are triggered faster than the maximum possible data-rate of the DIO interface.",
+        "Node": "qachannels/1/readout/result/overdio",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/readout/result/source": {
+        "Description": "Selects the signal source of the Result Logger.",
+        "Node": "qachannels/1/readout/result/source",
+        "Options": {
+            "1": "\"result_of_integration\": Complex-valued integration results of the Weighted Integration in Qubit Readout mode.",
+            "3": "\"result_of_discrimination\": The results after state discrimination."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/delay": {
+        "Description": "Sets the delay of the integration in Spectroscopy mode with respect to the Trigger signal. The resolution is 2 ns.",
+        "Node": "qachannels/1/spectroscopy/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "qachannels/1/spectroscopy/envelope/delay": {
+        "Description": "Sets the delay of the envelope waveform in Spectroscopy mode with respect to the Trigger signal. The resolution is 2 ns.",
+        "Node": "qachannels/1/spectroscopy/envelope/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "qachannels/1/spectroscopy/envelope/enable": {
+        "Description": "Enables the modulation of the oscillator signal with the complex envelope waveform.",
+        "Node": "qachannels/1/spectroscopy/envelope/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/envelope/length": {
+        "Description": "Length of the uploaded envelope waveform in number of complex samples.",
+        "Node": "qachannels/1/spectroscopy/envelope/length",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/envelope/wave": {
+        "Description": "Contains the envelope waveform as a vector of complex samples.",
+        "Node": "qachannels/1/spectroscopy/envelope/wave",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/length": {
+        "Description": "Sets the integration length in Spectroscopy mode in number of samples. Up to 33.5 MSa (2^25 samples) can be recorded, which corresponds to 16.7 ms.",
+        "Node": "qachannels/1/spectroscopy/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/result/acquired": {
+        "Description": "Indicates the index of the acquisition that will be performed on the next trigger.",
+        "Node": "qachannels/1/spectroscopy/result/acquired",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/result/averages": {
+        "Description": "Number of measurements that are averaged. Only powers of 2 are valid, other values are rounded down to the next power of 2. 1 means no averaging. The maximum setting is 32768.",
+        "Node": "qachannels/1/spectroscopy/result/averages",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/result/data/wave": {
+        "Description": "Acquired complex spectroscopy result data.",
+        "Node": "qachannels/1/spectroscopy/result/data/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/result/enable": {
+        "Description": "Enables the acquisition of spectroscopy results.",
+        "Node": "qachannels/1/spectroscopy/result/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/result/errors": {
+        "Description": "Number of hold-off errors detected since last reset.",
+        "Node": "qachannels/1/spectroscopy/result/errors",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/result/length": {
+        "Description": "Number of data points to record. One data point corresponds to a single averaged result value of the selected source.",
+        "Node": "qachannels/1/spectroscopy/result/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/result/mode": {
+        "Description": "Selects the averaging order of the result.",
+        "Node": "qachannels/1/spectroscopy/result/mode",
+        "Options": {
+            "0": "\"cyclic\": Cyclic averaging: a sequence of multiple results is recorded first, then averaged with the next repetition of the same sequence.",
+            "1": "\"sequential\": Sequential averaging: each result is recorded and averaged first, before the next result is recorded and averaged."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/spectroscopy/trigger/channel": {
+        "Description": "Selects the source of the trigger for the integration and envelope in Spectroscopy mode.",
+        "Node": "qachannels/1/spectroscopy/trigger/channel",
+        "Options": {
+            "0": "\"chan0trigin0\", \"channel0_trigger_input0\": Channel 1, Trigger Input A.",
+            "1": "\"chan0trigin1\", \"channel0_trigger_input1\": Channel 1, Trigger Input B.",
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "2": "\"chan1trigin0\", \"channel1_trigger_input0\": Channel 2, Trigger Input A.",
+            "3": "\"chan1trigin1\", \"channel1_trigger_input1\": Channel 2, Trigger Input B.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/triggers/0/imp50": {
+        "Description": "Trigger Input impedance: When on, the Trigger Input impedance is 50 Ohm; when off, 1 kOhm.",
+        "Node": "qachannels/1/triggers/0/imp50",
+        "Options": {
+            "0": "\"1_kOhm\": OFF: 1 k Ohm",
+            "1": "\"50_Ohm\": ON: 50 Ohm"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/triggers/0/level": {
+        "Description": "Defines the analog Trigger level.",
+        "Node": "qachannels/1/triggers/0/level",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "qachannels/1/triggers/0/value": {
+        "Description": "Shows the value of the digital Trigger Input. The value is integrated over a period of 100 ms. Values are: 1: low; 2: high; 3: was low and high in the period.",
+        "Node": "qachannels/1/triggers/0/value",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "qachannels/1/triggers/1/imp50": {
+        "Description": "Trigger Input impedance: When on, the Trigger Input impedance is 50 Ohm; when off, 1 kOhm.",
+        "Node": "qachannels/1/triggers/1/imp50",
+        "Options": {
+            "0": "\"1_kOhm\": OFF: 1 k Ohm",
+            "1": "\"50_Ohm\": ON: 50 Ohm"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "qachannels/1/triggers/1/level": {
+        "Description": "Defines the analog Trigger level.",
+        "Node": "qachannels/1/triggers/1/level",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "qachannels/1/triggers/1/value": {
+        "Description": "Shows the value of the digital Trigger Input. The value is integrated over a period of 100 ms. Values are: 1: low; 2: high; 3: was low and high in the period.",
+        "Node": "qachannels/1/triggers/1/value",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "scopes/0/averaging/count": {
+        "Description": "Configures the number of Scope measurements to average.",
+        "Node": "scopes/0/averaging/count",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "scopes/0/averaging/enable": {
+        "Description": "Enables averaging of Scope measurements.",
+        "Node": "scopes/0/averaging/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "scopes/0/channels/0/enable": {
+        "Description": "Enables recording for this Scope channel.",
+        "Node": "scopes/0/channels/0/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "Dependent"
+    },
+    "scopes/0/channels/0/inputselect": {
+        "Description": "Selects the scope input signal.",
+        "Node": "scopes/0/channels/0/inputselect",
+        "Options": {
+            "0": "\"chan0sigin\", \"channel0_signal_input\": Signal Input Channel 1.",
+            "1": "\"chan1sigin\", \"channel1_signal_input\": Signal Input Channel 2."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "scopes/0/channels/0/wave": {
+        "Description": "Contains the acquired Scope measurement data.",
+        "Node": "scopes/0/channels/0/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "Dependent"
+    },
+    "scopes/0/channels/1/enable": {
+        "Description": "Enables recording for this Scope channel.",
+        "Node": "scopes/0/channels/1/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "Dependent"
+    },
+    "scopes/0/channels/1/inputselect": {
+        "Description": "Selects the scope input signal.",
+        "Node": "scopes/0/channels/1/inputselect",
+        "Options": {
+            "0": "\"chan0sigin\", \"channel0_signal_input\": Signal Input Channel 1.",
+            "1": "\"chan1sigin\", \"channel1_signal_input\": Signal Input Channel 2."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "scopes/0/channels/1/wave": {
+        "Description": "Contains the acquired Scope measurement data.",
+        "Node": "scopes/0/channels/1/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "Dependent"
+    },
+    "scopes/0/channels/2/enable": {
+        "Description": "Enables recording for this Scope channel.",
+        "Node": "scopes/0/channels/2/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "Dependent"
+    },
+    "scopes/0/channels/2/inputselect": {
+        "Description": "Selects the scope input signal.",
+        "Node": "scopes/0/channels/2/inputselect",
+        "Options": {
+            "0": "\"chan0sigin\", \"channel0_signal_input\": Signal Input Channel 1.",
+            "1": "\"chan1sigin\", \"channel1_signal_input\": Signal Input Channel 2."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "scopes/0/channels/2/wave": {
+        "Description": "Contains the acquired Scope measurement data.",
+        "Node": "scopes/0/channels/2/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "Dependent"
+    },
+    "scopes/0/channels/3/enable": {
+        "Description": "Enables recording for this Scope channel.",
+        "Node": "scopes/0/channels/3/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "Dependent"
+    },
+    "scopes/0/channels/3/inputselect": {
+        "Description": "Selects the scope input signal.",
+        "Node": "scopes/0/channels/3/inputselect",
+        "Options": {
+            "0": "\"chan0sigin\", \"channel0_signal_input\": Signal Input Channel 1.",
+            "1": "\"chan1sigin\", \"channel1_signal_input\": Signal Input Channel 2."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "scopes/0/channels/3/wave": {
+        "Description": "Contains the acquired Scope measurement data.",
+        "Node": "scopes/0/channels/3/wave",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "Dependent"
+    },
+    "scopes/0/enable": {
+        "Description": "Enables the acquisition of Scope shots. Goes back to 0 (disabled) after the scope shot has been acquired.",
+        "Node": "scopes/0/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "scopes/0/length": {
+        "Description": "Defines the length of the recorded Scope shot in number of samples.",
+        "Node": "scopes/0/length",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "scopes/0/segments/count": {
+        "Description": "Specifies the number of segments to be recorded in device memory. The maximum Scope shot size is given by the available memory divided by the number of segments.",
+        "Node": "scopes/0/segments/count",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "scopes/0/segments/enable": {
+        "Description": "Enable segmented Scope recording. This allows for full bandwidth recording of Scope shots with a minimum dead time between individual shots.",
+        "Node": "scopes/0/segments/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "scopes/0/single": {
+        "Description": "Puts the Scope into single shot mode.",
+        "Node": "scopes/0/single",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "scopes/0/time": {
+        "Description": "Defines the time base of the Scope.",
+        "Node": "scopes/0/time",
+        "Options": {
+            "0": "2 GHz"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "scopes/0/trigger/channel": {
+        "Description": "Selects the trigger source signal.",
+        "Node": "scopes/0/trigger/channel",
+        "Options": {
+            "0": "\"chan0trigin0\", \"channel0_trigger_input0\": Channel 1, Trigger Input A.",
+            "1": "\"chan0trigin1\", \"channel0_trigger_input1\": Channel 1, Trigger Input B.",
+            "1024": "\"swtrig0\", \"software_trigger0\": Software Trigger 1.",
+            "2": "\"chan1trigin0\", \"channel1_trigger_input0\": Channel 2, Trigger Input A.",
+            "3": "\"chan1trigin1\", \"channel1_trigger_input1\": Channel 2, Trigger Input B.",
+            "32": "\"chan0seqtrig0\", \"channel0_sequencer_trigger0\": Channel 1, Sequencer Trigger Output.",
+            "33": "\"chan1seqtrig0\", \"channel1_sequencer_trigger0\": Channel 2, Sequencer Trigger Output.",
+            "64": "\"chan0seqmon0\", \"channel0_sequencer_monitor0\": Channel 1, Sequencer Monitor Trigger.",
+            "65": "\"chan1seqmon0\", \"channel1_sequencer_monitor0\": Channel 2, Sequencer Monitor Trigger."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "scopes/0/trigger/delay": {
+        "Description": "The delay of a Scope measurement. A negative delay results in data being acquired before the trigger point. The resolution is 2 ns.",
+        "Node": "scopes/0/trigger/delay",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "scopes/0/trigger/enable": {
+        "Description": "When triggering is enabled scope data are acquired every time the defined trigger condition is met.",
+        "Node": "scopes/0/trigger/enable",
+        "Options": {
+            "0": "\"off\": OFF: Continuous scope shot acquisition",
+            "1": "\"on\": ON: Trigger based scope shot acquisition"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "stats/cmdstream/bandwidth": {
+        "Description": "Command streaming bandwidth usage on the physical network connection between device and data server.",
+        "Node": "stats/cmdstream/bandwidth",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Mbit/s"
+    },
+    "stats/cmdstream/bytesreceived": {
+        "Description": "Number of bytes received on the command stream from the device since session start.",
+        "Node": "stats/cmdstream/bytesreceived",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "B"
+    },
+    "stats/cmdstream/bytessent": {
+        "Description": "Number of bytes sent on the command stream from the device since session start.",
+        "Node": "stats/cmdstream/bytessent",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "B"
+    },
+    "stats/cmdstream/packetslost": {
+        "Description": "Number of command packets lost since device start. Command packets contain device settings that are sent to and received from the device.",
+        "Node": "stats/cmdstream/packetslost",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/cmdstream/packetsreceived": {
+        "Description": "Number of packets received on the command stream from the device since session start.",
+        "Node": "stats/cmdstream/packetsreceived",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/cmdstream/packetssent": {
+        "Description": "Number of packets sent on the command stream to the device since session start.",
+        "Node": "stats/cmdstream/packetssent",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/cmdstream/pending": {
+        "Description": "Number of buffers ready for receiving command packets from the device.",
+        "Node": "stats/cmdstream/pending",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/cmdstream/processing": {
+        "Description": "Number of buffers being processed for command packets. Small values indicate proper performance. For a TCP/IP interface, command packets are sent using the TCP protocol.",
+        "Node": "stats/cmdstream/processing",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/datastream/bandwidth": {
+        "Description": "Data streaming bandwidth usage on the physical network connection between device and data server.",
+        "Node": "stats/datastream/bandwidth",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Mbit/s"
+    },
+    "stats/datastream/bytesreceived": {
+        "Description": "Number of bytes received on the data stream from the device since session start.",
+        "Node": "stats/datastream/bytesreceived",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "B"
+    },
+    "stats/datastream/packetslost": {
+        "Description": "Number of data packets lost since device start. Data packets contain measurement data.",
+        "Node": "stats/datastream/packetslost",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/datastream/packetsreceived": {
+        "Description": "Number of packets received on the data stream from the device since session start.",
+        "Node": "stats/datastream/packetsreceived",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/datastream/pending": {
+        "Description": "Number of buffers ready for receiving data packets from the device.",
+        "Node": "stats/datastream/pending",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/datastream/processing": {
+        "Description": "Number of buffers being processed for data packets. Small values indicate proper performance. For a TCP/IP interface, data packets are sent using the UDP protocol.",
+        "Node": "stats/datastream/processing",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/physical/currents/0": {
+        "Description": "Provides internal current readings for monitoring.",
+        "Node": "stats/physical/currents/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "mA"
+    },
+    "stats/physical/currents/1": {
+        "Description": "Provides internal current readings for monitoring.",
+        "Node": "stats/physical/currents/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "mA"
+    },
+    "stats/physical/currents/2": {
+        "Description": "Provides internal current readings for monitoring.",
+        "Node": "stats/physical/currents/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "mA"
+    },
+    "stats/physical/currents/3": {
+        "Description": "Provides internal current readings for monitoring.",
+        "Node": "stats/physical/currents/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "mA"
+    },
+    "stats/physical/currents/4": {
+        "Description": "Provides internal current readings for monitoring.",
+        "Node": "stats/physical/currents/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "mA"
+    },
+    "stats/physical/fanspeeds/0": {
+        "Description": "Speed of the internal cooling fans for monitoring.",
+        "Node": "stats/physical/fanspeeds/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "RPM"
+    },
+    "stats/physical/fanspeeds/1": {
+        "Description": "Speed of the internal cooling fans for monitoring.",
+        "Node": "stats/physical/fanspeeds/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "RPM"
+    },
+    "stats/physical/fanspeeds/2": {
+        "Description": "Speed of the internal cooling fans for monitoring.",
+        "Node": "stats/physical/fanspeeds/2",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "RPM"
+    },
+    "stats/physical/fanspeeds/3": {
+        "Description": "Speed of the internal cooling fans for monitoring.",
+        "Node": "stats/physical/fanspeeds/3",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "RPM"
+    },
+    "stats/physical/fanspeeds/4": {
+        "Description": "Speed of the internal cooling fans for monitoring.",
+        "Node": "stats/physical/fanspeeds/4",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "RPM"
+    },
+    "stats/physical/fanspeeds/5": {
+        "Description": "Speed of the internal cooling fans for monitoring.",
+        "Node": "stats/physical/fanspeeds/5",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "RPM"
+    },
+    "stats/physical/fpga/aux": {
+        "Description": "Supply voltage of the FPGA.",
+        "Node": "stats/physical/fpga/aux",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/fpga/core": {
+        "Description": "Core voltage of the FPGA.",
+        "Node": "stats/physical/fpga/core",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/fpga/pstemp": {
+        "Description": "Internal temperature of the FPGA's processor system.",
+        "Node": "stats/physical/fpga/pstemp",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/fpga/temp": {
+        "Description": "Internal temperature of the FPGA.",
+        "Node": "stats/physical/fpga/temp",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/overtemperature": {
+        "Description": "This flag is set to a value greater than 0 when the internal temperatures are reaching critical limits.",
+        "Node": "stats/physical/overtemperature",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "stats/physical/sigins/0/currents/0": {
+        "Description": "Provides internal current readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/currents/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigins/0/currents/1": {
+        "Description": "Provides internal current readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/currents/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigins/0/temperatures/0": {
+        "Description": "Provides internal temperature readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/temperatures/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigins/0/temperatures/1": {
+        "Description": "Provides internal temperature readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/temperatures/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigins/0/temperatures/2": {
+        "Description": "Provides internal temperature readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/temperatures/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigins/0/temperatures/3": {
+        "Description": "Provides internal temperature readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/temperatures/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigins/0/voltages/0": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/1": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/10": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/10",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/11": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/11",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/12": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/12",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/13": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/13",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/2": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/3": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/4": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/5": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/5",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/6": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/6",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/7": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/7",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/8": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/8",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/0/voltages/9": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/0/voltages/9",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/currents/0": {
+        "Description": "Provides internal current readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/currents/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigins/1/currents/1": {
+        "Description": "Provides internal current readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/currents/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigins/1/temperatures/0": {
+        "Description": "Provides internal temperature readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/temperatures/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigins/1/temperatures/1": {
+        "Description": "Provides internal temperature readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/temperatures/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigins/1/temperatures/2": {
+        "Description": "Provides internal temperature readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/temperatures/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigins/1/temperatures/3": {
+        "Description": "Provides internal temperature readings on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/temperatures/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigins/1/voltages/0": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/1": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/10": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/10",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/11": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/11",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/12": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/12",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/13": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/13",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/2": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/3": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/4": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/5": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/5",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/6": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/6",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/7": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/7",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/8": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/8",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigins/1/voltages/9": {
+        "Description": "Provides internal voltage measurement on the Signal Input board for monitoring.",
+        "Node": "stats/physical/sigins/1/voltages/9",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/currents/0": {
+        "Description": "Provides internal current readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/currents/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigouts/0/currents/1": {
+        "Description": "Provides internal current readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/currents/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigouts/0/currents/2": {
+        "Description": "Provides internal current readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/currents/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigouts/0/currents/3": {
+        "Description": "Provides internal current readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/currents/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigouts/0/temperatures/0": {
+        "Description": "Provides internal temperature readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/temperatures/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigouts/0/temperatures/1": {
+        "Description": "Provides internal temperature readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/temperatures/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigouts/0/temperatures/2": {
+        "Description": "Provides internal temperature readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/temperatures/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigouts/0/temperatures/3": {
+        "Description": "Provides internal temperature readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/temperatures/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigouts/0/voltages/0": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/1": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/10": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/10",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/11": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/11",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/2": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/3": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/4": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/5": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/5",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/6": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/6",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/7": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/7",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/8": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/8",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/0/voltages/9": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/0/voltages/9",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/currents/0": {
+        "Description": "Provides internal current readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/currents/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigouts/1/currents/1": {
+        "Description": "Provides internal current readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/currents/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigouts/1/currents/2": {
+        "Description": "Provides internal current readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/currents/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigouts/1/currents/3": {
+        "Description": "Provides internal current readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/currents/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/sigouts/1/temperatures/0": {
+        "Description": "Provides internal temperature readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/temperatures/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigouts/1/temperatures/1": {
+        "Description": "Provides internal temperature readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/temperatures/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigouts/1/temperatures/2": {
+        "Description": "Provides internal temperature readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/temperatures/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigouts/1/temperatures/3": {
+        "Description": "Provides internal temperature readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/temperatures/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/sigouts/1/voltages/0": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/1": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/10": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/10",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/11": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/11",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/2": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/3": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/4": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/5": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/5",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/6": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/6",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/7": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/7",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/8": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/8",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/sigouts/1/voltages/9": {
+        "Description": "Provides internal voltage readings on the Signal Output board for monitoring.",
+        "Node": "stats/physical/sigouts/1/voltages/9",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/currents/0": {
+        "Description": "Provides internal current readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/currents/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/synthesizer/currents/1": {
+        "Description": "Provides internal current readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/currents/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/synthesizer/currents/2": {
+        "Description": "Provides internal current readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/currents/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/synthesizer/currents/3": {
+        "Description": "Provides internal current readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/currents/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/synthesizer/currents/4": {
+        "Description": "Provides internal current readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/currents/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "A"
+    },
+    "stats/physical/synthesizer/temperatures/0": {
+        "Description": "Provides internal temperature readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/temperatures/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/synthesizer/temperatures/1": {
+        "Description": "Provides internal temperature readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/temperatures/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/synthesizer/temperatures/2": {
+        "Description": "Provides internal temperature readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/temperatures/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/synthesizer/temperatures/3": {
+        "Description": "Provides internal temperature readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/temperatures/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/synthesizer/temperatures/4": {
+        "Description": "Provides internal temperature readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/temperatures/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/synthesizer/voltages/0": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/1": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/10": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/10",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/2": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/3": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/4": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/5": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/5",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/6": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/6",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/7": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/7",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/8": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/8",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/synthesizer/voltages/9": {
+        "Description": "Provides internal voltage readings on the Synthesizer board for monitoring.",
+        "Node": "stats/physical/synthesizer/voltages/9",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/temperatures/0": {
+        "Description": "Provides internal temperature readings for monitoring.",
+        "Node": "stats/physical/temperatures/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/temperatures/1": {
+        "Description": "Provides internal temperature readings for monitoring.",
+        "Node": "stats/physical/temperatures/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/temperatures/2": {
+        "Description": "Provides internal temperature readings for monitoring.",
+        "Node": "stats/physical/temperatures/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/temperatures/3": {
+        "Description": "Provides internal temperature readings for monitoring.",
+        "Node": "stats/physical/temperatures/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/temperatures/4": {
+        "Description": "Provides internal temperature readings for monitoring.",
+        "Node": "stats/physical/temperatures/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/temperatures/5": {
+        "Description": "Provides internal temperature readings for monitoring.",
+        "Node": "stats/physical/temperatures/5",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/temperatures/6": {
+        "Description": "Provides internal temperature readings for monitoring.",
+        "Node": "stats/physical/temperatures/6",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/temperatures/7": {
+        "Description": "Provides internal temperature readings for monitoring.",
+        "Node": "stats/physical/temperatures/7",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "stats/physical/voltages/0": {
+        "Description": "Provides internal voltage readings for monitoring.",
+        "Node": "stats/physical/voltages/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/voltages/1": {
+        "Description": "Provides internal voltage readings for monitoring.",
+        "Node": "stats/physical/voltages/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/voltages/2": {
+        "Description": "Provides internal voltage readings for monitoring.",
+        "Node": "stats/physical/voltages/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/voltages/3": {
+        "Description": "Provides internal voltage readings for monitoring.",
+        "Node": "stats/physical/voltages/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "stats/physical/voltages/4": {
+        "Description": "Provides internal voltage readings for monitoring.",
+        "Node": "stats/physical/voltages/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "status/adc0max": {
+        "Description": "The maximum value on Signal Input 1 (ADC0) during 100 ms.",
+        "Node": "status/adc0max",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "status/adc0min": {
+        "Description": "The minimum value on Signal Input 1 (ADC0) during 100 ms",
+        "Node": "status/adc0min",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "status/adc1max": {
+        "Description": "The maximum value on Signal Input 2 (ADC1) during 100 ms.",
+        "Node": "status/adc1max",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "status/adc1min": {
+        "Description": "The minimum value on Signal Input 2 (ADC1) during 100 ms",
+        "Node": "status/adc1min",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "status/fifolevel": {
+        "Description": "USB FIFO level: Indicates the USB FIFO fill level inside the device. When 100%, data is lost",
+        "Node": "status/fifolevel",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "status/flags/binary": {
+        "Description": "A set of binary flags giving an indication of the state of various parts of the device. Reserved for future use.",
+        "Node": "status/flags/binary",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "status/flags/packetlosstcp": {
+        "Description": "Flag indicating if tcp packages have been lost.",
+        "Node": "status/flags/packetlosstcp",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "status/flags/packetlossudp": {
+        "Description": "Flag indicating if udp packages have been lost.",
+        "Node": "status/flags/packetlossudp",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "status/time": {
+        "Description": "The current timestamp.",
+        "Node": "status/time",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/activeinterface": {
+        "Description": "Currently active interface of the device.",
+        "Node": "system/activeinterface",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/boardrevisions/0": {
+        "Description": "Hardware revision of the motherboard containing the FPGA.",
+        "Node": "system/boardrevisions/0",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/boardrevisions/1": {
+        "Description": "Hardware revision of the Signal Output board.",
+        "Node": "system/boardrevisions/1",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/clocks/referenceclock/in/freq": {
+        "Description": "Indicates the frequency of the reference clock.",
+        "Node": "system/clocks/referenceclock/in/freq",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "system/clocks/referenceclock/in/source": {
+        "Description": "The intended reference clock source. When the source is changed, all the instruments connected with ZSync links will be disconnected. The connection should be re-established manually.",
+        "Node": "system/clocks/referenceclock/in/source",
+        "Options": {
+            "0": "\"internal\": The internal clock is intended to be used as the frequency and time base reference.",
+            "1": "\"external\": An external clock is intended to be used as the frequency and time base reference. Provide a clean and stable 10 MHz or 100 MHz reference to the appropriate back panel connector.",
+            "2": "\"zsync\": The ZSync clock is intended to be used as the frequency and time base reference."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "system/clocks/referenceclock/in/sourceactual": {
+        "Description": "The actual reference clock source.",
+        "Node": "system/clocks/referenceclock/in/sourceactual",
+        "Options": {
+            "0": "\"internal\": The internal clock is used as the frequency and time base reference.",
+            "1": "\"external\": An external clock is used as the frequency and time base reference.",
+            "2": "\"zsync\": The ZSync clock is used as the frequency and time base reference."
+        },
+        "Properties": "Read",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "system/clocks/referenceclock/in/status": {
+        "Description": "Status of the reference clock.",
+        "Node": "system/clocks/referenceclock/in/status",
+        "Options": {
+            "0": "Reference clock has been locked on.",
+            "1": "There was an error locking onto the reference clock signal.",
+            "2": "The device is busy trying to lock onto the reference clock signal."
+        },
+        "Properties": "Read",
+        "Type": "Integer (enumerated)",
+        "Unit": "None"
+    },
+    "system/clocks/referenceclock/out/enable": {
+        "Description": "Enable clock signal on the reference clock output. When the clock output is turned on or off, all the instruments connected with ZSync links will be disconnected. The connection should be re-established manually.",
+        "Node": "system/clocks/referenceclock/out/enable",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/clocks/referenceclock/out/freq": {
+        "Description": "Select the frequency of the output reference clock. Only 10 MHz and 100 MHz are allowed. When the frequency is changed, all the instruments connected with ZSync links will be disconnected. The connection should be re-established manually.",
+        "Node": "system/clocks/referenceclock/out/freq",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "system/fpgarevision": {
+        "Description": "HDL firmware revision.",
+        "Node": "system/fpgarevision",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/fwlog": {
+        "Description": "Returns log output of the firmware.",
+        "Node": "system/fwlog",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/fwlogenable": {
+        "Description": "Enables logging to the fwlog node.",
+        "Node": "system/fwlogenable",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/fwrevision": {
+        "Description": "Revision of the device-internal controller software.",
+        "Node": "system/fwrevision",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/identify": {
+        "Description": "Setting this node to 1 will cause all frontpanel LEDs to blink for 5 seconds, then return to their previous state.",
+        "Node": "system/identify",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/interfacespeed": {
+        "Description": "Speed of the currently active interface (USB only).",
+        "Node": "system/interfacespeed",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/nics/0/defaultgateway": {
+        "Description": "Default gateway configuration for the network connection.",
+        "Node": "system/nics/0/defaultgateway",
+        "Properties": "Read, Write",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/nics/0/defaultip4": {
+        "Description": "IPv4 address of the device to use if static IP is enabled.",
+        "Node": "system/nics/0/defaultip4",
+        "Properties": "Read, Write",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/nics/0/defaultmask": {
+        "Description": "IPv4 mask in case of static IP.",
+        "Node": "system/nics/0/defaultmask",
+        "Properties": "Read, Write",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/nics/0/gateway": {
+        "Description": "Current network gateway.",
+        "Node": "system/nics/0/gateway",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/nics/0/ip4": {
+        "Description": "Current IPv4 of the device.",
+        "Node": "system/nics/0/ip4",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/nics/0/mac": {
+        "Description": "Current MAC address of the device network interface.",
+        "Node": "system/nics/0/mac",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/nics/0/mask": {
+        "Description": "Current network mask.",
+        "Node": "system/nics/0/mask",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/nics/0/saveip": {
+        "Description": "If written, this action will program the defined static IP address to the device.",
+        "Node": "system/nics/0/saveip",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/nics/0/static": {
+        "Description": "Enable this flag if the device is used in a network with fixed IP assignment without a DHCP server.",
+        "Node": "system/nics/0/static",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/owner": {
+        "Description": "Returns the current owner of the device (IP).",
+        "Node": "system/owner",
+        "Properties": "Read",
+        "Type": "String",
+        "Unit": "None"
+    },
+    "system/properties/freqresolution": {
+        "Description": "The number of bits used to represent a frequency.",
+        "Node": "system/properties/freqresolution",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/properties/freqscaling": {
+        "Description": "The scale factor to use to convert a frequency represented as a freqresolution-bit integer to a floating point value.",
+        "Node": "system/properties/freqscaling",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "system/properties/maxdemodrate": {
+        "Description": "[empty]",
+        "Node": "system/properties/maxdemodrate",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "system/properties/maxfreq": {
+        "Description": "The maximum oscillator frequency that can be set.",
+        "Node": "system/properties/maxfreq",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "system/properties/maxtimeconstant": {
+        "Description": "The maximum demodulator time constant that can be set.",
+        "Node": "system/properties/maxtimeconstant",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "system/properties/minfreq": {
+        "Description": "The minimum oscillator frequency that can be set.",
+        "Node": "system/properties/minfreq",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "system/properties/mintimeconstant": {
+        "Description": "The minimum demodulator time constant that can be set.",
+        "Node": "system/properties/mintimeconstant",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "system/properties/negativefreq": {
+        "Description": "Indicates whether negative frequencies are supported.",
+        "Node": "system/properties/negativefreq",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/properties/timebase": {
+        "Description": "Minimal time difference between two timestamps. The value is equal to 1/(maximum sampling rate).",
+        "Node": "system/properties/timebase",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "system/shutdown": {
+        "Description": "Sending a '1' to this node initiates a shutdown of the operating system on the device. It is recommended to trigger this shutdown before switching the device off with the hardware switch at the back side of the device.",
+        "Node": "system/shutdown",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/stall": {
+        "Description": "Indicates if the network connection is stalled.",
+        "Node": "system/stall",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/swtriggers/0/single": {
+        "Description": "Issues a single software trigger event.",
+        "Node": "system/swtriggers/0/single",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "system/update": {
+        "Description": "Requests update of the device firmware and bitstream from the dataserver.",
+        "Node": "system/update",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    }
+}

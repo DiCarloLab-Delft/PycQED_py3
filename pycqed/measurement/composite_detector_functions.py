@@ -1,14 +1,8 @@
 import numpy as np
-#import time
-from pycqed.measurement import sweep_functions as swf
-#from pycqed.measurement import awg_sweep_functions as awg_swf
-#from pycqed.measurement import CBox_sweep_functions as CB_swf
 from pycqed.measurement import detector_functions as det
 from pycqed.analysis import measurement_analysis as ma
-#from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.analysis import analysis_toolbox as a_tools
 from qcodes.instrument.parameter import ManualParameter
-#from pycqed.measurement.waveform_control_CC import QWG_fluxing_seqs as qwfs
 import pycqed.analysis.tools.plotting as plt_tools
 
 
@@ -760,7 +754,7 @@ class Chevron_optimization_v1(det.Soft_Detector):
         kernel_before_list = self.dist_dict['ch%d' % self.flux_channel]
         kernel_before_loaded = []
         for k in kernel_before_list:
-            if k is not '':
+            if k != '':
                 kernel_before_loaded.append(np.loadtxt(kernel_dir+k))
         self.kernel_before = kernel_obj.convolve_kernel(kernel_before_loaded,
                                                         30000)

@@ -2,63 +2,43 @@ import os
 import logging
 import numpy as np
 import pickle
-from collections import OrderedDict
 import h5py
-import matplotlib.lines as mlines
+import lmfit
+import textwrap
+import pylab
+import math
+from math import erfc
+from copy import deepcopy
+from importlib import reload
+from pprint import pprint
+from deprecated import deprecated
+
+from collections import OrderedDict
+from collections import Counter  # used in counting string fractions
+
 import matplotlib
+import matplotlib.lines as mlines
 from matplotlib import pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
-import pycqed.measurement.hdf5_data as h5d
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import scipy.optimize as optimize
-from scipy import stats
-import lmfit
-from collections import Counter  # used in counting string fractions
-import textwrap
-from scipy.interpolate import interp1d
-import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
-from pycqed.utilities.general import SafeFormatter, format_value_string
-from scipy.ndimage.filters import gaussian_filter
-from importlib import reload
-import math
-
-# try:
-#     import pygsti
-# except ImportError as e:
-#     if str(e).find('pygsti') >= 0:
-#         logging.warning('Could not import pygsti')
-#     else:
-#         raise
-
-from math import erfc
-from scipy.signal import argrelmax, argrelmin
-from scipy.constants import *
-from copy import deepcopy
-from pycqed.analysis.fit_toolbox import functions as func
-from pprint import pprint
-
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor)
+from pycqed.analysis.fit_toolbox import functions as func
+from pycqed.utilities.general import SafeFormatter, format_value_string
+import pycqed.measurement.hdf5_data as h5d
 
-# FIXME: remove
-try:
-    from nathan_plotting_tools import *
-except:
-    pass
-from pycqed.analysis import composite_analysis as ca
+import scipy.optimize as optimize
+from scipy import stats
+from scipy.interpolate import interp1d
+from scipy.ndimage.filters import gaussian_filter
+from scipy.signal import argrelmax, argrelmin
+from scipy.constants import *
 
-# try:
-#     import qutip as qtp
-
-# except ImportError as e:
-#     if str(e).find('qutip') >= 0:
-#         logging.warning('Could not import qutip')
-#     else:
-#         raise
 
 reload(dm_tools)
 
@@ -300,7 +280,7 @@ class MeasurementAnalysis(object):
             s = s.decode('utf-8')
         # If it is an array of value decodes individual entries
         if type(s) == np.ndarray:
-            s = [s.decode('utf-8') for s in s]
+            s = [s if isinstance(s, str) else s.decode('utf-8') for s in s]
         return s
 
     def group_values(self, group_name):
@@ -890,7 +870,7 @@ class MeasurementAnalysis(object):
                              % datasaving_format)
 
     def get_best_fit_results(self, peak=False, weighted=False):
-        if len(self.data_file['Analysis']) is 1:
+        if len(self.data_file['Analysis']) == 1:
             return list(self.data_file['Analysis'].values())[0]
         else:
             normalized_chisquares = {}
@@ -1129,14 +1109,6 @@ class TD_Analysis(MeasurementAnalysis):
         self.for_ef = for_ef
 
         super(TD_Analysis, self).__init__(qb_name=qb_name, **kw)
-
-    # def run_default_analysis(self, close_file=True, **kw):
-    #     self.get_naming_and_values()
-    #     self.fit_data(**kw)
-    #     self.make_figures(**kw)
-    #     if close_file:
-    #         self.data_file.close()
-    #     return self.fit_res
 
     def rotate_and_normalize_data(self):
         if len(self.measured_values) == 1:
@@ -1798,7 +1770,7 @@ class Rabi_Analysis(TD_Analysis):
         # we may have 0 cal pts, so writing self.sweep_points[:-self.NoCalPoints]
         # will give an error if self.NoCalPoints==0.
         self.sweep_pts_wo_cal_pts = deepcopy(self.sweep_points)
-        if self.NoCalPoints is not 0:
+        if self.NoCalPoints != 0:
             self.sweep_pts_wo_cal_pts = \
                 self.sweep_pts_wo_cal_pts[:-self.NoCalPoints]
 
@@ -1863,7 +1835,7 @@ class Rabi_Analysis(TD_Analysis):
                        ' $\pm$ (%.3g) ' % (self.rabi_amplitudes['piHalfPulse_std']) +
                        self.parameter_units[0] + old_vals)
 
-            self.fig.text(0.5, 0, textstr,
+            self.fig.text(0.5, -0.2, textstr,
                           transform=self.ax.transAxes, fontsize=self.font_size,
                           verticalalignment='top',
                           horizontalalignment='center', bbox=self.box_props)
@@ -2289,6 +2261,7 @@ class TD_UHFQC(TD_Analysis):
         self.save_fig(fig, fig_tight=False, **kw)
 
 
+@deprecated(version='0.4', reason="only used for tests in PycQED_py3, not used within pycqed_scripts")
 class Echo_analysis(TD_Analysis):
     def __init__(self,vary_n=False,**kw):
         self.vary_n = vary_n
@@ -2525,7 +2498,7 @@ class Echo_analysis_V15(TD_Analysis):
                        '\nartificial detuning = %.2g MHz'
                        % (art_det * 1e-6))
 
-            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+            fig.text(0.5, -0.2, textstr, fontsize=self.font_size,
                      transform=ax.transAxes,
                      verticalalignment='top',
                      horizontalalignment='center', bbox=self.box_props)
@@ -2783,7 +2756,7 @@ class Echo_analysis_V15(TD_Analysis):
                                     % (self.T2['T2_stderr'] * self.scale) +
                                     self.units)
 
-                    self.fig.text(0.5, 0, textstr_main, fontsize=self.font_size,
+                    self.fig.text(0.5, -0.2, textstr_main, fontsize=self.font_size,
                                   transform=self.axs[i].transAxes,
                                   verticalalignment='top',
                                   horizontalalignment='center', bbox=self.box_props)
@@ -2817,7 +2790,7 @@ class Echo_analysis_V15(TD_Analysis):
         return self.T2
 
 
-
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Rabi_parabola_analysis(Rabi_Analysis):
 
     def fit_data(self, print_fit_results=False, **kw):
@@ -3109,6 +3082,7 @@ class Motzoi_XY_analysis(TD_Analysis):
         return self.optimal_motzoi
 
 
+@deprecated(version='0.4', reason="only used for testing in PycQED_py3, not used within pycqed_scripts")
 class QScale_Analysis(TD_Analysis):
     '''
     Analysis for a DRAG pulse calibration measurement as described in
@@ -3431,6 +3405,7 @@ class QScale_Analysis(TD_Analysis):
         return self.optimal_qscale
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Rabi_Analysis_old(TD_Analysis):
     '''
     This is the old Rabi analysis for the mathematica sequences of 60 points
@@ -4348,6 +4323,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                       close_fig=self.close_fig, **kw)
 
 
+@deprecated(version='0.4', reason="only used for test in PycQED_py3, not used within pycqed_scripts")
 class SSRO_discrimination_analysis(MeasurementAnalysis):
     '''
     Analysis that takes IQ-shots and extracts discrimination fidelity from
@@ -4478,6 +4454,7 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
         self.finish(**kw)
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
     '''
     Script to analyze the single shots used for touch and go selection
@@ -4488,7 +4465,7 @@ class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
         kw['h5mode'] = 'r+'
         super(self.__class__, self).__init__(**kw)
 
-    def run_default_analysis(self, print_fit_results=False, **kw):
+    def run_default_analysis(self, show=False, print_fit_results=False, **kw):
         self.add_analysis_datagroup_to_file()
 
         # plotting histograms of the raw shots on I and Q axis
@@ -4511,11 +4488,13 @@ class touch_n_go_SSRO_Analysis(MeasurementAnalysis):
         # plt.hist(SS_Q_data, bins=40,label = '0 Q')
         plt.legend()
         self.save_fig(fig, figname='raw-histograms', **kw)
-        plt.show()
+        if show:
+            plt.show()
 
         self.finish(**kw)
 
 
+@deprecated(version='0.4', reason="only used for tests in PycQED_py3, not used within pycqed_scripts")
 class SSRO_single_quadrature_discriminiation_analysis(MeasurementAnalysis):
     '''
     Analysis that fits two gaussians to a histogram of a dataset.
@@ -4737,7 +4716,7 @@ class T1_Analysis(TD_Analysis):
                        ' $\pm$ {:.5f} '.format(T1_err_micro_sec) +
                        units + old_vals)
 
-            self.fig.text(0.5, 0, textstr, transform=self.ax.transAxes,
+            self.fig.text(0.5, -0.2, textstr, transform=self.ax.transAxes,
                           fontsize=self.font_size,
                           verticalalignment='top',
                           horizontalalignment='center',
@@ -4959,7 +4938,7 @@ class Ramsey_Analysis(TD_Analysis):
                        '\nartificial detuning = %.2g MHz'
                        % (art_det * 1e-6))
 
-            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+            fig.text(0.5, -0.2, textstr, fontsize=self.font_size,
                      transform=ax.transAxes,
                      verticalalignment='top',
                      horizontalalignment='center', bbox=self.box_props)
@@ -5223,7 +5202,7 @@ class Ramsey_Analysis(TD_Analysis):
                                     % (self.T2_star['T2_star_stderr'] * self.scale) +
                                     self.units)
 
-                    self.fig.text(0.5, 0, textstr_main, fontsize=self.font_size,
+                    self.fig.text(0.5, -0.2, textstr_main, fontsize=self.font_size,
                                   transform=self.axs[i].transAxes,
                                   verticalalignment='top',
                                   horizontalalignment='center', bbox=self.box_props)
@@ -5257,6 +5236,7 @@ class Ramsey_Analysis(TD_Analysis):
         return self.T2_star
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class DragDetuning_Analysis(TD_Analysis):
 
     def __init__(self, label='DragDetuning', **kw):
@@ -5296,6 +5276,7 @@ class DragDetuning_Analysis(TD_Analysis):
         return (self.detuning, self.XpY90, self.YpX90)
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class TransientAnalysis(TD_Analysis):
 
     def run_default_analysis(self, print_fit_results=False, **kw):
@@ -5377,6 +5358,7 @@ class TransientAnalysis(TD_Analysis):
         return
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class DriveDetuning_Analysis(TD_Analysis):
 
     def __init__(self, label='DriveDetuning', **kw):
@@ -5473,7 +5455,7 @@ class DriveDetuning_Analysis(TD_Analysis):
                                         xlabel=self.xlabel,
                                         ylabel=r'$F$  $|1\rangle$',
                                         **kw)
-        if self.fit_type is 'sine':
+        if self.fit_type == 'sine':
             ax.plot(sweep_points, self.fit_results_sine.best_fit)
         else:
             ax.plot(sweep_points, self.fit_results_quadratic[0])
@@ -5484,6 +5466,7 @@ class DriveDetuning_Analysis(TD_Analysis):
         return self.drive_scaling_factor
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class OnOff_Analysis(TD_Analysis):
 
     def __init__(self, label='OnOff', idx=None, **kw):
@@ -5598,12 +5581,13 @@ class AllXY_Analysis(TD_Analysis):
     '''
 
     def __init__(self, label='AllXY', zero_coord=None, one_coord=None,
-                 make_fig=True, **kw):
+                 make_fig=True, prepend_msmt=False, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'  # Read write mode, file must exist
         self.zero_coord = zero_coord
         self.one_coord = one_coord
         self.make_fig = make_fig
+        self.prepend_msmt = prepend_msmt
 
         super(self.__class__, self).__init__(**kw)
 
@@ -5614,6 +5598,17 @@ class AllXY_Analysis(TD_Analysis):
         self.cal_points = kw.pop('cal_points', None)
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
+
+        if self.prepend_msmt:
+            print(self.measured_values)
+            print(np.array(self.measured_values).shape)
+            self.measured_values = [self.measured_values[0][1::2]]
+            print(self.measured_values)
+            print(np.array(self.measured_values).shape)
+            print(self.sweep_points)
+            print(np.array(self.sweep_points).shape)
+            self.sweep_points = self.sweep_points[1::2]
+
 
         if len(self.measured_values[0]) == 42:
             ideal_data = np.concatenate((0 * np.ones(10), 0.5 * np.ones(24),
@@ -5665,9 +5660,9 @@ class AllXY_Analysis(TD_Analysis):
         ax1.plot(self.sweep_points, ideal_data, label="Ideal")
         labels = [item.get_text() for item in ax1.get_xticklabels()]
         if len(self.measured_values[0]) == 42:
-            locs = np.arange(1, 42, 2)
+            locs = self.sweep_points[1::2] #np.arange(1, 42, 2)
         else:
-            locs = np.arange(0, 21, 1)
+            locs = self.sweep_points #np.arange(0, 21, 1)
         labels = ['II', 'XX', 'YY', 'XY', 'YX',
                   'xI', 'yI', 'xy', 'yx', 'xY', 'yX',
                   'Xy', 'Yx', 'xX', 'Xx', 'yY', 'Yy',
@@ -5698,6 +5693,7 @@ class AllXY_Analysis(TD_Analysis):
         self.save_fig(fig2, ylabel='Amplitude', **kw)
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class FFC_Analysis(TD_Analysis):
     '''
     Performs a rotation and normalization on the data and calculates a
@@ -6069,6 +6065,7 @@ class RB_double_curve_Analysis(RandomizedBenchmarking_Analysis):
                       fig_tight=False, **kw)
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class RandomizedBench_2D_flat_Analysis(RandomizedBenchmarking_Analysis):
     '''
     Analysis for the specific RB sequenes used in the CBox that require
@@ -6397,13 +6394,13 @@ class Homodyne_Analysis(MeasurementAnalysis):
             textstr+=old_vals
 
 
-        fig.text(0.5, 0, textstr, transform=ax.transAxes,
+        fig.text(0.5, -0.2, textstr, transform=ax.transAxes,
                  fontsize=self.font_size,
                  verticalalignment='top',
                  horizontalalignment='center', bbox=self.box_props)
 
         if 'complex' in fitting_model:
-            fig2.text(0.5, 0, textstr, transform=ax.transAxes,
+            fig2.text(0.5, -0.2, textstr, transform=ax.transAxes,
                       fontsize=self.font_size,
                       verticalalignment='top', horizontalalignment='center',
                       bbox=self.box_props)
@@ -6453,6 +6450,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         return fit_res
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Homodyne_Analysis_Mutipeak(MeasurementAnalysis):
 
     def __init__(self, label='', dip=False, **kw):
@@ -6521,6 +6519,8 @@ class Homodyne_Analysis_Mutipeak(MeasurementAnalysis):
 ################
 # VNA analysis #
 ################
+
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class VNA_Analysis(MeasurementAnalysis):
     '''
     Nice to use with all measurements performed with the VNA.
@@ -6601,6 +6601,7 @@ class Acquisition_Delay_Analysis(MeasurementAnalysis):
         return self.max_delay
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Hanger_Analysis_CosBackground(MeasurementAnalysis):
 
     def __init__(self, label='HM', **kw):
@@ -7132,7 +7133,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 except:
                     label = None
 
-        fig_dist.text(0.5, 0, label, transform=ax_dist.transAxes,
+        fig_dist.text(0.5, -0.2, label, transform=ax_dist.transAxes,
                       fontsize=self.font_size, verticalalignment='top',
                       horizontalalignment='center', bbox=self.box_props)
 
@@ -7176,6 +7177,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         return linewidth_estimate, linewidth_estimate_stderr
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Mixer_Calibration_Analysis(MeasurementAnalysis):
     '''
     Simple analysis that takes the minimum value measured and adds it
@@ -7345,6 +7347,7 @@ class Qubit_Characterization_Analysis(MeasurementAnalysis):
             self.finish(**kw)
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Qubit_Sweeped_Spectroscopy_Analysis(Qubit_Characterization_Analysis):
 
     def __init__(self, qubit_name, label='Qubit_Char', fit_mode='flux', **kw):
@@ -7485,7 +7488,7 @@ class TwoD_Analysis(MeasurementAnalysis):
             fig_title = '{} {} \n{}'.format(
                 self.timestamp_string, self.measurementstring,
                 self.value_names[i])
-
+            ax.set_title(fig_title) # Santi 20221006: Added timestamp to 2D plot in default analysis
             # subtract mean from each row/column if demanded
             plot_zvals = meas_vals.transpose()
             if subtract_mean_x:
@@ -7513,6 +7516,7 @@ class TwoD_Analysis(MeasurementAnalysis):
             self.finish()
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Mixer_Skewness_Analysis(TwoD_Analysis):
 
     def run_default_analysis(self, save_fig=True,
@@ -7917,6 +7921,7 @@ class Resonator_Powerscan_Analysis(MeasurementAnalysis):
 
         return fit_res
 
+
 class Resonator_Powerscan_Analysis_test(MeasurementAnalysis):
 
     def __init__(self, label='powersweep', **kw):
@@ -8170,7 +8175,7 @@ class Resonator_Powerscan_Analysis_test(MeasurementAnalysis):
         return fit_res
 
 
-
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class time_trace_analysis(MeasurementAnalysis):
     '''
     Analysis for a binary (+1, -1) time trace
@@ -8236,6 +8241,7 @@ class time_trace_analysis(MeasurementAnalysis):
             return self.mean_rnds_since_fl_pm, self.mean_rnds_since_fl_mp
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class time_trace_analysis_initialized(MeasurementAnalysis):
     '''
     Analysis for a binary (+1, -1) time trace
@@ -8274,6 +8280,7 @@ class time_trace_analysis_initialized(MeasurementAnalysis):
         return self.mean_rtf, self.std_err_rtf
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class rounds_to_failure_analysis(MeasurementAnalysis):
     '''
     Analysis for a binary (+1, -1) time trace
@@ -8328,6 +8335,7 @@ class rounds_to_failure_analysis(MeasurementAnalysis):
         return self.mean_rtf, self.std_err_rtf, self.RO_err_frac, self.flip_err_frac
 
 
+@deprecated(version='0.4', reason="only used for tests in PycQED_py3, not used within pycqed_scripts")
 class butterfly_analysis(MeasurementAnalysis):
     '''
     Extracts the coefficients for the post-measurement butterfly
@@ -8643,6 +8651,7 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
 # Ramiro's routines
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class Chevron_2D(object):
 
     def __init__(self, auto=True, label='', timestamp=None):
@@ -8997,6 +9006,7 @@ class DoubleFrequency(TD_Analysis):
         return
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class SWAPN_cost(object):
 
     def __init__(self, auto=True, label='SWAPN', cost_func='sum', timestamp=None, stepsize=10):
@@ -9856,6 +9866,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         self.save_fig(fig, 'Ram-Z_dac_arc.png')
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class GST_Analysis(TD_Analysis):
     '''
     Analysis for Gate Set Tomography. Extracts data from the files, bins it
@@ -10110,6 +10121,7 @@ class GST_Analysis(TD_Analysis):
         return counts, spam_label_order
 
 
+@deprecated(version='0.4', reason="not used within PycQED_py3 and pycqed_scripts")
 class CZ_1Q_phase_analysis(TD_Analysis):
 
     def __init__(self, use_diff: bool = True, meas_vals_idx: int = 0, **kw):

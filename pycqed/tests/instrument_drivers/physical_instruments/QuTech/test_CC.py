@@ -17,6 +17,7 @@ class Test_CC(unittest.TestCase):
         transport = FileTransport(str(test_path))
         cc = CC('cc', transport, ccio_slots_driving_vsm=[5])
 
+        # FIXME: use cc.init()
         cc.reset()
         cc.clear_status()
         cc.set_status_questionable_frequency_enable(0x7FFF)

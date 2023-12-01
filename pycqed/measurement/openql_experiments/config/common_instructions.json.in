@@ -1,0 +1,899 @@
+// File:    common_instructions.json.in
+// notes:   this file specifies commonalities between different setups for key "instructions"
+//          see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
+// author: 	Wouter Vlothuizen e.a.
+
+//{
+//	"instructions": {
+        //**************************************************************************************************************
+        // microwave
+        //**************************************************************************************************************
+
+        // based on PyqQED_py3 'generate_CCL_cfg.py':
+        "prepz": {
+            "duration": @INIT_DURATION@,
+            "cc": {
+                "signal": [],    // NB: no signal
+                "static_codeword_override": [0]
+            }
+        },
+
+        // based on PyqQED_py3 'mw_lutman.py' (matches default_mw_lutmap) and 'generate_CCL_cfg.py':
+        // normal gates
+        "i": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [],   // no signal
+                "static_codeword_override": [0]
+            }
+        },
+        "rx180": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "ge", "theta": 180, "phi": 0 }
+                    }
+                ],
+                "static_codeword_override": [1]
+            }
+        },
+        "ry180": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "ge", "theta": 180, "phi": 90 }
+                    }
+                ],
+                "static_codeword_override": [2]
+            }
+        },
+        "rx90": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "ge", "theta": 90, "phi": 0 }
+                    }
+                ],
+                "static_codeword_override": [3]
+            }
+        },
+        "ry90": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "ge", "theta": 90, "phi": 90 }
+                    }
+                ],
+                "static_codeword_override": [4]
+            }
+        },
+        "rxm90": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "ge", "theta": -90, "phi": 0 }
+                    }
+                ],
+                "static_codeword_override": [5]
+            }
+        },
+        "rym90": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "ge", "theta": -90, "phi": 90 }
+                    }
+                ],
+                "static_codeword_override": [6]
+            }
+        },
+        // FIXME: missing codeword 7
+
+        // spectroscopy gate
+        "spec": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "spec"}
+                    }
+                ],
+                "static_codeword_override": [8]
+            }
+        },
+
+        // pi pulse 2nd excited state
+        "rx12": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "ef", "theta": 180, "phi": 0 }
+                    }
+                ],
+                "static_codeword_override": [9]
+            }
+        },
+
+
+        "square": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "square"}
+                    }
+                ],
+                "static_codeword_override": [10]
+            }
+        },
+
+        // normal gate
+        "rx45": {
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "ge", "theta": 45, "phi": 0 }
+                    }
+                ],
+                "static_codeword_override": [13]
+            }
+        },
+
+
+
+        // RUS: replaces former gate decompositions
+        // FIXME: replace signal/value/type with sensible info
+        // FIXME: check codewords, fix conflicts, check prototypes
+        "rx2theta": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_27"}
+                    }
+                ],
+                "static_codeword_override": [27]
+            }
+        },
+        "rxm2theta": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_28"}
+                    }
+                ],
+                "static_codeword_override": [28]
+            }
+        },
+        "rx2thetaalpha": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_29"}
+                    }
+                ],
+                "static_codeword_override": [29]
+            }
+        },
+        "rx180beta": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_29"}
+                    }
+                ],
+                "static_codeword_override": [29]
+            }
+        },
+        "rx90alpha": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_26"}
+                    }
+                ],
+                "static_codeword_override": [26]
+            }
+        },
+        "rx180alpha2": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_25"}
+                    }
+                ],
+                "static_codeword_override": [25]
+            }
+        },
+
+        "ry90beta": {
+            "prototype": ["Y:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_28"}
+                    }
+                ],
+                "static_codeword_override": [28]
+            }
+        },
+        "rym90alpha": {
+            "prototype": ["Y:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_29"}
+                    }
+                ],
+                "static_codeword_override": [29]
+            }
+        },
+        "ry90betapi": {
+            "prototype": ["Y:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_30"}
+                    }
+                ],
+                "static_codeword_override": [30]
+            }
+        },
+
+        "rphi180": {
+            "prototype": ["Z:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_27"}
+                    }
+                ],
+                "static_codeword_override": [27]
+            }
+        },
+        "rphi180beta": {
+            "prototype": ["Z:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_28"}
+                    }
+                ],
+                "static_codeword_override": [28]
+            }
+        },
+        "rphi180beta2": {
+            "prototype": ["Z:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_30"}
+                    }
+                ],
+                "static_codeword_override": [30]
+            }
+        },
+        "rphi180alpha": {
+            "prototype": ["Z:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_31"}
+                    }
+                ],
+                "static_codeword_override": [31]
+            }
+        },
+        "rphim2theta": {
+            "prototype": ["Z:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "mw",
+                        "operand_idx": 0,
+                        "value": { "type": "cw_28"}
+                    }
+                ],
+                "static_codeword_override": [28]
+            }
+        },
+
+        // cw_00 .. cw_31
+        // FIXME: remove
+        // FIXME: codewords overlap with RUS above, which originally used gate decomposition
+        // FIXME: remove? Used by multi_qubit_oql.py and single_qubit_oql.py (echo/rabi_frequency/...)
+        // ef_rabi_seq() uses codeword range [9, 26]
+        "cw_00": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [0]
+            }
+        },
+        "cw_01": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [1]
+            }
+        },
+        "cw_02": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [2]
+            }
+        },
+        "cw_03": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [3]
+            }
+        },
+        "cw_04": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [4]
+            }
+        },
+        "cw_05": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [5]
+            }
+        },
+        "cw_06": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [6]
+            }
+        },
+        "cw_07": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [7]
+            }
+        },
+        "cw_08": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [8]
+            }
+        },
+        "cw_09": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [9]
+            }
+        },
+        "cw_10": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [10]
+            }
+        },
+        "cw_11": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [11]
+            }
+        },
+        "cw_12": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [12]
+            }
+        },
+        "cw_13": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [13]
+            }
+        },
+        "cw_14": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [14]
+            }
+        },
+        "cw_15": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [15]
+            }
+        },
+        "cw_16": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [16]
+            }
+        },
+        "cw_17": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [17]
+            }
+        },
+        "cw_18": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [18]
+            }
+        },
+        "cw_19": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [19]
+            }
+        },
+        "cw_20": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [20]
+            }
+        },
+        "cw_21": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [21]
+            }
+        },
+        "cw_22": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [22]
+            }
+        },
+        "cw_23": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [23]
+            }
+        },
+        "cw_24": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [24]
+            }
+        },
+        "cw_25": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [25]
+            }
+        },
+        "cw_26": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [26]
+            }
+        },
+        "cw_27": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [27]
+            }
+        },
+        "cw_28": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [28]
+            }
+        },
+        "cw_29": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [29]
+            }
+        },
+        "cw_30": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [30]
+            }
+        },
+        "cw_31": {
+            "prototype": ["X:qubit"],
+            "duration": @MW_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [31]
+            }
+        },
+
+        //**************************************************************************************************************
+        // measure
+        //**************************************************************************************************************
+
+        // allow decompositions that prepend measurement with microwave gate
+        "_do_measure": {
+            "prototype": ["M:qubit"],
+            "duration": @RO_DURATION@,
+            "cc": {
+                "signal": [
+                    {   "type": "measure",
+                        "operand_idx": 0,
+                        "value": ["dummy"]          // Future extension: specify output and weight, and generate code word
+                    }
+                ],
+                "static_codeword_override": [0]   // FIXME
+            }
+        },
+        "measure": {
+            "prototype": ["M:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": "_do_measure op(0)"
+            }
+        },
+        // FIXME: test to prefix some measurements with rx12
+        "_measure q6": {
+            "prototype": ["M:qubit"],
+            "duration": 0,
+            "decomposition": {
+                "into": [
+                    "rx12 q[6];",
+                    "_do_measure q[6]"
+                ]
+            }
+        },
+
+        //**************************************************************************************************************
+        // flux
+        //**************************************************************************************************************
+
+        // helpers for CZ gate decomposition, flux_lutman compatible
+        //
+        // NB: the '*_park' instructions now use prototype "I:qubit" for the park parameter, which makes the scheduler
+        // *ignore* that parameter. This allows for parallel scheduling of multiple instructions that perform the same
+        // park, but can also arise in conflicts (signal conflict in the CC backend) if a qubit is both used for parking
+        // and another fluxing operation.
+
+        "_cz_sw_ne_park": {
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SW" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NE" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 2,
+                        "value": { "type": "park" }
+                    }
+                ],
+                "static_codeword_override": [3,1,5]
+            }
+        },
+        "_cz_sw_ne": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SW" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NE" }
+                    }
+                ],
+                "static_codeword_override": [3,1]
+            }
+        },
+        "_cz_se_nw_park": {
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SE" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NW" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 2,
+                        "value": { "type": "park" }
+                    }
+                ],
+                "static_codeword_override": [2,4,5]
+            }
+        },
+        "_cz_se_nw": {
+            "prototype": ["Z:qubit", "Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "cz",  "which": "SE" }
+                    },
+                    {
+                        "type": "flux",
+                        "operand_idx": 1,
+                        "value": { "type": "idle_z",  "which": "NW" }
+                    }
+                ],
+                "static_codeword_override": [2,4]
+            }
+        },
+        "_cz_park": {  // NB: fka 'sf_park'
+            "prototype": ["Z:qubit"],
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "signal": [
+                    {
+                        "type": "flux",
+                        "operand_idx": 0,
+                        "value": { "type": "park" }
+                    }
+                ],
+                "static_codeword_override": [5]
+            }
+        },
+
+        // single qubit flux for calibration (compatible flux lutman)
+        "sf_square": {
+            "duration": @FLUX_DURATION@,
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [6]
+            }
+        },
+
+
+        // fl_cw_00 .. fl_cw_07
+        // FIXME: deprecated
+//        "fl_cw_00": {
+//            "duration": @FLUX_DURATION@,
+//            "cc": {
+//                "ref_signal": "two-qubit-flux",
+//                "static_codeword_override": [0]
+//            }
+//        },
+//        "fl_cw_01": {
+//            "duration": @FLUX_DURATION@,
+//            "cc": {
+//                "ref_signal": "two-qubit-flux",
+//                "static_codeword_override": [1]
+//            }
+//        },
+//        "fl_cw_02": {
+//            "duration": @FLUX_DURATION@,
+//            "cc": {
+//                "ref_signal": "two-qubit-flux",
+//                "static_codeword_override": [2]
+//            }
+//        },
+//        "fl_cw_03": {
+//            "duration": @FLUX_DURATION@,
+//            "cc": {
+//                "ref_signal": "two-qubit-flux",
+//                "static_codeword_override": [3]
+//            }
+//        },
+//        "fl_cw_04": {
+//            "duration": @FLUX_DURATION@,
+//            "cc": {
+//                "ref_signal": "two-qubit-flux",
+//                "static_codeword_override": [4]
+//            }
+//        },
+//        "fl_cw_05": {
+//            "duration": @FLUX_DURATION@,
+//            "cc": {
+//                "ref_signal": "two-qubit-flux",
+//                "static_codeword_override": [5]
+//            }
+//        },
+//        "fl_cw_06": {
+//            "duration": @FLUX_DURATION@,
+//            "cc": {
+//                "ref_signal": "two-qubit-flux",
+//                "static_codeword_override": [6]
+//            }
+//        },
+//        "fl_cw_07": {
+//            "duration": @FLUX_DURATION@,
+//            "cc": {
+//                "ref_signal": "two-qubit-flux",
+//                "static_codeword_override": [7]
+//            }
+//        },
+
+        // additions for measurements using real time feedback
+		"_wait_uhfqa": {
+            "prototype": ["U:qubit"],
+            "duration": 720
+        },
+        "_dist_dsm": {
+            "prototype": ["U:qubit"],
+			"duration": 20,
+			"cc": {
+                // although we don't output anything, we still need to associate with the correct measurement instrument & group
+				"signal": [
+					{
+    	                "type": "measure",
+						"operand_idx": 0,
+						"value": []    // don't generate output signal. This also triggers special behaviour to retrieve measurements in real-time (from OpenQL 0.10.3)
+					}
+                ]
+			}
+		},
+        "_wait_dsm": {
+            "prototype": ["U:qubit"],
+            "duration": 280
+        },
+
+        // additions for pragma/break
+        // Require OpenQL < 0.10.1 (use cQASM afterwards)
+        "if_1_break": {
+			"duration": 60,
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 1
+				}
+			}
+		},
+		"if_0_break": {
+			"duration": 60,
+			"cc": {
+				"signal": [],
+				"pragma": {
+                    "break": 0
+				}
+			}
+		}
+
+//	},	// end of "instructions"

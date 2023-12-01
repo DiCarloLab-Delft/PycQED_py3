@@ -4,11 +4,9 @@ import pytest
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 as HDAWG
 from pycqed.instrument_drivers.meta_instrument import lfilt_kernel_object as lko
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
-#from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import get_wf_idx_from_name
 from pycqed.instrument_drivers.virtual_instruments import sim_control_CZ as scCZ
-#from pycqed.measurement import measurement_control as mc
-#from qcodes import station as st
-#import pycqed.analysis.analysis_toolbox as a_tools
+
+from qcodes import Instrument
 
 
 class TestMultiQubitFluxLutMan:
@@ -33,6 +31,10 @@ class TestMultiQubitFluxLutMan:
             cls.fluxlutman.name + '_sim_control_CZ_SE')
         cls.sim_control_CZ_SW = scCZ.SimControlCZ(
             cls.fluxlutman.name + '_sim_control_CZ_SW')
+
+    @classmethod
+    def teardown_class(self):
+        Instrument.close_all()
 
     def setup_method(self, method):
         # gets called before every test method
@@ -92,16 +94,6 @@ class TestMultiQubitFluxLutMan:
         self.fluxlutman.czd_lambda_2_SE(np.nan)
         self.fluxlutman.czd_lambda_3_SE(np.nan)
         self.fluxlutman.czd_theta_f_SE(np.nan)
-
-    @classmethod
-    def teardown_class(self):
-        self.AWG.close_all()
-        # for inststr in list(self.AWG._all_instruments):
-        #     try:
-        #         inst = self.AWG.find_instrument(inststr)
-        #         inst.close()
-        #     except KeyError:
-        #         pass
 
     def test_amp_to_dac_val_conversions(self):
         self.fluxlutman.cfg_awg_channel(1)

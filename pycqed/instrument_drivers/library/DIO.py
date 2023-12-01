@@ -1,6 +1,6 @@
 import sys
 from abc import ABC, abstractmethod
-from typing import Tuple,List
+from typing import Tuple, List
 
 
 class CalInterface(ABC):
