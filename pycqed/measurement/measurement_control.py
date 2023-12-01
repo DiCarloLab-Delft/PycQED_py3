@@ -54,7 +54,7 @@ from pycqed.measurement.sweep_functions import Sweep_function
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
-from qcodes.plots.colors import color_cycle
+from qcodes_loop.plots.colors import color_cycle
 
 
 from . import measurement_control_helpers as mch
@@ -79,7 +79,7 @@ try:
     # That line was moved into the `__init__.py` of pycqed so that
     # `QtPlot` can be imported from qcodes with all the modifications
 
-    from qcodes.plots.pyqtgraph import QtPlot, TransformState
+    from qcodes_loop.plots.pyqtgraph import QtPlot, TransformState
 except Exception:
     print(
         "pyqtgraph plotting not supported, "

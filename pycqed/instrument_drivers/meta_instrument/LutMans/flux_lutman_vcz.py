@@ -8,7 +8,7 @@ from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from pycqed.measurement.waveform_control_CC import waveforms_vcz as wf_vcz
 
 import PyQt5
-from qcodes.plots.pyqtgraph import QtPlot
+from qcodes_loop.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
