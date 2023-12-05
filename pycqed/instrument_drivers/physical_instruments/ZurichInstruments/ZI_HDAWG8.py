@@ -243,6 +243,21 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
                             docstring=f'Configures the amplitude in full scale units of AWG {i} output {ch} (zero-indexed). Note: this parameter is deprecated, use awgs_{ch}_outputs_{ch}_gains_{ch} instead',
                             vals=validators.Numbers())
 
+    ##########################################################################
+    # 'public' overrides for ZI_base_instrument
+    ##########################################################################
+
+    def clear_errors(self):
+        super().clear_errors()
+        base_path = "raw/dios/0/parity/"
+        self.seti(base_path + "dio/clear", 1)
+        self.seti(base_path + "controller/clear", 1)
+        self.seti(base_path + "processing/clear", 1)
+
+    def check_errors(self, errors_to_ignore=None):
+        super().check_errors(errors_to_ignore)
+        self._check_dio_parity()
+
     # FIXME: why the override, does not seem necessary now QCoDeS PRs 1161/1163 have been merged
     def snapshot_base(self, update: bool=False,
                       params_to_skip_update =None,
@@ -608,6 +623,29 @@ while (1) {
 
         return set(valid_delays)
 
+    def _check_dio_parity(self):
+
+        base_path = "raw/dios/0/parity/"
+
+        num_errors_dio_fpga = self.geti(base_path + "dio/errors")
+        if num_errors_dio_fpga != 0:
+            log.error(f"Parity check failed on the DIO FPGA checking DIO data from the connector. Number of errors: {num_errors_dio_fpga}.")
+            self.seti(base_path + "dio/clear", 1)
+
+        num_errors_master_fpga = self.geti(base_path + "controller/errors")
+        if num_errors_master_fpga != 0:
+            log.error(
+                f"Parity check failed on the master FPGA checking DIO data from the DIO FPGA. Number of errors: {num_errors_master_fpga}."
+            )
+            self.seti(base_path + "controller/clear", 1)
+
+        num_errors_slave_fpga = self.geti(base_path + "processing/errors")
+        if num_errors_slave_fpga != 0:
+            log.error(
+                f"Parity check failed on the slave FPGA checking DIO data from the master FPGA. Number of errors: {num_errors_master_fpga}."
+            )
+            self.seti(base_path + "processing/clear", 1)
+
     ##########################################################################
     # overrides for CalInterface interface
     ##########################################################################
@@ -641,6 +679,7 @@ while (1) {
     def calibrate_dio_protocol(self, dio_mask: int, expected_sequence: List, port: int=0):
         # FIXME: UHF driver does not use expected_sequence, why the difference
         self.assure_ext_clock()
+        self._check_dio_parity()
         self.upload_codeword_program()
 
         for awg, sequence in expected_sequence:

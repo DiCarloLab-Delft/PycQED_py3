@@ -60,9 +60,9 @@ class ZI_HDAWG_core(zibase.ZI_base_instrument):
     """
 
     # Define minimum required revisions
-    MIN_FWREVISION = 62730
-    MIN_FPGAREVISION = 62832
-    MIN_SLAVEREVISION = 62659
+    MIN_FWREVISION = 68286
+    MIN_FPGAREVISION = 68286
+    MIN_SLAVEREVISION = 68286
 
     ##########################################################################
     # 'public' functions: device control
