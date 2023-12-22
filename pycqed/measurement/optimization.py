@@ -16,7 +16,6 @@ def nelder_mead(
         no_improve_thr=10e-6, 
         no_improve_break=10,
         maxiter=0,
-        bounds = None,
         alpha=1., gamma=2., rho=-0.5, sigma=0.5,
         verbose=False
         ):
@@ -50,14 +49,12 @@ def nelder_mead(
     Reference: https://en.wikipedia.org/wiki/Nelder%E2%80%93Mead_method
     '''
     # init
+
     x0 = np.array(x0)  # ensures algorithm also accepts lists
     dim = len(x0)
     prev_best = fun(x0)
     no_improve = 0
-    lower_bound = bounds[0]
-    upper_bound = bounds[1]
-    if bounds is not None:
-        x0 = np.clip(x0, lower_bound, upper_bound)
+
     res = [[x0, prev_best]]
     if type(initial_step) is float:
         initial_step_matrix = np.eye(dim)*initial_step

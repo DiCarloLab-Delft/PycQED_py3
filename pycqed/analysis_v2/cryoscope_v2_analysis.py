@@ -1008,7 +1008,8 @@ class Flux_arc_analysis(ba.BaseDataAnalysis):
         Freqs = np.abs(self.raw_data_dict['data'][:,1])
         _Amps = np.array(list(Amps)+[0])
         _Freqs = np.array(list(Freqs)+[0])
-        P_coefs = np.polyfit(_Amps, _Freqs, deg=2)
+        # RDC 26/10/2023. deg was 2, I am changing it to 4 to improve the freq conversion
+        P_coefs = np.polyfit(_Amps, _Freqs, deg=4)
         # Save processed data
         self.proc_data_dict['Amps'] = Amps
         self.proc_data_dict['Freqs'] = Freqs

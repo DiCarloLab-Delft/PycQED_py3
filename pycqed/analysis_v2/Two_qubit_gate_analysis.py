@@ -7,7 +7,9 @@ import pycqed.measurement.hdf5_data as h5d
 from matplotlib.colors import to_rgba, LogNorm
 from pycqed.analysis.tools.plotting import hsluv_anglemap45
 import itertools
-from pycqed.analysis.analysis_toolbox import set_xlabel
+from pycqed.analysis.analysis_toolbox import set_xlabel, get_timestamps_in_range
+from pycqed.utilities.general import get_gate_directions
+
 
 
 def Chevron(delta, t, g, delta_0, a, b, phi):
@@ -207,13 +209,13 @@ def Chevron_plotfn(
     axs[0].pcolormesh(Detunings*1e-6, Times*1e9, Pop_H)
     axs[0].set_xlabel(f'{qH} detuning (MHz)')
     axs[0].set_ylabel('Duration (ns)')
-    axs[0].set_title(f'Population {qH}')
+    axs[0].set_title(f'Population {qH}', pad = 40)
     axs[0].axvline(f0*1e-6, color='w', ls='--')
     axs[0].axhline(tp/2*1e9, color='w', ls='--')
     axs[0].plot([f0*1e-6], [tp/2*1e9], 'C3.')
     axt0 = axs[0].twiny()
     axt0.set_xlim((qH_freq*1e-6-np.array(axs[0].get_xlim()))*1e-3)
-    axt0.set_xlabel(f'{qH} Frequency (GHz)')
+    axt0.set_xlabel(f'{qH} Frequency (GHz)', labelpad = 2)
     # Low frequency qubit population
     axs[1].pcolormesh(Detunings*1e-6, Times*1e9, Pop_L)
     axs[1].set_xlabel(f'{qH} detuning (MHz)')
@@ -226,7 +228,7 @@ def Chevron_plotfn(
                 f'$\\Delta={f0*1e-6:.2f}$ MHz', color='w', size=12)
     axs[1].text((Detunings[0]+(Detunings[-1]-Detunings[0])*.02)*1e-6, (Times[-1]-(Times[-1]-Times[0])*.03)*1e9,
                 f'$J_2={Fit_params[0]*1e-6:.2f}$ MHz', color='w', size=12, va='top')
-    axs[1].set_title(f'Population {qL}')
+    axs[1].set_title(f'Population {qL}', pad = 40)
     axt1 = axs[1].twiny()
     axt1.set_xlim((qH_freq*1e-6-np.array(axs[1].get_xlim()))*1e-3)
     axt1.set_xlabel(f'{qH} Frequency (GHz)')
@@ -242,38 +244,47 @@ def Chevron_plotfn(
         axs[1].contour(X*1e-6, Y*1e9, Z, [c_lvl], colors=['w'],
                      linewidths=[1], linestyles=['--'], alpha=alpha)
 
-    fig.suptitle(f'{ts}\nChevron {qH}, {qL}', y=.95)
+    fig.suptitle(f'{ts}\nChevron {qH}, {qL}', y=1.2)
     # fig.tight_layout()
 
 
-class Two_qubit_gate_tomo_Analysis(ba.BaseDataAnalysis):
-    """
-    Analysis for the two qubit gate tomography calibration experiment.
-    
-    """
 
-    def __init__(self, n_pairs: int,
-                 t_start: str = None, 
+
+class TLS_landscape_Analysis(ba.BaseDataAnalysis):
+    """
+    Analysis for TLS landscape
+    """
+    def __init__(self,
+                 Q_freq: float,
+                 Poly_coefs: float,
+                 Out_range: float = 5,
+                 DAC_amp: float = 0.5,
+                 interaction_freqs: dict = None,
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
                  options_dict: dict = None, 
                  extract_only: bool = False,
-                 auto=True):
+                 auto=True,
+                 flux_lm_qpark = None,
+                 isparked: bool = False):
 
         super().__init__(t_start=t_start, 
                          t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
                          extract_only=extract_only)
-        self.n_pairs = n_pairs
+        self.Out_range = Out_range
+        self.DAC_amp = DAC_amp
+        self.Poly_coefs = Poly_coefs
+        self.Q_freq = Q_freq
+        self.interaction_freqs = interaction_freqs
+        self.flux_lm_qpark = flux_lm_qpark
+        self.isparked = isparked
         if auto:
             self.run_analysis()
 
     def extract_data(self):
-        """
-        This is a new style (sept 2019) data extraction.
-        This could at some point move to a higher level class.
-        """
         self.get_timestamps()
         self.timestamp = self.timestamps[0]
 
@@ -287,170 +298,53 @@ class Two_qubit_gate_tomo_Analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
 
     def process_data(self):
-
+        # Get qubit names
+        self.Q_name = self.raw_data_dict['folder'].split(' ')[-3]
         self.proc_data_dict = {}
-        self.qoi = {}
-
-        for n in range(self.n_pairs):
-            # Raw I Q shots from Ramsey qubit
-            I_data = self.raw_data_dict['data'][:,1+2*n]
-            Q_data = self.raw_data_dict['data'][:,2+2*n]
-            C_data = self.raw_data_dict['data'][:,1+2*(self.n_pairs+n)]
-            # Calibration points shots
-            Cal_0 = {'I': I_data[12::16], 'Q': Q_data[12::16]}
-            Cal_1 = {'I': I_data[13::16], 'Q': Q_data[13::16]}
-            Cal_2 = {'I': I_data[14::16], 'Q': Q_data[14::16]}
-            # Average RO level extracted from calibration points
-            avg_0 = np.array([np.mean(Cal_0['I']), np.mean(Cal_0['Q'])])
-            avg_1 = np.array([np.mean(Cal_1['I']), np.mean(Cal_1['Q'])])
-            avg_2 = np.array([np.mean(Cal_2['I']), np.mean(Cal_2['Q'])])
-            # Raw Ramsey qubit shots
-            Pauli_Z_off_raw = {'I': np.concatenate((I_data[0::16], I_data[6::16])), 
-                               'Q': np.concatenate((Q_data[0::16], Q_data[6::16])),
-                               'C': np.concatenate((C_data[0::16], C_data[6::16]))}
-            Pauli_Z_on_raw  = {'I': np.concatenate((I_data[1::16], I_data[7::16])), 
-                               'Q': np.concatenate((Q_data[1::16], Q_data[7::16])),
-                               'C': np.concatenate((C_data[1::16], C_data[7::16]))}
-            Pauli_X_off_raw = {'I': np.concatenate((I_data[2::16], I_data[8::16])), 
-                               'Q': np.concatenate((Q_data[2::16], Q_data[8::16])),
-                               'C': np.concatenate((C_data[2::16], C_data[8::16]))}
-            Pauli_X_on_raw  = {'I': np.concatenate((I_data[3::16], I_data[9::16])), 
-                               'Q': np.concatenate((Q_data[3::16], Q_data[9::16])),
-                               'C': np.concatenate((C_data[3::16], C_data[9::16]))}
-            Pauli_Y_off_raw = {'I': np.concatenate((I_data[4::16], I_data[10::16])), 
-                               'Q': np.concatenate((Q_data[4::16], Q_data[10::16])),
-                               'C': np.concatenate((C_data[4::16], C_data[10::16]))}
-            Pauli_Y_on_raw  = {'I': np.concatenate((I_data[5::16], I_data[11::16])), 
-                               'Q': np.concatenate((Q_data[5::16], Q_data[11::16])),
-                               'C': np.concatenate((C_data[5::16], C_data[11::16]))}
-            # Assigning shots based on readout levels
-            def state_assignment(P):
-                '''
-                Takes dictionary of input vector shots and returns digitized vector
-                of shots.
-                '''
-                N = len(P['I'])
-                P_dig = np.zeros(N)
-                P_state = np.zeros(N)
-                P2 = 0
-                for i in range(N):
-                    P_vec = np.array([P['I'][i], P['Q'][i]])
-                    dist_0 = np.linalg.norm(P_vec-avg_0)
-                    dist_1 = np.linalg.norm(P_vec-avg_1)
-                    dist_2 = np.linalg.norm(P_vec-avg_2)
-                    P_dig[i] = np.argmin([dist_0, dist_1])*-2+1
-                    P_state[i] = np.argmin([dist_0, dist_1, dist_2])
-                    if P_state[i] == 2:
-                        P2 += 1/N
-                return P_dig, P2
-            Pauli_X_off_dig, P2_X_off = state_assignment(Pauli_X_off_raw)
-            Pauli_X_on_dig , P2_X_on  = state_assignment(Pauli_X_on_raw)
-            Pauli_Y_off_dig, P2_Y_off = state_assignment(Pauli_Y_off_raw)
-            Pauli_Y_on_dig , P2_Y_on  = state_assignment(Pauli_Y_on_raw)
-            Pauli_Z_off_dig, P2_Z_off = state_assignment(Pauli_Z_off_raw)
-            Pauli_Z_on_dig , P2_Z_on  = state_assignment(Pauli_Z_on_raw)
-            ####################################
-            # Calculate quantities of interest
-            ####################################
-            # Pauli vectors for contorl qubit in On or Off
-            avg_X_off = np.mean(Pauli_X_off_dig)
-            avg_Y_off = np.mean(Pauli_Y_off_dig)
-            avg_Z_off = np.mean(Pauli_Z_off_dig)
-            avg_X_on = np.mean(Pauli_X_on_dig)
-            avg_Y_on = np.mean(Pauli_Y_on_dig)
-            avg_Z_on = np.mean(Pauli_Z_on_dig)
-            # Projection of Bloch vector onto the equator
-            r_off = np.sqrt(avg_Y_off**2+avg_X_off**2)
-            r_on  = np.sqrt(avg_Y_on**2+avg_X_on**2)
-            phi_off = np.mod(np.arctan2(avg_Y_off, avg_X_off), 2*np.pi)
-            phi_on  = np.mod(np.arctan2(avg_Y_on, avg_X_on), 2*np.pi)
-            # Calculate purity of the state (magnitude of bloch vector)
-            Purity_off = np.sqrt(avg_X_off**2+avg_Y_off**2+avg_Z_off**2)
-            Purity_on = np.sqrt(avg_X_on**2+avg_Y_on**2+avg_Z_on**2)
-            # Average Leakage over all Pauli components
-            Leakage_off = np.mean([P2_X_off, P2_Y_off, P2_Z_off])*100
-            Leakage_on  = np.mean([P2_X_on, P2_Y_on, P2_Z_on])*100
-
-            # Save quantities of interest
-            self.proc_data_dict[f'Cal_shots_{n}'] = [Cal_0, Cal_1, Cal_2]
-            self.proc_data_dict[f'Pauli_vector_off_{n}'] = [avg_X_off, avg_Y_off, avg_Z_off]
-            self.proc_data_dict[f'Pauli_vector_on_{n}']  = [avg_X_on, avg_Y_on, avg_Z_on]
-            self.proc_data_dict[f'R_off_{n}'] = r_off
-            self.proc_data_dict[f'R_on_{n}']  = r_on
-            self.proc_data_dict[f'Phi_off_{n}'] = phi_off
-            self.proc_data_dict[f'Phi_on_{n}']  = phi_on
-            self.proc_data_dict[f'Purity_off_{n}'] = Purity_off
-            self.proc_data_dict[f'Purity_on_{n}']  = Purity_on
-            self.proc_data_dict[f'Leakage_off_{n}'] = Leakage_off
-            self.proc_data_dict[f'Leakage_on_{n}']  = Leakage_on
-
-            self.qoi[f'Leakage_diff_{n}'] = Leakage_on-Leakage_off
-            self.qoi[f'Phase_diff_{n}'] = np.mod(phi_on-phi_off, 2*np.pi)*180/np.pi
+        # Sort data
+        Amps = np.unique(self.raw_data_dict['data'][:,0])
+        Times = np.unique(self.raw_data_dict['data'][:,1])
+        Pop = self.raw_data_dict['data'][:,2]
+        nx, ny = len(Amps), len(Times)
+        Pop = Pop.reshape(ny, nx)
+        # Convert amplitude to detuning (frequency)
+        P_func = np.poly1d(self.Poly_coefs)
+        Out_voltage = Amps*self.DAC_amp*self.Out_range/2
+        Detunings = P_func(Out_voltage)
+        # Save data
+        self.proc_data_dict['Out_voltage'] = Out_voltage
+        self.proc_data_dict['Detunings'] = np.real(Detunings)
+        self.proc_data_dict['Times'] = Times
+        self.proc_data_dict['Pop'] = Pop
+        self.proc_data_dict['park_detuning'] = None
+        if self.isparked:
+            poly = self.flux_lm_qpark.q_polycoeffs_freq_01_det()
+            ch_amp_park = self.flux_lm_qpark.park_amp()
+            sq_amp_park = self.flux_lm_qpark.sq_amp()
+            out_range_park = self.flux_lm_qpark.cfg_awg_channel_range()
+            out_voltage_park = (sq_amp_park * ch_amp_park * out_range_park) / 2
+            park_detuning = poly[0] * out_voltage_park ** 4 + poly[1] * out_voltage_park ** 3 + poly[2] * out_voltage_park ** 2 + poly[3] * out_voltage_park + poly[4]
+            self.proc_data_dict['park_detuning'] = park_detuning
 
     def prepare_plots(self):
-
         self.axs_dict = {}
-        for n in range(self.n_pairs):
-
-            self.figs[f'Main_figure_{n}'] = plt.figure(figsize=(8,8), dpi=100)
-            axs = [self.figs[f'Main_figure_{n}'].add_subplot(231), 
-                   self.figs[f'Main_figure_{n}'].add_subplot(232),
-                   self.figs[f'Main_figure_{n}'].add_subplot(222),
-                   self.figs[f'Main_figure_{n}'].add_subplot(223, projection='polar'),
-                   self.figs[f'Main_figure_{n}'].add_subplot(224),
-                   self.figs[f'Main_figure_{n}'].add_subplot(233)]
-            self.figs[f'Main_figure_{n}'].patch.set_alpha(0)
-            
-            self.axs_dict[f'Tomo_off_{n}'] = axs[0]
-            self.axs_dict[f'Tomo_on_{n}']  = axs[1]
-            self.axs_dict[f'Calibration_points_{n}'] = axs[2]
-            self.axs_dict[f'Equator_{n}'] = axs[3]
-            self.axs_dict[f'Leakage_{n}'] = axs[4]
-            self.axs_dict[f'Param_table_{n}'] = axs[5]
-
-            self.plot_dicts[f'Pauli_off_plot_{n}']={
-                'plotfn': Tomo_plotfn_1,
-                'data': self.proc_data_dict[f'Pauli_vector_off_{n}'],
-                'ax_id': f'Tomo_off_{n}'
-            }
-            self.plot_dicts[f'Pauli_on_plot_{n}']={
-                'plotfn': Tomo_plotfn_2,
-                'data': self.proc_data_dict[f'Pauli_vector_on_{n}'],
-                'ax_id': f'Tomo_on_{n}'
-            }
-            self.plot_dicts[f'Calibration_points_{n}']={
-                'plotfn': Calibration_plotfn,
-                'Cal_0': self.proc_data_dict[f'Cal_shots_{n}'][0],
-                'Cal_1': self.proc_data_dict[f'Cal_shots_{n}'][1],
-                'Cal_2': self.proc_data_dict[f'Cal_shots_{n}'][2],
-                'labels': self.raw_data_dict['value_names'][2*n:],
-                'ax_id': f'Calibration_points_{n}'
-            }
-            self.plot_dicts[f'Equator_{n}']={
-                'plotfn': Equator_plotfn,
-                'r_off': self.proc_data_dict[f'R_off_{n}'],
-                'r_on': self.proc_data_dict[f'R_on_{n}'],
-                'phi_off': self.proc_data_dict[f'Phi_off_{n}'],
-                'phi_on': self.proc_data_dict[f'Phi_on_{n}'],            
-                'ax_id': f'Equator_{n}'
-            }
-            self.plot_dicts[f'Leakage_{n}']={
-                'plotfn': Leakage_plotfn,
-                'Leakage_off': self.proc_data_dict[f'Leakage_off_{n}'],
-                'Leakage_on': self.proc_data_dict[f'Leakage_on_{n}'],           
-                'ax_id': f'Leakage_{n}'
-            }
-            self.plot_dicts[f'Param_table_{n}']={
-                'plotfn': Param_table_plotfn,
-                'phi_off': self.proc_data_dict[f'Phi_off_{n}'],
-                'phi_on': self.proc_data_dict[f'Phi_on_{n}'],
-                'Purity_off': self.proc_data_dict[f'Purity_off_{n}'],
-                'Purity_on': self.proc_data_dict[f'Purity_on_{n}'], 
-                'Leakage_off': self.proc_data_dict[f'Leakage_off_{n}'],
-                'Leakage_on': self.proc_data_dict[f'Leakage_on_{n}'],           
-                'ax_id': f'Param_table_{n}'
-            }
-
+        fig, ax = plt.subplots(figsize=(10,4), dpi=100)
+        self.figs[f'TLS_landscape'] = fig
+        self.axs_dict[f'TLS_landscape'] = ax
+        self.plot_dicts[f'TLS_landscape']={
+            'plotfn': TLS_landscape_plotfn,
+            'ax_id': f'TLS_landscape',
+            'Detunings' : self.proc_data_dict['Detunings'],
+            'Out_voltage' : self.proc_data_dict['Out_voltage'],
+            'Times' : self.proc_data_dict['Times'],
+            'Pop' : self.proc_data_dict['Pop'],
+            'Q_name' : self.Q_name,
+            'Q_freq' : self.Q_freq,
+            'interaction_freqs' : self.interaction_freqs,
+            'ts' : self.timestamp,
+            'isparked' : self.isparked,
+            'park_detuning': self.proc_data_dict['park_detuning'],
+        }
 
     def run_post_extract(self):
         self.prepare_plots()  # specify default plots
@@ -460,99 +354,57 @@ class Two_qubit_gate_tomo_Analysis(ba.BaseDataAnalysis):
                 close_figs=self.options_dict.get('close_figs', True),
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
-
-def Tomo_plotfn_1(ax, data, **kw):
-    ax.set_position((.0, .76, 0.4, .14))
-    ax.bar([0], [1], ls='--', ec='k', fc=to_rgba('purple', alpha=.1))
-    ax.bar([0,1,2], data, fc=to_rgba('purple', alpha=.8))
-    ax.set_ylim(-1.1, 1.1)
-    ax.set_ylabel(r'$\langle m_{\sigma}\rangle$', labelpad=-5)
-    ax.set_xlim(-.5, 2.5)
-    ax.set_xticks([0,1,2])
-    ax.set_xticklabels(['','', '', ''])
-    ax.text(1.65, .75, r'Control $|0\rangle$')
-    ax.set_title('Pauli expectation values')
-
-
-def Tomo_plotfn_2(ax, data, **kw):
-    ax.set_position((.0, .6, 0.4, .14))
-    ax.bar([0], [-1], ls='--', ec='k', fc=to_rgba('purple', alpha=.1))
-    ax.bar([0,1,2], data, fc=to_rgba('purple', alpha=.8))
-    ax.set_ylim(-1.1, 1.1)
-    ax.set_ylabel(r'$\langle m_{\sigma}\rangle$', labelpad=-5)
-    ax.set_xlim(-.5, 2.5)
-    ax.set_xticks([0,1,2])
-    ax.set_xticklabels(['X', 'Y', 'Z'])
-    ax.text(1.65, .75, r'Control $|1\rangle$')
-
-def Calibration_plotfn(ax, Cal_0, Cal_1, Cal_2, labels, **kw):
-    ax.set_position((.49, .6, 0.3, 0.3))
-    ax.scatter(Cal_0['I'], Cal_0['Q'], color='C0', 
-                   marker='.', alpha=.05, label=r'$|0\rangle$')
-    ax.scatter(Cal_1['I'], Cal_1['Q'], color='C3', 
-                   marker='.', alpha=.05, label=r'$|1\rangle$')
-    ax.scatter(Cal_2['I'], Cal_2['Q'], color='C2', 
-                   marker='.', alpha=.05, label=r'$|2\rangle$')
-    ax.set_xlabel(labels[0].decode())
-    ax.set_ylabel(labels[1].decode())
-    ax.set_title('Calibration points')
-    leg = ax.legend(frameon=False, ncol=3, columnspacing=1.)
-    for lh in leg.legendHandles: 
-        lh.set_alpha(1)
-
-
-def Equator_plotfn(ax, r_off, phi_off, r_on, phi_on, **kw):
-    ax.set_position((0.02, .25, 0.23, 0.23))
-    ax.set_rlim(0, 1)
-    ax.set_rticks([.5])
-    ax.set_yticklabels([''])
-    ax.plot([0, phi_off], [0, r_off], 'C0--', alpha=.5, lw=1)
-    ax.plot([0, phi_on], [0, r_on], 'C3--', alpha=.5, lw=1)
-    ax.plot([phi_off], [r_off], 'C0o', label=r'Control $|0\rangle$')
-    ax.plot([phi_on], [r_on], 'C3o', label=r'Control $|1\rangle$')
-    ax.set_title('Projection onto equator', pad=20)
-    ax.legend(loc=8, frameon=False, fontsize=7)
-
-
-def Leakage_plotfn(ax, Leakage_off, Leakage_on, **kw):
-    ax.set_position((0.35, .27, 0.15, 0.24))
-    ax.bar([0,1], [Leakage_off, Leakage_on], fc=to_rgba('C2', alpha=1))
-    ax.bar([0], [Leakage_on], fc=to_rgba('C2', alpha=.2))
-    ax.set_xticks([0,1])
-    ax.set_xticklabels([r'$|0\rangle$', r'$|1\rangle$'])
-    ax.set_xlabel(r'Control state')
-    ax.set_ylabel(r'P$(|2\rangle)$ (%)')
-    ax.set_title(r'Leakage $|2\rangle$')
-
-
-def Param_table_plotfn(ax,
-                       phi_off,
-                       phi_on,
-                       Purity_off,
-                       Purity_on,
-                       Leakage_off,
-                       Leakage_on,
-                       **kw):
-
-    ax.set_position((0.6, .37, 0.2, 0.1))
-    collabel=(r'$|0\rangle_C$', r'$|1\rangle_C$')
-    ax.axis('off')
-    tab_values=[['{:.2f}'.format(phi_off*180/np.pi), '{:.2f}'.format(phi_on*180/np.pi)],
-                ['{:.3f}'.format(Purity_off), '{:.3f}'.format(Purity_on)],
-                ['{:.2f}'.format(Leakage_off), '{:.2f}'.format(Leakage_on)]]
-
-    table = ax.table(cellText=tab_values,
-                         colLabels=collabel,
-                         rowLabels=[r'$\phi_\mathrm{Ramsey}$',
-                                    r'Purity',
-                                    r'$P(|2\rangle)$'],
-                         colWidths=[.3] * 2,
-                         loc='center')
-
-    table.set_fontsize(12)
-    table.scale(1.5, 1.5)
-    ax.text(-.4,-.5, 'Cphase: {:.2f}$^o$'.format((phi_on-phi_off)*180/np.pi), fontsize=14)
-    ax.text(-.4,-.9, 'Leakage diff: {:.2f} %'.format(Leakage_on-Leakage_off), fontsize=14)
+def TLS_landscape_plotfn(
+    ax,
+    Q_name, 
+    Q_freq,
+    Detunings,
+    Out_voltage,
+    Times,
+    Pop,
+    ts,
+    interaction_freqs = None,
+    isparked = None,
+    park_detuning = None,
+    **kw):
+    fig = ax.get_figure()
+    # Chevrons plot
+    def get_plot_axis(vals, rang=None):
+        if len(vals)>1:
+            dx = vals[1]-vals[0]
+            X = np.concatenate((vals, [vals[-1]+dx])) - dx/2
+        else:
+            X = vals
+        return X
+    Detunings = get_plot_axis(Detunings)
+    Times = get_plot_axis(Times)
+    # Frequency qubit population
+    vmax = 1 #min([1, np.max(Pop)])
+    vmax = max([vmax, 0.15])
+    vmin = 0
+    im = ax.pcolormesh(Detunings*1e-6, Times*1e9, Pop, vmax=vmax, vmin = vmin)
+    fig.colorbar(im, ax=ax, label='Population')
+    # plot two-qubit gate frequencies:
+    if interaction_freqs:
+        for gate, freq in interaction_freqs.items():
+            if freq > 10e6:
+                ax.axvline(freq*1e-6, color='w', ls='--')
+                ax.text(freq*1e-6, np.mean(Times)*1e9,
+                        f'CZ {gate}', va='center', ha='right',
+                        color='w', rotation=90)
+    if isparked:
+        ax.axvline(park_detuning*1e-6, color='w', ls='--')
+        ax.text(park_detuning*1e-6, np.mean(Times)*1e9,
+                f'parking freq', va='center', ha='right',
+                color='w', rotation=90)
+    ax.set_xlabel(f'{Q_name} detuning (MHz)')
+    ax.set_ylabel('Duration (ns)')
+    ax.set_title(f'Population {Q_name}', pad = 35)
+    axt0 = ax.twiny()
+    axt0.set_xlim((Q_freq*1e-6-np.array(ax.get_xlim()))*1e-3) # removing this for the TLS
+    axt0.set_xlabel(f'{Q_name} Frequency (GHz)', labelpad = 4)
+    fig.tight_layout()
+    fig.suptitle(f'{ts}\nTLS landscape {Q_name}', y=1.07)
 
 
 def SNZ(delta, tmid, tp, g, delta_0, det11_02, n_dist, B_amp):
@@ -1188,7 +1040,7 @@ class VCZ_B_Analysis(ba.BaseDataAnalysis):
             '''
             A = ((np.abs(CP)-180)/180)**2
             B = ((MF-np.min(MF))/.5)**2
-            # C = (np.mean(MF-np.min(MF), axis=0)/.5)**2
+            C = (np.mean(MF-np.min(MF), axis=0)/.5)**2
             return cp_coef*A + l1_coef*(B+C)
         for i, q0 in enumerate(self.Q0):
             CP = self.raw_data_dict['data'][:,2*i+2].reshape(ny, nx)
@@ -2000,6 +1852,389 @@ def Phase_model_plotfn(
     fig.suptitle(f'{timestamp}\nPhase gate model coefficients\n'+\
              f'{q_target} with control qubits {" ".join(Q_control)}', y=1.0)
     fig.tight_layout()
+
+
+
+Park_dict = {
+     ('QNW', 'QC'): [],
+     ('QNE', 'QC'): [],
+     ('QC', 'QSW'): ['QSE'],
+     ('QC', 'QSE'): ['QSW'],
+ }
+
+def convert_amp_to_freq(poly_coefs, ch_range, ch_amp, dac_amp):
+    '''
+    Helper function to convert flux pulse amp to frequency detuning.
+    '''
+    poly_func = np.poly1d(poly_coefs)
+    out_volt = dac_amp*ch_amp*ch_range/2
+    freq_det = poly_func(out_volt)
+    return freq_det
+
+def vcz_waveform(sampling_rate,
+                 amp_at_int_11_02,
+                 norm_amp_fine,
+                 amp_pad,
+                 amp_pad_samples,
+                 asymmetry,
+                 time_sqr,
+                 time_middle,
+                 time_pad,
+                 use_asymmety,
+                 use_net_zero_pulse,
+    ):
+    '''
+    Trace SNZ waveform.
+    '''
+    amp_at_sweetspot = 0.0
+    dt = 1
+    norm_amp_sq = 1
+    time_sqr = time_sqr * sampling_rate
+    time_middle = time_middle * sampling_rate
+    time_pad = time_pad * sampling_rate
+    # This is to avoid numerical issues when the user would run sweeps with
+    # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
+    # instead of `time_at_swtspt = np.arange(0, 42, 2) / 2.4e9` and get
+    # bad results for specific combinations of parameters
+    time_middle = np.round(time_middle / dt) * dt
+    time_sqr = np.round(time_sqr / dt) * dt
+    time_pad = np.round(time_pad / dt) * dt
+    # build padding part of waveform
+    pad_amps = np.full(int(time_pad / dt), 0) + amp_pad*2
+    for _i in range(len(pad_amps)):
+        if _i<amp_pad_samples:
+            pad_amps[_i] = 0
+    # pad_amps = np.full(int(time_pad / dt), 0)
+    sq_amps = np.full(int(time_sqr / dt), norm_amp_sq)
+    amps_middle = np.full(int(time_middle / dt), amp_at_sweetspot)
+    # build asymmetric SNZ amplitudes
+    if use_asymmety:
+        norm_amp_pos = 1+asymmetry
+        norm_amp_neg = 1-asymmetry
+    else:
+        norm_amp_pos = 1
+        norm_amp_neg = 1
+    pos_sq_amps = np.full(int(time_sqr / dt), norm_amp_pos)
+    neg_sq_amps = np.full(int(time_sqr / dt), norm_amp_neg)
+    # slope amp will be using the same scaling factor as in the symmetric case, 
+    # but relative to pos and neg amplitudes 
+    # such that this amp is in the range [0, 1]
+    slope_amp_pos = np.array([norm_amp_fine * norm_amp_pos])
+    slope_amp_neg = np.array([norm_amp_fine * norm_amp_neg])
+    pos_NZ_amps = np.concatenate((pos_sq_amps, slope_amp_pos))
+    neg_NZ_amps = np.concatenate((slope_amp_neg, neg_sq_amps))
+    amp = np.concatenate(
+        ([amp_at_sweetspot],
+        pad_amps,
+        pos_NZ_amps,
+        amps_middle,
+        (1-use_net_zero_pulse*2)*neg_NZ_amps,
+        pad_amps[::-1],
+        [amp_at_sweetspot])
+    )
+    amp = amp_at_int_11_02 * amp
+    tlist = np.cumsum(np.full(len(amp) - 1, dt))
+    tlist = np.concatenate(([0.0], tlist))  # Set first point to have t=0
+    return amp
+
+def gen_park(sampling_rate, park_length, park_pad_length, park_amp,
+             park_double_sided):
+    '''
+    Trace parking waveform.
+    '''
+    zeros = np.zeros(int(park_pad_length * sampling_rate))
+    if park_double_sided:
+        ones = np.ones(int(park_length * sampling_rate / 2))
+        pulse_pos = park_amp * ones
+        return np.concatenate((zeros, pulse_pos, - pulse_pos, zeros))
+    else:
+        pulse_pos = park_amp*np.ones(int(park_length*sampling_rate))
+        return np.concatenate((zeros, pulse_pos, zeros))
+
+class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
+    """
+    Analysis 
+    """
+    def __init__(self,
+                 Qubit_pairs: list,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True):
+        super().__init__(t_start=t_start, 
+                         t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.Qubit_pairs = Qubit_pairs
+        self.Qubits = np.unique(Qubit_pairs)
+        for qH, qL in Qubit_pairs:
+            Q_parks = Park_dict[(qH, qL)]
+            for q in Q_parks:
+                if not (q in self.Qubits):
+                    self.Qubits = np.concatenate((self.Qubits, [q]))
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        '''
+        Extract all relevant waveform information to trace
+        frequency trajectory of qubit during two-qubit gate.
+        '''
+        data = {q:{} for q in self.Qubits}
+        for q in self.Qubits:
+            # Qubit parameters
+            param_spec =  {'poly_coefs': (f'Instrument settings/flux_lm_{q}', 'attr:q_polycoeffs_freq_01_det'),
+                           'ch_range': (f'Instrument settings/flux_lm_{q}', 'attr:cfg_awg_channel_range'),
+                           'ch_amp': (f'Instrument settings/flux_lm_{q}', 'attr:cfg_awg_channel_amplitude'),
+                           'frequency': (f'Instrument settings/{q}', f'attr:freq_qubit'),
+                           'anharmonicity': (f'Instrument settings/{q}', f'attr:anharmonicity')}
+            # Gate parameters
+            for d in ['NW', 'NE', 'SW', 'SE']:
+                # Amplitudes
+                param_spec[f'amp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_dac_at_11_02_{d}')
+                param_spec[f'B_amp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_fine_{d}')
+                # param_spec[f'asymmetry_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_asymmetry_{d}')
+                # param_spec[f'amp_pad_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_pad_{d}')
+                # param_spec[f'amp_pad_samples_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_amp_pad_samples_{d}')
+                # param_spec[f'use_asymmetry_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_use_asymmetric_amp_{d}')
+                # param_spec[f'use_net_zero_pulse_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_use_net_zero_pulse_{d}')
+                # Durations
+                param_spec[f'tp_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_single_sq_{d}')
+                param_spec[f'tmid_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_middle_{d}')
+                param_spec[f'tpad_{d}'] = (f'Instrument settings/flux_lm_{q}', f'attr:vcz_time_pad_{d}')
+            # Park parameters
+            param_spec['park_double_sided'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_double_sided')
+            param_spec['park_amp'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_amp')
+            param_spec['t_park'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_length')
+            param_spec['tpad_park'] = (f'Instrument settings/flux_lm_{q}', f'attr:park_pad_length')
+            # extract data
+            data[q] = h5d.extract_pars_from_datafile(data_fp, param_spec)
+            # Sort and parse extracted quantities
+            p_coefs = data[q]['poly_coefs'][1:-1].split(' ')
+            while '' in p_coefs:
+                p_coefs.remove('')
+            data[q]['poly_coefs'] = list(eval(','.join(p_coefs)))
+            data[q]['ch_range'] = eval(data[q]['ch_range'])
+            data[q]['ch_amp'] = eval(data[q]['ch_amp'])
+            data[q]['frequency'] = eval(data[q]['frequency'])
+            data[q]['anharmonicity'] = eval(data[q]['anharmonicity'])
+            for d in ['NW', 'NE', 'SW', 'SE']:
+                data[q][f'amp_{d}'] = eval(data[q][f'amp_{d}'])
+                data[q][f'amp_pad_{d}'] = 0#eval(data[q][f'amp_pad_{d}'])
+                data[q][f'amp_pad_samples_{d}'] = 0#eval(data[q][f'amp_pad_samples_{d}'])
+                data[q][f'B_amp_{d}'] = eval(data[q][f'B_amp_{d}'])
+                data[q][f'asymmetry_{d}'] = 1#eval(data[q][f'asymmetry_{d}'])
+                data[q][f'tp_{d}'] = eval(data[q][f'tp_{d}'])
+                data[q][f'tmid_{d}'] = eval(data[q][f'tmid_{d}'])
+                data[q][f'tpad_{d}'] = eval(data[q][f'tpad_{d}'])
+                # data[q][f'use_asymmetry_{d}'] = eval(data[q][f'use_asymmetry_{d}'])
+                # data[q][f'use_net_zero_pulse_{d}'] = eval(data[q][f'use_net_zero_pulse_{d}'])
+            data[q]['park_double_sided'] = eval(data[q]['park_double_sided'])
+            data[q]['park_amp'] = eval(data[q]['park_amp'])
+            data[q]['t_park'] = eval(data[q]['t_park'])
+            data[q]['tpad_park'] = eval(data[q]['tpad_park'])
+        # Get TLS landscapes
+        self.TLS_analysis = {}
+        for q in self.Qubits:
+            label = f'Chevron {q} QC ground'
+            print(label)
+            try:
+                # Try to find TLS landscapes for relevant qubits
+                TS = get_timestamps_in_range(
+                        timestamp_start='20220101_000000',
+                        label=label)
+                for ts in TS[::-1]:
+                    # Try runing TLS analysis for each timestamp
+                    # until it is successful.
+                    try:
+                        a = TLS_landscape_Analysis(
+                                t_start = ts,
+                                Q_freq = data[q]['frequency'],
+                                Poly_coefs = data[q]['poly_coefs'],
+                                extract_only=True)
+                        assert len(a.proc_data_dict['Times'])>3, \
+                            'Not enough time steps in Chevron\nTrying other timestamp...'
+                        self.TLS_analysis[q] = a
+                        break
+                    except:
+                        # print_exception()
+                        print('No TLS landscape found')
+            except:
+                # print_exception()
+                print(f'No valid TLS landscape data found for {q}')
+        # save data in raw data dictionary
+        self.raw_data_dict = data
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        data = self.raw_data_dict
+        self.proc_data_dict = {q : {} for q in self.Qubits}
+        for q in self.Qubits:
+            self.proc_data_dict[q]['frequency'] = data[q]['frequency']
+            self.proc_data_dict[q]['anharmonicity'] = data[q]['anharmonicity']
+            # estimate detunings at each amplitude
+            for d in ['NW', 'NE', 'SW', 'SE']:
+                # Trace CZ waveform
+                _wf = vcz_waveform(
+                    sampling_rate = 2.4e9,
+                    amp_at_int_11_02 = data[q][f'amp_{d}'],
+                    norm_amp_fine = data[q][f'B_amp_{d}'],
+                    amp_pad = data[q][f'amp_pad_{d}'],
+                    amp_pad_samples = data[q][f'amp_pad_samples_{d}'],
+                    asymmetry = 1,#data[q][f'asymmetry_{d}'],
+                    time_sqr = data[q][f'tp_{d}'],
+                    time_middle = data[q][f'tmid_{d}'],
+                    time_pad = data[q][f'tpad_{d}'],
+                    use_asymmety = False,#data[q][f'use_asymmetry_{d}'],
+                    use_net_zero_pulse = True,)#data[q][f'use_net_zero_pulse_{d}'])
+                self.proc_data_dict[q][f'cz_waveform_{d}'] = _wf
+                # Convert CZ waveform into frequency trajectory
+                _Ftrajectory = -convert_amp_to_freq(data[q]['poly_coefs'],
+                                                    data[q]['ch_range'],
+                                                    data[q]['ch_amp'], _wf)
+                _Ftrajectory += data[q]['frequency']
+                self.proc_data_dict[q][f'cz_freq_trajectory_{d}'] = _Ftrajectory
+            # Parking trajectories
+            _wf = gen_park(sampling_rate = 2.4e9,
+                           park_length = data[q]['t_park'],
+                           park_pad_length = data[q]['tpad_park'],
+                           park_amp = data[q]['park_amp'],
+                           park_double_sided = data[q]['park_double_sided'])
+            self.proc_data_dict[q]['park_waveform'] = _wf
+            _Ftrajectory = -convert_amp_to_freq(data[q]['poly_coefs'],
+                                                data[q]['ch_range'],
+                                                data[q]['ch_amp'], _wf)
+            _Ftrajectory += data[q]['frequency']
+            self.proc_data_dict[q]['park_freq_trajectory'] = _Ftrajectory
+            # Idling trajectory
+            n_points = len(_Ftrajectory)
+            self.proc_data_dict[q]['idle_freq_trajectory'] = np.full(n_points, data[q]['frequency'])
+
+            print(self.TLS_analysis)
+    def prepare_plots(self):
+        self.axs_dict = {}
+        for qH, qL in self.Qubit_pairs:
+
+            fig, ax = plt.subplots(figsize=(4,4), dpi=100)
+            self.figs[f'{qH}_{qL}_Gate_frequency_trajectory'] = fig
+            self.axs_dict[f'plot_{qH}_{qL}'] = ax
+            # fig.patch.set_alpha(0)
+            self.plot_dicts[f'{qH}_{qL}_Gate_frequency_trajectory']={
+                    'plotfn': CZ_frequency_trajectory_plotfn,
+                    'ax_id': f'plot_{qH}_{qL}',
+                    'data': self.proc_data_dict,
+                    'qH': qH,
+                    'qL': qL,
+
+                    'TLS_analysis_dict': self.TLS_analysis,
+                    'timestamp': self.timestamps[0]}
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def CZ_frequency_trajectory_plotfn(
+    ax,
+    data, qH, qL,
+    timestamp,
+    TLS_analysis_dict,
+    include_TLS_landscape=True,
+    **kw):
+    fig = ax.get_figure()
+    # Compile all relevant freq. trajectories
+    directions = get_gate_directions(qH, qL)
+    parked_qubits = Park_dict[(qH, qL)]
+    wf = { qH: f'cz_freq_trajectory_{directions[0]}',
+           qL: f'cz_freq_trajectory_{directions[1]}' }
+    for q in parked_qubits:
+        wf[q] = 'park_freq_trajectory'
+    # Draw CZ trajectories
+    for q, _wf in wf.items():
+        if q in parked_qubits:
+            ax.plot(data[q][_wf]*1e-9, '--', markersize=3, lw=1, label=f'{q}')
+        else:
+            ax.plot(data[q][_wf]*1e-9, '.-', markersize=3, lw=1, label=f'{q}')
+            # if q == qH: # plot 02 level
+            #     ax.plot((data[q][_wf]+data[q]['anharmonicity'])*1e-9, 'C0.-', 
+            #             alpha=.5, markersize=3, lw=1, label=f'{q}')
+        # labels
+        ax.text(5, data[q][_wf][5]*1e-9+.015, f'{q}')
+    # settings of plot
+    ax.set_title(f'{timestamp}\n{qH}, {qL} Gate')
+    ax.set_ylabel('Frequency (GHz)')
+    ax.set_xlabel('Time (# samples)')
+    ax.grid(ls='--', alpha=.5)
+    # Side plots for TLS landscapes
+    if include_TLS_landscape:
+        axR = fig.add_subplot(111)
+        pos = axR.get_position()
+        axR.set_position([pos.x0+pos.width*1.005, pos.y0, pos.width*0.2, pos.height])
+        def get_plot_axis(vals, rang=None):
+            if len(vals)>1:
+                dx = vals[1]-vals[0]
+                X = np.concatenate((vals, [vals[-1]+dx])) - dx/2
+            else:
+                X = vals
+            return X
+        Detunings = data[qH]['frequency'] 
+        Detunings -= get_plot_axis(TLS_analysis_dict[qH].proc_data_dict['Detunings'])
+        Times = get_plot_axis(TLS_analysis_dict[qH].proc_data_dict['Times'])
+        Pop = TLS_analysis_dict[qH].proc_data_dict['Pop'] 
+        # Frequency qubit population
+        vmax = min([1, np.max(Pop)])
+        vmax = max([vmax, 0.15])
+        im = axR.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
+        axR.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, qH, ha='center', va='top', color='w')
+        axR.set_title('Gate qubits', size=7)
+        if qL in TLS_analysis_dict.keys():
+            Detunings = data[qL]['frequency'] - get_plot_axis(TLS_analysis_dict[qL].proc_data_dict['Detunings'])
+            Pop = TLS_analysis_dict[qL].proc_data_dict['Pop'] 
+            # Frequency qubit population
+            vmax = min([1, np.max(Pop)])
+            vmax = max([vmax, 0.15])
+            im = axR.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
+            axR.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, qL, ha='center', va='top', color='w')
+            axR.axhline(Detunings[0]*1e-9, color='w')
+        axR.set_ylim(ax.get_ylim())
+        axR.yaxis.tick_right()
+        axR.set_xticks([])
+        axR.axis('off')
+        # Parked qubit plots
+        i = 0
+        for q in parked_qubits:
+            if q in TLS_analysis_dict.keys():
+                axP = fig.add_subplot(221+i)
+                # using previous axis position <pos>
+                axP.set_position([pos.x0+pos.width*(1.21 + i*.205), pos.y0,
+                                  pos.width*0.2, pos.height])
+                
+                Detunings = data[q]['frequency'] - get_plot_axis(TLS_analysis_dict[q].proc_data_dict['Detunings'])
+                Pop = TLS_analysis_dict[q].proc_data_dict['Pop'] 
+                # Frequency qubit population
+                vmax = min([1, np.max(Pop)])
+                vmax = max([vmax, 0.15])
+                im = axP.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
+                axP.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, q, ha='center', va='top', color='w')
+                
+                axP.set_title('Park qubits', size=7)
+                axP.set_ylim(ax.get_ylim())
+                axP.yaxis.tick_right()
+                axP.set_xticks([])
+                axP.axis('off')
+                i += 1
 
 
 class Parity_check_calibration_analysis(ba.BaseDataAnalysis):

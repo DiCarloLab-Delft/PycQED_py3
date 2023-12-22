@@ -3142,7 +3142,7 @@ class HAL_Device(HAL_ShimMQ):
         self,
         qubits,
         nr_cliffords=np.array(
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
+            [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
         ),
         nr_seeds=100,
         interleaving_cliffords=[None],

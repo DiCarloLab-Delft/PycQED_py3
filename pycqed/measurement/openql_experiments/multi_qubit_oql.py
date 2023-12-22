@@ -875,6 +875,7 @@ def Chevron(
 
     """
     p = OqlProgram("Chevron", platf_cfg)
+    run_second_excited_state: bool = False
 
     buffer_nanoseconds = int(round(buffer_time / 1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2 / 1e-9))
@@ -899,6 +900,8 @@ def Chevron(
 
     k.gate(spec_gate, [qubit_idx_spec])
     k.gate('rx180', [qubit_idx])
+    if run_second_excited_state:
+        k.gate('rx12', [qubit_idx])  # HACK!!! 19-09-2023 (Ruggero)
 
     if buffer_nanoseconds > 0:
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
@@ -925,7 +928,9 @@ def Chevron(
     if buffer_nanoseconds2 > 0:
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
 
-    k.gate('rx180', [qubit_idx])
+    if run_second_excited_state:
+        k.gate('rx12', [qubit_idx])  # HACK!!! 19-09-2023 (Ruggero)
+    k.gate('rx180', [qubit_idx])  # add this one
     k.gate('rx180', [qubit_idx_spec])
 
     if recover_q_spec:
@@ -2137,7 +2142,7 @@ def parity_check_ramsey(
                     k.gate("rx180", [Q_idxs_control[j]])
             # cw_idx corresponds to special hardcoded angles in the lutman
             # special because the cw phase pulses go in mult of 20 deg
-            cw_idx = angle // 20 + 9
+            cw_idx = angle // 20 + 32 #9
             phi_gate = 'cw_{:02}'.format(cw_idx)
             for q in Q_idxs_target:
                 k.gate(phi_gate, [q])

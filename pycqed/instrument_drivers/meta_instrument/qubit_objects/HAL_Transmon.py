@@ -2318,7 +2318,7 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
                 'adaptive_function': nelder_mead,
                 'x0': opt_par,
                 'initial_step': initial_steps,
-                'bounds': bounds,
+                # 'bounds': bounds,
                 'no_improve_break': 10,#12,
                 'minimize': True,
                 'maxiter': maxiter,
@@ -3276,7 +3276,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
             shots_per_meas: int = 2 ** 16,
             vary_residual_excitation: bool = True,
             disable_metadata: bool = False,
-            label: str = ''
+            label: str = '', 
+            auto = True
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -3379,7 +3380,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
 
         a = ma2.ra.Singleshot_Readout_Analysis(
             options_dict=options_dict,
-            extract_only=no_figs)
+            extract_only=no_figs,
+            auto = True)
 
         ######################################################################
         # Update parameters in the qubit object based on the analysis
@@ -4885,19 +4887,19 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
         # Monitor key temperatures of interest
         # ADDED BY LDC.  THIS IS A KLUGE!
         # CAREFUL, thsi is Quantum-Inspire specific!!!
-        thisTWPA1=self.find_instrument('TWPA_pump_1')
-        thisTWPA2=self.find_instrument('TWPA_pump_2')
-        #thisVSM=self.find_instrument('VSM')
-        TempTWPA1=thisTWPA1.temperature()
-        TempTWPA2=thisTWPA2.temperature()
+        # thisTWPA1=self.find_instrument('TWPA_pump_1')
+        # thisTWPA2=self.find_instrument('TWPA_pump_2')
+        # #thisVSM=self.find_instrument('VSM')
+        # TempTWPA1=thisTWPA1.temperature()
+        # TempTWPA2=thisTWPA2.temperature()
         #TempVSM=thisVSM.temperature_avg()
         # for diagnostics only
-        print('Key temperatures (degC):')
-        print('='*35)
-        print(f'TWPA_Pump_1:\t{float(TempTWPA1):0.2f}')
-        print(f'TWPA_Pump_2:\t{float(TempTWPA2):0.2f}')
-        #print(f'VSM:\t\t{float(TempVSM):0.2f}')
-        print('='*35)
+        # print('Key temperatures (degC):')
+        # print('='*35)
+        # print(f'TWPA_Pump_1:\t{float(TempTWPA1):0.2f}')
+        # print(f'TWPA_Pump_2:\t{float(TempTWPA2):0.2f}')
+        # #print(f'VSM:\t\t{float(TempVSM):0.2f}')
+        # print('='*35)
         ###############################################
         ###############################################
 
@@ -5841,7 +5843,8 @@ class HAL_Transmon(HAL_ShimSQ.HAL_ShimSQ):
                 'analyze': True, 'SNR_detector': True,
                 'cal_residual_excitation': True,
                 'prepare': False,
-                'disable_metadata': True
+                'disable_metadata': True,
+                'auto': False
             },
             result_keys=['SNR', 'F_d', 'F_a']
         )

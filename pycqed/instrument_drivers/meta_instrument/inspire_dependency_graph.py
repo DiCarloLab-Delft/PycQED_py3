@@ -557,7 +557,7 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
             
             self.add_node('RB',
                           calibrate_function=Qubit.name + '.measure_single_qubit_randomized_benchmarking',
-                          calibrate_function_args={'recompile': RBrecompile, 'nr_seeds': RBnumseeds, 'nr_cliffords': 2 ** np.arange(11),
+                          calibrate_function_args={'recompile': RBrecompile, 'nr_seeds': RBnumseeds, 'nr_cliffords': 2 ** np.arange(10),
                                                   'disable_metadata': True})
             
             #self.add_node(Qubit.name + ' Second Flipping',
@@ -734,7 +734,7 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
                             'MC':self.device.instr_MC.get_instr(), 
                             'recompile': RBrecompile, 
                             'measure_idle_flux': False, 
-                            'nr_cliffords':np.array([1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50.]),
+                            'nr_cliffords':np.array([0., 1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50.]),
                             'cardinal': cardinal[str(pair)]})
             
         ###############
