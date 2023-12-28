@@ -1971,7 +1971,7 @@ def Single_qubit_phase_calibration_wrapper(qH, qL, station,
 		# if preparation is not deemed necessary try just updating detectors
 		try:
 			# acq_ch_map = device._acq_ch_map
-			acq_ch_map = device._prep_ro_assign_weights(qubits=qubits)
+			acq_ch_map = device._prep_ro_assign_weights(qubits=[qH, qL])
 			# device._prep_ro_integration_weights(qubits=qubits)
 			device._prep_ro_instantiate_detectors(qubits=[qH, qL], acq_ch_map=acq_ch_map)
 		except:
