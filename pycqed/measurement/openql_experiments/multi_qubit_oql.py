@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 import numpy as np
 
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
@@ -265,7 +265,7 @@ def Msmt_induced_dephasing_ramsey(
                     for j, q in enumerate(q_rams):
                         if echo_times == 'XmX':
                             for cycle in range(int(meas_time/2/20)):
-                                k.gate('rX180', [q])
+                                k.gate('rx180', [q])
                                 k.gate('rXm180', [q])
                         elif echo_times == 'YmY':
                             for cycle in range(int(meas_time/2/20)):
@@ -274,27 +274,27 @@ def Msmt_induced_dephasing_ramsey(
                         elif echo_times == 'XY':
                             for cycle in range(int(meas_time/6/20)):
                                 k.gate('i', [q])
-                                k.gate('rX180', [q])
+                                k.gate('rx180', [q])
                                 k.gate('i', [q])
                                 k.gate('i', [q])
                                 k.gate('rY180', [q])
                                 k.gate('i', [q])
                         elif echo_times == 'XYmYmX':
                             for cycle in range(int(meas_time/4/20)):
-                                k.gate('rX180', [q])
+                                k.gate('rx180', [q])
                                 k.gate('rY180', [q])
                                 k.gate('rYm180', [q])
                                 k.gate('rXm180', [q])
                         elif echo_times == 'XY8':
                             for cycle in range(int(meas_time/8/20)):
-                                k.gate('rX180', [q])
+                                k.gate('rx180', [q])
                                 k.gate('rY180', [q])
-                                k.gate('rX180', [q])
+                                k.gate('rx180', [q])
                                 k.gate('rY180', [q])
                                 k.gate('rY180', [q])
-                                k.gate('rX180', [q])
+                                k.gate('rx180', [q])
                                 k.gate('rY180', [q])
-                                k.gate('rX180', [q])
+                                k.gate('rx180', [q])
 
                         else:
                             k.gate('cw_30', [q])
@@ -2386,7 +2386,7 @@ def Weight_n_parity_tomography(
             for q in Q_D:
                 for cycle in range(int((readout_duration_ns-20)/2/20)):
                     k.gate('i', [q])
-                k.gate('rX180', [q])
+                k.gate('rx180', [q])
                 for cycle in range(int((readout_duration_ns-20)/2/20)):
                     k.gate('i', [q])
             k.gate("wait", [], 0)
@@ -2413,7 +2413,7 @@ def Weight_n_parity_tomography(
             for q in Q_D:
                 for cycle in range(int((readout_duration_ns-20)/2/20)):
                     k.gate('i', [q])
-                k.gate('rX180', [q])
+                k.gate('rx180', [q])
                 for cycle in range(int((readout_duration_ns-20)/2/20)):
                     k.gate('i', [q])
             k.gate("wait", [], 0)
@@ -2523,7 +2523,7 @@ def Parity_Sandia_benchmark(
     for q in QDs:
         for cycle in range(int(720/6/20)):
             k.gate('i', [q])
-            k.gate('rX180', [q])
+            k.gate('rx180', [q])
             k.gate('i', [q])
             k.gate('i', [q])
             k.gate('rY180', [q])
