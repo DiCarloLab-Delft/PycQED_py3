@@ -4435,3 +4435,186 @@ def repeated_stabilizer_data_measurement_sequence(
 
     p.compile()
     return p
+
+
+def repetition_code_sequence(
+        involved_ancilla_indices: List[int],
+        involved_data_indices: List[int],
+        all_ancilla_indices: List[int],
+        all_data_indices: List[int],
+        platf_cfg: str,
+        array_of_round_number: List[int],
+        stabilizer_type: str = 'X',
+        measurement_time_ns: int = 500,
+        ):
+    """OpenQL program constructor for repetition code experiement (any distance).
+
+    Args:
+        involved_ancilla_indices (List[int]): Ancilla-qubit indices part of the repetition code. Used by the central controller. Also known as 'cfg_qubit_nr'.
+        involved_data_indices (List[int]): Data-qubit indices part of the repetition code. Used by the central controller. Also known as 'cfg_qubit_nr'.
+        all_ancilla_indices (List[int]): All (ancilla) qubit indices on the device. Used for preparation and calibration points.
+        all_data_indices (List[int]): All (ancilla) qubit indices on the device. Used for preparation and calibration points.
+        platf_cfg (str): Config-file path, required for OqlProgram construction.
+        array_of_round_number (list): Array-like of parity-check repetition number. Example [1, 5, 10] will schedule a stabilizer reptition of x1, x5 and x10 respectively.
+        stabilizer_type (str, optional): _description_. Defaults to 'X'.
+        measurement_time_ns (int, optional): _description_. Defaults to 500.
+
+    Returns:
+        OqlProgram: _description_
+    """
+    p = OqlProgram("Repeated_stabilizer_seq", platf_cfg)
+    assert stabilizer_type in ['X', 'Z'], '"stabilizer_type" must be "X" or "Z"'
+    # Data qubit idx dictionary
+    qubit_id_to_name_lookup: Dict[int, str] = {
+        0: "D3",
+        1: "D7",
+        2: "D2",
+        3: "X3",
+        4: "D9",
+        5: "D8",
+        6: "D1",
+        7: "Z1",
+        8: "X2",
+        9: "X4",
+        10: "Z4",
+        11: "X1",
+        12: "Z3",
+        13: "D5",
+        14: "Z2",
+        15: "D4",
+        16: "D6",
+    }
+    
+    # remove X4 
+    qubit_nr_x4: int = 9
+    if qubit_nr_x4 in all_ancilla_indices:
+        all_ancilla_indices.remove(qubit_nr_x4)
+    
+    all_qubit_indices = all_ancilla_indices + all_data_indices
+
+    for n_rounds in array_of_round_number:
+        
+        k = p.create_kernel(f'Repetition_code_seq_{n_rounds}rounds')        
+        # Preparation & heralded_init
+        for q in all_qubit_indices:
+            k.prepz(q)
+            k.measure(q)
+        k.gate('wait', [], 400)  # to avoid UHF trigger holdoff!
+        # Arbitrary state initialization
+        if stabilizer_type == 'Z':
+            for i, q in enumerate(involved_data_indices):
+                if i % 2 == 0:
+                    k.gate("i", [q])
+                else:
+                    k.gate("rx180", [q])
+                    # k.gate("i", [q])
+        if stabilizer_type == 'X':
+            for i, q in enumerate(involved_data_indices):
+                if i % 2 == 0:
+                    k.gate("ry90", [q])
+                else:
+                    k.gate("rym90", [q])
+                    # k.gate("i", [q])
+        k.barrier([])
+        # QEC Rounds 
+        for i in range(n_rounds):
+            # First Pi/2 pulse
+            if stabilizer_type == 'X':
+                for q in involved_data_indices:
+                    k.gate("ry90", [q])
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['X3', 'Z1', 'X1', 'Z2']:
+                    k.gate("ry90", [q])
+            # Flux dance
+            k.gate('wait', [])
+            k.gate(f'repetition_code_1', [0])
+            k.gate(f'repetition_code_2', [0])
+            k.gate('wait', [])
+            # Second Pi/2 pulse
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['X3', 'Z1', 'X1', 'Z2']:
+                    k.gate("rym90", [q])
+                # First Pi/2 pulse
+                elif qubit_id_to_name_lookup[q] in ['Z3', 'X4', 'Z4', 'X2']:
+                    k.gate("ry90", [q])
+            # Flux dance
+            k.gate('wait', [])
+            k.gate(f'repetition_code_3', [0])
+            k.gate(f'repetition_code_4', [0])
+            k.gate('wait', [])
+            # Second Pi/2 pulse
+            if stabilizer_type == 'X':
+                for q in involved_data_indices:
+                    k.gate("rym90", [q])
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['Z3', 'X4', 'Z4', 'X2']:
+                    k.gate("rym90", [q])
+            k.gate('wait', [])
+            
+            # During any other round, measure only ancilla's and decouple data qubits.
+            at_last_round: bool = i == n_rounds-1
+            if not at_last_round:
+                # Measure (only) all ancilla's, dynamical decoupling on data qubits
+                for q in all_ancilla_indices:
+                    k.measure(q)
+                for q in involved_data_indices:
+                    # Single measurement Echo
+                    idle_time = (measurement_time_ns-20)//2
+                    nr_idles = idle_time//20
+                    for idle in range(nr_idles):
+                        k.gate('i', [q])
+                    k.gate('rx180', [q])
+                    for idle in range(nr_idles):
+                        k.gate('i', [q])
+                k.gate("wait", [], 0)
+
+        # Make sure all qubits are measured in the last round
+        # Before last round apply correction gate to data qubits, depending on the stabilizer type.
+        # Final measurement and data qubit correction
+        if stabilizer_type == 'X':
+            for q in involved_data_indices:
+                k.gate('rym90', [q])
+        for q in all_qubit_indices:
+            k.measure(q)
+        k.gate("wait", [], 0)
+        p.add_kernel(k)
+
+    ######################
+    # Calibration points #
+    ######################
+    # Calibration 000
+    k = p.create_kernel('Cal_zeros')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.measure(q)
+    p.add_kernel(k)
+    # Calibration 111
+    k = p.create_kernel('Cal_ones')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.gate('rx180', [q])
+        k.measure(q)
+    p.add_kernel(k)
+    # Calibration 222
+    k = p.create_kernel('Cal_twos')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.gate('rx180', [q])
+        k.gate('rx12', [q])
+        k.measure(q)
+    p.add_kernel(k)
+
+    p.compile()
+    return p

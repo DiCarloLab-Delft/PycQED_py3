@@ -6000,6 +6000,183 @@ class DeviceCCL(Instrument):
                     heralded_init=heralded_init,
                     number_of_kernels=number_of_kernels,
                     experiments=experiments,
+                    Pij_matrix=Pij_matrix,
+                    label=_title)
+            self.ro_acq_weight_type('optimal')
+        except:
+            print_exception()
+            self.ro_acq_weight_type('optimal')
+            raise ValueError('Somtehing happened!')
+        return a
+
+    def measure_repetition_code_defect_rate(
+            self,
+            involved_ancilla_ids: List[str],
+            involved_data_ids: List[str],
+            rounds: list = [1, 2, 4, 6, 10, 15, 25, 50],
+            repetitions: int = 20,
+            prepare_for_timedomain: bool = True,
+            prepare_readout: bool = True,
+            heralded_init: bool = True,
+            stabilizer_type: str = 'X',
+            measurement_time_ns: int = 500,
+            analyze: bool = True,
+            Pij_matrix: bool = True,
+            disable_metadata: bool = False,
+            ):
+        # assert self.ro_acq_weight_type() == 'optimal IQ'
+        assert self.ro_acq_digitized() == False
+        
+        # Surface-17 qubits
+        ancilla_x_names = ['X1', 'X2', 'X3', 'X4']
+        ancilla_z_names = ['Z1', 'Z2', 'Z3', 'Z4']
+        data_names = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9']
+        ancilla_x_indices: List[int] = [ self.find_instrument(q).cfg_qubit_nr() for q in ancilla_x_names ]
+        ancilla_z_indices: List[int] = [ self.find_instrument(q).cfg_qubit_nr() for q in ancilla_z_names ]
+        all_ancilla_indices: List[int] = ancilla_x_indices + ancilla_z_indices
+        all_data_indices: List[int] = [ self.find_instrument(q).cfg_qubit_nr() for q in data_names ]
+        
+        involved_ancilla_indices = [self.find_instrument(q).cfg_qubit_nr() for q in involved_ancilla_ids] 
+        involved_data_indices = [self.find_instrument(q).cfg_qubit_nr() for q in involved_data_ids] 
+        lru_qubits_indices = []
+        ######################################################
+        # Prepare for timedomain
+        ######################################################
+        def internal_prepare_for_timedomain():
+            """:return: Void."""
+            # prepare mw lutmans
+            # for q in [ancilla_qubit]+data_qubits:
+            for q in data_names + ancilla_x_names + ancilla_z_names:
+                mw_lm = self.find_instrument(f'MW_lutman_{q}')
+                mw_lm.set_default_lutmap()
+                mw_lm.load_waveforms_onto_AWG_lookuptable()
+
+            if prepare_for_timedomain:
+                # Redundancy just to be sure we are uploading every parameter
+                # for q_name in data_qubits+[ancilla_qubit]:
+                for q_name in data_names+ancilla_x_names+ancilla_z_names:
+                    q = self.find_instrument(q_name)
+                    q.prepare_for_timedomain()
+                self.prepare_for_timedomain(qubits=data_names+ancilla_x_names+ancilla_z_names, prepare_for_readout=False)
+            if (prepare_for_timedomain or prepare_readout):
+                ##################################################
+                # Prepare acquisition with custom channel map
+                ##################################################
+                # Need to create ordered list of experiment qubits
+                # and remaining ancilla qubits
+                ordered_qubit_dict = {}
+                # _qubits = [ancilla_qubit]+data_qubits
+                _qubits = involved_ancilla_ids + data_names
+                # Add qubits in experiment
+                for _q in _qubits:
+                    acq_instr = self.find_instrument(_q).instr_acquisition()
+                    if acq_instr not in ordered_qubit_dict.keys():\
+                        ordered_qubit_dict[acq_instr] = [_q]
+                    else:
+                        ordered_qubit_dict[acq_instr].append(_q)
+                # Add remaining ancilla qubits
+                _remaining_ancillas = ancilla_x_names + ancilla_z_names
+                for involved_ancilla_id in involved_ancilla_ids:
+                    _remaining_ancillas.remove(involved_ancilla_id)
+                    
+                _remaining_ancillas.remove('X4')
+                
+                for _q in _remaining_ancillas:
+                    acq_instr = self.find_instrument(_q).instr_acquisition()
+                    if acq_instr not in ordered_qubit_dict.keys():\
+                        ordered_qubit_dict[acq_instr] = [_q]
+                    else:
+                        ordered_qubit_dict[acq_instr].append(_q)
+                ordered_qubit_list = [ x for v in ordered_qubit_dict.values() for x in v ]
+                # ordered_chan_map = {q:'optimal IQ' if q in _qubits else 'optimal'\
+                #                     for q in ordered_qubit_list}
+                ordered_chan_map = {q:'optimal IQ' if q in _qubits+_remaining_ancillas else 'optimal'\
+                                    for q in ordered_qubit_list}
+                print(ordered_qubit_list)
+                print(ordered_chan_map)
+                ## expect IQ mode for D8 & D9 [because we have 6 qubits in this feedline]
+                # if 'D8' in ordered_chan_map.keys() and 'D9' in ordered_chan_map.keys():
+                #     ordered_chan_map['D8'] = 'optimal'
+                #     ordered_chan_map['D9'] = 'optimal'
+                self.ro_acq_weight_type('custom')
+                self.prepare_readout(qubits=ordered_qubit_list,
+                    qubit_int_weight_type_dict=ordered_chan_map)
+                ##################################################
+                # Prepare readout pulses with custom channel map
+                ##################################################
+                RO_lutman_1 = self.find_instrument('RO_lutman_1')
+                RO_lutman_2 = self.find_instrument('RO_lutman_2')
+                RO_lutman_3 = self.find_instrument('RO_lutman_3')
+                RO_lutman_4 = self.find_instrument('RO_lutman_4')
+                if [11] not in RO_lutman_1.resonator_combinations():
+                    RO_lutman_1.resonator_combinations([[11], 
+                        RO_lutman_1.resonator_combinations()[0]])
+                RO_lutman_1.load_waveforms_onto_AWG_lookuptable()
+
+                if [3, 7] not in RO_lutman_2.resonator_combinations():
+                    RO_lutman_2.resonator_combinations([[3, 7],
+                        RO_lutman_2.resonator_combinations()[0]])
+                RO_lutman_2.load_waveforms_onto_AWG_lookuptable()
+
+                if [8, 12] not in RO_lutman_4.resonator_combinations():
+                    RO_lutman_4.resonator_combinations([[8, 12],
+                        RO_lutman_4.resonator_combinations()[0]])
+                RO_lutman_4.load_waveforms_onto_AWG_lookuptable()
+
+                # if [9, 14, 10] not in RO_lutman_3.resonator_combinations():
+                #     RO_lutman_3.resonator_combinations([[9, 14, 10], 
+                #         RO_lutman_3.resonator_combinations()[0]])
+                # RO_lutman_3.load_waveforms_onto_AWG_lookuptable()
+                if [14, 10] not in RO_lutman_3.resonator_combinations():
+                    RO_lutman_3.resonator_combinations([[14, 10], 
+                        RO_lutman_3.resonator_combinations()[0]])
+                RO_lutman_3.load_waveforms_onto_AWG_lookuptable()
+        # TODO: This should be refactored in a more general approach that handles all the fun things related to (timedomain) readout.
+        internal_prepare_for_timedomain()
+        
+        # Generate compiler sequence
+        p = mqo.repetition_code_sequence(
+            involved_ancilla_indices=involved_ancilla_indices,
+            involved_data_indices=involved_data_indices,
+            all_ancilla_indices=all_ancilla_indices,
+            all_data_indices=all_data_indices,
+            array_of_round_number=rounds,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            stabilizer_type=stabilizer_type,
+            measurement_time_ns=measurement_time_ns,
+        )
+        # Set up nr_shots on detector
+        d = self.int_log_det
+        uhfqc_max_avg = 2**17  # 2**19
+        number_of_kernels: int = 1  # Performing only a single experiment
+        for det in d.detectors:
+            readouts_per_round = np.sum(np.array(rounds)+heralded_init) * number_of_kernels + 3*(1+heralded_init)
+            det.nr_shots = int(uhfqc_max_avg/readouts_per_round)*readouts_per_round
+
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
+        MC = self.instr_MC.get_instr()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(int(uhfqc_max_avg/readouts_per_round) * readouts_per_round * repetitions))
+        MC.set_detector_function(d)
+        
+        _title = f'Repeated_stab_meas_{rounds[0]}_to_{rounds[-1]}_rounds'+\
+                    f'_{"_".join(involved_ancilla_ids)}_{"_".join(involved_data_ids)}_data_qubit_measurement'
+        if len(_title) > 90:
+            _title = _title[:90]
+        try:
+            MC.run(_title, disable_snapshot_metadata=disable_metadata)
+            a = None
+            if analyze:
+                a = ma2.pba.Repeated_stabilizer_measurements(
+                    ancilla_qubit=involved_ancilla_ids,
+                    data_qubits = involved_data_ids,
+                    Rounds=rounds,
+                    heralded_init=heralded_init,
+                    number_of_kernels=number_of_kernels,
+                    experiments=['repetition_code'],
+                    Pij_matrix=Pij_matrix,
                     label=_title)
             self.ro_acq_weight_type('optimal')
         except:
