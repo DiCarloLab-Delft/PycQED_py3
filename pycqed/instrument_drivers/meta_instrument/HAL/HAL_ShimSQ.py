@@ -1366,7 +1366,6 @@ class HAL_ShimSQ(Qubit):
     import sys, os, time
     import numpy as np
     import zhinst.core as ziapi
-    from zhinst.toolkit import Session
     from threading import Thread, Event
     import matplotlib.pyplot as plt
 
