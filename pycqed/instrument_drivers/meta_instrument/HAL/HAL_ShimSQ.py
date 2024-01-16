@@ -1145,10 +1145,10 @@ class HAL_ShimSQ(Qubit):
             ro_lm.set('M_down_phi1_R{}'.format(idx), self.ro_pulse_down_phi1())
             
             # # Added by RDC 16/06/2023, PPC
-            ro_lm.set('cancellation_phase{}'.format(idx), self.cancellation_phase())
-            ro_lm.set('cancellation_attenuation{}'.format(idx), self.cancellation_attenuation())
-            ro_lm.set('pump_freq{}'.format(idx), self.pump_freq())
-            ro_lm.set('pump_power{}'.format(idx), self.pump_power())
+            # ro_lm.set('cancellation_phase{}'.format(idx), self.cancellation_phase())
+            # ro_lm.set('cancellation_attenuation{}'.format(idx), self.cancellation_attenuation())
+            # ro_lm.set('pump_freq{}'.format(idx), self.pump_freq())
+            # ro_lm.set('pump_power{}'.format(idx), self.pump_power())
 
             # propagate acquisition delay (NB: affects all resonators)
             ro_lm.acquisition_delay(self.ro_acq_delay())  # FIXME: better located in _prep_ro_integration_weights?

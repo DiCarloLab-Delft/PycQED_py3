@@ -120,11 +120,11 @@ def get_default_map_collection() -> FeedlineMapCollection:
                 bitmap_array=[
                     FeedlineBitMap(
                         id=0,
-                        bit_map=[0, 2, 3, 5, 6],
+                        bit_map=[0, 2],
                     ),
                     FeedlineBitMap(
                         id=1,
-                        bit_map=[1, 4],
+                        bit_map=[1, 3, 4, 5, 6],
                     )
                 ]
             ),

@@ -622,7 +622,7 @@ class ZI_base_instrument(Instrument):
                  interface: str= '1GbE',
                  server: str= 'localhost',
                  port: int= 8004,
-                 apilevel: int= 5,
+                 apilevel: int= 6,
                  num_codewords: int= 0,
                  awg_module: bool=True,
                  logfile: str = None,
