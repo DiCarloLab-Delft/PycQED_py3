@@ -1,6 +1,11 @@
 // File:    common_instructions.json.in
 // notes:   this file specifies commonalities between different setups for key "instructions"
 //          see https://openql.readthedocs.io/en/latest/gen/reference_architectures.html#qutech-central-controller for documentation of this file
+//          We use the following conventions:
+//          - gate names starting with "_" are "private", they are not intended for direct use by the end user, but as target for decompositions
+//          - gate names starting with "__" are reserved, they should not be used for noemal operation (we use them for experimental features)
+//          - for key "cc/signal/value", we use a JSON string that is compatible with the LutMan definitions. OpenQL outputs a .map file
+//            containing a list of gates including said signal value, which should be used to configure the LutMans in the future.
 // author: 	Wouter Vlothuizen e.a.
 
 //{
@@ -123,6 +128,7 @@
         },
 
         // pi pulse 2nd excited state
+        // FIXME: unfortunate name choice, because in all other places the number denotes a rotation in degrees (especially in mw_lutman.py::inspire_mw_lutmap)
         "rx12": {
             "duration": @MW_DURATION@,
             "cc": {
@@ -136,7 +142,6 @@
                 "static_codeword_override": [9]
             }
         },
-
 
         "square": {
             "duration": @MW_DURATION@,
@@ -637,6 +642,20 @@
         // measure
         //**************************************************************************************************************
 
+        "measure": {
+            "prototype": ["M:qubit"],
+            "duration": @RO_DURATION@,
+            "cc": {
+                "signal": [
+                    {   "type": "measure",
+                        "operand_idx": 0,
+                        "value": ["dummy"]          // Future extension: specify output and weight, and generate code word
+                    }
+                ],
+                "static_codeword_override": [0]   // FIXME
+            }
+        },
+
         // allow decompositions that prepend measurement with microwave gate
         "_do_measure": {
             "prototype": ["M:qubit"],
@@ -651,10 +670,12 @@
                 "static_codeword_override": [0]   // FIXME
             }
         },
-        "measure": {
+        // FIXME: fails if used in conjunction with legacy API
+        "_measure": {
             "prototype": ["M:qubit"],
             "duration": 0,
             "decomposition": {
+                "when": "pre-sched",
                 "into": "_do_measure op(0)"
             }
         },
@@ -663,11 +684,52 @@
             "prototype": ["M:qubit"],
             "duration": 0,
             "decomposition": {
+                "when": "pre-sched",
                 "into": [
                     "rx12 q[6];",
                     "_do_measure q[6]"
                 ]
             }
+        },
+
+        //**************************************************************************************************************
+        // additions for measurements using real time feedback, see 'CC-OpenQL-feedback-latency.pptx'
+        // FIXME: splitup into all components
+        //**************************************************************************************************************
+
+        // wait for real-time results from UHFQA. The required time consists of:
+        // - the trigger latency of the UHF (which depends on #codewords)
+        // - the state declaration latency of the UHF
+        // - DIO cable and calibration delay
+        // NB: the actual duration of the measurement is accounted for in the 'measure' instruction
+		"_wait_uhfqa": {
+            "prototype": ["U:qubit"],
+            "duration": 720
+        },
+
+        // retrieve the real-time results and initiate distributing them within the CC
+        "_dist_dsm": {
+            "prototype": ["U:qubit"],
+			"duration": 20,
+			"cc": {
+                // although we don't output anything, we still need to associate with the correct measurement instrument & group
+				"signal": [
+					{
+    	                "type": "measure",
+						"operand_idx": 0,
+						"value": []    // don't generate output signal. This also triggers special behaviour to retrieve measurements in real-time (from OpenQL 0.10.3)
+					}
+                ]
+			}
+		},
+
+        // wait for DSM to finish, consists of:
+        // - time required for DSM data distribution to finish (60 ns for 3 UHFs operating in parallel)
+        // - extra time required to cater for latency differences between instruments (FIXME: create separate entry)
+        //   depends on instruments and their settings, and dependency of condition that follows on instruments
+        "_wait_dsm": {
+            "prototype": ["U:qubit"],
+            "duration": 280
         },
 
         //**************************************************************************************************************
@@ -851,32 +913,11 @@
 //            }
 //        },
 
-        // additions for measurements using real time feedback
-		"_wait_uhfqa": {
-            "prototype": ["U:qubit"],
-            "duration": 720
-        },
-        "_dist_dsm": {
-            "prototype": ["U:qubit"],
-			"duration": 20,
-			"cc": {
-                // although we don't output anything, we still need to associate with the correct measurement instrument & group
-				"signal": [
-					{
-    	                "type": "measure",
-						"operand_idx": 0,
-						"value": []    // don't generate output signal. This also triggers special behaviour to retrieve measurements in real-time (from OpenQL 0.10.3)
-					}
-                ]
-			}
-		},
-        "_wait_dsm": {
-            "prototype": ["U:qubit"],
-            "duration": 280
-        },
-
+        //**************************************************************************************************************
         // additions for pragma/break
         // Require OpenQL < 0.10.1 (use cQASM afterwards)
+        //**************************************************************************************************************
+
         "if_1_break": {
 			"duration": 60,
 			"cc": {
@@ -894,6 +935,181 @@
                     "break": 0
 				}
 			}
+		},
+
+        //**************************************************************************************************************
+        // Experimental section for new features: names start with "__" to prevent clashes
+        // Require OpenQL >= 0.10.5 with passes 'opt.ConstProp' and 'opt.DeadCodeElim' enabled
+        //**************************************************************************************************************
+
+        // Parameterized gate decompositions (test)
+        // Based on https://gitlab.com/qutech-sd/quantum-infinity/infinity-control/-/blob/enh/feature_updates/src/infinity/compiler/transmon_compiler.py::__process_rotation_angles
+        // - angles are multiples of 5.625 degrees
+        // - compatible with mw_lutman.py::inspire_mw_lutmap
+        // - gate name is 'int(angle)'
+        // - original does not exploit wrapping at 360 degrees to get nearest angle
+        // FIXME: original has 'real' parameter in radians
+        "__rx": {
+            "prototype": ["X:qubit", "L:int"],
+            "duration": 0,
+            "decomposition": {
+                "when": "pre-sched",
+                "into": [
+                    "if (op(1) <= 2) {",            // int(0*5.625 + 5.625/2)
+                    "    i op(0)",
+//                    "} else if (op(1) <= 8) {",     // int(1*5.625 + 5.625/2)
+//                    "    rx5 op(0)",
+                    // FIXME: etc, also requires defining all rx* gates
+                    "} else {",
+                    "    i op(0)",
+                    "}"
+                ]
+            }
+        },
+        // Randomized benchmarking (test)
+        // Based on epstein_efficient_decomposition
+        "__test_epstein": {
+            "prototype": ["X:qubit", "R:int"],
+            "duration": 0,
+            "decomposition": {
+                "when": "pre-sched",
+                // NB: to meet timing, the CC backend of OpenQL would need to implement a computed goto for this long if-tree
+                // Alternatively, a binary tree could help improve timing
+                "into": [
+                    "if (op(1) == 0) {",
+                    "    i op(0)",
+                    "} else if (op(1) == 1) {",
+                    "    y90 op(0)",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 2) {",
+                    "    mx90 op(0)",
+                    "    my90 op(0)",
+                    "} else if (op(1) == 3) {",
+                    "    x180 op(0)",
+                    "} else if (op(1) == 4) {",
+                    "    my90 op(0)",
+                    "    mx90 op(0)",
+                    "} else if (op(1) == 5) {",
+                    "    x90 op(0)",
+                    "    my90 op(0)",
+                    "} else if (op(1) == 6) {",
+                    "    y180 op(0)",
+                    "} else if (op(1) == 7) {",
+                    "    my90 op(0)",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 8) {",
+                    "    x90 op(0)",
+                    "    y90 op(0)",
+                    "} else if (op(1) == 9) {",
+                    "    x180 op(0)",
+                    "    y180 op(0)",
+                    "} else if (op(1) == 10) {",
+                    "    y90 op(0)",
+                    "    mx90 op(0)",
+                    "} else if (op(1) == 11) {",
+                    "    mx90 op(0)",
+                    "    y90 op(0)",
+                    "} else if (op(1) == 12) {",
+                    "    y90 op(0)",
+                    "    x180 op(0)",
+                    "} else if (op(1) == 13) {",
+                    "    mx90 op(0)",
+                    "} else if (op(1) == 14) {",
+                    "    x90 op(0)",
+                    "    my90 op(0)",
+                    "    mx90 op(0)",
+                    "} else if (op(1) == 15) {",
+                    "    my90 op(0)",
+                    "} else if (op(1) == 16) {",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 17) {",
+                    "    x90 op(0)",
+                    "    y90 op(0)",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 18) {",
+                    "    my90 op(0)",
+                    "    x180 op(0)",
+                    "} else if (op(1) == 19) {",
+                    "    x90 op(0)",
+                    "    y180 op(0)",
+                    "} else if (op(1) == 20) {",
+                    "    x90 op(0)",
+                    "    my90 op(0)",
+                    "    x90 op(0)",
+                    "} else if (op(1) == 21) {",
+                    "    y90 op(0)",
+                    "} else if (op(1) == 22) {",
+                    "    mx90 op(0)",
+                    "    y180 op(0)",
+                    "} else if (op(1) == 23) {",
+                    "    x90 op(0)",
+                    "    y90 op(0)",
+                    "    mx90 op(0)",
+                    "}"
+                    // FIXME: else Error
+                ]
+            }
+        },
+
+        "__test_single_qubit_like_gates": {
+            "prototype": ["X:qubit", "X:qubit", "R:int", "R:int"],
+            "duration": 0,
+            "decomposition": {
+                "when": "pre-sched",
+                // FIXME: becomes sequential if op(0) and op(1) are handled by same sequencer (and also if not!)
+                "into": [
+                    "    __test_epstein op(0), op(2)",
+                    "    __test_epstein op(1), op(3)"
+                ]
+            }
+        },
+        "__test_CNOT_like_gates": {
+            "prototype": ["X:qubit", "X:qubit", "R:int", "R:int", "R:int", "R:int"],
+            "duration": 0,
+            "decomposition": {
+                "when": "pre-sched",
+                // op(0):
+                // op(1):
+                // op(2): rnd range [0,24)
+                // op(3): rnd range [0,24)
+                // op(4): rnd range [0,3)
+                // op(5): rnd range [0,3)
+                "into": [
+                    "    __test_epstein op(0), op(2)",
+                    "    __test_epstein op(1), op(3)",
+                    "    cz op(0),op(1)"
+                    // FIXME: S
+                ]
+            }
+        },
+
+        //**************************************************************************************************************
+        // Experimental decomposition to Waveforms
+        //**************************************************************************************************************
+
+        // just one random gate where we replace the "cc/signal" key by a decomposition into a 'wave' representation not unlike OpenPulse
+        "__cz_sw_ne_park": {
+            "prototype": ["Z:qubit", "Z:qubit", "I:qubit"],
+            "duration": 0,  //@FLUX_DURATION@, FIXME: must be set to schedule
+            "decomposition": {
+                "when": "post-sched",
+                "into": [
+                    "__play op(0), \"flux\", {|\"type\": \"cz\", \"which\": \"SW\", \"cw\": 3|}",
+                    "__play op(1), \"flux\", {|\"type\": \"idle_z\", \"which\": \"NE\", \"cw\": 1|}",
+                    "__play op(2), \"flux\", {|\"type\": \"park\", \"cw\": 5|}"
+		        ]
+            }
+        },
+        // FIXME: add duration to 'play'
+
+		// Native waveform gates:
+		"__play": {
+            "duration": @FLUX_DURATION@,    // FIXME: depends on gate
+			"prototype": [
+				"Z:qubit",  // qubit, used as part 1 of port
+				"L:string", // part 2 of port
+				"L:json"    // waveform
+            ]
 		}
 
 //	},	// end of "instructions"

@@ -158,7 +158,10 @@ class CCCore(SCPIBase):
         return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:READINDEX?')
 
     def get_calibrate_dio_margin(self, ccio: int) -> int:
-        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:MARGIN?')
+        return int( (self.get_calibrate_dio_timing_window(ccio)-1)/2)
+
+    def get_calibrate_dio_timing_window(self, ccio: int) -> int:
+        return self._ask_int(f'QUTech:CCIO{ccio}:DIOIN:CALibrate:MARGIN?') # FIXME: CC actually returns window size
 
     def set_vsm_delay_rise(self, ccio: int, bit: int, cnt_in_833_ps_steps: int) -> None:
         self._transport.write(f'QUTech:CCIO{ccio}:VSMbit{bit}:RISEDELAY {cnt_in_833_ps_steps}')

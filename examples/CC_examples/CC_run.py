@@ -35,7 +35,7 @@ log.setLevel(logging.INFO)
 
 log.info('connecting to CC')
 cc = CC('cc', IPTransport(ip))
-cc.init()
+#cc.init()
 
 for filename in filenames:
     log.info(f"uploading '{filename}' and starting CC")
@@ -47,5 +47,5 @@ for filename in filenames:
     for i in range(err_cnt):
         print(cc.get_system_error())
 
-cc.print_event()
+#cc.print_event()
 cc.print_status()

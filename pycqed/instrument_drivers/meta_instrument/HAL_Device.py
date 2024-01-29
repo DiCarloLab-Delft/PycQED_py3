@@ -599,7 +599,7 @@ class HAL_Device(HAL_ShimMQ):
         else:
             log.warning(f"Target qubit {target_qubits[0]} not X or Z!")
 
-        # if ramsey_qubits is given as list of qubit names, 
+        # if ramsey_qubits is given as list of qubit names,
         # only those will be used and converted to qubit numbers.
         # if ramsey_qubits is given as boolean,
         # all ancillas that are not part of the parity check will be ramseyd
@@ -611,18 +611,18 @@ class HAL_Device(HAL_ShimMQ):
                     log.warning(f"Ramsey qubit {qb} already given as ancilla qubit!")
                 Q_idxs_ramsey += [self.find_instrument(qb).cfg_qubit_nr()]
 
-        Q_idxs_target = [] 
+        Q_idxs_target = []
         for i,target_qubit in enumerate(target_qubits):
             log.info(f"Parity {target_qubit} - {control_qubits}, flux dance steps {flux_dance_steps}")
             Q_idxs_target += [self.find_instrument(target_qubit).cfg_qubit_nr()]
 
         # filter control qubits based on control_cases_to_measure,
         # then the cases will be created based on the filtered control qubits
-        Q_idxs_control = [] 
+        Q_idxs_control = []
         if not control_cases_to_measure:
             # if cases are not given, measure all cases for all control qubits
-            control_qubits_by_case = control_qubits   
-            Q_idxs_control += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits_by_case]  
+            control_qubits_by_case = control_qubits
+            Q_idxs_control += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits_by_case]
             cases = ['{:0{}b}'.format(i, len(Q_idxs_control)) for i in range(2**len(Q_idxs_control))]
         else:
             # if cases are given, prepare and measure only them
@@ -633,14 +633,14 @@ class HAL_Device(HAL_ShimMQ):
                 control_qubits_by_case += [control_qubits[i] for i,c in enumerate(case) \
                                             if c == '1' and control_qubits[i] not in control_qubits_by_case]
                 #control_qubits_by_case += [control_qubits[i] for i,c in enumerate(case) if c == '1']
-              
+
             # sort selected control qubits according to readout (feedline) order
             # qb_ro_order = np.sum([ list(self._acq_ch_map[key].keys()) for key in self._acq_ch_map.keys()], dtype=object)
             # dqb_ro_order = np.array(qb_ro_order, dtype=str)[[qb[0] == 'D' for qb in qb_ro_order]]
             control_qubits_by_case = [x for x,_ in sorted(zip(control_qubits_by_case, control_qubits))]
-            
+
             Q_idxs_control += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits_by_case]
-            cases = control_cases_to_measure 
+            cases = control_cases_to_measure
 
         # for separate preparation of parking qubits in 1, used to study parking
         if parking_qubits:
@@ -659,9 +659,9 @@ class HAL_Device(HAL_ShimMQ):
         # MW preparation
         for qb in all_qubits:
             mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
-            # check the lutman of the target, control and parking qubits for cw_27, 
+            # check the lutman of the target, control and parking qubits for cw_27,
             # which is needed for refocusing, case preparation, and preparation in 1 (respectively)
-            # and prepare if necessary       
+            # and prepare if necessary
             xm180_dict = {"name": "rXm180", "theta": -180, "phi": 0, "type": "ge"}
             if mw_lutman.LutMap().get(27) != xm180_dict:
                 log.warning(f"{mw_lutman.name} does not have refocusing pulse, overriding `cw_27` ...")
@@ -680,14 +680,14 @@ class HAL_Device(HAL_ShimMQ):
         if prepare_for_timedomain:
             # Take care of readout order (by feedline/UHF)
             if self.qubits_by_feedline():
-                all_qubits = sorted(all_qubits, 
+                all_qubits = sorted(all_qubits,
                                 key=lambda x: [i for i, feedline in enumerate(self.qubits_by_feedline()) \
                                                 if x in feedline])
                 log.info(f"Sorted qubits for readout preparation: {all_qubits}")
             else:
                 log.warning("Qubit order by feedline in `self.qubits_by_feedline()` parameter is not set, "
                             + "readout will be prepared in order of given qubits which can lead to errors!")
-            
+
             self.prepare_for_timedomain(qubits=all_qubits)
 
         # These are hardcoded angles in the mw_lutman for the AWG8
@@ -696,7 +696,7 @@ class HAL_Device(HAL_ShimMQ):
 
         # prepare flux codeword list according to given step numbers
         # will be programmed in order of the list, but scheduled in parallel (if possible)
-        
+
         if refocusing:
             flux_cw_list = [flux_codeword + '_refocus' + f'_{step}' for step in flux_dance_steps]
 
@@ -746,7 +746,7 @@ class HAL_Device(HAL_ShimMQ):
 
         return a.result
         # a = ma2.Parity_Check_Analysis(
-        #     label=label, 
+        #     label=label,
         #     target_qubit=target_qubits[0],
         #     extract_only=not plotting,
         #     analyze_parity_model=analyze_parity_model
@@ -757,7 +757,7 @@ class HAL_Device(HAL_ShimMQ):
         # if analyze_parity_model:
         #     model_errors = a.proc_data_dict['quantities_of_interest']['parity_model']['model_errors']
         #     model_terms = a.proc_data_dict['quantities_of_interest']['parity_model']['model_terms']
-        #     # this return structure is necessary to use this as a detector function 
+        #     # this return structure is necessary to use this as a detector function
         #     # for higher level calibration routines
         #     result = {**result,
         #                 'model_errors': model_errors,
@@ -838,20 +838,20 @@ class HAL_Device(HAL_ShimMQ):
         all_qubits = target_qubits + control_qubits
 
         # MW preparation
-        Q_idxs_control = []   
+        Q_idxs_control = []
         for qb in control_qubits:
-            Q_idxs_control += [self.find_instrument(qb).cfg_qubit_nr()]  
+            Q_idxs_control += [self.find_instrument(qb).cfg_qubit_nr()]
             mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
-            # check the lutman of the target, control and parking qubits for cw_27, 
+            # check the lutman of the target, control and parking qubits for cw_27,
             # which is needed for refocusing, case preparation, and preparation in 1 (respectively)
-            # and prepare if necessary       
+            # and prepare if necessary
             xm180_dict = {"name": "rXm180", "theta": -180, "phi": 0, "type": "ge"}
             if mw_lutman.LutMap().get(27) != xm180_dict:
                 log.warning(f"{mw_lutman.name} does not have refocusing pulse, overriding `cw_27` ...")
                 mw_lutman.LutMap()[27] = xm180_dict
                 mw_lutman.load_waveform_onto_AWG_lookuptable(27, regenerate_waveforms=True)
 
-        Q_idxs_target = [] 
+        Q_idxs_target = []
         for i,ancilla in enumerate(target_qubits):
             log.info(f"Parity check fidelity {ancilla} - {control_qubits}")
             Q_idxs_target += [self.find_instrument(ancilla).cfg_qubit_nr()]
@@ -882,7 +882,7 @@ class HAL_Device(HAL_ShimMQ):
         if prepare_for_timedomain:
             # Take care of readout order (by feedline/UHF)
             if self.qubits_by_feedline():
-                all_qubits = sorted(all_qubits, 
+                all_qubits = sorted(all_qubits,
                                 key=lambda x: [i for i, feedline in enumerate(self.qubits_by_feedline()) \
                                                 if x in feedline])
                 log.info(f"Sorted qubits for readout preparation: {all_qubits}")
@@ -917,10 +917,10 @@ class HAL_Device(HAL_ShimMQ):
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
         d = self.get_int_logging_detector(
-            qubits=target_qubits+control_qubits, 
+            qubits=target_qubits+control_qubits,
             result_logging_mode=result_logging_mode
             )
-        shots_per_meas = int(np.floor(np.min([shots_per_meas, nr_shots]) / len(cases)) 
+        shots_per_meas = int(np.floor(np.min([shots_per_meas, nr_shots]) / len(cases))
                             * len(cases) )
         d.set_child_attr("nr_shots", shots_per_meas)
 
@@ -957,8 +957,8 @@ class HAL_Device(HAL_ShimMQ):
         # RO preparation (assign res_combinations)
         ###########################################
         RO_lms = np.unique([self.find_instrument(q).instr_LutMan_RO() for q in all_qubits])
-        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() : 
-                      (self.find_instrument(q).name, 
+        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() :
+                      (self.find_instrument(q).name,
                        self.find_instrument(q).instr_LutMan_RO()) for q in all_qubits }
         main_qubits = []
         exception_qubits = []
@@ -1005,7 +1005,7 @@ class HAL_Device(HAL_ShimMQ):
         MC.run(f"Sandia_parity_benchmark_{ancilla_qubit}_{data_qubits[0]}_{data_qubits[1]}_{data_qubits[2]}_{data_qubits[3]}")
 
         ma2.pba.Sandia_parity_benchmark(label='Sandia',
-                                        ancilla_qubit=ancilla_qubit, 
+                                        ancilla_qubit=ancilla_qubit,
                                         data_qubits=data_qubits,
                                         exception_qubits=exception_qubits)
 
@@ -1030,8 +1030,8 @@ class HAL_Device(HAL_ShimMQ):
         # RO preparation (assign res_combinations)
         ###########################################
         RO_lms = np.unique([self.find_instrument(q).instr_LutMan_RO() for q in all_qubits])
-        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() : 
-                      (self.find_instrument(q).name, 
+        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() :
+                      (self.find_instrument(q).name,
                        self.find_instrument(q).instr_LutMan_RO()) for q in all_qubits }
         main_qubits = []
         exception_qubits = []
@@ -1062,7 +1062,7 @@ class HAL_Device(HAL_ShimMQ):
                 ro_lm = self.find_instrument(lm)
                 ro_lm.resonator_combinations(res_combs[lm])
                 ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
-        
+
         p = mqo.Weight_4_parity_tomography(
             Q_anc=ancilla_idx,
             Q_D1=data_idxs[0],
@@ -1086,7 +1086,7 @@ class HAL_Device(HAL_ShimMQ):
         MC.soft_avg(1)
         MC.live_plot_enabled(False)
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(int(uhfqc_max_avg/readouts_per_round) 
+        MC.set_sweep_points(np.arange(int(uhfqc_max_avg/readouts_per_round)
                                         * readouts_per_round * repetitions))
         MC.set_detector_function(d)
         MC.run(f'Weight_4_parity_tomography_{ancilla_qubit}_{data_qubits}_sim-msmt-{sim_measurement}_{label}')
@@ -1119,7 +1119,7 @@ class HAL_Device(HAL_ShimMQ):
         phase_updates = dict.fromkeys([pair[0] for pair in pairs])
         for i,pair in enumerate(pairs):
             phase_updates[pair[0]] = a[f"pair_{i}_phi_0_a"]
-        
+
         if measure_switched_target:
             a = self.measure_conditional_oscillation(
                 pairs=[pair[::-1] for pair in pairs],
@@ -1803,7 +1803,7 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_msmt_induced_dephasing(
             self,
-            meas_qubit: str, 
+            meas_qubit: str,
             target_qubits: list,
             measurement_time_ns: int,
             echo_times: list = None,
@@ -1822,8 +1822,8 @@ class HAL_Device(HAL_ShimMQ):
         # RO preparation (assign res_combinations)
         ###########################################
         RO_lms = np.unique([self.find_instrument(q).instr_LutMan_RO() for q in all_qubits])
-        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() : 
-                      (self.find_instrument(q).name, 
+        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() :
+                      (self.find_instrument(q).name,
                        self.find_instrument(q).instr_LutMan_RO()) for q in all_qubits }
         main_qubits = []
         exception_qubits = []
@@ -1857,8 +1857,8 @@ class HAL_Device(HAL_ShimMQ):
                 assert echo_phases != None
                 for i, q in enumerate(target_qubits):
                     mw_lm = self.find_instrument(f'MW_lutman_{q}')
-                    print(mw_lm.name)    
-                    mw_lm.LutMap()[30] = {'name': 'rEcho', 'theta': 180, 
+                    print(mw_lm.name)
+                    mw_lm.LutMap()[30] = {'name': 'rEcho', 'theta': 180,
                                           'phi': echo_phases[i], 'type': 'ge'}
                     mw_lm.load_phase_pulses_to_AWG_lookuptable()
 
@@ -1883,7 +1883,7 @@ class HAL_Device(HAL_ShimMQ):
         MC.soft_avg(1)
         MC.live_plot_enabled(True)
         MC.set_sweep_function(s)
-        sw_pts = np.concatenate((np.repeat(np.arange(0, 360, 20), 6), 
+        sw_pts = np.concatenate((np.repeat(np.arange(0, 360, 20), 6),
                                  np.array([360, 361, 362, 364])))
         MC.set_sweep_points(sw_pts)
         MC.set_detector_function(d)
@@ -2410,32 +2410,31 @@ class HAL_Device(HAL_ShimMQ):
 
         for q in qubits:
             assert q in self.qubits()
-        
+
         Q_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
 
         if max_delay is None:
-            max_delay = 0 
+            max_delay = 0
         else:
             max_delay = np.max(times) + 40e-9
 
         Fl_lutmans = [self.find_instrument(q).instr_LutMan_Flux.get_instr() \
                       for q in qubits]
 
+        # determine sweep function and flux 'codeword'
         if waveform_name == "square":
             Sw_functions = [swf.FLsweep(lutman, lutman.sq_length,
                             waveform_name="square") for lutman in Fl_lutmans]
             swfs = swf.multi_sweep_function(Sw_functions)
             flux_cw = "fl_cw_06"
-
         elif waveform_name == "custom_wf":
-            Sw_functions = [swf.FLsweep(lutman, lutman.custom_wf_length, 
+            Sw_functions = [swf.FLsweep(lutman, lutman.custom_wf_length,
                             waveform_name="custom_wf") for lutman in Fl_lutmans]
             swfs = swf.multi_sweep_function(Sw_functions)
             flux_cw = "fl_cw_05"
-
         else:
             raise ValueError(
                 'waveform_name "{}" should be either '
@@ -2475,6 +2474,7 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_detector_function(d)
         label = 'Cryoscope_{}_amps'.format('_'.join(qubits))
         MC.run(label)
+
         # Run analysis
         a = ma2.cv2.multi_qubit_cryoscope_analysis(label='Cryoscope',
                                                    update_FIRs=update_FIRs)
@@ -2562,8 +2562,8 @@ class HAL_Device(HAL_ShimMQ):
 
         p = mqo.Cryoscope(
             q0idx,
-            buffer_time1=0,
-            buffer_time2=max_delay,
+            buffer_time1=0, # FIXME: unexpected argument
+            buffer_time2=max_delay, # FIXME: unexpected argument
             twoq_pair=twoq_pair,
             flux_cw=flux_cw,
             platf_cfg=self.cfg_openql_platform_fn())
@@ -3016,7 +3016,7 @@ class HAL_Device(HAL_ShimMQ):
     #     net_cliffords = [0, 3 * 24 + 3]
 
     #     programs = []
-        
+
     #     print('Generating {} RB programs'.format(nr_seeds))
     #     t0 = time.time()
     #     for i in range(nr_seeds):
@@ -5328,13 +5328,13 @@ class HAL_Device(HAL_ShimMQ):
         """
         Measures parity check as part of a flux dance for `B_sweep_points` different
         SNZ B values for each gate defined in `parity_check`.
-        Runs parity check model optimization analysis, which fits 
-        a linear dependence of the parity check model phase error given 
-        the measured error of each B value, to determine the B value required 
+        Runs parity check model optimization analysis, which fits
+        a linear dependence of the parity check model phase error given
+        the measured error of each B value, to determine the B value required
         to achieve an error of zero.
 
         Args:
-            parity_check: 
+            parity_check:
                 List of qubits and gate directions which define the flux_lutmans to be used.
                 Parking qubits are not used for this routine, and can be replaced with an empty list.
                 Assumed format: [ [[ancilla_qubit]], [[data_qubit]], [[gate_direction]], [[parking_qubits]] ]
@@ -5360,7 +5360,7 @@ class HAL_Device(HAL_ShimMQ):
                 flux_lm = self.find_instrument(f"flux_lm_{control_qubit[0]}")
             else:
                 flux_lm = self.find_instrument(f"flux_lm_{target_qubit[0]}")
-        
+
             old_B = flux_lm.parameters[f"vcz_amp_fine_{gate_direction[0]}"]()
             sweep_points = a_tools.get_values_around(old_B, range_frac=B_sweep_range_frac, num_points=B_sweep_n_points)
 
@@ -5374,12 +5374,12 @@ class HAL_Device(HAL_ShimMQ):
             old_weight_type = self.ro_acq_weight_type()
             self.ro_acq_digitized(False)
             self.ro_acq_weight_type('optimal')
-            
+
             all_qubits = target_qubit + control_qubits_all
             if prepare_for_timedomain:
                 # Take care of readout order (by feedline/UHF)
                 if self.qubits_by_feedline():
-                    all_qubits = sorted(all_qubits, 
+                    all_qubits = sorted(all_qubits,
                                     key=lambda x: [i for i, feedline in enumerate(self.qubits_by_feedline()) \
                                                     if x in feedline])
                     log.info(f"Sorted qubits for readout preparation: {all_qubits}")
@@ -5391,10 +5391,10 @@ class HAL_Device(HAL_ShimMQ):
 
             # generate model terms to use for labels
             controls_qubits_sorted = [qb for qb in all_qubits if qb != target_qubit[0]]
-            control_combinations = [elem for k in range(1, len(controls_qubits_sorted)+1) 
+            control_combinations = [elem for k in range(1, len(controls_qubits_sorted)+1)
                                             for elem in itt.combinations(controls_qubits_sorted, k)]
             model_terms = [target_qubit[0]]
-            model_terms += [ target_qubit[0] + ',' + qbs 
+            model_terms += [ target_qubit[0] + ',' + qbs
                             for qbs in [','.join(comb) for comb in control_combinations] ]
 
             d = det.Function_Detector(
@@ -5415,7 +5415,7 @@ class HAL_Device(HAL_ShimMQ):
                 )
 
             s = swf.FLsweep(
-                lm=flux_lm, 
+                lm=flux_lm,
                 par=flux_lm.parameters[f"vcz_amp_fine_{gate_direction[0]}"],
                 waveform_name=f"cz_{gate_direction[0]}",
                 upload_waveforms_always=True
@@ -5442,7 +5442,7 @@ class HAL_Device(HAL_ShimMQ):
                 print(repr(e))
                 print(e.__traceback__)
                 log.error(logging.traceback.format_exc())
-            
+
             # reset B!
             flux_lm.parameters[f"vcz_amp_fine_{gate_direction[0]}"](old_B)
 
@@ -5495,7 +5495,7 @@ class HAL_Device(HAL_ShimMQ):
             horizontal_calibration == True:
                 Horizontal calibration mode, parity check will be optimized while whole flux dance
                 specified by `flux_codeword` and `flux_dance_steps` is played.
-        
+
         Args:
 
         Raises:
@@ -5557,8 +5557,8 @@ class HAL_Device(HAL_ShimMQ):
                        'extract_only': True,
                        'disable_metadata': True},
                        # TODO adapt for nested lists
-                value_names=[f'cost_function_val_{pair}', 
-                            f'delta_phi_{pair}', 
+                value_names=[f'cost_function_val_{pair}',
+                            f'delta_phi_{pair}',
                             f'missing_fraction_{pair}'],
                 result_keys=[f'cost_function_val_{pair}',
                             f'delta_phi_{pair}',
@@ -5576,18 +5576,18 @@ class HAL_Device(HAL_ShimMQ):
         else:
             flux_lm = self.find_instrument(f"flux_lm_{pair[1]}")
 
-        # TODO: bypass waveform upload in sweep functions to save time by avoiding 
+        # TODO: bypass waveform upload in sweep functions to save time by avoiding
         #       repeated upload of the same parameters.
         #       Waveforms can be updated and uploaded only in the detector function
-        #       which should be enough since the detector function is called by the MC 
+        #       which should be enough since the detector function is called by the MC
         #       only after new sweep function values are set.
         #       But somehow this was not working during an initial test.
-        sweep_function_1 = swf.FLsweep(lm=flux_lm, 
+        sweep_function_1 = swf.FLsweep(lm=flux_lm,
                                         par=flux_lm.parameters[f"vcz_amp_sq_{gate_direction}"],
                                         waveform_name=f"cz_{gate_direction}",
                                         # bypass_waveform_upload=True,
-                                        upload_waveforms_always=True) 
-        sweep_function_2 = swf.FLsweep(lm=flux_lm, 
+                                        upload_waveforms_always=True)
+        sweep_function_2 = swf.FLsweep(lm=flux_lm,
                                         par=flux_lm.parameters[f"vcz_amp_fine_{gate_direction}"],
                                         waveform_name=f"cz_{gate_direction}",
                                         # bypass_waveform_upload=True,
@@ -5597,16 +5597,16 @@ class HAL_Device(HAL_ShimMQ):
         log.info(f"Flux codeword: {flux_codeword}, flux dance steps: {flux_dance_steps}")
 
         if adaptive_target_cost is not None:
-            # target cost value can be computed by: 
+            # target cost value can be computed by:
             # target_cost = cf.parity_check_cost(
-            #     phase_diff=185, 
-            #     phase_weight=0.5, 
+            #     phase_diff=185,
+            #     phase_weight=0.5,
             #     missing_fraction=0.02)
             # convergence threshold strangely has to be given in loss function, not here
-            goal = lndm.mk_min_threshold_goal_func(max_pnts_beyond_threshold=2) 
+            goal = lndm.mk_min_threshold_goal_func(max_pnts_beyond_threshold=2)
         else:
             goal = lndm.mk_minimization_goal_func()
-        
+
         loss = lndm.mk_minimization_loss_func(
             max_no_improve_in_local=6,
             converge_below=adaptive_target_cost,
@@ -5642,7 +5642,7 @@ class HAL_Device(HAL_ShimMQ):
             log.info(f"Optimization result: {result['opt_res']}")
             log.info(f"A = {flux_lm.parameters[f'vcz_amp_sq_{gate_direction}']()},"
                     f"B = {flux_lm.parameters[f'vcz_amp_fine_{gate_direction}']()}")
-            
+
             if update:
                 if horizontal_calibration:
                     # Heatmap analysis currently doesn't work for msmt format of horizontal calibration
@@ -5691,7 +5691,7 @@ class HAL_Device(HAL_ShimMQ):
                 self.measure_parity_check_flux_dance(
                     target_qubits=[pair[0]],
                     control_qubits=[pair[1]],
-                    ramsey_qubits=ramsey_qubits, 
+                    ramsey_qubits=ramsey_qubits,
                     flux_dance_steps=flux_dance_steps,
                     flux_codeword=flux_codeword,
                     prepare_for_timedomain=True,
@@ -5710,7 +5710,7 @@ class HAL_Device(HAL_ShimMQ):
             log.error(logging.traceback.format_exc())
 
     def measure_vcz_A_B_landscape(
-        self, 
+        self,
         Q0,
         Q1,
         A_ranges,
@@ -5719,8 +5719,8 @@ class HAL_Device(HAL_ShimMQ):
         Q_parks: list = None,
         flux_codeword: str = 'cz'):
         """
-        Perform 2D sweep of amplitude and wave parameter while measuring 
-        conditional phase and missing fraction via the "conditional 
+        Perform 2D sweep of amplitude and wave parameter while measuring
+        conditional phase and missing fraction via the "conditional
         oscillation" experiment.
 
         Q0 : High frequency qubit(s). Can be given as single qubit or list.
@@ -5740,7 +5740,7 @@ class HAL_Device(HAL_ShimMQ):
         nested_MC = self.instr_nested_MC.get_instr()
         # get gate directions
         directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
-        
+
         # Time-domain preparation
         # Prepare for time domain
         self.prepare_for_timedomain(
@@ -5765,7 +5765,7 @@ class HAL_Device(HAL_ShimMQ):
                     extract_only,
                     disable_metadata):
             a = self.measure_conditional_oscillation_multi(
-                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))],
                     parked_qbs=Q_parks,
                     flux_codeword=flux_codeword,
                     prepare_for_timedomain=prepare_for_timedomain,
@@ -5777,8 +5777,8 @@ class HAL_Device(HAL_ShimMQ):
                   for i in range(len(Q0)) }
             mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
                   for i in range(len(Q0)) }
-            return { **cp, **mf} 
-            
+            return { **cp, **mf}
+
         d = det.Function_Detector(
             wrapper,
             msmt_kw={'Q0' : Q0, 'Q1' : Q1,
@@ -5816,7 +5816,7 @@ class HAL_Device(HAL_ShimMQ):
 
 
     def measure_vcz_A_tmid_landscape(
-        self, 
+        self,
         Q0,
         Q1,
         T_mids,
@@ -5826,8 +5826,8 @@ class HAL_Device(HAL_ShimMQ):
         Tp : float = None,
         flux_codeword: str = 'cz'):
         """
-        Perform 2D sweep of amplitude and wave parameter while measuring 
-        conditional phase and missing fraction via the "conditional 
+        Perform 2D sweep of amplitude and wave parameter while measuring
+        conditional phase and missing fraction via the "conditional
         oscillation" experiment.
 
         Q0 : High frequency qubit(s). Can be given as single qubit or list.
@@ -5879,7 +5879,7 @@ class HAL_Device(HAL_ShimMQ):
                     extract_only,
                     disable_metadata):
             a = self.measure_conditional_oscillation_multi(
-                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))],
                     parked_qbs=Q_parks,
                     flux_codeword=flux_codeword,
                     prepare_for_timedomain=prepare_for_timedomain,
@@ -5891,7 +5891,7 @@ class HAL_Device(HAL_ShimMQ):
                   for i in range(len(Q0)) }
             mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
                   for i in range(len(Q0)) }
-            return { **cp, **mf} 
+            return { **cp, **mf}
 
         d = det.Function_Detector(
             wrapper,
@@ -5915,7 +5915,7 @@ class HAL_Device(HAL_ShimMQ):
             n_points=A_points)
         swf2 = swf.flux_t_middle_sweep(
             fl_lm_tm =  list(np.array([[Flux_lm_0[i], Flux_lm_1[i] ]\
-                             for i in range(len(Q0))]).flatten()), 
+                             for i in range(len(Q0))]).flatten()),
             fl_lm_park = Flux_lms_park,
             which_gate = list(np.array(directions).flatten()),
             t_pulse = Tp)
