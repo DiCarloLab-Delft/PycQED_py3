@@ -330,7 +330,6 @@ while (1) {
         """
         if isinstance(commandtable, dict):
             commandtable = json.dumps(commandtable, sort_keys=True, indent=2)
-
         # validate json (without schema)
         try:
             json.loads(commandtable)

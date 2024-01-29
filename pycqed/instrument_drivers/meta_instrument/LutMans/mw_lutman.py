@@ -9,39 +9,39 @@ from qcodes.utils import validators as vals
 
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
-default_mw_lutmap = {
-    0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
-    1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0 , "type" : "ge"},
-    2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90, "type" : "ge"},
-    3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0 , "type" : "ge"},
-    4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90, "type" : "ge"},
-    5  : {"name" : "rXm90" , "theta" : -90      , "phi" : 0 , "type" : "ge"},
-    6  : {"name" : "rYm90" , "theta" : -90      , "phi" : 90, "type" : "ge"},
-    7  : {"name" : "rPhi90", "theta" : 90       , "phi" : 0 , "type" : "ge"},
-    8  : {"name" : "spec"  , "type"  : "spec"}  ,
-    9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0 , "type" : "ef"},
-    10 : {"name" : "square", "type"  : "square"},
-    11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90, "type" : "ge"},
-    12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
-    13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
-    14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
-    15 : {"name" : "rX12_90"  , "theta" : 90, "phi" : 0 , "type" : "ef"},
-    30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
-    52 : {"name" : "phaseCorrPark1" , "type" : "phase"},
-    53 : {"name" : "phaseCorrPark2" , "type" : "phase"},
-    54 : {"name" : "phaseCorrPark3" , "type" : "phase"},
-    55 : {"name" : "phaseCorrPark4" , "type" : "phase"},
-    56 : {"name" : "phaseCorrPark5" , "type" : "phase"},
-    57 : {"name" : "phaseCorrPark6" , "type" : "phase"},
-    58 : {"name" : "phaseCorrPark7" , "type" : "phase"},
-    59 : {"name" : "phaseCorrPark8" , "type" : "phase"},
-    60 : {"name" : "phaseCorrNW" , "type" : "phase"},
-    61 : {"name" : "phaseCorrNE" , "type" : "phase"},
-    62 : {"name" : "phaseCorrSW" , "type" : "phase"},
-    63 : {"name" : "phaseCorrSE" , "type" : "phase"},
-}
+# default_mw_lutmap = {
+#     0  : {"name" : "I"     , "theta" : 0        , "phi" : 0 , "type" : "ge"},
+#     1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0 , "type" : "ge"},
+#     2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90, "type" : "ge"},
+#     3  : {"name" : "rX90"  , "theta" : 90       , "phi" : 0 , "type" : "ge"},
+#     4  : {"name" : "rY90"  , "theta" : 90       , "phi" : 90, "type" : "ge"},
+#     5  : {"name" : "rXm90" , "theta" : -90      , "phi" : 0 , "type" : "ge"},
+#     6  : {"name" : "rYm90" , "theta" : -90      , "phi" : 90, "type" : "ge"},
+#     7  : {"name" : "rPhi90", "theta" : 90       , "phi" : 0 , "type" : "ge"},
+#     8  : {"name" : "spec"  , "type"  : "spec"}  ,
+#     9  : {"name" : "rX12"  , "theta" : 180      , "phi" : 0 , "type" : "ef"},
+#     10 : {"name" : "square", "type"  : "square"},
+#     11 : {"name" : "rY45"  , "theta" : 45       , "phi" : 90, "type" : "ge"},
+#     12 : {"name" : "rYm45" , "theta" : -45      , "phi" : 90, "type" : "ge"},
+#     13 : {"name" : "rX45"  , "theta" : 45       , "phi" : 0 , "type" : "ge"},
+#     14 : {"name" : "rXm45" , "theta" : -45      , "phi" : 0 , "type" : "ge"},
+#     15 : {"name" : "rX12_90"  , "theta" : 90, "phi" : 0 , "type" : "ef"},
+#     30 : {"name" : "rPhi180" , "theta" : 180    , "phi" : 0 , "type" : "ge"},
+#     52 : {"name" : "phaseCorrPark1" , "type" : "phase"},
+#     53 : {"name" : "phaseCorrPark2" , "type" : "phase"},
+#     54 : {"name" : "phaseCorrPark3" , "type" : "phase"},
+#     55 : {"name" : "phaseCorrPark4" , "type" : "phase"},
+#     56 : {"name" : "phaseCorrPark5" , "type" : "phase"},
+#     57 : {"name" : "phaseCorrPark6" , "type" : "phase"},
+#     58 : {"name" : "phaseCorrPark7" , "type" : "phase"},
+#     59 : {"name" : "phaseCorrPark8" , "type" : "phase"},
+#     60 : {"name" : "phaseCorrNW" , "type" : "phase"},
+#     61 : {"name" : "phaseCorrNE" , "type" : "phase"},
+#     62 : {"name" : "phaseCorrSW" , "type" : "phase"},
+#     63 : {"name" : "phaseCorrSE" , "type" : "phase"},
+# }
 
-inspire_mw_lutmap = {
+default_mw_lutmap = {
     0  : {"name" : "I"     , "theta" : 0        , "phi" : 0  , "type" : "ge"}, # I for CW compatibility
     1  : {"name" : "rX180" , "theta" : 180      , "phi" : 0  , "type" : "ge"}, # rX180 for CW compatibility
     2  : {"name" : "rY180" , "theta" : 180      , "phi" : 90 , "type" : "ge"}, # rY180 for CW compatibility
@@ -520,10 +520,11 @@ class Base_MW_LutMan(Base_LutMan):
         """
         Loads rPhi90 pulses onto the AWG lookuptable.
         """
+        startIndex=32  # changed from 9, LDC, 22/10/23
         if len(phases) > 18:
             raise ValueError('max 18 phase values can be provided')
         for i, (phase) in enumerate(phases):
-            self.LutMap()[i+9] = {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
+            self.LutMap()[startIndex+i] = {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
         self.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
 
     # FIXME: function is almost identical to load_phase_pulses_to_AWG_lookuptable, except for phi vs. theta
@@ -1109,7 +1110,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     def upload_single_qubit_phase_corrections(self):
         commandtable_dict = {
             "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
-            "header": {"version": "0.2"},
+            "header": {"version": "1.0"}, # NOTE: I hacked it from version 0.2 to 1.0 because it was complaining
             "table": []
         }
 

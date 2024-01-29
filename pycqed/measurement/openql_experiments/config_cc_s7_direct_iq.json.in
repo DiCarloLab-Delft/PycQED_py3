@@ -56,7 +56,7 @@
 						[22,21,20,19,18,17,16],           // group 2. NB: starts at bit 16 so twin-QWG can also support it
 						[29,28,27,26,25,24,23]            // group 4
 					],
-					"trigger_bits": [31,15]
+					"trigger_bits": [31]
 				},
 				"awg8-flux": {							   // ZI_HDAWG8.py::cfg_codeword_protocol() == 'flux'
                     // NB: please note that internally one AWG unit handles 2 channels, which requires special handling of the waveforms
