@@ -904,8 +904,9 @@ def echo(times, qubit_idx: int, platf_cfg: str, delta_phase: int = 40) -> OqlPro
 
     for i, time in enumerate(times[:-4]):
 
+        startIndex=32  # added by LDC on 2022/10/23. Starting index used to be 9.
         angle = (i*delta_phase) % 360
-        cw_idx = angle//20 + 9
+        cw_idx = 32 + angle//20
         wait_nanoseconds = int(round(time*1e9 / 2))
 
         k = p.create_kernel("echo_{}".format(i))
