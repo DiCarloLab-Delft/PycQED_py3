@@ -1,4 +1,5 @@
 import os
+import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 import pycqed.analysis_v2.base_analysis as ba
@@ -177,6 +178,17 @@ class SingleQubitGBT_analysis(ba.BaseDataAnalysis):
 			self.raw_data_dict[q]['t_T2'] = t2.sweep_points[:-4]
 			self.raw_data_dict[q]['p_T2'] = t2.normalized_data_points
 			self.raw_data_dict[q]['T2'] = t2.fit_res.params['tau'].value
+			# Bundle all errors in array so it gets saved in hdf5
+			self.raw_data_dict[q]['Errors'] = np.array([
+				self.raw_data_dict[q]['SQG_err'],
+				self.raw_data_dict[q]['L1_err'],
+				self.raw_data_dict[q]['RO_err'],
+				self.raw_data_dict[q]['allxy_err'],
+				self.raw_data_dict[q]['T1'],
+				self.raw_data_dict[q]['T2']])
+
+		self.proc_data_dict = {}
+		self.proc_data_dict['quantities_of_interest'] = self.raw_data_dict
 
 	def process_data(self):
 		pass
@@ -955,30 +967,42 @@ class ParityCheckGBT_analysis(ba.BaseDataAnalysis):
 			Data_qubits = fp_tomo.split(f'tomography_{stab}_')[-1]
 			Data_qubits = Data_qubits.split('_sim')[0]
 			Data_qubits = Data_qubits.split('_')
-			if stab == 'Z1':
-				exc_qubits = ['D1']
-			elif stab == 'Z2':
-				exc_qubits = ['D3']
-			elif stab == 'Z3':
-				exc_qubits = []
-			elif stab == 'Z4':
-				exc_qubits = ['D5']
-			else:
-			    raise ValueError('exception qubits must be given to analysis')
-			a = ma2.pba.Weight_n_parity_tomography(
-				label = label_tomo,
-				sim_measurement=True,
-				n_rounds=2,
-				exception_qubits=exc_qubits,
-				post_selection=False,
-				extract_only=True)
-			self.raw_data_dict[stab]['rho_0'] = a.proc_data_dict['rho_0']
-			self.raw_data_dict[stab]['rho_1'] = a.proc_data_dict['rho_1']
-			self.raw_data_dict[stab]['fidelity_0'] = a.proc_data_dict['Fid_0']
-			self.raw_data_dict[stab]['fidelity_1'] = a.proc_data_dict['Fid_1']
-			self.raw_data_dict[stab]['M1'] = a.proc_data_dict['M1']
-			self.raw_data_dict[stab]['M2'] = a.proc_data_dict['M2']
-			self.raw_data_dict[stab]['repeatability'] = a.proc_data_dict['repeatability']
+			try:
+				if stab == 'Z1':
+					exc_qubits = ['D4', 'D5']  # ['D1']
+				elif stab == 'Z2':
+					exc_qubits = ['D3']
+				elif stab == 'Z3':
+					exc_qubits = ['D7']
+				elif stab == 'Z4':
+					exc_qubits = ['D5']
+				elif stab == 'X1':
+					exc_qubits = ['D2']
+				elif stab == 'X2':
+					exc_qubits = ['D2', 'D3']
+				elif stab == 'X3':
+					exc_qubits = ['D8']
+				elif stab == 'X4':
+					exc_qubits = []
+				else:
+					raise ValueError('exception qubits must be given to analysis')
+
+				a = ma2.pba.Weight_n_parity_tomography(
+					label = label_tomo,
+					sim_measurement=True,
+					n_rounds=2,
+					exception_qubits=exc_qubits,
+					post_selection=False,
+					extract_only=True)
+				self.raw_data_dict[stab]['rho_0'] = a.proc_data_dict['rho_0']
+				self.raw_data_dict[stab]['rho_1'] = a.proc_data_dict['rho_1']
+				self.raw_data_dict[stab]['fidelity_0'] = a.proc_data_dict['Fid_0']
+				self.raw_data_dict[stab]['fidelity_1'] = a.proc_data_dict['Fid_1']
+				self.raw_data_dict[stab]['M1'] = a.proc_data_dict['M1']
+				self.raw_data_dict[stab]['M2'] = a.proc_data_dict['M2']
+				self.raw_data_dict[stab]['repeatability'] = a.proc_data_dict['repeatability']
+			except Exception as e:
+				warnings.warn(e)
 
 	def process_data(self):
 		pass

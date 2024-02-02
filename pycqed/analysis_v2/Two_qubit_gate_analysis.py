@@ -364,7 +364,7 @@ def TLS_landscape_plotfn(
     # Frequency qubit population
     vmax = min([1, np.max(Pop)])
     vmax = max([vmax, 0.15])
-    im = ax.pcolormesh(Detunings*1e-6, Times*1e9, Pop, vmax=vmax)
+    im = ax.pcolormesh(Detunings*1e-6, Times*1e9, Pop, vmax=1)#vmax)
     fig.colorbar(im, ax=ax, label='Population')
     # plot two-qubit gate frequencies:
     if interaction_freqs:
@@ -3365,7 +3365,8 @@ def CZ_frequency_trajectory_plotfn(
         axR.set_position([pos.x0+pos.width*1.005, pos.y0, pos.width*0.2, pos.height])
         def get_plot_axis(vals, rang=None):
             if len(vals)>1:
-                dx = vals[1]-vals[0]
+                n = len(vals)//2
+                dx = vals[n]-vals[n-1]
                 X = np.concatenate((vals, [vals[-1]+dx])) - dx/2
             else:
                 X = vals
@@ -3375,25 +3376,34 @@ def CZ_frequency_trajectory_plotfn(
         Pop = TLS_analysis_dict[qH].proc_data_dict['Pop'] 
         # Frequency qubit population
         vmax = min([1, np.max(Pop)])
-        vmax = max([vmax, 0.15])
+        vmax = 1#max([vmax, 0.15])
         im = axR.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
         axR.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, qH, ha='center', va='top', color='w')
-        axR.set_title('Gate qubits', size=7)
+        axR.set_title('High qubit', size=7)
         if qL in TLS_analysis_dict.keys():
+            axL = fig.add_subplot(221)
+            # using previous axis position <pos>
+            axL.set_position([pos.x0+pos.width*(1.21), pos.y0,
+                              pos.width*0.2, pos.height])
             Detunings = data[qL]['frequency'] - get_plot_axis(TLS_analysis_dict[qL].proc_data_dict['Detunings'])
-            Pop = TLS_analysis_dict[qL].proc_data_dict['Pop'] 
+            Pop = TLS_analysis_dict[qL].proc_data_dict['Pop']
             # Frequency qubit population
             vmax = min([1, np.max(Pop)])
-            vmax = max([vmax, 0.15])
-            im = axR.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
-            axR.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, qL, ha='center', va='top', color='w')
-            axR.axhline(Detunings[0]*1e-9, color='w')
+            vmax = 1#max([vmax, 0.15])
+            im = axL.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
+            axL.text(Times[len(Times)//2]*1e9, max(Detunings)*1e-9-.05, qL, ha='center', va='top', color='w')
+            # axR.axhline(max(Detunings)*1e-9, color='w')
+            axL.set_title('Low qubit', size=7)
+            axL.set_ylim(ax.get_ylim())
+            axL.yaxis.tick_right()
+            axL.set_xticks([])
+            axL.axis('off')
         axR.set_ylim(ax.get_ylim())
         axR.yaxis.tick_right()
         axR.set_xticks([])
         axR.axis('off')
         # Parked qubit plots
-        i = 0
+        i = 1
         for q in parked_qubits:
             if q in TLS_analysis_dict.keys():
                 axP = fig.add_subplot(221+i)
@@ -3405,11 +3415,10 @@ def CZ_frequency_trajectory_plotfn(
                 Pop = TLS_analysis_dict[q].proc_data_dict['Pop'] 
                 # Frequency qubit population
                 vmax = min([1, np.max(Pop)])
-                vmax = max([vmax, 0.15])
+                vmax = 1#max([vmax, 0.15])
                 im = axP.pcolormesh(Times*1e9, Detunings*1e-9, Pop.transpose(), vmax=vmax)
-                axP.text(Times[len(Times)//2]*1e9, Detunings[0]*1e-9-.05, q, ha='center', va='top', color='w')
-                
-                axP.set_title('Park qubits', size=7)
+                axP.text(Times[len(Times)//2]*1e9, max(Detunings)*1e-9-.05, q, ha='center', va='top', color='w')
+                axP.set_title('Park qubit', size=7)
                 axP.set_ylim(ax.get_ylim())
                 axP.yaxis.tick_right()
                 axP.set_xticks([])
@@ -3552,8 +3561,10 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
         # self.qoi['L_1'] = L_1
         self.qoi['P_excited'] = P_excited
         self.qoi['Phases'] = {}
+        self.qoi['Contrast'] = {}
         for q in self.Q_target:
             self.qoi['Phases'][q] = { c:Fit_res[q][c][0] for c in self.control_cases }
+            self.qoi['Contrast'][q] = { c:Fit_res[q][c][1] for c in self.control_cases }
         if self.solve_for_phase_gate_model:
             self.qoi['Phase_model'] = Phase_model
 

@@ -4,6 +4,7 @@
 from dataclasses import dataclass, field
 import warnings
 from typing import List, Union, Dict, Tuple
+from enum import Enum, unique, auto
 from pycqed.qce_utils.definitions import SingletonABCMeta
 from pycqed.qce_utils.custom_exceptions import ElementNotIncludedException
 from pycqed.qce_utils.control_interfaces.intrf_channel_identifier import (
@@ -20,6 +21,57 @@ from pycqed.qce_utils.control_interfaces.intrf_connectivity_surface_code import 
     IParityGroup,
     ParityType,
 )
+from pycqed.qce_utils.control_interfaces.intrf_connectivity import (
+    IDeviceLayer
+)
+
+
+@unique
+class FrequencyGroup(Enum):
+    LOW = auto()
+    MID = auto()
+    HIGH = auto()
+
+
+@dataclass(frozen=True)
+class FrequencyGroupIdentifier:
+    """
+    Data class, representing (qubit) frequency group identifier.
+    """
+    _id: FrequencyGroup
+
+    # region Class Properties
+    @property
+    def id(self) -> FrequencyGroup:
+        """:return: Self identifier."""
+        return self._id
+    # endregion
+
+    # region Class Methods
+    def is_equal_to(self, other: 'FrequencyGroupIdentifier') -> bool:
+        """:return: Boolean, whether other frequency group identifier is equal self."""
+        return self.id == other.id
+
+    def is_higher_than(self, other: 'FrequencyGroupIdentifier') -> bool:
+        """:return: Boolean, whether other frequency group identifier is 'lower' than self."""
+        # Guard clause, if frequency groups are equal, return False
+        if self.is_equal_to(other):
+            return False
+        if self.id == FrequencyGroup.MID and other.id == FrequencyGroup.LOW:
+            return True
+        if self.id == FrequencyGroup.HIGH:
+            return True
+        return False
+
+    def is_lower_than(self, other: 'FrequencyGroupIdentifier') -> bool:
+        """:return: Boolean, whether other frequency group identifier is 'higher' than self."""
+        # Guard clause, if frequency groups are equal, return False
+        if self.is_equal_to(other):
+            return False
+        if self.is_higher_than(other):
+            return False
+        return True
+    # endregion
 
 
 @dataclass(frozen=True)
@@ -110,6 +162,69 @@ class ParityGroup(IParityGroup):
 
 
 @dataclass(frozen=True)
+class FluxDanceLayer:
+    """
+    Data class, containing directional gates played during 'flux-dance' layer.
+    """
+    _edge_ids: List[IEdgeID]
+    """Non-directional edges, part of flux-dance layer."""
+
+    # region Class Properties
+    @property
+    def qubit_ids(self) -> List[IQubitID]:
+        """:return: All qubit-ID's."""
+        return list(set([qubit_id for edge in self.edge_ids for qubit_id in edge.qubit_ids]))
+
+    @property
+    def edge_ids(self) -> List[IEdgeID]:
+        """:return: Array-like of directional edge identifiers, specific for this flux dance."""
+        return self._edge_ids
+    # endregion
+
+    # region Class Methods
+    def contains(self, element: Union[IQubitID, IEdgeID]) -> bool:
+        """:return: Boolean, whether element is part of flux-dance layer or not."""
+        if element in self.qubit_ids:
+            return True
+        if element in self.edge_ids:
+            return True
+        return False
+
+    def get_involved_edge(self, qubit_id: IQubitID) -> IEdgeID:
+        """:return: Edge in which qubit-ID is involved. If qubit-ID not part of self, raise error."""
+        for edge in self.edge_ids:
+            if edge.contains(element=qubit_id):
+                return edge
+        raise ElementNotIncludedException(f'Element {qubit_id} is not part of self ({self}) and cannot be part of an edge.')
+
+    def get_spectating_qubit_ids(self, device_layer: IDeviceLayer) -> List[IQubitID]:
+        """:return: Direct spectator (nearest neighbor) to qubit-ID's participating in flux-dance."""
+        participating_qubit_ids: List[IQubitID] = self.qubit_ids
+        nearest_neighbor_ids: List[IQubitID] = [neighbor_id for qubit_id in participating_qubit_ids for neighbor_id in device_layer.get_neighbors(qubit_id, order=1)]
+        filtered_nearest_neighbor_ids: List[IQubitID] = list(set([qubit_id for qubit_id in nearest_neighbor_ids if qubit_id not in participating_qubit_ids]))
+        return filtered_nearest_neighbor_ids
+
+    def requires_parking(self, qubit_id: IQubitID, device_layer: ISurfaceCodeLayer) -> bool:
+        """
+        Determines whether qubit-ID is required to park based on participation in flux dance and frequency group.
+        :return: Boolean, whether qubit-ID requires some form of parking.
+        """
+        spectating_qubit_ids: List[IQubitID] = self.get_spectating_qubit_ids(device_layer=device_layer)
+        # Guard clause, if qubit-ID does not spectate the flux-dance, no need for parking
+        if qubit_id not in spectating_qubit_ids:
+            return False
+        # Check if qubit-ID requires parking based on its frequency group ID and active two-qubit gates.
+        frequency_group: FrequencyGroupIdentifier = device_layer.get_frequency_group_identifier(element=qubit_id)
+        # Parking is required if any neighboring qubit from a higher frequency group is part of an edge.
+        neighboring_qubit_ids: List[IQubitID] = device_layer.get_neighbors(qubit=qubit_id, order=1)
+        involved_neighbors: List[IQubitID] = [qubit_id for qubit_id in neighboring_qubit_ids if self.contains(qubit_id)]
+        involved_frequency_groups: List[FrequencyGroupIdentifier] = [device_layer.get_frequency_group_identifier(element=qubit_id) for qubit_id in involved_neighbors]
+        return any([neighbor_frequency_group.is_higher_than(frequency_group) for neighbor_frequency_group in involved_frequency_groups])
+    # endregion
+
+
+
+@dataclass(frozen=True)
 class VirtualPhaseIdentifier(IChannelIdentifier):
     """
     Data class, describing (code-word) identifier for virtual phase.
@@ -131,6 +246,33 @@ class VirtualPhaseIdentifier(IChannelIdentifier):
     def __eq__(self, other):
         """:returns: Boolean if other shares equal identifier, else InterfaceMethodException."""
         if isinstance(other, VirtualPhaseIdentifier):
+            return self.id.__eq__(other.id)
+        return False
+    # endregion
+
+
+@dataclass(frozen=True)
+class FluxOperationIdentifier(IChannelIdentifier):
+    """
+    Data class, describing (code-word) identifier for flux operation.
+    """
+    _id: str
+
+    # region Interface Properties
+    @property
+    def id(self) -> str:
+        """:returns: Reference Identifier."""
+        return self._id
+    # endregion
+
+    # region Interface Methods
+    def __hash__(self):
+        """:returns: Identifiable hash."""
+        return self._id.__hash__()
+
+    def __eq__(self, other):
+        """:returns: Boolean if other shares equal identifier, else InterfaceMethodException."""
+        if isinstance(other, FluxOperationIdentifier):
             return self.id.__eq__(other.id)
         return False
     # endregion
@@ -215,6 +357,25 @@ class Surface17Layer(ISurfaceCodeLayer, metaclass=SingletonABCMeta):
             _data_qubits=[QubitIDObj('D5'), QubitIDObj('D6'), QubitIDObj('D8'), QubitIDObj('D9')]
         ),
     ]
+    _frequency_group_lookup: Dict[IQubitID, FrequencyGroupIdentifier] = {
+        QubitIDObj('D1'): FrequencyGroupIdentifier(_id=FrequencyGroup.LOW),
+        QubitIDObj('D2'): FrequencyGroupIdentifier(_id=FrequencyGroup.LOW),
+        QubitIDObj('D3'): FrequencyGroupIdentifier(_id=FrequencyGroup.LOW),
+        QubitIDObj('D4'): FrequencyGroupIdentifier(_id=FrequencyGroup.HIGH),
+        QubitIDObj('D5'): FrequencyGroupIdentifier(_id=FrequencyGroup.HIGH),
+        QubitIDObj('D6'): FrequencyGroupIdentifier(_id=FrequencyGroup.HIGH),
+        QubitIDObj('D7'): FrequencyGroupIdentifier(_id=FrequencyGroup.LOW),
+        QubitIDObj('D8'): FrequencyGroupIdentifier(_id=FrequencyGroup.LOW),
+        QubitIDObj('D9'): FrequencyGroupIdentifier(_id=FrequencyGroup.LOW),
+        QubitIDObj('Z1'): FrequencyGroupIdentifier(_id=FrequencyGroup.MID),
+        QubitIDObj('Z2'): FrequencyGroupIdentifier(_id=FrequencyGroup.MID),
+        QubitIDObj('Z3'): FrequencyGroupIdentifier(_id=FrequencyGroup.MID),
+        QubitIDObj('Z4'): FrequencyGroupIdentifier(_id=FrequencyGroup.MID),
+        QubitIDObj('X1'): FrequencyGroupIdentifier(_id=FrequencyGroup.MID),
+        QubitIDObj('X2'): FrequencyGroupIdentifier(_id=FrequencyGroup.MID),
+        QubitIDObj('X3'): FrequencyGroupIdentifier(_id=FrequencyGroup.MID),
+        QubitIDObj('X4'): FrequencyGroupIdentifier(_id=FrequencyGroup.MID),
+    }
 
     # region ISurfaceCodeLayer Interface Properties
     @property
@@ -293,6 +454,10 @@ class Surface17Layer(ISurfaceCodeLayer, metaclass=SingletonABCMeta):
         if element in self.edge_ids:
             return True
         return False
+    
+    def get_frequency_group_identifier(self, element: IQubitID) -> FrequencyGroupIdentifier:
+        """:return: Frequency group identifier based on qubit-ID."""
+        return self._frequency_group_lookup[element]
     # endregion
 
 
@@ -394,6 +559,52 @@ class Repetition9Layer(ISurfaceCodeLayer, metaclass=SingletonABCMeta):
         DirectionalEdgeIDObj(QubitIDObj('D9'), QubitIDObj('X4')): VirtualPhaseIdentifier('vcz_virtual_q_ph_corr_NW'),
         DirectionalEdgeIDObj(QubitIDObj('X4'), QubitIDObj('D9')): VirtualPhaseIdentifier('vcz_virtual_q_ph_corr_SE'),
     }
+    _flux_dances: List[Tuple[FluxDanceLayer, FluxOperationIdentifier]] = [
+        (
+            FluxDanceLayer(
+                _edge_ids=[
+                    EdgeIDObj(QubitIDObj('X1'), QubitIDObj('D1')),
+                    EdgeIDObj(QubitIDObj('Z1'), QubitIDObj('D4')),
+                    EdgeIDObj(QubitIDObj('X3'), QubitIDObj('D7')),
+                    EdgeIDObj(QubitIDObj('Z2'), QubitIDObj('D6')),
+                ]
+            ),
+            FluxOperationIdentifier(_id='repetition_code_1')
+        ),
+        (
+            FluxDanceLayer(
+                _edge_ids=[
+                    EdgeIDObj(QubitIDObj('X1'), QubitIDObj('D2')),
+                    EdgeIDObj(QubitIDObj('Z1'), QubitIDObj('D5')),
+                    EdgeIDObj(QubitIDObj('X3'), QubitIDObj('D8')),
+                    EdgeIDObj(QubitIDObj('Z2'), QubitIDObj('D3')),
+                ]
+            ),
+            FluxOperationIdentifier(_id='repetition_code_2')
+        ),
+        (
+            FluxDanceLayer(
+                _edge_ids=[
+                    EdgeIDObj(QubitIDObj('Z3'), QubitIDObj('D7')),
+                    EdgeIDObj(QubitIDObj('X4'), QubitIDObj('D8')),
+                    EdgeIDObj(QubitIDObj('Z4'), QubitIDObj('D5')),
+                    EdgeIDObj(QubitIDObj('X2'), QubitIDObj('D2')),
+                ]
+            ),
+            FluxOperationIdentifier(_id='repetition_code_3')
+        ),
+        (
+            FluxDanceLayer(
+                _edge_ids=[
+                    EdgeIDObj(QubitIDObj('Z3'), QubitIDObj('D4')),
+                    EdgeIDObj(QubitIDObj('X4'), QubitIDObj('D9')),
+                    EdgeIDObj(QubitIDObj('Z4'), QubitIDObj('D6')),
+                    EdgeIDObj(QubitIDObj('X2'), QubitIDObj('D3')),
+                ]
+            ),
+            FluxOperationIdentifier(_id='repetition_code_4')
+        ),
+    ]
 
     # region ISurfaceCodeLayer Interface Properties
     @property
@@ -434,6 +645,16 @@ class Repetition9Layer(ISurfaceCodeLayer, metaclass=SingletonABCMeta):
         raise ElementNotIncludedException(f"Element: {element} is not included in any parity group.")
     # endregion
 
+    # region IGateDanceLayer Interface Methods
+    def get_flux_dance_at_round(self, index: int) -> FluxDanceLayer:
+        """:return: Flux-dance object based on round index."""
+        try:
+            flux_dance_layer: FluxDanceLayer = self._flux_dances[index]
+            return flux_dance_layer
+        except:
+            raise ElementNotIncludedException(f"Index: {index} is out of bounds for flux dance of length: {len(self._flux_dances)}.")
+    # endregion
+
     # region IDeviceLayer Interface Methods
     def get_connected_qubits(self, feedline: IFeedlineID) -> List[IQubitID]:
         """:return: Qubit-ID's connected to feedline-ID."""
@@ -456,6 +677,41 @@ class Repetition9Layer(ISurfaceCodeLayer, metaclass=SingletonABCMeta):
     # endregion
 
     # region Class Methods
+    def _get_flux_dance_layer(self, element: IEdgeID) -> FluxDanceLayer:
+        """:return: Flux-dance layer of which edge element is part of."""
+        # Assumes element is part of only a single flux-dance layer
+        for flux_dance_layer, _ in self._flux_dances:
+            if flux_dance_layer.contains(element=element):
+                return flux_dance_layer
+        raise ElementNotIncludedException(f"Element: {element} is not included in any flux-dance layer.")
+
+    def _get_flux_operation_identifier(self, element: IEdgeID) -> FluxOperationIdentifier:
+        """:return: Identifier describing flux-dance layer."""
+        for flux_dance_layer, flux_operation_identifier in self._flux_dances:
+            if flux_dance_layer.contains(element=element):
+                return flux_operation_identifier
+        raise ElementNotIncludedException(f"Element: {element} is not included in any flux-dance layer.")
+
+
+    def get_flux_operation_identifier(self, qubit_id0: str, qubit_id1: str) -> str:
+        """:return: Identifier describing flux-dance layer."""
+        edge: IEdgeID = EdgeIDObj(
+            qubit_id0=QubitIDObj(_id=qubit_id0),
+            qubit_id1=QubitIDObj(_id=qubit_id1),
+        )
+        return self._get_flux_operation_identifier(element=edge).id
+
+    def get_edge_flux_operation_identifier(self, ancilla_qubit: str) -> List[str]:
+        """:return: Identifier describing flux-dance layer."""
+        qubit_id: IQubitID = QubitIDObj(_id=ancilla_qubit)
+        parity_group: IParityGroup = self.get_parity_group(element=qubit_id)
+        return [
+            self._get_flux_operation_identifier(
+                element=edge_id,
+            ).id
+            for edge_id in parity_group.edge_ids
+        ]
+
     def _get_virtual_phase_identifier(self, directional_edge: DirectionalEdgeIDObj) -> VirtualPhaseIdentifier:
         """:return: Identifier for virtual phase correction. Based on element and parity group."""
         return self._virtual_phase_lookup[directional_edge]
@@ -492,6 +748,19 @@ class Repetition9Layer(ISurfaceCodeLayer, metaclass=SingletonABCMeta):
             for data_id in parity_group.data_ids
         ]
 
+    def get_parity_data_identifier(self, ancilla_qubit: str) -> List[str]:
+        """
+        Iterates over provided ancilla qubit ID's.
+        Construct corresponding IQubitID's.
+        Obtain corresponding IParityGroup's.
+        Flatten list of (unique) data qubit ID's part of these parity groups.
+        :return: Array-like of (unique) data qubit ID's part of ancilla qubit parity groups.
+        """
+        ancilla_qubit_id: IQubitID = QubitIDObj(ancilla_qubit)
+        parity_group: IParityGroup = self.get_parity_group(element=ancilla_qubit_id)
+        data_qubit_ids: List[IQubitID] = [qubit_id for qubit_id in parity_group.data_ids]
+        return [qubit_id.id for qubit_id in data_qubit_ids]
+
     def get_parity_data_identifiers(self, ancilla_qubits: List[str]) -> List[str]:
         """
         Iterates over provided ancilla qubit ID's.
@@ -500,16 +769,15 @@ class Repetition9Layer(ISurfaceCodeLayer, metaclass=SingletonABCMeta):
         Flatten list of (unique) data qubit ID's part of these parity groups.
         :return: Array-like of (unique) data qubit ID's part of ancilla qubit parity groups.
         """
-        ancilla_qubit_ids: List[IQubitID] = [QubitIDObj(ancilla_qubit) for ancilla_qubit in ancilla_qubits]
-        parity_groups: List[IParityGroup] = [self.get_parity_group(element=qubit_id) for qubit_id in ancilla_qubit_ids]
-        data_qubit_ids: List[IQubitID] = [qubit_id for parity_group in parity_groups for qubit_id in parity_group.data_ids]
-        return [unique_qubit_id.id for unique_qubit_id in set(data_qubit_ids)]
+        return [unique_qubit_id for ancilla_qubit in ancilla_qubits for unique_qubit_id in set(self.get_parity_data_identifier(ancilla_qubit=ancilla_qubit))]
+    
+    def get_frequency_group_identifier(self, element: IQubitID) -> FrequencyGroupIdentifier:
+        """:return: Frequency group identifier based on qubit-ID."""
+        return Surface17Layer().get_frequency_group_identifier(element=element)
     # endregion
 
 
 if __name__ == '__main__':
 
-    for parity_group in Repetition9Layer().parity_group_x + Repetition9Layer().parity_group_z:
-        print(parity_group.ancilla_id.id)
-        print(f'(Ancilla) phase cw: {Repetition9Layer().get_ancilla_virtual_phase_identifier(parity_group.ancilla_id.id)}')
-        print(f'(Data) phase cw: ', [phase_id for phase_id in Repetition9Layer().get_data_virtual_phase_identifiers(parity_group.ancilla_id.id)])
+    flux_dance_0 = Repetition9Layer().get_flux_dance_at_round(0)
+    print(flux_dance_0.edge_ids)    

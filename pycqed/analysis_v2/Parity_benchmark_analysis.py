@@ -1901,7 +1901,7 @@ def defect_rate_plotn(
     axs[0].set_ylabel('error probability')
     axs[0].set_xlabel('rounds')
     axs[0].legend(frameon=False, bbox_to_anchor = (1.01, 1))
-    axs[0].set_title('Deffect rate')
+    axs[0].set_title('defect rate')
 
     axs[1].plot((np.arange(n_rounds)+1), p_0*100, 'C0-', label='Normal')
     axs[1].plot((np.arange(n_rounds)+1), p_1*100, 'C1-', label='LRU data')
@@ -2430,11 +2430,13 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
             # select experiments for which the Pij matrix will be computed
             k_of_interest = []
             if ('surface_13' in self.experiments) or \
-               ('surface_13_LRU' in self.experiments):
+               ('surface_13_LRU' in self.experiments) or True:
                 if ('surface_13' in self.experiments):
                     k_of_interest.append(self.experiments.index('surface_13'))
                 if ('surface_13_LRU' in self.experiments):
                     k_of_interest.append(self.experiments.index('surface_13_LRU'))
+                else:
+                    k_of_interest = [0]
                 # Calculate defects each stabilizer ancilla qubits
                 _Ancilla_qubits = [q for q in self.Qubits if 'Z' in q]
                 Defects = { q : { k:{} for k in range(n_kernels) } for q in _Ancilla_qubits }
@@ -2598,7 +2600,7 @@ def defect_rate_k_plotfn(
     axs[0].grid(ls='--')
     axs[0].set_ylabel('error probability')
     axs[0].set_xlabel('rounds')
-    axs[0].set_title('Deffect rate')
+    axs[0].set_title('defect rate')
     axs[0].set_ylim(0, .5)
     # axs[0].set_ylim(0, 1)
     axs[0].set_yticks([0, .1, .2, .3, .4, .5])

@@ -64,6 +64,13 @@ class IEdgeID(IChannelIdentifier, metaclass=ABCMeta):
     Interface class, for qubit-to-qubit edge reference.
     """
 
+    # region Interface Properties
+    @property
+    def qubit_ids(self) -> List[IQubitID]:
+        """:return: All qubit-ID's."""
+        raise InterfaceMethodException
+    # endregion
+
     # region Interface Methods
     @abstractmethod
     def contains(self, element: IQubitID) -> bool:
@@ -246,6 +253,11 @@ class EdgeIDObj(IEdgeID):
     def id(self) -> QID:
         """:returns: Reference ID for edge."""
         return f"{self.qubit_id0.id}-{self.qubit_id1.id}"
+
+    @property
+    def qubit_ids(self) -> List[IQubitID]:
+        """:return: All qubit-ID's."""
+        return [self.qubit_id0, self.qubit_id1]
     # endregion
 
     # region Interface Methods

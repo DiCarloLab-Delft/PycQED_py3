@@ -1,8 +1,6 @@
 """
 Created: 2020-07-15
-Author: Victor Negirneac
 """
-
 import matplotlib.pyplot as plt
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.analysis_v2.cryoscope_v2_tools as cv2_tools
@@ -738,7 +736,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                  extract_only: bool = False,
                  auto=True,
                  poly_params: dict = None,
-                 derivative_window_length: float=3e-9,
+                 derivative_window_length: float=5e-9,
                 ):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
@@ -1265,8 +1263,8 @@ class Cryoscope_long_analysis(ba.BaseDataAnalysis):
         # Fit exponential to trace
         if self.update_IIR:
             try:
-                p0 = [-.01, 100e-9, 1.0085]
-                popt, pcov = curve_fit(filter_func, Time[:]*1e-9, Trace[:], p0=p0)
+                p0 = [+.001, 400e-9, 1.0085]
+                popt, pcov = curve_fit(filter_func, Time[8:]*1e-9, Trace[8:], p0=p0)
             except:
                 print_exception()
                 print('Fit failed. Trying new initial guess')
