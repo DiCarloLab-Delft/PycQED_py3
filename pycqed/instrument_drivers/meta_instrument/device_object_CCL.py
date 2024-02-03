@@ -19,6 +19,10 @@ from qcodes.instrument.parameter import (
     InstrumentRefParameter,
     Parameter,
 )
+from qce_circuit.library.repetition_code_circuit import (
+    InitialStateContainer,
+    InitialStateEnum,
+)
 
 from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
@@ -31,6 +35,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import tomography as tomo
 from pycqed.analysis_v2 import measurement_analysis as ma2
+from pycqed.analysis_v2.repeated_stabilizer_analysis import RepeatedStabilizerAnalysis
 from pycqed.utilities.general import check_keyboard_interrupt, print_exception,\
                                      get_gate_directions, get_frequency_waveform,\
                                      get_DAC_amp_frequency, get_Ch_amp_frequency
@@ -6368,15 +6373,30 @@ class DeviceCCL(Instrument):
             MC.run(_title, disable_snapshot_metadata=disable_metadata)
             a = None
             if analyze:
-                a = ma2.pba.Repeated_stabilizer_measurements(
-                    ancilla_qubit=involved_ancilla_ids,
-                    data_qubits = involved_data_ids,
-                    Rounds=rounds,
-                    heralded_init=heralded_init,
-                    number_of_kernels=number_of_kernels,
-                    experiments=['repetition_code'],
-                    Pij_matrix=Pij_matrix,
-                    label=_title)
+                # a = ma2.pba.Repeated_stabilizer_measurements(
+                #     ancilla_qubit=involved_ancilla_ids,
+                #     data_qubits = involved_data_ids,
+                #     Rounds=rounds,
+                #     heralded_init=heralded_init,
+                #     number_of_kernels=number_of_kernels,
+                #     experiments=['repetition_code'],
+                #     Pij_matrix=Pij_matrix,
+                #     label=_title)
+                
+                fillvalue = None
+                involved_qubit_names: List[str] = [
+                    item
+                    for pair in itt.zip_longest(involved_data_ids, involved_ancilla_ids, fillvalue=fillvalue) for item in pair if item != fillvalue
+                ]
+                a = RepeatedStabilizerAnalysis(
+                    involved_qubit_names=involved_qubit_names,
+                    qec_cycles=rounds,
+                    initial_state=InitialStateContainer.from_ordered_list(
+                        [InitialStateEnum.ZERO] * len(involved_data_ids)
+                    ),  # TODO: Construct initial state from arguments
+                    label=_title,
+                )
+                a.run_analysis()
             self.ro_acq_weight_type('optimal')
         except:
             print_exception()
