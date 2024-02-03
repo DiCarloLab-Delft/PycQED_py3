@@ -9,6 +9,7 @@ import copy
 import logging
 from collections import OrderedDict
 import numbers
+from tqdm import tqdm
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import NumpyJsonEncoder
@@ -457,7 +458,7 @@ class BaseDataAnalysis(object):
         if self.verbose:
             print('Saving figures to %s' % savedir)
 
-        for key in key_list:
+        for key in tqdm(key_list, desc=f"Save figures to {self.raw_data_dict['timestamps'][0]}"):
             if self.presentation_mode:
                 savename = os.path.join(
                     savedir, key + tstag + 'presentation' + '.' + fmt)
@@ -798,7 +799,7 @@ class BaseDataAnalysis(object):
             key_list = [key_list]
         self.key_list = key_list
 
-        for key in key_list:
+        for key in tqdm(key_list, desc="Contructing figures"):
             # go over all the plot_dicts
             pdict = self.plot_dicts[key]
             pdict['no_label'] = no_label
