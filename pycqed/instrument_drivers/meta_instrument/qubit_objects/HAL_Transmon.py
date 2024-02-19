@@ -4470,6 +4470,137 @@ class HAL_Transmon(HAL_ShimSQ):
                 close_fig=close_fig
             )
 
+    def measure_qubit_frequency_dac_scan_ramzz(
+            self, freqs,
+            dac_values,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            mode='pulsed_marked',
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            fluxChan=None,
+            close_fig=True,
+            nested_resonator_calibration=False,
+            nested_resonator_calibration_use_min=False,
+            resonator_freqs=None,
+            trigger_idx=None
+    ):
+        """
+        Performs the qubit spectroscopy while changing the current applied
+        to the flux bias line.
+
+        Args:
+            freqs (array):
+                MW drive frequencies to sweep over
+
+            dac_values (array):
+                values of the current to sweep over
+
+            mode (str {'pulsed_mixer', 'CW', 'pulsed_marked'}):
+                specifies the spectroscopy mode (cf. measure_spectroscopy method)
+
+            fluxChan (str):
+                Fluxchannel that is varied. Defaults to self.fl_dc_ch
+
+            nested_resonator_calibration (bool):
+                specifies whether to track the RO resonator
+                frequency (which itself is flux-dependent)
+
+            nested_resonator_calibration_use_min (bool):
+                specifies whether to use the resonance
+                minimum in the nested routine
+
+            resonator_freqs (array):
+                manual specifications of the frequencies over in which to
+                search for RO resonator in the nested routine
+
+            analyze (bool):
+                indicates whether to generate colormaps of the measured data
+
+            label (str):
+                suffix to append to the measurement label
+
+        Relevant qubit parameters:
+            instr_FluxCtrl (str):
+                instrument controlling the current bias
+
+            fluxChan (str):
+                channel of the flux control instrument corresponding to the qubit
+        """
+
+        if mode == 'pulsed_mixer':
+            old_channel_amp = self.mw_channel_amp()
+            self.mw_channel_amp(1)
+            self.prepare_for_timedomain()
+            self.mw_channel_amp(old_channel_amp)
+        elif mode == 'CW' or mode == 'pulsed_marked':
+            self.prepare_for_continuous_wave()
+            measurement_qubit.prepare_for_timedomain()
+        else:
+            logging.error('Mode {} not recognized'.format(mode))
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if trigger_idx is None:
+            trigger_idx = self.cfg_qubit_nr()
+
+        CC = self.instr_CC.get_instr()
+        if mode == 'pulsed_marked':
+            p = sqo.pulsed_spec_seq_marked(
+                qubit_idx=self.cfg_qubit_nr(),
+                spec_pulse_length=self.spec_pulse_length(),
+                platf_cfg=self.cfg_openql_platform_fn(),
+                trigger_idx=trigger_idx
+            )
+        else:
+            p = sqo.pulsed_spec_seq_ramzz(
+                qubit_idx=self.cfg_qubit_nr(),
+                measured_qubit_idx = measurement_qubit.cfg_qubit_nr(),
+                ramzz_wait_time_ns = ramzz_wait_time_ns,
+                spec_pulse_length=self.spec_pulse_length(),
+                platf_cfg=self.cfg_openql_platform_fn()
+            )
+        CC.eqasm_program(p.filename)
+        # CC gets started in the int_avg detector
+
+        dac_par = self.hal_flux_get_parameters(fluxChan)
+
+        if mode == 'pulsed_mixer':
+            spec_source = self.instr_spec_source_2.get_instr()
+            spec_source.on()
+        else:
+            spec_source = self.instr_spec_source.get_instr()
+            spec_source.on()
+            # if mode == 'pulsed_marked':
+            #     spec_source.pulsemod_state('On')
+
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+        if nested_resonator_calibration:
+            res_updating_dac_par = swf.Nested_resonator_tracker(
+                qubit=self,
+                nested_MC=self.instr_nested_MC.get_instr(),
+                freqs=resonator_freqs,
+                par=dac_par,
+                use_min=nested_resonator_calibration_use_min,
+                reload_sequence=True,
+                sequence_file=p,
+                cc=CC
+            )
+            MC.set_sweep_function_2D(res_updating_dac_par)
+        else:
+            MC.set_sweep_function_2D(dac_par)
+        MC.set_sweep_points_2D(dac_values)
+        measurement_qubit.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+        measurement_qubit.int_avg_det_single.always_prepare = True
+        MC.set_detector_function(measurement_qubit.int_avg_det_single)
+        MC.run(name='Qubit_dac_scan' + self.msmt_suffix, mode='2D')
+
+        if analyze:
+            return ma.TwoD_Analysis(
+                label='Qubit_dac_scan',
+                close_fig=close_fig
+            )
+
     def _measure_spectroscopy_CW(
             self,
             freqs,
@@ -4523,6 +4654,71 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             self.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
             MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
+
+        self.hal_acq_spec_mode_off()
+
+        if analyze:
+            ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+    def measure_spectroscopy_CW_ramzz(
+            self,
+            freqs,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            MC: Optional[MeasurementControl] = None,
+            analyze=True,
+            close_fig=True,
+            label='',
+            prepare_for_continuous_wave=True):
+        """
+        Does a CW spectroscopy experiment by sweeping the frequency of a
+        microwave source.
+
+        Relevant qubit parameters:
+            instr_spec_source (RohdeSchwarz_SGS100A):
+                instrument used to apply CW excitation
+
+            spec_pow (float):
+                power of the MW excitation at the output of the spec_source (dBm)
+                FIXME: parameter disappeared, and power not set
+
+            label (str):
+                suffix to append to the measurement label
+        """
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
+            measurement_qubit.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        self.hal_acq_spec_mode_on()
+
+        p = sqo.pulsed_spec_seq_ramzz(
+            qubit_idx=self.cfg_qubit_nr(),
+            measured_qubit_idx = measurement_qubit.cfg_qubit_nr(),
+            ramzz_wait_time_ns = ramzz_wait_time_ns,
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        # CC gets started in the int_avg detector
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        # Set marker mode off for CW:
+        if not spec_source.get_idn()['model'] == 'E8257D':  # FIXME: HW dependency on old HP/Keysight model
+            spec_source.pulsemod_state('Off')
+
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+        if self.cfg_spec_mode():
+            print('Enter loop')
+            MC.set_detector_function(measurement_qubit.UHFQC_spec_det)
+        else:
+            measurement_qubit.int_avg_det_single._set_real_imag(False)  # FIXME: changes state
+            MC.set_detector_function(measurement_qubit.int_avg_det_single)
         MC.run(name='CW_spectroscopy' + self.msmt_suffix + label)
 
         self.hal_acq_spec_mode_off()

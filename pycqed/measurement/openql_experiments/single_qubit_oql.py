@@ -96,6 +96,40 @@ def pulsed_spec_seq(
     p.compile()
     return p
 
+def pulsed_spec_seq_ramzz(
+        qubit_idx: int,
+        measured_qubit_idx: int,
+        ramzz_wait_time_ns: int,
+        spec_pulse_length: float,
+        platf_cfg: str
+) -> OqlProgram:
+    """
+    Sequence for pulsed spectroscopy.
+
+    Important notes: because of the way the CCL functions this sequence is
+    made by repeating multiple "spec" pulses of 20ns back to back.
+    As such the spec_pulse_lenght must be a multiple of 20e-9. If
+    this is not the case the spec_pulse_length will be rounded.
+
+    """
+    p = OqlProgram("pulsed_spec_seq_ramzz", platf_cfg)
+    k = p.create_kernel("main")
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', [qubit_idx])
+    k.gate('ry90', [measured_qubit_idx])
+    k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+    k.gate('ry270', [measured_qubit_idx])
+    k.measure(measured_qubit_idx)
+    p.add_kernel(k)
+
+    p.compile()
+    return p
+
 
 def pulsed_spec_seq_marked(
         qubit_idx: int,
