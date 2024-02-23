@@ -649,9 +649,11 @@ def T1(qubit_idx: int,
     p.compile()
     return p
 
-
-def T1_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
-             ramzz_wait_time_ns: int, platf_cfg: str,
+def T1_ramzz(times,
+             qubit_idx: int,
+             measured_qubit_idx: int,
+             ramzz_wait_time_ns: int,
+             platf_cfg: str,
              nr_flux_dance:float=None):
     """
     Single qubit T1 sequence.
@@ -660,8 +662,8 @@ def T1_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     Input pars:
         times:          the list of waiting times for each T1 element
-        inv_qubit_idx:  int specifying the target qubit (starting at 0)
-        meas_qubit_idx: int specifying qubit used for ramzz readout
+        qubit_idx:  int specifying the target qubit (starting at 0)
+        measured_qubit_idx: int specifying qubit used for ramzz readout
         platf_cfg:      filename of the platform config file
     Returns:
         p:              OpenQL Program object containing
@@ -672,8 +674,8 @@ def T1_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     for i, time in enumerate(times):
         k = p.create_kernel('T1_{}'.format(i))
-        k.prepz(inv_qubit_idx)
-        k.prepz(meas_qubit_idx)
+        k.prepz(qubit_idx)
+        k.prepz(measured_qubit_idx)
         k.gate('wait', [], 0)
 
         wait_nanoseconds = int(round(time/1e-9))
@@ -684,37 +686,37 @@ def T1_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
                     k.gate(f'flux-dance-{step}', [0])
                 k.gate("wait", [], 0)  # alignment
 
-        k.gate('rx180', [inv_qubit_idx])
-        k.gate("wait", [inv_qubit_idx, meas_qubit_idx], wait_nanoseconds)
+        k.gate('rx180', [qubit_idx])
+        k.gate("wait", [qubit_idx, measured_qubit_idx], wait_nanoseconds)
 
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
 
         p.add_kernel(k)
 
     # adding the calibration points
     for i in np.arange(2):
         k = p.create_kernel("cal_gr_"+str(i))
-        k.prepz(inv_qubit_idx)
+        k.prepz(qubit_idx)
         k.gate('wait', [], 0)
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
         k.gate('wait', [], 0)
         p.add_kernel(k)
 
     for i in np.arange(2):
         k = p.create_kernel("cal_ex_"+str(i))
-        k.prepz(inv_qubit_idx)
-        k.gate('rx180', [inv_qubit_idx])
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
         k.gate('wait', [], 0)
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
         k.gate('wait', [], 0)
         p.add_kernel(k)
 
@@ -818,8 +820,11 @@ def Ramsey(
     return p
 
 
-def Ramsey_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
-                 ramzz_wait_time_ns: int, platf_cfg: str):
+def Ramsey_ramzz(times,
+                 qubit_idx: int,
+                 measured_qubit_idx: int,
+                 ramzz_wait_time_ns: int,
+                 platf_cfg: str):
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -827,8 +832,8 @@ def Ramsey_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     Input pars:
         times:          the list of waiting times for each Ramsey element
-        inv_qubit_idx:  int specifying the target qubit (starting at 0)
-        meas_qubit_idx: int specifiying the qubit used for ramzz readout
+        qubit_idx:  int specifying the target qubit (starting at 0)
+        measured_qubit_idx: int specifiying the qubit used for ramzz readout
         platf_cfg:      filename of the platform config file
     Returns:
         p:              OpenQL Program object containing
@@ -838,44 +843,44 @@ def Ramsey_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     for i, time in enumerate(times[:-4]):
         k = p.create_kernel("Ramsey_{}".format(i))
-        k.prepz(inv_qubit_idx)
-        k.prepz(meas_qubit_idx)
+        k.prepz(qubit_idx)
+        k.prepz(measured_qubit_idx)
         k.gate('wait', [], 0)
 
         wait_nanoseconds = int(round(time/1e-9))
-        k.gate('rx90', [inv_qubit_idx])
-        k.gate("wait", [inv_qubit_idx], wait_nanoseconds)
-        k.gate('ry90', [inv_qubit_idx])
+        k.gate('rx90', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.gate('ry90', [qubit_idx])
         k.gate('wait', [], 0)
 
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
 
         p.add_kernel(k)
 
     # adding the calibration points
     for i in np.arange(2):
         k = p.create_kernel("cal_gr_"+str(i))
-        k.prepz(inv_qubit_idx)
+        k.prepz(qubit_idx)
         k.gate('wait', [], 0)
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
         k.gate('wait', [], 0)
         p.add_kernel(k)
 
     for i in np.arange(2):
         k = p.create_kernel("cal_ex_"+str(i))
-        k.prepz(inv_qubit_idx)
-        k.gate('rx180', [inv_qubit_idx])
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
         k.gate('wait', [], 0)
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
         k.gate('wait', [], 0)
         p.add_kernel(k)
 
@@ -964,8 +969,11 @@ def echo(times, qubit_idx: int, platf_cfg: str, delta_phase: int = 40) -> OqlPro
     return p
 
 
-def echo_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
-               ramzz_wait_time_ns: int, platf_cfg: str):
+def echo_ramzz(times,
+               qubit_idx: int,
+               measurement_qubit_idx: int,
+               ramzz_wait_time_ns: int,
+               platf_cfg: str):
     """
     Echo sequence with RamZZ readout.
     Writes output files to the directory specified in openql.
@@ -973,8 +981,8 @@ def echo_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
 
     Input pars:
         times:          the list of waiting times for each Ramsey element
-        inv_qubit_idx:  int specifying the target qubit (starting at 0)
-        meas_qubit_idx: int specifiying the qubit used for ramzz readout
+        qubit_idx:  int specifying the target qubit (starting at 0)
+        measurement_qubit_idx: int specifiying the qubit used for ramzz readout
         platf_cfg:      filename of the platform config file
     Returns:
         p:              OpenQL Program object containing
@@ -985,50 +993,50 @@ def echo_ramzz(times, inv_qubit_idx: int, meas_qubit_idx: int,
     for i, time in enumerate(times[:-4]):
 
         k = p.create_kernel("echo_{}".format(i))
-        k.prepz(inv_qubit_idx)
-        k.prepz(meas_qubit_idx)
+        k.prepz(qubit_idx)
+        k.prepz(measurement_qubit_idx)
         k.gate('wait', [], 0)
 
         wait_nanoseconds = int(round(time/1e-9/2))
-        k.gate('rx90', [inv_qubit_idx])
-        k.gate("wait", [inv_qubit_idx], wait_nanoseconds)
-        k.gate('rx180', [inv_qubit_idx])
-        k.gate("wait", [inv_qubit_idx], wait_nanoseconds)
+        k.gate('rx90', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.gate('rx180', [qubit_idx])
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
         angle = (i*40) % 360
         cw_idx = angle//20 + 9
         if angle == 0:
-            k.gate('rx90', [inv_qubit_idx])
+            k.gate('rx90', [qubit_idx])
         else:
-            k.gate('cw_{:02}'.format(cw_idx), [inv_qubit_idx])
+            k.gate('cw_{:02}'.format(cw_idx), [qubit_idx])
         k.gate('wait', [], 0)
 
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measurement_qubit_idx])
+        k.gate('wait', [measurement_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measurement_qubit_idx])
+        k.measure(measurement_qubit_idx)
         p.add_kernel(k)
 
     # adding the calibration points
     for i in np.arange(2):
         k = p.create_kernel("cal_gr_"+str(i))
-        k.prepz(inv_qubit_idx)
+        k.prepz(qubit_idx)
         k.gate('wait', [], 0)
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measurement_qubit_idx])
+        k.gate('wait', [measurement_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measurement_qubit_idx])
+        k.measure(measurement_qubit_idx)
         k.gate('wait', [], 0)
         p.add_kernel(k)
 
     for i in np.arange(2):
         k = p.create_kernel("cal_ex_"+str(i))
-        k.prepz(inv_qubit_idx)
-        k.gate('rx180', [inv_qubit_idx])
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
         k.gate('wait', [], 0)
-        k.gate('ry90', [meas_qubit_idx])
-        k.gate('wait', [meas_qubit_idx], ramzz_wait_time_ns)
-        k.gate('rym90', [meas_qubit_idx])
-        k.measure(meas_qubit_idx)
+        k.gate('ry90', [measurement_qubit_idx])
+        k.gate('wait', [measurement_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measurement_qubit_idx])
+        k.measure(measurement_qubit_idx)
         k.gate('wait', [], 0)
         p.add_kernel(k)
 
@@ -1467,6 +1475,114 @@ def off_on(
         k.gate("wait", [])
 
         k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()) and ('two' not in pulse_comb.lower()):
+        raise ValueError(f"pulse_comb {pulse_comb} has to contain only 'on' and 'off'.")
+
+    p.compile()
+    return p
+
+def off_on_ramzz(
+        qubit_idx: int,
+        measured_qubit_idx: int,
+        ramzz_wait_time_ns: int,
+        pulse_comb: str,
+        initialize: bool,
+        platf_cfg: str,
+        nr_flux_after_init: float=None,
+        flux_cw_after_init: Union[str, List[str]]=None,
+        fluxed_qubit_idx: int=None,
+        wait_time_after_flux: float=0,
+        cross_driving_qubit: int=None,
+        ) -> OqlProgram:
+
+    """
+    Performs an 'off_on' sequence on the qubit specified.
+        off: (RO) - prepz -      - RO
+        on:  (RO) - prepz - x180 - RO
+    Args:
+        qubit_idx (int) :
+        pulse_comb (list): What pulses to play valid options are
+            "off", "on", "off_on"
+        initialize (bool): if True does an extra initial measurement to
+            post select data.
+        platf_cfg (str) : filepath of OpenQL platform config file
+
+    Pulses can be optionally enabled by putting 'off', respectively 'on' in
+    the pulse_comb string.
+    """
+    p = OqlProgram('off_on', platf_cfg)
+
+    # # Off
+    if 'off' in pulse_comb.lower():
+        k = p.create_kernel("off")
+        k.prepz(qubit_idx)
+        if initialize:
+            k.measure(qubit_idx)
+
+        if nr_flux_after_init and flux_cw_after_init:
+            if fluxed_qubit_idx is None:
+                fluxed_qubit_idx = qubit_idx
+            for i in range(int(nr_flux_after_init)):
+                if type(flux_cw_after_init) == list:
+                    for cw in flux_cw_after_init:
+                        k.gate(cw, [fluxed_qubit_idx])
+                else:
+                    k.gate(flux_cw_after_init, [fluxed_qubit_idx])
+            k.gate("wait", [], wait_time_after_flux)
+
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
+        p.add_kernel(k)
+
+    if 'on' in pulse_comb.lower():
+        k = p.create_kernel("on")
+        k.prepz(qubit_idx)
+        if initialize:
+            k.measure(qubit_idx)
+
+        if nr_flux_after_init and flux_cw_after_init:
+            if fluxed_qubit_idx is None:
+                fluxed_qubit_idx = qubit_idx
+            for i in range(int(nr_flux_after_init)):
+                if type(flux_cw_after_init) == list:
+                    for cw in flux_cw_after_init:
+                        k.gate(cw, [fluxed_qubit_idx])
+                else:
+                    k.gate(flux_cw_after_init, [fluxed_qubit_idx])
+            k.gate("wait", [], wait_time_after_flux)
+
+        
+        # k.gate('rx180', [qubit_idx])
+        if cross_driving_qubit is not None:
+            k.gate('rx180', [cross_driving_qubit])
+            k.gate("i", [qubit_idx])
+            k.gate("wait", [])
+        else: 
+            k.gate('rx180', [qubit_idx])
+
+        k.gate("wait", [])
+
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
+        p.add_kernel(k)
+
+    if 'two' in pulse_comb.lower():
+        k = p.create_kernel("two")
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
+        k.gate('rx12', [qubit_idx])
+        k.gate("wait", [])
+
+        k.gate('ry90', [measured_qubit_idx])
+        k.gate('wait', [measured_qubit_idx], ramzz_wait_time_ns)
+        k.gate('ry270', [measured_qubit_idx])
+        k.measure(measured_qubit_idx)
         p.add_kernel(k)
 
     if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()) and ('two' not in pulse_comb.lower()):

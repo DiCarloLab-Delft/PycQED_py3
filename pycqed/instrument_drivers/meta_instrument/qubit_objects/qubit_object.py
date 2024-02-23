@@ -210,6 +210,23 @@ class Qubit(Instrument):
                 intentional detuing from the known qubit frequency
         """
         raise NotImplementedError()
+    
+    def measure_ramsey_ramzz(self):
+        """
+        Ramsey measurement used to measure the inhomogenuous dephasing time T2* as well as
+        the qubit frequency. The measurement consists of the pi/2 pulses with a variable delay
+        time between. The MW LO can be intentionally detuned from the qubit frequency.
+        Consequently the measurement yields decaying oscillations which is easier to fit
+        accurately than the monotonuous decay.
+
+        Args:
+            times (array):
+                array of delay times between the two pi/2 pulses
+
+            artificial_detuning (float):
+                intentional detuing from the known qubit frequency
+        """
+        raise NotImplementedError()
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True):
@@ -1423,6 +1440,88 @@ class Qubit(Instrument):
                               50*n*stepsize, n*stepsize)
             artificial_detuning = artificial_periods/times[-1]
             self.measure_ramsey(times,
+                                artificial_detuning=artificial_detuning,
+                                freq_qubit=cur_freq,
+                                label='_{}pulse_sep'.format(n),
+                                analyze=False,
+                                prepare_for_timedomain=True if 0 == i else False)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
+                                   freq_qubit=cur_freq,
+                                   artificial_detuning=artificial_detuning,
+                                   close_file=False)
+            if test_beating and a.fit_res.chisqr > 0.4:
+                logging.warning('Found double frequency in Ramsey: large '
+                                'deviation found in single frequency fit.'
+                                'Returning True to continue automation. Retry '
+                                'with test_beating=False to ignore.')
+
+                return True
+            fitted_freq = a.fit_res.params['frequency'].value
+            measured_detuning = fitted_freq-artificial_detuning
+            cur_freq = a.qubit_frequency
+
+            qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
+            qubit_ana_grp.attrs['artificial_detuning'] = \
+                str(artificial_detuning)
+            qubit_ana_grp.attrs['measured_detuning'] = \
+                str(measured_detuning)
+            qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
+            a.finish()  # make sure I close the file
+            if verbose:
+                print('Measured detuning:{:.2e}'.format(measured_detuning))
+                print('Setting freq to: {:.9e}, \n'.format(cur_freq))
+            if times[-1] > 2.*a.T2_star['T2_star']:
+                # If the last step is > T2* then the next will be for sure
+                if verbose:
+                    print('Breaking of measurement because of T2*')
+                break
+        if verbose:
+            print('Converged to: {:.9e}'.format(cur_freq))
+        if update:
+            self.freq_qubit(cur_freq)
+        return cur_freq
+    
+    def calibrate_frequency_ramsey_ramzz(
+            self,
+            measurement_qubit,
+            ramzz_wait_time_ns,
+            steps=[1, 3, 10, 30, 100, 300, 1000],
+            artificial_periods=2.5,
+            stepsize: float = 20e-9,
+            verbose: bool = True,
+            update: bool = True,
+            close_fig: bool = True,
+            test_beating: bool = True
+    ):
+        # USED_BY: inspire_dependency_graph.py,
+        # USED_BY: device_dependency_graphs_v2.py,
+        # USED_BY: device_dependency_graphs.py
+        """
+        Runs an iterative procudere of ramsey experiments to estimate
+        frequency detuning to converge to the qubit frequency up to the limit
+        set by T2*.
+
+        Args:
+            steps (array):
+                multiples of the initial stepsize on which to run the
+
+            artificial_periods (float):
+                intended number of periods in theramsey measurement, used to adjust
+                the artificial detuning
+
+            stepsize (float):
+                smalles stepsize in ns for which to run ramsey experiments.
+        """
+        cur_freq = self.freq_qubit()
+        # Steps don't double to be more robust against aliasing
+        for i,n in enumerate(steps):
+            times = np.arange(self.mw_gauss_width()*4,
+                              50*n*stepsize, n*stepsize)
+            artificial_detuning = artificial_periods/times[-1]
+            self.measure_ramsey_ramzz(
+                                measurement_qubit,
+                                ramzz_wait_time_ns,
+                                times,
                                 artificial_detuning=artificial_detuning,
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
