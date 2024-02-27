@@ -887,6 +887,9 @@ class CCLight_Transmon(Qubit):
         - generate the RO pulse
         - set the integration weights
         """
+        self._prep_ro_instantiate_detectors()
+        self._prep_ro_sources()
+        
         if self.cfg_prepare_ro_awg():
             self.instr_acquisition.get_instr().load_default_settings(
                 upload_sequence=False)
@@ -896,9 +899,6 @@ class CCLight_Transmon(Qubit):
         else:
             log.warning(
                 '"cfg_prepare_ro_awg" set to False, not preparing readout .')
-
-        self._prep_ro_instantiate_detectors()
-        self._prep_ro_sources()
 
     def _prep_deskewing_matrix(self):
         UHFQC = self.instr_acquisition.get_instr()
