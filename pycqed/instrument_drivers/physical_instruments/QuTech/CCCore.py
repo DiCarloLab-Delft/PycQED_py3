@@ -302,13 +302,15 @@ class CCCore(SCPIBase):
     TRACE_CCIO_BP_OUT = 3
 
     # HDAWG DIO/marker bit definitions: CC output
-    HDAWG_TOGGLE_DS = 30
+    HDAWG_TOGGLE_DS = 30  # odd parity since CCIO firmware version 0.3.2, CC software version 0.2.6.2)
+    HDAWG_ODD_PARITY = 30 # see HDAWG_TOGGLE_DS
     HDAWG_TRIG = 31
     HDAWG_CW = range(0,29)  # NB: bits used depend on mode
 
     # QWG DIO/marker bit definitions: CC output
     QWG_TOGGLE_DS = 30
     QWG_TRIG = 31
+    QWG_TRIG_1 = 15
     QWG1_CW = range(0,11)
     QWG2_CW = range(16,27)
     # FIXME: add full dual-QWG definitions
