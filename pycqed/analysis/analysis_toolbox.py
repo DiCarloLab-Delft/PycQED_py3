@@ -8,8 +8,8 @@ import logging
 import pandas as pd
 import colorsys as colors
 # FIXME: was commented out, breaks code below
-#import qutip as qp
-#import qutip.metrics as qpmetrics
+import qutip as qtp
+import qutip.metrics as qpmetrics
 
 from copy import deepcopy
 from collections import OrderedDict as od
@@ -28,8 +28,6 @@ from matplotlib.colors import LogNorm
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel, set_cbarlabel,
                                             data_to_table_png,
                                             SI_prefix_and_scale_factor)
-
-
 
 ######################################################################
 #     Filehandling tools
@@ -1327,7 +1325,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
 
-    if thresholdlst.size is 0:
+    if thresholdlst.size == 0:
         kk = 0
     else:
         kk = thresholdlst[0]
@@ -1400,7 +1398,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
 
-    if thresholdlst.size is 0:
+    if thresholdlst.size == 0:
         kk = 0
     else:
         kk = thresholdlst[0]
@@ -1786,31 +1784,31 @@ def current_timemark():
 
 def get_values_around(center_val, range_frac=0.25, num_points=3, bounds=(0,1)):
     """
-    Returns a an array of `num_points` equidistant numbers 
-    around value `center_val`, 
+    Returns a an array of `num_points` equidistant numbers
+    around value `center_val`,
     which are lie `range_frac` of `center_val` around its value.
-    The special feature of this method is that it wraps the new array 
-    around `bounds` (e.g. starting from the beginning if a value would 
+    The special feature of this method is that it wraps the new array
+    around `bounds` (e.g. starting from the beginning if a value would
     land outside the upper bound), to always be able to return
     `num_points` equidistant points around `center_val`.
     """
     # first generate num_points values by range_frac percent around center_val
-    values = np.linspace(center_val - range_frac*center_val, 
-                        center_val + range_frac*center_val, 
+    values = np.linspace(center_val - range_frac*center_val,
+                        center_val + range_frac*center_val,
                         num_points)
 
-    # if the result goes above the allowed range for values, add as many points 
+    # if the result goes above the allowed range for values, add as many points
     # below the original lower end as were above the range
-    # this is done by subtracting the number of points above range times the spacing 
+    # this is done by subtracting the number of points above range times the spacing
     if values[-1] > bounds[-1]:
         values = values - np.diff(values).mean()*(values > 1).sum()
 
-    # if after the correction we ended up below zero, it means that the given 
+    # if after the correction we ended up below zero, it means that the given
     # range_frac is not compatible with the given center `center_val`
     if (values < bounds[0]).sum() + (values > bounds[-1]).sum():
         raise ValueError(f"Given `range_frac` not compatible with center `center_val`"
                         f" and boundaries {bounds}! values = [{values}]")
-        
+
     return values
 
 
@@ -2223,19 +2221,19 @@ def calculate_transmon_and_resonator_transitions(Ec, Ej, f_bus, gs, ng=0):
                                                       no_transitions=2,
                                                       ng=ng, dim=10,
                                                       return_injs=True)
-    H_q = qp.Qobj(np.diag((0, f01, f01+f12)))
-    H_q = qp.tensor(H_q, *[qp.qeye(max_ph+1)]*n_bus)
-    a_q = qp.Qobj(np.diag((1, np.abs(injs[2, 1]/injs[1, 0])), k=1))
-    a_q = qp.tensor(a_q, *[qp.qeye(max_ph+1)]*n_bus)
+    H_q = qtp.Qobj(np.diag((0, f01, f01 + f12)))
+    H_q = qtp.tensor(H_q, *[qtp.qeye(max_ph + 1)] * n_bus)
+    a_q = qtp.Qobj(np.diag((1, np.abs(injs[2, 1] / injs[1, 0])), k=1))
+    a_q = qtp.tensor(a_q, *[qtp.qeye(max_ph + 1)] * n_bus)
 
     # bus operators
     n_r_list = []
     a_r_list = []
 
-    a_r_generating_list = [qp.destroy(
-        max_ph+1)] + [qp.qeye(max_ph+1)]*(n_bus-1)
+    a_r_generating_list = [qtp.destroy(
+        max_ph+1)] + [qtp.qeye(max_ph + 1)] * (n_bus - 1)
     for fb, g in zip(f_bus, gs):
-        a_r = qp.tensor(qp.qeye(3), *a_r_generating_list)
+        a_r = qtp.tensor(qtp.qeye(3), *a_r_generating_list)
         a_r_list.append(a_r)
         n_r_list.append(a_r.dag() * a_r)
         a_r_generating_list = a_r_generating_list[-1:]+a_r_generating_list[:-1]
@@ -2250,19 +2248,19 @@ def calculate_transmon_and_resonator_transitions(Ec, Ej, f_bus, gs, ng=0):
     ees, ess = H.eigenstates()
 
     # define bare qubit states
-    qubit_g = qp.tensor(qp.fock(3, 0), *[qp.fock(max_ph+1, 0)]*n_bus)
-    qubit_e = qp.tensor(qp.fock(3, 1), *[qp.fock(max_ph+1, 0)]*n_bus)
-    qubit_f = qp.tensor(qp.fock(3, 2), *[qp.fock(max_ph+1, 0)]*n_bus)
+    qubit_g = qtp.tensor(qtp.fock(3, 0), *[qtp.fock(max_ph + 1, 0)] * n_bus)
+    qubit_e = qtp.tensor(qtp.fock(3, 1), *[qtp.fock(max_ph + 1, 0)] * n_bus)
+    qubit_f = qtp.tensor(qtp.fock(3, 2), *[qtp.fock(max_ph + 1, 0)] * n_bus)
 
     # define bare bus states
     bus_e_list = []
     bus_e_qubit_e_list = []
     bus_e_generating_list = [
-        qp.fock(max_ph+1, 1)] + [qp.fock(max_ph+1, 0)]*(n_bus-1)
+        qtp.fock(max_ph + 1, 1)] + [qtp.fock(max_ph + 1, 0)] * (n_bus - 1)
     for fb, g in zip(f_bus, gs):
-        bus_e = qp.tensor(qp.fock(3, 0), *bus_e_generating_list)
+        bus_e = qtp.tensor(qtp.fock(3, 0), *bus_e_generating_list)
         bus_e_list.append(bus_e)
-        bus_e_qubit_e = qp.tensor(qp.fock(3, 1), *bus_e_generating_list)
+        bus_e_qubit_e = qtp.tensor(qtp.fock(3, 1), *bus_e_generating_list)
         bus_e_qubit_e_list.append(bus_e_qubit_e)
         bus_e_generating_list = bus_e_generating_list[-1:] + \
             bus_e_generating_list[:-1]
@@ -2936,13 +2934,13 @@ def solve_quadratic_equation(a, b, c, verbose=False):
 
 def chirpz(x, A, W, M):
     """Compute the chirp z-transform.
-    
+
     Chirp z-Transform.
     As described in
     Rabiner, L.R., R.W. Schafer and C.M. Rader.
     The Chirp z-Transform Algorithm.
     IEEE Transactions on Audio and Electroacoustics, AU-17(2):86--92, 1969
-    
+
     The discrete z-transform,
     X(z) = \sum_{n=0}^{N-1} x_n z^{-n}
     is calculated at M points,
@@ -2950,14 +2948,14 @@ def chirpz(x, A, W, M):
     for A and W complex, which gives
     X(z_k) = \sum_{n=0}^{N-1} x_n z_k^{-n}
     """
-    A = np.complex(A)
-    W = np.complex(W)
-    if np.issubdtype(np.complex, x.dtype) or np.issubdtype(np.float, x.dtype):
+    A = complex(A)
+    W = complex(W)
+    if np.issubdtype(complex, x.dtype) or np.issubdtype(float, x.dtype):
         dtype = x.dtype
     else:
         dtype = float
 
-    x = np.asarray(x, dtype=np.complex)
+    x = np.asarray(x, dtype=complex)
 
     N = x.size
     L = int(2**np.ceil(np.log2(M+N-1)))
@@ -2966,7 +2964,7 @@ def chirpz(x, A, W, M):
     y = np.power(A, -n) * np.power(W, n**2 / 2.) * x
     Y = np.fft.fft(y, L)
 
-    v = np.zeros(L, dtype=np.complex)
+    v = np.zeros(L, dtype=complex)
     v[:M] = np.power(W, -n[:M]**2/2.)
     v[L-N+1:] = np.power(W, -n[N-1:0:-1]**2/2.)
     V = np.fft.fft(v)
@@ -3043,7 +3041,7 @@ def calculate_g_coupling_from_frequency_shift(f_bare, f_shifted, f_qubit):
 #         mask[min(idx_min, ii):max(idx_min, ii+1)])
 #     # function that returns mask_ii applied for all elements of the vector mask
 #     continuous_mask = np.array(
-#         [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
+#         [m for m in map(mask_ii, np.arange(len(mask)))], dtype=bool)
 #     # doing the fit
 #     my_fit_model = QuadraticModel()
 
@@ -3082,7 +3080,7 @@ def find_min(x, y, return_fit=False, perc=30):
         mask[min(idx_min, ii):max(idx_min, ii + 1)])
     # function that returns mask_ii applied for all elements of the vector mask
     continuous_mask = np.array(
-        [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
+        [m for m in map(mask_ii, np.arange(len(mask)))], dtype=bool)
     # doing the fit
     my_fit_model = QuadraticModel()
     x_fit = x[continuous_mask]

@@ -8,7 +8,7 @@ from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from pycqed.measurement.waveform_control_CC import waveforms_vcz as wf_vcz
 
 import PyQt5
-from qcodes.plots.pyqtgraph import QtPlot
+from qcodes_loop.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import time
@@ -170,7 +170,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Generate CZ waveforms and populates self._wave_dict
         """
         self._wave_dict = {}
-        
+
         for _, waveform in self.LutMap().items():
             wave_name = waveform["name"]
             if waveform["type"] == "cz" or waveform["type"] == "idle_z":
@@ -1400,8 +1400,8 @@ class LRU_Flux_LutMan(Base_Flux_LutMan):
     def _gen_lru(self):
         self.lru_func = wf.mod_lru_pulse
         _wf = self.lru_func(
-            t_total = self.mw_lru_duration(), 
-            t_rise = self.mw_lru_rise_duration(), 
+            t_total = self.mw_lru_duration(),
+            t_rise = self.mw_lru_rise_duration(),
             f_modulation = self.mw_lru_modulation(),
             amplitude = self.mw_lru_amplitude(),
             sampling_rate = self.sampling_rate())[0]

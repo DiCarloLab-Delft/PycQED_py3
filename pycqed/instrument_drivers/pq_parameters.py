@@ -64,6 +64,8 @@ class InstrumentParameter(ManualParameter):
 
 class ConfigParameter(ManualParameter):
     # TODO: move this to qcodes as a pull request
+    # FIXME: raises DepeceactionWarning on recent QCoDes (Pyython 3.7), e.g.:
+    #  Parameter kernel_list did not correctly register itself on instrument k0. Please check that `instrument` argument is passed from <class 'pycqed.instrument_drivers.pq_parameters.ConfigParameter'> all the way to `_BaseParameter`. This will be an error in the future
 
     """
     Define one parameter that reflects a manual configuration setting.

@@ -8,9 +8,9 @@ import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
 import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as\
     tqc
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
-    import (gate_decomposition, epstein_fixed_length_decomposition)
+    import gate_decomposition, epstein_fixed_length_decomposition
 from pycqed.measurement.randomized_benchmarking.clifford_group \
-    import (clifford_lookuptable, clifford_group_single_qubit)
+    import clifford_lookuptable, clifford_group_single_qubit
 from pycqed.measurement.randomized_benchmarking.generate_clifford_hash_tables \
     import construct_clifford_lookuptable
 
@@ -146,12 +146,12 @@ class TestHashedLookuptables(unittest.TestCase):
     def test_get_clifford_id(self):
         for i in range(24):
             Cl = tqc.SingleQubitClifford(i)
-            idx = tqc.get_clifford_id(Cl.pauli_transfer_matrix)
+            idx = Cl._get_clifford_id(Cl.pauli_transfer_matrix)
             self.assertTrue(idx == Cl.idx)
 
         for i in test_indices_2Q:
             Cl = tqc.TwoQubitClifford(i)
-            idx = tqc.get_clifford_id(Cl.pauli_transfer_matrix)
+            idx = Cl._get_clifford_id(Cl.pauli_transfer_matrix)
             self.assertTrue(idx == Cl.idx)
 
 
@@ -166,46 +166,46 @@ class Test_CliffordGroupProperties(unittest.TestCase):
     def test_single_qubit_like_PTM(self):
         hash_table = []
         for idx in np.arange(24**2):
-            clifford = tqc.single_qubit_like_PTM(idx)
+            clifford = tqc.TwoQubitClifford.single_qubit_like_PTM(idx)
             hash_val = crc32(clifford.round().astype(int))
             hash_table.append(hash_val)
         self.assertTrue(len(hash_table) == 24**2)
         self.assertTrue(len(np.unique(hash_table)) == 24**2)
         with pytest.raises(AssertionError):
-            clifford = tqc.single_qubit_like_PTM(24**2+1)
+            clifford = tqc.TwoQubitClifford.single_qubit_like_PTM(24**2+1)
 
     def test_CNOT_like_PTM(self):
         hash_table = []
         for idx in np.arange(5184):
-            clifford = tqc.CNOT_like_PTM(idx)
+            clifford = tqc.TwoQubitClifford.CNOT_like_PTM(idx)
             hash_val = crc32(clifford.round().astype(int))
             hash_table.append(hash_val)
         self.assertTrue(len(hash_table) == 5184)
         self.assertTrue(len(np.unique(hash_table)) == 5184)
         with pytest.raises(AssertionError):
-            clifford = tqc.CNOT_like_PTM(5184**2+1)
+            clifford = tqc.TwoQubitClifford.CNOT_like_PTM(5184**2+1)
 
     def test_iSWAP_like_PTM(self):
         hash_table = []
         for idx in np.arange(5184):
-            clifford = tqc.iSWAP_like_PTM(idx)
+            clifford = tqc.TwoQubitClifford.iSWAP_like_PTM(idx)
             hash_val = crc32(clifford.round().astype(int))
             hash_table.append(hash_val)
         self.assertTrue(len(hash_table) == 5184)
         self.assertTrue(len(np.unique(hash_table)) == 5184)
         with pytest.raises(AssertionError):
-            clifford = tqc.iSWAP_like_PTM(5184+1)
+            clifford = tqc.TwoQubitClifford.iSWAP_like_PTM(5184+1)
 
     def test_SWAP_like_PTM(self):
         hash_table = []
         for idx in np.arange(24**2):
-            clifford = tqc.SWAP_like_PTM(idx)
+            clifford = tqc.TwoQubitClifford.SWAP_like_PTM(idx)
             hash_val = crc32(clifford.round().astype(int))
             hash_table.append(hash_val)
         self.assertTrue(len(hash_table) == 24**2)
         self.assertTrue(len(np.unique(hash_table)) == 24**2)
         with pytest.raises(AssertionError):
-            clifford = tqc.SWAP_like_PTM(24**2+1)
+            clifford = tqc.TwoQubitClifford.SWAP_like_PTM(24**2+1)
 
     def test_two_qubit_group(self):
         hash_table = tqc.get_two_qubit_clifford_hash_table()
@@ -244,7 +244,6 @@ class TestCliffordCalculus(unittest.TestCase):
         np.testing.assert_array_equal(Cliff_prod.pauli_transfer_matrix,
                                       dot_prod)
 
-
     def test_inverse_single_qubit_clifford(self):
         for i in range(24):
             Cl = tqc.SingleQubitClifford(i)
@@ -269,7 +268,7 @@ class TestCliffordGateDecomposition(unittest.TestCase):
                 self.assertTrue(g[1] == 'q0')
 
     def test_two_qubit_gate_decomposition(self):
-        for idx in (test_indices_2Q):
+        for idx in test_indices_2Q:
             CL = tqc.TwoQubitClifford(idx)
             gate_dec = CL.gate_decomposition
             self.assertTrue(isinstance(gate_dec, list))
@@ -303,6 +302,7 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
     def test_single_qubit_randomized_benchmarking_sequence(self):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
+        # FIXME: seed and net_cl ignored
         for seed, net_cl in zip(seeds, net_cliffs):
             cliffords_single_qubit_class = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0,  number_of_qubits=1, seed=0)
@@ -313,6 +313,7 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
     def test_interleaved_randomized_benchmarking_sequence_1Q(self):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
+        # FIXME: seed and net_cl ignored
         for seed, net_cl in zip(seeds, net_cliffs):
             intl_cliffords = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0, number_of_qubits=1, seed=0,
@@ -325,10 +326,10 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
             new_cliff[1::2] = 0
             assert_array_equal(intl_cliffords, new_cliff)
 
-
     def test_interleaved_randomized_benchmarking_sequence_2Q(self):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
+        # FIXME: seed and net_cl ignored
         for seed, net_cl in zip(seeds, net_cliffs):
             intl_cliffords = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0, number_of_qubits=2, seed=0,
@@ -341,7 +342,6 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
             new_cliff[1::2] = 0
             np.testing.assert_array_equal(intl_cliffords,
                                           new_cliff)
-
 
     def test_two_qubit_randomized_benchmarking_sequence(self):
         """
@@ -358,5 +358,3 @@ class TestCliffordClassRBSeqs(unittest.TestCase):
             # no test for correctness here. Corectness depend on the fact
             # that it implements code very similar to the Single qubit version
             # and has components that are all tested.
-
-

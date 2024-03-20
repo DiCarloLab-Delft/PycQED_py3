@@ -8,8 +8,10 @@ import numpy as np
 from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.tools import matplotlib_utils as mpl_utils
-from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp,\
-    rotate_and_normalize_data
+from pycqed.analysis.analysis_toolbox import (
+    get_datafilepath_from_timestamp,
+    rotate_and_normalize_data,
+)
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel, \
     cmap_to_alpha, cmap_first_to_alpha
 import pycqed.analysis.tools.data_manipulation as dm_tools
@@ -39,10 +41,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
     def __init__(self,
                 nr_qubits: int,
-                t_start: str = None, 
+                t_start: str = None,
                 t_stop: str = None,
                 label: str = '',
-                options_dict: dict = None, 
+                options_dict: dict = None,
                 extract_only: bool = False,
                 extract_combinations: bool = False,
                 post_selection: bool = False,
@@ -240,7 +242,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 F_vs_th = (1-(1-abs(norm_cumsum_0-norm_cumsum_1))/2)
                 opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
                 opt_idx = int(round(np.average(opt_idxs)))
-                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i])) 
+                #opt_idx = np.argmin(np.abs(all_bins-self.post_selec_thresholds[i]))
                 self.proc_data_dict['Post_PDF_data'][ch]['F_assignment_raw'] = \
                     F_vs_th[opt_idx]
                 self.proc_data_dict['Post_PDF_data'][ch]['threshold_raw'] = \
@@ -1510,7 +1512,7 @@ class RTE_analysis(ba.BaseDataAnalysis):
         self.thresholds = thresholds
         if error_type is None:
             self.error_type = 'all'
-        elif error_type is 'all' or error_type is 'meas' or error_type is 'flip':
+        elif error_type == 'all' or error_type == 'meas' or error_type == 'flip':
             self.error_type = error_type
         else:
             raise ValueError('Error type "{}" not supported.'.format(error_type))
@@ -1557,18 +1559,18 @@ class RTE_analysis(ba.BaseDataAnalysis):
                         [self.nr_measurements*j:self.nr_measurements*j+self.cycles]
                     # Digitize data
                     shots = np.array([-1 if s < self.thresholds[q] else 1 for s in raw_shots])
-                    if state is '0':
+                    if state == '0':
                         shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = (shots_f[1:]-shots_f[:-1])/2
 
-                    elif state is '1':
+                    elif state == '1':
                         shots_f = -1*shots
                         shots_f = np.pad(shots_f, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = (shots_f[1:]-shots_f[:-1])/2
 
-                    elif state is 'pi':
+                    elif state == 'pi':
                         shots_f = np.pad(shots, pad_width=1, mode='constant', constant_values=-1)[:-1] # introduce 0 in begining
                         # Detect errors
                         error = shots_f[:-1]+shots_f[1:]-1
@@ -1584,11 +1586,11 @@ class RTE_analysis(ba.BaseDataAnalysis):
                     # count errors
                     nr_errors = np.sum(abs(error))
                     # Get RTE
-                    if self.error_type is 'all':
+                    if self.error_type == 'all':
                         RTE = next((i+1 for i, x in enumerate(error) if x), None) # All errors
-                    elif self.error_type is 'meas':
+                    elif self.error_type == 'meas':
                         RTE = next((i+1 for i, x in enumerate(measr) if x), None) # Errors due to misdiagnosis
-                    elif self.error_type is 'flip':
+                    elif self.error_type == 'flip':
                         RTE = next((i+1 for i, x in enumerate(flipr) if x), None) # Errors due to flips
 
                     if RTE is None:
@@ -1743,7 +1745,7 @@ class RTE_analysis(ba.BaseDataAnalysis):
 
 class Readout_sweep_analysis(ba.BaseDataAnalysis):
     """
-    This analysis extracts measurement QND metrics 
+    This analysis extracts measurement QND metrics
     For details on the procedure see:
     arXiv:2110.04285
     """
@@ -1751,10 +1753,10 @@ class Readout_sweep_analysis(ba.BaseDataAnalysis):
                  qubit:str,
                  frequencies: list,
                  amplitudes: list,
-                 t_start: str = None, 
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -1824,16 +1826,16 @@ class Readout_sweep_analysis(ba.BaseDataAnalysis):
         Y_arr = np.array(list(Y_arr)+[Y_arr[-1]+dy])
         Fid_arr = transform_array(Fidelity, len(X_arr)-1, len(Y_arr)-1)
         QND_arr = transform_array(P_QND, len(X_arr)-1, len(Y_arr)-1)
-        QNp_arr = transform_array(P_QNDp, len(X_arr)-1, len(Y_arr)-1)  
+        QNp_arr = transform_array(P_QNDp, len(X_arr)-1, len(Y_arr)-1)
 
         self.proc_data_dict['X_arr'] = X_arr
         self.proc_data_dict['Y_arr'] = Y_arr
         self.proc_data_dict['Fid_arr'] = Fid_arr
         self.proc_data_dict['QND_arr'] = QND_arr
         self.proc_data_dict['QNp_arr'] = QNp_arr
-        self.proc_data_dict['Opt_Fid'] = Opt_Fid 
-        self.proc_data_dict['Opt_QND'] = Opt_QND 
-        self.proc_data_dict['Opt_QNp'] = Opt_QNp 
+        self.proc_data_dict['Opt_Fid'] = Opt_Fid
+        self.proc_data_dict['Opt_QND'] = Opt_QND
+        self.proc_data_dict['Opt_QNp'] = Opt_QNp
         self.qoi ={}
         self.qoi['Opt_Cal'] = Opt_Cal
         self.qoi['Fid_Cal'] = Fid_Cal
@@ -1849,7 +1851,7 @@ class Readout_sweep_analysis(ba.BaseDataAnalysis):
         self.plot_dicts[f'RO_sweep_{self.qubit}'] = {
             'plotfn': RO_sweep_plotfn,
             'ax_id': f'RO_sweep_{self.qubit}',
-            'X_arr': self.proc_data_dict['X_arr'], 
+            'X_arr': self.proc_data_dict['X_arr'],
             'Y_arr': self.proc_data_dict['Y_arr'],
             'Fid_arr': self.proc_data_dict['Fid_arr'],
             'QND_arr': self.proc_data_dict['QND_arr'],
@@ -1925,11 +1927,11 @@ class measurement_dephasing_analysis(ba.BaseDataAnalysis):
     def __init__(self,
                  meas_time: float,
                  exception_qubits: list,
-                 target_qubits:list,
-                 t_start: str = None, 
+                 target_qubits: list,
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -2005,7 +2007,7 @@ class measurement_dephasing_analysis(ba.BaseDataAnalysis):
         self.qoi = {'Dephasing_0': {q:Dephasing[q]['0'] for q in self.target_qubits },
                     'Dephasing_1': {q:Dephasing[q]['1'] for q in self.target_qubits }}
 
-        
+
     def prepare_plots(self):
         for q in self.target_qubits:
             self.plot_dicts[f'Ramsey_curves_{q}'] = {
@@ -2018,6 +2020,56 @@ class measurement_dephasing_analysis(ba.BaseDataAnalysis):
                 'Dephasing_1':self.qoi['Dephasing_1'][q]
             }
 
+class Depletion_AllXY_analysis(ba.BaseDataAnalysis):
+    """
+    """
+    def __init__(self,
+                 qubit,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.qubit = qubit
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = h5d.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        data_0 = self.raw_data_dict['data'][:,1][0::3]
+        data_1 = self.raw_data_dict['data'][:,1][2::3]
+        zero_lvl = np.mean(data_0[:2])
+        one_lvl = np.mean(data_0[-2:])
+        data_0 = (data_0 - zero_lvl)/(one_lvl-zero_lvl)
+        data_1 = (data_1 - zero_lvl)/(one_lvl-zero_lvl)
+        self.proc_data_dict['data_0'] = data_0
+        self.proc_data_dict['data_1'] = data_1
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': plot_depletion_allxy,
+            'qubit': self.qubit,
+            'timestamp': self.timestamp,
+            'data_0': self.proc_data_dict['data_0'],
+            'data_1': self.proc_data_dict['data_1']
+        }
 
 ######################################
 # Helper functions
@@ -2247,7 +2299,7 @@ def plot_single_qubit_histogram(data, ax, para_hist,
     ax.set_xlabel('Effective voltage (V)')
     ax.set_ylabel('Counts')
     ax.set_title('Histogram of shots "'+qubit_label+'"')
-    
+
     ax.legend(loc=0, fontsize=5)
     # Text box with quantities of interest
     if post_selection is True:
@@ -2337,7 +2389,7 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
                                 para_cdf, timestamp,
                                 hist_data, combinations,
                                 qubit_idx, value_name,
-                                qubit_labels, threshold,legend,
+                                qubit_labels, threshold, legend,
                                 qoi, post_selection=False,
                                  **kw):
 
@@ -2643,6 +2695,64 @@ def plot_RTE_histogram(qubit_label: str,
     fig.suptitle(mpl_utils.latex_friendly_str('{}'.format(timestamp)), y=1.05)
     fig.tight_layout()
 
+
+def plot_QND_metrics(Cal_0, Cal_1, th,
+                     p00, p11, p01p, p10p,
+                     P_QND, P_QNDp,
+                     timestamp: str,
+                     qubit: str,
+                     ax, **kw):
+
+    fig = ax.get_figure()
+
+    ax.plot(Cal_0[0], Cal_0[1], 'C0.', alpha=.05, markeredgewidth=0)
+    ax.plot(Cal_1[0], Cal_1[1], 'C3.', alpha=.05, markeredgewidth=0)
+    ax.axvline(th, color='k', ls='--', lw=.6)
+    x_lim = 1.1*np.max(list(np.abs(Cal_0[0]))+list(np.abs(Cal_1[0])))
+    y_lim = 1.1*np.max(list(np.abs(Cal_0[1]))+list(np.abs(Cal_1[1])))
+    lim = max(x_lim, y_lim)
+    ax.set_xlim(-x_lim, x_lim)
+    ax.set_ylim(-y_lim, y_lim)
+    ax.set_xlabel('I quadrature (V)')
+    ax.set_ylabel('Q quadrature (V)')
+    text = '\n'.join((f'P$(0_2|0_1)$  = {p00*100:.2f} %',
+                      f'P$(1_2|1_1)$  = {p11*100:.2f} %',
+                      f'P$(1_3|0_2)$  = {p01p*100:.2f} %',
+                      f'P$(0_3|1_2)$  = {p10p*100:.2f} %',
+                      '',
+                      '$P_{QND}$ = '+f'{P_QND*100:.2f} %',
+                      '$P_{QND,X_\pi}$ = '+f'{P_QNDp*100:.2f} %'))
+    props = dict(boxstyle='round', facecolor='gray', alpha=0.15)
+    ax.text(1.05, 1, 'Experiment', transform=ax.transAxes, fontsize=10,
+            verticalalignment='top')
+    ax.text(1.05, 1-.325, 'Results', transform=ax.transAxes, fontsize=10,
+            verticalalignment='top')
+    ax.text(1.05, 0.9-.325, text, transform=ax.transAxes, fontsize=10,
+            verticalalignment='top', bbox=props)
+    ax.set_title(f'{qubit} {timestamp}')
+
+    ax1 = fig.add_subplot(212)
+    ax1.set_position((.91, .66 , .5, .2))
+    ax1.set_xlim(0,  1*1.12)
+    ax1.set_ylim(0, .4*1.12)
+    ax1.axis('off')
+    ax1.plot([.1, 2], [.2, .2], 'k', lw=.5)
+    rect = patches.Rectangle((.05, .125), .15, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.125, .2, '$X_{\pi/2}$', va='center', ha='center', size=6)
+    rect = patches.Rectangle((.22, .125), .225, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.33, .2, '$m_1$', va='center', ha='center', size=6)
+    rect = patches.Rectangle((.47, .125), .225, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.58, .2, '$m_2$', va='center', ha='center', size=6)
+    rect = patches.Rectangle((.72, .125), .15, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(.8, .2, '$X_{\pi}$', va='center', ha='center', size=6)
+    rect = patches.Rectangle((.89, .125), .225, .15, linewidth=.5, edgecolor='k', facecolor='white', zorder=3)
+    ax1.add_patch(rect)
+    ax1.text(1, .2, '$m_3$', va='center', ha='center', size=6)
+
 def plot_ramsey_dephasing(qubit, timestamp,
                           M_data, Fit_params,
                           Dephasing_0, Dephasing_1,
@@ -2650,12 +2760,12 @@ def plot_ramsey_dephasing(qubit, timestamp,
     angles = np.arange(0,360,20)
     ax.plot(angles, M_data[qubit]['no_meas_0'], 'C0o', label='no_meas_0')
     ax.plot(angles, M_data[qubit]['no_meas_1'], 'C3o', label='no_meas_1')
-    ax.plot(angles, M_data[qubit]['meas_0'], 'o', 
+    ax.plot(angles, M_data[qubit]['meas_0'], 'o',
             color='teal', label='meas_0')
-    ax.plot(angles, M_data[qubit]['meas_1'], 'o', 
+    ax.plot(angles, M_data[qubit]['meas_1'], 'o',
             color='palevioletred', label='meas_1')
     ax.plot([360, 370, 380, 390], M_data[qubit]['cal_pts'], 'C2o-')
-    
+
     def func(x, A, phi, offset):
             return A*(1+np.cos((x+phi)*np.pi/180))/2 + offset
     X = np.linspace(0, 340, 101)
@@ -2663,11 +2773,11 @@ def plot_ramsey_dephasing(qubit, timestamp,
     ax.plot(X, func(X, *Fit_params[qubit]['no_meas_1']), 'C3--')
     ax.plot(X, func(X, *Fit_params[qubit]['meas_0']), '--', color='teal')
     ax.plot(X, func(X, *Fit_params[qubit]['meas_1']), '--', color='palevioletred')
-    
+
     ax.set_title(f'{timestamp} Target qubit {qubit}')
     ax.set_xlabel('Angle (deg)')
     ax.set_ylabel(r'P($|1\rangle$)')
-    
+
     text = 'Without RO pulse: \n'+\
            f'$\phi_0={Fit_params[qubit]["no_meas_0"][1]:.2f}$\n'+\
            f'$\phi_1={Fit_params[qubit]["no_meas_1"][1]:.2f}$\n'+\
@@ -2681,3 +2791,23 @@ def plot_ramsey_dephasing(qubit, timestamp,
     ax.text(430, .3, text, bbox=props)
 
     ax.legend(frameon=False)
+
+
+def plot_depletion_allxy(qubit, timestamp,
+                         data_0, data_1,
+                         ax, **kw):
+
+    allXY = ['II', 'XX', 'YY', 'XY', 'YX', 'xI', 'yI',
+             'xy', 'yx', 'xY', 'yX', 'Xy', 'Yx', 'xX',
+             'Xx', 'yY', 'Yy', 'XI', 'YI', 'xx', 'yy']
+
+    ideal = [0 for i in range(10)] + [.5 for i in range(24)] + [1 for i in range(8)]
+
+    ax.set_xticks(np.arange(0, 42, 2)+.5)
+    ax.set_xticklabels(allXY)
+    ax.set_ylabel(r'P($|1\rangle$)')
+    ax.plot(ideal, 'k--', lw=1, label='ideal')
+    ax.plot(data_0, 'C0o-', alpha=1, label='Standard sequence')
+    ax.plot(data_1, 'C1.-', alpha=.75, label='post-measurement')
+    ax.set_title(timestamp+'_Depletion_ALLXY_'+qubit)
+    ax.legend(loc=0)

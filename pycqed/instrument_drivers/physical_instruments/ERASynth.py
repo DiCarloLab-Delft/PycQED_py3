@@ -76,6 +76,8 @@ class ERASynth(Instrument):
         self.print_debug(False)  # Print less messages to improve communication
         self.wifi_off()  # Also to print less messages to improve communication
 
+        print("Connected to EraSynth " + self.name)
+
     def _add_qcodes_parameters(self):
 
         # ##############################################################################

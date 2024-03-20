@@ -17,7 +17,9 @@ from matplotlib.colors import to_rgba
 import itertools
 plt.rcdefaults()
 
-
+####################################
+# HELPER FUNCTIONS
+####################################
 def estimate_threshold(P0, P1):
     bounds = np.min(list(P0)+list(P1)), np.max(list(P0)+list(P1))
     y0, x0 = np.histogram(P0, range=bounds, bins=200)
@@ -67,19 +69,19 @@ class ProbabilityDistribution(np.ndarray):
         self.bs = ["".join(x) for x in itertools.product(*([('0', '1')] * n_bits))]
         self.bi = {s: i for i,s in enumerate(self.bs)}
         return self
-  
+
     def __getitem__(self, key):
         if isinstance(key, str):
             return super().__getitem__(self.bi[key])
         else:
             return super().__getitem__(key)
-    
+
     def __setitem__(self, key, val):
         if isinstance(key, str):
             return super().__setitem__(self.bi[key], val)
         else:
             return super().__setitem__(key, val)
-    
+
     def __str__(self):
         return '\n'.join(["%s: %g" % (s, v) for s,v in zip(self.bs, self)]) + '\n'
 
@@ -88,7 +90,7 @@ def calculate_TVD(p, q):
     for s in p.keys():
         D_tvd += np.abs(p[s]-q[s])/2
     return D_tvd
-    
+
 def calculate_OVD(p, q, p_ideal):
     D_ovd = 0
     for s in p.keys():
@@ -110,9 +112,9 @@ def compute_metrics(p, e1, e2, n_data_points):
     disturbances_single = pb.compute_disturbances(n_bits, data_ref, data_single, solver=SOLVER)
     data_double = np.array(p_double * n_data_points, dtype='int')  # no finite sample error
     disturbances_double = pb.compute_disturbances(n_bits, data_ref, data_double, solver=SOLVER)
-    
+
     p_ideal = { s : 0.5 if s in ['0000', '1111'] else 0 for s in p.keys() }
-    
+
     D_tvd_single = calculate_TVD(p, e1)
     D_ovd_single = calculate_OVD(p, e1, p_ideal)
     r_single = D_ovd_single/D_tvd_single
@@ -125,16 +127,29 @@ def compute_metrics(p, e1, e2, n_data_points):
     return (D_tvd_single, D_ovd_single, r_single, Disturbances_ovd_single,
             D_tvd_double, D_ovd_double, r_double, Disturbances_ovd_double)
 
+
 class Sandia_parity_benchmark(ba.BaseDataAnalysis):
+    """
+    Multiplexed readout analysis.
+
+    Does data binning and creates histograms of data.
+    Threshold is auto determined as the mean of the data.
+    Used to construct a assignment probability matrix.
+
+    WARNING: Not sure if post selection supports measurement
+    data in two quadratures. Should use optimal weights if
+    using post-selection.
+    Reference: Done during IARPA, Sandia group
+    """
 
     def __init__(self,
                  ancilla_qubit:str,
                  data_qubits:list,
                  exception_qubits:list=[],
-                 t_start: str = None, 
+                 t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -325,7 +340,7 @@ def plot_function(P0, P1, P, E1, E2, M1, M2,
                           '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[1][0], Disturbances_ovd_single[1][1]),
                           '$\Delta^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_single[2][0]+Disturbances_ovd_single[3][0], Disturbances_ovd_single[2][1]+Disturbances_ovd_single[3][1]),
                           '$r$  =  %f' % (r_single)))
-    
+
     textstr2 = '\n'.join(('Repeatability  =  %.1f%%' % ((1-M2)*100),
                           '$D_1^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[0][0], Disturbances_ovd_double[0][1]),
                           '$D_2^{ovd}$  =  %f $\pm$ %f' % (Disturbances_ovd_double[1][0], Disturbances_ovd_double[1][1]),
@@ -428,7 +443,7 @@ def get_Pauli_expectation_values(Beta_matrix, Gate_order, Mask, Tomo_shots_dig):
     '''
     Qubits = list(Tomo_shots_dig.keys())[1:]
     n = len(Qubits)
-    
+
     B_matrix = np.array([Beta_matrix[key][1:] for key in Beta_matrix.keys()])
     B_0 = np.array([Beta_matrix[key][0] for key in Beta_matrix.keys()])
     iB_matrix = np.linalg.inv(B_matrix)
@@ -488,7 +503,7 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
                  t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -545,7 +560,7 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
         else:
             cycle = 3**n*(self.n_rounds+1)
 
-        ## NB: Ps is not yet implemented 
+        ## NB: Ps is not yet implemented
         if self.post_selection:
             cycle*=2
 
@@ -574,7 +589,7 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
             if qubit in Data_qubits:
                 states = ['0','1']
                 combs = [''.join(s) for s in itertools.product(states, repeat=n)]
-                
+
                 for comb in combs:
                     tot_shots = np.concatenate((Cal_shots[qubit]['0'+comb], Cal_shots[qubit]['1'+comb]))
                     Cal_shots_dig[qubit][comb] = digitize(tot_shots, Thresholds[qubit])
@@ -597,7 +612,7 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
                         _idx = self.n_rounds*j + self.n_rounds-1
                         Tomo_shots[qubit][j] = list(self.raw_data_dict['data'][:,i+1][_idx::cycle+2**(n+1)])
                     Tomo_shots_dig[qubit][j] = list(digitize(Tomo_shots[qubit][j], Thresholds[qubit]))
-        else: # Sequential measurement    
+        else: # Sequential measurement
             for i, qubit in enumerate(Data_qubits):
                 for j in range(3**n):
                     if qubit in self.exception_qubits:
@@ -646,7 +661,7 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
         #####################################
         # Calculate Pauli expectation values
         #####################################
-        Pauli_terms_0, rho_0, P_frac_0 = get_Pauli_expectation_values(B, gen_gate_order(n), ps_mask_0, 
+        Pauli_terms_0, rho_0, P_frac_0 = get_Pauli_expectation_values(B, gen_gate_order(n), ps_mask_0,
                                                                       Tomo_shots_dig=Tomo_shots_dig)
         Pauli_terms_1, rho_1, P_frac_1 = get_Pauli_expectation_values(B, gen_gate_order(n), ps_mask_1,
                                                                       Tomo_shots_dig=Tomo_shots_dig)
@@ -887,7 +902,7 @@ def _calculate_fid_and_threshold(x0, n0, x1, n1):
     x0, n0 is the histogram data of shots 0 (value and occurences),
     x1, n1 is the histogram data of shots 1 (value and occurences).
     """
-    # Build cumulative histograms of shots 0 
+    # Build cumulative histograms of shots 0
     # and 1 in common bins by interpolation.
     all_x = np.unique(np.sort(np.concatenate((x0, x1))))
     cumsum0, cumsum1 = np.cumsum(n0), np.cumsum(n1)
@@ -949,7 +964,7 @@ def _fit_double_gauss(x_vals, hist_0, hist_1):
         return np.concatenate((_dist0, _dist1))
     # Guess for fit
     pdf_0 = hist_0/np.sum(hist_0) # Get prob. distribution
-    pdf_1 = hist_1/np.sum(hist_1) # 
+    pdf_1 = hist_1/np.sum(hist_1) #
     _x0_guess = np.sum(x_vals*pdf_0) # calculate mean
     _x1_guess = np.sum(x_vals*pdf_1) #
     _sigma0_guess = np.sqrt(np.sum((x_vals-_x0_guess)**2*pdf_0)) # calculate std
@@ -999,7 +1014,7 @@ def _fit_double_gauss(x_vals, hist_0, hist_1):
 
 def _decision_boundary_points(coefs, intercepts):
     '''
-    Find points along the decision boundaries of 
+    Find points along the decision boundaries of
     LinearDiscriminantAnalysis (LDA).
     This is performed by finding the interception
     of the bounds of LDA. For LDA, these bounds are
@@ -1054,7 +1069,7 @@ def _calculate_defect_rate(Shots, n_rounds, with_reset=False):
         M_values = np.ones((nr_shots, n_rounds))
         for r in range(n_rounds):
             # Convert to +1 and -1 values
-            M_values[:,r] *= 1-2*(Shots[f'round {r+1}']) 
+            M_values[:,r] *= 1-2*(Shots[f'round {r+1}'])
 
         P_values = np.hstack( (np.ones((nr_shots, 2)), M_values) )
         P_values = P_values[:,1:] * P_values[:,:-1]
@@ -1064,7 +1079,7 @@ def _calculate_defect_rate(Shots, n_rounds, with_reset=False):
         P_values = np.ones((nr_shots, n_rounds))
         for r in range(n_rounds):
             # Convert to +1 and -1 values
-            P_values[:,r] *= 1-2*(Shots[f'round {r+1}']) 
+            P_values[:,r] *= 1-2*(Shots[f'round {r+1}'])
     D_values = P_values[:,1:] * P_values[:,:-1]
     Deffect_rate = [ np.nanmean(1-D_values[:,i])/2 for i in range(n_rounds)]
     return Deffect_rate
@@ -1077,7 +1092,7 @@ class Repeated_stabilizer_measurement_analysis(ba.BaseDataAnalysis):
                  t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  auto=True
                  ):
@@ -1438,19 +1453,19 @@ class Repeated_stabilizer_measurement_analysis(ba.BaseDataAnalysis):
             'defect_rate_0': self.qoi['defect_rate_normal'],
             'defect_rate_0_ps': self.qoi['defect_rate_normal_ps'],
             'defect_rate_1': self.qoi['defect_rate_LRU_data'],
-            'defect_rate_1_ps': self.qoi['defect_rate_LRU_data_ps'], 
+            'defect_rate_1_ps': self.qoi['defect_rate_LRU_data_ps'],
             'defect_rate_2': self.qoi['defect_rate_LRU_ancilla'],
-            'defect_rate_2_ps': self.qoi['defect_rate_LRU_ancilla_ps'], 
+            'defect_rate_2_ps': self.qoi['defect_rate_LRU_ancilla_ps'],
             'defect_rate_3': self.qoi['defect_rate_LRU_data_ancilla'],
-            'defect_rate_3_ps': self.qoi['defect_rate_LRU_data_ancilla_ps'], 
-            'ps_0': self.qoi['Ps_fraction_normal'], 
-            'ps_1': self.qoi['Ps_fraction_LRU_data'], 
-            'ps_2': self.qoi['Ps_fraction_LRU_ancilla'], 
+            'defect_rate_3_ps': self.qoi['defect_rate_LRU_data_ancilla_ps'],
+            'ps_0': self.qoi['Ps_fraction_normal'],
+            'ps_1': self.qoi['Ps_fraction_LRU_data'],
+            'ps_2': self.qoi['Ps_fraction_LRU_ancilla'],
             'ps_3': self.qoi['Ps_fraction_LRU_data_ancilla'],
-            'p_0': self.qoi['Population_normal'], 
-            'p_1': self.qoi['Population_LRU_data'], 
-            'p_2': self.qoi['Population_LRU_ancilla'], 
-            'p_3': self.qoi['Population_LRU_data_ancilla'], 
+            'p_0': self.qoi['Population_normal'],
+            'p_1': self.qoi['Population_LRU_data'],
+            'p_2': self.qoi['Population_LRU_ancilla'],
+            'p_3': self.qoi['Population_LRU_data_ancilla'],
             'qubit': self.qubit,
             'timestamp': self.timestamp
         }
@@ -1464,7 +1479,7 @@ class Repeated_stabilizer_measurement_analysis(ba.BaseDataAnalysis):
                 tag_tstamp=self.options_dict.get('tag_tstamp', True))
 
 def ssro_IQ_projection_plotfn(
-    shots_0, 
+    shots_0,
     shots_1,
     shots_2,
     shots_3,
@@ -1476,7 +1491,7 @@ def ssro_IQ_projection_plotfn(
     dec_bounds,
     Fid_dict,
     timestamp,
-    qubit, 
+    qubit,
     ax, **kw):
     fig = ax.get_figure()
     axs = fig.get_axes()
@@ -1485,11 +1500,11 @@ def ssro_IQ_projection_plotfn(
     def twoD_Gaussian(data, amplitude, x0, y0, sigma_x, sigma_y, theta):
         x, y = data
         x0 = float(x0)
-        y0 = float(y0)    
+        y0 = float(y0)
         a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
         b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
         c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
-        g = amplitude*np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0) 
+        g = amplitude*np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0)
                                 + c*((y-y0)**2)))
         return g.ravel()
     def _fit_2D_gaussian(X, Y):
@@ -1684,7 +1699,7 @@ def ssro_IQ_projection_plotfn(
                 verticalalignment='top', bbox=props)
 
 def ssro_IQ_projection_plotfn_2(
-    shots_0, 
+    shots_0,
     shots_1,
     shots_2,
     projection_01,
@@ -1694,7 +1709,7 @@ def ssro_IQ_projection_plotfn_2(
     dec_bounds,
     Fid_dict,
     timestamp,
-    qubit, 
+    qubit,
     ax, **kw):
     fig = ax.get_figure()
     axs = fig.get_axes()
@@ -1703,11 +1718,11 @@ def ssro_IQ_projection_plotfn_2(
     def twoD_Gaussian(data, amplitude, x0, y0, sigma_x, sigma_y, theta):
         x, y = data
         x0 = float(x0)
-        y0 = float(y0)    
+        y0 = float(y0)
         a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
         b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
         c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
-        g = amplitude*np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0) 
+        g = amplitude*np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0)
                                 + c*((y-y0)**2)))
         return g.ravel()
     def _fit_2D_gaussian(X, Y):
@@ -1870,21 +1885,21 @@ def defect_rate_plotn(
     defect_rate_0,
     defect_rate_0_ps,
     defect_rate_1,
-    defect_rate_1_ps, 
+    defect_rate_1_ps,
     defect_rate_2,
-    defect_rate_2_ps, 
+    defect_rate_2_ps,
     defect_rate_3,
-    defect_rate_3_ps, 
-    ps_0, 
-    ps_1, 
-    ps_2, 
-    ps_3, 
-    p_0, 
-    p_1, 
-    p_2, 
-    p_3, 
+    defect_rate_3_ps,
+    ps_0,
+    ps_1,
+    ps_2,
+    ps_3,
+    p_0,
+    p_1,
+    p_2,
+    p_3,
     timestamp,
-    qubit, 
+    qubit,
     ax, **kw):
     fig = ax.get_figure()
     axs = fig.get_axes()
@@ -1932,7 +1947,7 @@ def _calculate_defects(Shots, n_rounds, Data_qubit_meas):
     M_values = np.ones((nr_shots, n_rounds))
     for r in range(n_rounds):
         # Convert to +1 and -1 values
-        M_values[:,r] *= 1-2*(Shots[f'round {r+1}']) 
+        M_values[:,r] *= 1-2*(Shots[f'round {r+1}'])
     # Append +1 Pauli frame in first round
     P_values = np.hstack( (np.ones((nr_shots, 2)), M_values) )
     P_values = P_values[:,1:] * P_values[:,:-1]
@@ -1958,7 +1973,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
                  t_start: str = None,
                  t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, 
+                 options_dict: dict = None,
                  extract_only: bool = False,
                  with_reset: bool = False,
                  number_of_kernels: int = 3,
@@ -2027,7 +2042,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
             for i, name in enumerate(ch_names):
                 if ch_name in name:
                     return i+1
-        chan_idxs = { q: (_find_channel(f'{q} I'), 
+        chan_idxs = { q: (_find_channel(f'{q} I'),
                           _find_channel(f'{q} Q')) for q in self.Qubits}
 
         # Dictionary that will store raw shots
@@ -2068,7 +2083,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
             self.proc_data_dict[qubit]['Shots_0'] = Shots_0
             self.proc_data_dict[qubit]['Shots_1'] = Shots_1
             self.proc_data_dict[qubit]['Shots_2'] = Shots_2
-            self.proc_data_dict['Thresholds'] = Thresholds          
+            self.proc_data_dict['Thresholds'] = Thresholds
             # Use classifier for data
             data = np.concatenate((Shots_0, Shots_1, Shots_2))
             labels = [0 for s in Shots_0]+[1 for s in Shots_1]+[2 for s in Shots_2]
@@ -2281,7 +2296,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
                     # Note we are using the rotated shots already
                     for k in range(n_kernels):
                         shots_exp[k][q][f'{n_rounds}_R'][f'round {r+1}'] = \
-                            raw_shots[q][r+k*(n_rounds+self.heralded_init)+self.heralded_init+_aux::_cycle]                 
+                            raw_shots[q][r+k*(n_rounds+self.heralded_init)+self.heralded_init+_aux::_cycle]
                     # Perform Qubit assignment
                     if _zero_lvl < threshold: # zero level is left of threshold
                         for k in range(n_kernels):
@@ -2340,7 +2355,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
         for q in self.Qubits:
             M_inv = np.linalg.inv(self.proc_data_dict[q]['Assignment_matrix'])
             if q in self.ancilla_qubit:
-                # For the ancilla qubit we'll calculate  
+                # For the ancilla qubit we'll calculate
                 # leakage in every measurement round.
                 for n_rounds in Rounds:
                     for k in range(n_kernels):
@@ -2352,7 +2367,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
                 for k in range(n_kernels):
                     Population_f[k][q] = np.array([Population[k][q][f'{Rounds[-1]}_R'][key][2] for key in Population[k][q][f'{Rounds[-1]}_R'].keys()])
             else:
-                # For the data qubit we'll only calculate  
+                # For the data qubit we'll only calculate
                 # leakage in the last measurement round.
                 for n_rounds in Rounds:
                     for k in range(n_kernels):
@@ -2364,7 +2379,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
         self.proc_data_dict['Population'] = Population
         self.proc_data_dict['Population_f'] = Population_f
         ###########################
-        ## Leakage postselection 
+        ## Leakage postselection
         ###########################
         Shots_qubit_ps = { k:{} for k in range(n_kernels) }
         Ps_fraction = { k : np.ones(Rounds[-1]) for k in range(n_kernels) }
@@ -2394,7 +2409,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
         #         _mask_1[k] *= np.array([1 if s != 1 else np.nan for s in Shots_qubit_ps[k][f'{Rounds[-1]}_R'][f'round 1']])
         #         Ps_fraction_1[k][r] = np.nansum(_mask_1[k])/_n_shots
         #         Shots_qubit_ps[k][f'{Rounds[-1]}_R'][f'round {r+1}'] = Shots_qubit_ps[k][f'{Rounds[-1]}_R'][f'round {r+1}']*_mask_1[k]
-        
+
         ###########################
         ## Postselection on first round being zero on spec
         ###########################
@@ -2482,7 +2497,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
                                         Pij[i+R*qi, j+R*qj] = ( np.mean(xi*xj) - np.mean(xi)*np.mean(xj) ) / \
                                                               ( (1-2*np.mean(xi))*(1-2*np.mean(xj)) )
                     self.qoi['Pij_matrix'][k] = Pij
-            else: 
+            else:
                 print('Pij matrix is only calculated for surface_13 experiment')
         ###########################
         # Calculate defect rate
@@ -2533,7 +2548,7 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
                 'qubit': qubit,
                 'timestamp': self.timestamp
             }
-        
+
         for qa in self.ancilla_qubit:
             if qa in ['Z2', 'Z3', 'X1', 'X4']:
                 fig = plt.figure(figsize=(11,3))
@@ -2584,7 +2599,7 @@ def defect_rate_k_plotfn(
     Rounds,
     defect_rate,
     defect_rate_ps,
-    Population, 
+    Population,
     timestamp,
     qubit,
     data_qubits,
@@ -2594,7 +2609,7 @@ def defect_rate_k_plotfn(
     axs = fig.get_axes()
 
     n_rounds = Rounds[-1]
-    for k in defect_rate.keys(): 
+    for k in defect_rate.keys():
         axs[0].plot((np.arange(n_rounds)+1)[1:], defect_rate[k][f'{Rounds[-1]}_R'][1:], f'C{k}-', label=experiments[k])
         axs[0].plot((np.arange(n_rounds)+1)[1:], defect_rate_ps[k][f'{Rounds[-1]}_R'][1:], f'C{k}--')
     axs[0].grid(ls='--')
@@ -2606,7 +2621,7 @@ def defect_rate_k_plotfn(
     axs[0].set_yticks([0, .1, .2, .3, .4, .5])
     axs[0].set_yticks([0.05, .15, .25, .35, .45], minor=True)
 
-    for k in defect_rate.keys(): 
+    for k in defect_rate.keys():
         axs[1].plot((np.arange(n_rounds)+1), Population[k][qubit]*100, f'C{k}-', label=experiments[k])
     axs[1].set_ylabel(r'Leakage population (%)')
     axs[1].set_xlabel('rounds')
@@ -2626,7 +2641,7 @@ def defect_rate_k_plotfn(
     fig.tight_layout()
 
 def ssro_IQ_projection_plotfn_3(
-    shots_0, 
+    shots_0,
     shots_1,
     shots_2,
     projection_01,
@@ -2636,7 +2651,7 @@ def ssro_IQ_projection_plotfn_3(
     dec_bounds,
     Fid_dict,
     timestamp,
-    qubit, 
+    qubit,
     ax, **kw):
     fig = ax.get_figure()
     axs = fig.get_axes()
@@ -2645,11 +2660,11 @@ def ssro_IQ_projection_plotfn_3(
     def twoD_Gaussian(data, amplitude, x0, y0, sigma_x, sigma_y, theta):
         x, y = data
         x0 = float(x0)
-        y0 = float(y0)    
+        y0 = float(y0)
         a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
         b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
         c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
-        g = amplitude*np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0) 
+        g = amplitude*np.exp( - (a*((x-x0)**2) + 2*b*(x-x0)*(y-y0)
                                 + c*((y-y0)**2)))
         return g.ravel()
     def _fit_2D_gaussian(X, Y):

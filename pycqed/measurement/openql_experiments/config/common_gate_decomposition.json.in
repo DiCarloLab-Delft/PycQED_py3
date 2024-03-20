@@ -19,6 +19,7 @@
         "mx90 %0": ["rxm90 %0"],
 
         // Clifford decomposition per Epstein et al. Phys. Rev. A 89, 062321 (2014)
+        // FIXME: only used by single_qubit_oql::randomized_benchmarking()
         "cl_0 %0": ["i %0"],
         "cl_1 %0": ["ry90 %0", "rx90 %0"],
         "cl_2 %0": ["rxm90 %0", "rym90 %0"],

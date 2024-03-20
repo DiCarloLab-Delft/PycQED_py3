@@ -173,7 +173,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
         self._params_to_exclude = set(self.parameters.keys()) - self._snapshot_whitelist
 
         t1 = time.time()
-        log.info(f'{self.devname}: Initialized ZI_HDAWG in {t1 - t0}s')
+        log.info(f'{self.devname}: Initialized ZI_HDAWG in {t1 - t0:.3}s')
 
     def _gen_set_awgs_outputs_amplitude(self, awg, ch):
         """
@@ -327,7 +327,7 @@ while (1) {
         needed for single qubit phase corrections.
 
         commandtable (Union[str, dict]):
-            The json string to be uploaded as the commandtable. 
+            The json string to be uploaded as the commandtable.
             Will be converted to string if given as dict.
         """
         if isinstance(commandtable, dict):

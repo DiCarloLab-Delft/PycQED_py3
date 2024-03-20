@@ -18,15 +18,24 @@ frequencies. See e.g., "waveform_control_CC/waveforms_flux.py".
 
 import logging
 import numpy as np
-import scipy
-from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 
-def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
-                sampling_rate: float=2e8, axis: str='x', phase: float=0,
-                phase_unit: str='deg',
-                motzoi: float=0, delay: float=0,
-                subtract_offset: str='average'):
+# import scipy
+# from pycqed.analysis.fitting_models import Qubit_freq_to_dac
+
+
+def gauss_pulse(
+        amp: float,
+        sigma_length: float,
+        nr_sigma: int = 4,
+        sampling_rate: float = 2e8,
+        axis: str = 'x',
+        phase: float = 0,
+        phase_unit: str = 'deg',
+        motzoi: float = 0,
+        delay: float = 0,
+        subtract_offset: str = 'average'
+):
     '''
     All inputs are in s and Hz.
     phases are in degree.
@@ -63,22 +72,22 @@ def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
         pulse_I, pulse_Q: Two quadratures of the waveform.
     '''
     sigma = sigma_length  # old legacy naming, to be replaced
-    length = sigma*nr_sigma
+    length = sigma * nr_sigma
 
-    t_step = 1/sampling_rate
-    mu = length/2. - 0.5*t_step  # center should be offset by half a sample
-    t = np.arange(0, nr_sigma*sigma, t_step)
+    t_step = 1 / sampling_rate
+    mu = length / 2. - 0.5 * t_step  # center should be offset by half a sample
+    t = np.arange(0, nr_sigma * sigma, t_step)
 
-    gauss_env = amp*np.exp(-(0.5 * ((t-mu)**2) / sigma**2))
-    deriv_gauss_env = motzoi * -1 * (t-mu)/(sigma**1) * gauss_env
+    gauss_env = amp * np.exp(-(0.5 * ((t - mu) ** 2) / sigma ** 2))
+    deriv_gauss_env = motzoi * -1 * (t - mu) / (sigma ** 1) * gauss_env
 
     # Subtract offsets
     if subtract_offset.lower() == 'none' or subtract_offset is None:
         # Do not subtract offset
         pass
     elif subtract_offset.lower() == 'average':
-        gauss_env -= (gauss_env[0]+gauss_env[-1])/2.
-        deriv_gauss_env -= (deriv_gauss_env[0]+deriv_gauss_env[-1])/2.
+        gauss_env -= (gauss_env[0] + gauss_env[-1]) / 2.
+        deriv_gauss_env -= (deriv_gauss_env[0] + deriv_gauss_env[-1]) / 2.
     elif subtract_offset.lower() == 'first':
         gauss_env -= gauss_env[0]
         deriv_gauss_env -= deriv_gauss_env[0]
@@ -89,12 +98,12 @@ def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
         raise ValueError('Unknown value "{}" for keyword argument '
                          '"subtract_offset".'.format(subtract_offset))
 
-    delay_samples = delay*sampling_rate
+    delay_samples = delay * sampling_rate
 
     # generate pulses
     Zeros = np.zeros(int(delay_samples))
-    G = np.array(list(Zeros)+list(gauss_env))
-    D = np.array(list(Zeros)+list(deriv_gauss_env))
+    G = np.array(list(Zeros) + list(gauss_env))
+    D = np.array(list(Zeros) + list(deriv_gauss_env))
 
     if axis == 'y':
         phase += 90
@@ -141,16 +150,16 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
         empty delay in s
         phase in degrees
     '''
-    nr_samples = int(np.round((length+delay)*sampling_rate))
-    delay_samples = int(np.round(delay*sampling_rate))
+    nr_samples = int(np.round((length + delay) * sampling_rate))
+    delay_samples = int(np.round(delay * sampling_rate))
     pulse_samples = nr_samples - delay_samples
-    amp_I = amp*np.cos(phase*2*np.pi/360)
-    amp_Q = amp*np.sin(phase*2*np.pi/360)
+    amp_I = amp * np.cos(phase * 2 * np.pi / 360)
+    amp_Q = amp * np.sin(phase * 2 * np.pi / 360)
     block_I = amp_I * np.ones(int(pulse_samples))
     block_Q = amp_Q * np.ones(int(pulse_samples))
     Zeros = np.zeros(int(delay_samples))
-    pulse_I = np.array(list(Zeros)+list(block_I))
-    pulse_Q = np.array(list(Zeros)+list(block_Q))
+    pulse_I = np.array(list(Zeros) + list(block_I))
+    pulse_Q = np.array(list(Zeros) + list(block_Q))
     return pulse_I, pulse_Q
 
 
@@ -170,7 +179,7 @@ def block_pulse_vsm(amp, length, sampling_rate=2e8, delay=0, phase=0):
 
 
 def mod_pulse(pulse_I, pulse_Q, f_modulation: float,
-              Q_phase_delay: float=0, sampling_rate: float=2e8):
+              Q_phase_delay: float = 0, sampling_rate: float = 2e8):
     '''
     Single sideband modulation (SSB) of an input pulse_I, pulse_Q
     inputs are in s and Hz.
@@ -184,23 +193,23 @@ def mod_pulse(pulse_I, pulse_Q, f_modulation: float,
     mixer phase offset.
     To add phase to the pulse itself edit the envelope function.
     '''
-    Q_phase_delay_rad = 2*np.pi * Q_phase_delay/360.
+    Q_phase_delay_rad = 2 * np.pi * Q_phase_delay / 360.
     nr_pulse_samples = len(pulse_I)
-    f_mod_samples = f_modulation/sampling_rate
+    f_mod_samples = f_modulation / sampling_rate
     pulse_samples = np.linspace(0, nr_pulse_samples, nr_pulse_samples,
                                 endpoint=False)
 
-    pulse_I_mod = pulse_I*np.cos(2*np.pi*f_mod_samples*pulse_samples) + \
-        pulse_Q*np.sin(2*np.pi*f_mod_samples*pulse_samples)
-    pulse_Q_mod = pulse_I*-np.sin(2*np.pi*f_mod_samples*pulse_samples +
-                                  Q_phase_delay_rad) + \
-        pulse_Q*np.cos(2*np.pi*f_mod_samples*pulse_samples + Q_phase_delay_rad)
+    pulse_I_mod = pulse_I * np.cos(2 * np.pi * f_mod_samples * pulse_samples) + \
+                  pulse_Q * np.sin(2 * np.pi * f_mod_samples * pulse_samples)
+    pulse_Q_mod = pulse_I * -np.sin(2 * np.pi * f_mod_samples * pulse_samples +
+                                    Q_phase_delay_rad) + \
+                  pulse_Q * np.cos(2 * np.pi * f_mod_samples * pulse_samples + Q_phase_delay_rad)
 
     return pulse_I_mod, pulse_Q_mod
 
 
 def simple_mod_pulse(pulse_I, pulse_Q, f_modulation: float,
-                     Q_phase_delay: float =0, sampling_rate: float=2e8):
+                     Q_phase_delay: float = 0, sampling_rate: float = 2e8):
     '''
     Double sideband modulation (DSB) of an input pulse_I, pulse_Q
     inputs are in s and Hz.
@@ -214,15 +223,15 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation: float,
     mixer phase offset.
     To add phase to the pulse itself edit the envelope function.
     '''
-    Q_phase_delay_rad = 2*np.pi * Q_phase_delay/360.
+    Q_phase_delay_rad = 2 * np.pi * Q_phase_delay / 360.
     nr_pulse_samples = len(pulse_I)
-    f_mod_samples = f_modulation/sampling_rate
+    f_mod_samples = f_modulation / sampling_rate
     pulse_samples = np.linspace(0, nr_pulse_samples, int(nr_pulse_samples),
                                 endpoint=False)
 
-    pulse_I_mod = pulse_I*np.cos(2*np.pi*f_mod_samples*pulse_samples)
-    pulse_Q_mod = pulse_Q*np.sin(2*np.pi*f_mod_samples*pulse_samples +
-                                 Q_phase_delay_rad)
+    pulse_I_mod = pulse_I * np.cos(2 * np.pi * f_mod_samples * pulse_samples)
+    pulse_Q_mod = pulse_Q * np.sin(2 * np.pi * f_mod_samples * pulse_samples +
+                                   Q_phase_delay_rad)
     return pulse_I_mod, pulse_Q_mod
 
 
@@ -238,8 +247,8 @@ def mixer_predistortion_matrix(alpha, phi):
     PycQED/docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
     '''
     predistortion_matrix = np.array(
-        [[1,  np.tan(phi*2*np.pi/360)],
-         [0, 1/alpha * 1/np.cos(phi*2*np.pi/360)]])
+        [[1, np.tan(phi * 2 * np.pi / 360)],
+         [0, 1 / alpha * 1 / np.cos(phi * 2 * np.pi / 360)]])
     return predistortion_matrix
 
 
@@ -256,11 +265,11 @@ def rotate_wave(wave_I, wave_Q, phase: float, unit: str = 'deg'):
     if unit == 'deg':
         angle = np.deg2rad(phase)
     elif unit == 'rad':
-        angle = angle
+        angle = phase
     else:
         raise ValueError('unit must be either "deg" or "rad"')
-    rot_I = np.cos(angle)*wave_I - np.sin(angle)*wave_Q
-    rot_Q = np.sin(angle)*wave_I + np.cos(angle)*wave_Q
+    rot_I = np.cos(angle) * wave_I - np.sin(angle) * wave_Q
+    rot_Q = np.sin(angle) * wave_I + np.cos(angle) * wave_Q
     return rot_I, rot_Q
 
 
@@ -268,10 +277,18 @@ def rotate_wave(wave_I, wave_Q, phase: float, unit: str = 'deg'):
 # Modulated standard waveforms
 #####################################################
 
-def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
-              nr_sigma=4,
-              motzoi=0, sampling_rate=2e8,
-              Q_phase_delay=0, delay=0):
+def mod_gauss(
+        amp,
+        sigma_length,
+        f_modulation,
+        axis='x',
+        phase=0,
+        nr_sigma=4,
+        motzoi=0,
+        sampling_rate=2e8,
+        Q_phase_delay=0,
+        delay=0
+):
     '''
     Simple modulated gauss pulse. All inputs are in s and Hz.
     '''
@@ -285,10 +302,18 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
     return pulse_I_mod, pulse_Q_mod
 
 
-def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
-                  nr_sigma=4,
-                  motzoi=0, sampling_rate=2e8,
-                  Q_phase_delay=0, delay=0):
+def mod_gauss_VSM(
+        amp,
+        sigma_length,
+        f_modulation,
+        axis='x',
+        phase=0,
+        nr_sigma=4,
+        motzoi=0,
+        sampling_rate=2e8,
+        Q_phase_delay=0,
+        delay=0
+):
     '''
     4-channel VSM compatible DRAG pulse
     '''
@@ -311,8 +336,13 @@ def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
     return G_I_mod, G_Q_mod, D_I_mod, D_Q_mod
 
 
-def mod_square(amp, length, f_modulation,  phase=0,
-               motzoi=0, sampling_rate=1e9):
+def mod_square(
+        amp,
+        length,
+        f_modulation,
+        phase=0,
+        sampling_rate=1e9
+):
     '''
     Simple modulated gauss pulse. All inputs are in s and Hz.
     '''
@@ -324,9 +354,15 @@ def mod_square(amp, length, f_modulation,  phase=0,
     return pulse_I_mod, pulse_Q_mod
 
 
-def mod_square_VSM(amp_G, amp_D, length, f_modulation,
-                   phase_G: float = 0, phase_D: float=0,
-                   sampling_rate: float=1e9):
+def mod_square_VSM(
+        amp_G,
+        amp_D,
+        length,
+        f_modulation,
+        phase_G: float = 0,
+        phase_D: float = 0,
+        sampling_rate: float = 1e9
+):
     """
     4-channel square waveform modulated using SSB modulation.
     """

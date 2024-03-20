@@ -29,6 +29,10 @@ class Test_VNA_complex_reso_Analysis(unittest.TestCase):
             'phi_v':-4.483641207597703e-07,
             'phi_0':6.28318526488766}
         for key, val in expected_dict.items():
-            np.testing.assert_almost_equal(
-                a.fit_dicts['reso_fit']['fit_res'].params[key].value, val, decimal=2)
+            np.testing.assert_approx_equal(
+                a.fit_dicts['reso_fit']['fit_res'].params[key].value,
+                val,
+                significant=6
+            )
+            # FIXME: originally used assert_almost_equal with decimal=2, which sometimes failed on f0
 

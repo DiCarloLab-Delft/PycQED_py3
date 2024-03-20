@@ -124,6 +124,7 @@ class Test_RBAnalysis(unittest.TestCase):
 
 
 class Test_CharRBAnalysis:
+    @unittest.skip(reason="Incorrectly assumes data file is present on arbitrary absolute path.")
     def test_char_rb_extract_data(self):
 
         ts = "20181129_170623"
