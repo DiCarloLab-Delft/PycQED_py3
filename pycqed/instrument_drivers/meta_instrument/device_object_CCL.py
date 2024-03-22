@@ -8,7 +8,7 @@ import datetime
 from collections import OrderedDict
 import multiprocessing
 from importlib import reload
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Optional
 import itertools as itt
 from math import ceil
 
@@ -36,9 +36,15 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import tomography as tomo
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis_v2.repeated_stabilizer_analysis import RepeatedStabilizerAnalysis
-from pycqed.utilities.general import check_keyboard_interrupt, print_exception,\
-                                     get_gate_directions, get_frequency_waveform,\
-                                     get_DAC_amp_frequency, get_Ch_amp_frequency
+from pycqed.utilities.general import (
+    check_keyboard_interrupt,
+    print_exception,
+    get_gate_directions,
+    get_frequency_waveform,
+    get_DAC_amp_frequency,
+    get_Ch_amp_frequency,
+    get_parking_qubits,
+)
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
     QuTech_AWG_Module,
@@ -1535,7 +1541,79 @@ class DeviceCCL(Instrument):
             (a.proc_data_dict['quantities_of_interest']['phi_1'].n+180) % 360 - 180
 
         return result_dict
-    
+
+    def measure_flux_arc_dc_conditional_oscillation(
+            self,
+            qubit_high: str,
+            qubit_low: str,
+            flux_array: Optional[np.ndarray] = None,
+            flux_sample_points: int = 21,
+            disable_metadata: bool = False,
+            prepare_for_timedomain: bool = True,
+            analyze: bool = True,
+            ):
+        assert self.ro_acq_weight_type() == 'optimal', "Expects device acquisition weight type to be 'optimal'"
+
+        # Get instruments
+        nested_MC = self.instr_nested_MC.get_instr()
+        qubit_high_instrument = self.find_instrument(qubit_high)
+        _flux_instrument = qubit_high_instrument.instr_FluxCtrl.get_instr()
+        _flux_parameter = _flux_instrument[f'FBL_{qubit_high}']
+        qubits_awaiting_prepare = [qubit_high, qubit_low]
+        self.prepare_readout(qubits_awaiting_prepare)
+        parked_qubits = get_parking_qubits(qubit_high, qubit_low)
+
+        original_current: float = qubit_high_instrument.fl_dc_I0()
+        if flux_array is None:
+            flux_array = np.linspace(-40e-6, 40e-6, flux_sample_points) + original_current
+
+        local_prepare = ManualParameter('local_prepare', initial_value=prepare_for_timedomain)
+        def wrapper():
+            a = self.measure_conditional_oscillation_multi(
+                pairs=[[qubit_high, qubit_low]],
+                parked_qbs=parked_qubits,
+                disable_metadata=disable_metadata,
+                prepare_for_timedomain=local_prepare(),
+                extract_only=True,
+            )
+            local_prepare(False)  # Turn off prepare for followup measurements
+            return {
+                'pair_1_delta_phi_a': a['pair_1_delta_phi_a'],
+                'pair_1_missing_frac_a': a['pair_1_missing_frac_a'],
+                'pair_1_offset_difference_a': a['pair_1_offset_difference_a'],
+                'pair_1_phi_0_a': a['pair_1_phi_0_a'],
+                'pair_1_phi_1_a': a['pair_1_phi_1_a'],
+            }
+
+        d = det.Function_Detector(
+            wrapper,
+            result_keys=['pair_1_missing_frac_a', 'pair_1_delta_phi_a', 'pair_1_phi_0_a'],
+            value_names=['missing_fraction', 'phi_cond', 'phi_0'],
+            value_units=['a.u.', 'degree', 'degree'],
+        )
+
+        nested_MC.set_detector_function(d)
+        nested_MC.set_sweep_function(_flux_parameter)
+        nested_MC.set_sweep_points(np.atleast_1d(flux_array))
+
+        response = None
+        label = f'conditional_oscillation_dc_flux_arc_{qubit_high}'
+        try:
+            response = nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
+        except Exception as e:
+            log.warn(e)
+        finally:
+            _flux_parameter(original_current)
+        if analyze:
+            a = ma2.FineBiasAnalysis(
+                initial_bias=original_current,
+                label=label,
+            )
+            a.run_analysis()
+            return a
+        return response
+
+
     def measure_residual_ZZ_coupling(
         self,
         q0: str,
