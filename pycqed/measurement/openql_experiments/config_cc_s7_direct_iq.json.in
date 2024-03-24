@@ -173,7 +173,7 @@
 				},
                 {
                     "name": "mw_1",
-                    "qubits": [[4], [5], [6], []],
+                    "qubits": [[], [5], [6], [4]],
                     "signal_type": "mw",
                     "ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-mw-direct-iq",

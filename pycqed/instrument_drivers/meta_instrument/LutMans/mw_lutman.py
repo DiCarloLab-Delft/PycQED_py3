@@ -1235,7 +1235,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     def upload_single_qubit_phase_corrections(self):
         commandtable_dict = {
             "$schema": "http://docs.zhinst.com/hdawg/commandtable/v2/schema",
-            "header": {"version": "1.0"}, # NOTE: I hacked it from version 0.2 to 1.0 because it was complaining
+            "header": {"version": "0.2"}, # NOTE: I hacked it from version 0.2 to 1.0 because it was complaining
             "table": []
         }
 
