@@ -11,6 +11,10 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.utilities.general import print_exception
 import pycqed.measurement.hdf5_data as hd5
+from pycqed.qce_utils.analysis_factory.factory_transmon_arc_identifier import (
+    FluxArcIdentifier,
+    FluxArcIdentifierAnalysis,
+)
 from collections import OrderedDict
 from uncertainties import ufloat
 from scipy import signal
@@ -1136,6 +1140,17 @@ class Flux_arc_analysis(ba.BaseDataAnalysis):
             'qubit': self.qubit,
             'timestamp': self.timestamps[0]
         }
+        fig, ax = plt.subplots(figsize=(5, 4), dpi=100)
+        self.axs_dict[f'detailed_voltage_arc_trace'] = ax
+        self.figs[f'detailed_voltage_arc_trace'] = fig
+        self.plot_dicts['detailed_voltage_arc_trace'] = {
+            'plotfn': voltage_arc_plotfn_detailed,
+            'ax_id': 'detailed_voltage_arc_trace',
+            'amplitudes': self.proc_data_dict['Amps'],
+            'detunings': self.proc_data_dict['Freqs'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamps[0],
+        }
 
     def run_post_extract(self):
         self.prepare_plots()  # specify default plots
@@ -1162,6 +1177,27 @@ def Voltage_arc_plotfn(
     ax.set_xlabel('Output Voltage (V)')
     ax.set_title(f'{timestamp}\n{qubit} Voltage frequency arc')
     fig.tight_layout()
+
+
+def voltage_arc_plotfn_detailed(
+    amplitudes,
+    detunings,
+    qubit,
+    timestamp,
+    ax,
+    **kw,
+    ):
+    identifier = FluxArcIdentifier(
+        _amplitude_array=amplitudes,
+        _detuning_array=detunings,
+    )
+    fig = ax.get_figure()
+    fig, ax = FluxArcIdentifierAnalysis.plot_flux_arc_identifier(
+        identifier=identifier,
+        host_axes=(fig, ax),
+    )
+    ax.set_title(f'{timestamp}\n{qubit} Detailed voltage frequency arc')
+    return fig, ax
 
 
 class FluxArcSymmetryIntersectionAnalysis(ba.BaseDataAnalysis):
