@@ -7308,6 +7308,106 @@ class CCLight_Transmon(Qubit):
             fl_lutman.q_polycoeffs_freq_01_det(p_coefs)
         return a
 
+    def measure_flux_arc_dc(
+        self,
+        flux_bias_span: np.ndarray = np.linspace(-100e-6, 100e-6, 7),
+        flux_pulse_durations: np.ndarray = np.arange(40e-9, 60e-9, 1/2.4e9),
+        flux_pulse_amplitude: float = 0.4,
+        disable_metadata: bool = False,
+        prepare_for_timedomain: bool = True,
+    ):
+        """
+        Measures the DC flux arc by calibrating the polynomial coefficients for flux (voltage)
+        to frequency conversion. This is achieved by measuring cryoscope traces at different
+        flux pulse amplitudes and durations. The method ensures accurate frequency to flux conversion
+        essential for quantum experiments involving flux-tunable qubits.
+
+        Args:
+            flux_bias_span (np.ndarray):
+                Span of flux bias points around the original current setting. These points define
+                the range over which the flux arc is measured. Defaults to a linear space
+                between -100e-6 and 100e-6 with 7 points.
+            flux_pulse_durations (np.ndarray):
+                Array of flux pulse durations to be used for each cryoscope trace measurement.
+                Defines how long the flux pulse is applied during the measurement. Defaults to
+                an array ranging from 40e-9 to 60e-9 with steps inversely proportional to 2.4e9.
+            flux_pulse_amplitude (float):
+                The amplitude of the flux pulse applied during the cryoscope trace measurement.
+                Determines the strength of the flux pulse. Default value is 0.4.
+            disable_metadata (bool):
+                If set to True, disables the inclusion of metadata in the measurement snapshot.
+                Useful for repeated measurements where metadata redundancy is unnecessary.
+                Defaults to False.
+            prepare_for_timedomain (bool):
+                Determines whether the system should be prepared for time-domain measurements
+                before conducting the flux arc measurement. Defaults to True.
+
+        Returns:
+            If analyze is True, returns an analysis object containing results of the flux arc
+            symmetry and intersection analysis. Otherwise, returns the raw measurement response
+            from the nested measurement control.
+
+        Note:
+            This method assumes that the readout acquisition weight type is set to 'optimal'.
+            An assertion error is raised if the condition is not met.
+        """
+        assert self.ro_acq_weight_type() == 'optimal', "Expects transmon acquisition weight type to be 'optimal'"
+
+        # Get instruments
+        nested_MC = self.instr_nested_MC.get_instr()
+        _flux_lutman = self.instr_LutMan_Flux.get_instr()
+        _flux_instrument = self.instr_FluxCtrl.get_instr()
+        _flux_parameter = _flux_instrument[f'FBL_{self.name}']
+
+        original_current: float = self.fl_dc_I0()
+        flux_bias_array: np.ndarray = flux_bias_span + original_current
+
+        local_prepare = ManualParameter('local_prepare', initial_value=prepare_for_timedomain)
+        def wrapper():
+            a_positive = self.measure_flux_frequency_timedomain(
+                amplitude=+flux_pulse_amplitude,
+                times=flux_pulse_durations,
+                disable_metadata=True,
+                prepare_for_timedomain=local_prepare(),
+            )
+            local_prepare(False)  # Turn off prepare for followup measurements
+            a_negative = self.measure_flux_frequency_timedomain(
+                amplitude=-flux_pulse_amplitude,
+                times=flux_pulse_durations,
+                disable_metadata=True,
+                prepare_for_timedomain=False,
+            )
+            return {
+                'detuning_positive': a_positive.proc_data_dict['detuning'],
+                'detuning_negative': a_negative.proc_data_dict['detuning'],
+                'amplitude': flux_pulse_amplitude,
+            }
+        d = det.Function_Detector(
+            wrapper,
+            result_keys=['detuning_positive', 'detuning_negative'],
+            value_names=['detuning', 'detuning'],
+            value_units=['Hz', 'Hz'])
+
+        nested_MC.set_detector_function(d)
+        nested_MC.set_sweep_function(_flux_parameter)
+        nested_MC.set_sweep_points(np.atleast_1d(flux_bias_array))
+
+        label = f'voltage_to_frequency_dc_flux_arc_{self.name}'
+        try:
+            response = nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
+        except Exception as e:
+            log.warn(e)
+        finally:
+            _flux_parameter(original_current)
+        if analyze:
+            a = ma2.cv2.FluxArcSymmetryIntersectionAnalysis(
+                initial_bias=original_current,
+                label=label,
+            )
+            a.run_analysis()
+            return a
+        return response
+
     ###########################################################################
     # Dep graph check functions
     ###########################################################################
