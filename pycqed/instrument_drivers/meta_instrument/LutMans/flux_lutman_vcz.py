@@ -132,6 +132,36 @@ class Base_Flux_LutMan(Base_LutMan):
 
 
 class HDAWG_Flux_LutMan(Base_Flux_LutMan):
+    
+    # region Class Properties
+    @property
+    def total_length(self) -> int:
+        """:return: Total number of sample points dedicated to waveform."""
+        return self.total_park_length + self.total_pad_length
+
+    @property
+    def total_park_length(self) -> int:
+        """:return: Total number of sample points dedicated to parking."""
+        return int(np.round(self.sampling_rate() * self.park_length()))
+
+    @property
+    def total_pad_length(self) -> int:
+        """:return: Total number of sample points dedicated to waveform padding."""
+        return int(np.round(self.sampling_rate() * self.park_pad_length() * 2))
+
+    @property
+    def first_pad_length(self) -> int:
+        """:return: Number of sample points in first pad-'arm' of two-sided parking."""
+        equal_split: int = int(np.round(self.sampling_rate() * self.park_pad_length()))
+        minimum_padding: int = 1
+        return max(min(equal_split + self.park_pad_symmetry_offset(), self.total_pad_length - minimum_padding), minimum_padding)
+
+    @property
+    def second_pad_length(self) -> int:
+        """:return: Number of sample points in second pad-'arm' of two-sided parking."""
+        return self.total_pad_length - self.first_pad_length
+    # endregion
+    
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
@@ -195,15 +225,28 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def _gen_park(self):
         zeros = np.zeros(int(self.park_pad_length() * self.sampling_rate()))
+        # Padding
+        first_zeros: np.ndarray = np.zeros(shape=self.first_pad_length)
+        second_zeros: np.ndarray = np.zeros(shape=self.second_pad_length)
+        
         if self.park_double_sided():
             ones = np.ones(int(self.park_length() * self.sampling_rate() / 2))
             pulse_pos = self.park_amp() * ones
-            return np.concatenate((zeros, pulse_pos, - pulse_pos, zeros))
+            return np.concatenate((
+                first_zeros, 
+                +1 * pulse_pos,
+                -1 * pulse_pos,
+                second_zeros,
+            ))
         else:
             pulse_pos = self.park_amp() * np.ones(
                 int(self.park_length() * self.sampling_rate())
             )
-            return np.concatenate((zeros, pulse_pos, zeros))
+            return np.concatenate((
+                first_zeros,
+                pulse_pos,
+                second_zeros,
+            ))
 
     def _add_qubit_parameters(self):
         """
@@ -316,6 +359,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             label="Parking pulse padding duration (single-sided)",
             initial_value=0,
             vals=vals.Numbers(0, 100e-6),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "park_pad_symmetry_offset",
+            unit="samples",
+            label="Parking pulse padding samling point offset.\
+                Applies offset to sampling points in initial padding (additive) and final padding (subtractive).\
+                The offset is bounded such that the padding is minimal 1# and maximal total_padding - 1#.",
+            initial_value=0,
+            vals=vals.Numbers(-100, 100),
             parameter_class=ManualParameter,
         )
         self.add_parameter(
