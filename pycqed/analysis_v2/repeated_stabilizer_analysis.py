@@ -31,6 +31,9 @@ from qce_interp import (
     LabeledSyndromeDecoder,
     StateAcquisitionContainer,
 )
+from qce_interp.interface_definitions.intrf_error_identifier import (
+    DataArrayLabels,
+)
 from qce_interp.visualization import (
     plot_state_classification,
     plot_defect_rate,
@@ -42,6 +45,90 @@ from qce_interp.visualization.plotting_functionality import (
     IFigureAxesPair,
 )
 import matplotlib.pyplot as plt
+import itertools
+import numpy as np
+from qce_interp.visualization.plotting_functionality import (
+    construct_subplot,
+    IFigureAxesPair,
+    LabelFormat,
+    AxesFormat,
+    SubplotKeywordEnum,
+)
+
+
+# Define a blue color cycler
+blue_shades = [
+    '#1f77b4',  # matplotlib default blue
+    '#add8e6',  # light blue
+    '#0000ff',  # blue
+    '#00008b',  # dark blue
+    '#4169e1',  # royal blue
+    '#00bfff',  # deep sky blue
+    '#87ceeb'   # sky blue
+]
+
+
+def plot_defect_rate(error_identifier: IErrorDetectionIdentifier, qubit_id: IQubitID, qec_cycles: int, **kwargs) -> IFigureAxesPair:
+    """
+    :param error_identifier: Instance that identifiers errors.
+    :param qubit_id: Qubit identifier for which the defects are plotted.
+    :param qec_cycles: Integer number of qec cycles that should be included in the defect plot.
+    :param kwargs: Key-word arguments that are passed to plt.subplots() method.
+    :return: Tuple of Figure and Axes pair.
+    """
+    # Data allocation
+    labeled_error_identifier: LabeledErrorDetectionIdentifier = LabeledErrorDetectionIdentifier(error_identifier)
+    data_array: xr.DataArray = labeled_error_identifier.get_labeled_defect_stabilizer_lookup(cycle_stabilizer_count=qec_cycles)[qubit_id]
+    # Calculate the mean across 'measurement_repetition'
+    averages = data_array.mean(dim=DataArrayLabels.MEASUREMENT.value)
+    label: str = qubit_id.id
+    color: str = kwargs.pop('color', blue_shades[0])
+
+    # Plotting
+    label_format: LabelFormat = LabelFormat(
+        x_label='QEC round',
+        y_label=r'Defect rate $\langle d_i \rangle$',
+    )
+    kwargs[SubplotKeywordEnum.LABEL_FORMAT.value] = label_format
+    fig, ax = construct_subplot(**kwargs)
+    # averages.plot.line('.-', color=color, ax=ax, label=label)
+    x_array: np.ndarray = np.arange(1, len(averages.values) + 1)
+    y_array: np.ndarray = averages.values
+    ax.plot(
+        x_array[1:],
+        y_array[1:],
+        '.-',
+        color=color,
+        label=label,
+    )
+    ax = label_format.apply_to_axes(axes=ax)
+
+    ax.set_ylim([0.0, 0.5])
+    ax.set_xlim([0.5, max(x_array) + 0.5])
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    return fig, ax
+
+
+def plot_all_defect_rate(error_identifier: IErrorDetectionIdentifier, included_rounds: int, **kwargs) -> IFigureAxesPair:
+    """
+    :param error_identifier: Instance that identifiers errors.
+    :param included_rounds: Integer number of qec cycles that should be included in the defect plot.
+    :param kwargs: Key-word arguments that are passed to plt.subplots() method.
+    :return: Tuple of Figure and Axes pair.
+    """
+    # Data allocation
+    fig, ax = construct_subplot(**kwargs)
+    color_cycle = itertools.cycle(blue_shades)
+    for qubit_id in error_identifier.involved_stabilizer_qubit_ids:
+        kwargs[SubplotKeywordEnum.HOST_AXES.value] = (fig, ax)
+        kwargs['color'] = next(color_cycle)
+        fig, ax = plot_defect_rate(
+            error_identifier,
+            qubit_id,
+            qec_cycles=included_rounds,
+            **kwargs,
+        )
+    return fig, ax
 
 
 class RepeatedStabilizerAnalysis(BaseDataAnalysis):
@@ -114,6 +201,7 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
         # Data allocation
         self.axs_dict = {}
         self.plot_dicts = {}
+        timestamp: str = self.timestamp
         
         # Pij matrix
         title: str = 'pij_matrix'
@@ -123,7 +211,8 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
         self.plot_dicts[title] = {
             'plotfn': plot_function_wrapper(plot_pij_matrix),
             'error_identifier': self.labeled_error_identifier,
-            'included_rounds': self.data_manager.rounds,
+            'included_rounds': self.data_manager.qec_rounds,
+            'timestamp': timestamp,
         }
         # Defect rates (individual)
         for qubit_id in self.involved_ancilla_qubit_ids:
@@ -135,7 +224,8 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
                 'plotfn': plot_function_wrapper(plot_defect_rate),
                 'error_identifier': self.labeled_error_identifier,
                 'qubit_id': qubit_id,
-                'qec_cycles': self.data_manager.rounds[-1],
+                'qec_cycles': self.data_manager.qec_rounds[-1],
+                'timestamp': timestamp,
             }
         # Defect rates (all)
         title: str = 'all_defect_rates'
@@ -145,7 +235,8 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
         self.plot_dicts[title] = {
             'plotfn': plot_function_wrapper(plot_all_defect_rate),
             'error_identifier': self.labeled_error_identifier,
-            'included_rounds': self.data_manager.rounds[-1],
+            'included_rounds': self.data_manager.qec_rounds[-1],
+            'timestamp': timestamp,
         }
         # IQ readout (individual)
         for qubit_id in self.involved_qubit_ids:
@@ -156,6 +247,7 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
             self.plot_dicts[title] = {
                 'plotfn': plot_function_wrapper(plot_state_classification),
                 'state_classifier': self.data_manager.get_state_acquisition(qubit_id=qubit_id),
+                'timestamp': timestamp,
             }
     
     def run_post_extract(self):
@@ -193,7 +285,11 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
 def plot_function_wrapper(plot_function: Callable[[Any], Any]) -> Callable[[Optional[plt.Axes], Any], Any]:
     
     def method(ax: Optional[plt.Axes] = None, *args, **kwargs) -> IFigureAxesPair:
+        # Data allocation
+        timestamp: str = kwargs.pop("timestamp", "not defined")
         fig = ax.get_figure()
+        fig.suptitle(f'ts: {timestamp}\n')
+        
         kwargs[SubplotKeywordEnum.HOST_AXES.value] = (fig, ax)
         return plot_function(
             *args,
@@ -212,13 +308,18 @@ if __name__ == "__main__":
     )
     
     analysis = RepeatedStabilizerAnalysis(
-        involved_qubit_names=["D5", "Z4", "D6", "Z2", "D3"],
-        qec_cycles=list(range(1, 11, 1)),
+        involved_qubit_names=["D7", "Z3", "D4", "Z1", "D5", "Z4", "D6", "Z2", "D3", "X2", "D2", "X1", "D1"],
+        qec_cycles=[i for i in range(0, 25, 1)],
         initial_state=InitialStateContainer.from_ordered_list([
+            InitialStateEnum.ZERO,
+            InitialStateEnum.ONE,
+            InitialStateEnum.ZERO,
+            InitialStateEnum.ONE,
             InitialStateEnum.ZERO,
             InitialStateEnum.ONE,
             InitialStateEnum.ZERO,
         ]),
         label="Repeated_stab_meas",
     )
+    print(analysis.get_timestamps())
     analysis.run_analysis()
