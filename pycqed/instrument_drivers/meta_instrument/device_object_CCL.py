@@ -1565,18 +1565,21 @@ class DeviceCCL(Instrument):
 
         original_current: float = qubit_high_instrument.fl_dc_I0()
         if flux_array is None:
-            flux_array = np.linspace(-40e-6, 40e-6, flux_sample_points) + original_current
+            flux_array = np.linspace(-30e-6, 30e-6, flux_sample_points) + original_current
 
         local_prepare = ManualParameter('local_prepare', initial_value=prepare_for_timedomain)
+        local_metadata = ManualParameter('local_metadata', initial_value=disable_metadata)
         def wrapper():
             a = self.measure_conditional_oscillation_multi(
                 pairs=[[qubit_high, qubit_low]],
                 parked_qbs=parked_qubits,
-                disable_metadata=disable_metadata,
+                disable_metadata=local_metadata(),
                 prepare_for_timedomain=local_prepare(),
                 extract_only=True,
             )
-            local_prepare(False)  # Turn off prepare for followup measurements
+            # Turn off prepare and metadata for followup measurements
+            local_prepare(False)
+            local_metadata(False)
             return {
                 'pair_1_delta_phi_a': a['pair_1_delta_phi_a'],
                 'pair_1_missing_frac_a': a['pair_1_missing_frac_a'],
