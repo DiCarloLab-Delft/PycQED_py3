@@ -4168,10 +4168,9 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             update=False,
-            flip_ef=False,
             ax='x',
             angle='180',
-            label=''):
+            disable_metadata = False):
         """
         Measurement for fine-tuning of the pi and pi/2 pulse amplitudes. Executes sequence
         pi (repeated N-times) - pi/2 - measure
@@ -4192,7 +4191,7 @@ class HAL_Transmon(HAL_ShimSQ):
             ax (str {'x', 'y'}):
                 axis arour which the pi pulses are to be performed. Possible values 'x' or 'y'
 
-            angle (str {'90', '180'}):r
+            angle (str {'90', '180'}):
                 specifies whether to apply pi or pi/2 pulses. Possible values: '180' or '90'
 
             update (bool):
@@ -4205,69 +4204,80 @@ class HAL_Transmon(HAL_ShimSQ):
             MC = self.instr_MC.get_instr()
 
         # allow flipping only with pi/2 or pi, and x or y pulses
-        assert angle in ['90','180']
+        assert angle in ['90', '180']
         assert ax.lower() in ['x', 'y']
 
         # append the calibration points, times are for location in plot
         nf = np.array(number_of_flips)
         dn = nf[1] - nf[0]
         nf = np.concatenate([nf,
-                                (nf[-1]+1*dn,
-                                nf[-1]+2*dn,
-                                nf[-1]+3*dn,
-                                nf[-1]+4*dn) ])
+                             (nf[-1] + 1 * dn,
+                              nf[-1] + 2 * dn,
+                              nf[-1] + 3 * dn,
+                              nf[-1] + 4 * dn)])
 
         self.prepare_for_timedomain()
-        p = sqo.flipping(number_of_flips=nf, equator=equator,flip_ef=flip_ef,
-                         qubit_idx=self.cfg_qubit_nr(),
-                         platf_cfg=self.cfg_openql_platform_fn(),
-                         ax=ax.lower(), angle=angle)
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             unit='#',
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+
+        p = sqo.flipping(
+            number_of_flips=nf,
+            equator=equator,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn(),
+            ax=ax.lower(),
+            angle=angle
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            unit='#',
+            CCL=self.instr_CC.get_instr()
+        )
         MC.set_sweep_function(s)
         MC.set_sweep_points(nf)
+        d = self.int_avg_det
         MC.set_detector_function(d)
-        if flip_ef:
-            label = 'ef_rx12'
-        MC.run('flipping_'+ax+angle+label+self.msmt_suffix)
+        MC.run('flipping_' + ax + angle + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
+
         if analyze:
-            a = ma2.FlippingAnalysis(
-                options_dict={'scan_label': 'flipping'})
+            a = ma2.FlippingAnalysis(options_dict={'scan_label': 'flipping'})
 
-        if update:
-            # choose scale factor based on simple goodness-of-fit comparison
-            # This method gives priority to the line fit: 
-            # the cos fit will only be chosen if its chi^2 relative to the 
-            # chi^2 of the line fit is at least 10% smaller 
-            if (a.fit_res['line_fit'].chisqr - a.fit_res['cos_fit'].chisqr)/a.fit_res['line_fit'].chisqr \
-                    > 0.1:
-                scale_factor = a._get_scale_factor_cos()
-            else:
-                scale_factor = a._get_scale_factor_line()
+            if update:
+                # choose scale factor based on simple goodness-of-fit comparison
+                # This method gives priority to the line fit:
+                # the cos fit will only be chosen if its chi^2 relative to the
+                # chi^2 of the line fit is at least 10% smaller
+                scale_factor = a.get_scale_factor()
 
-            if abs(scale_factor-1) < 1e-3:
-                print('Pulse amplitude accurate within 0.1%. Amplitude not updated.')
-                return a
+                # for debugging purposes
+                print(scale_factor)
 
-            if angle == '180':
-                if self.cfg_with_vsm():
-                    amp_old = self.mw_vsm_G_amp()
-                    self.mw_vsm_G_amp(scale_factor*amp_old)
-                else:
-                    amp_old = self.mw_channel_amp()
-                    self.mw_channel_amp(scale_factor*amp_old)
-            elif angle == '90':
-                amp_old = self.mw_amp90_scale()
-                self.mw_amp90_scale(scale_factor*amp_old)
+                if abs(scale_factor - 1) < 0.2e-3:
+                    print('Pulse amplitude accurate within 0.02%. Amplitude not updated.')
+                    return a
 
-            print('Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
-                ax, angle, amp_old, scale_factor*amp_old))
+                if angle == '180':
+                    if self.cfg_with_vsm():
+                        amp_old = self.mw_vsm_G_amp()
+                        self.mw_vsm_G_amp(scale_factor * amp_old)
+                    else:
+                        amp_old = self.mw_channel_amp()
+                        self.mw_channel_amp(scale_factor * amp_old)
+                elif angle == '90':
+                    amp_old = self.mw_amp90_scale()
+                    self.mw_amp90_scale(scale_factor * amp_old)
+
+                print('Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
+                    ax, angle, amp_old, scale_factor * amp_old))
 
         return a
 
-    def flipping_GBT(self, nr_sequence: int = 7):  # FIXME: prefix with "measure_"
+    def flipping_GBT(
+            self, 
+            nr_sequence: int = 7,                # max number of flipping iterations
+            number_of_flips=np.arange(0, 31, 2), # specifies the number of pi pulses at each step
+            eps=0.0005,
+            disable_metadata = False):                           # specifies the GBT threshold
+        # FIXME: prefix with "measure_"
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -4277,10 +4287,32 @@ class HAL_Transmon(HAL_ShimSQ):
         Right now this method will always return true no matter what
         Later we can add a condition as a check.
         '''
+
+        ###############################################
+        ###############################################
+        # Monitor key temperatures of interest
+        # ADDED BY LDC.  THIS IS A KLUGE!
+        # CAREFUL, thsi is Quantum-Inspire specific!!!
+        # thisTWPA1=self.find_instrument('TWPA_pump_1')
+        # thisTWPA2=self.find_instrument('TWPA_pump_2')
+        # #thisVSM=self.find_instrument('VSM')
+        # TempTWPA1=thisTWPA1.temperature()
+        # TempTWPA2=thisTWPA2.temperature()
+        #TempVSM=thisVSM.temperature_avg()
+        # for diagnostics only
+        # print('Key temperatures (degC):')
+        # print('='*35)
+        # print(f'TWPA_Pump_1:\t{float(TempTWPA1):0.2f}')
+        # print(f'TWPA_Pump_2:\t{float(TempTWPA2):0.2f}')
+        # #print(f'VSM:\t\t{float(TempVSM):0.2f}')
+        # print('='*35)
+        ###############################################
+        ###############################################
+
         for i in range(nr_sequence):
-            a = self.measure_flipping(update=True)
-            scale_factor = a._get_scale_factor_line()
-            if abs(1 - scale_factor) <= 0.0005:
+            a = self.measure_flipping(update=True, number_of_flips=number_of_flips, disable_metadata = disable_metadata)
+            scale_factor = a.get_scale_factor()
+            if abs(1 - scale_factor) <= eps:
                 return True
         else:
             return False
