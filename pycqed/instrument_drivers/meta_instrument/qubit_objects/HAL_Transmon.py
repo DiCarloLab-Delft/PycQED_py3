@@ -2712,8 +2712,6 @@ class HAL_Transmon(HAL_ShimSQ):
         # This snippet causes 0.08 s of overhead but is dangerous to bypass
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
-            nr_flux_dance=nr_flux_dance,
-            wait_time=wait_time,
             initialize=post_select,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
@@ -6248,8 +6246,8 @@ class HAL_Transmon(HAL_ShimSQ):
             prepare_for_timedomain: bool = True,
             ignore_f_cal_pts: bool = False,
             compile_only: bool = False,
-            rb_tasks=None
-    ):
+            rb_tasks=None,
+            disable_metadata = False):
         # USED_BY: inspire_dependency_graph.py,
         """
         Measures randomized benchmarking decay including second excited state
@@ -6368,18 +6366,19 @@ class HAL_Transmon(HAL_ShimSQ):
         d.prepare_function_kwargs = prepare_function_kwargs
         d.nr_shots = reps_per_seed * len(sweep_points)
         MC.set_detector_function(d)
-        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points})
+        MC.run('RB_{}seeds'.format(nr_seeds) + self.msmt_suffix, exp_metadata={'bins': sweep_points},
+                disable_snapshot_metadata = disable_metadata)
 
         a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
             label='RB_',
             rates_I_quad_ch_idx=0,
             cal_pnts_in_dset=np.repeat(["0", "1", "2"], 2)
         )
-
+        
         for key in a.proc_data_dict['quantities_of_interest'].keys():
             if 'eps_simple_lin_trans' in key:
                 self.F_RB((1-a.proc_data_dict['quantities_of_interest'][key].n)**(1/1.875))
-
+        
         return True
 
 
@@ -6468,8 +6467,7 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True
-    ):
+            prepare_for_timedomain=True):
         """
         Measures a rabi oscillation of the ef/12 transition.
 
@@ -6489,7 +6487,8 @@ class HAL_Transmon(HAL_ShimSQ):
         p = sqo.ef_rabi_seq(
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
-            platf_cfg=self.cfg_openql_platform_fn()
+            platf_cfg=self.cfg_openql_platform_fn(),
+            add_cal_points=False
         )
 
         s = swf.OpenQL_Sweep(

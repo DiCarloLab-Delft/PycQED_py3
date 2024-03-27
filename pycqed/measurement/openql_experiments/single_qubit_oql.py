@@ -2055,7 +2055,8 @@ def ef_rabi_seq(
     # These angles correspond to special pi/2 pulses in the lutman
     for i, amp in enumerate(amps):
         # cw_idx corresponds to special hardcoded pulses in the lutman
-        cw_idx = i + 9
+        StartIndex=32 # from 9, LDC, 2022/10/23
+        cw_idx = StartIndex+i
 
         k = p.create_kernel("ef_A{}_{}".format(int(abs(1000*amp)),i))
         k.prepz(q0)
