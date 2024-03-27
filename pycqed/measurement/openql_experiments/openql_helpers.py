@@ -93,7 +93,7 @@ class OqlProgram:
 
         # determine architecture and extension of generated file
         if eqasm_compiler == 'cc_light_compiler':
-            # NB: OpenQL>=0.9.0 no longer has a backend for CC-light
+            # NB: OpenQL no longer has a backend for CC-light
             self._arch = 'CCL'
             self._ext = '.qisa'  # CC-light, QCC
         else:
@@ -104,9 +104,6 @@ class OqlProgram:
         # NB: for cQasm, the actual name is determined by 'pragma @ql.name' in the source, not by self.name,
         # so users must maintain consistency
         self.filename = join(OqlProgram.output_dir, self.name + self._ext)
-
-        # map file for OpenQL>=0.10.3
-        self._map_filename = join(OqlProgram.output_dir, self.name + ".map")
 
 
     def add_kernel(self, k: ql.Kernel) -> None:
@@ -184,23 +181,6 @@ class OqlProgram:
 
         c = self._configure_compiler(src_filename, extra_pass_options)
         c.compile_with_frontend(self.platform)
-
-
-    def get_map(self) -> dict:
-        """
-        get map data produced by OpenQL>=0.10.3
-        """
-
-        return json.load(self._map_filename)
-
-
-    def get_measurement_map(self) -> dict:
-        """
-        get measurements from map data produced by OpenQL>=0.10.3
-        """
-
-        data = self.get_map()
-        return data["measurements"]
 
 
     # NB: used in clifford_rb_oql.py to skip both generation of RB sequences, and OpenQL compilation if
@@ -436,9 +416,10 @@ class OqlProgram:
                 k.gate('rx180', [q0])
             elif comb[0] == '2':
                 k.gate('rx180', [q0])
-                # FIXME: this is a workaround
-                # k.gate('rx12', [q0])
-                k.gate('cw_31', [q0])
+                # LDC 2022/10/23
+                k.gate('rx12', [q0])
+                # original
+                #k.gate('cw_31', [q0])
 
             if comb[1] == '0':
                 k.gate('i', [q1])
@@ -446,9 +427,10 @@ class OqlProgram:
                 k.gate('rx180', [q1])
             elif comb[1] == '2':
                 k.gate('rx180', [q1])
-                # FIXME: this is a workaround
-                # k.gate('rx12', [q1])
-                k.gate('cw_31', [q1])
+                # LDC 2022/10/23
+                k.gate('rx12', [q1])
+                # original
+                # k.gate('cw_31', [q1])
 
             # Used to ensure timing is aligned
             k.gate('wait', measured_qubits, 0)
@@ -464,7 +446,7 @@ class OqlProgram:
             qubits: List[int],
             combinations: List[str] = ["00", "01", "10", "11"],
             reps_per_cal_pnt: int = 1,
-            f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
+            f_state_cal_pt_cw: int = 1,  # 1 is the one listed as rX12 in `mw_lutman`
             nr_flux_dance: int = None,
             flux_cw_list: List[str] = None
     ) -> None:
@@ -607,9 +589,10 @@ class OqlProgram:
                 k.gate('rx180', [q0])
             elif comb[0] == '2':
                 k.gate('rx180', [q0])
-                # FIXME: this is a workaround
-                # k.gate('rx12', [q0])
-                k.gate('cw_31', [q0])
+                # LDC 2022/10/23
+                k.gate('rx12', [q0])
+                # original
+                #k.gate('cw_31', [q0])
 
             if comb[1] == '0':
                 k.gate('i', [q1])
@@ -617,9 +600,10 @@ class OqlProgram:
                 k.gate('rx180', [q1])
             elif comb[1] == '2':
                 k.gate('rx180', [q1])
-                # FIXME: this is a workaround
-                # k.gate('rx12', [q1])
-                k.gate('cw_31', [q1])
+                # LDC 2022/10/23
+                k.gate('rx12', [q1])
+                # original
+                #k.gate('cw_31', [q1])
             if comb[0] == 'P' and comb[-1] == '0':
                 k.gate('i', [q2])
             elif comb[0] == 'P' and comb[-1] == '1':
@@ -633,7 +617,7 @@ class OqlProgram:
             self.add_kernel(k)
 
 
-    #############################################################################
+#############################################################################
     # Private functions
     #############################################################################
 
@@ -666,16 +650,7 @@ class OqlProgram:
             )
 
             # decomposer for legacy decompositions (those defined in the "gate_decomposition" section)
-            # FIXME: comment incorrect, also decomposes new-style definitions
             # see https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
-            c.append_pass(
-                'dec.Instructions',
-                # NB: don't change the name 'legacy', see:
-                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#instruction-decomposer
-                # - https://openql.readthedocs.io/en/latest/gen/reference_passes.html#predicate-key
-                'legacy',
-            )
-        else:  # FIXME: experimental. Also decompose API input to allow use of new style decompositions
             c.append_pass(
                 'dec.Instructions',
                 # NB: don't change the name 'legacy', see:

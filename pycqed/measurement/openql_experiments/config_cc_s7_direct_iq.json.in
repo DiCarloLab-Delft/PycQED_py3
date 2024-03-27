@@ -318,7 +318,7 @@
             "cc_light_instr": "xm90",
             "cc": {
                 "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [4]
+                "static_codeword_override": [12]
             }
         },
         "rym90": {

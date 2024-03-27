@@ -1,22 +1,22 @@
 import logging
 import numpy as np
-from deprecated import deprecated
+from pycqed.measurement.randomized_benchmarking.clifford_group import (
+    clifford_lookuptable,
+)
+import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 
-from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_lookuptable
-from pycqed.measurement.randomized_benchmarking.clifford_decompositions import gate_decomposition
-from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group import Clifford, SingleQubitClifford, TwoQubitClifford
+from pycqed.measurement.randomized_benchmarking.clifford_decompositions import (
+    gate_decomposition,
+)
 
 
-def calculate_net_clifford(
-        rb_clifford_indices: np.ndarray,
-        Cliff:Clifford = SingleQubitClifford
-) -> Clifford:
+def calculate_net_clifford(rb_clifford_indices, Clifford=tqc.SingleQubitClifford):
     """
     Calculate the net-clifford from a list of cliffords indices.
 
     Args:
         rb_clifford_indices: list or array of integers specifying the cliffords.
-        Cliff : Clifford object used to determine what
+        Clifford : Clifford object used to determine what
             inversion technique to use and what indices are valid.
             Valid choices are `SingleQubitClifford` and `TwoQubitClifford`
 
@@ -29,7 +29,7 @@ def calculate_net_clifford(
     """
 
     # Calculate the net clifford
-    net_clifford = Cliff(0)  # assumes element 0 is the Identity
+    net_clifford = Clifford(0)  # assumes element 0 is the Identity
     for idx in rb_clifford_indices:
         # [2020-07-03 Victor] the `abs` below was to remove the sign that was
         # used to treat CZ as CZ and not the member of CNOT-like set of gates
@@ -52,16 +52,13 @@ def calculate_net_clifford(
         # clifford + 100000, this is to keep it readable and bigger than the
         # 11520 elements of the Two-qubit Clifford group C2
         # corresponding clifford
-        cliff = Cliff(idx % 100_000)
-
+        cliff = Clifford(idx % 100_000)
         # order of operators applied in is right to left, therefore
         # the new operator is applied on the left side.
         net_clifford = cliff * net_clifford
-
     return net_clifford
 
 
-# FIXME: deprecate along with randomized_benchmarking_sequence_old()
 def calculate_recovery_clifford(cl_in, desired_cl=0):
     """
     Extracts the clifford that has to be applied to cl_in to make the net
@@ -73,7 +70,6 @@ def calculate_recovery_clifford(cl_in, desired_cl=0):
     return row.index(desired_cl)
 
 
-@deprecated(version='0.4', reason='not used within pyqed')
 def decompose_clifford_seq(clifford_sequence, gate_decomposition=gate_decomposition):
     decomposed_seq = []
     for cl in clifford_sequence:
@@ -81,7 +77,6 @@ def decompose_clifford_seq(clifford_sequence, gate_decomposition=gate_decomposit
     return decomposed_seq
 
 
-@deprecated(version='0.4', reason='not used within pyqed')
 def convert_clifford_sequence_to_tape(
     clifford_sequence, lutmapping, gate_decomposition=gate_decomposition
 ):
@@ -103,7 +98,6 @@ def convert_clifford_sequence_to_tape(
     return tape
 
 
-# FIXME: deprecate, also including calculate_recovery_clifford() and clifford_lookuptable
 def randomized_benchmarking_sequence_old(
     n_cl: int, desired_net_cl: int = 0, seed: int = None
 ):
@@ -123,7 +117,7 @@ def randomized_benchmarking_sequence_old(
     the desired_net_cl to "3" (corresponds to Pauli X).
     """
     logging.warning(
-        "deprecation warning, only exists for testing equivalence to new function."
+        "deprecation warning, only exists for testing " "equivalence to new function."
     )
 
     if seed is None:
@@ -146,6 +140,7 @@ def randomized_benchmarking_sequence_old(
 # More advanced sequences are available using this method.
 ##############################################################################
 
+
 def randomized_benchmarking_sequence(
     n_cl: int,
     desired_net_cl: int = 0,
@@ -153,7 +148,7 @@ def randomized_benchmarking_sequence(
     max_clifford_idx: int = 11520,
     interleaving_cl: int = None,
     seed: int = None,
-) -> np.ndarray:
+):
     """
     Generates a randomized benchmarking sequence for the one or two qubit
     clifford group.
@@ -185,15 +180,16 @@ def randomized_benchmarking_sequence(
     """
 
     if number_of_qubits == 1:
-        Cl = SingleQubitClifford
+        Cl = tqc.SingleQubitClifford
         group_size = np.min([24, max_clifford_idx])
     elif number_of_qubits == 2:
-        Cl = TwoQubitClifford
+        Cl = tqc.TwoQubitClifford
         group_size = np.min([11520, max_clifford_idx])
     else:
         raise NotImplementedError()
 
     # Generate a random sequence of Cliffords
+
     # Even if no seed is provided make sure we pick a new state such that
     # it is safe to run generate and compile the random sequences in
     # parallel using multiprocess
