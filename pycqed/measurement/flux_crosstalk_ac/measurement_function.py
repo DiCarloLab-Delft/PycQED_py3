@@ -21,6 +21,7 @@ from pycqed.measurement.flux_crosstalk_ac.schedule import (
     schedule_flux_crosstalk,
     schedule_ramsey,
 )
+import pycqed.instrument_drivers.meta_instrument.Surface17_dependency_graph as S17GBT
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 from pycqed.analysis_v2.base_analysis import BaseDataAnalysis
 import pycqed.measurement.hdf5_data as hd5
@@ -196,41 +197,64 @@ def decorator_pyplot_dataset(dataset_key: str, array_dimensions: int, show_figur
     return decorator
 
 
-@decorator_run_analysis(
-    analysis_class=FluxCrosstalkAnalysis,
-    filter_label='FluxCrosstalk',
-)
-def measure_ac_flux_crosstalk(device: Device, qubit_echo_id: str, prepare_for_timedomain: bool = False, disable_metadata: bool = False):
+# @decorator_run_analysis(
+#     analysis_class=FluxCrosstalkAnalysis,
+#     filter_label='FluxCrosstalk',
+# )
+def measure_ac_flux_crosstalk(device: Device, qubit_echo_id: str, qubit_target_id: str, prepare_for_timedomain: bool = False, disable_metadata: bool = True):
     """
     Performs an experiment
     """
     # Data allocation
     qubit_echo: Transmon = device.find_instrument(qubit_echo_id)
-    flux_lutman: FluxLutMan = qubit_echo.instr_LutMan_Flux.get_instr()
-    max_duration_ns: int = 10  # [ns]
-    flux_pulse_duration: np.ndarray = np.arange(0e-9, max_duration_ns * 1e-9, 1/2.4e9)
+    qubit_target: Transmon = device.find_instrument(qubit_target_id)
+    flux_lutman_echo: FluxLutMan = qubit_echo.instr_LutMan_Flux.get_instr()
+    flux_lutman_target: FluxLutMan = qubit_target.instr_LutMan_Flux.get_instr()
+    
+    # Sweep parameters
+    target_amplitudes: np.ndarray = np.linspace(-0.5, 0.5, 7)
+    flux_pulse_duration: int = 60 + 20 # [ns]
+    echo_detuning: np.ndarray = np.linspace(20e6, 100e6, 7)
+    echo_amplitudes: np.ndarray = S17GBT.get_DAC_amp_frequency(echo_detuning, flux_lutman_echo, negative_amp=False)
+    # echo_amplitude_channel: float = S17GBT.get_Ch_amp_frequency(max(abs(echo_detuning)), flux_lutman_echo, DAC_param='sq_amp')
+    print('echo detuning: ', echo_detuning)
+    print('echo amplitudes: ', echo_amplitudes)
+    
+    # Update lutmans
+    flux_lutman_echo.sq_length((flux_pulse_duration - 20) * 1e-9)
+    flux_lutman_target.sq_length((flux_pulse_duration - 20) * 1e-9)
+    flux_lutman_echo.load_waveform_onto_AWG_lookuptable("sq_length", regenerate_waveforms=True)
+    flux_lutman_target.load_waveform_onto_AWG_lookuptable("sq_length", regenerate_waveforms=True)
+
     # flux_pulse_amplitude: np.ndarray = np.asarray([flux_lutman.sq_amp()])
     flux_cw = "sf_square"
     meas_control: MeasurementControl = device.instr_MC.get_instr()
-    meas_control_nested: MeasurementControl = device.instr_nested_MC.get_instr()
     central_control: CentralControl = device.instr_CC.get_instr()
 
     # Prepare for time-domain if requested
     if prepare_for_timedomain:
-        device.prepare_for_timedomain(qubits=[qubit_echo_id])
+        device.prepare_for_timedomain(qubits=[qubit_echo_id, qubit_target_id])
 
     schedule: OqlProgram = schedule_flux_crosstalk(
         qubit_echo_index=qubit_echo.cfg_qubit_nr(),
+        qubit_target_index=qubit_target.cfg_qubit_nr(),
         flux_pulse_cw=flux_cw,  # Square pulse?
         platf_cfg=device.cfg_openql_platform_fn(),
-        half_echo_delay_ns=max_duration_ns,  # [ns]
+        half_echo_delay_ns=flux_pulse_duration,  # [ns]
     )
-    sweep_function: FluxSweepFunctionObject = FluxSweepFunctionObject(
-        flux_lutman,
-        flux_lutman.sq_length,  # Square length (qcodes) parameter
-        amp_for_generation=0.0,
+    sweep_function_echo: FluxSweepFunctionObject = FluxSweepFunctionObject(
+        flux_lutman_echo,
+        flux_lutman_echo.sq_amp,  # Square length (qcodes) parameter
+        amp_for_generation=None,
         waveform_name="square",  # Meaning we are going to sweep the square-pulse parameters only
     )
+    sweep_function_target: FluxSweepFunctionObject = FluxSweepFunctionObject(
+        flux_lutman_target,
+        flux_lutman_target.sq_amp,  # Square length (qcodes) parameter
+        amp_for_generation=None,
+        waveform_name="square",  # Meaning we are going to sweep the square-pulse parameters only
+    )
+    
     # flux_pulse_duration = np.concatenate([flux_pulse_duration, np.zeros(shape=4)])  # Include calibration points
     central_control.eqasm_program(schedule.filename)
     central_control.start()
@@ -241,10 +265,20 @@ def measure_ac_flux_crosstalk(device: Device, qubit_echo_id: str, prepare_for_ti
         always_prepare=True,
     )
 
-    meas_control.set_sweep_function(sweep_function)
-    meas_control.set_sweep_points(flux_pulse_duration)
+    meas_control.set_sweep_functions([sweep_function_echo, sweep_function_target])
+    meas_control.set_sweep_points(np.column_stack([echo_amplitudes, target_amplitudes]))
+    
     meas_control.set_detector_function(detector)
     label = f'FluxCrosstalk_{qubit_echo.name}'
     result = meas_control.run(label, disable_snapshot_metadata=disable_metadata)
 
     return result
+
+
+if __name__ == "__main__":
+    from pycqed.measurement.flux_crosstalk_ac import measurement_function as fluxcross_module
+    reload(fluxcross_module)
+    
+    fluxcross_module.measure_ac_flux_crosstalk(
+        device,
+    )
