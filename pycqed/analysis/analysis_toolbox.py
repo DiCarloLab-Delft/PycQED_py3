@@ -9,7 +9,7 @@ import pandas as pd
 import colorsys as colors
 # FIXME: was commented out, breaks code below
 import qutip as qtp
-import qutip.metrics as qpmetrics
+import qutip.core.metrics as qpmetrics
 
 from copy import deepcopy
 from collections import OrderedDict as od

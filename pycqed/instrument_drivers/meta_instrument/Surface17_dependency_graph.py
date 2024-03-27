@@ -3728,6 +3728,7 @@ def DIO_calibration(station, force: bool = False):
 	'''
 	# Get all intruments
 	no_error = True
+	awgs_with_errors = []
 	cc = station.components['cc']
 	UHFQC_1 = station.components['UHFQC_1']
 	UHFQC_2 = station.components['UHFQC_2']
@@ -3765,6 +3766,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = UHFQC_1._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('UHFQC_1')
 		# no_error = False
 		UHFQC_1._errors = {}
 		print(f'Calibrating DIO on UHFQC_1.')
@@ -3784,6 +3787,8 @@ def DIO_calibration(station, force: bool = False):
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
 		# no_error = False
+		if _errors != {}:
+			awgs_with_errors.append('UHFQC_2')
 		UHFQC_2._errors = {}
 		print(f'Calibrating DIO on UHFQC_2.')
 		try:
@@ -3801,6 +3806,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = UHFQC_3._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('UHFQC_3')
 		# no_error = False	# this is commented because some holdoff error cannot be fixed
 		UHFQC_3._errors = {}
 		print(f'Calibrating DIO on UHFQC_3.')
@@ -3820,6 +3827,8 @@ def DIO_calibration(station, force: bool = False):
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
 		# no_error = False
+		if _errors != {}:
+			awgs_with_errors.append('UHFQC_4')
 		UHFQC_4._errors = {}
 		print(f'Calibrating DIO on UHFQC_4.')
 		try:
@@ -3841,6 +3850,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = AWG8_8481._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('AWG8_8481')
 		no_error = False
 		AWG8_8481._errors = {}
 		print(f'Calibrating DIO on AWG8_8481.')
@@ -3860,6 +3871,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = AWG8_8068._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('AWG8_8068')
 		no_error = False
 		AWG8_8068._errors = {}
 		print(f'Calibrating DIO on AWG8_8068.')
@@ -3879,6 +3892,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = AWG8_8074._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('AWG8_8074')
 		no_error = False
 		AWG8_8074._errors = {}
 		print(f'Calibrating DIO on AWG8_8074.')	
@@ -3898,6 +3913,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = AWG8_8076._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('AWG8_8076')
 		no_error = False
 		AWG8_8076._errors = {}
 		print(f'Calibrating DIO on AWG8_8076.')	
@@ -3917,6 +3934,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = AWG8_8499._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('AWG8_8499')
 		no_error = False
 		AWG8_8499._errors = {}
 		print(f'Calibrating DIO on AWG8_8499.')	
@@ -3940,6 +3959,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = AWG8_8279._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('AWG8_8279')
 		no_error = False
 		AWG8_8279._errors = {}
 		print(f'Calibrating DIO on AWG8_8279.')
@@ -3972,6 +3993,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = AWG8_8320._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('AWG8_8320')
 		no_error = False
 		AWG8_8320._errors = {}
 		print(f'Calibrating DIO on AWG8_8320.')
@@ -4004,6 +4027,8 @@ def DIO_calibration(station, force: bool = False):
 	_errors = AWG8_8071._errors
 	# if 'AWGDIOTIMING' in _errors.keys():
 	if _errors != {} or force:
+		if _errors != {}:
+			awgs_with_errors.append('AWG8_8071')
 		no_error = False
 		AWG8_8071._errors = {}
 		print(f'Calibrating DIO on AWG8_8071.')
@@ -4037,7 +4062,7 @@ def DIO_calibration(station, force: bool = False):
 	device.tim_mw_latency_3(0) # 8068
 	device.tim_mw_latency_4(-10e-9) # 8481
 	device.prepare_timing()
-	return no_error
+	return no_error, awgs_with_errors
 
 ###############################################################################
 # LRU calibration graph

@@ -16,7 +16,7 @@ if 1:   # FIXME: hack should be removed
     # KEEP ABOVE any QtPlot import!!!
     warnings.warn(message="Attempts to apply qcodes QtPlot monkey patch.")
     try:
-        from qcodes import plots
+        # from qcodes import plots
         from pycqed.measurement import qcodes_QtPlot_monkey_patching
     except ImportError as e:
         warnings.warn(message="Failed to apply qcodes QtPlot monkey patch.")
