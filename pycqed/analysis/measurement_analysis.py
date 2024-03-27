@@ -6335,16 +6335,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         scale = SI_prefix_and_scale_factor(val=max(abs(ax.get_xticks())),
                                            unit=self.sweep_unit[0])[0]
-
-        instr_set = self.data_file['Instrument settings']
-        try:
-            old_RO_freq = float(instr_set[self.qb_name].attrs['f_RO'])
-            old_vals = '\n$f_{\mathrm{old}}$ = %.5f GHz' % (
-                old_RO_freq * scale)
-        except (TypeError, KeyError, ValueError):
-            logging.warning('qb_name is None. Old parameter values will '
-                            'not be retrieved.')
-            old_vals = ''
+        
+        old_vals = ''
 
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
             if kw['custom_power_message'] is None:
