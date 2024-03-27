@@ -582,7 +582,12 @@ def FluxTimingCalibration(
     p.add_kernel(k)
 
     if cal_points:
-        p.add_single_qubit_cal_points(qubit_idx=qubit_idx)  # FIXME: unresolved
+        cal_states =  ['{:0{}b}'.format(i, len(qubit_idxs)) for i in range(2**len(qubit_idxs))]
+        p.add_multi_q_cal_points(
+            qubits=qubit_idxs,
+            combinations=cal_states
+        )
+        # p.add_single_qubit_cal_points(qubit_idx=qubit_idx)  # FIXME: unresolved
     p.compile()
     return p
 
