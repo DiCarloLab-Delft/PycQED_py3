@@ -1,9 +1,12 @@
+import os
 from importlib import reload
 import lmfit
 import numpy as np
 from uncertainties import ufloat
 from scipy.stats import sem
 from collections import OrderedDict
+import matplotlib.pyplot as plt
+import pycqed.measurement.hdf5_data as hd5
 from pycqed.analysis import fitting_models as fit_mods
 reload(fit_mods)
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -2299,3 +2302,128 @@ class Crossing_Analysis(ba.BaseDataAnalysis):
 
     def get_intersect(self):
         return self.proc_data_dict["root"]
+
+
+class FineBiasAnalysis(ba.BaseDataAnalysis):
+    """
+    Behaviour class,
+    """
+
+    # region Class Constructor
+    def __init__(
+        self,
+        initial_bias: float,
+        t_start: str = None,
+        t_stop: str = None,
+        data_file_path: str = None,
+        label: str = "",
+        options_dict: dict = None,
+    ):
+        super().__init__(
+            t_start=t_start,
+            t_stop=t_stop,
+            label=label,
+            data_file_path=data_file_path,
+            options_dict=options_dict,
+            close_figs=True,
+            extract_only=False,
+            do_fitting=False,
+        )
+        self.initial_bias: float = initial_bias  # A
+    # endregion
+
+
+    # region Interface Methods
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = a_tools.get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        self.qubit_id = self.raw_data_dict['folder'].split('_')[-1]
+        self.flux_array: np.ndarray = self.raw_data_dict['data'][:, 0]
+        missing_fraction_array: np.ndarray = self.raw_data_dict['data'][:, 1]
+        self.conditional_phase_array: np.ndarray = self.raw_data_dict['data'][:, 2]  # Degree
+        single_qubit_phase_array: np.ndarray = self.raw_data_dict['data'][:, 3]  # Degree
+
+        self.leakage_array: np.ndarray = missing_fraction_array / 2
+        self.conditional_phase_array -= 180
+        self.single_qubit_phase_array = np.mod(single_qubit_phase_array + 180, 360) - 180
+
+        self.polynomial_fit = np.polyfit(self.flux_array, self.leakage_array, deg=2)
+        self.polynomials = np.poly1d(self.polynomial_fit)
+        # Extract the DC bias for minimum L1 according to fit.
+        self.fitted_min_bias = -self.polynomial_fit[1] / (2 * self.polynomial_fit[0])
+        self.minimal_leakage_bias = self.flux_array[self.leakage_array.argmin()]
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, ax = plt.subplots(figsize=(6, 5), dpi=256)
+        self.axs_dict[f'leakage_arc_trace'] = ax
+        self.figs[f'leakage_arc_trace'] = fig
+        self.plot_dicts['leakage_arc_trace'] = {
+            'plotfn': self.plot_leakage_arc,
+            'ax_id': 'leakage_arc_trace',
+            'flux_array': self.flux_array,
+            'conditional_phase_array': self.conditional_phase_array,
+            'single_qubit_phase_array': self.single_qubit_phase_array,
+            'leakage_array': self.leakage_array,
+            'initial_dc': self.initial_bias,
+            'fitted_min_bias': self.fitted_min_bias,
+            'minimal_leakage_bias': self.minimal_leakage_bias,
+            'polynomial': self.polynomials,
+            'timestamp': self.timestamps[0],
+            'qubit_name': self.qubit_id,
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+    # endregion
+
+    # region Static Class Methods
+    @staticmethod
+    def plot_leakage_arc(flux_array: np.ndarray, conditional_phase_array: np.ndarray,
+                         single_qubit_phase_array: np.ndarray, leakage_array: np.ndarray, initial_dc: float, fitted_min_bias: float, minimal_leakage_bias: float, polynomial,
+                         timestamp: str, qubit_name: str, ax, **kw):
+        fig = ax.get_figure()
+        axt = ax.twinx()
+
+        axt.plot(flux_array, conditional_phase_array, 'C2o', label='$\\delta\\phi_{2Q}$')
+        axt.plot(flux_array, single_qubit_phase_array, 'C4o', label='$\\delta\\phi_{1Q}$')  # Tim 15-06
+        axt.set_ylabel('Phase error (deg)')
+        axt.set_ylim(top = 180, bottom = -180) # HARDCODED range with hardcoded ticks. Tim 15-06
+        axt.set_yticks(np.arange(-180, 180+1, 20))
+        axt.legend(loc='upper left', bbox_to_anchor=(1.1, 1.05))
+
+        ax.plot(flux_array, leakage_array, 'C3o', label="$\mathrm{L_1}$")
+        high_resolution_flux_array = np.linspace(min(flux_array), max(flux_array), 101)
+        high_resolution_polynomial_array = polynomial(high_resolution_flux_array)
+        ax.plot(high_resolution_flux_array, high_resolution_polynomial_array, 'C0--')
+        ax.axvline(initial_dc, color='r', alpha=.25, label=fr'Starting bias = {initial_dc * 1e6:.2f} $\mathrm{{\mu A}}$')
+        ax.axvline(fitted_min_bias, color='b', alpha=.25, label=fr'Suggested bias = {fitted_min_bias * 1e6:.2f} $\mathrm{{\mu A}}$')
+        ax.axvline(minimal_leakage_bias, color='magenta', alpha=.25, label=fr'Min Leakage bias = {minimal_leakage_bias * 1e6:.2f} $\mathrm{{\mu A}}$')
+
+        ax.set_xlabel('DC flux bias ($\mathrm{\mu A}$)')
+        ax.set_ylabel('Leakage estimate $\mathrm{L_1}$')
+        ax.set_ylim(bottom=0)
+        ax.legend(loc='upper left', bbox_to_anchor=(1.1, 0.9))
+
+        ax.set_title(f'{timestamp}\n{qubit_name} Leakage vs DC-flux')
+        return fig, ax
+    # endregion

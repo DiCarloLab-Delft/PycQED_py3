@@ -87,7 +87,7 @@ from pycqed.analysis_v2.timedomain_analysis import (
     FlippingAnalysis, EFRabiAnalysis, DecoherenceAnalysis, Intersect_Analysis,
     Oscillation_Analysis, ComplexRamseyAnalysis, Crossing_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,
-    Grovers_TwoQubitAllStates_Analysis)
+    Grovers_TwoQubitAllStates_Analysis, FineBiasAnalysis)
 from pycqed.analysis_v2.readout_analysis import (
     Singleshot_Readout_Analysis, RO_acquisition_delayAnalysis,
     Dispersive_shift_Analysis, Readout_landspace_Analysis)

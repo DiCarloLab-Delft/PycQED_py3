@@ -36,9 +36,15 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import tomography as tomo
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis_v2.repeated_stabilizer_analysis import RepeatedStabilizerAnalysis
-from pycqed.utilities.general import check_keyboard_interrupt, print_exception,\
-                                     get_gate_directions, get_frequency_waveform,\
-                                     get_DAC_amp_frequency, get_Ch_amp_frequency, get_parking_qubits
+from pycqed.utilities.general import (
+    check_keyboard_interrupt,
+    print_exception,
+    get_gate_directions,
+    get_frequency_waveform,
+    get_DAC_amp_frequency,
+    get_Ch_amp_frequency,
+    get_parking_qubits,
+)
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
     QuTech_AWG_Module,
@@ -1344,7 +1350,7 @@ class DeviceCCL(Instrument):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
-        in the two-qubit Cphase gate is measured using Ramsey-lie sequence.
+        in the two-qubit Cphase gate is measured using Ramsey-like sequence.
         Specifically qubit q0 of each pair is prepared in the superposition, while q1 is in 0 or 1 state.
         Next the flux pulse is applied. Finally pi/2 afterrotation around various axes
         is applied to q0, and q1 is flipped back (if neccessary) to 0 state.
@@ -1535,7 +1541,82 @@ class DeviceCCL(Instrument):
             (a.proc_data_dict['quantities_of_interest']['phi_1'].n+180) % 360 - 180
 
         return result_dict
-    
+
+    def measure_flux_arc_dc_conditional_oscillation(
+            self,
+            qubit_high: str,
+            qubit_low: str,
+            flux_array: Optional[np.ndarray] = None,
+            flux_sample_points: int = 21,
+            disable_metadata: bool = False,
+            prepare_for_timedomain: bool = True,
+            analyze: bool = True,
+            ):
+        assert self.ro_acq_weight_type() == 'optimal', "Expects device acquisition weight type to be 'optimal'"
+
+        # Get instruments
+        nested_MC = self.instr_nested_MC.get_instr()
+        qubit_high_instrument = self.find_instrument(qubit_high)
+        _flux_instrument = qubit_high_instrument.instr_FluxCtrl.get_instr()
+        _flux_parameter = _flux_instrument[f'FBL_{qubit_high}']
+        qubits_awaiting_prepare = [qubit_high, qubit_low]
+        self.prepare_readout(qubits_awaiting_prepare)
+        parked_qubits = get_parking_qubits(qubit_high, qubit_low)
+
+        original_current: float = qubit_high_instrument.fl_dc_I0()
+        if flux_array is None:
+            flux_array = np.linspace(-30e-6, 30e-6, flux_sample_points) + original_current
+
+        local_prepare = ManualParameter('local_prepare', initial_value=prepare_for_timedomain)
+        local_metadata = ManualParameter('local_metadata', initial_value=disable_metadata)
+        def wrapper():
+            a = self.measure_conditional_oscillation_multi(
+                pairs=[[qubit_high, qubit_low]],
+                parked_qbs=parked_qubits,
+                disable_metadata=local_metadata(),
+                prepare_for_timedomain=local_prepare(),
+                extract_only=True,
+            )
+            # Turn off prepare and metadata for followup measurements
+            local_prepare(False)
+            local_metadata(False)
+            return {
+                'pair_1_delta_phi_a': a['pair_1_delta_phi_a'],
+                'pair_1_missing_frac_a': a['pair_1_missing_frac_a'],
+                'pair_1_offset_difference_a': a['pair_1_offset_difference_a'],
+                'pair_1_phi_0_a': a['pair_1_phi_0_a'],
+                'pair_1_phi_1_a': a['pair_1_phi_1_a'],
+            }
+
+        d = det.Function_Detector(
+            wrapper,
+            result_keys=['pair_1_missing_frac_a', 'pair_1_delta_phi_a', 'pair_1_phi_0_a'],
+            value_names=['missing_fraction', 'phi_cond', 'phi_0'],
+            value_units=['a.u.', 'degree', 'degree'],
+        )
+
+        nested_MC.set_detector_function(d)
+        nested_MC.set_sweep_function(_flux_parameter)
+        nested_MC.set_sweep_points(np.atleast_1d(flux_array))
+
+        response = None
+        label = f'conditional_oscillation_dc_flux_arc_{qubit_high}'
+        try:
+            response = nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
+        except Exception as e:
+            log.warn(e)
+        finally:
+            _flux_parameter(original_current)
+        if analyze:
+            a = ma2.FineBiasAnalysis(
+                initial_bias=original_current,
+                label=label,
+            )
+            a.run_analysis()
+            return a
+        return response
+
+
     def measure_residual_ZZ_coupling(
         self,
         q0: str,
@@ -2841,7 +2922,9 @@ class DeviceCCL(Instrument):
                                flux_latencies, microwave_latencies,
                                MC=None,
                                pulse_length=40e-9, flux_cw='fl_cw_06',
-                               prepare_for_timedomain: bool = True):
+                               prepare_for_timedomain: bool = True,
+                               run_analysis: bool = True,
+                               ):
         """
         Measure the ramsey-like sequence with the 40 ns flux pulses played between
         the two pi/2. While playing this sequence the delay of flux and microwave pulses
@@ -2864,6 +2947,9 @@ class DeviceCCL(Instrument):
 
             prepare_for_timedomain (bool):
                 calls self.prepare_for_timedomain on start
+
+            run_analysis (bool):
+                executes analysis functionality
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2885,7 +2971,7 @@ class DeviceCCL(Instrument):
         p = mqo.FluxTimingCalibration(qubit_idxs=Q_idxs,
                                       platf_cfg=self.cfg_openql_platform_fn(),
                                       flux_cw=flux_cw,
-                                      cal_points=False)
+                                      cal_points=True)
 
         CC.eqasm_program(p.filename)
 
@@ -2903,12 +2989,13 @@ class DeviceCCL(Instrument):
         label = 'Timing_diag_{}'.format('_'.join(qubits))
         MC.run_2D(label)
 
-        # This is the analysis that should be run but with custom delays
-        ma2.Timing_Cal_Flux_Fine(ch_idx=0, close_figs=False,
-                                 ro_latency=-100e-9,
-                                 flux_latency=0,
-                                 flux_pulse_duration=10e-9,
-                                 mw_pulse_separation=80e-9)
+        if run_analysis:
+            # This is the analysis that should be run but with custom delays
+            ma2.Timing_Cal_Flux_Fine(ch_idx=0, close_figs=False,
+                                    ro_latency=-100e-9,
+                                    flux_latency=0,
+                                    flux_pulse_duration=10e-9,
+                                    mw_pulse_separation=80e-9)
 
     def measure_timing_1d_trace(self, q0, latencies, latency_type='flux',
                                 MC=None,  label='timing_{}_{}',
@@ -5230,6 +5317,7 @@ class DeviceCCL(Instrument):
         qP: str,
         Park_distances: list = np.arange(300e6, 1000e6, 5e6),
         flux_cw: str = 'cz',
+        relative_to_qH: bool = True,
         extract_only: bool = False,
         prepare_for_timedomain: bool = True,
         disable_metadata: bool = False):
@@ -5338,12 +5426,15 @@ class DeviceCCL(Instrument):
             det_qL = get_frequency_waveform(f'vcz_amp_dac_at_11_02_{dircts[1]}',
                                             flux_lm_L)
             # calculate required detuning of qP during 2Q-gate
-            park_freq = Q_H.freq_qubit()-det_qH-park_dist
-            park_det = Q_P.freq_qubit()-park_freq
+            park_det = park_dist
+            if relative_to_qH:
+                park_freq = Q_H.freq_qubit()-det_qH-park_dist
+                park_det = Q_P.freq_qubit()-park_freq
             Park_detunings.append(park_det)
             # Only park if the qubit is closer than then 350 MHz
             amp_park = get_DAC_amp_frequency(park_det, flux_lm_P)
             Park_amps.append(amp_park)
+
         # If parking distance results in negative detuning, clip those values
         idx = np.where(np.array(Park_detunings)>0)[0]
         Park_amps = np.array(Park_amps)[idx]
@@ -6241,6 +6332,15 @@ class DeviceCCL(Instrument):
         involved_ancilla_indices = [self.find_instrument(q).cfg_qubit_nr() for q in involved_ancilla_ids] 
         involved_data_indices = [self.find_instrument(q).cfg_qubit_nr() for q in involved_data_ids] 
         lru_qubits_indices = []
+        if initial_state is None:
+            initial_state: InitialStateContainer = InitialStateContainer.from_ordered_list(
+                [InitialStateEnum.ZERO] * len(involved_data_ids)
+            )
+        else:
+            initial_state: InitialStateContainer = InitialStateContainer.from_ordered_list([
+                InitialStateEnum.ZERO if state == 0 else InitialStateEnum.ONE
+                for state in initial_state
+            ])
         ######################################################
         # Prepare for timedomain
         ######################################################
@@ -6346,7 +6446,7 @@ class DeviceCCL(Instrument):
             platf_cfg=self.cfg_openql_platform_fn(),
             stabilizer_type=stabilizer_type,
             measurement_time_ns=measurement_time_ns,
-            initial_state=initial_state
+            initial_state=list(initial_state.as_array)
         )
         # Set up nr_shots on detector
         d = self.int_log_det
@@ -6365,8 +6465,10 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.arange(int(uhfqc_max_avg/readouts_per_round) * readouts_per_round * repetitions))
         MC.set_detector_function(d)
         
-        _title = f'Repeated_stab_meas_{rounds[0]}_to_{rounds[-1]}_rounds'+\
-                    f'_{"_".join(involved_ancilla_ids)}_{"_".join(involved_data_ids)}_data_qubit_measurement'
+        rounds_title: str = f"{rounds[0]}_to_{rounds[-1]}"
+        involved_qubits_title: str = ''.join(involved_ancilla_ids)
+        initial_state_title: str = ''.join(initial_state.as_array.astype(str))
+        _title = f'Repeated_stab_meas_{rounds_title}_rounds_{involved_qubits_title}_qubits_{initial_state_title}_state'
         if len(_title) > 90:
             _title = _title[:90]
         try:
@@ -6391,9 +6493,7 @@ class DeviceCCL(Instrument):
                 a = RepeatedStabilizerAnalysis(
                     involved_qubit_names=involved_qubit_names,
                     qec_cycles=rounds,
-                    initial_state=InitialStateContainer.from_ordered_list(
-                        [InitialStateEnum.ZERO] * len(involved_data_ids)
-                    ),  # TODO: Construct initial state from arguments
+                    initial_state=initial_state,
                     label=_title,
                 )
                 a.run_analysis()

@@ -3227,7 +3227,7 @@ class TwoQubitGate_frequency_trajectory_analysis(ba.BaseDataAnalysis):
         # Get TLS landscapes
         self.TLS_analysis = {}
         for q in self.Qubits:
-            label = f'Chevron {q} D1 ground'
+            label = f'Chevron_prep_state_e {q} D1 ground'
             try:
                 # Try to find TLS landscapes for relevant qubits
                 TS = get_timestamps_in_range(

@@ -2,6 +2,7 @@
 Created: 2020-07-15
 """
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.analysis_v2.cryoscope_v2_tools as cv2_tools
 from pycqed.analysis_v2 import measurement_analysis as ma2
@@ -10,6 +11,10 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.utilities.general import print_exception
 import pycqed.measurement.hdf5_data as hd5
+from pycqed.qce_utils.analysis_factory.factory_transmon_arc_identifier import (
+    FluxArcIdentifier,
+    FluxArcIdentifierAnalysis,
+)
 from collections import OrderedDict
 from uncertainties import ufloat
 from scipy import signal
@@ -1135,6 +1140,17 @@ class Flux_arc_analysis(ba.BaseDataAnalysis):
             'qubit': self.qubit,
             'timestamp': self.timestamps[0]
         }
+        fig, ax = plt.subplots(figsize=(5, 4), dpi=100)
+        self.axs_dict[f'detailed_voltage_arc_trace'] = ax
+        self.figs[f'detailed_voltage_arc_trace'] = fig
+        self.plot_dicts['detailed_voltage_arc_trace'] = {
+            'plotfn': voltage_arc_plotfn_detailed,
+            'ax_id': 'detailed_voltage_arc_trace',
+            'amplitudes': self.proc_data_dict['Amps'],
+            'detunings': self.proc_data_dict['Freqs'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamps[0],
+        }
 
     def run_post_extract(self):
         self.prepare_plots()  # specify default plots
@@ -1161,6 +1177,174 @@ def Voltage_arc_plotfn(
     ax.set_xlabel('Output Voltage (V)')
     ax.set_title(f'{timestamp}\n{qubit} Voltage frequency arc')
     fig.tight_layout()
+
+
+def voltage_arc_plotfn_detailed(
+    amplitudes,
+    detunings,
+    qubit,
+    timestamp,
+    ax,
+    **kw,
+    ):
+    identifier = FluxArcIdentifier(
+        _amplitude_array=amplitudes,
+        _detuning_array=detunings,
+    )
+    fig = ax.get_figure()
+    fig, ax = FluxArcIdentifierAnalysis.plot_flux_arc_identifier(
+        identifier=identifier,
+        host_axes=(fig, ax),
+    )
+    ax.set_title(f'{timestamp}\n{qubit} Detailed voltage frequency arc')
+    return fig, ax
+
+
+class FluxArcSymmetryIntersectionAnalysis(ba.BaseDataAnalysis):
+    """
+    Behaviour class, Analysis that handles intersection calculation of
+    equal positive and negative (AC) flux-pulse amplitudes while sweeping (DC) flux bias.
+    """
+
+    # region Class Constructor
+    def __init__(
+        self,
+        initial_bias: float,
+        t_start: str = None,
+        t_stop: str = None,
+        data_file_path: str = None,
+        label: str = "",
+        options_dict: dict = None,
+    ):
+        super().__init__(
+            t_start=t_start,
+            t_stop=t_stop,
+            label=label,
+            data_file_path=data_file_path,
+            options_dict=options_dict,
+            close_figs=True,
+            extract_only=False,
+            do_fitting=False,
+        )
+        self.initial_bias: float = initial_bias  # A
+    # endregion
+
+    # region Interface Methods
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        self.qubit_id = self.raw_data_dict['folder'].split('_')[-1]
+        self.flux_bias_array: np.ndarray = self.raw_data_dict['data'][:, 0]
+        self.positive_detuning_array: np.ndarray = self.raw_data_dict['data'][:, 1]
+        self.negative_detuning_array: np.ndarray = self.raw_data_dict['data'][:, 2]
+
+        fit1 = np.polyfit(self.flux_bias_array, self.positive_detuning_array, 1)
+        fit2 = np.polyfit(self.flux_bias_array, self.negative_detuning_array, 1)
+
+        # Extract the slope (m) and intercept (b) for both fits
+        m1, b1 = fit1
+        m2, b2 = fit2
+
+        # Calculate the x- and y-coordinate of the intersection
+        self.x_intersect = (b2 - b1) / (m1 - m2)
+        self.y_intersect = m1 * self.x_intersect + b1
+        self.suggested_bias_value = self.x_intersect
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, ax = plt.subplots(figsize=(6, 5), dpi=256)
+        self.axs_dict[f'flux_arc_intersection'] = ax
+        self.figs[f'flux_arc_intersection'] = fig
+        self.plot_dicts['flux_arc_intersection'] = {
+            'plotfn': self.plot_flux_arc_intersection,
+            'ax_id': 'flux_arc_intersection',
+            'flux_bias_array': self.flux_bias_array,
+            'positive_detuning_array': self.positive_detuning_array,
+            'negative_detuning_array': self.negative_detuning_array,
+            'initial_bias': self.initial_bias,
+            'suggested_bias': self.suggested_bias_value,
+            'timestamp': self.timestamps[0],
+            'qubit_name': self.qubit_id,
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+    # endregion
+
+    # region Static Class Methods
+    @staticmethod
+    def plot_flux_arc_intersection(flux_bias_array: np.ndarray, positive_detuning_array: np.ndarray, negative_detuning_array: np.ndarray, initial_bias: float, suggested_bias: float, timestamp: str, qubit_name: str, ax, **kw):
+        fit1 = np.polyfit(flux_bias_array, positive_detuning_array, 1)
+        poly1 = np.poly1d(fit1)
+        fit2 = np.polyfit(flux_bias_array, negative_detuning_array, 1)
+        poly2 = np.poly1d(fit2)
+
+        # Extract the slope (m) and intercept (b) for both fits
+        m1, b1 = fit1
+        m2, b2 = fit2
+
+        # Calculate the x- and y-coordinate of the intersection
+        x_intersect = suggested_bias
+        y_intersect = m1 * x_intersect + b1
+
+        # Figure and Axes
+        fig = ax.get_figure()
+        ax.plot(
+            flux_bias_array,
+            positive_detuning_array,
+            linestyle='none',
+            marker='o',
+        )
+        ax.plot(
+            flux_bias_array,
+            negative_detuning_array,
+            linestyle='none',
+            marker='o',
+        )
+
+        min_x = min(x_intersect, min(flux_bias_array))
+        max_x = max(x_intersect, max(flux_bias_array))
+        span_x = abs(min_x - max_x)
+        high_resolution_x = np.linspace(min_x - 0.1 * span_x, max_x + 0.1 * span_x, 101)
+        y1_fit = poly1(high_resolution_x)
+        y2_fit = poly2(high_resolution_x)
+
+        ax.plot(high_resolution_x, y1_fit, 'C0--')
+        ax.plot(high_resolution_x, y2_fit, 'C1--')
+        ax.plot(x_intersect, y_intersect, linestyle='none', marker='o', alpha=0.8, color='gray')
+        # Suggested value
+        ax.axvline(x_intersect, linestyle='--', marker='None', color='darkgrey')
+
+        transform = transforms.blended_transform_factory(ax.transData, ax.transAxes)
+        ax.text(x_intersect, 0.9, f'   {x_intersect * 1e3:0.4f} mA', ha='left', va='center', transform=transform)
+        ax.set_xlim(min(high_resolution_x), max(high_resolution_x))
+        ax.set_xlabel('Flux bias [A]')
+        ax.set_ylabel('Frequency detuning [Hz]')
+
+        ax.grid(True, alpha=0.5, linestyle='dashed')  # Adds dashed gridlines
+        ax.set_axisbelow(True)  # Puts grid on background
+        ax.set_title(f'{timestamp}\n{qubit_name} Frequency-arc vs DC-flux')
+        return fig, ax
+    # endregion
 
 
 class Cryoscope_long_analysis(ba.BaseDataAnalysis):
