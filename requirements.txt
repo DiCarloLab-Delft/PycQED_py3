@@ -48,4 +48,5 @@ pytest
 # wheel
 # # Manually build from source.
 # qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c  # Build from commit
+pymatching
 git+https://github.com/DiCarloLab-Delft/QCoCircuits

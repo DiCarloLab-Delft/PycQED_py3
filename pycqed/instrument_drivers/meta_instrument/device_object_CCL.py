@@ -8,7 +8,7 @@ import datetime
 from collections import OrderedDict
 import multiprocessing
 from importlib import reload
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Optional
 import itertools as itt
 from math import ceil
 
@@ -19,7 +19,7 @@ from qcodes.instrument.parameter import (
     InstrumentRefParameter,
     Parameter,
 )
-from qce_circuit.library.repetition_code_circuit import (
+from qce_circuit.language.intrf_declarative_circuit import (
     InitialStateContainer,
     InitialStateEnum,
 )
@@ -38,7 +38,7 @@ from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis_v2.repeated_stabilizer_analysis import RepeatedStabilizerAnalysis
 from pycqed.utilities.general import check_keyboard_interrupt, print_exception,\
                                      get_gate_directions, get_frequency_waveform,\
-                                     get_DAC_amp_frequency, get_Ch_amp_frequency
+                                     get_DAC_amp_frequency, get_Ch_amp_frequency, get_parking_qubits
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
     QuTech_AWG_Module,

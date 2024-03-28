@@ -1187,7 +1187,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # the first position is for the LRU phase correction
         # the 8 positions after that, are for parking related phase corrections,
         # the last 4 are for phase corrections due to gate in corresponding direction
-        phase = self.parameters['LRU_virtual_q_ph_corr']()
+        # phase = self.parameters['LRU_virtual_q_ph_corr']()
+        phase = 0
         commandtable_dict['table'] += [{"index": int(51),
                                         "phase0": {"value": float(phase), "increment": True},
                                         "phase1": {"value": float(phase), "increment": True}

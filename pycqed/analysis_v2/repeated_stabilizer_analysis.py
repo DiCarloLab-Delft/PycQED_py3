@@ -8,7 +8,7 @@ from enum import Enum
 import pycqed.measurement.hdf5_data as hd5
 from pycqed.analysis_v2.base_analysis import BaseDataAnalysis
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
-from qce_circuit.library.repetition_code_circuit import (
+from qce_circuit.language.intrf_declarative_circuit import (
     InitialStateContainer,
     InitialStateEnum,
 )
