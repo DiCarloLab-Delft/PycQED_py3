@@ -1602,15 +1602,16 @@ class HAL_Device(HAL_ShimMQ):
             self,
             qubits: list,
             q_target: str,
-            nr_shots: int = 2 ** 13,  # 8192
+            nr_shots: int = 2 ** 15,
             prepare_for_timedomain: bool = True,
             second_excited_state: bool = False,
             result_logging_mode='raw',
             initialize: bool = False,
             analyze=True,
-            shots_per_meas: int = 2 ** 16,
+            shots_per_meas: int = 2 ** 17,
             nr_flux_dance: int = None,
             wait_time: float = None,
+            integration_length = 1e-6,
             label='Mux_SSRO',
             MC=None):
         # FIXME: lots of similarity with measure_ssro_multi_qubit
@@ -1645,10 +1646,12 @@ class HAL_Device(HAL_ShimMQ):
             nr_cases = 3 ** len(qubits)
 
         if initialize == True:
-            nr_shots = 4 * nr_shots
+            nr_shots = 2*2*nr_shots
         else:
-            nr_shots = 2 * nr_shots
+            nr_shots = 2*nr_shots
 
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_digitized(False)
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits)
         if MC is None:
@@ -1669,7 +1672,9 @@ class HAL_Device(HAL_ShimMQ):
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
 
         # right is LSQ
-        d = self.get_int_logging_detector(qubits, result_logging_mode=result_logging_mode)
+        d = self.get_int_logging_detector(qubits, 
+                                          integration_length = integration_length,
+                                          result_logging_mode=result_logging_mode)
 
         # This assumes qubit names do not contain spaces
         det_qubits = [v.split()[-1] for v in d.value_names]
@@ -1698,6 +1703,7 @@ class HAL_Device(HAL_ShimMQ):
         # restore parameters
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
+        self.ro_acq_digitized(old_digitized)
 
         if analyze:
             if initialize == True:
@@ -1720,6 +1726,8 @@ class HAL_Device(HAL_ShimMQ):
                                                      nr_qubits=len(qubits),
                                                      q_target=q_target)
             q_ch = [ch for ch in a.Channels if q_target in ch.decode()][0]
+
+
             # Set thresholds
             for i, qubit in enumerate(qubits):
                 label = a.raw_data_dict['value_names'][i]
@@ -1735,11 +1743,13 @@ class HAL_Device(HAL_ShimMQ):
             cases: list = ['off', 'on'],
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain: bool = True,
+            disable_snapshot_metadata: bool=False,
             analyze: bool = True
     ):
         '''
         Documentation.
         '''
+
         if q_target not in qubits:
             raise ValueError("q_target must be included in qubits.")
         # Ensure all qubits use same acquisition instrument
@@ -1782,7 +1792,11 @@ class HAL_Device(HAL_ShimMQ):
                 sampling_rate = 1.8e9
             else:
                 raise NotImplementedError()
-            nr_samples = self.ro_acq_integration_length() * sampling_rate
+            # Leo change here. 2022/09/06
+            # The transients are used to derive optimal weight functions.
+            # The weight functions should always be full length (4096 samples).
+            #nr_samples = self.ro_acq_integration_length() * sampling_rate
+            nr_samples = 4096
 
             d = det.UHFQC_input_average_detector(
                 UHFQC=self.find_instrument(instruments[0]),
@@ -1793,7 +1807,8 @@ class HAL_Device(HAL_ShimMQ):
             MC.set_sweep_function(s)
             MC.set_sweep_points(np.arange(nr_samples) / sampling_rate)
             MC.set_detector_function(d)
-            MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb, self.msmt_suffix))
+            MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb, self.msmt_suffix),
+                disable_snapshot_metadata=disable_snapshot_metadata)
 
             if analyze:
                 analysis[i] = ma2.Multiplexed_Transient_Analysis(
@@ -4698,6 +4713,7 @@ class HAL_Device(HAL_ShimMQ):
             update=True,
             verify=True,
             averages=2 ** 15,
+            disable_snapshot_metadata: bool=False,
             return_analysis=True
     ):
         # USED_BY: inspire_dependency_graph.py,
@@ -4734,10 +4750,11 @@ class HAL_Device(HAL_ShimMQ):
         A = self.measure_transients(
             qubits=qubits,
             q_target=q_target,
+            disable_snapshot_metadata = disable_snapshot_metadata,
             cases=['on', 'off']
         )
 
-        # resore parameters
+        # restore parameters
         self.ro_acq_averages(old_avg)
 
         # Optimal weights
@@ -4750,17 +4767,68 @@ class HAL_Device(HAL_ShimMQ):
         )
 
         if update:
-            Q_target.ro_acq_weight_func_I(B.qoi['W_I'])
-            Q_target.ro_acq_weight_func_Q(B.qoi['W_Q'])
+
+            ##########################################################
+            #### 2022/09/01
+            #### Leo change to make weight functions have zero average
+            #### and no remnants of longer prior weight functions.
+            ##########################################################
+            WeightFunction_I=B.qoi['W_I']
+            WeightFunction_Q=B.qoi['W_Q']            
+
+            # subtract average from weight functions
+            WFlength_I=len(WeightFunction_I)
+            WFlength_Q=len(WeightFunction_Q)
+            #for diagnostics only
+            #print(WFlength_I,WFlength_Q)
+
+            Avg_I=np.average(WeightFunction_I)
+            Avg_Q=np.average(WeightFunction_Q)
+            for i in range(WFlength_I):
+                WeightFunction_I[i]-=Avg_I
+            for i in range(WFlength_Q):
+                WeightFunction_Q[i]-=Avg_Q
+
+            # zero pad as necessary
+            WFlength=WFlength_I
+            NumZeros=4096-WFlength
+            if NumZeros>=0:
+                WeightFunction_I = np.concatenate([WeightFunction_I, np.zeros(NumZeros)])
+            else:
+                WeightFunction_I = WeightFunction_I[:NumZeros]
+
+            WFlength=WFlength_Q
+            NumZeros=4096-WFlength
+            if NumZeros>=0:
+                WeightFunction_Q = np.concatenate([WeightFunction_Q, np.zeros(NumZeros)])
+            else:
+                WeightFunction_Q = WeightFunction_Q[:NumZeros]
+
+
+            Q_target.ro_acq_weight_func_I(WeightFunction_I)
+            Q_target.ro_acq_weight_func_Q(WeightFunction_Q)
+
+            # this ws the original line of code.
+            #Q_target.ro_acq_weight_func_I(B.qoi['W_I'])
+            #Q_target.ro_acq_weight_func_Q(B.qoi['W_Q'])
+
             Q_target.ro_acq_weight_type('optimal')
 
             if verify:
+                # do an SSRO run using the new weight functions.
                 Q_target._prep_ro_integration_weights()
                 Q_target._prep_ro_instantiate_detectors()
+
                 ssro_dict= self.measure_ssro_single_qubit(
                     qubits=qubits,
-                    q_target=q_target
-                )
+                    q_target=q_target,
+                    integration_length = Q_target.ro_acq_integration_length(),
+                    initialize=True)
+
+                # This bit added by LDC to update fit results. 
+                Q_target.F_init(1-ssro_dict['Post_residual_excitation'])
+                Q_target.F_ssro(ssro_dict['Post_F_a'])
+
             if return_analysis:
                 return ssro_dict
             else:

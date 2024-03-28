@@ -1536,6 +1536,7 @@ class HAL_Transmon(HAL_ShimSQ):
             self,
             MC: Optional[MeasurementControl] = None,
             nested_MC: Optional[MeasurementControl] = None,
+            nr_shots_per_case: int = 2 ** 13,  # 8192
             start_freq=None,
             start_amp=None,
             start_freq_step=None,
@@ -1571,7 +1572,7 @@ class HAL_Transmon(HAL_ShimSQ):
         '''
 
         ## check single-qubit ssro first, if assignment fidelity below 92.5%, run optimizer
-        self.measure_ssro(post_select=True)
+        self.measure_ssro(nr_shots_per_case=nr_shots_per_case, post_select=True)
         if self.F_ssro() > check_threshold:
             return True
 
@@ -1611,7 +1612,6 @@ class HAL_Transmon(HAL_ShimSQ):
         ad_func_pars = {'adaptive_function': nelder_mead,
                         'x0': [self.ro_freq(), self.ro_pulse_amp()],
                         'initial_step': [start_freq_step, start_amp_step],
-                        'no_improv_break': 10,
                         'minimize': False,
                         'maxiter': 20,
                         'f_termination': optimize_threshold}
@@ -2438,11 +2438,13 @@ class HAL_Transmon(HAL_ShimSQ):
             optimal_IQ: bool = False,
             measure_transients_CCL_switched: bool = False,
             prepare: bool = True,
-            disable_metadata: bool = False,
+            disable_metadata: bool = True,
             nr_shots_per_case: int = 2 ** 13,
             post_select: bool = False,
             averages: int = 2 ** 15,
             post_select_threshold: float = None,
+            depletion_analysis: bool = False,
+            depletion_optimization_window = None
     ) -> bool:
         """
         Measures readout transients for the qubit in ground and excited state to indicate
@@ -2478,10 +2480,18 @@ class HAL_Transmon(HAL_ShimSQ):
                                                               analyze=analyze,
                                                               depletion_analysis=False)
         else:
-            transients = self.measure_transients(MC=MC, analyze=analyze,
-                                                 depletion_analysis=False,
-                                                 disable_metadata=disable_metadata)
-        if analyze:
+            if depletion_analysis:
+                a, transients = self.measure_transients(MC=MC, analyze=analyze,
+                                                     depletion_analysis=depletion_analysis,
+                                                     disable_metadata=disable_metadata,
+                                                     depletion_optimization_window = depletion_optimization_window)
+            else:
+                transients = self.measure_transients(MC=MC, analyze=analyze,
+                                                     depletion_analysis=depletion_analysis,
+                                                     disable_metadata=disable_metadata)
+
+
+        if analyze and depletion_analysis == False:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
         self.ro_acq_averages(old_avg)
@@ -2496,24 +2506,12 @@ class HAL_Transmon(HAL_ShimSQ):
         # fixme: deviding the weight functions by four to not have overflow in
         # thresholding of the UHFQC
         weight_scale_factor = 1. / (4 * np.max([maxI, maxQ]))
-        W_func_I = np.array(weight_scale_factor * optimized_weights_I)
-        W_func_Q = np.array(weight_scale_factor * optimized_weights_Q)
-
-        # Smooth optimal weight functions
-        T = np.arange(len(W_func_I))/1.8e9
-        W_demod_func_I = np.real( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
-        W_demod_func_Q = np.imag( (W_func_I + 1j*W_func_Q)*np.exp(2j*np.pi * T * self.ro_freq_mod()) )
-
-        from scipy.signal import medfilt
-        W_dsmooth_func_I = medfilt(W_demod_func_I, 101)
-        W_dsmooth_func_Q = medfilt(W_demod_func_Q, 101)
-
-        W_smooth_func_I = np.real( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
-        W_smooth_func_Q = np.imag( (W_dsmooth_func_I + 1j*W_dsmooth_func_Q)*np.exp(-2j*np.pi * T * self.ro_freq_mod()) )
+        optimized_weights_I = np.array(weight_scale_factor * optimized_weights_I)
+        optimized_weights_Q = np.array(weight_scale_factor * optimized_weights_Q)
 
         if update:
-            self.ro_acq_weight_func_I(np.array(W_smooth_func_I))
-            self.ro_acq_weight_func_Q(np.array(W_smooth_func_Q))
+            self.ro_acq_weight_func_I(optimized_weights_I)
+            self.ro_acq_weight_func_Q(optimized_weights_Q)
             if optimal_IQ:
                 self.ro_acq_weight_type('optimal IQ')
             else:
@@ -2530,7 +2528,11 @@ class HAL_Transmon(HAL_ShimSQ):
                 return ssro_dict
         if verify:
             warnings.warn('Not verifying as settings were not updated.')
-        return True
+
+        if depletion_analysis:
+            return a
+        else:
+            return True
 
     ##########################################################################
     # measure_ functions (overrides for class Qubit)
@@ -2656,7 +2658,7 @@ class HAL_Transmon(HAL_ShimSQ):
             SNR_detector: bool = False,
             shots_per_meas: int = 2 ** 16,
             vary_residual_excitation: bool = True,
-            disable_metadata: bool = False,
+            disable_metadata: bool = True,
             label: str = ''
     ):
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3005,13 +3007,18 @@ class HAL_Transmon(HAL_ShimSQ):
             depletion_analysis_plot: bool = True,
             depletion_optimization_window=None,
             disable_metadata: bool = False,
-            plot_max_time=None
+            plot_max_time=None,
+            averages: int=2**15
     ):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
         if plot_max_time is None:
-            plot_max_time = self.ro_acq_integration_length() + 250e-9
+            plot_max_time = self.ro_acq_integration_length() + 1000e-9
+
+        # store the original averaging settings so that we can restore them at the end.
+        old_avg = self.ro_acq_averages()
+        self.ro_acq_averages(averages)
 
         if prepare:
             self.prepare_for_timedomain()
@@ -3052,17 +3059,30 @@ class HAL_Transmon(HAL_ShimSQ):
             data = MC.run(
                 'Measure_transients{}_{}'.format(self.msmt_suffix, i),
                 disable_snapshot_metadata=disable_metadata)
+
             dset = data['dset']
             transients.append(dset.T[1:])
             if analyze:
                 ma.MeasurementAnalysis()
+        
+        # restore initial averaging settings.
+        self.ro_acq_averages(old_avg)
+        
         if depletion_analysis:
+            print('Sweeping parameters:')
+            print(r"- amp0 = {}".format(self.ro_pulse_up_amp_p0()))
+            print(r"- amp1 = {}".format(self.ro_pulse_up_amp_p1()))
+            print(r"- amp2 = {}".format(self.ro_pulse_down_amp0()))
+            print(r"- amp3 = {}".format(self.ro_pulse_down_amp1()))
+            print(r"- phi2 = {}".format(self.ro_pulse_down_phi0()))
+            print(r"- phi3 = {}".format(self.ro_pulse_down_phi1()))
+
             a = ma.Input_average_analysis(
                 IF=self.ro_freq_mod(),
                 optimization_window=depletion_optimization_window,
                 plot=depletion_analysis_plot,
                 plot_max_time=plot_max_time)
-            return a
+            return a, [np.array(t, dtype=np.float64) for t in transients] # before it was only a 
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
