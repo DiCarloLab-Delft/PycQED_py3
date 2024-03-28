@@ -157,10 +157,10 @@ class HeterodyneInstrument(Instrument):
         # Upload the correct integration weigths
         if self.single_sideband_demod():
             self._acquisition_instr.prepare_SSB_weight_and_rotation(
-                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
+                IF=self.f_RO_mod(), weight_chI=0, weight_chQ=1)
         else:
             self._acquisition_instr.prepare_DSB_weight_and_rotation(
-                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
+                IF=self.f_RO_mod(), weight_chI=0, weight_chQ=1)
 
         if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
             # self._acquisition_instr.awg_sequence_acquisition() # Dirty hack to get UHFLI to cooperate
@@ -553,10 +553,10 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         # prepare weights and rotation
         if self.single_sideband_demod():
             self._acquisition_instr.prepare_SSB_weight_and_rotation(
-                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
+                IF=self.f_RO_mod(), weight_chI=0, weight_chQ=1)
         else:
             self._acquisition_instr.prepare_DSB_weight_and_rotation(
-                IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
+                IF=self.f_RO_mod(), weight_chI=0, weight_chQ=1)
 
         # this sets the result to integration and rotation outcome
         self._acquisition_instr.qas_0_result_source(2)

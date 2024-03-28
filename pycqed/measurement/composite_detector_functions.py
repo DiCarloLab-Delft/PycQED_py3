@@ -77,7 +77,7 @@ import pycqed.analysis.tools.plotting as plt_tools
 #
 #     def __init__(self, measurement_name,  MC, AWG, acquisition_instr,
 #                  pulse_pars, RO_pars, raw=True, analyze=True, upload=True,
-#                  IF=None, weight_function_I=0, weight_function_Q=1,
+#                  IF=None, weight_chI=0, weight_chQ=1,
 #                  optimized_weights=False, one_weight_function_UHFQC=False,
 #                  wait=0.0, close_fig=True, SSB=False,
 #                  nr_averages=1024, integration_length=1e-6,
@@ -158,8 +158,8 @@ import pycqed.analysis.tools.plotting as plt_tools
 #                         nr_shots=min(self.nr_shots, 4094)))
 #                 if self.SSB:
 #                     self.UHFQC.prepare_SSB_weight_and_rotation(
-#                         IF=self.IF, weight_function_I=self.weight_function_I,
-#                         weight_function_Q=self.weight_function_Q)
+#                         IF=self.IF, weight_chI=self.weight_function_I,
+#                         weight_chQ=self.weight_function_Q)
 #                 else:
 #                     if self.IF == None:
 #                         raise ValueError(
@@ -167,8 +167,8 @@ import pycqed.analysis.tools.plotting as plt_tools
 #                     else:
 #                         self.UHFQC.prepare_DSB_weight_and_rotation(
 #                             IF=self.IF,
-#                             weight_function_I=self.weight_function_I,
-#                             weight_function_Q=self.weight_function_Q)
+#                             weight_chI=self.weight_function_I,
+#                             weight_chQ=self.weight_function_Q)
 #             elif 'DDM' in str(self.acquisition_instr):
 #                 self.MC.set_detector_function(
 #                     det.DDM_integration_logging_det(
@@ -179,8 +179,8 @@ import pycqed.analysis.tools.plotting as plt_tools
 #                         nr_shots=min(self.nr_shots, 8000)))
 #                 if self.SSB:
 #                     self.DDM.prepare_SSB_weight_and_rotation(
-#                         IF=self.IF, weight_function_I=self.weight_function_I,
-#                         weight_function_Q=self.weight_function_Q)
+#                         IF=self.IF, weight_chI=self.weight_function_I,
+#                         weight_chQ=self.weight_function_Q)
 #                 #not yet implemented
 #                 # else:
 #                 #     if self.IF == None:
@@ -189,8 +189,8 @@ import pycqed.analysis.tools.plotting as plt_tools
 #                 #     else:
 #                 #         self.UHFQC.prepare_DSB_weight_and_rotation(
 #                 #             IF=self.IF,
-#                 #             weight_function_I=self.weight_function_I,
-#                 #             weight_function_Q=self.weight_function_Q)
+#                 #             weight_chI=self.weight_function_I,
+#                 #             weight_chQ=self.weight_function_Q)
 #
 #     def acquire_data_point(self, *args, **kw):
 #         self.time_start = time.time()

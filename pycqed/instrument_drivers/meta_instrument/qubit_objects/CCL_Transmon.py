@@ -1134,13 +1134,13 @@ class CCLight_Transmon(Qubit):
             if self.ro_acq_weight_type() == 'SSB':
                 UHFQC.prepare_SSB_weight_and_rotation(
                     IF=self.ro_freq_mod(),
-                    weight_function_I=self.ro_acq_weight_chI(),
-                    weight_function_Q=self.ro_acq_weight_chQ())
+                    weight_chI=self.ro_acq_weight_chI(),
+                    weight_chQ=self.ro_acq_weight_chQ())
             elif self.ro_acq_weight_type() == 'DSB':
                 UHFQC.prepare_DSB_weight_and_rotation(
                     IF=self.ro_freq_mod(),
-                    weight_function_I=self.ro_acq_weight_chI(),
-                    weight_function_Q=self.ro_acq_weight_chQ())
+                    weight_chI=self.ro_acq_weight_chI(),
+                    weight_chQ=self.ro_acq_weight_chQ())
             elif 'optimal' in self.ro_acq_weight_type():
                 if (self.ro_acq_weight_func_I() is None or
                         self.ro_acq_weight_func_Q() is None):
@@ -1157,8 +1157,8 @@ class CCLight_Transmon(Qubit):
 
                     UHFQC.prepare_SSB_weight_and_rotation(
                         IF=self.ro_freq_mod(),
-                        weight_function_I=self.ro_acq_weight_chI(),
-                        weight_function_Q=None,
+                        weight_chI=self.ro_acq_weight_chI(),
+                        weight_chQ=None,
                         rotation_angle=self.ro_acq_rotated_SSB_rotation_angle(),
                         length=self.ro_acq_integration_length_weigth_function(),
                         scaling_factor=scaling_factor)

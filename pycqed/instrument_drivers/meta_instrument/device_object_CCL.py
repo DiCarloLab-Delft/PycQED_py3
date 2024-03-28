@@ -757,8 +757,8 @@ class DeviceCCL(Instrument):
 
                 acq_instr.prepare_SSB_weight_and_rotation(
                     IF=qb.ro_freq_mod(),
-                    weight_function_I=qb.ro_acq_weight_chI(),
-                    weight_function_Q=qb.ro_acq_weight_chQ(),
+                    weight_chI=qb.ro_acq_weight_chI(),
+                    weight_chQ=qb.ro_acq_weight_chQ(),
                 )
 
         elif 'optimal' in self.ro_acq_weight_type():
