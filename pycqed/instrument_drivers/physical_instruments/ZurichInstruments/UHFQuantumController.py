@@ -142,11 +142,9 @@ class UHFQC(uhf.UHFQA_core, DIO.CalInterface):
 
         # Holds the number of configured cases
         self._cases = None
-        print("A")
         super().__init__(name=name, device=device, interface=interface, address=address,
                          server=server, port=port, nr_integration_channels=nr_integration_channels,
                          **kw)
-        print("B")
         t1 = time.time()
         log.info(f'{self.devname}: Initialized UHFQC in {t1 - t0:.3f}s')
 
