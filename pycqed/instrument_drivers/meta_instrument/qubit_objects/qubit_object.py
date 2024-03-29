@@ -1229,7 +1229,8 @@ class Qubit(Instrument):
             update=True,
             close_fig=True,
             MC=None,
-            label=''
+            label='',
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs.py
         """
@@ -1321,7 +1322,7 @@ class Qubit(Instrument):
             return self.calibrate_frequency_ramsey(
                 steps=steps, artificial_periods=artificial_periods,
                 verbose=verbose, update=update,
-                close_fig=close_fig)
+                close_fig=close_fig, disable_metadata = disable_metadata)
         return analysis_spec.fitted_freq
 
     def calibrate_spec_pow(
@@ -1412,7 +1413,8 @@ class Qubit(Instrument):
             verbose: bool = True,
             update: bool = True,
             close_fig: bool = True,
-            test_beating: bool = True
+            test_beating: bool = True,
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -1444,7 +1446,8 @@ class Qubit(Instrument):
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
                                 analyze=False,
-                                prepare_for_timedomain=True if 0 == i else False)
+                                prepare_for_timedomain=True if 0 == i else False,
+                                disable_metadata = disable_metadata)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,

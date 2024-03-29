@@ -850,7 +850,8 @@ class HAL_Transmon(HAL_ShimSQ):
             verbose=False,
             MC: Optional[MeasurementControl] = None,
             update=True,
-            all_modules=False
+            all_modules=False,
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -867,7 +868,7 @@ class HAL_Transmon(HAL_ShimSQ):
             else:
                 amps = np.linspace(0, 1, 31)
 
-        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules)
+        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules, disable_metadata = disable_metadata)
 
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
 
@@ -1347,7 +1348,8 @@ class HAL_Transmon(HAL_ShimSQ):
             freqs=None,
             amps=None,
             analyze: bool = True,
-            update: bool = True
+            update: bool = True,
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -1405,7 +1407,7 @@ class HAL_Transmon(HAL_ShimSQ):
                                   msmt_kw={'prepare': True}
                                   )
         nested_MC.set_detector_function(d)
-        nested_MC.run(name='RO_coarse_tuneup', mode='2D')
+        nested_MC.run(name='RO_coarse_tuneup', mode='2D', disable_snapshot_metadata = disable_metadata)
 
         if analyze is True:
             # Analysis
@@ -1544,7 +1546,8 @@ class HAL_Transmon(HAL_ShimSQ):
             optimize_threshold: float = .99,
             check_threshold: float = .90,
             analyze: bool = True,
-            update: bool = True
+            update: bool = True,
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs
@@ -1618,7 +1621,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
 
         nested_MC.set_optimization_method('nelder_mead')
-        nested_MC.run(name='RO_fine_tuneup', mode='adaptive')
+        nested_MC.run(name='RO_fine_tuneup', mode='adaptive', disable_snapshot_metadata = disable_metadata)
 
         if analyze is True:
             ma.OptimizationAnalysis(label='RO_fine_tuneup')
@@ -2266,7 +2269,12 @@ class HAL_Transmon(HAL_ShimSQ):
     # calibrate_ functions (overrides for class Qubit)
     ##########################################################################
 
-    def calibrate_motzoi(self, MC: Optional[MeasurementControl] = None, verbose=True, update=True, motzois=None):
+    def calibrate_motzoi(self,
+                         MC: Optional[MeasurementControl] = None,
+                         verbose=True,
+                         update=True,
+                         motzois=None,
+                         disable_metadata = False):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         """
@@ -2282,7 +2290,7 @@ class HAL_Transmon(HAL_ShimSQ):
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
-        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True)
+        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True,  disable_metadata = disable_metadata)
         opt_motzoi = a.get_intersect()[0]
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
             if verbose:
@@ -3094,7 +3102,8 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             real_imag=True,
             prepare_for_timedomain=True,
-            all_modules=False
+            all_modules=False,
+            disable_metadata = False
     ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
@@ -3132,7 +3141,8 @@ class HAL_Transmon(HAL_ShimSQ):
                 analyze,
                 close_fig,
                 real_imag,
-                prepare_for_timedomain
+                prepare_for_timedomain,
+                disable_metadata
             )
 
     def measure_rabi_ramzz(
@@ -3257,7 +3267,8 @@ class HAL_Transmon(HAL_ShimSQ):
             analyze=True,
             close_fig=True,
             real_imag=True,
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True,
+            disable_metadata = False
     ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
@@ -3289,7 +3300,7 @@ class HAL_Transmon(HAL_ShimSQ):
         # real_imag is actually not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='rabi_' + self.msmt_suffix)
+        MC.run(name='rabi_' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         ma.Rabi_Analysis(label='rabi_')
         return True
@@ -3415,7 +3426,8 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True,
+            disable_metadata = False
     ) -> float:
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -3430,7 +3442,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(np.arange(42))
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('AllXY' + label + self.msmt_suffix)
+        MC.run('AllXY' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
@@ -3490,6 +3502,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3554,7 +3567,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('T1' + self.msmt_suffix)
+        MC.run('T1' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
@@ -3686,7 +3699,8 @@ class HAL_Transmon(HAL_ShimSQ):
             update=True,
             detector=False,
             double_fit=False,
-            test_beating=True
+            test_beating=True,
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3745,7 +3759,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('Ramsey' + label + self.msmt_suffix)
+        MC.run('Ramsey' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         # Restore old frequency value
         self.instr_LO_mw.get_instr().set('frequency', old_frequency)
@@ -3991,7 +4005,8 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             update=True,
             label: str = '',
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True,
+            disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -4062,7 +4077,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(times)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('echo' + label + self.msmt_suffix)
+        MC.run('echo' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             # N.B. v1.5 analysis
@@ -4341,7 +4356,8 @@ class HAL_Transmon(HAL_ShimSQ):
             prepare_for_timedomain: bool = True,
             MC: Optional[MeasurementControl] = None,
             analyze=True,
-            close_fig=True
+            close_fig=True,
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs.py (via calibrate_motzoi)
         """
@@ -4416,7 +4432,7 @@ class HAL_Transmon(HAL_ShimSQ):
             always_prepare=True
         )
         MC.set_detector_function(d)
-        MC.run('Motzoi_XY' + self.msmt_suffix)
+        MC.run('Motzoi_XY' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             if self.ro_acq_weight_type() == 'optimal':
@@ -6487,7 +6503,8 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True):
+            prepare_for_timedomain=True,
+            disable_metadata = False):
         """
         Measures a rabi oscillation of the ef/12 transition.
 
@@ -6523,7 +6540,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points_2D(anharmonicity)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('ef_rabi_2D' + label + self.msmt_suffix, mode='2D')
+        MC.run('ef_rabi_2D' + label + self.msmt_suffix, mode='2D', disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma.TwoD_Analysis()
@@ -6538,7 +6555,8 @@ class HAL_Transmon(HAL_ShimSQ):
             label: str = '',
             analyze=True,
             close_fig=True,
-            prepare_for_timedomain=True
+            prepare_for_timedomain=True,
+            disable_metadata = False
     ):
         """
         Measures a rabi oscillation of the ef/12 transition.
@@ -6573,7 +6591,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.set_sweep_points(p.sweep_points)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('ef_rabi' + label + self.msmt_suffix)
+        MC.run('ef_rabi' + label + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a2 = ma2.EFRabiAnalysis(close_figs=True, label='ef_rabi')
