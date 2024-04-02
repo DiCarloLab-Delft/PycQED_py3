@@ -13,23 +13,33 @@ import networkx as nx
 import datetime
 import multiprocessing
 from importlib import reload
-from typing import List, Union, Optional, Tuple
-from deprecated import deprecated
+from typing import List, Union, Optional
 
+import pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ as HAL_ShimMQ_module
+reload(HAL_ShimMQ_module)
 from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import HAL_ShimMQ
+from pycqed.instrument_drivers.meta_instrument.HAL.HAL_ShimMQ import _acq_ch_map_to_IQ_ch_map
 
 from pycqed.analysis import multiplexed_RO_analysis as mra
+reload(mra)
 from pycqed.measurement import detector_functions as det
 reload(det)
-
 from pycqed.measurement import sweep_functions as swf
+reload(swf)
 from pycqed.analysis import measurement_analysis as ma
+reload(ma)
 from pycqed.analysis import tomography as tomo
+reload(tomo)
 from pycqed.analysis_v2 import measurement_analysis as ma2
+reload(ma2)
 import pycqed.analysis_v2.tomography_2q_v2 as tomo_v2
 
 from pycqed.utilities import learner1D_minimizer as l1dm
+
 from pycqed.utilities.general import check_keyboard_interrupt, print_exception
+
+# imported by LDC. not sure.
+#import pycqed.instrument_drivers.meta_instrument.HAL_Device as devccl
 
 # Imported for type checks
 #from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import QuTech_AWG_Module
@@ -104,13 +114,13 @@ class HAL_Device(HAL_ShimMQ):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
-        in the two-qubit Cphase gate is measured using Ramsey-lie sequence.
+        in the two-qubit Cphase gate is measured using Ramsey-like sequence.
         Specifically qubit q0 is prepared in the superposition, while q1 is in 0 or 1 state.
         Next the flux pulse is applied. Finally pi/2 afterrotation around various axes
         is applied to q0, and q1 is flipped back (if neccessary) to 0 state.
         Plotting the probabilities of the zero state for each qubit as a function of
         the afterrotation axis angle, and comparing case of q1 in 0 or 1 state, enables to
-        measure the conditional phase and estimale the leakage of the Cphase gate.
+        measure the conditional phase and estimate the leakage of the Cphase gate.
 
         Refs:
         Rol arXiv:1903.02492, Suppl. Sec. D
@@ -160,8 +170,7 @@ class HAL_Device(HAL_ShimMQ):
             list_qubits_used.append(q3)
 
         if prepare_for_timedomain:
-            self.prepare_readout(qubits=list_qubits_used)
-            self.prepare_fluxing(qubits=list_qubits_used)
+            self.prepare_for_timedomain(qubits=list_qubits_used)
             for q in list_qubits_used:  # only on the CZ qubits we add the ef pulses
                 mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
                 lm = mw_lutman.LutMap()
@@ -237,6 +246,9 @@ class HAL_Device(HAL_ShimMQ):
             options_dict=options_dict,
             extract_only=extract_only)
 
+        result_dict = {'cond_osc': a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value, 
+                       'leakage': a.proc_data_dict['quantities_of_interest']['missing_fraction'].nominal_value}
+
         return a
 
 
@@ -264,7 +276,7 @@ class HAL_Device(HAL_ShimMQ):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation. In this experiment the conditional phase
-        in the two-qubit Cphase gate is measured using Ramsey-lie sequence.
+        in the two-qubit Cphase gate is measured using Ramsey-like sequence.
         Specifically qubit q0 of each pair is prepared in the superposition, while q1 is in 0 or 1 state.
         Next the flux pulse is applied. Finally pi/2 afterrotation around various axes
         is applied to q0, and q1 is flipped back (if neccessary) to 0 state.
@@ -331,7 +343,9 @@ class HAL_Device(HAL_ShimMQ):
         ramsey_qubits = []
 
         for i, pair in enumerate(pairs):
-            print('Pair (target,control) {} : ({},{})'.format(i + 1, pair[0], pair[1]))
+            #For diagnostics only
+            #print('Pair (target,control) {} : ({},{})'.format(i + 1, pair[0], pair[1]))
+            
             assert pair[0] in self.qubits()
             assert pair[1] in self.qubits()
             Q_idxs_target += [self.find_instrument(pair[0]).cfg_qubit_nr()]
@@ -339,12 +353,16 @@ class HAL_Device(HAL_ShimMQ):
             list_qubits_used += [pair[0], pair[1]]
             ramsey_qubits += [pair[0]]
 
+        #For diagnostics only
+        #print('Q_idxs_target : {}'.format(Q_idxs_target))
+        #print('Q_idxs_control : {}'.format(Q_idxs_control))
+        #print('list_qubits_used : {}'.format(list_qubits_used))
+
         if parked_qbs is not None:
             Q_idxs_parked = [self.find_instrument(Q).cfg_qubit_nr() for Q in parked_qbs]
 
         if prepare_for_timedomain:
-            self.prepare_readout(qubits=list_qubits_used)
-            self.prepare_fluxing(qubits=list_qubits_used)
+            self.prepare_for_timedomain(qubits=list_qubits_used)
 
             for i, q in enumerate(np.concatenate([ramsey_qubits])):
                 # only on the CZ qubits we add the ef pulses
@@ -401,8 +419,15 @@ class HAL_Device(HAL_ShimMQ):
         )
 
         if len(pairs) > 1:
+            # qb_ro_order = np.sum([ list(self._acq_ch_map[key].keys()) for key in self._acq_ch_map.keys()])
+            # qubits_by_feedline = [['D1','X1'],
+            #                         ['D2','Z1','D3','D4','D5','D7','X2','X3','Z3'],
+            #                         ['D6','D8','D9','X4','Z2','Z4']]
+            # qb_ro_order = sorted(np.array(pairs).flatten().tolist(),
+            #                     key=lambda x: [i for i,qubits in enumerate(qubits_by_feedline) if x in qubits])
             qb_ro_order = [qb for qb_dict in self._acq_ch_map.values() for qb in qb_dict.keys()]
         else:
+            # qb_ro_order = [ list(self._acq_ch_map[key].keys()) for key in self._acq_ch_map.keys()][0]
             qb_ro_order = [pairs[0][0], pairs[0][1]]
 
         result_dict = {}
@@ -449,15 +474,14 @@ class HAL_Device(HAL_ShimMQ):
             phase_offsets: List[float] = None,
             control_cases_to_measure: List[str] = None,
             downsample_angle_points: int = 1,
+            prepare_for_timedomain=True,
             initialization_msmt: bool = False,
             wait_time_before_flux_ns: int = 0,
             wait_time_after_flux_ns: int = 0,
-            analyze_parity_model: bool = False,
-            plotting=True,
-            prepare_for_timedomain=True,
             label_suffix="",
-            disable_metadata=False,
             MC: Optional[MeasurementControl] = None,
+            disable_metadata=False,
+            plotting=True,
     ):
         """
         Measures a parity check while playing codewords that are part
@@ -573,79 +597,79 @@ class HAL_Device(HAL_ShimMQ):
         Returns:
             Analysis result.
         """
-        assert all([qb in self.qubits() for qb in control_qubits])
-        assert all([qb in self.qubits() for qb in target_qubits])
+
+        if self.ro_acq_weight_type() != 'optimal':
+            # this occurs because the detector groups qubits per feedline.
+            # If you do not pay attention, this will mess up the analysis of
+            # this experiment.
+            raise ValueError('Current analysis is not working with {}'.format(self.ro_acq_weight_type()))
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        old_digitized = self.ro_acq_digitized()
-        old_weight_type = self.ro_acq_weight_type()
-        self.ro_acq_digitized(False)
-        self.ro_acq_weight_type('optimal')
-
         # if `ramsey_qubits` and/or `flux_dance_steps` are given, they will be used literally.
-        # otherwise, they will be set for the standard S17 experiment for the target qubit type
-        # NOTE: this part is specific to surface-17!
+        # otherwise, they will be set for the standard experiment for the target qubit type
         if 'X' in target_qubits[0]:
             if ramsey_qubits and type(ramsey_qubits) is bool:
-                ramsey_qubits = [qb for qb in ['X1','X2','X3','X4'] if qb not in target_qubits]
+                ramsey_qubits = [qb for qb in ['X1', 'X2', 'X3', 'X4'] if qb not in target_qubits]
             if not flux_dance_steps:
-                flux_dance_steps = [1,2,3,4]
+                flux_dance_steps = [1, 2, 3, 4]
         elif 'Z' in target_qubits[0]:
             if ramsey_qubits and type(ramsey_qubits) is bool:
-                ramsey_qubits = [qb for qb in ['Z1','Z2','Z3','Z4'] if qb not in target_qubits]
+                ramsey_qubits = [qb for qb in ['Z1', 'Z2', 'Z3', 'Z4'] if qb not in target_qubits]
             if not flux_dance_steps:
-                flux_dance_steps = [5,6,7,8]
+                flux_dance_steps = [5, 6, 7, 8]
         else:
             log.warning(f"Target qubit {target_qubits[0]} not X or Z!")
 
-        # if ramsey_qubits is given as list of qubit names, 
+        # if ramsey_qubits is given as list of qubit names,
         # only those will be used and converted to qubit numbers.
         # if ramsey_qubits is given as boolean,
         # all ancillas that are not part of the parity check will be ramseyd
         if ramsey_qubits:
             Q_idxs_ramsey = []
-            for i,qb in enumerate(ramsey_qubits):
+            for i, qb in enumerate(ramsey_qubits):
                 assert qb in self.qubits()
                 if qb in target_qubits:
                     log.warning(f"Ramsey qubit {qb} already given as ancilla qubit!")
                 Q_idxs_ramsey += [self.find_instrument(qb).cfg_qubit_nr()]
 
-        Q_idxs_target = [] 
-        for i,target_qubit in enumerate(target_qubits):
+        Q_idxs_target = []
+        for i, target_qubit in enumerate(target_qubits):
             log.info(f"Parity {target_qubit} - {control_qubits}, flux dance steps {flux_dance_steps}")
+            assert target_qubit in self.qubits()
             Q_idxs_target += [self.find_instrument(target_qubit).cfg_qubit_nr()]
 
         # filter control qubits based on control_cases_to_measure,
         # then the cases will be created based on the filtered control qubits
-        Q_idxs_control = [] 
+        Q_idxs_control = []
+        assert all([qb in self.qubits() for qb in control_qubits])
         if not control_cases_to_measure:
             # if cases are not given, measure all cases for all control qubits
-            control_qubits_by_case = control_qubits   
-            Q_idxs_control += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits_by_case]  
-            cases = ['{:0{}b}'.format(i, len(Q_idxs_control)) for i in range(2**len(Q_idxs_control))]
+            control_qubits_by_case = control_qubits
+            Q_idxs_control += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits_by_case]
+            cases = ['{:0{}b}'.format(i, len(Q_idxs_control)) for i in range(2 ** len(Q_idxs_control))]
         else:
             # if cases are given, prepare and measure only them
-            # NOTE: this feature is not fully tested yet and may not work!
-            # this part selects only the control qubits needed, avoid repetition
+            # select only the control qubits needed, avoid repetition
             control_qubits_by_case = []
             for case in control_cases_to_measure:
-                control_qubits_by_case += [control_qubits[i] for i,c in enumerate(case) \
-                                            if c == '1' and control_qubits[i] not in control_qubits_by_case]
-                #control_qubits_by_case += [control_qubits[i] for i,c in enumerate(case) if c == '1']
-              
+                control_qubits_by_case += [control_qubits[i] for i, c in enumerate(case) \
+                                           if c == '1' and control_qubits[i] not in control_qubits_by_case]
+                # control_qubits_by_case += [control_qubits[i] for i,c in enumerate(case) if c == '1']
+
             # sort selected control qubits according to readout (feedline) order
             # qb_ro_order = np.sum([ list(self._acq_ch_map[key].keys()) for key in self._acq_ch_map.keys()], dtype=object)
             # dqb_ro_order = np.array(qb_ro_order, dtype=str)[[qb[0] == 'D' for qb in qb_ro_order]]
-            control_qubits_by_case = [x for x,_ in sorted(zip(control_qubits_by_case, control_qubits))]
-            
+            control_qubits_by_case = [x for x, _ in sorted(zip(control_qubits_by_case, control_qubits))]
+
             Q_idxs_control += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits_by_case]
-            cases = control_cases_to_measure 
+            cases = control_cases_to_measure
 
         # for separate preparation of parking qubits in 1, used to study parking
         if parking_qubits:
             Q_idxs_parking = []
-            for i,qb in enumerate(parking_qubits):
+            for i, qb in enumerate(parking_qubits):
                 assert qb in self.qubits()
                 if qb in target_qubits + control_qubits:
                     log.warning(f"Parking qubit {qb} already given as control or target qubit!")
@@ -656,52 +680,42 @@ class HAL_Device(HAL_ShimMQ):
         if parking_qubits:
             all_qubits += parking_qubits
 
-        # MW preparation
+        # check the lutman of the target, control and parking qubits for cw_27,
+        # which is needed for refocusing, case preparation, and preparation in 1 (respectively)
+        # and prepare if necessary
         for qb in all_qubits:
             mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
-            # check the lutman of the target, control and parking qubits for cw_27, 
-            # which is needed for refocusing, case preparation, and preparation in 1 (respectively)
-            # and prepare if necessary       
             xm180_dict = {"name": "rXm180", "theta": -180, "phi": 0, "type": "ge"}
             if mw_lutman.LutMap().get(27) != xm180_dict:
-                log.warning(f"{mw_lutman.name} does not have refocusing pulse, overriding `cw_27` ...")
+                print(f"{mw_lutman.name} does not have refocusing pulse, overriding cw_27..")
                 mw_lutman.LutMap()[27] = xm180_dict
                 mw_lutman.load_waveform_onto_AWG_lookuptable(27, regenerate_waveforms=True)
 
-            # check if phase pulses already exist on target qubits to avoid unnecessary upload delay
-            if qb in target_qubits:
-                if not np.all([mw_lutman.LutMap()[i+9] == {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
-                                for i, phase in enumerate(np.arange(0,360,20)) ]) \
-                        or phase_offsets:
-                    # load_phase_pulses already uploads all other waveforms inside
-                    mw_lutman.load_phase_pulses_to_AWG_lookuptable(
-                        phases=np.arange(0,360,20)+phase_offsets[i] if phase_offsets else np.arange(0,360,20))
+        for i, qb in enumerate(target_qubits):
+            mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
+            # load_phase_pulses already uploads all waveforms inside
+            mw_lutman.load_phase_pulses_to_AWG_lookuptable(
+                phases=np.arange(0, 360, 20) + phase_offsets[i] if phase_offsets else np.arange(0, 360, 20))
 
         if prepare_for_timedomain:
-            # Take care of readout order (by feedline/UHF)
-            if self.qubits_by_feedline():
-                all_qubits = sorted(all_qubits, 
-                                key=lambda x: [i for i, feedline in enumerate(self.qubits_by_feedline()) \
-                                                if x in feedline])
-                log.info(f"Sorted qubits for readout preparation: {all_qubits}")
-            else:
-                log.warning("Qubit order by feedline in `self.qubits_by_feedline()` parameter is not set, "
-                            + "readout will be prepared in order of given qubits which can lead to errors!")
-            
-            self.prepare_for_timedomain(qubits=all_qubits)
+            # To preserve readout (feedline/UHF) order in preparation!
+            qubits_by_feedline = [['D1', 'X1'],
+                                  ['D2', 'Z1', 'D3', 'D4', 'D5', 'D7', 'X2', 'X3', 'Z3'],
+                                  ['D6', 'D8', 'D9', 'X4', 'Z2', 'Z4']]
+            all_qubits_sorted = sorted(all_qubits,
+                                       key=lambda x: [i for i, qubits in enumerate(qubits_by_feedline) if x in qubits])
+            log.info(f"Sorted preparation qubits: {all_qubits_sorted}")
+            self.prepare_for_timedomain(qubits=all_qubits_sorted)
 
         # These are hardcoded angles in the mw_lutman for the AWG8
         # only x2 and x3 downsample_swp_points available
-        angles = np.arange(0, 341, 20*downsample_angle_points)
+        angles = np.arange(0, 341, 20 * downsample_angle_points)
 
-        # prepare flux codeword list according to given step numbers
+        # prepare flux codeword list according to given step numbers and refocusing flag
         # will be programmed in order of the list, but scheduled in parallel (if possible)
-        
-        if refocusing:
-            flux_cw_list = [flux_codeword + '_refocus' + f'_{step}' for step in flux_dance_steps]
+        flux_cw_list = [flux_codeword + f'-{step}-refocus' if refocusing else flux_codeword + f'-{step}'
+                        for step in flux_dance_steps]
 
-        else:
-            flux_cw_list = [flux_codeword + f'_{step}' for step in flux_dance_steps]
         p = mqo.parity_check_flux_dance(
             Q_idxs_target=Q_idxs_target,
             Q_idxs_control=Q_idxs_control,
@@ -715,16 +729,16 @@ class HAL_Device(HAL_ShimMQ):
             initialization_msmt=initialization_msmt,
             wait_time_before_flux=wait_time_before_flux_ns,
             wait_time_after_flux=wait_time_after_flux_ns
-            )
+        )
 
         s = swf.OpenQL_Sweep(
             openql_program=p,
             CCL=self.instr_CC.get_instr(),
             parameter_name="Cases",
             unit="a.u."
-            )
+        )
 
-        d = self.get_int_avg_det(qubits=target_qubits+control_qubits)
+        d = self.get_int_avg_det()
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
@@ -732,10 +746,8 @@ class HAL_Device(HAL_ShimMQ):
 
         label = f"Parity_check_flux_dance_{target_qubits}_{control_qubits_by_case}_{self.msmt_suffix}_{label_suffix}"
         MC.run(label, disable_snapshot_metadata=disable_metadata)
-        self.ro_acq_digitized(old_digitized)
-        self.ro_acq_weight_type(old_weight_type)
 
-        a = ma2.Parity_Check_Analysis_OLD(
+        a = ma2.Parity_Check_Analysis(
             label=label,
             ancilla_qubits=target_qubits,
             data_qubits=control_qubits_by_case,
@@ -745,45 +757,23 @@ class HAL_Device(HAL_ShimMQ):
         )
 
         return a.result
-        # a = ma2.Parity_Check_Analysis(
-        #     label=label, 
-        #     target_qubit=target_qubits[0],
-        #     extract_only=not plotting,
-        #     analyze_parity_model=analyze_parity_model
-        #     )
-
-        # result = a.proc_data_dict
-
-        # if analyze_parity_model:
-        #     model_errors = a.proc_data_dict['quantities_of_interest']['parity_model']['model_errors']
-        #     model_terms = a.proc_data_dict['quantities_of_interest']['parity_model']['model_terms']
-        #     # this return structure is necessary to use this as a detector function 
-        #     # for higher level calibration routines
-        #     result = {**result,
-        #                 'model_errors': model_errors,
-        #                 'model_terms': model_terms,
-        #                 # must extract the nominal value here because MC/HDF5 cannot deal with ufloats in the data array
-        #                 **{f'model_error_{term}': x.n for term, x in zip(model_terms, model_errors)}
-        #                 }
-
-        # return result
 
 
     def measure_parity_check_fidelity(
             self,
-            target_qubits: List[str],
-            control_qubits: List[str], # have to be given in readout (feedline) order
-            flux_dance_steps: List[int] = [1,2,3,4],
-            flux_codeword: str = 'flux_dance',
-            ramsey_qubits: List[str] = None,
+            target_qubits: list,
+            control_qubits: list,  # have to be given in readout (feedline) order
+            flux_dance_steps: List[int] = [1, 2, 3, 4],
+            flux_codeword: str = 'flux-dance',
+            ramsey_qubits: list = None,
             refocusing: bool = False,
-            phase_offsets: List[float] = None,
-            cases_to_measure: List[str] = None,
-            result_logging_mode: str = 'raw',
-            prepare_for_timedomain: bool = True,
+            phase_offsets: list = None,
+            cases_to_measure: list = None,
+            result_logging_mode='raw',
+            prepare_for_timedomain=True,
             initialization_msmt: bool = True,
-            nr_shots_per_case: int = 2**14,
-            shots_per_meas: int = 2**16,
+            nr_shots_per_case: int = 2 ** 14,
+            shots_per_meas: int = 2 ** 16,
             wait_time_before_flux_ns: int = 0,
             wait_time_after_flux_ns: int = 0,
             label_suffix: str = "",
@@ -823,54 +813,33 @@ class HAL_Device(HAL_ShimMQ):
 
         """
 
-        assert all([qb in self.qubits() for qb in control_qubits])
-        assert all([qb in self.qubits() for qb in target_qubits])
         if self.ro_acq_weight_type() != 'optimal':
             # this occurs because the detector groups qubits per feedline.
             # If you do not pay attention, this will mess up the analysis of
             # this experiment.
-            raise ValueError('Current analysis is not working with {}'.format(self.ro_acq_weight_type()))
+            raise ValueError('Current conditional analysis is not working with {}'.format(self.ro_acq_weight_type()))
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        cases = ['{:0{}b}'.format(i, len(control_qubits)) for i in range(2**len(control_qubits))]
-        # prepare list of all used qubits
-        all_qubits = target_qubits + control_qubits
+        Q_idxs_ancilla = []
+        for i, ancilla in enumerate(target_qubits):
+            log.info(f"Parity {ancilla} - {control_qubits}")
+            assert ancilla in self.qubits()
+            assert all([Q in self.qubits() for Q in control_qubits])
+            Q_idxs_ancilla += [self.find_instrument(ancilla).cfg_qubit_nr()]
 
-        # MW preparation
-        Q_idxs_control = []   
-        for qb in control_qubits:
-            Q_idxs_control += [self.find_instrument(qb).cfg_qubit_nr()]  
-            mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
-            # check the lutman of the target, control and parking qubits for cw_27, 
-            # which is needed for refocusing, case preparation, and preparation in 1 (respectively)
-            # and prepare if necessary       
-            xm180_dict = {"name": "rXm180", "theta": -180, "phi": 0, "type": "ge"}
-            if mw_lutman.LutMap().get(27) != xm180_dict:
-                log.warning(f"{mw_lutman.name} does not have refocusing pulse, overriding `cw_27` ...")
-                mw_lutman.LutMap()[27] = xm180_dict
-                mw_lutman.load_waveform_onto_AWG_lookuptable(27, regenerate_waveforms=True)
-
-        Q_idxs_target = [] 
-        for i,ancilla in enumerate(target_qubits):
-            log.info(f"Parity check fidelity {ancilla} - {control_qubits}")
-            Q_idxs_target += [self.find_instrument(ancilla).cfg_qubit_nr()]
-            mw_lutman = self.find_instrument(ancilla).instr_LutMan_MW.get_instr()
-            # check if phase pulses already exist on target qubits to avoid unnecessary upload delay
-            if not np.all([mw_lutman.LutMap()[i+9] == {"name": "rPhi90", "theta": 90, "phi": phase, "type": "ge"}
-                            for i, phase in enumerate(np.arange(0,360,20)) ]) \
-                    or phase_offsets:
-                # load_phase_pulses already uploads all other waveforms inside
-                mw_lutman.load_phase_pulses_to_AWG_lookuptable(
-                    phases=np.arange(0,360,20)+phase_offsets[i] if phase_offsets else np.arange(0,360,20))
-
+        Q_idxs_ramsey = []
         if ramsey_qubits:
-            Q_idxs_ramsey = []
-            for i,qb in enumerate(ramsey_qubits):
+            for i, qb in enumerate(ramsey_qubits):
                 assert qb in self.qubits()
                 if qb in target_qubits:
                     log.warning(f"Ramsey qubit {qb} already given as ancilla qubit!")
                 Q_idxs_ramsey += [self.find_instrument(qb).cfg_qubit_nr()]
+
+        Q_idxs_data = []
+        Q_idxs_data += [self.find_instrument(Q).cfg_qubit_nr() for Q in control_qubits]
+        cases = ['{:0{}b}'.format(i, len(Q_idxs_data)) for i in range(2 ** len(Q_idxs_data))]
 
         if initialization_msmt:
             nr_shots = 2 * nr_shots_per_case * len(cases)
@@ -879,53 +848,46 @@ class HAL_Device(HAL_ShimMQ):
             nr_shots = nr_shots_per_case * len(cases)
 
         self.ro_acq_digitized(False)
+
         if prepare_for_timedomain:
-            # Take care of readout order (by feedline/UHF)
-            if self.qubits_by_feedline():
-                all_qubits = sorted(all_qubits, 
-                                key=lambda x: [i for i, feedline in enumerate(self.qubits_by_feedline()) \
-                                                if x in feedline])
-                log.info(f"Sorted qubits for readout preparation: {all_qubits}")
-            else:
-                log.warning("Qubit order by feedline in `self.qubits_by_feedline()` parameter is not set, "
-                            + "readout will be prepared in order of given qubits which can lead to errors!")
+            self.prepare_for_timedomain(qubits=target_qubits + control_qubits)
 
-            self.prepare_for_timedomain(qubits=target_qubits+control_qubits)
+        for i, qb in enumerate(target_qubits):
+            mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
+            # load_phase_pulses already uploads all waveforms inside
+            mw_lutman.load_phase_pulses_to_AWG_lookuptable(
+                phases=np.arange(0, 360, 20) + phase_offsets[i] if phase_offsets else np.arange(0, 360, 20))
 
-        # prepare flux codeword list according to given step numbers
+        # prepare flux codeword list according to given step numbers and refocusing flag
         # will be programmed in order of the list, but scheduled in parallel (if possible)
-        # flux_cw_list = [flux_codeword + f'_{step}' for step in flux_dance_steps]
-        if refocusing:
-            flux_cw_list = [flux_codeword + '_refocus' + f'_{step}' for step in flux_dance_steps]
-
-        else:
-            flux_cw_list = [flux_codeword + f'_{step}' for step in flux_dance_steps]
+        flux_cw_list = [flux_codeword + f'-{step}-refocus' if refocusing else flux_codeword + f'-{step}'
+                        for step in flux_dance_steps]
 
         p = mqo.parity_check_fidelity(
-            Q_idxs_target=Q_idxs_target,
-            Q_idxs_control=Q_idxs_control,
+            Q_idxs_ancilla,
+            Q_idxs_data,
+            Q_idxs_ramsey,
             control_cases=cases,
             flux_cw_list=flux_cw_list,
-            Q_idxs_ramsey=Q_idxs_ramsey if ramsey_qubits else None,
             refocusing=refocusing,
             platf_cfg=self.cfg_openql_platform_fn(),
             initialization_msmt=initialization_msmt,
             wait_time_before_flux=wait_time_before_flux_ns,
             wait_time_after_flux=wait_time_after_flux_ns
-            )
+        )
 
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
-
-        d = self.get_int_logging_detector(
-            qubits=target_qubits+control_qubits, 
-            result_logging_mode=result_logging_mode
-            )
-        shots_per_meas = int(np.floor(np.min([shots_per_meas, nr_shots]) / len(cases)) 
-                            * len(cases) )
-        d.set_child_attr("nr_shots", shots_per_meas)
-
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
+        d = self.get_int_logging_detector(
+            qubits=target_qubits + control_qubits,
+            result_logging_mode=result_logging_mode
+        )
+        shots_per_meas = int(np.floor(np.min([shots_per_meas, nr_shots])
+                                      / len(cases))
+                             * len(cases)
+                             )
+        d.set_child_attr("nr_shots", shots_per_meas)
         MC.set_detector_function(d)
 
         # disable live plotting and soft averages
@@ -940,215 +902,91 @@ class HAL_Device(HAL_ShimMQ):
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
 
-        # a = ma2.Parity_Check_Fidelity_Analysis(label=label)
-        # return a.result
-
-    def measure_sandia_parity_benchmark(self,
-                                        ancilla_qubit: str,
-                                        data_qubits: list,
-                                        prepare_for_timedomain:bool=True):
-        ###################
-        # setup qubit idxs
-        ###################
-        all_qubits = [ancilla_qubit]+data_qubits
-        ancilla_idx = self.find_instrument(ancilla_qubit).cfg_qubit_nr()
-        data_idxs = [ self.find_instrument(q).cfg_qubit_nr() for q in data_qubits ]
-        ###########################################
-        # RO preparation (assign res_combinations)
-        ###########################################
-        RO_lms = np.unique([self.find_instrument(q).instr_LutMan_RO() for q in all_qubits])
-        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() : 
-                      (self.find_instrument(q).name, 
-                       self.find_instrument(q).instr_LutMan_RO()) for q in all_qubits }
-        main_qubits = []
-        exception_qubits = []
-        res_combs = {}
-        for lm in RO_lms:
-            res_combs[lm] = []
-            comb = []
-            for idx in data_idxs+[ancilla_idx]:
-                  if qubit_RO_lm[idx][1] == lm:
-                        comb += [idx]
-            res_combs[lm] += [comb]
-            if qubit_RO_lm[ancilla_idx][1] == lm:
-                  res_combs[lm] += [[ancilla_idx]]
-                  main_qubits = [qubit_RO_lm[idx][0] for idx in comb]
-            else:
-                  exception_qubits += [qubit_RO_lm[idx][0] for idx in comb]
-        # Time-domain preparation
-        ordered_qubits = main_qubits+exception_qubits
-        if prepare_for_timedomain:
-            assert self.ro_acq_weight_type() == 'optimal'
-            self.prepare_for_timedomain(ordered_qubits)
-            for lm in RO_lms:
-                ro_lm = self.find_instrument(lm)
-                ro_lm.resonator_combinations(res_combs[lm])
-                ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
-        ########################
-        # SETUP MC and detector
-        ########################
-        uhfqc_max_avg = 2**17
-        d = self.get_int_logging_detector(qubits=ordered_qubits, result_logging_mode='raw')
-        for detector in d.detectors:
-            detector.nr_shots = int(uhfqc_max_avg/5)*5
-        p = mqo.Parity_Sandia_benchmark(qA=ancilla_idx,
-                                        QDs=data_idxs,
-                                        platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-        MC = self.instr_MC.get_instr()
-        MC.soft_avg(1)
-        MC.live_plot_enabled(False)
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(int(uhfqc_max_avg/5)*5))
-        MC.set_detector_function(d)
-        MC.run(f"Sandia_parity_benchmark_{ancilla_qubit}_{data_qubits[0]}_{data_qubits[1]}_{data_qubits[2]}_{data_qubits[3]}")
-
-        ma2.pba.Sandia_parity_benchmark(label='Sandia',
-                                        ancilla_qubit=ancilla_qubit, 
-                                        data_qubits=data_qubits,
-                                        exception_qubits=exception_qubits)
+        return True
 
 
-    def measure_weight4_parity_tomography(
+    # FIXME: commented out
+    # def measure_phase_corrections(
+    #         self,
+    #         target_qubits: List[str],
+    #         control_qubits: List[str],
+    #         flux_codeword: str="cz",
+    #         measure_switched_target: bool=True,
+    #         update: bool = True,
+    #         prepare_for_timedomain=True,
+    #         disable_cz: bool = False,
+    #         disabled_cz_duration_ns: int = 60,
+    #         cz_repetitions: int = 1,
+    #         wait_time_before_flux_ns: int = 0,
+    #         wait_time_after_flux_ns: int = 0,
+    #         label="",
+    #         verbose=True,
+    #         extract_only=False,
+    #         ):
+    #     assert all(qb in self.qubits() for control_qubits + target_qubits)
+
+    #     for q_target, q_control in zip(target_qubits, control_qubits):
+    #         a = self.measure_conditional_oscillation(
+    #             q_target,
+    #             q_control,
+
+    #             prepare_for_timedomain=prepare_for_timedomain
+    #             extract_only=extract_only
+    #             )
+
+    #     if measure_switched_target:
+    #         for q_target, q_control in zip(control_qubits, target_qubits):
+    #             a = self.measure_conditional_oscillation(
+    #                 q_target,
+    #                 q_control,
+
+    #                 prepare_for_timedomain=prepare_for_timedomain
+    #                 extract_only=extract_only
+    #                 )
+
+    #     for qb in target_qubits:
+    #         mw_lutman = self.find_instrument(qb).instr_LutMan_MW.get_instr()
+
+    #     return self
+
+
+    def measure_two_qubit_grovers_repeated(
             self,
-            ancilla_qubit: str,
-            data_qubits: list,
-            sim_measurement: bool,
-            prepare_for_timedomain: bool=True,
-            repetitions: int=10,
-            label: str=''
-            ):
-        assert self.ro_acq_digitized() == False
-        ###################
-        # setup qubit idxs
-        ###################
-        all_qubits = [ancilla_qubit]+data_qubits
-        ancilla_idx = self.find_instrument(ancilla_qubit).cfg_qubit_nr()
-        data_idxs = [ self.find_instrument(q).cfg_qubit_nr() for q in data_qubits ]
-        ###########################################
-        # RO preparation (assign res_combinations)
-        ###########################################
-        RO_lms = np.unique([self.find_instrument(q).instr_LutMan_RO() for q in all_qubits])
-        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() : 
-                      (self.find_instrument(q).name, 
-                       self.find_instrument(q).instr_LutMan_RO()) for q in all_qubits }
-        main_qubits = []
-        exception_qubits = []
-        res_combs = {}
-        for lm in RO_lms:
-            res_combs[lm] = []
-            comb1= []
-            comb2= []
-            # ancilla + data qubits resonators
-            for idx in [ancilla_idx]+data_idxs:
-                  if qubit_RO_lm[idx][1] == lm:
-                        comb1+= [idx]
-                        comb2+= [idx]
-            res_combs[lm] += [comb1]
-            if qubit_RO_lm[ancilla_idx][1] == lm:
-                  res_combs[lm] += [[ancilla_idx]]
-                  comb2.remove(ancilla_idx)
-                  res_combs[lm] += [comb2]
-                  main_qubits = [qubit_RO_lm[idx][0] for idx in comb1]
-            else:
-                  exception_qubits += [qubit_RO_lm[idx][0] for idx in comb1]
-        # Time-domain preparation
-        ordered_qubits = main_qubits+exception_qubits
+            qubits: list,
+            nr_of_grover_iterations=40,
+            prepare_for_timedomain=True,
+            MC: Optional[MeasurementControl] = None,
+    ):
         if prepare_for_timedomain:
-            assert self.ro_acq_weight_type() == 'optimal'
-            self.prepare_for_timedomain(ordered_qubits)
-            for lm in RO_lms:
-                ro_lm = self.find_instrument(lm)
-                ro_lm.resonator_combinations(res_combs[lm])
-                ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
-        
-        p = mqo.Weight_4_parity_tomography(
-            Q_anc=ancilla_idx,
-            Q_D1=data_idxs[0],
-            Q_D2=data_idxs[1],
-            Q_D3=data_idxs[2],
-            Q_D4=data_idxs[3],
-            simultaneous_measurement=sim_measurement,
-            platf_cfg=self.cfg_openql_platform_fn())
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
 
-        uhfqc_max_avg = 2**17
-        if sim_measurement:
-            readouts_per_round = 81+2**5
-        else:
-            readouts_per_round = 81*2+2**5
-        d = self.get_int_logging_detector(qubits=all_qubits, result_logging_mode='raw')
-        d.detectors[0].nr_shots = int(uhfqc_max_avg/readouts_per_round) * readouts_per_round
-        d.detectors[1].nr_shots = int(uhfqc_max_avg/readouts_per_round) * readouts_per_round
-        s = swf.OpenQL_Sweep(openql_program=p,
-                     CCL=self.instr_CC.get_instr())
-        MC = self.instr_MC.get_instr()
-        MC.soft_avg(1)
-        MC.live_plot_enabled(False)
+        for q in qubits:
+            assert q in self.qubits()
+
+        q0idx = self.find_instrument(qubits[-1]).cfg_qubit_nr()
+        q1idx = self.find_instrument(qubits[-2]).cfg_qubit_nr()
+
+        p = mqo.grovers_two_qubits_repeated(
+            qubits=[q1idx, q0idx],
+            nr_of_grover_iterations=nr_of_grover_iterations,
+            platf_cfg=self.cfg_openql_platform_fn(),
+        )
+
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
+        d = self.get_correlation_detector()  # FIXME: broken, parameter qubits missing
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(int(uhfqc_max_avg/readouts_per_round) 
-                                        * readouts_per_round * repetitions))
+        MC.set_sweep_points(np.arange(nr_of_grover_iterations))
         MC.set_detector_function(d)
-        MC.run(f'Weight_4_parity_tomography_{ancilla_qubit}_{data_qubits}_sim-msmt-{sim_measurement}_{label}')
-        # Warning analysis requires that the detector function is ordered
-        # as: [anc_qubit, data_qubit[0],[1],[2],[3]]
-        ma2.pba.Weight_4_parity_tomography(sim_measurement=sim_measurement)
-
-
-    def measure_phase_corrections(
-            self,
-            pairs: List[List[str]],
-            flux_codeword: str = "cz",
-            measure_switched_target: bool = True,
-            update: bool = True,
-            prepare_for_timedomain = True,
-            label: str = "_ph-corr",
-            ):
-        """
-        FIXME: not fully tested yet
-        """
-        assert all(pair in self.qubit_edges() or pair[::-1] in self.qubit_edges()
-                     for pair in pairs)
-
-        a = self.measure_conditional_oscillation_multi(
-            pairs=pairs,
-            flux_codeword=flux_codeword,
-            prepare_for_timedomain=prepare_for_timedomain,
-            label=label
+        MC.run(
+            "Grovers_two_qubit_repeated_{}_{}{}".format(
+                qubits[-2], qubits[-1], self.msmt_suffix
             )
-        phase_updates = dict.fromkeys([pair[0] for pair in pairs])
-        for i,pair in enumerate(pairs):
-            phase_updates[pair[0]] = a[f"pair_{i}_phi_0_a"]
-        
-        if measure_switched_target:
-            a = self.measure_conditional_oscillation(
-                pairs=[pair[::-1] for pair in pairs],
-                flux_codeword=flux_codeword,
-                prepare_for_timedomain=prepare_for_timedomain,
-                label=label
-                )
-            for i,pair in enumerate(pairs):
-                phase_updates[pair[1]] = a[f"pair_{i}_phi_0_a"]
+        )
 
-        if update:
-            # find gate direction to update corresponding lutman parameter
-            if measure_switched_target:
-                all_pairs = pairs + [pair[::-1] for pair in pairs]
-            else:
-                all_pairs = pairs
-
-            for i,pair in enumerate(all_pairs):
-                if self.qubit_edges().get('-'.join(pair), False):
-                    gate = self.qubit_edges()['-'.join(pair)]
-                elif self.qubit_edges().get('-'.join(pair[::-1]), False):
-                    gate = self.qubit_edges()['-'.join(pair[::-1])]
-                else:
-                    raise ValueError(f"Gate direction for pair {pair} not found in list of qubit edges!")
-
-                mw_lutman = self.find_instrument(pair[0]).instr_LutMan_MW.get_instr()
-                mw_lutman.parameters[f"vcz_virtual_q_ph_corr_{gate}"](phase_updates[pair[0]])
-
-        return phase_updates
+        a = ma.MeasurementAnalysis()
+        return a
 
 
     def measure_two_qubit_tomo_bell(
@@ -1212,8 +1050,7 @@ class HAL_Device(HAL_ShimMQ):
 
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
-        # 36 tomo rotations + 7*4 calibration points
-        cases = np.arange(36 + 7 * 4)
+        cases = np.arange(36 + 7 * 4)        # 36 tomo rotations + 7*4 calibration points
         if not shots_logging:
             d = self.get_correlation_detector([q0, q1])
             MC.set_sweep_points(cases)
@@ -1367,6 +1204,219 @@ class HAL_Device(HAL_ShimMQ):
         return a_full, a_seq
 
 
+    def measure_single_qubit_parity(
+            self,
+            qD: str,
+            qA: str,
+            number_of_repetitions: int = 1,
+            initialization_msmt: bool = False,
+            initial_states=["0", "1"],
+            nr_shots: int = 4088 * 4,
+            flux_codeword: str = "cz",
+            analyze: bool = True,
+            close_fig: bool = True,
+            prepare_for_timedomain: bool = True,
+            MC: Optional[MeasurementControl] = None,
+            parity_axis="Z",
+    ):
+        assert qD in self.qubits()
+        assert qA in self.qubits()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=[qD, qA])
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        qDidx = self.find_instrument(qD).cfg_qubit_nr()
+        qAidx = self.find_instrument(qA).cfg_qubit_nr()
+
+        p = mqo.single_qubit_parity_check(
+            qDidx,
+            qAidx,
+            self.cfg_openql_platform_fn(),
+            number_of_repetitions=number_of_repetitions,
+            initialization_msmt=initialization_msmt,
+            initial_states=initial_states,
+            flux_codeword=flux_codeword,
+            parity_axis=parity_axis,
+        )
+
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
+        d = self.get_int_logging_detector(qubits=[qA], result_logging_mode="lin_trans")
+        # d.nr_shots = 4088  # To ensure proper data binning
+        # Because we are using a multi-detector
+        d.set_child_attr("nr_shots", 4088)
+
+        # save and change settings
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        name = "Single_qubit_parity_{}_{}_{}".format(qD, qA, number_of_repetitions)
+        MC.run(name)
+
+        # restore settings
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+
+        if analyze:
+            a = ma2.Singleshot_Readout_Analysis(
+                t_start=None,
+                t_stop=None,
+                label=name,
+                options_dict={
+                    "post_select": initialization_msmt,
+                    "nr_samples": 2 + 2 * initialization_msmt,
+                    "post_select_threshold": self.find_instrument(
+                        qA
+                    ).ro_acq_threshold(),
+                },
+                extract_only=False,
+            )
+        return a
+
+
+    def measure_two_qubit_parity(
+            self,
+            qD0: str,
+            qD1: str,
+            qA: str,
+            number_of_repetitions: int = 1,
+            initialization_msmt: bool = False,
+            initial_states=[
+                ["0", "0"],
+                ["0", "1"],
+                ["1", "0"],
+                ["1", "1"],
+            ],  # nb: this groups even and odd
+            # nr_shots: int=4088*4,
+            flux_codeword: str = "cz",
+            # flux_codeword1: str = "cz",
+            flux_codeword_list: List[str] = None,
+            # flux_codeword_D1: str = None,
+            analyze: bool = True,
+            close_fig: bool = True,
+            prepare_for_timedomain: bool = True,
+            MC: Optional[MeasurementControl] = None,
+            echo: bool = True,
+            post_select_threshold: float = None,
+            parity_axes=["ZZ"],
+            tomo=False,
+            tomo_after=False,
+            ro_time=600e-9,
+            echo_during_ancilla_mmt: bool = True,
+            idling_time=780e-9,
+            idling_time_echo=480e-9,
+            idling_rounds=0,
+    ):
+        assert qD0 in self.qubits()
+        assert qD1 in self.qubits()
+        assert qA in self.qubits()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=[qD1, qD0, qA])
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        qD0idx = self.find_instrument(qD0).cfg_qubit_nr()
+        qD1idx = self.find_instrument(qD1).cfg_qubit_nr()
+        qAidx = self.find_instrument(qA).cfg_qubit_nr()
+
+        p = mqo.two_qubit_parity_check(
+            qD0idx,
+            qD1idx,
+            qAidx,
+            self.cfg_openql_platform_fn(),
+            number_of_repetitions=number_of_repetitions,
+            initialization_msmt=initialization_msmt,
+            initial_states=initial_states,
+            flux_codeword=flux_codeword,
+            # flux_codeword1=flux_codeword1,
+            flux_codeword_list=flux_codeword_list,
+            # flux_codeword_D1=flux_codeword_D1,
+            echo=echo,
+            parity_axes=parity_axes,
+            tomo=tomo,
+            tomo_after=tomo_after,
+            ro_time=ro_time,
+            echo_during_ancilla_mmt=echo_during_ancilla_mmt,
+            idling_time=idling_time,
+            idling_time_echo=idling_time_echo,
+            idling_rounds=idling_rounds,
+        )
+        s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
+
+        d = self.get_int_logging_detector(
+            qubits=[qD1, qD0, qA],
+            result_logging_mode="lin_trans"
+        )
+
+        if tomo:
+            mmts_per_round = (
+                    number_of_repetitions * len(parity_axes)
+                    + 1 * initialization_msmt
+                    + 1 * tomo_after
+            )
+            print("mmts_per_round", mmts_per_round)
+            nr_shots = 4096 * 64 * mmts_per_round  # To ensure proper data binning
+            if mmts_per_round < 4:
+                nr_shots = 4096 * 64 * mmts_per_round  # To ensure proper data binning
+            elif mmts_per_round < 10:
+                nr_shots = 64 * 64 * mmts_per_round  # To ensure proper data binning
+            elif mmts_per_round < 20:
+                nr_shots = 16 * 64 * mmts_per_round  # To ensure proper data binning
+            elif mmts_per_round < 40:
+                nr_shots = 16 * 64 * mmts_per_round  # To ensure proper data binning
+            else:
+                nr_shots = 8 * 64 * mmts_per_round  # To ensure proper data binning
+            d.set_child_attr("nr_shots", nr_shots)
+
+        else:
+            nr_shots = 4096 * 8  # To ensure proper data binning
+            d.set_child_attr("nr_shots", nr_shots)
+
+        # save and change settings
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        self.msmt_suffix = "rounds{}".format(number_of_repetitions)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        name = "Two_qubit_parity_{}_{}_{}_{}_{}".format(
+            parity_axes, qD1, qD0, qA, self.msmt_suffix
+        )
+        MC.run(name)
+
+        # restore settings
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+
+        if analyze:
+            if not tomo and not initialization_msmt:
+                a = mra.two_qubit_ssro_fidelity(name)
+            a = ma2.Singleshot_Readout_Analysis(
+                t_start=None,
+                t_stop=None,
+                label=name,
+                options_dict={
+                    "post_select": initialization_msmt,
+                    "nr_samples": 2 + 2 * initialization_msmt,
+                    "post_select_threshold": self.find_instrument(
+                        qA
+                    ).ro_acq_threshold(),
+                    "preparation_labels": ["prep. 00, 11", "prep. 01, 10"],
+                },
+                extract_only=False,
+            )
+            return a
+
+
     def measure_residual_ZZ_coupling(
             self,
             q0: str,
@@ -1486,7 +1536,7 @@ class HAL_Device(HAL_ShimMQ):
     def measure_ssro_multi_qubit(
             self,
             qubits: list,
-            nr_shots_per_case: int = 2 ** 13,  # 8192
+            nr_shots_per_case: int = 2 ** 14, 
             prepare_for_timedomain: bool = True,
             result_logging_mode='raw',
             initialize: bool = False,
@@ -1552,6 +1602,8 @@ class HAL_Device(HAL_ShimMQ):
             # this experiment.
             raise ValueError('Detector qubits do not match order specified.{} vs {}'.format(qubits, det_qubits))
 
+        # Compute the number of shots per UHFQC acquisition. 
+        # LDC question: why would there be an upper limit? Is this still relevant?
         shots_per_meas = int(
             np.floor(np.min([shots_per_meas, nr_shots]) / nr_cases) * nr_cases
         )
@@ -1581,20 +1633,24 @@ class HAL_Device(HAL_ShimMQ):
                     nr_qubits=len(qubits),
                     post_selection=True,
                     post_selec_thresholds=thresholds)
-                for qubit in qubits:
-                    for key in a.proc_data_dict['quantities_of_interest'].keys():
-                        if f' {qubit}' in str(key):
-                            self.find_instrument(qubit).F_ssro(a.proc_data_dict['quantities_of_interest'][key]['Post_F_a'])
-                            self.find_instrument(qubit).F_init(1-a.proc_data_dict['quantities_of_interest'][key]['Post_residual_excitation'])
+
+                # LDC turning off for now while debugging Quantum Inspire. 2022/06/22
+                #for qubit in qubits:
+                    #for key in a.proc_data_dict['quantities_of_interest'].keys():
+                        #if f' {qubit}' in str(key):
+                            # self.find_instrument(qubit).F_ssro(a.proc_data_dict['quantities_of_interest'][key]['Post_F_a'])
+                            # self.find_instrument(qubit).F_init(1-a.proc_data_dict['quantities_of_interest'][key]['Post_residual_excitation'])
             else:
                 a = ma2.Multiplexed_Readout_Analysis(
                     label=label,
                     nr_qubits=len(qubits))
+
             # Set thresholds
             for i, qubit in enumerate(qubits):
                 label = a.Channels[i]
                 threshold = a.qoi[label]['threshold_raw']
-                self.find_instrument(qubit).ro_acq_threshold(threshold)
+                # LDC turning off this update for now. 2022/06/28
+                # self.find_instrument(qubit).ro_acq_threshold(threshold)
         return True
 
 
@@ -1816,98 +1872,127 @@ class HAL_Device(HAL_ShimMQ):
         return analysis
 
 
-    def measure_msmt_induced_dephasing(
-            self,
-            meas_qubit: str, 
-            target_qubits: list,
-            measurement_time_ns: int,
-            echo_times: list = None,
-            echo_phases: list = None,
-            prepare_for_timedomain: bool=True):
+    def measure_msmt_induced_dephasing_matrix(
+            self, qubits: list,
+            analyze=True,
+            MC: Optional[MeasurementControl] = None,
+            prepare_for_timedomain=True,
+            amps_rel=np.linspace(0, 1, 11),
+            verbose=True,
+            get_quantum_eff: bool = False,
+            dephasing_sequence='ramsey',
+            selected_target=None,
+            selected_measured=None,
+            target_qubit_excited=False,
+            extra_echo=False,
+            echo_delay=0e-9
+    ):
+        """
+        Measures the msmt induced dephasing for readout the readout of qubits
+        i on qubit j. Additionally measures the SNR as a function of amplitude
+        for the diagonal elements to obtain the quantum efficiency.
+        In order to use this: make sure that
+        - all readout_and_depletion pulses are of equal total length
+        - the cc light to has the readout time configured equal to the
+            measurement and depletion time + 60 ns buffer
 
-        assert self.ro_acq_digitized() == False
-        assert self.ro_acq_weight_type() == 'optimal'
-        ###################
-        # setup qubit idxs
-        ###################
-        all_qubits = [meas_qubit]+target_qubits
-        meas_qubit_idx = self.find_instrument(meas_qubit).cfg_qubit_nr()
-        target_idxs = [ self.find_instrument(q).cfg_qubit_nr() for q in target_qubits ]
-        ###########################################
-        # RO preparation (assign res_combinations)
-        ###########################################
-        RO_lms = np.unique([self.find_instrument(q).instr_LutMan_RO() for q in all_qubits])
-        qubit_RO_lm = { self.find_instrument(q).cfg_qubit_nr() : 
-                      (self.find_instrument(q).name, 
-                       self.find_instrument(q).instr_LutMan_RO()) for q in all_qubits }
-        main_qubits = []
-        exception_qubits = []
-        res_combs = {}
-        for lm in RO_lms:
-            res_combs[lm] = []
-            comb1= []
-            comb2= []
-            # meas_qubit + target qubits resonators
-            for idx in [meas_qubit_idx]+target_idxs:
-                  if qubit_RO_lm[idx][1] == lm:
-                        comb1+= [idx]
-                        comb2+= [idx]
-            res_combs[lm] += [comb1]
-            if qubit_RO_lm[meas_qubit_idx][1] == lm:
-                  res_combs[lm] += [[meas_qubit_idx]]
-                  comb2.remove(meas_qubit_idx)
-                  res_combs[lm] += [comb2]
-                  main_qubits = [qubit_RO_lm[idx][0] for idx in comb1]
-            else:
-                  exception_qubits += [qubit_RO_lm[idx][0] for idx in comb1]
-        # Time-domain preparation
-        ordered_qubits = main_qubits+exception_qubits
+        FIXME: not sure if the weight function assignment is working correctly.
+
+        the qubit objects will use SSB for the dephasing measurements.
+        """
+
+        lpatt = "_trgt_{TQ}_measured_{RQ}"
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(ordered_qubits, bypass_flux=True)
-            for lm in RO_lms:
-                ro_lm = self.find_instrument(lm)
-                ro_lm.resonator_combinations(res_combs[lm])
-                ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
-            if echo_times != None:
-                assert echo_phases != None
-                for i, q in enumerate(target_qubits):
-                    mw_lm = self.find_instrument(f'MW_lutman_{q}')
-                    print(mw_lm.name)    
-                    mw_lm.LutMap()[30] = {'name': 'rEcho', 'theta': 180, 
-                                          'phi': echo_phases[i], 'type': 'ge'}
-                    mw_lm.load_phase_pulses_to_AWG_lookuptable()
+            # for q in qubits:
+            #    q.prepare_for_timedomain()
+            self.prepare_for_timedomain(qubits=qubits)
 
-        if exception_qubits != []:
-            exception_idxs = [self.find_instrument(q).cfg_qubit_nr()
-                             for q in exception_qubits]
-        else:
-            exception_idxs = None
+        # Save old qubit suffixes
+        old_suffixes = [self.find_instrument(q).msmt_suffix for q in qubits]
+        old_suffix = self.msmt_suffix
 
-        p = mqo.Msmt_induced_dephasing_ramsey(
-            q_rams = target_idxs,
-            q_meas = meas_qubit_idx,
-            echo_times = echo_times,
-            meas_time = measurement_time_ns,
-            exception_qubits=exception_idxs,
-            platf_cfg=self.cfg_openql_platform_fn())
+        # Save the start-time of the experiment for analysis
+        start = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        d = self.get_int_avg_det(qubits=ordered_qubits)
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-        MC = self.instr_MC.get_instr()
-        MC.soft_avg(1)
-        MC.live_plot_enabled(True)
-        MC.set_sweep_function(s)
-        sw_pts = np.concatenate((np.repeat(np.arange(0, 360, 20), 6), 
-                                 np.array([360, 361, 362, 364])))
-        MC.set_sweep_points(sw_pts)
-        MC.set_detector_function(d)
-        MC.run(f'Msmt_induced_dephasing_{meas_qubit}_{target_qubits}')
+        # Loop over all target and measurement qubits
+        target_qubits = [self.find_instrument(q) for q in qubits]
+        measured_qubits = [self.find_instrument(q) for q in qubits]
+        if selected_target != None:
+            target_qubits = [target_qubits[selected_target]]
+        if selected_measured != None:
+            measured_qubits = [measured_qubits[selected_measured]]
+        for target_qubit in target_qubits:
+            for measured_qubit in measured_qubits:
+                # Set measurement label suffix
+                s = lpatt.replace("{TQ}", target_qubit.name)
+                s = s.replace("{RQ}", measured_qubit.name)
+                measured_qubit.msmt_suffix = s
+                target_qubit.msmt_suffix = s
 
-        a = ma2.mra.measurement_dephasing_analysis(
-                meas_time=measurement_time_ns*1e-9,
-                exception_qubits=exception_qubits)
+                # Print label
+                if verbose:
+                    print(s)
 
+                # Slight differences if diagonal element
+                if target_qubit == measured_qubit:
+                    amps_rel = amps_rel
+                    mqp = None
+                    list_target_qubits = None
+                else:
+                    # t_amp_max = max(target_qubit.ro_pulse_down_amp0(),
+                    #                target_qubit.ro_pulse_down_amp1(),
+                    #                target_qubit.ro_pulse_amp())
+                    # amp_max = max(t_amp_max, measured_qubit.ro_pulse_amp())
+                    # amps_rel = np.linspace(0, 0.49/(amp_max), n_amps_rel)
+                    amps_rel = amps_rel
+                    mqp = self.cfg_openql_platform_fn()
+                    list_target_qubits = [
+                        target_qubit,
+                    ]
+
+                # If a diagonal element, consider doing the full quantum
+                # efficiency matrix.
+                if target_qubit == measured_qubit and get_quantum_eff:
+                    res = measured_qubit.measure_quantum_efficiency(
+                        verbose=verbose,
+                        amps_rel=amps_rel,
+                        dephasing_sequence=dephasing_sequence,
+                    )
+                else:
+                    res = measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
+                        verbose=verbose,
+                        amps_rel=amps_rel,
+                        cross_target_qubits=list_target_qubits,
+                        multi_qubit_platf_cfg=mqp,
+                        analyze=True,
+                        sequence=dephasing_sequence,
+                        target_qubit_excited=target_qubit_excited,
+                        extra_echo=extra_echo,
+                        # buffer_time=buffer_time
+                    )
+                # Print the result of the measurement
+                if verbose:
+                    print(res)
+
+        # Save the end-time of the experiment
+        stop = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # reset the msmt_suffix'es
+        for qi, q in enumerate(qubits):
+            self.find_instrument(q).msmt_suffix = old_suffixes[qi]
+        self.msmt_suffix = old_suffix
+
+        # Run the analysis for this experiment
+        if analyze:
+            options_dict = {
+                "verbose": True,
+            }
+            qarr = qubits
+            labelpatt = 'ro_amp_sweep_dephasing'+lpatt
+            ca = ma2.CrossDephasingAnalysis(t_start=start, t_stop=stop,
+                                            label_pattern=labelpatt,
+                                            qubit_labels=qarr,
+                                            options_dict=options_dict)
 
     def measure_chevron(
         self,
@@ -1920,20 +2005,21 @@ class HAL_Device(HAL_ShimMQ):
         adaptive_sampling_pts=None,
         adaptive_pars: dict = None,
         prepare_for_timedomain=True,
-        MC: Optional[MeasurementControl] = None,
+        MC=None,
         freq_tone=6e9,
         pow_tone=-10,
         spec_tone=False,
         target_qubit_sequence: str = "ramsey",
         waveform_name="square",
         recover_q_spec: bool = False,
-    ):
+        disable_metadata: bool = False,
+        ):
         """
         Measure a chevron patter of esulting from swapping of the excitations
         of the two qubits. Qubit q0 is prepared in 1 state and flux-pulsed
         close to the interaction zone using (usually) a rectangular pulse.
         Meanwhile q1 is prepared in 0, 1 or superposition state. If it is in 0
-    state flipping between 01-10 can be observed. It if is in 1 state flipping
+        state flipping between 01-10 can be observed. It if is in 1 state flipping
         between 11-20 as well as 11-02 show up. In superpostion everything is visible.
 
         Args:
@@ -1994,7 +2080,6 @@ class HAL_Device(HAL_ShimMQ):
             q0    -x180-flux-x180-RO-
             qspec ----------------RO- (target_qubit_sequence='ground')
         """
-
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -2031,25 +2116,16 @@ class HAL_Device(HAL_ShimMQ):
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=[q0, q_spec])
 
-        if 1:
-            amp_par = self.hal_get_flux_amp_parameter(q0)
-        else:
-            # FIXME: HW dependency
-            awg = fl_lutman.AWG.get_instr()
-            using_QWG = isinstance(awg, QuTech_AWG_Module)
-            if using_QWG:
-                awg_ch = fl_lutman.cfg_awg_channel()
-                amp_par = awg.parameters["ch{}_amp".format(awg_ch)]
-            else:
-                awg_ch = (
-                    fl_lutman.cfg_awg_channel() - 1
-                )  # -1 is to account for starting at 1
-                ch_pair = awg_ch % 2
-                awg_nr = awg_ch // 2
+        awg = fl_lutman.AWG.get_instr()
+        awg_ch = (
+            fl_lutman.cfg_awg_channel() - 1
+        )  # -1 is to account for starting at 1
+        ch_pair = awg_ch % 2
+        awg_nr = awg_ch // 2
 
-                amp_par = awg.parameters[
-                    "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
-                ]
+        amp_par = awg.parameters[
+            "awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair)
+        ]
 
         sw = swf.FLsweep(fl_lutman, length_par, waveform_name=waveform_name)
 
@@ -2063,11 +2139,12 @@ class HAL_Device(HAL_ShimMQ):
             platf_cfg=self.cfg_openql_platform_fn(),
             target_qubit_sequence=target_qubit_sequence,
             cc=self.instr_CC.get_instr().name,
-            recover_q_spec=recover_q_spec
+            recover_q_spec=recover_q_spec,
         )
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
+        
         d = self.get_correlation_detector(
             qubits=[q0, q_spec],
             single_int_avg=True,
@@ -2084,8 +2161,8 @@ class HAL_Device(HAL_ShimMQ):
         if not adaptive_sampling:
             MC.set_sweep_points(amps)
             MC.set_sweep_points_2D(lengths)
-            MC.run(label, mode="2D")
-
+            MC.run(label, mode="2D",
+                   disable_snapshot_metadata=disable_metadata)
             ma.TwoD_Analysis()
         else:
             if adaptive_pars is None:
@@ -2096,7 +2173,6 @@ class HAL_Device(HAL_ShimMQ):
                 }
             MC.set_adaptive_function_parameters(adaptive_pars)
             MC.run(label + " adaptive", mode="adaptive")
-
             ma2.Basic2DInterpolatedAnalysis()
 
 
@@ -2379,42 +2455,115 @@ class HAL_Device(HAL_ShimMQ):
             ma2.Basic1DAnalysis()
 
 
+    def measure_two_qubit_ramsey(
+        self,
+        q0: str,
+        q_spec: str,
+        times,
+        prepare_for_timedomain=True,
+        MC: Optional[MeasurementControl] = None,
+        target_qubit_sequence: str = "excited",
+        chunk_size: int = None,
+    ):
+        """
+        Measure a ramsey on q0 while setting the q_spec to excited state ('excited'),
+        ground state ('ground') or superposition ('ramsey'). Suitable to measure
+        large values of residual ZZ coupling.
+
+        Args:
+            q0 (str):
+                qubit on which ramsey measurement is performed
+
+            q1 (str):
+                spectator qubit prepared in 0, 1 or superposition state
+
+            times (array):
+                durations of the ramsey sequence
+
+            prepare_for_timedomain (bool):
+                should all instruments be reconfigured to
+                time domain measurements
+
+            target_qubit_sequence (str {"ground", "extited", "ramsey"}):
+                specifies whether the spectator qubit should be
+                prepared in the 0 state ('ground'), 1 state ('extited') or
+                in superposition ('ramsey')
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        assert q_spec in self.qubits()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=[q0, q_spec])
+
+        p = mqo.two_qubit_ramsey(
+            times,
+            q0idx,
+            q_specidx,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            target_qubit_sequence=target_qubit_sequence,
+        )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name="Time",
+            unit="s",
+        )
+
+        dt = times[1] - times[0]
+        times = np.concatenate((times, [times[-1] + k * dt for k in range(1, 9)]))
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+
+        d = self.get_correlation_detector(qubits=[q0, q_spec])
+        # d.chunk_size = chunk_size
+        MC.set_detector_function(d)
+
+        MC.run(
+            "Two_qubit_ramsey_{}_{}_{}".format(q0, q_spec, target_qubit_sequence),
+            mode="1D",
+        )
+        ma.MeasurementAnalysis()
+
+
     def measure_cryoscope(
         self,
         qubits,
         times,
-        MC: Optional[MeasurementControl] = None,
-        nested_MC: Optional[MeasurementControl] = None,
+        MC=None,
+        nested_MC=None,
         double_projections: bool = False,
+        wait_time_flux: int = 0,
         update_FIRs: bool=False,
         waveform_name: str = "square",
         max_delay=None,
         twoq_pair=[2, 0],
+        disable_metadata: bool = False,
         init_buffer=0,
         prepare_for_timedomain: bool = True,
-    ):
+        ):
         """
         Performs a cryoscope experiment to measure the shape of a flux pulse.
-
         Args:
             qubits  (list):
                 a list of two target qubits
-
             times   (array):
                 array of measurment times
-
             label (str):
                 used to label the experiment
-
             waveform_name (str {"square", "custom_wf"}) :
                 defines the name of the waveform used in the
                 cryoscope. Valid values are either "square" or "custom_wf"
-
             max_delay {float, "auto"} :
                 determines the delay in the pulse sequence
                 if set to "auto" this is automatically set to the largest
                 pulse duration for the cryoscope.
-
             prepare_for_timedomain (bool):
                 calls self.prepare_for_timedomain on start
         """
@@ -2461,6 +2610,7 @@ class HAL_Device(HAL_ShimMQ):
             qubit_idxs=Q_idxs,
             flux_cw=flux_cw,
             twoq_pair=twoq_pair,
+            wait_time_flux=wait_time_flux,
             platf_cfg=self.cfg_openql_platform_fn(),
             cc=self.instr_CC.get_instr().name,
             double_projections=double_projections,
@@ -2489,10 +2639,11 @@ class HAL_Device(HAL_ShimMQ):
         )
         MC.set_detector_function(d)
         label = 'Cryoscope_{}_amps'.format('_'.join(qubits))
-        MC.run(label)
+        MC.run(label+self.msmt_suffix,disable_snapshot_metadata=disable_metadata)
         # Run analysis
-        a = ma2.cv2.multi_qubit_cryoscope_analysis(label='Cryoscope',
-                                                   update_FIRs=update_FIRs)
+        a = ma2.cv2.multi_qubit_cryoscope_analysis(
+            label='Cryoscope',
+            update_FIRs=update_FIRs)
         if update_FIRs:
             for qubit, fltr in a.proc_data_dict['conv_filters'].items():
                 lin_dist_kern = self.find_instrument(f'lin_dist_kern_{qubit}')
@@ -2501,6 +2652,7 @@ class HAL_Device(HAL_ShimMQ):
                 lin_dist_kern.filter_model_04(filter_dict)
 
         return True
+
 
 
     def measure_cryoscope_vs_amp(
@@ -2679,11 +2831,317 @@ class HAL_Device(HAL_ShimMQ):
         )
 
 
+    def measure_timing_1d_trace(
+            self,
+            q0,
+            latencies,
+            latency_type='flux',
+            MC: Optional[MeasurementControl] = None,
+            label='timing_{}_{}',
+            buffer_time=40e-9,
+            prepare_for_timedomain: bool = True,
+            mw_gate: str = "rx90", sq_length: float = 60e-9
+    ):
+        mmt_label = label.format(self.name, q0)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        assert q0 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        self.prepare_for_timedomain([q0])
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman.sq_length(sq_length)
+
+        # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 120ns
+        p = sqo.FluxTimingCalibration(
+            q0idx,
+            times=[buffer_time],
+            platf_cfg=self.cfg_openql_platform_fn(),
+            flux_cw='fl_cw_06',
+            cal_points=False,
+            mw_gate=mw_gate
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+
+        d = self.get_int_avg_det(single_int_avg=True)
+        MC.set_detector_function(d)
+
+        if latency_type == 'flux':
+            s = swf.tim_flux_latency_sweep(self)
+        elif latency_type == 'mw':
+            s = swf.tim_mw_latency_sweep(self)
+        else:
+            raise ValueError('Latency type {} not understood.'.format(latency_type))
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(latencies)
+        MC.run(mmt_label)
+
+        a_obj = ma2.Basic1DAnalysis(label=mmt_label)
+        return a_obj
+
+
+    def measure_ramsey_with_flux_pulse(
+            self,
+            q0: str,
+            times,
+            MC: Optional[MeasurementControl] = None,
+            label='Fluxed_ramsey',
+            prepare_for_timedomain: bool = True,
+            pulse_shape: str = 'square',
+            sq_eps: float = None
+    ):
+        """
+        Performs a cryoscope experiment to measure the shape of a flux pulse.
+
+        Args:
+            q0  (str)     :
+                name of the target qubit
+
+            times   (array):
+                array of measurment times
+
+            label (str):
+                used to label the experiment
+
+            prepare_for_timedomain (bool):
+                calls self.prepare_for_timedomain on start
+
+        Note: the amplitude and (expected) detuning of the flux pulse is saved
+         in experimental metadata.
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        partner_lutman = self.find_instrument(fl_lutman.instr_partner_lutman())
+
+        # save and change parameters
+        old_max_length = fl_lutman.cfg_max_wf_length()
+        old_sq_length = fl_lutman.sq_length()
+        fl_lutman.cfg_max_wf_length(max(times) + 200e-9)
+        partner_lutman.cfg_max_wf_length(max(times) + 200e-9)
+        fl_lutman.custom_wf_length(max(times) + 200e-9)
+        partner_lutman.custom_wf_length(max(times) + 200e-9)
+        fl_lutman.load_waveforms_onto_AWG_lookuptable(force_load_sequencer_program=True)
+
+        def set_flux_pulse_time(value):
+            if pulse_shape == "square":
+                flux_cw = "fl_cw_02"
+                fl_lutman.sq_length(value)
+                fl_lutman.load_waveform_realtime("square", regenerate_waveforms=True)
+            elif pulse_shape == "single_sided_square":
+                flux_cw = "fl_cw_05"
+
+                dac_scalefactor = fl_lutman.get_amp_to_dac_val_scalefactor()
+                dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
+                    sq_eps, state_A="01", state_B=None, positive_branch=True
+                )
+
+                sq_pulse = dacval * np.ones(int(value * fl_lutman.sampling_rate()))
+
+                fl_lutman.custom_wf(sq_pulse)
+                fl_lutman.load_waveform_realtime("custom_wf", regenerate_waveforms=True)
+            elif pulse_shape == "double_sided_square":
+                flux_cw = "fl_cw_05"
+
+                dac_scalefactor = fl_lutman.get_amp_to_dac_val_scalefactor()
+                pos_dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
+                    sq_eps, state_A="01", state_B=None, positive_branch=True
+                )
+
+                neg_dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
+                    sq_eps, state_A="01", state_B=None, positive_branch=False
+                )
+
+                sq_pulse_half = np.ones(int(value / 2 * fl_lutman.sampling_rate()))
+
+                sq_pulse = np.concatenate(
+                    [pos_dacval * sq_pulse_half, neg_dacval * sq_pulse_half]
+                )
+                fl_lutman.custom_wf(sq_pulse)
+                fl_lutman.load_waveform_realtime("custom_wf", regenerate_waveforms=True)
+
+            p = mqo.fluxed_ramsey(
+                q0idx,
+                wait_time=value,
+                flux_cw=flux_cw,
+                platf_cfg=self.cfg_openql_platform_fn(),
+            )
+            self.instr_CC.get_instr().eqasm_program(p.filename)
+            self.instr_CC.get_instr().start()
+
+        flux_pulse_time = Parameter("flux_pulse_time", set_cmd=set_flux_pulse_time)
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=[q0])
+
+        MC.set_sweep_function(flux_pulse_time)
+        MC.set_sweep_points(times)
+        d = self.get_int_avg_det(
+            values_per_point=2,
+            values_per_point_suffex=["final x90", "final y90"],
+            single_int_avg=True,
+            always_prepare=True,
+        )
+        MC.set_detector_function(d)
+        metadata_dict = {"sq_eps": sq_eps}
+        MC.run(label, exp_metadata=metadata_dict)
+
+        # restore parameters
+        fl_lutman.cfg_max_wf_length(old_max_length)
+        partner_lutman.cfg_max_wf_length(old_max_length)
+        fl_lutman.sq_length(old_sq_length)
+        fl_lutman.load_waveforms_onto_AWG_lookuptable(force_load_sequencer_program=True)
+
+
+    def measure_sliding_flux_pulses(
+        self,
+        qubits: list,
+        times: list,
+        MC,
+        nested_MC,
+        prepare_for_timedomain: bool = True,
+        flux_cw: str = "fl_cw_01",
+        disable_initial_pulse: bool = False,
+        label="",
+    ):
+        """
+        Performs a sliding pulses experiment in order to determine how
+        the phase picked up by a flux pulse depends on preceding flux
+        pulses.
+
+        Args:
+            qubits (list):
+                two-element list of qubits. Only the second of the qubits
+                listed matters. First needs to be provided for compatibility
+                with OpenQl.
+
+            times (array):
+                delays between the two flux pulses to sweep over
+
+            flux_cw (str):
+                codeword specifying which of the flux pulses to execute
+
+            disable_initial_pulse (bool):
+                allows to execute the reference measurement without
+                the first of the flux pulses
+
+            label (str):
+                suffix to append to the measurement label
+        """
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubits)
+
+        q0_name = qubits[-1]
+
+        counter_par = ManualParameter("counter", unit="#")
+        counter_par(0)
+
+        gate_separation_par = ManualParameter("gate separation", unit="s")
+        gate_separation_par(20e-9)
+
+        d = det.Function_Detector(
+            get_function=self._measure_sliding_pulse_phase,
+            value_names=["Phase", "stderr"],
+            value_units=["deg", "deg"],
+            msmt_kw={
+                "disable_initial_pulse": disable_initial_pulse,
+                "qubits": qubits,
+                "counter_par": [counter_par],
+                "gate_separation_par": [gate_separation_par],
+                "nested_MC": nested_MC,
+                "flux_cw": flux_cw,
+            },
+        )
+
+        MC.set_sweep_function(gate_separation_par)
+        MC.set_sweep_points(times)
+
+        MC.set_detector_function(d)
+        MC.run("Sliding flux pulses {}{}".format(q0_name, label))
+
+
+    def _measure_sliding_pulse_phase(
+        self,
+        disable_initial_pulse,
+        counter_par,
+        gate_separation_par,
+        qubits: list,
+        nested_MC,
+        flux_cw="fl_cw_01",
+    ):
+        """
+        Method relates to "measure_sliding_flux_pulses", this performs one
+        phase measurement for the sliding pulses experiment.
+        It is defined as a private method as it should not be used
+        independently.
+        """
+        # FIXME passing as a list is a hack to work around Function detector
+        counter_par = counter_par[0]
+        gate_separation_par = gate_separation_par[0]
+
+        if disable_initial_pulse:
+            flux_codeword_a = "fl_cw_00"
+        else:
+            flux_codeword_a = flux_cw
+        flux_codeword_b = flux_cw
+
+        counter_par(counter_par() + 1)
+        # substract mw_pulse_dur to correct for mw_pulse before 2nd flux pulse
+        mw_pulse_dur = 20e-9
+        wait_time = int((gate_separation_par() - mw_pulse_dur) * 1e9)
+
+        if wait_time < 0:
+            raise ValueError()
+
+        # angles = np.arange(0, 341, 20*1)
+        # These are hardcoded angles in the mw_lutman for the AWG8
+        angles = np.concatenate(
+            [np.arange(0, 101, 20), np.arange(140, 341, 20)]
+        )  # avoid CW15, issue
+        # angles = np.arange(0, 341, 20))
+
+        qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        p = mqo.sliding_flux_pulses_seq(
+            qubits=qubit_idxs,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            wait_time=wait_time,
+            angles=angles,
+            flux_codeword_a=flux_codeword_a,
+            flux_codeword_b=flux_codeword_b,
+            add_cal_points=False,
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name="Phase",
+            unit="deg",
+        )
+        nested_MC.set_sweep_function(s)
+        nested_MC.set_sweep_points(angles)
+        nested_MC.set_detector_function(self.get_correlation_detector(qubits=qubits))
+        nested_MC.run(
+            "sliding_CZ_oscillation_{}".format(counter_par()),
+            disable_snapshot_metadata=True,
+        )
+
+        # ch_idx = 1 because of the order of the correlation detector
+        a = ma2.Oscillation_Analysis(ch_idx=1)
+        phi = np.rad2deg(a.fit_res["cos_fit"].params["phase"].value) % 360
+
+        phi_stderr = np.rad2deg(a.fit_res["cos_fit"].params["phase"].stderr)
+
+        return (phi, phi_stderr)
+
+
     def measure_two_qubit_randomized_benchmarking(
         self,
         qubits,
         nr_cliffords=np.array(
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
+            [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
         ),
         nr_seeds=100,
         interleaving_cliffords=[None],
@@ -2799,7 +3257,7 @@ class HAL_Device(HAL_ShimMQ):
         else:
             sim_cz_qubits_idxs = None
 
-        net_cliffords = [0, 3 * 24 + 3]  # see two_qubit_clifford_group::common_cliffords
+        net_cliffords = [0, 3 * 24 + 3]
 
         def send_rb_tasks(pool_):
             tasks_inputs = []
@@ -2832,7 +3290,7 @@ class HAL_Device(HAL_ShimMQ):
             return rb_tasks
 
         if compile_only:
-            assert pool is not None  # FIXME: add proper message
+            assert pool is not None
             rb_tasks = send_rb_tasks(pool)
             return rb_tasks
 
@@ -2897,240 +3355,6 @@ class HAL_Device(HAL_ShimMQ):
         # N.B. if interleaving cliffords are used, this won't work
         ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
 
-    # FIXME: Under testing by Jorge
-    # def measure_two_qubit_randomized_benchmarking(
-    #     self,
-    #     qubits,
-    #     nr_cliffords=np.array(
-    #         [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 9.0, 12.0, 15.0, 20.0, 25.0, 30.0, 50.0]
-    #     ),
-    #     nr_seeds=100,
-    #     interleaving_cliffords=[None],
-    #     label="TwoQubit_RB_{}seeds_recompile={}_icl{}_{}_{}_{}",
-    #     recompile: bool = "as needed",
-    #     cal_points=True,
-    #     flux_codeword="cz",
-    #     flux_allocated_duration_ns: int = None,
-    #     sim_cz_qubits: list = None,
-    #     sim_single_qubits: list = None,
-    #     compile_only: bool = False,
-    #     pool=None,  # a multiprocessing.Pool()
-    #     rb_tasks=None,  # used after called with `compile_only=True`
-    #     MC=None
-    # ):
-    #     """
-    #     Measures two qubit randomized benchmarking, including
-    #     the leakage estimate.
-
-    #     [2020-07-04 Victor] this method was updated to allow for parallel
-    #     compilation using all the cores of the measurement computer
-
-    #     Refs:
-    #     Knill PRA 77, 012307 (2008)
-    #     Wood PRA 97, 032306 (2018)
-
-    #     Args:
-    #         qubits (list):
-    #             pair of the qubit names on which to perform RB
-
-    #         nr_cliffords (array):
-    #             lengths of the clifford sequences to perform
-
-    #         nr_seeds (int):
-    #             number of different clifford sequences of each length
-
-    #         interleaving_cliffords (list):
-    #             list of integers (or None) which specifies which cliffords
-    #             to interleave the sequence with (for interleaved RB)
-    #             For indices of Clifford group elements go to
-    #             two_qubit_clifford_group.py
-
-    #         label (str):
-    #             string for formatting the measurement name
-
-    #         recompile (bool, str {'as needed'}):
-    #             indicate whether to regenerate the sequences of clifford gates.
-    #             By default it checks whether the needed sequences were already
-    #             generated since the most recent change of OpenQL file
-    #             specified in self.cfg_openql_platform_fn
-
-    #         cal_points (bool):
-    #             should calibration point (qubits in 0 and 1 states)
-    #             be included in the measurement
-
-    #         flux_codeword (str):
-    #             flux codeword corresponding to the Cphase gate
-    #         sim_cz_qubits (list):
-    #             A list of qubit names on which a simultaneous cz
-    #             instruction must be applied. This is for characterizing
-    #             CZ gates that are intended to be performed in parallel
-    #             with other CZ gates.
-    #         flux_allocated_duration_ns (list):
-    #             Duration in ns of the flux pulse used when interleaved gate is
-    #             [100_000], i.e. idle identity
-    #         compilation_only (bool):
-    #             Compile only the RB sequences without measuring, intended for
-    #             parallelizing iRB sequences compilation with measurements
-    #         pool (multiprocessing.Pool):
-    #             Only relevant for `compilation_only=True`
-    #             Pool to which the compilation tasks will be assigned
-    #         rb_tasks (list):
-    #             Only relevant when running `compilation_only=True` previously,
-    #             saving the rb_tasks, waiting for them to finish then running
-    #             this method again and providing the `rb_tasks`.
-    #             See the interleaved RB for use case.
-    #     """
-    #     if MC is None:
-    #         MC = self.instr_MC.get_instr()
-
-    #     # Settings that have to be preserved, change is required for
-    #     # 2-state readout and postprocessing
-    #     old_weight_type = self.ro_acq_weight_type()
-    #     old_digitized = self.ro_acq_digitized()
-    #     old_avg = self.ro_acq_averages()
-    #     self.ro_acq_weight_type("optimal IQ")
-    #     self.ro_acq_digitized(False)
-
-    #     self.prepare_for_timedomain(qubits=qubits)
-    #     MC.soft_avg(1)
-    #     # The detector needs to be defined before setting back parameters
-    #     d = self.get_int_logging_detector(qubits=qubits)
-    #     # set back the settings
-    #     self.ro_acq_weight_type(old_weight_type)
-    #     self.ro_acq_digitized(old_digitized)
-
-    #     for q in qubits:
-    #         q_instr = self.find_instrument(q)
-    #         mw_lutman = q_instr.instr_LutMan_MW.get_instr()
-    #         mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
-    #     if sim_single_qubits:
-    #         for q in sim_single_qubits:
-    #             q_instr = self.find_instrument(q)
-    #             mw_lutman = q_instr.instr_LutMan_MW.get_instr()
-    #             mw_lutman.set_default_lutmap()
-    #             mw_lutman.load_waveforms_onto_AWG_lookuptable()
-
-
-    #     MC.soft_avg(1)
-
-    #     qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
-    #     if sim_cz_qubits is not None:
-    #         sim_cz_qubits_idxs = [
-    #             self.find_instrument(q).cfg_qubit_nr() for q in sim_cz_qubits
-    #         ]
-    #     else:
-    #         sim_cz_qubits_idxs = None
-
-    #     if sim_single_qubits is not None:
-    #         sim_single_qubits_idxs = [
-    #             self.find_instrument(q).cfg_qubit_nr() for q in sim_single_qubits
-    #         ]
-    #     else:
-    #         sim_single_qubits_idxs = None
-
-    #     net_cliffords = [0, 3 * 24 + 3]
-
-    #     programs = []
-        
-    #     print('Generating {} RB programs'.format(nr_seeds))
-    #     t0 = time.time()
-    #     for i in range(nr_seeds):
-    #         check_keyboard_interrupt()
-    #         # p = cl_oql.randomized_benchmarking(
-    #         #     qubits=qubit_idxs,
-    #         #     nr_cliffords=nr_cliffords,
-    #         #     nr_seeds=1,
-    #         #     flux_codeword=flux_codeword,
-    #         #     flux_allocated_duration_ns=flux_allocated_duration_ns,
-    #         #     platf_cfg=self.cfg_openql_platform_fn(),
-    #         #     program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
-    #         #         int(i),
-    #         #         list(map(int, nr_cliffords)),
-    #         #         interleaving_cliffords,
-    #         #         qubits[0],
-    #         #         qubits[1],
-    #         #         ),
-    #         #     interleaving_cliffords=interleaving_cliffords,
-    #         #     cal_points=cal_points,
-    #         #     net_cliffords=net_cliffords,  # measures with and without inverting
-    #         #     f_state_cal_pts=True,
-    #         #     recompile=recompile,
-    #         #     sim_cz_qubits=sim_cz_qubits_idxs,
-    #         #     )
-    #         p = cl_oql.two_qubit_randomized_benchmarking(
-    #             two_qubit_pair= qubit_idxs,
-    #             single_qubits=sim_single_qubits_idxs,
-    #             nr_cliffords=nr_cliffords,
-    #             nr_seeds= 1,
-    #             flux_codeword=flux_codeword,
-    #             flux_allocated_duration_ns=flux_allocated_duration_ns,
-    #             platf_cfg=self.cfg_openql_platform_fn(),
-    #             program_name="TwoQ_RB_int_cl_s{}_ncl{}_icl{}_{}_{}".format(
-    #                 int(i),
-    #                 list(map(int, nr_cliffords)),
-    #                 interleaving_cliffords,
-    #                 qubits[0],
-    #                 qubits[1],
-    #                 ),
-    #             interleaving_cliffords=interleaving_cliffords,
-    #             cal_points=cal_points,
-    #             two_qubit_net_cliffords=net_cliffords,
-    #             single_qubit_net_cliffords=net_cliffords,
-    #             f_state_cal_pts=True,
-    #             recompile=recompile
-    #             )
-    #         print(f'compiled_program {i+1}')
-    #         programs.append(p)
-
-
-    #     # to include calibration points
-    #     if cal_points:
-    #         sweep_points = np.append(
-    #             np.repeat(nr_cliffords, 2),
-    #             [nr_cliffords[-1] + 0.5] * 2
-    #             + [nr_cliffords[-1] + 1.5] * 2
-    #             + [nr_cliffords[-1] + 2.5] * 3,
-    #         )
-    #     else:
-    #         sweep_points = np.repeat(nr_cliffords, 2)
-
-    #     counter_param = ManualParameter("name_ctr", initial_value=0)
-    #     prepare_function_kwargs = {
-    #         "counter_param": counter_param,
-    #         "programs": programs,
-    #         "CC": self.instr_CC.get_instr(),
-    #     }
-
-    #     # Using the first detector of the multi-detector as this is
-    #     # in charge of controlling the CC (see self.get_int_logging_detector)
-    #     d.set_prepare_function(
-    #         oqh.load_range_of_oql_programs,
-    #         prepare_function_kwargs, detectors="first"
-    #     )
-    #     # d.nr_averages = 128
-
-    #     reps_per_seed = 4094 // len(sweep_points)
-    #     nr_shots = reps_per_seed * len(sweep_points)
-    #     d.set_child_attr("nr_shots", nr_shots)
-
-    #     s = swf.None_Sweep(parameter_name="Number of Cliffords", unit="#")
-
-    #     MC.set_sweep_function(s)
-    #     MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
-
-    #     MC.set_detector_function(d)
-    #     label = label.format(
-    #         nr_seeds,
-    #         recompile,
-    #         interleaving_cliffords,
-    #         qubits[0],
-    #         qubits[1],
-    #         flux_codeword)
-    #     if sim_single_qubits:
-    #         label += f'_sim_{sim_single_qubits}'
-    #     MC.run(label, exp_metadata={"bins": sweep_points})
-    #     # N.B. if interleaving cliffords are used, this won't work
-    #     ma2.RandomizedBenchmarking_TwoQubit_Analysis(label=label)
 
     def measure_interleaved_randomized_benchmarking_statistics(
             self,
@@ -3193,14 +3417,13 @@ class HAL_Device(HAL_ShimMQ):
             self,
             qubits: list,
             nr_cliffords=np.array(
-                [1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50., 70., 90., 120.]
-            ),
+                [1., 3., 5., 7., 9., 11., 15., 20., 25., 30., 40., 50.]),
             nr_seeds=100,
             recompile: bool = "as needed",
             flux_codeword="cz",
             flux_allocated_duration_ns: int = None,
             sim_cz_qubits: list = None,
-            measure_idle_flux: bool = True,
+            measure_idle_flux: bool = False,
             rb_tasks_start: list = None,
             pool=None,
             cardinal: dict = None,
@@ -3210,7 +3433,7 @@ class HAL_Device(HAL_ShimMQ):
         ):
         # USED_BY: inspire_dependency_graph.py,
         """
-        Perform two qubit interleaved randomized benchmarking with an
+        Perform two-qubit interleaved randomized benchmarking with an
         interleaved CZ gate, and optionally an interleaved idle identity with
         the duration of the CZ.
 
@@ -3223,7 +3446,8 @@ class HAL_Device(HAL_ShimMQ):
 
         def run_parallel_iRB(
                 recompile, pool, rb_tasks_start: list = None,
-                start_next_round_compilation: bool = False
+                start_next_round_compilation: bool = False,
+                cardinal=cardinal
             ):
             """
             We define the full parallel iRB procedure here as function such
@@ -3247,8 +3471,6 @@ class HAL_Device(HAL_ShimMQ):
                     flux_codeword=flux_codeword,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
-                    # FIXME: Under testing by Jorge
-                    # sim_single_qubits=sim_single_qubits,
                     compile_only=True,
                     pool=pool
                 )
@@ -3266,8 +3488,6 @@ class HAL_Device(HAL_ShimMQ):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
                 compile_only=True,
                 pool=pool
             )
@@ -3278,113 +3498,108 @@ class HAL_Device(HAL_ShimMQ):
                 MC=MC,
                 nr_cliffords=nr_cliffords,
                 interleaving_cliffords=[None],
-                recompile=False,  # This of course needs to be False
+                recompile=recompile,  # This of course needs to be False
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
                 rb_tasks=rb_tasks_start,
             )
 
             # 5. Wait for [104368] compilation to finish
             cl_oql.wait_for_rb_tasks(rb_tasks_CZ)
 
-            # 6. Start (non-blocking) compilation for [100_000]
-            if measure_idle_flux:
-                rb_tasks_I = self.measure_two_qubit_randomized_benchmarking(
-                    qubits=qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[100_000],
-                    recompile=recompile,
-                    flux_codeword=flux_codeword,
-                    flux_allocated_duration_ns=flux_allocated_duration_ns,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                    # FIXME: Under testing by Jorge
-                    # sim_single_qubits=sim_single_qubits,
-                    compile_only=True,
-                    pool=pool,
-                )
-            elif start_next_round_compilation:
-                # Optionally send to the `pool` the tasks of RB compilation to be
-                # used on the next round of calling the iRB method
-                rb_tasks_next = self.measure_two_qubit_randomized_benchmarking(
-                    qubits=qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[None],
-                    recompile=recompile,
-                    flux_codeword=flux_codeword,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                    # FIXME: Under testing by Jorge
-                    # sim_single_qubits=sim_single_qubits,
-                    compile_only=True,
-                    pool=pool
-                )
+            # # 6. Start (non-blocking) compilation for [100_000]
+            # if measure_idle_flux:
+            #     rb_tasks_I = self.measure_two_qubit_randomized_benchmarking(
+            #         qubits=qubits,
+            #         MC=MC,
+            #         nr_cliffords=nr_cliffords,
+            #         interleaving_cliffords=[100_000],
+            #         recompile=recompile,
+            #         flux_codeword=flux_codeword,
+            #         flux_allocated_duration_ns=flux_allocated_duration_ns,
+            #         nr_seeds=nr_seeds,
+            #         sim_cz_qubits=sim_cz_qubits,
+            #         compile_only=True,
+            #         pool=pool,
+            #     )
+            # elif start_next_round_compilation:
+            #     # Optionally send to the `pool` the tasks of RB compilation to be
+            #     # used on the next round of calling the iRB method
+            #     rb_tasks_next = self.measure_two_qubit_randomized_benchmarking(
+            #         qubits=qubits,
+            #         MC=MC,
+            #         nr_cliffords=nr_cliffords,
+            #         interleaving_cliffords=[None],
+            #         recompile=recompile,
+            #         flux_codeword=flux_codeword,
+            #         nr_seeds=nr_seeds,
+            #         sim_cz_qubits=sim_cz_qubits,
+            #         compile_only=True,
+            #         pool=pool
+            #     )
+
             # 7. Start the measurement and run the analysis for [104368]
             self.measure_two_qubit_randomized_benchmarking(
                 qubits=qubits,
                 MC=MC,
                 nr_cliffords=nr_cliffords,
                 interleaving_cliffords=[104368],
-                recompile=False,
+                recompile=recompile,
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
                 rb_tasks=rb_tasks_CZ,
             )
-            ma2.InterleavedRandomizedBenchmarkingAnalysis(
+            a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
                 label_base="icl[None]",
                 label_int="icl[104368]"
             )
+            # update qubit objects to record the attained CZ fidelity
+            if cardinal:
+                opposite_cardinal = {'NW':'SE', 'NE':'SW', 'SW':'NE', 'SE':'NW'}
+                self.find_instrument(qubits[0]).parameters[f'F_2QRB_{cardinal}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
+                self.find_instrument(qubits[1]).parameters[f'F_2QRB_{opposite_cardinal[cardinal]}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
 
-            if measure_idle_flux:
-                # 8. Wait for [100_000] compilation to finish
-                cl_oql.wait_for_rb_tasks(rb_tasks_I)
 
-                # 8.a. Optionally send to the `pool` the tasks of RB compilation to be
-                # used on the next round of calling the iRB method
-                if start_next_round_compilation:
-                    rb_tasks_next = self.measure_two_qubit_randomized_benchmarking(
-                        qubits=qubits,
-                        MC=MC,
-                        nr_cliffords=nr_cliffords,
-                        interleaving_cliffords=[None],
-                        recompile=recompile,
-                        flux_codeword=flux_codeword,
-                        nr_seeds=nr_seeds,
-                        sim_cz_qubits=sim_cz_qubits,
-                        # FIXME: Under testing by Jorge
-                        # sim_single_qubits=sim_single_qubits,
-                        compile_only=True,
-                        pool=pool
-                    )
+            # if measure_idle_flux:
+            #     # 8. Wait for [100_000] compilation to finish
+            #     cl_oql.wait_for_rb_tasks(rb_tasks_I)
 
-                # 9. Start the measurement and run the analysis for [100_000]
-                self.measure_two_qubit_randomized_benchmarking(
-                    qubits=qubits,
-                    MC=MC,
-                    nr_cliffords=nr_cliffords,
-                    interleaving_cliffords=[100_000],
-                    recompile=False,
-                    flux_codeword=flux_codeword,
-                    flux_allocated_duration_ns=flux_allocated_duration_ns,
-                    nr_seeds=nr_seeds,
-                    sim_cz_qubits=sim_cz_qubits,
-                    # FIXME: Under testing by Jorge
-                    # sim_single_qubits=sim_single_qubits,
-                    rb_tasks=rb_tasks_I
-                )
-                ma2.InterleavedRandomizedBenchmarkingAnalysis(
-                    label_base="icl[None]",
-                    label_int="icl[104368]",
-                    label_int_idle="icl[100000]"
-                )
+            #     # 8.a. Optionally send to the `pool` the tasks of RB compilation to be
+            #     # used on the next round of calling the iRB method
+            #     if start_next_round_compilation:
+            #         rb_tasks_next = self.measure_two_qubit_randomized_benchmarking(
+            #             qubits=qubits,
+            #             MC=MC,
+            #             nr_cliffords=nr_cliffords,
+            #             interleaving_cliffords=[None],
+            #             recompile=recompile,
+            #             flux_codeword=flux_codeword,
+            #             nr_seeds=nr_seeds,
+            #             sim_cz_qubits=sim_cz_qubits,
+            #             compile_only=True,
+            #             pool=pool
+            #         )
+
+            #     # 9. Start the measurement and run the analysis for [100_000]
+            #     self.measure_two_qubit_randomized_benchmarking(
+            #         qubits=qubits,
+            #         MC=MC,
+            #         nr_cliffords=nr_cliffords,
+            #         interleaving_cliffords=[100_000],
+            #         recompile=False,
+            #         flux_codeword=flux_codeword,
+            #         flux_allocated_duration_ns=flux_allocated_duration_ns,
+            #         nr_seeds=nr_seeds,
+            #         sim_cz_qubits=sim_cz_qubits,
+            #         rb_tasks=rb_tasks_I
+            #     )
+            #     ma2.InterleavedRandomizedBenchmarkingAnalysis(
+            #         label_base="icl[None]",
+            #         label_int="icl[104368]",
+            #         label_int_idle="icl[100000]"
+            #     )
 
             return rb_tasks_next
 
@@ -3410,6 +3625,7 @@ class HAL_Device(HAL_ShimMQ):
                     rb_tasks_start=rb_tasks_start,
                     start_next_round_compilation=start_next_round_compilation)
                 return rb_tasks_next
+
         else:
             # recompile=False no need to parallelize compilation with measurement
             # Perform two-qubit RB (no interleaved gate)
@@ -3422,8 +3638,6 @@ class HAL_Device(HAL_ShimMQ):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
             )
 
             # Perform two-qubit RB with CZ interleaved
@@ -3436,14 +3650,14 @@ class HAL_Device(HAL_ShimMQ):
                 flux_codeword=flux_codeword,
                 nr_seeds=nr_seeds,
                 sim_cz_qubits=sim_cz_qubits,
-                # FIXME: Under testing by Jorge
-                # sim_single_qubits=sim_single_qubits,
             )
 
             a = ma2.InterleavedRandomizedBenchmarkingAnalysis(
                 label_base="icl[None]",
                 label_int="icl[104368]",
             )
+
+            # update qubit objects to record the attained CZ fidelity
             if cardinal:
                 opposite_cardinal = {'NW':'SE', 'NE':'SW', 'SW':'NE', 'SE':'NW'}
                 self.find_instrument(qubits[0]).parameters[f'F_2QRB_{cardinal}'].set(1-a.proc_data_dict['quantities_of_interest']['eps_CZ_simple'].n)
@@ -3461,8 +3675,6 @@ class HAL_Device(HAL_ShimMQ):
                     flux_allocated_duration_ns=flux_allocated_duration_ns,
                     nr_seeds=nr_seeds,
                     sim_cz_qubits=sim_cz_qubits,
-                    # FIXME: Under testing by Jorge
-                    # sim_single_qubits=sim_single_qubits,
                 )
                 ma2.InterleavedRandomizedBenchmarkingAnalysis(
                     label_base="icl[None]",
@@ -3471,6 +3683,355 @@ class HAL_Device(HAL_ShimMQ):
 
                 )
         return True
+
+    def measure_single_qubit_interleaved_randomized_benchmarking_parking(
+        self,
+        qubits: list,
+        MC: MeasurementControl,
+        nr_cliffords=2**np.arange(12),
+        nr_seeds: int = 100,
+        recompile: bool = 'as needed',
+        flux_codeword: str = "cz",
+        rb_on_parked_qubit_only: bool = False,
+        rb_tasks_start: list = None,
+        pool=None,
+        start_next_round_compilation: bool = False
+    ):
+        """
+        This function uses the same parallelization approaches as the
+        `measure_two_qubit_interleaved_randomized_benchmarking`. See it
+        for details and useful comments
+        """
+
+        def run_parallel_iRB(
+            recompile, pool, rb_tasks_start: list = None,
+            start_next_round_compilation: bool = False
+        ):
+
+            rb_tasks_next = None
+
+            # 1. Start (non-blocking) compilation for [None]
+            if rb_tasks_start is None:
+                rb_tasks_start = self.measure_single_qubit_randomized_benchmarking_parking(
+                    qubits=qubits,
+                    MC=MC,
+                    nr_cliffords=nr_cliffords,
+                    interleaving_cliffords=[None],
+                    recompile=recompile,
+                    flux_codeword=flux_codeword,
+                    nr_seeds=nr_seeds,
+                    rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+                    compile_only=True,
+                    pool=pool
+                )
+
+            # 2. Wait for [None] compilation to finish
+            cl_oql.wait_for_rb_tasks(rb_tasks_start)
+
+            # 200_000 by convention is a CZ on the first two qubits with
+            # implicit parking on the 3rd qubit
+            # 3. Start (non-blocking) compilation for [200_000]
+            rb_tasks_CZ_park = self.measure_single_qubit_randomized_benchmarking_parking(
+                qubits=qubits,
+                MC=MC,
+                nr_cliffords=nr_cliffords,
+                interleaving_cliffords=[200_000],
+                recompile=recompile,
+                flux_codeword=flux_codeword,
+                nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+                compile_only=True,
+                pool=pool
+            )
+            # 4. Start the measurement and run the analysis for [None]
+            self.measure_single_qubit_randomized_benchmarking_parking(
+                qubits=qubits,
+                MC=MC,
+                nr_cliffords=nr_cliffords,
+                interleaving_cliffords=[None],
+                recompile=False,  # This of course needs to be False
+                flux_codeword=flux_codeword,
+                nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+                rb_tasks=rb_tasks_start,
+            )
+
+            # 5. Wait for [200_000] compilation to finish
+            cl_oql.wait_for_rb_tasks(rb_tasks_CZ_park)
+
+            if start_next_round_compilation:
+                # Optionally send to the `pool` the tasks of RB compilation to be
+                # used on the next round of calling the iRB method
+                rb_tasks_next = self.measure_single_qubit_randomized_benchmarking_parking(
+                    qubits=qubits,
+                    MC=MC,
+                    nr_cliffords=nr_cliffords,
+                    interleaving_cliffords=[None],
+                    recompile=recompile,
+                    flux_codeword=flux_codeword,
+                    nr_seeds=nr_seeds,
+                    rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+                    compile_only=True,
+                    pool=pool
+                )
+            # 7. Start the measurement and run the analysis for [200_000]
+            self.measure_single_qubit_randomized_benchmarking_parking(
+                qubits=qubits,
+                MC=MC,
+                nr_cliffords=nr_cliffords,
+                interleaving_cliffords=[200_000],
+                recompile=False,
+                flux_codeword=flux_codeword,
+                nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+                rb_tasks=rb_tasks_CZ_park,
+            )
+
+            ma2.InterleavedRandomizedBenchmarkingParkingAnalysis(
+                label_base="icl[None]",
+                label_int="icl[200000]"
+            )
+
+            return rb_tasks_next
+
+        if recompile or recompile == "as needed":
+            # This is an optimization that compiles the interleaved RB
+            # sequences for the next measurement while measuring the previous
+            # one
+            if pool is None:
+                # Using `with ...:` makes sure the other processes will be terminated
+                with multiprocessing.Pool(maxtasksperchild=cl_oql.maxtasksperchild) as pool:
+                    run_parallel_iRB(
+                        recompile=recompile,
+                        pool=pool,
+                        rb_tasks_start=rb_tasks_start)
+            else:
+                # In this case the `pool` to execute the RB compilation tasks
+                # is provided, `rb_tasks_start` is expected to be as well
+                rb_tasks_next = run_parallel_iRB(
+                    recompile=recompile,
+                    pool=pool,
+                    rb_tasks_start=rb_tasks_start,
+                    start_next_round_compilation=start_next_round_compilation)
+                return rb_tasks_next
+        else:
+            # recompile=False no need to parallelize compilation with measurement
+            # Perform two-qubit RB (no interleaved gate)
+            self.measure_single_qubit_randomized_benchmarking_parking(
+                qubits=qubits,
+                MC=MC,
+                nr_cliffords=nr_cliffords,
+                interleaving_cliffords=[None],
+                recompile=recompile,
+                flux_codeword=flux_codeword,
+                nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+            )
+
+            # Perform two-qubit RB with CZ interleaved
+            self.measure_single_qubit_randomized_benchmarking_parking(
+                qubits=qubits,
+                MC=MC,
+                nr_cliffords=nr_cliffords,
+                interleaving_cliffords=[200_000],
+                recompile=recompile,
+                flux_codeword=flux_codeword,
+                nr_seeds=nr_seeds,
+                rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+            )
+
+            ma2.InterleavedRandomizedBenchmarkingParkingAnalysis(
+                label_base="icl[None]",
+                label_int="icl[200000]"
+            )
+
+
+    def measure_single_qubit_randomized_benchmarking_parking(
+            self,
+            qubits: list,
+            nr_cliffords=2**np.arange(10),
+            nr_seeds: int = 100,
+            MC: Optional[MeasurementControl] = None,
+            recompile: bool = 'as needed',
+            prepare_for_timedomain: bool = True,
+            cal_points: bool = True,
+            ro_acq_weight_type: str = "optimal IQ",
+            flux_codeword: str = "cz",
+            rb_on_parked_qubit_only: bool = False,
+            interleaving_cliffords: list = [None],
+            compile_only: bool = False,
+            pool=None,  # a multiprocessing.Pool()
+            rb_tasks=None  # used after called with `compile_only=True`
+        ):
+        """
+        [2020-07-06 Victor] This is a modified copy of the same method from CCL_Transmon.
+        The modification is intended for measuring a single qubit RB on a qubit
+        that is parked during an interleaving CZ. There is a single qubit RB
+        going on in parallel on all 3 qubits. This should cover the most realistic
+        case for benchmarking the parking flux pulse.
+
+        Measures randomized benchmarking decay including second excited state
+        population.
+
+        For this it:
+            - stores single shots using `ro_acq_weight_type` weights (int. logging)
+            - uploads a pulse driving the ef/12 transition (should be calibr.)
+            - performs RB both with and without an extra pi-pulse
+            - includes calibration points for 0, 1, and 2 states (g,e, and f)
+            - runs analysis which extracts fidelity and leakage/seepage
+
+        Refs:
+        Knill PRA 77, 012307 (2008)
+        Wood PRA 97, 032306 (2018)
+
+        Args:
+            nr_cliffords (array):
+                list of lengths of the clifford gate sequences
+
+            nr_seeds (int):
+                number of random sequences for each sequence length
+
+            recompile (bool, str {'as needed'}):
+                indicate whether to regenerate the sequences of clifford gates.
+                By default it checks whether the needed sequences were already
+                generated since the most recent change of OpenQL file
+                specified in self.cfg_openql_platform_fn
+
+            rb_on_parked_qubit_only (bool):
+                `True`: there is a single qubit RB being applied only on the
+                3rd qubit (parked qubit)
+                `False`: there will be a single qubit RB applied to all 3
+                qubits
+            other args: behave same way as for 1Q RB r 2Q RB
+        """
+
+        # because only 1 seed is uploaded each time
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # Settings that have to be preserved, change is required for
+        # 2-state readout and postprocessing
+        old_weight_type = self.ro_acq_weight_type()
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_weight_type(ro_acq_weight_type)
+        self.ro_acq_digitized(False)
+
+        self.prepare_for_timedomain(qubits=qubits)
+        MC.soft_avg(1)
+        # The detector needs to be defined before setting back parameters
+        d = self.get_int_logging_detector(qubits=qubits)
+        # set back the settings
+        self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_digitized(old_digitized)
+
+        for q in qubits:
+            q_instr = self.find_instrument(q)
+            mw_lutman = q_instr.instr_LutMan_MW.get_instr()
+            mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+        MC.soft_avg(1)  # Not sure this is necessary here...
+
+        net_cliffords = [0, 3]  # always measure double sided
+        qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+
+        def send_rb_tasks(pool_):
+            tasks_inputs = []
+            for i in range(nr_seeds):
+                task_dict = dict(
+                    qubits=qubit_idxs,
+                    nr_cliffords=nr_cliffords,
+                    net_cliffords=net_cliffords,  # always measure double sided
+                    nr_seeds=1,
+                    platf_cfg=self.cfg_openql_platform_fn(),
+                    program_name='RB_s{}_ncl{}_net{}_icl{}_{}_{}_park_{}_rb_on_parkonly{}'.format(
+                        i, nr_cliffords, net_cliffords, interleaving_cliffords, *qubits,
+                        rb_on_parked_qubit_only),
+                    recompile=recompile,
+                    simultaneous_single_qubit_parking_RB=True,
+                    rb_on_parked_qubit_only=rb_on_parked_qubit_only,
+                    cal_points=cal_points,
+                    flux_codeword=flux_codeword,
+                    interleaving_cliffords=interleaving_cliffords
+                )
+                tasks_inputs.append(task_dict)
+            # pool.starmap_async can be used for positional arguments
+            # but we are using a wrapper
+            rb_tasks = pool_.map_async(cl_oql.parallel_friendly_rb, tasks_inputs)
+
+            return rb_tasks
+
+        if compile_only:
+            assert pool is not None
+            rb_tasks = send_rb_tasks(pool)
+            return rb_tasks
+
+        if rb_tasks is None:
+            # Using `with ...:` makes sure the other processes will be terminated
+            # avoid starting too mane processes,
+            # nr_processes = None will start as many as the PC can handle
+            nr_processes = None if recompile else 1
+            with multiprocessing.Pool(
+                nr_processes,
+                maxtasksperchild=cl_oql.maxtasksperchild  # avoid RAM issues
+            ) as pool:
+                rb_tasks = send_rb_tasks(pool)
+                cl_oql.wait_for_rb_tasks(rb_tasks)
+
+        programs_filenames = rb_tasks.get()
+
+        # to include calibration points
+        if cal_points:
+            sweep_points = np.append(
+                # repeat twice because of net clifford being 0 and 3
+                np.repeat(nr_cliffords, 2),
+                [nr_cliffords[-1] + 0.5] * 2 +
+                [nr_cliffords[-1] + 1.5] * 2 +
+                [nr_cliffords[-1] + 2.5] * 2,
+            )
+        else:
+            sweep_points = np.repeat(nr_cliffords, 2)
+
+        counter_param = ManualParameter('name_ctr', initial_value=0)
+        prepare_function_kwargs = {
+            'counter_param': counter_param,
+            'programs_filenames': programs_filenames,
+            'CC': self.instr_CC.get_instr()}
+
+        # Using the first detector of the multi-detector as this is
+        # in charge of controlling the CC (see self.get_int_logging_detector)
+        d.set_prepare_function(
+            oqh.load_range_of_oql_programs_from_filenames,
+            prepare_function_kwargs, detectors="first"
+        )
+
+        reps_per_seed = 4094 // len(sweep_points)
+        d.set_child_attr("nr_shots", reps_per_seed * len(sweep_points))
+
+        s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed * nr_seeds))
+
+        MC.set_detector_function(d)
+        label = 'RB_{}_{}_park_{}_{}seeds_recompile={}_rb_park_only={}_icl{}'.format(
+            *qubits, nr_seeds, recompile, rb_on_parked_qubit_only, interleaving_cliffords)
+        label += self.msmt_suffix
+        # FIXME should include the indices in the exp_metadata and
+        # use that in the analysis instead of being dependent on the
+        # measurement for those parameters
+        rates_I_quad_ch_idx = -2
+        cal_pnts_in_dset = np.repeat(["0", "1", "2"], 2)
+        MC.run(label, exp_metadata={
+            'bins': sweep_points,
+            "rates_I_quad_ch_idx": rates_I_quad_ch_idx,
+            "cal_pnts_in_dset": list(cal_pnts_in_dset)  # needs to be list to save
+        })
+
+        a_q2 = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
+            label=label,
+            rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+            cal_pnts_in_dset=cal_pnts_in_dset
+        )
+        return a_q2
 
 
     def measure_two_qubit_purity_benchmarking(
@@ -4141,6 +4702,85 @@ class HAL_Device(HAL_ShimMQ):
         return Analysis
 
 
+    def measure_performance(
+            self,
+            number_of_repetitions: int = 1,
+            post_selection: bool = False,
+            qubit_pairs: list = [['QNW', 'QC'], ['QNE', 'QC'],
+                                 ['QC', 'QSW', 'QSE'], ['QC', 'QSE', 'QSW']],
+            do_cond_osc: bool = True,
+            do_1q: bool = True,
+            do_2q: bool = True,
+            do_ro: bool = True
+    ):
+
+        """
+        Routine runs readout, single-qubit and two-qubit metrics.
+
+        Parameters
+        ----------
+        number_of_repetitions : int
+            defines number of times the routine is repeated.
+        post_selection: bool
+            defines whether readout fidelities are measured with post-selection.
+        qubit_pairs: list
+            list of the qubit pairs for which 2-qubit metrics should be measured.
+            Each pair should be a list of 2 strings (3 strings, if a parking operation
+            is needed) of the respective qubit object names.
+
+        Returns
+        -------
+        succes: bool
+            True if performance metrics were run successfully, False if it failed.
+
+        """
+
+        for _ in range(0, number_of_repetitions):
+            try:
+                if do_ro:
+                    self.measure_ssro_multi_qubit(self.qubits(), initialize=post_selection)
+
+                if do_1q:
+                    for qubit in self.qubits():
+                        qubit_obj = self.find_instrument(qubit)
+                        qubit_obj.ro_acq_averages(4096)
+                        qubit_obj.measure_T1()
+                        qubit_obj.measure_ramsey()
+                        qubit_obj.measure_echo()
+
+                        qubit_obj.ro_acq_weight_type('SSB')
+                        qubit_obj.ro_soft_avg(3)
+                        qubit_obj.measure_allxy()
+
+                        qubit_obj.ro_soft_avg(1)
+                        qubit_obj.measure_single_qubit_randomized_benchmarking()
+
+                        qubit_obj.ro_acq_weight_type('optimal')
+
+                self.ro_acq_weight_type('optimal')
+                if do_2q:
+                    for pair in qubit_pairs:
+                        self.measure_two_qubit_randomized_benchmarking(qubits=pair[:2],
+                                                                        MC=self.instr_MC.get_instr())
+                        self.measure_state_tomography(qubits=pair[:2], bell_state=0,
+                                                        prepare_for_timedomain=True, live_plot=False,
+                                                        nr_shots_per_case=2**10, shots_per_meas=2**14,
+                                                        label='State_Tomography_Bell_0')
+
+                        if do_cond_osc:
+                            self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+                            self.measure_conditional_oscillation(q0=pair[1], q1=pair[0])
+                            # in case of parked qubit, assess its parked phase as well
+                            if len(pair) == 3:
+                                self.measure_conditional_oscillation( q0=pair[0], q1=pair[1], q2=pair[2],
+                                                                    parked_qubit_seq='ramsey')
+            except KeyboardInterrupt:
+                print('Keyboard Interrupt')
+                break
+            except:
+                print("Exception encountered during measure_device_performance")
+
+
     def measure_multi_rabi(
             self,
             qubits: list = None,
@@ -4165,7 +4805,7 @@ class HAL_Device(HAL_ShimMQ):
 
         s = swf.mw_lutman_amp_sweep(qubits=qubits, device=self)
 
-        d = self.get_int_avg_det(single_int_avg=True)
+        d = self.int_avg_det_single
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4310,12 +4950,17 @@ class HAL_Device(HAL_ShimMQ):
 
     def measure_multi_T1(
             self,
-            qubits: list = None,
-            times=None,
+            qubits: List[str] = None,
+            times: List[List[float]] = None,
             MC: Optional[MeasurementControl] = None,
-            prepare_for_timedomain=True,
-            analyze=True,
-            update=True):
+            prepare_for_timedomain: bool = True,
+            analyze: bool = True,
+            update: bool = True
+        ):
+        '''
+        NOTE: THIS ROUTINE DOES NOT CURRENTLY WORK WITH NON-EQUAL TIMES FOR THE DIFFERENT QUBITS!!!! LDC 2022/07/07
+        MUST FIX!!!!!
+        '''
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4323,23 +4968,55 @@ class HAL_Device(HAL_ShimMQ):
         if qubits is None:
             qubits = self.qubits()
 
+        # sort qubits as per the device qubit list
+        # (a) get list of all qubits on device
+        devicequbitlist=self.qubits()
+        numqubitsAll=len(devicequbitlist)
+
+        # (b) determine the position of the input qubits on device list
+        numqubits=len(qubits)
+        qubitpos=[]
+        for i in range(numqubits):
+            thisqubit=qubits[i]
+            for j in range(numqubitsAll):
+                if (thisqubit==devicequbitlist[j]):
+                    qubitpos.append(j)
+        # (c) sort positions in increasing order according to the device list
+        qubitpos=sorted(qubitpos)
+        sortedqubits=qubits
+        for i in range(numqubits):
+            sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        qubits=sortedqubits
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
 
         qubits_idx = []
-        set_times = []
         for q in qubits:
-            qub = self.find_instrument(q)
-            qubits_idx.append(qub.cfg_qubit_nr())
-            stepsize = max((4 * qub.T1() / 31) // (abs(qub.cfg_cycle_time()))
-                           * abs(qub.cfg_cycle_time()), 40e-9)
-            set_time = np.arange(0, stepsize * 34, stepsize)
-            set_times.append(set_time)
+            qubits_idx.append(self.find_instrument(q).cfg_qubit_nr())
 
         if times is None:
-            times = set_times
+            default_times = []
+            for q in qubits:
+                qub = self.find_instrument(q)                
+                # stepsize = max((4 * qub.T1() / 31) // abs(qub.cfg_cycle_time()) * abs(qub.cfg_cycle_time()), 40e-9)
+                # qub_times = np.arange(0, stepsize * 34, stepsize)
 
-        points = len(times[0])
+                # default timing: 4 x current T1, 31 points
+                qub_times = np.linspace(0, qub.T1() * 4, 31) // qub.cfg_cycle_time() * qub.cfg_cycle_time()
+                default_times.append(qub_times)
+            times = default_times
+
+        # check that each time array is equal length. Otherwise, raise error.
+        if 1 != len(set(map(len, times))):
+            raise ValueError("List of times has to be same length for each qubit!")
+
+        # append calibration points
+        for i,t in enumerate(times):
+            dt = np.mean(np.diff(t)) # times[1] - times[0]
+            times[i] = np.concatenate([t, np.linspace(t[-1]+dt, t[-1]+5*dt, 4)])
+
+        n_points = len(times[0])
 
         p = mqo.multi_qubit_T1(
             times=times,
@@ -4349,7 +5026,7 @@ class HAL_Device(HAL_ShimMQ):
 
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(points))
+        MC.set_sweep_points(np.arange(n_points))
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
         label = 'Multi_T1_' + '_'.join(qubits)
@@ -4357,29 +5034,67 @@ class HAL_Device(HAL_ShimMQ):
 
         if analyze:
             a = ma2.Multi_T1_Analysis(qubits=qubits, times=times)
-        if update:
-            for q in qubits:
-                qub = self.find_instrument(q)
-                T1 = a.proc_data_dict['quantities_of_interest'][q]['tau']
-                qub.T1(T1)
-
-        return a
-
+        
+            # for diagnostics only!!! LDC
+            #for q in qubits:
+            #    qub = self.find_instrument(q)
+            #    T1 = a.proc_data_dict['quantities_of_interest'][q]['tau']
+            #    print(T1)
+            
+            # update T1 values in qubit objects if chosen to. 
+            # of course, it makes sense to update only if analyze is true and update is true
+            if update:
+                for q in qubits:
+                    T1 = a.proc_data_dict['quantities_of_interest'][q]['tau']
+                    qub = self.find_instrument(q)
+                    qub.T1(T1)
+            # return the analysis results
+            return a
+        # if no analysis, simply return true.
+        return True
 
     def measure_multi_Echo(
             self,
-            qubits: list = None,
-            times=None,
+            qubits: List[str] = None,
+            times: List[List[float]] = None,
             MC: Optional[MeasurementControl] = None,
-            prepare_for_timedomain=True,
-            analyze=True,
-            update=True
-    ):
+            prepare_for_timedomain: bool = True,
+            analyze: bool = True,
+            update: bool = True
+        ):
+        '''
+        This code was last revised by LDC, 2022/07/07.
+        Imported some clever features added by Olexiy in measure_multi_T1.
+        FIXED: AWG LUTs were not updated with pi/2 pulses with varying phase.
+
+        NOTE: THIS ROUTINE DOES NOT CURRENTLY WORK WITH NON-EQUAL TIMES FOR THE DIFFERENT QUBITS!!!! LDC 2022/07/07
+        FIX ME!!!!
+        '''
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         if qubits is None:
             qubits = self.qubits()
+
+        # sort qubits as per the device qubit list
+        # (a) get list of all qubits on device
+        devicequbitlist=self.qubits()
+        numqubitsAll=len(devicequbitlist)
+
+        # (b) determine the position of the input qubits on device list
+        numqubits=len(qubits)
+        qubitpos=[]
+        for i in range(numqubits):
+            thisqubit=qubits[i]
+            for j in range(numqubitsAll):
+                if (thisqubit==devicequbitlist[j]):
+                    qubitpos.append(j)
+        # (c) sort positions in increasing order according to the device list
+        qubitpos=sorted(qubitpos)
+        sortedqubits=qubits
+        for i in range(numqubits):
+            sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        qubits=sortedqubits
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
@@ -4389,15 +5104,30 @@ class HAL_Device(HAL_ShimMQ):
         for q in qubits:
             qub = self.find_instrument(q)
             qubits_idx.append(qub.cfg_qubit_nr())
-            stepsize = max((2 * qub.T2_echo() / 61) // (abs(qub.cfg_cycle_time()))
-                           * abs(qub.cfg_cycle_time()), 20e-9)
-            set_time = np.arange(0, stepsize * 64, stepsize)
+            stepsize = max((2 * qub.T2_echo() / 60) // abs(qub.cfg_cycle_time()) * abs(qub.cfg_cycle_time()), 40e-9)
+            set_time = np.arange(0, 61)*stepsize
             set_times.append(set_time)
+
+            # added by LDC.  2022/07/07 
+            # The phase pulses were not being put on the AWG lookuptable.
+            mw_lutman = qub.instr_LutMan_MW.get_instr()
+            mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+
 
         if times is None:
             times = set_times
 
-        points = len(times[0])
+        # check that each time array is equal length. Otherwise, raise error.
+        if 1 != len(set(map(len, times))):
+            raise ValueError("List of times has to be same length for each qubit!")
+
+        # append calibration points
+        for i,t in enumerate(times):
+            dt = np.mean(np.diff(t)) # times[1] - times[0]
+            times[i] = np.concatenate([t, np.linspace(t[-1]+dt, t[-1]+5*dt, 4)])
+
+        n_points = len(times[0])
+
 
         p = mqo.multi_qubit_Echo(
             times=times,
@@ -4406,7 +5136,7 @@ class HAL_Device(HAL_ShimMQ):
 
         s = swf.OpenQL_Sweep(openql_program=p, CCL=self.instr_CC.get_instr())
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(points))
+        MC.set_sweep_points(np.arange(n_points))
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
         label = 'Multi_Echo_' + '_'.join(qubits)
@@ -4414,34 +5144,119 @@ class HAL_Device(HAL_ShimMQ):
 
         if analyze:
             a = ma2.Multi_Echo_Analysis(label=label, qubits=qubits, times=times)
-        if update:
             qoi = a.proc_data_dict['quantities_of_interest']
-            for q in qubits:
-                qub = self.find_instrument(q)
-                T2_echo = qoi[q]['tau']
-                qub.T2_echo(T2_echo)
+            
+            # for diagnostics only.
+            #for q in qubits:
+            #    T2_echo = qoi[q]['tau']
+            #    print(T2_echo)
 
+            if update:
+                for q in qubits:
+                    T2_echo = qoi[q]['tau']
+                    qub = self.find_instrument(q)
+                    qub.T2_echo(T2_echo)
+            # return the analysis results
+            return a
+        # if no analysis, simply return true.        
         return True
 
+    def multi_flipping_GBT(
+            self,
+            qubits: List[str] = None, 
+            nr_sequence: int = 7,                   # max number of iterations
+            number_of_flips=np.arange(0, 31, 2),    # specifies the number of pi pulses at each step
+            eps=0.0005):                            # specifies the GBT threshold
+
+
+        # sort qubits as per the device qubit list
+        # (a) get list of all qubits on device
+        devicequbitlist=self.qubits()
+        numqubitsAll=len(devicequbitlist)
+
+        # (b) determine the position of the input qubits on device list
+        numqubits=len(qubits)
+        qubitpos=[]
+        for i in range(numqubits):
+            thisqubit=qubits[i]
+            for j in range(numqubitsAll):
+                if (thisqubit==devicequbitlist[j]):
+                    qubitpos.append(j)
+        # (c) sort positions in increasing order according to the device list
+        qubitpos=sorted(qubitpos)
+        sortedqubits=qubits
+        for i in range(numqubits):
+            sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        qubits=sortedqubits
+        # for diagnostics only
+        #print(qubits)
+
+
+        for i in range(nr_sequence):
+            a = self.measure_multi_flipping(qubits=qubits, 
+                                            number_of_flips=number_of_flips,
+                                            analyze=True,
+                                            update=True)
+            # for diagnostics only
+            print("Iteration ",i,":")
+            print(qubits)
+            print(a)
+
+            # determine if all qubits meet spec
+            # if at least one qubit does not, repeat.
+            isdone=1
+            for j in range(numqubits):
+                scale_factor= a[j]
+                if abs(1 - scale_factor) <= eps:
+                    isdone*=1
+                else:
+                    isdone*=0
+                
+            if (isdone==1):
+                print('GBT has converged on all qubits. Done!')
+                return True
+        return False
 
     def measure_multi_flipping(
             self,
-            qubits: list = None,
-            number_of_flips: int = None,
+            qubits: List[str] = None,
+            number_of_flips=np.arange(0, 31, 2),
             equator=True,
             ax='x',
             angle='180',
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain=True,
+            analyze=True,
             update=False,
-            scale_factor_based_on_line: bool = False
-    ):
+            scale_factor_based_on_line: bool = False):
+
         # allow flipping only with pi/2 or pi, and x or y pulses
         assert angle in ['90', '180']
         assert ax.lower() in ['x', 'y']
 
         if MC is None:
             MC = self.instr_MC.get_instr()
+
+        # get list of all qubits on device
+        devicequbitlist=self.qubits()
+        numqubitsAll=len(devicequbitlist)
+
+        # determine the position of the input qubits on device list
+        numqubits=len(qubits)
+        qubitpos=[]
+        for i in range(numqubits):
+            thisqubit=qubits[i]
+            for j in range(numqubitsAll):
+                if (thisqubit==devicequbitlist[j]):
+                    qubitpos.append(j)
+        # sort positions in increasing order according to the device list
+        qubitpos=sorted(qubitpos)
+        sortedqubits=qubits
+        for i in range(numqubits):
+            sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        qubits=sortedqubits
+        # for diagnostics only
+        #print(qubits)
 
         if qubits is None:
             qubits = self.qubits()
@@ -4451,7 +5266,12 @@ class HAL_Device(HAL_ShimMQ):
 
         if number_of_flips is None:
             number_of_flips = 30
-        nf = np.arange(0, (number_of_flips + 4) * 2, 2)
+            nf = np.arange(0, (number_of_flips + 4) * 2, 2)
+        else:
+            nf = np.array(number_of_flips)
+            dn = nf[1] - nf[0]
+            nf = np.concatenate([nf, (nf[-1] + 1 * dn, nf[-1] + 2 * dn, nf[-1] + 3 * dn, nf[-1] + 4 * dn)])
+
 
         qubits_idx = []
         for q in qubits:
@@ -4475,50 +5295,79 @@ class HAL_Device(HAL_ShimMQ):
         label = 'Multi_flipping_' + '_'.join(qubits)
         MC.run(label)
 
-        a = ma2.Multi_Flipping_Analysis(qubits=qubits, label=label)
+        if analyze:
+            a = ma2.Multi_Flipping_Analysis(qubits=qubits, label=label)
 
-        if update:
-            for q in qubits:
-                # Same as in single-qubit flipping:
-                # Choose scale factor based on simple goodness-of-fit comparison,
-                # unless it is forced by `scale_factor_based_on_line`
-                # This method gives priority to the line fit:
-                # the cos fit will only be chosen if its chi^2 relative to the
-                # chi^2 of the line fit is at least 10% smaller
-                # cos_chisqr = a.proc_data_dict['quantities_of_interest'][q]['cos_fit'].chisqr
-                # line_chisqr = a.proc_data_dict['quantities_of_interest'][q]['line_fit'].chisqr
+            if update:
+                scale_factor_vec=[]
+                for q in qubits:
+                    #scale_factor = a.get_scale_factor()
+                    scale_factor = a.proc_data_dict['{}_scale_factor'.format(q)]
+                    scale_factor_vec.append(scale_factor)
+                    if abs(scale_factor - 1) < 0.2e-3:
+                        print(f'Qubit {q}: Pulse amplitude accurate within 0.02%. Amplitude not updated.')
+                    else:
+                        qb = self.find_instrument(q)
+                        if angle == '180':
+                            if qb.cfg_with_vsm():
+                                amp_old = qb.mw_vsm_G_amp()
+                                qb.mw_vsm_G_amp(amp_old * scale_factor)
+                            else:
+                                amp_old = qb.mw_channel_amp()
+                                qb.mw_channel_amp(amp_old * scale_factor)
+                        elif angle == '90':
+                            amp_old = qb.mw_amp90_scale()
+                            qb.mw_amp90_scale(amp_old * scale_factor)
+
+                        print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
+                            q, ax, angle, amp_old, scale_factor * amp_old))
+
+                return scale_factor_vec
+            return a
+        return True
+
+
+
+                # # Same as in single-qubit flipping:
+                # # Choose scale factor based on simple goodness-of-fit comparison,
+                # # unless it is forced by `scale_factor_based_on_line`
+                # # This method gives priority to the line fit:
+                # # the cos fit will only be chosen if its chi^2 relative to the
+                # # chi^2 of the line fit is at least 10% smaller
+                # # cos_chisqr = a.proc_data_dict['quantities_of_interest'][q]['cos_fit'].chisqr
+                # # line_chisqr = a.proc_data_dict['quantities_of_interest'][q]['line_fit'].chisqr
+
+                # # if scale_factor_based_on_line:
+                # #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
+                # # elif (line_chisqr - cos_chisqr)/line_chisqr > 0.1:
+                # #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['cos_fit']['sf']
+                # # else:
+                # #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
 
                 # if scale_factor_based_on_line:
                 #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
-                # elif (line_chisqr - cos_chisqr)/line_chisqr > 0.1:
-                #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['cos_fit']['sf']
                 # else:
-                #     scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
+                #     # choose scale factor preferred by analysis (currently based on BIC measure)
+                #     scale_factor = a.proc_data_dict['{}_scale_factor'.format(q)]
 
-                if scale_factor_based_on_line:
-                    scale_factor = a.proc_data_dict['quantities_of_interest'][q]['line_fit']['sf']
-                else:
-                    # choose scale factor preferred by analysis (currently based on BIC measure)
-                    scale_factor = a.proc_data_dict['{}_scale_factor'.format(q)]
+                # if abs(scale_factor - 1) < 1e-3:
+                #     print(f'Qubit {q}: Pulse amplitude accurate within 0.1%. Amplitude not updated.')
+                #     return a
 
-                if abs(scale_factor - 1) < 1e-3:
-                    print(f'Qubit {q}: Pulse amplitude accurate within 0.1%. Amplitude not updated.')
-                    return a
+                # qb = self.find_instrument(q)
+                # if angle == '180':
+                #     if qb.cfg_with_vsm():
+                #         amp_old = qb.mw_vsm_G_amp()
+                #         qb.mw_vsm_G_amp(scale_factor * amp_old)
+                #     else:
+                #         amp_old = qb.mw_channel_amp()
+                #         qb.mw_channel_amp(scale_factor * amp_old)
+                # elif angle == '90':
+                #     amp_old = qb.mw_amp90_scale()
+                #     qb.mw_amp90_scale(scale_factor * amp_old)
 
-                qb = self.find_instrument(q)
-                if angle == '180':
-                    if qb.cfg_with_vsm():
-                        amp_old = qb.mw_vsm_G_amp()
-                        qb.mw_vsm_G_amp(scale_factor * amp_old)
-                    else:
-                        amp_old = qb.mw_channel_amp()
-                        qb.mw_channel_amp(scale_factor * amp_old)
-                elif angle == '90':
-                    amp_old = qb.mw_amp90_scale()
-                    qb.mw_amp90_scale(scale_factor * amp_old)
-
-                print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
-                    q, ax, angle, amp_old, scale_factor * amp_old))
+                # print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
+                #     q, ax, angle, amp_old, scale_factor * amp_old))
 
 
     def measure_multi_motzoi(
@@ -5029,84 +5878,32 @@ class HAL_Device(HAL_ShimMQ):
             operation_pairs: list = [(['QNW', 'QC'], 'SE'), (['QNE', 'QC'], 'SW'),
                                      (['QC', 'QSW', 'QSE'], 'SW'), (['QC', 'QSE', 'QSW'], 'SE')]
     ):
-        # USED_BY: inspire_dependency_graph.py,
 
-        # First, fix parking phases
-        # Set 'qubits': [q0.name, q1.name, q2.name] and 'parked_qubit_seq': 'ramsey'
         if do_park_cal:
             for operation_tuple in operation_pairs:
                 pair, gate = operation_tuple
                 if len(pair) != 3: continue
 
                 check = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1], q2=pair[2], parked_qubit_seq='ramsey')
-                cur_val = check.proc_data_dict['quantities_of_interest']['park_phase_off'].nominal_value
-                if abs(cur_val) < 3 or abs(360-cur_val) < 3:
-                    continue
+                value = check.proc_data_dict['quantities_of_interest']['park_phase_off'].nominal_value
+                q2 = self.find_instrument(pair[2])
+                mw_lm = q2.instr_LutMan_MW.get_instr()
 
-                q0 = self.find_instrument(pair[0]) # ramsey qubit (we make this be the fluxed one)
-                q1 = self.find_instrument(pair[1]) # control qubit
-                q2 = self.find_instrument(pair[2]) # parked qubit
+                current_value = mw_lm.vcz_virtual_q_ph_corr_park()
+                mw_lm.vcz_virtual_q_ph_corr_park(np.mod(value+current_value,360))
 
-                # cf.counter_param(0)
-                flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
-                nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
-                mc = self.instr_MC.get_instr()
-
-                parked_seq = 'ramsey'
-                conv_cost_det = det.Function_Detector( get_function=czcf.conventional_CZ_cost_func,
-                        msmt_kw={'device': self, 'FL_LutMan_QR': flux_lm,
-                            'MC': mc, 'waveform_name': 'cz_{}'.format(gate),
-                            'qubits': [q0.name, q1.name, q2.name],
-                            'parked_qubit_seq': parked_seq},
-                        value_names=['Cost function value',
-                            'Conditional phase', 'offset difference', 'missing fraction',
-                            'Q0 phase', 'Park Phase OFF', 'Park Phase ON'],
-                        result_keys=['cost_function_val',
-                            'delta_phi', 'offset_difference', 'missing_fraction',
-                            'single_qubit_phase_0', 'park_phase_off', 'park_phase_on'],
-                        value_units=['a.u.', 'deg', '%', '%', 'deg', 'deg', 'deg'])
-
-                park_flux_lm = q2.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
-
-                # 1D Scan of phase corrections after flux pulse
-                value_min = park_flux_lm.park_amp() - phase_offset_park
-                value_max = park_flux_lm.park_amp() + phase_offset_park
-                sw = swf.joint_HDAWG_lutman_parameters(name='park_amp',
-                                                    parameter_1=park_flux_lm.park_amp,
-                                                    parameter_2=park_flux_lm.park_amp_minus,
-                                                    AWG=park_flux_lm.AWG.get_instr(),
-                                                    lutman=park_flux_lm)
-
-                nested_mc.set_sweep_function(sw)
-                nested_mc.set_sweep_points(np.linspace(value_min, value_max, 10))
-                label = '1D_park_phase_corr_{}_{}_{}'.format(q0.name,q1.name,q2.name)
-                nested_mc.set_detector_function(conv_cost_det)
-                result = nested_mc.run(label)
-
-                # Use ch_to_analyze as 5 for parking phase
-                a_obj = ma2.Crossing_Analysis(label=label, ch_idx='Park Phase OFF', target_crossing=0)
-                crossed_value = a_obj.proc_data_dict['root']
-                park_flux_lm.park_amp(crossed_value)
-                park_flux_lm.park_amp_minus(-crossed_value)
-
-        # Then, fix single-qubit phases
-        # Set 'qubits': [q0.name, q1.name] and 'parked_qubit_seq': 'ground'
         if do_sq_cal:
             for operation_tuple in operation_pairs:
-                # For each qubit pair, calibrate both individually (requires inversion of arguments)
                 for reverse in [False, True]:
                     if reverse and skip_reverse:
                         continue
                     pair, gate = operation_tuple
-                    parked_seq = 'ground'
 
                     if reverse:
                         check = self.measure_conditional_oscillation(q0=pair[1], q1=pair[0])
                     else:
                         check = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
-                    cur_val = check.proc_data_dict['quantities_of_interest']['phi_0'].nominal_value
-                    if abs(cur_val) < 3 or abs(360-cur_val) < 3:
-                        continue
+                    value = check.proc_data_dict['quantities_of_interest']['phi_0'].nominal_value
 
                     if reverse:
                         q0 = self.find_instrument(pair[1]) # ramsey qubit (we make this be the fluxed one)
@@ -5120,103 +5917,157 @@ class HAL_Device(HAL_ShimMQ):
                         q1 = self.find_instrument(pair[1]) # control qubit
                         gate = gate
 
-                    q2 = None
-                    # cf.counter_param(0)
-                    flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
-                    nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
-                    mc = self.instr_MC.get_instr()
-
-                    conv_cost_det = det.Function_Detector( get_function=czcf.conventional_CZ_cost_func,
-                                    msmt_kw={'device': self, 'FL_LutMan_QR': flux_lm,
-                                        'MC': mc,'waveform_name': 'cz_{}'.format(gate),
-                                        'qubits': [q0.name, q1.name], 'parked_qubit_seq': parked_seq},
-                                    value_names=['Cost function value',
-                                        'Conditional phase', 'offset difference', 'missing fraction',
-                                        'Q0 phase', 'Park Phase OFF', 'Park Phase ON'],
-                                    result_keys=['cost_function_val',
-                                        'delta_phi', 'offset_difference', 'missing_fraction',
-                                        'single_qubit_phase_0', 'park_phase_off', 'park_phase_on'],
-                                    value_units=['a.u.', 'deg', '%', '%', 'deg', 'deg', 'deg'])
-
-                    # 1D Scan of phase corrections after flux pulse
-                    #value_min = flux_lm.cz_phase_corr_amp_SW()-phase_offset
-                    value_min = getattr(flux_lm, 'cz_phase_corr_amp_' + gate )()-phase_offset_sq
-                    #value_max = flux_lm.cz_phase_corr_amp_SW()+phase_offset
-                    value_max = getattr(flux_lm, 'cz_phase_corr_amp_' + gate )()+phase_offset_sq
-
-                    label = 'CZ_1D_sweep_phase_corr_{}'.format(gate)
-                    nested_mc.set_sweep_function(getattr(flux_lm, 'cz_phase_corr_amp_' + gate ))
-                    nested_mc.set_sweep_points(np.linspace(value_min, value_max, 10))
-                    nested_mc.set_detector_function(conv_cost_det)
-                    result = nested_mc.run(label)
-
-                    # Use ch_to_analyze as 4 for single qubit phases ('Q0 phase')
-                    a_obj = ma2.Crossing_Analysis(label=label,
-                                                ch_idx='Q0 phase',
-                                                target_crossing=0)
-                    crossed_value = a_obj.proc_data_dict['root']
-                    getattr(flux_lm, 'cz_phase_corr_amp_' + gate )(crossed_value)
+                    mw_lm = q0.instr_LutMan_MW.get_instr()
+                    current_value = getattr(mw_lm, 'vcz_virtual_q_ph_corr_' + gate )()
+                    getattr(mw_lm, 'vcz_virtual_q_ph_corr_' + gate )(np.mod(value+current_value,360))
         return True
 
 
-    def calibrate_cz_thetas(
+    def measure_two_qubit_phase_GBT(
             self,
-            phase_offset: float = 1,
-            operation_pairs: list = [(['QNW', 'QC'], 'SE'), (['QNE', 'QC'], 'SW'),
-                                     (['QC', 'QSW', 'QSE'], 'SW'), (['QC', 'QSE', 'QSW'], 'SE')]
-    ):
-        # USED_BY: inspire_dependency_graph.py,
+            pair,
+            eps=10,                # error threshold for two-qubit phase, in degrees
+            updateSQP=True        # determines whether to update single-qubit phase while at it.
+            ):
+        '''
+        The goal of this routine is to measure the two-qubit phase of a CZ specified by operation_pair.
+        The Ramsey'd qubit is always q0 (the first element in operation_pair).
+        The control qubit is always q1 (the second element in opertion_pair).
+        By default, we take advantage of the measurement to update the single-qubit phase of q0.
+        Finally, we check if the two-qubit-phase is in bounds, as determined by eps. 
+        Leo DC, 22/06/17
+        '''
 
-        # Set 'qubits': [q0.name, q1.name] and 'parked_qubit_seq': 'ground'
-        for operation_tuple in operation_pairs:
-            pair, gate = operation_tuple
-            parked_seq = 'ground'
+        # getthe direction of the CZ gate
+        direction=get_gate_directions(pair[0],pair[1])[0]
 
-            check = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
-            if abs(180-check.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value)<2:
-                continue
 
-            q0 = self.find_instrument(pair[0]) # ramsey qubit (we make this be the fluxed one)
-            q1 = self.find_instrument(pair[1]) # control qubit
-            q2 = None
-            gate = gate
+        # for diagnostics only
+        #print(pair)
+        #print(direction)
 
-            # cf.counter_param(0)
-            flux_lm = q0.instr_LutMan_Flux.get_instr() # flux_lm of fluxed_qubit
-            nested_mc = q0.instr_nested_MC.get_instr() # device object has no nested MC object, get from qubit object
-            mc = self.instr_MC.get_instr()
+        # run the conditional oscillation
+        a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+        
+        # get qubit object and the micrwoave lutman for qO
+        q0 = self.find_instrument(pair[0])
+        mw_lm_q0 = q0.instr_LutMan_MW.get_instr()
+               
 
-            conv_cost_det = det.Function_Detector( get_function=czcf.conventional_CZ_cost_func,
-                            msmt_kw={'device': self, 'FL_LutMan_QR': flux_lm,
-                                'MC': mc,'waveform_name': 'cz_{}'.format(gate),
-                                'qubits': [q0.name, q1.name], 'parked_qubit_seq': parked_seq},
-                            value_names=['Cost function value',
-                                'Conditional phase', 'offset difference', 'missing fraction',
-                                'Q0 phase', 'Park Phase OFF', 'Park Phase ON'],
-                            result_keys=['cost_function_val',
-                                'delta_phi', 'offset_difference', 'missing_fraction',
-                                'single_qubit_phase_0', 'park_phase_off', 'park_phase_on'],
-                            value_units=['a.u.', 'deg', '%', '%', 'deg', 'deg', 'deg'])
+        # get the two-qubit-phase, update it in qubit obect, and calculate absolute error.
+        tqp = a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value # note that analysis always return a positive value
+        tqp = np.mod(tqp,360) # ensure modulo 360, should already be.
+        eps_tqp=np.abs(tqp-180)
+        # update the two-qubit phase in qubit object
+        # added by LDC on 2022/06/24
+        getattr(q0, 'CZ_two_qubit_phase_'+ direction)(tqp)
 
-            # 1D Scan of phase corrections after flux pulse
-            value_min = getattr(flux_lm, 'cz_theta_f_' + gate )()-phase_offset
-            #value_max = flux_lm.cz_phase_corr_amp_SW()+phase_offset
-            value_max = getattr(flux_lm, 'cz_theta_f_' + gate )()+phase_offset
+        # update the single-qubit phase microwave lutman if chosen to do so
+        if(updateSQP==True):
+            dphi0 = a.proc_data_dict['quantities_of_interest']['phi_0'].nominal_value
+            current_dphi0 = getattr(mw_lm_q0, 'vcz_virtual_q_ph_corr_' + direction )()
+            # update single-qubit-phase correction    
+            getattr(mw_lm_q0, 'vcz_virtual_q_ph_corr_' + direction)(np.mod(current_dphi0+dphi0,360))
+        # finally, compare to threshold
+        if (eps_tqp <= eps):
+                return True
+        return False
 
-            label = 'CZ_1D_sweep_theta_{}'.format(gate)
-            nested_mc.set_sweep_function(getattr(flux_lm, 'cz_theta_f_' + gate ))
-            nested_mc.set_sweep_points(np.linspace(value_min, value_max, 10))
-            nested_mc.set_detector_function(conv_cost_det)
-            result = nested_mc.run(label)
+    def calibrate_single_qubit_phase_GBT(
+            self,
+            pair,
+            eps=1,               # error threshold for single-qubit phase, in degrees
+            numpasses=5           # number of attemps to reach threshold
+            ):
+        '''
+        The goal of this routine is to calibrate the single-qubit phase of a qubit q0 during a CZ between q0 and q1.
+        The Ramsey'd qubit is always q0 (the first element in operation_pair).
+        The control qubit is always q1 (the second element in opertion_pair). 
+        This routine also updates the two-qubit-phase found in the q0 object.
+        Leo DC, 22/06/24
+        '''
 
-            # Use ch_to_analyze as 4 for single qubit phases ('Q0 phase')
-            a_obj = ma2.Crossing_Analysis(label=label,
-                                          ch_idx='Conditional phase',
-                                          target_crossing=180)
-            crossed_value = a_obj.proc_data_dict['root']
-            getattr(flux_lm, 'cz_theta_f_' + gate )(crossed_value)
+        # getthe direction of the CZ gate
+        direction=get_gate_directions(pair[0],pair[1])[0]
 
-        return True
+        # for diagnostics only
+        #print(pair)
+        #print(direction)
+
+        # get qubit object and the micrwoave lutman for qO
+        q0 = self.find_instrument(pair[0])
+        mw_lm_q0 = q0.instr_LutMan_MW.get_instr()
+
+        for thispass in range(0,numpasses):
+            # run the conditional oscillation
+            a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+
+            # get the two-qubit-phase, update it in qubit obect, and calculate absolute error.
+            tqp = a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value # note that analysis always return a positive value
+            tqp = np.mod(tqp,360) # ensure modulo 360, should already be the case.
+            
+            # update the two-qubit phase in qubit object
+            # added by LDC on 2022/06/24
+            getattr(q0, 'CZ_two_qubit_phase_'+ direction)(tqp)
+
+            # get single-qubit phase update
+            dphi0 = a.proc_data_dict['quantities_of_interest']['phi_0'].nominal_value
+            dphi0 = np.mod(dphi0,360) # ensure modulo 360 degrees.
+            # finally, compare to threshold
+            if (dphi0 <= eps or np.abs(dphi0-360) <= eps):
+                return True
+            else:   # if not within threshold, update the single-qubit phase
+                # get previous single-qubit phase
+                previous_dphi0 = getattr(mw_lm_q0, 'vcz_virtual_q_ph_corr_' + direction )() 
+                # do update
+                getattr(mw_lm_q0, 'vcz_virtual_q_ph_corr_' + direction)(np.mod(previous_dphi0+dphi0,360))
+
+        return False
+
+    def calibrate_parking_phase_GBT(
+            self,
+            pair,
+            eps=5,          # error threshold for single-qubit phase, in degrees
+            numpasses=5     # number of attemps to reach threshold
+            ):
+        '''
+        The goal of this routine is to cabrate the single-qubit phase of the parked qubit in a CZ gate.
+        The Ramsey'd qubit in the CZ pair is always q0 (the first element in operation_pair).
+        The control qubit in the CZ pair is always q1 (the second element in opertion_pair). 
+        The parked qubit is q2. It is also Ramsey'd.
+        Leo DC, 22/06/18
+        '''
+
+        # get qubit object and the micrwoave lutman for qO
+        q2 = self.find_instrument(pair[2])
+        mw_lm_q2 = q2.instr_LutMan_MW.get_instr()
+        # for diagnostics only
+        #print (q2.name, mw_lm_q2.name)
+
+        for thispass in range(numpasses):
+
+            # run the conditional oscillation experiment
+            a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1], q2=pair[2], parked_qubit_seq='ramsey')   
+            # get single-qubit phase update
+            dphi0 = a.proc_data_dict['quantities_of_interest']['park_phase_off'].nominal_value
+            dphi0 = np.mod(dphi0,360) # ensure modulo 360 degrees.
+            
+            #for diagnostics only
+            #print(thispass, dphi0)
+            
+            # finally, compare to threshold
+            if ((dphi0 <= eps) or (np.abs(dphi0-360) <= eps)):
+                return True
+            else:   # if not within threshold, update the single-qubit phase
+                # get previous single-qubit phase
+                previous_dphi0 = mw_lm_q2.vcz_virtual_q_ph_corr_park() 
+
+                # for diagnostics only
+                # print(previous_dphi0)
+
+                # do update
+                mw_lm_q2.vcz_virtual_q_ph_corr_park(np.mod(previous_dphi0+dphi0,360))
+        return False
 
 
     def calibrate_multi_frequency_fine(
@@ -5276,6 +6127,678 @@ class HAL_Device(HAL_ShimMQ):
                 break
 
         return True
+
+    #######################################
+    # Two qubit gate calibration functions
+    #######################################
+    def measure_vcz_A_tmid_landscape(
+        self, 
+        Q0,
+        Q1,
+        T_mids,
+        A_ranges,
+        A_points: int,
+        Q_parks: list = None,
+        Tp : float = None,
+        flux_codeword: str = 'cz',
+        flux_pulse_duration: float = 60e-9,
+        prepare_for_timedomain: bool = True,
+        disable_metadata: bool = False):
+        """
+        Perform 2D sweep of amplitude and wave parameter while measuring 
+        conditional phase and missing fraction via the "conditional 
+        oscillation" experiment.
+
+        Q0 : High frequency qubit(s). Can be given as single qubit or list.
+        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
+        T_mids : list of vcz "T_mid" values to sweep.
+        A_ranges : list of tuples containing ranges of amplitude sweep.
+        A_points : Number of points to sweep for amplitude range.
+        Q_parks : list of qubits parked during operation.
+        """
+        if isinstance(Q0, str):
+            Q0 = [Q0]
+        if isinstance(Q1, str):
+            Q1 = [Q1]
+        assert len(Q0) == len(Q1)
+
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        # get gate directions
+        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
+        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
+        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
+        # Prepare for time domain
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(
+                qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+                bypass_flux=True)
+            for i, lm in enumerate(Flux_lm_0):
+                print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
+                print(f'Setting {Q0[i]} vcz_amp_fine_{directions[i][0]} to 0.5')
+                print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
+                lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
+                lm.set(f'vcz_amp_fine_{directions[i][0]}', .5)
+                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
+            for i, lm in enumerate(Flux_lm_1):
+                print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+        # Look for Tp values
+        if Tp:
+            if isinstance(Tp, str):
+                Tp = [Tp]
+        else:
+            Tp = [lm.get(f'vcz_time_single_sq_{directions[i][0]}')*2 for i, lm in enumerate(Flux_lm_0)]
+        assert len(Q0) == len(Tp)
+        #######################
+        # Load phase pulses
+        #######################
+        if prepare_for_timedomain:
+            for i, q in enumerate(Q0):
+                # only on the CZ qubits we add the ef pulses 
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                lm = mw_lutman.LutMap()
+                # we hardcode the X on the ef transition to CW 31 here.
+                lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                # load_phase_pulses will also upload other waveforms
+                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+        # Wrapper function for conditional oscillation detector function.
+        def wrapper(Q0, Q1,
+                    prepare_for_timedomain,
+                    downsample_swp_points,
+                    extract_only,
+                    disable_metadata):
+            a = self.measure_conditional_oscillation_multi(
+                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+                    parked_qbs=Q_parks,
+                    flux_codeword=flux_codeword,
+                    prepare_for_timedomain=prepare_for_timedomain,
+                    downsample_swp_points=downsample_swp_points,
+                    extract_only=extract_only,
+                    disable_metadata=disable_metadata,
+                    verbose=False)
+            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
+                  for i in range(len(Q0)) }
+            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
+                  for i in range(len(Q0)) }
+            return { **cp, **mf} 
+
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
+                     'prepare_for_timedomain' : False,
+                     'downsample_swp_points': 3,
+                     'extract_only': True,
+                     'disable_metadata': True},
+            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_units=list(np.array([['deg', '%']\
+                                   for i in range(len(Q0))]).flatten()))
+        nested_MC.set_detector_function(d)
+
+        swf1 = swf.multi_sweep_function_ranges(
+            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude\
+                             for i in range(len(Q0))],
+            sweep_ranges= A_ranges,
+            n_points=A_points)
+        swf2 = swf.flux_t_middle_sweep(
+            fl_lm_tm =  list(np.array([[Flux_lm_0[i], Flux_lm_1[i] ]\
+                             for i in range(len(Q0))]).flatten()), 
+            fl_lm_park = Flux_lms_park,
+            which_gate = list(np.array(directions).flatten()),
+            t_pulse = Tp,
+            duration = flux_pulse_duration)
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(np.arange(A_points))
+        nested_MC.set_sweep_function_2D(swf2)
+        nested_MC.set_sweep_points_2D(T_mids)
+        MC.live_plot_enabled(False)
+        nested_MC.run(f'VCZ_Amp_vs_Tmid_{Q0}_{Q1}_{Q_parks}',
+                      mode='2D', disable_snapshot_metadata=disable_metadata)
+        # MC.live_plot_enabled(True)
+        ma2.tqg.VCZ_tmid_Analysis(Q0=Q0, Q1=Q1,
+                                  A_ranges=A_ranges,
+                                  label='VCZ_Amp_vs_Tmid')
+
+    # def calibrate_vcz_asymmetry(
+    #     self, 
+    #     Q0, Q1,
+    #     Asymmetries: list = np.linspace(-.005, .005, 7),
+    #     Q_parks: list = None,
+    #     prepare_for_timedomain = True,
+    #     update_params: bool = True,
+    #     flux_codeword: str = 'cz',
+    #     disable_metadata: bool = False):
+    #     """
+    #     Perform a sweep of vcz pulse asymmetry while measuring 
+    #     conditional phase and missing fraction via the "conditional 
+    #     oscillation" experiment.
+
+    #     Q0 : High frequency qubit(s). Can be given as single qubit or list.
+    #     Q1 : Low frequency qubit(s). Can be given as single qubit or list.
+    #     Offsets : Offsets of pulse asymmetry.
+    #     Q_parks : list of qubits parked during operation.
+    #     """
+    #     if isinstance(Q0, str):
+    #         Q0 = [Q0]
+    #     if isinstance(Q1, str):
+    #         Q1 = [Q1]
+    #     assert len(Q0) == len(Q1)
+    #     MC = self.instr_MC.get_instr()
+    #     nested_MC = self.instr_nested_MC.get_instr()
+    #     # get gate directions
+    #     directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+    #     Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
+    #     Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
+    #     Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
+    #     # Make sure asymmetric pulses are enabled
+    #     for i, flux_lm in enumerate(Flux_lm_0):
+    #         param = flux_lm.parameters[f'vcz_use_asymmetric_amp_{directions[i][0]}']
+    #         assert param() == True , 'Asymmetric pulses must be enabled.'
+    #     if prepare_for_timedomain:    
+    #         # Time-domain preparation
+    #         self.prepare_for_timedomain(
+    #             qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+    #             bypass_flux=True)
+    #         ###########################
+    #         # Load phase pulses
+    #         ###########################
+    #         for i, q in enumerate(Q0):
+    #             # only on the CZ qubits we add the ef pulses 
+    #             mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+    #             lm = mw_lutman.LutMap()
+    #             # we hardcode the X on the ef transition to CW 31 here.
+    #             lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+    #             lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+    #             # load_phase_pulses will also upload other waveforms
+    #             mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+    #     # Wrapper function for conditional oscillation detector function.
+    #     def wrapper(Q0, Q1,
+    #                 prepare_for_timedomain,
+    #                 downsample_swp_points,
+    #                 extract_only,
+    #                 disable_metadata):
+    #         a = self.measure_conditional_oscillation_multi(
+    #                 pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+    #                 parked_qbs=Q_parks,
+    #                 flux_codeword=flux_codeword,
+    #                 prepare_for_timedomain=prepare_for_timedomain,
+    #                 downsample_swp_points=downsample_swp_points,
+    #                 extract_only=extract_only,
+    #                 disable_metadata=disable_metadata,
+    #                 verbose=False)
+    #         cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
+    #               for i in range(len(Q0)) }
+    #         mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
+    #               for i in range(len(Q0)) }
+    #         return { **cp, **mf} 
+            
+    #     d = det.Function_Detector(
+    #         wrapper,
+    #         msmt_kw={'Q0' : Q0, 'Q1' : Q1,
+    #                  'prepare_for_timedomain' : False,
+    #                  'downsample_swp_points': 3,
+    #                  'extract_only': True,
+    #                  'disable_metadata': True},
+    #         result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
+    #                                for i in range(len(Q0))]).flatten()),
+    #         value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
+    #                                for i in range(len(Q0))]).flatten()),
+    #         value_units=list(np.array([['deg', '%']\
+    #                                for i in range(len(Q0))]).flatten()))
+    #     nested_MC.set_detector_function(d)
+    #     swfs = [swf.FLsweep(lm = lm,
+    #                         par = lm.parameters[f'vcz_asymmetry_{directions[i][0]}'],
+    #                         waveform_name = f'cz_{directions[i][0]}')
+    #             for i, lm in enumerate(Flux_lm_0) ]
+    #     swf1 = swf.multi_sweep_function(sweep_functions=swfs)
+    #     nested_MC.set_sweep_function(swf1)
+    #     nested_MC.set_sweep_points(Asymmetries)
+
+    #     MC.live_plot_enabled(False)
+    #     nested_MC.run(f'VCZ_asymmetry_sweep_{Q0}_{Q1}_{Q_parks}', mode='1D', 
+    #                   disable_snapshot_metadata=disable_metadata)
+    #     MC.live_plot_enabled(True)
+    #     a = ma2.tqg.VCZ_asymmetry_sweep_Analysis(label='VCZ_asymmetry_sweep')
+    #     ################################
+    #     # Update (or reset) flux params
+    #     ################################
+    #     for i, flux_lm in enumerate(Flux_lm_0):
+    #         param = flux_lm.parameters[f'vcz_asymmetry_{directions[i][0]}']
+    #         if update_params:
+    #             param(a.qoi[f'asymmetry_opt_{i}'])
+    #             print(f'Updated {param.name} to {a.qoi[f"asymmetry_opt_{i}"]*100:.3f}%')
+    #         else:
+    #             param(0)
+    #             print(f'Reset {param.name} to 0%')
+
+    def measure_vcz_A_B_landscape(
+        self, 
+        Q0, Q1,
+        A_ranges,
+        A_points: int,
+        B_amps: list,
+        Q_parks: list = None,
+        update_flux_params: bool = False,
+        flux_codeword: str = 'cz',
+        prepare_for_timedomain: bool = True,
+        disable_metadata: bool = False):
+        """
+        Perform 2D sweep of amplitude and wave parameter while measuring 
+        conditional phase and missing fraction via the "conditional 
+        oscillation" experiment.
+
+        Q0 : High frequency qubit(s). Can be given as single qubit or list.
+        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
+        T_mids : list of vcz "T_mid" values to sweep.
+        A_ranges : list of tuples containing ranges of amplitude sweep.
+        A_points : Number of points to sweep for amplitude range.
+        Q_parks : list of qubits parked during operation.
+        """
+        if isinstance(Q0, str):
+            Q0 = [Q0]
+        if isinstance(Q1, str):
+            Q1 = [Q1]
+        assert len(Q0) == len(Q1)
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        # get gate directions
+        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
+        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
+        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
+        # Prepare for time domain
+        if prepare_for_timedomain:
+            # Time-domain preparation
+            self.prepare_for_timedomain(
+                qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
+                bypass_flux=True)
+            for i, lm in enumerate(Flux_lm_0):
+                print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
+                print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
+                lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
+                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
+            for i, lm in enumerate(Flux_lm_1):
+                print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
+                lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
+        # Update two qubit gate parameters
+        if update_flux_params:
+            # List of current flux lutman amplitudes
+            Amps_11_02 = [{ d: lm.get(f'vcz_amp_dac_at_11_02_{d}')\
+                         for d in ['NW', 'NE', 'SW', 'SE']} for lm in Flux_lm_0]
+            # List of parking amplitudes
+            Amps_park = [ lm.get('park_amp') for lm in Flux_lm_0 ]
+            # List of current flux lutman channel gains
+            Old_gains = [ lm.get('cfg_awg_channel_amplitude') for lm in Flux_lm_0]
+        ###########################
+        # Load phase pulses
+        ###########################
+        if prepare_for_timedomain:
+            for i, q in enumerate(Q0):
+                # only on the CZ qubits we add the ef pulses 
+                mw_lutman = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                lm = mw_lutman.LutMap()
+                # we hardcode the X on the ef transition to CW 31 here.
+                lm[27] = {'name': 'rXm180', 'phi': 0, 'theta': -180, 'type': 'ge'}
+                lm[31] = {"name": "rX12", "theta": 180, "phi": 0, "type": "ef"}
+                # load_phase_pulses will also upload other waveforms
+                mw_lutman.load_phase_pulses_to_AWG_lookuptable()
+        # Wrapper function for conditional oscillation detector function.
+        def wrapper(Q0, Q1,
+                    prepare_for_timedomain,
+                    downsample_swp_points,
+                    extract_only,
+                    disable_metadata):
+            a = self.measure_conditional_oscillation_multi(
+                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
+                    parked_qbs=Q_parks,
+                    flux_codeword=flux_codeword,
+                    prepare_for_timedomain=prepare_for_timedomain,
+                    downsample_swp_points=downsample_swp_points,
+                    extract_only=extract_only,
+                    disable_metadata=disable_metadata,
+                    verbose=False)
+            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
+                  for i in range(len(Q0)) }
+            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
+                  for i in range(len(Q0)) }
+            return { **cp, **mf} 
+            
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
+                     'prepare_for_timedomain' : False,
+                     'downsample_swp_points': 3,
+                     'extract_only': True,
+                     'disable_metadata': True},
+            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
+                                   for i in range(len(Q0))]).flatten()),
+            value_units=list(np.array([['deg', '%']\
+                                   for i in range(len(Q0))]).flatten()))
+        nested_MC.set_detector_function(d)
+
+        swf1 = swf.multi_sweep_function_ranges(
+            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude
+                             for i in range(len(Q0))],
+            sweep_ranges= A_ranges,
+            n_points=A_points)
+        swfs = [swf.FLsweep(lm = lm,
+                            par = lm.parameters[f'vcz_amp_fine_{directions[i][0]}'],
+                            waveform_name = f'cz_{directions[i][0]}')
+                for i, lm in enumerate(Flux_lm_0) ]
+        swf2 = swf.multi_sweep_function(sweep_functions=swfs)
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(np.arange(A_points))
+        nested_MC.set_sweep_function_2D(swf2)
+        nested_MC.set_sweep_points_2D(B_amps)
+
+        # MC.live_plot_enabled(False)
+        nested_MC.run(f'VCZ_Amp_vs_B_{Q0}_{Q1}_{Q_parks}',
+                      mode='2D', disable_snapshot_metadata=disable_metadata)
+        # MC.live_plot_enabled(True)
+        a = ma2.tqg.VCZ_B_Analysis(Q0=Q0, Q1=Q1,
+                                   A_ranges=A_ranges,
+                                   directions=directions,
+                                   label='VCZ_Amp_vs_B')
+        ###################################
+        # Update flux parameters
+        ###################################
+        if update_flux_params:
+            print('Updating flux lutman parameters:')
+            def _set_amps_11_02(amps, lm, verbose=True):
+                '''
+                Helper function to set amplitudes in Flux_lutman
+                '''
+                for d in amps.keys():
+                    lm.set(f'vcz_amp_dac_at_11_02_{d}', amps[d])
+                    if verbose:
+                        print(f'Set {lm.name}.vcz_amp_dac_at_11_02_{d} to {amps[d]}')
+            # Update channel gains for each gate
+            Opt_gains = [ a.qoi[f'Optimal_amps_{q}'][0] for q in Q0 ]
+            Opt_Bvals = [ a.qoi[f'Optimal_amps_{q}'][1] for q in Q0 ]
+            
+            for i in range(len(Q0)):
+                # If new channel gain is higher than old gain then scale dac
+                # values accordingly: new_dac = old_dac*(old_gain/new_gain)
+                if Opt_gains[i] > Old_gains[i]:
+                    Flux_lm_0[i].set('cfg_awg_channel_amplitude', Opt_gains[i])
+                    print(f'Set {Flux_lm_0[i].name}.cfg_awg_channel_amplitude to {Opt_gains[i]}')
+                    for d in ['NW', 'NE', 'SW', 'SE']:
+                        Amps_11_02[i][d] *= Old_gains[i]/Opt_gains[i]
+                    Amps_11_02[i][directions[i][0]] = 0.5
+                    Amps_park[i] *= Old_gains[i]/Opt_gains[i]
+                # If new channel gain is lower than old gain, then choose
+                # dac value for measured gate based on old gain
+                else:
+                    Flux_lm_0[i].set('cfg_awg_channel_amplitude', Old_gains[i])
+                    print(f'Set {Flux_lm_0[i].name}.cfg_awg_channel_amplitude to {Old_gains[i]}')
+                    Amps_11_02[i][directions[i][0]] = 0.5*Opt_gains[i]/Old_gains[i]
+                # Set flux_lutman amplitudes
+                _set_amps_11_02(Amps_11_02[i], Flux_lm_0[i])
+                Flux_lm_0[i].set(f'vcz_amp_fine_{directions[i][0]}', Opt_Bvals[i])
+                Flux_lm_0[i].set(f'park_amp', Amps_park[i])
+        return a.qoi
+
+    def measure_parity_check_ramsey(
+        self,
+        Q_target: list,
+        Q_control: list,
+        flux_cw_list: list,
+        control_cases: list = None,
+        Q_spectator: list = None,
+        pc_repetitions: int = 1,
+        downsample_angle_points: int = 1,
+        prepare_for_timedomain: bool = True,
+        disable_metadata: bool = False,
+        extract_only: bool = False,
+        analyze: bool = True,
+        solve_for_phase_gate_model: bool = False,
+        update_mw_phase: bool = False,
+        mw_phase_param: str = 'vcz_virtual_q_ph_corr_step_1',
+        wait_time_before_flux: int = 0,
+        wait_time_after_flux: int = 0):
+        """
+        Perform conditional oscillation like experiment in the context of a
+        parity check.
+
+        Q_target : Ancilla qubit where parity is projected.
+        Q_control : List of control qubits in parity check.
+        Q_spectator : Similar to control qubit, but will be treated as 
+                      spectator in analysis.
+        flux_cw_list : list of flux codewords to be played during the parity
+                       check.
+        Control_cases : list of different control qubit states. Defaults to all
+                        possible combinations of states.
+        """
+        # assert len(Q_target) == 1
+        assert self.ro_acq_weight_type().lower() == 'optimal'
+        MC = self.instr_MC.get_instr()
+        if Q_spectator:
+            Q_control += Q_spectator
+        if control_cases == None:
+            control_cases = ['{:0{}b}'.format(i, len(Q_control))\
+                              for i in range(2**len(Q_control))]
+            solve_for_phase_gate_model = True
+        else:
+            for case in control_cases:
+                assert len(case) == len(Q_control)
+
+        qubit_list = Q_target + Q_control
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubit_list)
+            for q in Q_target:
+                mw_lm = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                mw_lm.set_default_lutmap()
+                mw_lm.load_phase_pulses_to_AWG_lookuptable()
+        Q_target_idx = [self.find_instrument(q).cfg_qubit_nr() for q in Q_target]
+        Q_control_idx = [self.find_instrument(q).cfg_qubit_nr() for q in Q_control]
+        # These are hardcoded angles in the mw_lutman for the AWG8
+        # only x2 and x3 downsample_swp_points available
+        angles = np.arange(0, 341, 20 * downsample_angle_points)
+        p = mqo.parity_check_ramsey(
+            Q_idxs_target = Q_target_idx,
+            Q_idxs_control = Q_control_idx,
+            control_cases = control_cases,
+            flux_cw_list = flux_cw_list,
+            platf_cfg = self.cfg_openql_platform_fn(),
+            angles = angles,
+            nr_spectators = len(Q_spectator) if Q_spectator else 0,
+            pc_repetitions=pc_repetitions,
+            wait_time_before_flux = wait_time_before_flux,
+            wait_time_after_flux = wait_time_after_flux
+            )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+            parameter_name="Cases",
+            unit="a.u."
+            )
+        d = self.get_int_avg_det(qubits=qubit_list)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_detector_function(d)
+        label = f'Parity_check_ramsey_{"_".join(qubit_list)}'
+        if pc_repetitions != 1:
+            label += f'_x{pc_repetitions}'
+        MC.run(label, disable_snapshot_metadata=disable_metadata)
+        if analyze:
+            a = ma2.tqg.Parity_check_ramsey_analysis(
+                label=label,
+                Q_target = Q_target,
+                Q_control = Q_control,
+                Q_spectator = Q_spectator,
+                control_cases = control_cases,
+                angles = angles,
+                solve_for_phase_gate_model = solve_for_phase_gate_model,
+                extract_only = extract_only)
+            if update_mw_phase:
+                if type(mw_phase_param) is str:
+                    mw_phase_param = [mw_phase_param for q in Q_target]
+                for q, param in zip(Q_target, mw_phase_param):
+                    # update single qubit phase
+                    Q = self.find_instrument(q)
+                    mw_lm = Q.instr_LutMan_MW.get_instr()
+                    # Make sure mw phase parameter is valid
+                    assert param in mw_lm.parameters.keys()
+                    # Calculate new virtual phase
+                    phi0 = mw_lm.get(param)
+                    phi_new = list(a.qoi['Phase_model'][Q.name].values())[0]
+                    phi = np.mod(phi0+phi_new, 360)
+                    mw_lm.set(param, phi)
+                    print(f'{Q.name}.{param} changed to {phi} deg.')
+            return a.qoi
+
+    def calibrate_parity_check_phase(
+        self,
+        Q_ancilla: list,
+        Q_control: list,
+        Q_pair_target: list,
+        flux_cw_list: list,
+        B_amps: list = None,
+        control_cases: list = None,
+        pc_repetitions: int = 1,
+        downsample_angle_points: int = 1,
+        prepare_for_timedomain: bool = True,
+        extract_only: bool = False,
+        update_flux_param: bool = True,
+        update_mw_phase: bool = True,
+        mw_phase_param: str = 'vcz_virtual_q_ph_corr_step_1'):
+        """
+        Calibrate the phase of a gate in a parity-check by performing a sweep 
+        of the SNZ B parameter while measuring the parity check phase gate
+        coefficients.
+
+        Q_ancilla : Ancilla qubit of the parity check.
+        Q_control : List of control qubits in parity check.
+        Q_pair_target : list of two qubits involved in the two qubit gate. Must
+                        be given in the order [<high_freq_q>, <low_freq_q>]
+        flux_cw_list : list of flux codewords to be played during the parity
+                       check.
+        B_amps : List of B parameters to sweep through.
+        Control_cases : list of different control qubit states. Defaults to all
+                        possible combinations of states.
+        """
+        assert self.ro_acq_weight_type().lower() == 'optimal'
+        assert len(Q_ancilla) == 1
+        qubit_list = Q_ancilla + Q_control
+        assert Q_pair_target[0] in qubit_list
+        assert Q_pair_target[1] in qubit_list
+
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+
+        # get gate directions of two-qubit gate codewords
+        directions = get_gate_directions(Q_pair_target[0],
+                                         Q_pair_target[1])
+        fl_lm = self.find_instrument(Q_pair_target[0]).instr_LutMan_Flux.get_instr()
+        fl_par = f'vcz_amp_fine_{directions[0]}'
+        B0 = fl_lm.get(fl_par)
+        if B_amps is None:
+            B_amps = np.linspace(-.1, .1, 3)+B0
+            if np.min(B_amps) < 0:
+                B_amps -= np.min(B_amps)
+            if np.max(B_amps) > 1:
+                B_amps -= np.max(B_amps)-1
+
+        # Prepare for timedomain
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubit_list)
+            for q in Q_ancilla:
+                mw_lm = self.find_instrument(q).instr_LutMan_MW.get_instr()
+                mw_lm.set_default_lutmap()
+                mw_lm.load_phase_pulses_to_AWG_lookuptable()
+        # Wrapper function for parity check ramsey detector function.
+        def wrapper(Q_target, Q_control,
+                    flux_cw_list,
+                    downsample_angle_points,
+                    extract_only):
+            a = self.measure_parity_check_ramsey(
+                Q_target = Q_target,
+                Q_control = Q_control,
+                flux_cw_list = flux_cw_list,
+                control_cases = None,
+                downsample_angle_points = downsample_angle_points,
+                prepare_for_timedomain = False,
+                pc_repetitions=pc_repetitions,
+                solve_for_phase_gate_model = True,
+                disable_metadata = True,
+                extract_only = extract_only)
+            pm = { f'Phase_model_{op}' : a['Phase_model'][Q_ancilla[0]][op]\
+                   for op in a['Phase_model'][Q_ancilla[0]].keys()}
+            mf = { f'missing_fraction_{q}' : a['Missing_fraction'][q]\
+                  for q in Q_control }
+            return { **pm, **mf} 
+        n = len(Q_control)
+        Operators = ['{:0{}b}'.format(i, n).replace('0','I').replace('1','Z')\
+                     for i in range(2**n)]
+        d = det.Function_Detector(
+            wrapper,
+            msmt_kw={'Q_target' : Q_ancilla,
+                     'Q_control' : Q_control,
+                     'flux_cw_list': flux_cw_list,
+                     'downsample_angle_points': downsample_angle_points,
+                     'extract_only': extract_only},
+            result_keys=[f'Phase_model_{op}' for op in Operators]+\
+                        [f'missing_fraction_{q}' for q in Q_control],
+            value_names=[f'Phase_model_{op}' for op in Operators]+\
+                        [f'missing_fraction_{q}' for q in Q_control],
+            value_units=['deg' for op in Operators]+\
+                        ['fraction' for q in Q_control])
+        nested_MC.set_detector_function(d)
+        # Set sweep function
+        swf1 = swf.FLsweep(
+            lm = fl_lm,
+            par = fl_lm.parameters[fl_par],
+            waveform_name = f'cz_{directions[0]}')
+        nested_MC.set_sweep_function(swf1)
+        nested_MC.set_sweep_points(B_amps)
+
+        MC.live_plot_enabled(False)
+        label = f'Parity_check_calibration_gate_{"_".join(Q_pair_target)}'
+        nested_MC.run(label)
+        # MC.live_plot_enabled(True)
+
+        a = ma2.tqg.Parity_check_calibration_analysis(
+            Q_ancilla = Q_ancilla,
+            Q_control = Q_control,
+            Q_pair_target = Q_pair_target,
+            B_amps = B_amps,
+            label = label)
+        if update_flux_param:
+            try :
+                if (a.qoi['Optimal_B']>0) and (a.qoi['Optimal_B']<1):
+                    # update flux parameter
+                    fl_lm.set(fl_par, a.qoi['Optimal_B'])
+                elif a.qoi['Optimal_B']<0:
+                    fl_lm.set(fl_par, 0)
+                elif a.qoi['Optimal_B']>1:
+                    fl_lm.set(fl_par, 1)
+            except:
+                fl_lm.set(fl_par, B0)
+                raise ValueError(f'B amplitude {a.qoi["Optimal_B"]:.3f} not valid. '+\
+                                 f'Resetting {fl_par} to {B0:.3f}.')
+        else:
+            fl_lm.set(fl_par, B0)
+            print(f'Resetting {fl_par} to {B0:.3f}.')
+
+        if update_mw_phase:
+            # update single qubit phase
+            Qa = self.find_instrument(Q_ancilla[0])
+            mw_lm = Qa.instr_LutMan_MW.get_instr()
+            # Make sure mw phase parameter is valid
+            assert mw_phase_param in mw_lm.parameters.keys()
+            # Calculate new virtual phase
+            phi0 = mw_lm.get(mw_phase_param)
+            phi = np.mod(phi0+a.qoi['Phase_offset'], 360)
+            mw_lm.set(mw_phase_param, phi)
+
+        return a.qoi
 
     ########################################################
     # other methods
@@ -5378,666 +6901,3 @@ class HAL_Device(HAL_ShimMQ):
 
         self._dag = dag
         return dag
-
-    def calibrate_parity_model_phases(
-            self,
-            parity_check: List[List[str]],
-            B_sweep_range_frac: float = 0.2,
-            B_sweep_n_points: int = 2,
-            refocusing: bool = False,
-            ramsey_qubits: List[str] = None,
-            flux_codeword: str = 'repetition-code',
-            flux_dance_steps: List[int] = [1,2],
-            update: bool = True,
-            prepare_for_timedomain: bool = True,
-            plot_each_msmt: bool = False,
-            MC = None
-        ) -> dict:
-        """
-        Measures parity check as part of a flux dance for `B_sweep_points` different
-        SNZ B values for each gate defined in `parity_check`.
-        Runs parity check model optimization analysis, which fits 
-        a linear dependence of the parity check model phase error given 
-        the measured error of each B value, to determine the B value required 
-        to achieve an error of zero.
-
-        Args:
-            parity_check: 
-                List of qubits and gate directions which define the flux_lutmans to be used.
-                Parking qubits are not used for this routine, and can be replaced with an empty list.
-                Assumed format: [ [[ancilla_qubit]], [[data_qubit]], [[gate_direction]], [[parking_qubits]] ]
-                Example:        [   [['Z4']]*4, \
-                                    [['D9'],['D6'],['D8'],['D5']], \
-                                    [['NE'],['NW'],['NW'],['NE']], \
-                                    [['D8'],['X2','Z2'],['D8'],['X3','X2']] ]
-        Returns:
-            optimal B values per gate of `parity_check`
-        """
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        # here we need to measure all data qubits, since we are intereseted in the model phases
-        # of all qubits and not just the one we sweeep
-        control_qubits_all = np.asarray(parity_check[1]).flatten().tolist()
-        results = OrderedDict().fromkeys(control_qubits_all)
-
-        for target_qubit, control_qubit, gate_direction, _ in list(zip(*parity_check)):
-
-            # if the pair has a high frequency qubit, we need to select its lutman instead of the ancilla's
-            if control_qubit[0] in ['D4','D5','D6']:
-                flux_lm = self.find_instrument(f"flux_lm_{control_qubit[0]}")
-            else:
-                flux_lm = self.find_instrument(f"flux_lm_{target_qubit[0]}")
-        
-            old_B = flux_lm.parameters[f"vcz_amp_fine_{gate_direction[0]}"]()
-            sweep_points = a_tools.get_values_around(old_B, range_frac=B_sweep_range_frac, num_points=B_sweep_n_points)
-
-            log.info(f"Parity check B sweep: {target_qubit} - {control_qubit} - {gate_direction}")
-            log.info(f"Control qubits in sweep order: {control_qubits_all}")
-            log.info(f"Ramsey qubits: {ramsey_qubits}")
-            log.info(f"Flux codeword: {flux_codeword}, flux dance steps: {flux_dance_steps}")
-            log.info(f"B sweep: {flux_lm.name}-{gate_direction}, around {old_B}, values: {sweep_points}")
-
-            old_digitized = self.ro_acq_digitized()
-            old_weight_type = self.ro_acq_weight_type()
-            self.ro_acq_digitized(False)
-            self.ro_acq_weight_type('optimal')
-            
-            all_qubits = target_qubit + control_qubits_all
-            if prepare_for_timedomain:
-                # Take care of readout order (by feedline/UHF)
-                if self.qubits_by_feedline():
-                    all_qubits = sorted(all_qubits, 
-                                    key=lambda x: [i for i, feedline in enumerate(self.qubits_by_feedline()) \
-                                                    if x in feedline])
-                    log.info(f"Sorted qubits for readout preparation: {all_qubits}")
-                else:
-                    log.warning("Qubit order by feedline in `self.qubits_by_feedline()` parameter is not set, "
-                                + "readout will be prepared in order of given qubits which can lead to errors!")
-
-                self.prepare_for_timedomain(qubits=all_qubits)
-
-            # generate model terms to use for labels
-            controls_qubits_sorted = [qb for qb in all_qubits if qb != target_qubit[0]]
-            control_combinations = [elem for k in range(1, len(controls_qubits_sorted)+1) 
-                                            for elem in itt.combinations(controls_qubits_sorted, k)]
-            model_terms = [target_qubit[0]]
-            model_terms += [ target_qubit[0] + ',' + qbs 
-                            for qbs in [','.join(comb) for comb in control_combinations] ]
-
-            d = det.Function_Detector(
-                get_function=self.measure_parity_check_flux_dance,
-                msmt_kw={'target_qubits': target_qubit,
-                        'control_qubits': controls_qubits_sorted,
-                        'ramsey_qubits': ramsey_qubits,
-                        'flux_dance_steps': flux_dance_steps,
-                        'flux_codeword': flux_codeword,
-                        'refocusing': False,
-                        'prepare_for_timedomain': False,
-                        'plotting': plot_each_msmt,
-                        'MC': self.instr_nested_MC.get_instr()
-                        },
-                value_names=[f'model_error_{term}' for term in model_terms],
-                result_keys=[f'model_error_{term}' for term in model_terms],
-                value_units=['deg'] * len(model_terms)
-                )
-
-            s = swf.FLsweep(
-                lm=flux_lm, 
-                par=flux_lm.parameters[f"vcz_amp_fine_{gate_direction[0]}"],
-                waveform_name=f"cz_{gate_direction[0]}",
-                upload_waveforms_always=True
-                )
-
-            MC.set_detector_function(d)
-            MC.set_sweep_function(s)
-            MC.set_sweep_points(sweep_points)
-            label = f"Parity_model_optimization_{target_qubit}-{control_qubit}-{gate_direction}_Bpoints-{B_sweep_n_points}_Brange-{B_sweep_range_frac}"
-
-            try:
-                MC.run(label,
-                    exp_metadata={
-                        'target_qubit': target_qubit,
-                        'control_qubits': controls_qubits_sorted,
-                        'sweep_qubit': control_qubit,
-                        'sweep_points': sweep_points,
-                        'old_B_value': [old_B],
-                        'model_terms': model_terms,
-                    })
-            except Exception as e:
-                log.warning("\nMeasurement interrupted! Resetting old B value.\n")
-                flux_lm.parameters[f"vcz_amp_fine_{gate_direction[0]}"](old_B)
-                print(repr(e))
-                print(e.__traceback__)
-                log.error(logging.traceback.format_exc())
-            
-            # reset B!
-            flux_lm.parameters[f"vcz_amp_fine_{gate_direction[0]}"](old_B)
-
-            a = ma2.Parity_Model_Optimization_Analysis(label=label)
-            new_B = a.proc_data_dict['quantities_of_interest']['optimal_B_value']
-            rel_B_change = a.proc_data_dict['quantities_of_interest']['relative_B_change']
-
-            if update:
-                if 0 <= new_B <= 1:
-                    log.info(f"Changing B of {flux_lm.name} for direction {gate_direction[0]} from {old_B} to {new_B.n}.")
-                    log.info(f"Relative change in B is {rel_B_change} %.")
-                    flux_lm.parameters[f"vcz_amp_fine_{gate_direction[0]}"](new_B.n)
-                else:
-                    log.warning(f"Optimal B value {new_B} outside of range (0,1)! Value left unchanged.")
-
-            results[control_qubit[0]] = {'a': a, 'new_B': new_B, 'rel_B_change': rel_B_change}
-
-        self.ro_acq_digitized(old_digitized)
-        self.ro_acq_weight_type(old_weight_type)
-
-        return results
-
-
-    def calibrate_snz_fine_landscape(
-            self,
-            pair: List[str],
-            gate_direction: str,
-            ramsey_qubits: Union[bool, List[str]] = False,
-            parked_qubits: List[str]=None,
-            horizontal_calibration: bool = False,
-            flux_codeword: str = 'flux-dance',
-            flux_dance_steps: List[int] = [1],
-            adaptive_sampling_pts: int = 60,
-            adaptive_A_bounds: Tuple[float] = (0.97, 1.03),
-            adaptive_volume_weight: float = 20,
-            adaptive_target_cost: float = 0.01,
-            measure_result: bool = True,
-            update: bool = True,
-            prepare_for_timedomain: bool = True,
-            MC = None,
-        ) -> dict:
-        """
-        Calibrates A and B parameters of SNZ gate(s) between pair(s) given in `pair`
-        by sampling the cost function landscaping adaptively.
-        Works in two modes:
-            horizontal_calibration == False:
-                Vertical calibration mode, individual SNZ gate will be optimized.
-                `flux_codeword` can be a composite codeword for a flux dance step.
-                Supports parallel optimization of gate in a flux dance step.
-            horizontal_calibration == True:
-                Horizontal calibration mode, parity check will be optimized while whole flux dance
-                specified by `flux_codeword` and `flux_dance_steps` is played.
-        
-        Args:
-
-        Raises:
-            ValueError: If amount of gates specified by `pair` and `gate_directions`
-                does not match what is expected given the mode (`horizontal_calibration`).
-
-        Returns:
-            Optimal point (A,B) of SNZ between `pair`
-        """
-        if type(pair) != list or type(pair[0]) != str:
-            raise ValueError(f"`pair` always must be given as simple list of target and control qubit names!")
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-
-        old_digitized = self.ro_acq_digitized()
-        old_weight_type = self.ro_acq_weight_type()
-        self.ro_acq_digitized(False)
-        self.ro_acq_weight_type('optimal')
-
-        # reset cost function counter to keep track of a new optimization run
-        cf.counter_param(0)
-        if horizontal_calibration:
-            self.prepare_for_timedomain(qubits=pair)
-            cost_det = det.Function_Detector(
-                get_function=cf.parity_check_cost_function,
-                msmt_kw={'device': self,
-                        'MC': self.instr_nested_MC.get_instr(),
-                        'target_qubits': [pair[0]],
-                        'control_qubits': [pair[1]],
-                        'ramsey_qubits': ramsey_qubits,
-                        'flux_codeword': flux_codeword,
-                        'flux_dance_steps': flux_dance_steps,
-                        'phase_weight_factor': 0.5,
-                        'include_missing_frac_cost': True,
-                        'prepare_for_timedomain': False,
-                        'disable_metadata': True,
-                        'plotting': False,
-                        'analyze_parity_model': False},
-                value_names=['cost_function_val', 'phi_diff', f'missing_frac_{pair[1]}'],
-                result_keys=['cost_function_val', 'phi_diff', f'missing_frac_{pair[1]}'],
-                value_units=['a.u.', 'deg', '%']
-                )
-        else:
-            self.prepare_for_timedomain(qubits=np.asarray(pair).flatten().tolist())
-            cost_det = det.Function_Detector(
-                get_function=cf.conventional_CZ_cost_func2,
-                msmt_kw={'device': self,
-                       'MC': self.instr_nested_MC.get_instr(),
-                       'pairs': [pair],
-                       'parked_qbs': parked_qubits,
-                       'flux_codeword': flux_codeword + '_' + str(flux_dance_steps[0]),
-                       'parked_qubit_seq': 'ground',
-                       'include_single_qubit_phase_in_cost': False,
-                       'target_single_qubit_phase': 360,
-                       'include_leakage_in_cost': True,
-                       'target_phase': 180,
-                       'cond_phase_weight_factor': 0.5,
-                       'prepare_for_timedomain': False,
-                       'extract_only': True,
-                       'disable_metadata': True},
-                       # TODO adapt for nested lists
-                value_names=[f'cost_function_val_{pair}', 
-                            f'delta_phi_{pair}', 
-                            f'missing_fraction_{pair}'],
-                result_keys=[f'cost_function_val_{pair}',
-                            f'delta_phi_{pair}',
-                            f'missing_fraction_{pair}'],
-                value_units=['a.u.', 'deg', '%']
-                )
-
-
-        # if the pair has a high frequency data qubit, we need to select its lutman
-        # NOTE: here we assume no pairs between two data qubits are possible (S17 architecture)
-        # qb = [qb for qb in pair if 'D' in qb]
-        # if qb and qb[0] in ['D4','D5','D6']:
-        if pair[0] in ['D4','D5','D6']:
-            flux_lm = self.find_instrument(f"flux_lm_{pair[0]}")
-        else:
-            flux_lm = self.find_instrument(f"flux_lm_{pair[1]}")
-
-        # TODO: bypass waveform upload in sweep functions to save time by avoiding 
-        #       repeated upload of the same parameters.
-        #       Waveforms can be updated and uploaded only in the detector function
-        #       which should be enough since the detector function is called by the MC 
-        #       only after new sweep function values are set.
-        #       But somehow this was not working during an initial test.
-        sweep_function_1 = swf.FLsweep(lm=flux_lm, 
-                                        par=flux_lm.parameters[f"vcz_amp_sq_{gate_direction}"],
-                                        waveform_name=f"cz_{gate_direction}",
-                                        # bypass_waveform_upload=True,
-                                        upload_waveforms_always=True) 
-        sweep_function_2 = swf.FLsweep(lm=flux_lm, 
-                                        par=flux_lm.parameters[f"vcz_amp_fine_{gate_direction}"],
-                                        waveform_name=f"cz_{gate_direction}",
-                                        # bypass_waveform_upload=True,
-                                        upload_waveforms_always=True)
-
-        log.info(f"SNZ fine landscape adaptive optimization: {pair}, {flux_lm}, {gate_direction}")
-        log.info(f"Flux codeword: {flux_codeword}, flux dance steps: {flux_dance_steps}")
-
-        if adaptive_target_cost is not None:
-            # target cost value can be computed by: 
-            # target_cost = cf.parity_check_cost(
-            #     phase_diff=185, 
-            #     phase_weight=0.5, 
-            #     missing_fraction=0.02)
-            # convergence threshold strangely has to be given in loss function, not here
-            goal = lndm.mk_min_threshold_goal_func(max_pnts_beyond_threshold=2) 
-        else:
-            goal = lndm.mk_minimization_goal_func()
-        
-        loss = lndm.mk_minimization_loss_func(
-            max_no_improve_in_local=6,
-            converge_below=adaptive_target_cost,
-            volume_weight=adaptive_volume_weight
-            )
-
-        fine_B_amp_bounds = (0.0,  1.0)
-        num_init_points = 10
-        X0 = np.array([np.ones(num_init_points),
-                        np.linspace(*fine_B_amp_bounds[::-1], num_init_points+2)[1:-1]
-                        ]).T
-
-        adaptive_pars = {'adaptive_function': lndm.LearnerND_Minimizer,
-                        'goal': lambda l: goal(l) or l.npoints >= adaptive_sampling_pts,
-                        'bounds': [np.array(adaptive_A_bounds), np.array(fine_B_amp_bounds)],
-                        'loss_per_simplex': loss,
-                        'minimize': True,
-                        'X0': X0
-                        }
-
-        MC.cfg_clipping_mode(True)
-        MC.set_detector_function(cost_det)
-        MC.set_sweep_functions([sweep_function_1, sweep_function_2])
-        MC.set_adaptive_function_parameters(adaptive_pars)
-        label = f'SNZ_fine_landscape_{pair}_horizontal-{horizontal_calibration}_{flux_codeword}'
-
-        # save initial gate parameters to restore in case of failure
-        old_A = flux_lm.parameters[f'vcz_amp_sq_{gate_direction}']()
-        old_B = flux_lm.parameters[f'vcz_amp_fine_{gate_direction}']()
-
-        try:
-            result = MC.run(label, mode='adaptive')
-            log.info(f"Optimization result: {result['opt_res']}")
-            log.info(f"A = {flux_lm.parameters[f'vcz_amp_sq_{gate_direction}']()},"
-                    f"B = {flux_lm.parameters[f'vcz_amp_fine_{gate_direction}']()}")
-            
-            if update:
-                if horizontal_calibration:
-                    # Heatmap analysis currently doesn't work for msmt format of horizontal calibration
-                    # apply optimal parameters:
-                    flux_lm.parameters[f"vcz_amp_sq_{gate_direction}"](result['opt_res']['xopt'][0])
-                    flux_lm.parameters[f"vcz_amp_fine_{gate_direction}"](result['opt_res']['xopt'][1])
-                else:
-                    a = ma2.Conditional_Oscillation_Heatmap_Analysis(
-                        label=label,
-                        for_multi_CZ=True,
-                        pair={'pair_name': pair, 'sweep_ratio': [1,1], 'pair_num': 0},
-                        close_figs=True,
-                        extract_only=False,
-                        plt_orig_pnts=True,
-                        plt_contour_L1=False,
-                        plt_contour_phase=True,
-                        plt_optimal_values=True,
-                        plt_optimal_values_max=1,
-                        find_local_optimals=True,
-                        plt_clusters=False,
-                        cluster_from_interp=False,
-                        clims={"Cost func": [0, 300],
-                                "missing fraction": [0, 30],
-                                "offset difference": [0, 30]},
-                        target_cond_phase=180,
-                        phase_thr=20,
-                        L1_thr=10,
-                        clustering_thr=0.1,
-                        gen_optima_hulls=True,
-                        hull_L1_thr=5,
-                        hull_phase_thr=20,
-                        plt_optimal_hulls=True,
-                        save_cond_phase_contours=[180])
-                    # apply optimal params from point with smallest missing fraction:
-                    opt_point = np.argmin([x['missing fraction'] for x in a.proc_data_dict['optimal_measured_values']])
-                    flux_lm.parameters[f'vcz_amp_sq_{gate_direction}'](a.proc_data_dict['optimal_pars_values'][opt_point]['relative_sq_amp'])
-                    flux_lm.parameters[f'vcz_amp_fine_{gate_direction}'](a.proc_data_dict['optimal_pars_values'][opt_point]['fine_amp'])
-
-                log.info(f"Gate parameters updated to:"
-                        f"A = {flux_lm.parameters[f'vcz_amp_sq_{gate_direction}']()},"
-                        f"B = {flux_lm.parameters[f'vcz_amp_fine_{gate_direction}']()}.")
-                flux_lm.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
-
-            if measure_result:
-                # measure optimized parity check for reference
-                self.measure_parity_check_flux_dance(
-                    target_qubits=[pair[0]],
-                    control_qubits=[pair[1]],
-                    ramsey_qubits=ramsey_qubits, 
-                    flux_dance_steps=flux_dance_steps,
-                    flux_codeword=flux_codeword,
-                    prepare_for_timedomain=True,
-                    plotting=True,
-                    analyze_parity_model=False
-                    )
-
-            return result
-
-        except Exception as e:
-            log.warning(f"Measurement for {pair} interrupted! Resetting old values.")
-            flux_lm.parameters[f'vcz_amp_sq_{gate_direction}'](old_A)
-            flux_lm.parameters[f'vcz_amp_fine_{gate_direction}'](old_B)
-            print(repr(e))
-            print(e.__traceback__)
-            log.error(logging.traceback.format_exc())
-
-    def measure_vcz_A_B_landscape(
-        self, 
-        Q0,
-        Q1,
-        A_ranges,
-        A_points: int,
-        B_amps: list,
-        Q_parks: list = None,
-        flux_codeword: str = 'cz'):
-        """
-        Perform 2D sweep of amplitude and wave parameter while measuring 
-        conditional phase and missing fraction via the "conditional 
-        oscillation" experiment.
-
-        Q0 : High frequency qubit(s). Can be given as single qubit or list.
-        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
-        T_mids : list of vcz "T_mid" values to sweep.
-        A_ranges : list of tuples containing ranges of amplitude sweep.
-        A_points : Number of points to sweep for amplitude range.
-        Q_parks : list of qubits parked during operation.
-        """
-        if isinstance(Q0, str):
-            Q0 = [Q0]
-        if isinstance(Q1, str):
-            Q1 = [Q1]
-        assert len(Q0) == len(Q1)
-
-        MC = self.instr_MC.get_instr()
-        nested_MC = self.instr_nested_MC.get_instr()
-        # get gate directions
-        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
-        
-        # Time-domain preparation
-        # Prepare for time domain
-        self.prepare_for_timedomain(
-            qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
-            bypass_flux=True)
-        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
-        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
-        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
-        for i, lm in enumerate(Flux_lm_0):
-            print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
-            print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
-            lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-        for i, lm in enumerate(Flux_lm_1):
-            print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
-
-        # Wrapper function for conditional oscillation detector function.
-        def wrapper(Q0, Q1,
-                    prepare_for_timedomain,
-                    downsample_swp_points,
-                    extract_only,
-                    disable_metadata):
-            a = self.measure_conditional_oscillation_multi(
-                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
-                    parked_qbs=Q_parks,
-                    flux_codeword=flux_codeword,
-                    prepare_for_timedomain=prepare_for_timedomain,
-                    downsample_swp_points=downsample_swp_points,
-                    extract_only=extract_only,
-                    disable_metadata=disable_metadata,
-                    verbose=False)
-            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
-                  for i in range(len(Q0)) }
-            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
-                  for i in range(len(Q0)) }
-            return { **cp, **mf} 
-            
-        d = det.Function_Detector(
-            wrapper,
-            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
-                     'prepare_for_timedomain' : False,
-                     'downsample_swp_points': 3,
-                     'extract_only': True,
-                     'disable_metadata': True},
-            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
-                                   for i in range(len(Q0))]).flatten()),
-            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
-                                   for i in range(len(Q0))]).flatten()),
-            value_units=list(np.array([['deg', '%']\
-                                   for i in range(len(Q0))]).flatten()))
-        nested_MC.set_detector_function(d)
-
-        swf1 = swf.multi_sweep_function_ranges(
-            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude
-                             for i in range(len(Q0))],
-            sweep_ranges= A_ranges,
-            n_points=A_points)
-        swfs = [swf.FLsweep(lm = lm,
-                            par = lm.parameters[f'vcz_amp_fine_{directions[i][0]}'],
-                            waveform_name = f'cz_{directions[i][0]}')
-                for i, lm in enumerate(Flux_lm_0) ]
-        swf2 = swf.multi_sweep_function(sweep_functions=swfs)
-        nested_MC.set_sweep_function(swf1)
-        nested_MC.set_sweep_points(np.arange(A_points))
-        nested_MC.set_sweep_function_2D(swf2)
-        nested_MC.set_sweep_points_2D(B_amps)
-
-        MC.live_plot_enabled(False)
-        nested_MC.run(f'VCZ_Amp_vs_B_{Q0}_{Q1}_{Q_parks}',
-                      mode='2D')
-        MC.live_plot_enabled(True)
-
-
-    def measure_vcz_A_tmid_landscape(
-        self, 
-        Q0,
-        Q1,
-        T_mids,
-        A_ranges,
-        A_points: int,
-        Q_parks: list = None,
-        Tp : float = None,
-        flux_codeword: str = 'cz'):
-        """
-        Perform 2D sweep of amplitude and wave parameter while measuring 
-        conditional phase and missing fraction via the "conditional 
-        oscillation" experiment.
-
-        Q0 : High frequency qubit(s). Can be given as single qubit or list.
-        Q1 : Low frequency qubit(s). Can be given as single qubit or list.
-        T_mids : list of vcz "T_mid" values to sweep.
-        A_ranges : list of tuples containing ranges of amplitude sweep.
-        A_points : Number of points to sweep for amplitude range.
-        Q_parks : list of qubits parked during operation.
-        """
-        if isinstance(Q0, str):
-            Q0 = [Q0]
-        if isinstance(Q1, str):
-            Q1 = [Q1]
-        assert len(Q0) == len(Q1)
-
-        MC = self.instr_MC.get_instr()
-        nested_MC = self.instr_nested_MC.get_instr()
-        # get gate directions
-        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
-        # Prepare for time domain
-        self.prepare_for_timedomain(
-            qubits=np.array([[Q0[i],Q1[i]] for i in range(len(Q0))]).flatten(),
-            bypass_flux=True)
-        Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
-        Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
-        Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
-        for i, lm in enumerate(Flux_lm_0):
-            print(f'Setting {Q0[i]} vcz_amp_sq_{directions[i][0]} to 1')
-            print(f'Setting {Q0[i]} vcz_amp_fine_{directions[i][0]} to 0.5')
-            print(f'Setting {Q0[i]} vcz_amp_dac_at_11_02_{directions[i][0]} to 0.5')
-            lm.set(f'vcz_amp_sq_{directions[i][0]}', 1)
-            lm.set(f'vcz_amp_fine_{directions[i][0]}', .5)
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][0]}', .5)
-        for i, lm in enumerate(Flux_lm_1):
-            print(f'Setting {Q1[i]} vcz_amp_dac_at_11_02_{directions[i][1]} to 0')
-            lm.set(f'vcz_amp_dac_at_11_02_{directions[i][1]}',  0)
-        # Look for Tp values
-        if Tp:
-            if isinstance(Tp, str):
-                Tp = [Tp]
-        else:
-            Tp = [lm.get(f'vcz_time_single_sq_{directions[0]}')*2 for lm in Flux_lm_0]
-        assert len(Q0) == len(Tp)
-
-        # Wrapper function for conditional oscillation detector function.
-        def wrapper(Q0, Q1,
-                    prepare_for_timedomain,
-                    downsample_swp_points,
-                    extract_only,
-                    disable_metadata):
-            a = self.measure_conditional_oscillation_multi(
-                    pairs=[[Q0[i], Q1[i]] for i in range(len(Q0))], 
-                    parked_qbs=Q_parks,
-                    flux_codeword=flux_codeword,
-                    prepare_for_timedomain=prepare_for_timedomain,
-                    downsample_swp_points=downsample_swp_points,
-                    extract_only=extract_only,
-                    disable_metadata=disable_metadata,
-                    verbose=False)
-            cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
-                  for i in range(len(Q0)) }
-            mf = { f'missing_fraction_{i+1}' : a[f'pair_{i+1}_missing_frac_a']\
-                  for i in range(len(Q0)) }
-            return { **cp, **mf} 
-
-        d = det.Function_Detector(
-            wrapper,
-            msmt_kw={'Q0' : Q0, 'Q1' : Q1,
-                     'prepare_for_timedomain' : False,
-                     'downsample_swp_points': 3,
-                     'extract_only': True,
-                     'disable_metadata': True},
-            result_keys=list(np.array([[f'phi_cond_{i+1}', f'missing_fraction_{i+1}']\
-                                   for i in range(len(Q0))]).flatten()),
-            value_names=list(np.array([[f'conditional_phase_{i+1}', f'missing_fraction_{i+1}']\
-                                   for i in range(len(Q0))]).flatten()),
-            value_units=list(np.array([['deg', '%']\
-                                   for i in range(len(Q0))]).flatten()))
-        nested_MC.set_detector_function(d)
-
-        swf1 = swf.multi_sweep_function_ranges(
-            sweep_functions=[Flux_lm_0[i].cfg_awg_channel_amplitude\
-                             for i in range(len(Q0))],
-            sweep_ranges= A_ranges,
-            n_points=A_points)
-        swf2 = swf.flux_t_middle_sweep(
-            fl_lm_tm =  list(np.array([[Flux_lm_0[i], Flux_lm_1[i] ]\
-                             for i in range(len(Q0))]).flatten()), 
-            fl_lm_park = Flux_lms_park,
-            which_gate = list(np.array(directions).flatten()),
-            t_pulse = Tp)
-        nested_MC.set_sweep_function(swf1)
-        nested_MC.set_sweep_points(np.arange(A_points))
-        nested_MC.set_sweep_function_2D(swf2)
-        nested_MC.set_sweep_points_2D(T_mids)
-
-        MC.live_plot_enabled(False)
-        nested_MC.run(f'VCZ_Amp_vs_Tmid_{Q0}_{Q1}_{Q_parks}',
-                      mode='2D')
-        MC.live_plot_enabled(True)
-
-
-def get_gate_directions(q0, q1,
-                        map_qubits=None):
-    """
-    Helper function to determine two-qubit gate directions.
-    q0 and q1 should be given as high-freq and low-freq qubit, respectively.
-    Default map is surface-17, however other maps are supported.
-    """
-    if map_qubits == None:
-        # Surface-17 layout
-        map_qubits = {'Z3' : [-2,-1],
-                      'D9' : [ 0, 2],
-                      'X4' : [-1, 2],
-                      'D8' : [-1, 1],
-                      'Z4' : [ 0, 1],
-                      'D6' : [ 1, 1],
-                      'D7' : [-2, 0],
-                      'X3' : [-1, 0],
-                      'D5' : [ 0, 0],
-                      'X2' : [ 1, 0],
-                      'D3' : [ 2, 0],
-                      'D4' : [-1,-1],
-                      'Z1' : [ 0,-1],
-                      'D2' : [ 1,-1],
-                      'X1' : [ 1,-2],
-                      'Z2' : [ 2, 1],
-                      'D1' : [ 0,-2]
-                     }
-    V0 = np.array(map_qubits[q0])
-    V1 = np.array(map_qubits[q1])
-    diff = V1-V0
-    dist = np.sqrt(np.sum((diff)**2))
-    if dist > 1:
-        raise ValueError('Qubits are not nearest neighbors')
-    if diff[0] == 0.:
-        if diff[1] > 0:
-            return ('NE', 'SW')
-        else:
-            return ('SW', 'NE')
-    elif diff[1] == 0.:
-        if diff[0] > 0:
-            return ('SE', 'NW')
-        else:
-            return ('NW', 'SE')

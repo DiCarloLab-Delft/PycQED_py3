@@ -1438,16 +1438,23 @@ class Qubit(Instrument):
         cur_freq = self.freq_qubit()
         # Steps don't double to be more robust against aliasing
         for i,n in enumerate(steps):
-            times = np.arange(self.mw_gauss_width()*4,
-                              50*n*stepsize, n*stepsize)
+            # Old way of specfiying times.
+            #times = np.arange(self.mw_gauss_width()*4,
+            #                  50*n*stepsize, n*stepsize)
+
+            # New way of specifying times.
+            # LDC, 2022/09/13.
+            numpts=51
+            times = np.arange(0,numpts*n*stepsize, n*stepsize)
+
             artificial_detuning = artificial_periods/times[-1]
             self.measure_ramsey(times,
                                 artificial_detuning=artificial_detuning,
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
                                 analyze=False,
-                                prepare_for_timedomain=True if 0 == i else False,
-                                disable_metadata = disable_metadata)
+                                disable_metadata = disable_metadata,
+                                prepare_for_timedomain=True if 0 == i else False)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,

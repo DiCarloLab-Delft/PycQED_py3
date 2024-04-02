@@ -3502,7 +3502,8 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
-            disable_metadata = False
+            disable_metadata = False,
+            auto = True
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
@@ -3511,6 +3512,7 @@ class HAL_Transmon(HAL_ShimSQ):
         """
         N.B. this is a good example for a generic timedomain experiment using the HAL_Transmon.
         """
+
         if times is not None and nr_cz_instead_of_idle_time is not None:
             raise ValueError("Either idle time or CZ mode must be chosen!")
 
@@ -3570,7 +3572,7 @@ class HAL_Transmon(HAL_ShimSQ):
         MC.run('T1' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
-            a = ma.T1_Analysis(auto=True, close_fig=True)
+            a = ma.T1_Analysis(auto=auto, close_fig=True)
             if update:
                 self.T1(a.T1)
             return a.T1
@@ -3699,7 +3701,7 @@ class HAL_Transmon(HAL_ShimSQ):
             update=True,
             detector=False,
             double_fit=False,
-            test_beating=True,
+            test_beating=True, 
             disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
@@ -4005,7 +4007,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             update=True,
             label: str = '',
-            prepare_for_timedomain=True,
+            prepare_for_timedomain=True, 
             disable_metadata = False
     ):
         # USED_BY: inspire_dependency_graph.py,
@@ -4031,11 +4033,18 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # default timing
         if times is None:
-            # funny default is because there is no real time sideband
-            # modulation
-            stepsize = max((self.T2_echo() * 2 / 61) // (abs(self.cfg_cycle_time()))
-                           * abs(self.cfg_cycle_time()), 20e-9)
-            times = np.arange(0, self.T2_echo() * 4, stepsize * 2)
+            # Old formulation of the time vector
+            ## funny default is because there is no real time sideband
+            ## modulation
+            #stepsize = max((self.T2_echo() * 2 / 61) // (abs(self.cfg_cycle_time()))
+            #               * abs(self.cfg_cycle_time()), 20e-9)
+            #times = np.arange(0, self.T2_echo() * 4, stepsize * 2)
+
+            # New version by LDC. 022/09/13
+            # I want all T2echo experiments to have the same number of time values.
+            numpts=51
+            stepsize = max((self.T2_echo() * 4 / (numpts-1)) // 40e-9, 1) * 40.0e-9
+            times = np.arange(0, numpts*stepsize, stepsize)
 
         # append the calibration points, times are for location in plot
         dt = times[1] - times[0]
@@ -4047,14 +4056,13 @@ class HAL_Transmon(HAL_ShimSQ):
 
         # Checking if pulses are on 20 ns grid
         if not all([np.round(t * 1e9) % (2 * self.cfg_cycle_time() * 1e9) == 0 for t in times]):
-            raise ValueError('timesteps must be multiples of 40e-9')
+            raise ValueError('timesteps must be multiples of 40 ns')
 
         # Checking if pulses are locked to the pulse modulation
         mw_lutman = self.instr_LutMan_MW.get_instr()
         if not all([np.round(t / 1 * 1e9) % (2 / self.mw_freq_mod.get() * 1e9) == 0 for t in times]) and \
                 mw_lutman.cfg_sideband_mode() != 'real-time':
-            raise ValueError(
-                'timesteps must be multiples of 2 modulation periods')
+            raise ValueError('timesteps must be multiples of 2 modulation periods')
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
