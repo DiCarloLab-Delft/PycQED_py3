@@ -525,19 +525,19 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
 
             self.add_node('T1',
                            calibrate_function = Qubit.name + '.measure_T1',
-                           calibrate_function_args={'disable_metadata': True})
+                           calibrate_function_args={'disable_metadata': False})
 
             #self.add_node(Qubit.name + ' T2_Star',
             #               calibrate_function = Qubit.name + '.measure_ramsey')
             
             self.add_node('T2e',
                            calibrate_function = Qubit.name + '.measure_echo',
-                           calibrate_function_args={'disable_metadata': True})
+                           calibrate_function_args={'disable_metadata': False})
       
             self.add_node('Frequency',
                           calibrate_function=Qubit.name + '.calibrate_frequency_ramsey',
                           calibrate_function_args={'steps':[10, 30],
-                                                  'disable_metadata': True})
+                                                  'disable_metadata': False})
                           #check_function=Qubit.name + '.check_ramsey', tolerance=0.1e-3)
             
             self.add_node('Flipping',
