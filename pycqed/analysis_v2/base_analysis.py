@@ -791,7 +791,7 @@ class BaseDataAnalysis(object):
         if axs_dict is not None:
             for key, val in list(axs_dict.items()):
                 self.axs[key] = val
-        if key_list == 'auto':
+        if key_list is 'auto':
             key_list = self.auto_keys
         if key_list is None:
             key_list = self.plot_dicts.keys()
@@ -1050,7 +1050,7 @@ class BaseDataAnalysis(object):
             legend_ncol = pdict.get('legend_ncol', 1)
             legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol,**legend_kws)
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol, **legend_kws)
 
         if self.tight_fig:
             axs.figure.tight_layout()

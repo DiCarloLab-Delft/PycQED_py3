@@ -219,7 +219,7 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
         #        qubitobjects.append(self.device.find_instrument(qubit))
 
         # Prefer to order qubits in the following way
-        qubitnames=['NW', 'NE', 'W', 'C', 'E', 'SW', 'SE']
+        qubitnames=['NW', 'W', 'NE', 'C', 'E', 'SW', 'SE']
         #qubitnames=['QNE', 'QC', 'QSW', 'QSE']
         for qubitname in qubitnames:
             if qubitname != 'fakequbit':
@@ -792,7 +792,7 @@ class inspire_dep_graph_T1T2(AutoDepGraph_DAG):
         #        qubitobjects.append(self.device.find_instrument(qubit))
         
         # I prefer to use this order. Change startup sequence later.
-        qubitnames=['QNW', 'QNE', 'QC', 'QSW', 'QSE']
+        qubitnames=['NW', 'W', 'NE', 'C', 'E', 'SW', 'SE']
         for qubitname in qubitnames:
             if qubitname != 'fakequbit':
                 qubitobjects.append(self.device.find_instrument(qubitname))
@@ -858,7 +858,7 @@ class inspire_dep_graph_T1T2par(AutoDepGraph_DAG):
 
       # Add all nodes
       
-      qubitlist=["QNW", "QNE", "QSW", "QSE"]
+      qubitlist=['NW', 'NE', 'SW', 'SE']
       #qubitlist=["QNE", "QSW", "QSE"]
 
       numqubits=len(qubitlist)
@@ -875,7 +875,7 @@ class inspire_dep_graph_T1T2par(AutoDepGraph_DAG):
                           calibrate_function_args={ 'qubits': qubitlist, 
                                                     'times' : timeslist, 
                                                     'update': True})
-      qubitlist=["QC"]
+      qubitlist=['W', 'C', 'E']
       numqubits=len(qubitlist)
       timeslist=[np.linspace(0.0, 50.0,51)*1e-6]*numqubits
       self.add_node('T1center',  
@@ -924,7 +924,7 @@ class inspire_dep_graph_QUICKpar(AutoDepGraph_DAG):
 
 
         # doing this very manually for now
-        CZindices=[0,1,3,4];
+        CZindices=[0,1,3,4]
         #CZindices=[1,3,4]; # used when QNW misbehaves.
 
 

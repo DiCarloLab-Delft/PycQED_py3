@@ -93,13 +93,13 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             self.Channels = self.raw_data_dict['value_names']
             Channels = self.Channels
             raw_shots = self.raw_data_dict['data'][:, 1:]
-            qubit_labels = [ch.decode('utf-8').rsplit(' ', 1)[1] for ch in Channels]
+            qubit_labels = [ch.rsplit(' ', 1)[1] for ch in Channels]
         # Data in two quadratures
         elif len(self.raw_data_dict['value_names']) == 2*nr_qubits:
             self.Channels = self.raw_data_dict['value_names'][::2]
             Channels = self.Channels
             raw_shots = self.raw_data_dict['data'][:, 1::2]
-            qubit_labels = [ch.decode('utf-8').rsplit(' ', 2)[1] for ch in Channels]
+            qubit_labels = [ch.rsplit(' ', 2)[1] for ch in Channels]
         else:
             raise ValueError('Number of qudratures is not the same for all qubits')
 
@@ -2495,7 +2495,7 @@ def plot_single_qubit_crosstalk(data, ax, para_hist,
         ax.plot(bin_centers, cnts, label=key, color=col)
     ax.axvline(x=threshold, label=r'$\mathrm{threshold}_{assign}$',
                ls='--', linewidth=1., color='black', alpha=.75)
-    ax.set_xlabel(mpl_utils.latex_friendly_str(value_name.decode('utf-8')))
+    ax.set_xlabel(mpl_utils.latex_friendly_str(value_name))
     ax.set_ylabel('Counts')
     # l = ax.legend(loc=(1.05, .01), title='Prepared state\n{}'.format(
     #     qubit_labels), prop={'size': 4})

@@ -1781,7 +1781,7 @@ class HAL_Device(HAL_ShimMQ):
                 a = ma2.Multiplexed_Readout_Analysis(label=label,
                                                      nr_qubits=len(qubits),
                                                      q_target=q_target)
-            q_ch = [ch for ch in a.Channels if q_target in ch.decode()][0]
+            q_ch = [ch for ch in a.Channels if q_target in ch][0]
 
 
             # Set thresholds

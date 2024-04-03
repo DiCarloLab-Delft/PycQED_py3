@@ -167,7 +167,8 @@ class HAL_ShimMQ(Instrument):
                 fl_lutman = qb.instr_LutMan_Flux.get_instr()
                 fl_lutman.load_waveforms_onto_AWG_lookuptable()
             except Exception as e:
-                warnings.warn(f"Could not load flux pulses for {qb}, exception '{e}'")
+                warnings.warn("Could not load flux pulses for {}".format(qb))
+                warnings.warn("Exception {}".format(e))
 
     def prepare_readout(self, qubits, reduced: bool = False):
         """
@@ -182,10 +183,11 @@ class HAL_ShimMQ(Instrument):
             self._prep_ro_sources(qubits=qubits)
 
         self._prep_ro_assign_weights(qubits=qubits)  # NB: sets self.acq_ch_map
-        self._prep_ro_integration_weights(qubits=qubits)
+        self._prep_ro_integration_weights(qubits=qubits) # Note: also sets thresholds! LDC.
+
         if not reduced:
             self._prep_ro_pulses(qubits=qubits)
-            # self._prep_ro_instantiate_detectors() # FIXME: unused
+            self._prep_ro_instantiate_detectors()
 
         # TODO:
         # - update global readout parameters (relating to mixer settings)
@@ -213,7 +215,7 @@ class HAL_ShimMQ(Instrument):
             self,
             qubits: list,
             reduced: bool = False,
-            bypass_flux: bool = False,
+            bypass_flux: bool = True,
             prepare_for_readout: bool = True
     ):
         """
@@ -229,7 +231,7 @@ class HAL_ShimMQ(Instrument):
             return
         if bypass_flux is False:
             self.prepare_fluxing(qubits=qubits)
-        self.prepare_timing()
+        # self.prepare_timing()
 
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)
@@ -326,6 +328,7 @@ class HAL_ShimMQ(Instrument):
     def get_int_logging_detector(
             self,
             qubits=None,
+            integration_length = 1e-6,
             result_logging_mode='raw'
     ) -> Multi_Detector:
         # FIXME: qubits passed to but not used in function
@@ -355,6 +358,7 @@ class HAL_ShimMQ(Instrument):
             # channel_dict = {}
             # for q in qubits:
 
+            # added by rdc 07/03/2023
             UHFQC = self.find_instrument(acq_instr_name)
             int_log_dets.append(
                 det.UHFQC_integration_logging_det(
@@ -408,7 +412,7 @@ class HAL_ShimMQ(Instrument):
         return input_average_detector
 
 
-    def get_int_avg_det(self, **kw) -> Multi_Detector:
+    def get_int_avg_det(self, integration_length = 1e-6,**kw) -> Multi_Detector:
         """
         Create an multi detector based integration average detector.
 
@@ -436,6 +440,7 @@ class HAL_ShimMQ(Instrument):
                 CC = self.instr_CC.get_instr()
             else:
                 CC = None
+
             int_avg_dets.append(
                 det.UHFQC_integrated_average_detector(
                     channels=list(acq_ch_map[acq_instr_name].values()),
@@ -765,6 +770,27 @@ class HAL_ShimMQ(Instrument):
         """
         log.info("Setting integration weights")
 
+        #########################
+        #########################
+        #Added by LDC. 2022/07/07
+        #The goal here is to set the thresholds of UNUSED channels so high that the result is always 0.
+        #We first set all thresholds for all channels very high (30).
+        #Note that the thresholds of USED channels are overwritten to their true values further down.
+        UHFQCs=[]
+        for qb_name in qubits:
+            qb = self.find_instrument(qb_name)
+            thisUHF=qb.instr_acquisition.get_instr()
+            if thisUHF not in UHFQCs:
+                UHFQCs.append(thisUHF)
+        for thisUHF in UHFQCs:
+            #print("got here!")
+            for i in range(10):
+                thisUHF.set(f"qas_0_thresholds_{i}_level", 30)
+        #### NEED TO TEST!!!!!!!!
+        #########################
+        #########################
+
+
         if self.ro_acq_weight_type() == "SSB":
             log.info("using SSB weights")
             for qb_name in qubits:
@@ -792,8 +818,8 @@ class HAL_ShimMQ(Instrument):
                 else:
                     acq_instr.set("qas_0_integration_weights_{}_real".format(qb.ro_acq_weight_chI()), opt_WI,)
                     acq_instr.set("qas_0_integration_weights_{}_imag".format(qb.ro_acq_weight_chI()), opt_WQ,)
-                    acq_instr.set("qas_0_rotations_{}".format(
-                                qb.ro_acq_weight_chI()), 1.0 - 1.0j)
+                    acq_instr.set("qas_0_rotations_{}".format(qb.ro_acq_weight_chI()), 1.0 - 1.0j)
+                    
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         acq_instr.set('qas_0_integration_weights_{}_real'.format(qb.ro_acq_weight_chQ()), opt_WQ)
@@ -801,6 +827,7 @@ class HAL_ShimMQ(Instrument):
                         acq_instr.set('qas_0_rotations_{}'.format(qb.ro_acq_weight_chQ()), 1.0 + 1.0j)
 
                 if self.ro_acq_digitized():
+
                     # Update the RO theshold
                     if (qb.ro_acq_rotated_SSB_when_optimal() and
                             abs(qb.ro_acq_threshold()) > 32):
@@ -881,21 +908,21 @@ class HAL_ShimMQ(Instrument):
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
     # FIXME: unused
-    # def _prep_ro_instantiate_detectors(self):
-    #     """
-    #     Instantiate acquisition detectors.
-    #     """
-    #     # log.info("Instantiating readout detectors")
-    #     # self.input_average_detector = self.get_input_avg_det()  # FIXME: unused
-    #     # self.int_avg_det = self.get_int_avg_det()  # FIXME: unused
-    #     # self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True) # FIXME: unused
-    #     # self.int_log_det = self.get_int_logging_detector()  # FIXME: unused
+    def _prep_ro_instantiate_detectors(self):
+        """
+        Instantiate acquisition detectors.
+        """
+        log.info("Instantiating readout detectors")
+        # self.input_average_detector = self.get_input_avg_det()  # FIXME: unused
+        # self.int_avg_det = self.get_int_avg_det()  # FIXME: unused
+        self.int_avg_det_single = self.get_int_avg_det(single_int_avg=True)
+        # self.int_log_det = self.get_int_logging_detector()  # FIXME: unused
 
-    #     # FIXME: unused
-    #     # if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
-    #     #     self.corr_det = self.get_correlation_detector(qubits=qubits)
-    #     # else:
-    #     #     self.corr_det = None
+        # FIXME: unused
+        # if len(qubits) == 2 and self.ro_acq_weight_type() == 'optimal':
+        #     self.corr_det = self.get_correlation_detector(qubits=qubits)
+        # else:
+        #     self.corr_det = None
 
 
     @deprecated(version='0.4', reason="VSM support is broken")
