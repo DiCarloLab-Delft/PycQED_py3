@@ -542,7 +542,8 @@ class Weight_n_parity_tomography(ba.BaseDataAnalysis):
     def process_data(self):
 
         self.proc_data_dict = {}
-        Qubits = [ name.decode().split(' ')[-1] for name in self.raw_data_dict['value_names'] ]
+        # Note: .decode() is necessary for old compression version of HDF5 files
+        Qubits = [(name.decode() if isinstance(name, bytes) else name).split(' ')[-1] for name in self.raw_data_dict['value_names'] ]
         Data_qubits = [ q for q in Qubits if 'D' in q ]
         Anc_qubit = [ q for q in Qubits if ('X' in q) or ('Z' in q) ][0]
         n = len(Data_qubits)
@@ -2036,7 +2037,8 @@ class Repeated_stabilizer_measurements(ba.BaseDataAnalysis):
         if self.heralded_init:
             _cycle += 3
         # Get qubit names in channel order
-        ch_names = [ name.decode() for name in self.raw_data_dict['value_names'] ]
+        # Note: .decode() is necessary for old compression version of HDF5 files
+        ch_names = [(name.decode() if isinstance(name, bytes) else name) for name in self.raw_data_dict['value_names'] ]
         self.Qubits = self.ancilla_qubit + self.data_qubits
         def _find_channel(ch_name):
             for i, name in enumerate(ch_names):
