@@ -2989,7 +2989,7 @@ def park_sweep_plotfn(
     #             avoided_crossing_fit_func(Parking_distances, *popt), 'k--')
     axs[1].plot(Parking_distances*1e-6, Delta_phi_cond, 'C0.')
     axs[1].set_ylim(-90, 90)
-    axs[1].set_ylabel('$\\delta \\phi_\\mathrm{cond}}$ (deg)')
+    axs[1].set_ylabel('$\\delta \\phi_\\mathrm{{cond}}$ (deg)')
     axs[1].axhline(0, ls='--', color='k', lw=1, alpha=.25, zorder=10)
     # Plot of Missing fractions
     axs[3].plot(Parking_distances*1e-6, Miss_frac/2, 'C0-', alpha=.25, label='$L_{{1_{{|0\\rangle_P}}}}$')
