@@ -2963,7 +2963,10 @@ class CCLight_Transmon(Qubit):
     #####################################################
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True,
-                                        label=''):
+                                        label='',
+                                        prepare_for_continuous_wave: bool = True,
+                                        disable_metadata: bool = True,
+                                        ):
         """
         Measures a transmission through the feedline as a function of frequency.
         Usually used to find and characterize the resonators in routines such as
@@ -2981,7 +2984,8 @@ class CCLight_Transmon(Qubit):
                 suffix to append to the measurement label
         """
         UHFQC = self.instr_acquisition.get_instr()
-        self.prepare_for_continuous_wave()
+        if prepare_for_continuous_wave:
+            self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
         # Starting specmode if set in config
@@ -3004,7 +3008,7 @@ class CCLight_Transmon(Qubit):
 
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_scan'+self.msmt_suffix+label)
+        MC.run(name='Resonator_scan'+self.msmt_suffix+label, disable_snapshot_metadata=disable_metadata)
         # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
@@ -3477,7 +3481,7 @@ class CCLight_Transmon(Qubit):
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
-        if analyze:
+        if analyze and not disable_metadata:
             ma.Qubit_Spectroscopy_Analysis(label=self.msmt_suffix,
                                            close_fig=close_fig,
                                            qb_name=self.name)
@@ -4658,7 +4662,8 @@ class CCLight_Transmon(Qubit):
 
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
                                  analyze=True, close_fig=True, real_imag=True,
-                                 prepare_for_timedomain=True):
+                                 prepare_for_timedomain=True,
+                                 disable_metadata: bool = False):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
         while the drive frequency and pulse duration is kept fixed
@@ -4692,8 +4697,9 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
 
         label = '' 
-        MC.run(name=f'rabi_'+self.msmt_suffix+label)
-        ma.Rabi_Analysis(label='rabi_')
+        MC.run(name=f'rabi_'+self.msmt_suffix+label, disable_snapshot_metadata=disable_metadata)
+        if analyze and not disable_metadata:
+            ma.Rabi_Analysis(label='rabi_')
         return True
 
     def measure_rabi_mw_crosstalk(self, MC=None, amps=np.linspace(0, 1, 31),
@@ -5033,7 +5039,8 @@ class CCLight_Transmon(Qubit):
                             'initial_step': initial_steps,
                             'no_improve_break': 50,
                             'minimize': minimize,
-                            'maxiter': 1500}
+                            'maxiter': 1500,
+                            'bounds': []}
 
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.run(name=msmt_string,
@@ -7316,6 +7323,7 @@ class CCLight_Transmon(Qubit):
         flux_pulse_amplitude: float = 0.4,
         disable_metadata: bool = False,
         prepare_for_timedomain: bool = True,
+        analyze: bool = True,
     ):
         """
         Measures the DC flux arc by calibrating the polynomial coefficients for flux (voltage)
@@ -7397,7 +7405,7 @@ class CCLight_Transmon(Qubit):
         try:
             response = nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
         except Exception as e:
-            log.warn(e)
+            log.warning(e)
         finally:
             _flux_parameter(original_current)
         if analyze:
