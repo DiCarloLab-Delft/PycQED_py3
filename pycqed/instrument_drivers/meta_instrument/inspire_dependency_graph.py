@@ -265,18 +265,21 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
                         calibrate_function_args={'qubits': spectator_list, 
                                                   'q_target': Qubit.name, 
                                                   'return_analysis': False,
-                                                  'averages': 2 ** 15,   # this is the number of avgs to use for each transient
+                                                  'averages': 2 ** 19,   # this is the number of avgs to use for each transient
                                                   'update': True,
-                                                  'verify': True})
+                                                  'verify': True,
+                                                  'disable_metadata': True})
 
         #NewQubitList=['QSW', 'QSE', 'QC', 'QNE']
         #self.add_node('Cross Fidelity',
         #                calibrate_function=self.device.name + '.measure_ssro_multi_qubit',
         #                calibrate_function_args={'qubits': NewQubitList, 'initialize': True})
 
+        qubit_list = ['NW', 'W', 'NE', 'C', 'E', 'SW', 'SE']
+
         self.add_node('Cross Fidelity',
                         calibrate_function=self.device.name + '.measure_ssro_multi_qubit',
-                        calibrate_function_args={'qubits': self.device.qubits(), 'initialize': True})
+                        calibrate_function_args={'qubits': qubit_list, 'initialize': True})
 
         self.add_node('Prep Inspire',
                       calibrate_function=self.device.name + '.prepare_for_inspire')
@@ -536,7 +539,7 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
       
             self.add_node('Frequency',
                           calibrate_function=Qubit.name + '.calibrate_frequency_ramsey',
-                          calibrate_function_args={'steps':[10, 30],
+                          calibrate_function_args={'steps':[1, 3, 10, 30],
                                                   'disable_metadata': False})
                           #check_function=Qubit.name + '.check_ramsey', tolerance=0.1e-3)
             
@@ -547,7 +550,7 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
             
             self.add_node('Motzoi',
                           calibrate_function=Qubit.name + '.calibrate_motzoi',
-                          calibrate_function_args={'motzois': np.arange(0,0.21,.02),
+                          calibrate_function_args={'motzois': np.linspace(start = -0.2, stop = 0.2, num = 21),
                                                   'disable_metadata': True})
 
             self.add_node('AllXY',

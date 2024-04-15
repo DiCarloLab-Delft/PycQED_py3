@@ -851,7 +851,7 @@ class HAL_Transmon(HAL_ShimSQ):
             MC: Optional[MeasurementControl] = None,
             update=True,
             all_modules=False,
-            disable_metadata = False
+            disable_metadata: bool = False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -3103,7 +3103,7 @@ class HAL_Transmon(HAL_ShimSQ):
             real_imag=True,
             prepare_for_timedomain=True,
             all_modules=False,
-            disable_metadata = False
+            disable_metadata: bool = False
     ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
@@ -3268,7 +3268,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             real_imag=True,
             prepare_for_timedomain=True,
-            disable_metadata = False
+            disable_metadata: bool = False
     ):
         """
         Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
@@ -3300,7 +3300,8 @@ class HAL_Transmon(HAL_ShimSQ):
         # real_imag is actually not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)  # FIXME: changes state
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='rabi_' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
+        MC.run(name='rabi_' + self.msmt_suffix,
+               disable_snapshot_metadata = disable_metadata)
 
         ma.Rabi_Analysis(label='rabi_')
         return True
@@ -3502,7 +3503,7 @@ class HAL_Transmon(HAL_ShimSQ):
             close_fig=True,
             analyze=True,
             MC: Optional[MeasurementControl] = None,
-            disable_metadata = False,
+            disable_metadata: bool = False,
             auto = True
     ):
         # USED_BY: inspire_dependency_graph.py,

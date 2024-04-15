@@ -1543,6 +1543,7 @@ class HAL_Device(HAL_ShimMQ):
             analyze=True,
             shots_per_meas: int = 2 ** 16,
             label='Mux_SSRO',
+            disable_metadata: bool = False,
             MC=None):
         """
         Perform a simultaneous ssro experiment on multiple qubits.
@@ -1619,7 +1620,8 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run("{}_{}_{}".format(label, qubits, self.msmt_suffix))
+        MC.run("{}_{}_{}".format(label, qubits, self.msmt_suffix),
+               disable_snapshot_metadata = disable_metadata)
 
         # restore parameters
         MC.soft_avg(old_soft_avg)
@@ -1669,6 +1671,7 @@ class HAL_Device(HAL_ShimMQ):
             wait_time: float = None,
             integration_length = 1e-6,
             label='Mux_SSRO',
+            disable_metadata: bool = False,
             MC=None):
         # FIXME: lots of similarity with measure_ssro_multi_qubit
         '''
@@ -1695,6 +1698,10 @@ class HAL_Device(HAL_ShimMQ):
         '''
 
         log.info('{}.measure_ssro_multi_qubit for qubits{}'.format(self.name, qubits))
+
+        # MS here, the following line is to ensure that the integration length of the object 'device'
+        # is being used, instead of the qubit object, 2024/04/15
+        integration_length = self.ro_acq_integration_length()
 
         # off and on, not including post selection init measurements yet
         nr_cases = 2 ** len(qubits)  # e.g., 00, 01 ,10 and 11 in the case of 2q
@@ -1754,7 +1761,8 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run('{}_{}_{}'.format(label, q_target, self.msmt_suffix))
+        MC.run('{}_{}_{}'.format(label, q_target, self.msmt_suffix),
+               disable_snapshot_metadata = disable_metadata)
 
         # restore parameters
         MC.soft_avg(old_soft_avg)
@@ -1799,7 +1807,7 @@ class HAL_Device(HAL_ShimMQ):
             cases: list = ['off', 'on'],
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain: bool = True,
-            disable_snapshot_metadata: bool=False,
+            disable_metadata: bool=False,
             analyze: bool = True
     ):
         '''
@@ -1864,7 +1872,7 @@ class HAL_Device(HAL_ShimMQ):
             MC.set_sweep_points(np.arange(nr_samples) / sampling_rate)
             MC.set_detector_function(d)
             MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb, self.msmt_suffix),
-                disable_snapshot_metadata=disable_snapshot_metadata)
+                disable_snapshot_metadata = disable_metadata)
 
             if analyze:
                 analysis[i] = ma2.Multiplexed_Transient_Analysis(
@@ -5562,7 +5570,7 @@ class HAL_Device(HAL_ShimMQ):
             update=True,
             verify=True,
             averages=2 ** 15,
-            disable_snapshot_metadata: bool=False,
+            disable_metadata: bool=False,
             return_analysis=True
     ):
         # USED_BY: inspire_dependency_graph.py,
@@ -5599,7 +5607,7 @@ class HAL_Device(HAL_ShimMQ):
         A = self.measure_transients(
             qubits=qubits,
             q_target=q_target,
-            disable_snapshot_metadata = disable_snapshot_metadata,
+            disable_metadata = disable_metadata,
             cases=['on', 'off']
         )
 
@@ -5668,11 +5676,12 @@ class HAL_Device(HAL_ShimMQ):
                 Q_target._prep_ro_integration_weights()
                 Q_target._prep_ro_instantiate_detectors()
 
-                ssro_dict= self.measure_ssro_single_qubit(
-                    qubits=qubits,
+                ssro_dict = self.measure_ssro_single_qubit(
+                    qubits=[q_target],
                     q_target=q_target,
-                    integration_length = Q_target.ro_acq_integration_length(),
-                    initialize=True)
+                    integration_length = self.ro_acq_integration_length(),
+                    initialize=True,
+                    disable_metadata = disable_metadata)
 
                 # This bit added by LDC to update fit results. 
                 Q_target.F_init(1-ssro_dict['Post_residual_excitation'])
