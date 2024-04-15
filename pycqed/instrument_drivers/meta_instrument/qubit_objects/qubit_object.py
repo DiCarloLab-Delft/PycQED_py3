@@ -1230,7 +1230,7 @@ class Qubit(Instrument):
             close_fig=True,
             MC=None,
             label='',
-            disable_metadata = False
+            disable_metadata: bool = False
     ):
         # USED_BY: device_dependency_graphs.py
         """
@@ -1414,7 +1414,7 @@ class Qubit(Instrument):
             update: bool = True,
             close_fig: bool = True,
             test_beating: bool = True,
-            disable_metadata = False
+            disable_metadata: bool = False
     ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,

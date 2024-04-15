@@ -1804,6 +1804,7 @@ class HAL_Device(HAL_ShimMQ):
             self,
             qubits: list,
             q_target: str,
+            soft_averaging: int = 3,
             cases: list = ['off', 'on'],
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain: bool = True,
@@ -1868,11 +1869,21 @@ class HAL_Device(HAL_ShimMQ):
                 nr_averages=self.ro_acq_averages(),
                 nr_samples=int(nr_samples))
 
+            # save and change settings
+            old_soft_avg = MC.soft_avg()
+            old_live_plot_enabled = MC.live_plot_enabled()
+            MC.soft_avg(soft_averaging)
+            MC.live_plot_enabled(False)
+
             MC.set_sweep_function(s)
             MC.set_sweep_points(np.arange(nr_samples) / sampling_rate)
             MC.set_detector_function(d)
             MC.run('Mux_transients_{}_{}_{}'.format(q_target, pulse_comb, self.msmt_suffix),
                 disable_snapshot_metadata = disable_metadata)
+            
+            # restore settings
+            MC.soft_avg(old_soft_avg)
+            MC.live_plot_enabled(old_live_plot_enabled)
 
             if analyze:
                 analysis[i] = ma2.Multiplexed_Transient_Analysis(
@@ -5570,6 +5581,7 @@ class HAL_Device(HAL_ShimMQ):
             update=True,
             verify=True,
             averages=2 ** 15,
+            soft_averaging: int = 3,
             disable_metadata: bool=False,
             return_analysis=True
     ):
@@ -5607,6 +5619,7 @@ class HAL_Device(HAL_ShimMQ):
         A = self.measure_transients(
             qubits=qubits,
             q_target=q_target,
+            soft_averaging = soft_averaging,
             disable_metadata = disable_metadata,
             cases=['on', 'off']
         )

@@ -265,7 +265,8 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
                         calibrate_function_args={'qubits': spectator_list, 
                                                   'q_target': Qubit.name, 
                                                   'return_analysis': False,
-                                                  'averages': 2 ** 19,   # this is the number of avgs to use for each transient
+                                                  'averages': 2 ** 15,   # this is the number of avgs to use for each transient
+                                                  'soft_averaging': 10,
                                                   'update': True,
                                                   'verify': True,
                                                   'disable_metadata': True})
@@ -279,12 +280,7 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
 
         self.add_node('Cross Fidelity',
                         calibrate_function=self.device.name + '.measure_ssro_multi_qubit',
-                        calibrate_function_args={'qubits': qubit_list, 'initialize': True})
-
-        self.add_node('Prep Inspire',
-                      calibrate_function=self.device.name + '.prepare_for_inspire')
-        self.add_node('Upload Calibration Results',
-                      calibrate_function='infinity.calibration.calibration')
+                        calibrate_function_args={'qubits': qubit_list, 'initialize': True, 'disable_metadata': True})
 
         #########################
         # Create all dependencies
@@ -297,12 +293,6 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
                              Qubit.name + ' SSRO')
           self.add_edge('Cross Fidelity',
                            Qubit.name + ' Optimal Weights')
-
-        self.add_edge('Prep Inspire',
-                          'Cross Fidelity')
-      
-        self.add_edge('Upload Calibration Results', 
-                          'Prep Inspire')
 
         self.cfg_plot_mode = 'svg'
         self.update_monitor()
@@ -524,23 +514,29 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
 
               self.add_node('Optimal Weights',
                         calibrate_function=self.device.name + '.calibrate_optimal_weights_mux',
-                        calibrate_function_args={'qubits': spectator_list, 'q_target': Qubit.name, 'return_analysis': False})
+                        calibrate_function_args={'qubits': spectator_list, 
+                                                  'q_target': Qubit.name, 
+                                                  'return_analysis': False,
+                                                  'averages': 2 ** 19,   # this is the number of avgs to use for each transient
+                                                  'update': True,
+                                                  'verify': True,
+                                                  'disable_metadata': True})
 
             self.add_node('T1',
                            calibrate_function = Qubit.name + '.measure_T1',
-                           calibrate_function_args={'disable_metadata': False})
+                           calibrate_function_args={'disable_metadata': True})
 
             #self.add_node(Qubit.name + ' T2_Star',
             #               calibrate_function = Qubit.name + '.measure_ramsey')
             
             self.add_node('T2e',
                            calibrate_function = Qubit.name + '.measure_echo',
-                           calibrate_function_args={'disable_metadata': False})
+                           calibrate_function_args={'disable_metadata': True})
       
             self.add_node('Frequency',
                           calibrate_function=Qubit.name + '.calibrate_frequency_ramsey',
                           calibrate_function_args={'steps':[1, 3, 10, 30],
-                                                  'disable_metadata': False})
+                                                  'disable_metadata': True})
                           #check_function=Qubit.name + '.check_ramsey', tolerance=0.1e-3)
             
             self.add_node('Flipping',
@@ -561,9 +557,6 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
                           calibrate_function=Qubit.name + '.measure_single_qubit_randomized_benchmarking',
                           calibrate_function_args={'recompile': RBrecompile, 'nr_seeds': RBnumseeds, 'nr_cliffords': 2 ** np.arange(10),
                                                   'disable_metadata': True})
-            
-            #self.add_node(Qubit.name + ' Second Flipping',
-            #              calibrate_function=Qubit.name + '.flipping_GBT')
             
             
 
@@ -597,26 +590,6 @@ class inspire_dep_graph_1Q(AutoDepGraph_DAG):
             
             self.add_edge('RB',
                           'AllXY')
-
-
-        ##############
-        # Device nodes
-        ##############
-        self.add_node('Prep Inspire',
-                      calibrate_function=self.device.name + '.prepare_for_inspire')
-        self.add_node('Upload Calibration Results',
-                      calibrate_function='infinity.calibration.calibration')
-
-        ##########################
-        # Device-node Dependencies
-        ##########################
-
-        for Qubit in Qubit_list:
-           self.add_edge('Prep Inspire',
-                            'RB')
-      
-        self.add_edge('Upload Calibration Results', 
-                          'Prep Inspire')
 
         self.cfg_plot_mode = 'svg'
         self.update_monitor()
