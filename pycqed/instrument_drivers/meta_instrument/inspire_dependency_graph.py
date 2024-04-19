@@ -262,11 +262,11 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
 
           self.add_node(Qubit.name + ' Optimal Weights',
                         calibrate_function=self.device.name + '.calibrate_optimal_weights_mux',
-                        calibrate_function_args={'qubits': spectator_list, 
+                        calibrate_function_args={'qubits': [Qubit.name], # for QI put [Qubit.name]
                                                   'q_target': Qubit.name, 
                                                   'return_analysis': False,
                                                   'averages': 2 ** 15,   # this is the number of avgs to use for each transient
-                                                  'soft_averaging': 10,
+                                                  'soft_averaging': 15,
                                                   'update': True,
                                                   'verify': True,
                                                   'disable_metadata': True})

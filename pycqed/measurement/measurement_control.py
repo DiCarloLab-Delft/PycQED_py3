@@ -328,7 +328,7 @@ class MeasurementControl(Instrument):
                 self._get_measurement_begintime()
                 if not disable_snapshot_metadata:
                     self._save_instrument_settings(self.data_object)
-                self._create_experimentaldata_dataset()
+                self._create_experimentaldata_dataset(name_msmt = name) # RDC added name = name on 16-04-2024
 
                 self.plotting_bins = None
                 if exp_metadata is not None:
@@ -1936,17 +1936,32 @@ class MeasurementControl(Instrument):
             )
         return self.column_names
 
-    def _create_experimentaldata_dataset(self):
+    def _create_experimentaldata_dataset(self, name_msmt):
         data_group = self.data_object.create_group("Experimental Data")
-        self.dset = data_group.create_dataset(
-            "Data",
-            (0, len(self.sweep_functions) + len(self.detector_function.value_names)),
-            maxshape=(
-                None,
-                len(self.sweep_functions) + len(self.detector_function.value_names),
-            ),
-            dtype="float64",
-        )
+        ###################################re
+        # added by RDC on 16-04-2024
+        if name_msmt == 'XOR_run':
+            self.dset = data_group.create_dataset(
+                "Data",
+                (0, len(self.sweep_functions) + len(self.detector_function.value_names)),
+                maxshape=(
+                    None,
+                    len(self.sweep_functions) + len(self.detector_function.value_names),
+                ),
+                dtype="int8",
+            )
+        else:
+        # end of the changes
+        ##################################
+            self.dset = data_group.create_dataset(
+                "Data",
+                (0, len(self.sweep_functions) + len(self.detector_function.value_names)),
+                maxshape=(
+                    None,
+                    len(self.sweep_functions) + len(self.detector_function.value_names),
+                ),
+                dtype="float64",
+            )
         self._get_column_names()
         self.dset.attrs["column_names"] = h5d.encode_to_utf8(self.column_names)
         # Added to tell analysis how to extract the data

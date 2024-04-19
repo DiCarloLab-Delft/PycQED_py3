@@ -3004,6 +3004,94 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             logging.error(f'Mode {mode} not recognized. Available modes: "CW", "pulsed_marked", "pulsed_mixer"')
 
+# Adding measurement butterfly from pagani detached. RDC 16-02-2023
+
+    def measure_msmt_butterfly(
+            self,
+            prepare_for_timedomain: bool = True,
+            calibrate_optimal_weights: bool = False,
+            nr_max_acq: int = 2**17,
+            disable_metadata: bool = False,
+            f_state: bool = False,
+            no_figs: bool = False,
+            opt_for = None,
+            depletion_analysis: bool = False, 
+            depletion_optimization_window = None):
+        
+        # ensure readout settings are correct
+        assert self.ro_acq_weight_type() != 'optimal'
+        assert self.ro_acq_digitized() == False
+
+        if calibrate_optimal_weights:
+            r = self.calibrate_optimal_weights(
+                prepare=prepare_for_timedomain,
+                verify=False, 
+                optimal_IQ=True,
+                disable_metadata=disable_metadata,
+                depletion_analysis = depletion_analysis,
+                depletion_optimization_window = depletion_optimization_window)
+
+        if prepare_for_timedomain and calibrate_optimal_weights == False:
+            self.prepare_for_timedomain()
+
+        d = self.int_log_det
+        # the msmt butterfly sequence has 3 measurements per state,
+        # therefore we need to make sure the number of shots is a multiple of that
+        uhfqc_max_avg = min(max(2**10, nr_max_acq), 2**20)
+
+        if f_state:
+            nr_measurements = 12
+        else:
+            nr_measurements = 8
+
+        nr_shots = int((uhfqc_max_avg//nr_measurements) * nr_measurements)
+        d.nr_shots = nr_shots
+        p = sqo.butterfly(
+            f_state = f_state,
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn()
+        )
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr()
+        )
+        MC = self.instr_MC.get_instr()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        print(nr_shots)
+        MC.set_detector_function(d)
+        MC.run(
+            f"Measurement_butterfly_{self.name}_{f_state}",
+            disable_snapshot_metadata=disable_metadata
+        )
+        a = ma2.ra.measurement_butterfly_analysis(
+            qubit=self.name,
+            label='butterfly',
+            f_state=f_state,
+            extract_only=no_figs)
+
+        # calculate the cost function
+        c = {}
+        if opt_for == 'fidelity':
+            c['ro_cost'] = 0.1 * r['depletion_cost'] + (3 - (a.qoi['Fidelity'] + a.qoi['p00_0'] + a.qoi['p11_1']))
+        if opt_for == 'depletion':
+            c['ro_cost'] = 1 * r['depletion_cost'] + 0.1 * (3 - (a.qoi['Fidelity'] + a.qoi['p00_0'] + a.qoi['p11_1']))
+        if opt_for == 'total':
+            c['ro_cost'] = 10 * r['depletion_cost'] + 10 * (1 - a.qoi['Fidelity']) + 2 - (a.qoi['p00_0'] + a.qoi['p11_1'])
+
+        print('Important values:')
+        print('- Depletion Cost: {}'.format(r['depletion_cost']))
+        print('- Assignment Fidelity: {}%'.format(np.round(a.qoi['Fidelity'] * 100, 2)))
+        print('- QND_g: {}%'.format(np.round(a.qoi['p00_0'] * 100, 2)))
+        print('- QND_e: {}%'.format(np.round(a.qoi['p11_1'] * 100, 2)))
+        print('- Readout Pulse Cost: {}'.format(c['ro_cost']))
+
+        return c
+
+###################################
+
     def measure_transients(
             self,
             MC: Optional[MeasurementControl] = None,

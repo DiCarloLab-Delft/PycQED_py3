@@ -1624,38 +1624,64 @@ def RO_QND_sequence(q_idx,
     
     return p
 
-def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str) -> OqlProgram:
+def butterfly(qubit_idx: int, f_state: bool, platf_cfg: str) -> OqlProgram:
     """
     Performs a 'butterfly' sequence on the qubit specified.
-        0:  prepz (RO) -      - RO - RO
+        0:  prepz (RO) - RO - RO
         1:  prepz (RO) - x180 - RO - RO
-
+        2:  prepz (RO) - x180 - rx12 - RO - RO
     Args:
         qubit_idx (int)  : index of the qubit
         initialize (bool): if True does an extra initial measurement to
             post select data.
         platf_cfg (str)  : openql config used for setup.
-
     """
     p = OqlProgram('butterfly', platf_cfg)
 
     k = p.create_kernel('0')
     k.prepz(qubit_idx)
-    if initialize:
-        k.measure(qubit_idx)
+    k.measure(qubit_idx)
     k.measure(qubit_idx)
     k.measure(qubit_idx)
     p.add_kernel(k)
 
     k = p.create_kernel('1')
     k.prepz(qubit_idx)
-    if initialize:
-        k.measure(qubit_idx)
-    k.x(qubit_idx)
+    k.measure(qubit_idx)
+    k.gate('rX180',[qubit_idx])
     k.measure(qubit_idx)
     k.measure(qubit_idx)
     p.add_kernel(k)
 
+    if f_state:
+        k = p.create_kernel('2')
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        k.gate('rX180',[qubit_idx])
+        k.gate('rx12',[qubit_idx])
+        k.measure(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    k = p.create_kernel("Init_0")
+    k.prepz(qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    k = p.create_kernel("Init_1")
+    k.prepz(qubit_idx)
+    k.gate('rx180', [qubit_idx])
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    if f_state:
+        k = p.create_kernel("Init_2")
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
+        k.gate('rx12', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+        
     p.compile()
 
     return p
