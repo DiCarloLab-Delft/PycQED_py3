@@ -3004,6 +3004,126 @@ class HAL_Transmon(HAL_ShimSQ):
         else:
             logging.error(f'Mode {mode} not recognized. Available modes: "CW", "pulsed_marked", "pulsed_mixer"')
 
+    def measure_flux_frequency_timedomain(
+        self,
+        amplitude: float = None,
+        times: list = np.arange(20e-9, 40e-9, 1/2.4e9),
+        wait_time_flux: int = 0,
+        disable_metadata: bool = False,
+        analyze: bool = True,
+        prepare_for_timedomain: bool = True,
+        ):
+        """
+        Performs a cryoscope experiment to measure frequency
+        detuning for a given flux pulse amplitude.
+        Args:
+            Times: 
+                Flux pulse durations used for cryoscope trace.
+            Amplitudes: 
+                Amplitude of flux pulse used for cryoscope trace.
+        Note on analysis: The frequency is calculated based on 
+        a FFT of the cryoscope trace. This means the frequency
+        resolution of this measurement will be given by the duration
+        of the cryoscope trace. To minimize the duration of this 
+        measurement we obtain the center frequency of the FFT by
+        fitting it to a Lorentzian, which circumvents the frequency
+        sampling.
+        """
+        assert self.ro_acq_weight_type()=='optimal'
+        MC = self.instr_MC.get_instr()
+        nested_MC = self.instr_nested_MC.get_instr()
+        fl_lutman = self.instr_LutMan_Flux.get_instr()
+        if amplitude:
+            fl_lutman.sq_amp(amplitude)
+        out_voltage = fl_lutman.sq_amp()*\
+            fl_lutman.cfg_awg_channel_amplitude()*\
+            fl_lutman.cfg_awg_channel_range()/2
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+            fl_lutman.load_waveforms_onto_AWG_lookuptable()
+        p = mqo.Cryoscope(
+            qubit_idxs=[self.cfg_qubit_nr()],
+            flux_cw="fl_cw_06",
+            wait_time_flux=wait_time_flux,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            cc=self.instr_CC.get_instr().name,
+            double_projections=False,
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
+        sw_function = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
+                                  waveform_name="square")
+        MC.set_sweep_function(sw_function)
+        MC.set_sweep_points(times)
+        values_per_point = 2
+        values_per_point_suffex = ["cos", "sin"]
+        d = self.get_int_avg_det(
+            values_per_point=values_per_point,
+            values_per_point_suffex=values_per_point_suffex,
+            single_int_avg=True,
+            always_prepare=False
+        )
+        MC.set_detector_function(d)
+        label = f'Voltage_to_frequency_{out_voltage:.2f}V_{self.name}'
+        MC.run(label,disable_snapshot_metadata=disable_metadata)
+        # Run analysis
+        if analyze:
+            a = ma2.cv2.Time_frequency_analysis(
+                label='Voltage_to_frequency')
+            return a
+    
+    def calibrate_flux_arc(
+        self,
+        Times: list = np.arange(20e-9, 40e-9, 1/2.4e9),
+        Amplitudes: list = [-0.4, -0.35, -0.3, 0.3, 0.35, 0.4],
+        update: bool = True,
+        disable_metadata: bool = False,
+        prepare_for_timedomain: bool = True):
+        """
+        Calibrates the polynomial coeficients for flux (voltage) 
+        to frequency conversion. Does so by measuring cryoscope traces
+        at different amplitudes.
+        Args:
+            Times: 
+                Flux pulse durations used to measure each
+                cryoscope trace.
+            Amplitudes: 
+                DAC amplitudes of flux pulse used for each
+                cryoscope trace.
+        """
+        assert self.ro_acq_weight_type()=='optimal'
+        nested_MC = self.instr_nested_MC.get_instr()
+        fl_lutman = self.instr_LutMan_Flux.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+            fl_lutman.load_waveforms_onto_AWG_lookuptable()
+        sw_function = swf.FLsweep(fl_lutman, fl_lutman.sq_amp,
+                          waveform_name="square")
+        nested_MC.set_sweep_function(sw_function)
+        nested_MC.set_sweep_points(Amplitudes)
+        def wrapper():
+            a = self.measure_flux_frequency_timedomain(
+                times = Times,
+                disable_metadata=True,
+                prepare_for_timedomain=False)
+            return {'detuning':a.proc_data_dict['detuning']}
+        d = det.Function_Detector(
+            wrapper,
+            result_keys=['detuning'],
+            value_names=['detuning'],
+            value_units=['Hz'])
+        nested_MC.set_detector_function(d)
+        label = f'Voltage_frequency_arc_{self.name}'
+        nested_MC.run(label, disable_snapshot_metadata=disable_metadata)
+        a = ma2.cv2.Flux_arc_analysis(label='Voltage_frequency_arc',
+                    channel_amp=fl_lutman.cfg_awg_channel_amplitude(),
+                    channel_range=fl_lutman.cfg_awg_channel_range())
+        # Update detuning polynomial coeficients
+        if update:
+            p_coefs = a.qoi['P_coefs']
+            fl_lutman.q_polycoeffs_freq_01_det(p_coefs)
+        return a
+
 # Adding measurement butterfly from pagani detached. RDC 16-02-2023
 
     def measure_msmt_butterfly(

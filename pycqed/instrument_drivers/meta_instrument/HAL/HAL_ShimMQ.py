@@ -231,7 +231,7 @@ class HAL_ShimMQ(Instrument):
             return
         if bypass_flux is False:
             self.prepare_fluxing(qubits=qubits)
-        # self.prepare_timing()
+        self.prepare_timing()
 
         for qb_name in qubits:
             qb = self.find_instrument(qb_name)

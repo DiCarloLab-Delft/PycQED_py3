@@ -1899,7 +1899,7 @@ def FluxTimingCalibration(
         # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0) #alignment workaround
         k.barrier([])  # alignment workaround
         # k.gate(flux_cw, [2, 0])
-        k.gate('sf_square', [qubit_idx])
+        k.gate("sf_square", [qubit_idx])
         if t_nanoseconds > 10:
             # k.gate("wait", [0, 1, 2, 3, 4, 5, 6], t_nanoseconds)
             k.gate("wait", [], t_nanoseconds)  # alignment workaround

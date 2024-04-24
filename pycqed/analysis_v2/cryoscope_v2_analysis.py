@@ -748,7 +748,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['timestamps'] = self.timestamps
         self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
         # Extract extra required quantities
-        self.Qubits = [ s.decode().split(' ')[-2] for s in self.raw_data_dict['value_names'][::2] ]
+        self.Qubits = [ s.split(' ')[-2] for s in self.raw_data_dict['value_names'][::2] ]
         poly_params = { f'polycoeff_{q}': (f'Instrument settings/flux_lm_{q}', 
                                            'attr:q_polycoeffs_freq_01_det') for q in self.Qubits }
         filter_params = { f'filter_{q}': (f'Instrument settings/lin_dist_kern_{q}',
@@ -875,3 +875,230 @@ def plot_cryoscope_trace(trace,
     ax.axhline(1.001, color='grey', ls=':')
     ax.axhline(0.999, color='grey', ls=':')
     ax.set_title(timestamp+': Step responses Cryoscope '+qubit)
+
+class Time_frequency_analysis(ba.BaseDataAnalysis):
+    def __init__(self,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        # Sort data
+        self.qubit = self.raw_data_dict['folder'].split('_')[-1]
+        Time = self.raw_data_dict['data'][:,0]
+        X_proj = self.raw_data_dict['data'][:,1]
+        Y_proj = self.raw_data_dict['data'][:,2]
+        # PSD of signal
+        time_step = Time[1]-Time[0]
+        _X_proj = X_proj-np.mean(X_proj) # Remove 0 freq coef
+        _Y_proj = Y_proj-np.mean(Y_proj) #
+        PSD = np.abs(np.fft.fft(_X_proj+1j*_Y_proj))**2*time_step/len(Time)
+        Freqs = np.fft.fftfreq(_X_proj.size, time_step)
+        idx = np.argsort(Freqs)
+        Freqs = Freqs[idx]
+        PSD = PSD[idx]
+        # Make lorentzian Fit to extract detuning 
+        # (Doing so, overcomes the frequency sampling accuracy)
+        def lorentz(x, x0, G):
+            return G**2 / ( (x-x0)**2 + G**2 )
+        def fit_func(x, x0, G, A, B):
+            return A*lorentz(x, x0, G) + B
+        # Fit guess
+        det_0 = Freqs[np.argmax(PSD)] 
+        G_0 = 1/(Time[-1]-Time[0])
+        A_0 = np.max(PSD)-np.mean(PSD)
+        B_0 = np.mean(PSD)
+        p0 = [det_0, G_0, A_0, B_0]
+        from scipy.optimize import curve_fit
+        try:
+            popt, pcov = curve_fit(fit_func, Freqs, PSD,
+                                   p0=p0, maxfev=int(1e5))
+            detuning = popt[0]
+        except:
+            print('Fitting Failed!')
+            detuning = Freqs[np.argmax(PSD)] 
+        # Save processed data
+        self.proc_data_dict['Time'] = Time
+        self.proc_data_dict['X_proj'] = X_proj
+        self.proc_data_dict['Y_proj'] = Y_proj
+        self.proc_data_dict['Freqs'] = Freqs
+        self.proc_data_dict['PSD'] = PSD
+        self.proc_data_dict['detuning'] = detuning
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, axs = plt.subplots(figsize=(5, 4), nrows=2, dpi=100)
+        axs = axs.flatten()
+        # fig.patch.set_alpha(0)
+        self.axs_dict[f'FFT_of_time_trace'] = axs[0]
+        self.figs[f'FFT_of_time_trace'] = fig
+        self.plot_dicts['FFT_of_time_trace'] = {
+            'plotfn': FFT_plotfn,
+            'ax_id': 'FFT_of_time_trace',
+            'Time': self.proc_data_dict['Time'],
+            'X_proj': self.proc_data_dict['X_proj'],
+            'Y_proj': self.proc_data_dict['Y_proj'],
+            'Freqs': self.proc_data_dict['Freqs'],
+            'PSD': self.proc_data_dict['PSD'],
+            'detuning': self.proc_data_dict['detuning'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamps[0]
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def FFT_plotfn(
+    Time,
+    X_proj,
+    Y_proj,
+    Freqs,
+    PSD,
+    detuning,
+    qubit,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+
+    axs[0].plot(Time*1e9, X_proj, 'C0.-')
+    axs[0].plot(Time*1e9, Y_proj, 'C1.-')
+    axs[0].set_xlabel('Pulse duration (ns)')
+    axs[0].set_ylabel('Voltage (a.u.)')
+
+    PSD += np.mean(PSD)
+    axs[1].plot(Freqs*1e-6, PSD, '-')
+    axs[1].set_xlim(Freqs[0]*1e-6, Freqs[-1]*1e-6)
+    axs[1].set_xlabel('Frequency (MHz)')
+    axs[1].set_ylabel('PSD ($\mathrm{Hz^{-1}}$)')
+    axs[1].set_yscale('log')
+
+    axs[0].set_title(f'{timestamp}\n{qubit} Cryoscope trace')
+
+    fig.tight_layout()
+
+class Flux_arc_analysis(ba.BaseDataAnalysis):
+    def __init__(self,
+                 channel_amp:float,
+                 channel_range:float,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.ch_amp = channel_amp
+        self.ch_range = channel_range
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        # Sort data
+        self.qubit = self.raw_data_dict['folder'].split('_')[-1]
+        Amps = self.raw_data_dict['data'][:,0]*self.ch_amp*self.ch_range/2
+        Freqs = np.abs(self.raw_data_dict['data'][:,1])
+        _Amps = np.array(list(Amps)+[0])
+        _Freqs = np.array(list(Freqs)+[0])
+        # RDC 26/10/2023. deg was 2, I am changing it to 4 to improve the freq conversion
+        P_coefs = np.polyfit(_Amps, _Freqs, deg=4)
+        # Save processed data
+        self.proc_data_dict['Amps'] = Amps
+        self.proc_data_dict['Freqs'] = Freqs
+        self.qoi = {}
+        self.qoi['P_coefs'] = P_coefs 
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, ax = plt.subplots(figsize=(5, 4), dpi=100)
+        # fig.patch.set_alpha(0)
+        self.axs_dict[f'Voltage_arc_trace'] = ax
+        self.figs[f'Voltage_arc_trace'] = fig
+        self.plot_dicts['Voltage_arc_trace'] = {
+            'plotfn': Voltage_arc_plotfn,
+            'ax_id': 'Voltage_arc_trace',
+            'Amps': self.proc_data_dict['Amps'],
+            'Freqs': self.proc_data_dict['Freqs'],
+            'P_coefs': self.qoi['P_coefs'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamps[0]
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def Voltage_arc_plotfn(
+    Amps,
+    Freqs,
+    P_coefs,
+    qubit,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    _Amps = np.linspace(Amps[0]*1.1, Amps[-1]*1.1)
+    Arc = np.poly1d(P_coefs)
+    ax.plot(_Amps, Arc(_Amps)*1e-6, 'C0-')
+    ax.plot(Amps, Freqs*1e-6, 'C3.')
+    ax.grid(ls = '--')
+    ax.set_ylabel('Detuning (MHz)')
+    ax.set_xlabel('Output Voltage (V)')
+    ax.set_title(f'{timestamp}\n{qubit} Voltage frequency arc')
+    fig.tight_layout()
