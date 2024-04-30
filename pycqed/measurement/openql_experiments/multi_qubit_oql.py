@@ -2347,11 +2347,12 @@ def Weight_n_parity_tomography(
         wait_time_after_flux: int = 0,
         simultaneous_measurement: bool=True,
         n_rounds=1,
-        readout_duration_ns: int = 340
+        readout_duration_ns: int = 340,
+        mw_duration_ns: int = 20,
         ):
     p = OqlProgram("Weight_n_parity_tomography", platf_cfg)
 
-    if ((readout_duration_ns-20)/2)%20 != 0:
+    if ((readout_duration_ns-mw_duration_ns)/2)%mw_duration_ns != 0:
         print('Warning: Readout duration is not multiple of\
                 Dynamical decoupling block sequence!')
 
@@ -2389,10 +2390,10 @@ def Weight_n_parity_tomography(
             k.barrier([])
             k.measure(Q_anc)
             for q in Q_D:
-                for cycle in range(int((readout_duration_ns-20)/2/20)):
+                for cycle in range(int((readout_duration_ns-mw_duration_ns)/2/mw_duration_ns)):
                     k.gate('i', [q])
                 k.gate('rx180', [q])
-                for cycle in range(int((readout_duration_ns-20)/2/20)):
+                for cycle in range(int((readout_duration_ns-mw_duration_ns)/2/mw_duration_ns)):
                     k.gate('i', [q])
             k.gate("wait", [], 0)
 
@@ -2416,10 +2417,10 @@ def Weight_n_parity_tomography(
 
         if not simultaneous_measurement:
             for q in Q_D:
-                for cycle in range(int((readout_duration_ns-20)/2/20)):
+                for cycle in range(int((readout_duration_ns-mw_duration_ns)/2/mw_duration_ns)):
                     k.gate('i', [q])
                 k.gate('rx180', [q])
-                for cycle in range(int((readout_duration_ns-20)/2/20)):
+                for cycle in range(int((readout_duration_ns-mw_duration_ns)/2/mw_duration_ns)):
                     k.gate('i', [q])
             k.gate("wait", [], 0)
 
