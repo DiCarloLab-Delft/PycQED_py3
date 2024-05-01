@@ -608,15 +608,6 @@ def Cryoscope(
 
     p = OqlProgram("Cryoscope", platf_cfg)
 
-    # FIXME: the variables created here are effectively unused
-    if cc.upper() == 'CCL':
-        flux_target = twoq_pair
-    elif cc.upper() == 'QCC' or cc.upper() == 'CC':
-        cw_idx = int(flux_cw[-2:])
-        flux_cw = 'sf_{}'.format(_def_lm_flux[cw_idx]['name'].lower())
-    else:
-        raise ValueError('CC type not understood: {}'.format(cc))
-
     k = p.create_kernel("RamZ_X")
     k.prepz(qubit_idxs[0])
     k.barrier([])  # alignment workaround

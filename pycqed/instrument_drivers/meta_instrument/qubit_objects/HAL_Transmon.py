@@ -3037,7 +3037,7 @@ class HAL_Transmon(HAL_ShimSQ):
             fl_lutman.sq_amp(amplitude)
         out_voltage = fl_lutman.sq_amp()*\
             fl_lutman.cfg_awg_channel_amplitude()*\
-            fl_lutman.cfg_awg_channel_range()/2
+            fl_lutman.cfg_awg_channel_range()/2 # +/- 2.5V, else, 5Vpp
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
             fl_lutman.load_waveforms_onto_AWG_lookuptable()
