@@ -874,8 +874,8 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                 Trace = Trace[initial_idx:]
                 # Fit exponential to trace
                 from scipy.optimize import curve_fit
-                p0 = [-.2, 15e-9, 1]
-                popt, pcov = curve_fit(filter_func, Times, Trace, p0=p0)
+                p0 = [-.2, 15e-9, 1.02] # third point changed from 1 to 1.02
+                popt, pcov = curve_fit(filter_func, Times, Trace, p0=p0, maxfev=5000)
                 filtr = {'amp': popt[0], 'tau': popt[1]}
                 self.proc_data_dict['exponential_filter'][q] = filtr
                 self.proc_data_dict['fit_params'][q] = popt
@@ -1110,7 +1110,7 @@ class Flux_arc_analysis(ba.BaseDataAnalysis):
         _Amps = np.array(list(Amps)+[0])
         _Freqs = np.array(list(Freqs)+[0])
         # RDC 26/10/2023. deg was 2, I am changing it to 4 to improve the freq conversion
-        P_coefs = np.polyfit(_Amps, _Freqs, deg=4)
+        P_coefs = np.polyfit(_Amps, _Freqs, deg=2)
         # Save processed data
         self.proc_data_dict['Amps'] = Amps
         self.proc_data_dict['Freqs'] = Freqs
