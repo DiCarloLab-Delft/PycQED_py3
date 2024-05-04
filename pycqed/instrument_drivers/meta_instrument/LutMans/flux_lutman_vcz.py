@@ -57,6 +57,11 @@ _def_lm = {
     7: {"name": "custom_wf", "type": "custom"},
 }
 
+# _def_lm = {
+#     0: {"name": "i", "type": "idle"},
+# }
+# for pulse_label in range(144): # 480 comes from len(times = np.arange(0.0e-9, 200.0e-9, 1/2.4e9))
+#     _def_lm[pulse_label + 1] = {"name": f"square_{pulse_label + 1:03}", "type": "square"}
 
 class Base_Flux_LutMan(Base_LutMan):
     """
@@ -142,6 +147,16 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     def set_default_lutmap(self):
         """Set the default lutmap for standard microwave drive pulses."""
         self.LutMap(_def_lm.copy())
+    
+    def generate_cryoscope_lutmap(self, duration):
+        cryoscope_lutmap = {
+            0: {"name": "i", "type": "idle"},
+        }
+        times = np.arange(0.0e-9, duration, 1/2.4e9)
+        pulse_number = len(times)
+        for pulse_label in range(pulse_number):
+            cryoscope_lutmap[pulse_label + 1] = {"name": f"square_{pulse_label + 1:03}", "type": "square"}
+        self.LutMap(cryoscope_lutmap.copy())
 
     def generate_standard_waveforms(self):
         """
@@ -164,6 +179,28 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             elif waveform["type"] == "idle_z":
                 # The vcz pulse itself has all parameters necessary for the correction
                 self._wave_dict[wave_name] = self._gen_cz(which_gate=which_gate)
+
+    def generate_cryoscope_waveforms(self, duration):
+        """
+        Generate all the standard waveforms and populates self._wave_dict
+        """
+        self._wave_dict = {}
+        self._wave_dict["i"] = self._gen_i()
+
+        self.generate_cryoscope_lutmap(duration = duration)
+
+        times = np.arange(0.0e-9, 200.0e-9, 1/2.4e9)
+        loop_index = 0
+        self.cfg_max_wf_length(duration+40e-9)
+
+        for _, waveform in self.LutMap().items():
+            if waveform["name"] == 'i':
+                pass
+            else:
+                wave_name = waveform["name"]
+                self.sq_length(times[loop_index])
+                self._wave_dict[wave_name] = self._gen_square()
+                loop_index += 1
 
     def generate_cz_waveforms(self):
         """
@@ -813,6 +850,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Loads a specific waveform to the AWG
         """
 
+        AWG = self.AWG.get_instr()
         # Here we are ductyping to determine if the waveform name or the
         # codeword was specified.
         if type(wave_id) == str:
@@ -831,6 +869,13 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
                 self._wave_dict[waveform_name] = gen_wf_func(
                     which_gate=waveform_name[3:]
                 )
+            if AWG.cfg_codeword_protocol() == "cryoscope_flux":
+                if waveform_name == 'i':
+                    waveform_name_string = 'i'
+                else:
+                    waveform_name_string = 'square'
+                gen_wf_func = getattr(self, "_gen_{}".format(waveform_name_string))
+                self._wave_dict[waveform_name_string] = gen_wf_func()
             else:
                 gen_wf_func = getattr(self, "_gen_{}".format(waveform_name))
                 self._wave_dict[waveform_name] = gen_wf_func()
@@ -869,6 +914,10 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         """
 
         AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()
+
+        AWG.cfg_codeword_protocol("cryoscope_flux")
+        AWG._get_cryoscope_waveform_table(awg_nr = awg_ch/2)
 
         if stop_start:
             AWG.stop()

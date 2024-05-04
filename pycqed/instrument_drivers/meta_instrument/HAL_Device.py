@@ -2681,19 +2681,157 @@ class HAL_Device(HAL_ShimMQ):
                 filter_dict = {'params': fltr,
                                'model': 'exponential', 'real-time': True }
                 if fltr['amp'] > 0:
-                    print('Amplitude of filter is positive (overfitting).')
-                    print('Filter not updated.')
-                    return True
-                else:
-                    # Check wich is the first empty exponential filter
-                    for i in range(4):
-                        _fltr = lin_dist_kern.get(f'filter_model_0{i}')
-                        if _fltr == {}:
-                            lin_dist_kern.set(f'filter_model_0{i}', filter_dict)
-                            return True
-                        else:
-                            print(f'filter_model_0{i} used.')
-                    print('All exponential filter tabs are full. Filter not updated.')
+                    log.warning('Amplitude of filter is positive (overfitting).')
+                # Check wich is the first empty exponential filter
+                for i in range(4):
+                    _fltr = lin_dist_kern.get(f'filter_model_0{i}')
+                    if _fltr == {}:
+                        lin_dist_kern.set(f'filter_model_0{i}', filter_dict)
+                        return True
+                    else:
+                        print(f'filter_model_0{i} used.')
+                print('All exponential filter tabs are full. Filter not updated.')
+        return True
+    
+    def measure_cryoscope_fast(
+        self,
+        qubits,
+        times,
+        MC=None,
+        nested_MC=None,
+        double_projections: bool = False,
+        wait_time_flux: int = 0,
+        update_FIRs: bool=False,
+        update_IIRs: bool=False,
+        waveform_name: str = "square",
+        max_delay=None,
+        twoq_pair=[2, 0],
+        disable_metadata: bool = False,
+        init_buffer=0,
+        analyze: bool = True,
+        prepare_for_timedomain: bool = True,
+        ):
+        """
+        Performs a cryoscope experiment to measure the shape of a flux pulse.
+
+        Args:
+            qubits  (list):
+                a list of two target qubits
+
+            times   (array):
+                array of measurment times
+
+            label (str):
+                used to label the experiment
+
+            waveform_name (str {"square", "custom_wf"}) :
+                defines the name of the waveform used in the
+                cryoscope. Valid values are either "square" or "custom_wf"
+
+            max_delay {float, "auto"} :
+                determines the delay in the pulse sequence
+                if set to "auto" this is automatically set to the largest
+                pulse duration for the cryoscope.
+
+            prepare_for_timedomain (bool):
+                calls self.prepare_for_timedomain on start
+        """
+        assert self.ro_acq_weight_type() == 'optimal'
+        assert not (update_FIRs and update_IIRs), 'Can only either update IIRs or FIRs' 
+        if update_FIRs or update_IIRs:
+            assert analyze==True, 'Analsis has to run for filter update'
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+        for q in qubits:
+            assert q in self.qubits()
+        Q_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain(qubits=qubits)
+        if max_delay is None:
+            max_delay = 0 
+        else:
+            max_delay = np.max(times) + 40e-9
+        Fl_lutmans = [self.find_instrument(q).instr_LutMan_Flux.get_instr() \
+                      for q in qubits]
+
+        if 0 in Fl_lutmans[0].LutMap():
+            Fl_lutmans[0].LutMap().pop(0)
+        square_pulse_gates = []
+        for entry in range(len(Fl_lutmans[0].LutMap())):
+            square_pulse_gates.append(Fl_lutmans[0].LutMap()[entry+1]['name'])
+
+        p = mqo.Cryoscope_fast(
+            qubit_idxs=Q_idxs,
+            flux_cw=square_pulse_gates,
+            twoq_pair=twoq_pair,
+            wait_time_flux=wait_time_flux,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            cc=self.instr_CC.get_instr().name,
+            double_projections=double_projections,
+        )
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            parameter_name='Time',
+            unit='s',
+            CCL=self.instr_CC.get_instr()
+        )
+        s.sweep_control = 'soft'
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+
+        if double_projections:
+            # Cryoscope v2
+            values_per_point = 4
+            values_per_point_suffex = ["cos", "sin", "mcos", "msin"]
+        else:
+            # Cryoscope v1
+            values_per_point = 2
+            values_per_point_suffex = ["cos", "sin"]
+
+        d = self.get_int_avg_det(
+            qubits=qubits,
+            values_per_point=values_per_point,
+            values_per_point_suffex=values_per_point_suffex,
+            single_int_avg=True,
+            always_prepare=True
+        )
+        MC.set_detector_function(d)
+        label = 'Cryoscope_{}_amps'.format('_'.join(qubits))
+        MC.run(label,disable_snapshot_metadata=disable_metadata)
+        # Run analysis
+        if analyze:
+            a = ma2.cv2.multi_qubit_cryoscope_analysis(
+                label='Cryoscope',
+                update_IIRs=update_IIRs,
+                update_FIRs=update_FIRs)
+        if update_FIRs:
+            for qubit, fltr in a.proc_data_dict['conv_filters'].items():
+                lin_dist_kern = self.find_instrument(f'lin_dist_kern_{qubit}')
+                filter_dict = {'params': {'weights': fltr},
+                               'model': 'FIR', 'real-time': True }
+                lin_dist_kern.filter_model_04(filter_dict)
+        elif update_IIRs:
+            for qubit, fltr in a.proc_data_dict['exponential_filter'].items():
+                lin_dist_kern = self.find_instrument(f'lin_dist_kern_{qubit}')
+                filter_dict = {'params': fltr,
+                               'model': 'exponential', 'real-time': True }
+                if fltr['amp'] > 0:
+                    log.warning('Amplitude of filter is positive (overfitting).')
+                # Check wich is the first empty exponential filter
+                for i in range(4):
+                    _fltr = lin_dist_kern.get(f'filter_model_0{i}')
+                    if _fltr == {}:
+                        lin_dist_kern.set(f'filter_model_0{i}', filter_dict)
+                        return True
+                    else:
+                        print(f'filter_model_0{i} used.')
+                print('All exponential filter tabs are full. Filter not updated.')
         return True
 
     def measure_cryoscope_vs_amp(

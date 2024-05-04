@@ -138,6 +138,20 @@ _control_modes = {
             [27, 26, 25]
         ],
         "trigger_bits": [31,15]
+    },
+    "cryoscope_flux": {  # alias for "awg8-flux"
+        # NB: please note that internally one HDQWG AWG unit handles 2 channels, which requires special handling of the waveforms
+        "control_bits": [
+            [2, 1, 0],
+            [5, 4, 3],
+            [8, 7, 6],
+            [11, 10, 9],
+            [18, 17, 16],
+            [21, 20, 19],
+            [24, 23, 22],
+            [27, 26, 25]
+        ],
+        "trigger_bits": [31,15]
     }
 }
 

@@ -684,6 +684,107 @@ def Cryoscope(
     p.compile()
     return p
 
+def Cryoscope_fast(
+        qubit_idxs: list,
+        flux_cw: str = 'fl_cw_06',  # FIXME: effectively unused
+        twoq_pair=[2, 0],
+        platf_cfg: str = '',
+        cc: str = 'CC',
+        wait_time_flux: int = 0,
+        double_projections: bool = True
+    ) -> OqlProgram:
+    """
+    Single qubit Ramsey sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+    Input pars:
+        times:          the list of waiting times for each Ramsey element
+       q0idx,q1idx      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+    """
+
+    p = OqlProgram("Cryoscope", platf_cfg)
+
+    for i, square_gate in enumerate(flux_cw):
+        k = p.create_kernel('RamZ_X{}'.format(i))
+
+        k.prepz(qubit_idxs[0])
+        k.barrier([])  # alignment workaround
+        for q_idx in qubit_idxs:
+            k.gate('rx90', [q_idx])
+        k.gate('wait', [], wait_time_flux)
+        k.barrier([])  # alignment workaround
+        for q_idx in qubit_idxs:
+            k.gate(square_gate, [q_idx])
+        k.barrier([])  # alignment workaround
+        k.gate('wait', [], wait_time_flux)
+        for q_idx in qubit_idxs:
+            k.gate('rx90', [q_idx])
+        k.barrier([])
+        for q_idx in qubit_idxs:
+            k.measure(q_idx)
+        p.add_kernel(k)
+
+        k = p.create_kernel('RamZ_Y{}'.format(i))
+        k.prepz(qubit_idxs[0])
+        k.barrier([])  # alignment workaround
+        for q_idx in qubit_idxs:
+            k.gate('rx90', [q_idx])
+        k.gate('wait', [], wait_time_flux)
+        k.barrier([])  # alignment workaround
+        for q_idx in qubit_idxs:
+            k.gate(square_gate, [q_idx])
+        k.barrier([])  # alignment workaround
+        k.gate('wait', [], wait_time_flux)
+        for q_idx in qubit_idxs:
+            k.gate('ry90', [q_idx])
+        k.barrier([])
+        for q_idx in qubit_idxs:
+            k.measure(q_idx)
+        p.add_kernel(k)
+
+        if double_projections:
+            k = p.create_kernel('RamZ_mX{}'.format(i))
+            k.prepz(qubit_idxs[0])
+            k.barrier([])  # alignment workaround
+            for q_idx in qubit_idxs:
+                k.gate('rx90', [q_idx])
+            k.gate('wait', [], wait_time_flux)
+            k.barrier([])  # alignment workaround
+            for q_idx in qubit_idxs:
+                k.gate(square_gate, [q_idx])
+            k.barrier([])  # alignment workaround
+            k.gate('wait', [], wait_time_flux)
+            for q_idx in qubit_idxs:
+                k.gate('rxm90', [q_idx])
+            k.barrier([])
+            for q_idx in qubit_idxs:
+                k.measure(q_idx)
+            p.add_kernel(k)
+
+            k = p.create_kernel('RamZ_mY{}'.format(i))
+            k.prepz(qubit_idxs[0])
+            k.barrier([])  # alignment workaround
+            for q_idx in qubit_idxs:
+                k.gate('rx90', [q_idx])
+            k.gate('wait', [], wait_time_flux)
+            k.barrier([])  # alignment workaround
+            for q_idx in qubit_idxs:
+                k.gate(square_gate, [q_idx])
+            k.barrier([])  # alignment workaround
+            k.gate('wait', [], wait_time_flux)
+            for q_idx in qubit_idxs:
+                k.gate('rym90', [q_idx])
+            k.barrier([])
+            for q_idx in qubit_idxs:
+                k.measure(q_idx)
+            p.add_kernel(k)
+
+    p.compile()
+    return p
+
 
 # FIXME: not really used
 def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str) -> OqlProgram:

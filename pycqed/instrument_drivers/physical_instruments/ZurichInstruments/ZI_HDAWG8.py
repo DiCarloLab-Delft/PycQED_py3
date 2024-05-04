@@ -218,7 +218,7 @@ class ZI_HDAWG8(zicore.ZI_HDAWG_core, DIO.CalInterface):
 
         self.add_parameter(
             'cfg_codeword_protocol', initial_value='identical',
-            vals=validators.Enum('identical', 'microwave', 'novsm_microwave', 'flux'), docstring=(
+            vals=validators.Enum('identical', 'microwave', 'novsm_microwave', 'flux', 'cryoscope_flux'), docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
@@ -376,6 +376,36 @@ while (1) {
                 wf_table.append((zibase.gen_waveform_name(ch, dio_cw),
                                  zibase.gen_waveform_name(ch+1, dio_cw)))
         return wf_table
+    
+    def _get_cryoscope_waveform_table(self, awg_nr: int) -> list:
+        """
+        Returns the waveform table.
+
+        The waveform table determines the mapping of waveforms to DIO codewords.
+        The index of the table corresponds to the DIO codeword.
+        The entry is a tuple of waveform names.
+
+        Example:
+            ["wave_ch7_cw000", "wave_ch8_cw000",
+            "wave_ch7_cw001", "wave_ch8_cw001",
+            "wave_ch7_cw002", "wave_ch8_cw002"]
+
+        The waveform table generated depends on the awg_nr and the codeword
+        protocol.
+        """
+        ch = awg_nr*2
+        wf_table = []
+        if 'cryoscope_flux' in self.cfg_codeword_protocol():
+            for cw in range(self._num_codewords):
+                    # 481 comes from len(times = np.arange(0.0e-9, 200.0e-9, 1/2.4e9))
+                    # plus the idenity gate 'i'
+                    wf_table.append((zibase.gen_waveform_name(ch, cw),
+                                     zibase.gen_waveform_name(ch+1, cw)))
+        else:
+            for dio_cw in range(self._num_codewords):
+                wf_table.append((zibase.gen_waveform_name(ch, dio_cw),
+                                 zibase.gen_waveform_name(ch+1, dio_cw)))
+        return wf_table
 
     def _codeword_table_preamble(self, awg_nr):
         """
@@ -386,12 +416,14 @@ while (1) {
         program = ''
 
         wf_table = self._get_waveform_table(awg_nr=awg_nr)
+        if self.cfg_codeword_protocol() == 'cryoscope_flux':
+            wf_table = self._get_cryoscope_waveform_table(awg_nr=awg_nr)
         for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
             csvname_l = self.devname + '_' + wf_l
             csvname_r = self.devname + '_' + wf_r
 
             # FIXME: Unfortunately, 'static' here also refers to configuration required for flux HDAWG8
-            if self.cfg_sideband_mode() == 'static' or self.cfg_codeword_protocol() == 'flux':
+            if self.cfg_sideband_mode() == 'static' or self.cfg_codeword_protocol() == 'flux' or self.cfg_codeword_protocol() == 'cryoscope_flux':
                 # program += 'assignWaveIndex(\"{}\", \"{}\", {});\n'.format(
                 #     csvname_l, csvname_r, dio_cw)
                 program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
@@ -468,7 +500,7 @@ while (1) {
             self.set(param, 0)
 
         # Set amp or direct mode
-        if self.cfg_codeword_protocol() == 'flux':
+        if self.cfg_codeword_protocol() == 'flux' or self.cfg_codeword_protocol() == 'cryoscope_flux':
             # when doing flux pulses, set everything to amp mode
             for ch in range(8):
                 self.set('sigouts_{}_direct'.format(ch), 0)

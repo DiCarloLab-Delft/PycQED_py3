@@ -1272,6 +1272,4811 @@
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [6]
             }
+        },
+
+        //////////////////////////////////////////
+        // Default 3 Cryoscope flux operations
+        //////////////////////////////////////////
+
+        "square_001": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [1]
+            }
+        },
+        "square_002": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [2]
+            }
+        },
+        "square_003": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [3]
+            }
+        },
+        "square_004": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [4]
+            }
+        },
+        "square_005": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [5]
+            }
+        },
+        "square_006": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [6]
+            }
+        },
+        "square_007": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [7]
+            }
+        },
+        "square_008": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [8]
+            }
+        },
+        "square_009": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [9]
+            }
+        },
+        "square_010": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [10]
+            }
+        },
+        "square_011": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [11]
+            }
+        },
+        "square_012": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [12]
+            }
+        },
+        "square_013": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [13]
+            }
+        },
+        "square_014": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [14]
+            }
+        },
+        "square_015": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [15]
+            }
+        },
+        "square_016": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [16]
+            }
+        },
+        "square_017": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [17]
+            }
+        },
+        "square_018": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [18]
+            }
+        },
+        "square_019": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [19]
+            }
+        },
+        "square_020": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [20]
+            }
+        },
+        "square_021": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [21]
+            }
+        },
+        "square_022": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [22]
+            }
+        },
+        "square_023": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [23]
+            }
+        },
+        "square_024": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [24]
+            }
+        },
+        "square_025": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [25]
+            }
+        },
+        "square_026": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [26]
+            }
+        },
+        "square_027": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [27]
+            }
+        },
+        "square_028": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [28]
+            }
+        },
+        "square_029": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [29]
+            }
+        },
+        "square_030": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [30]
+            }
+        },
+        "square_031": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [31]
+            }
+        },
+        "square_032": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [32]
+            }
+        },
+        "square_033": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [33]
+            }
+        },
+        "square_034": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [34]
+            }
+        },
+        "square_035": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [35]
+            }
+        },
+        "square_036": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [36]
+            }
+        },
+        "square_037": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [37]
+            }
+        },
+        "square_038": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [38]
+            }
+        },
+        "square_039": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [39]
+            }
+        },
+        "square_040": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [40]
+            }
+        },
+        "square_041": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [41]
+            }
+        },
+        "square_042": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [42]
+            }
+        },
+        "square_043": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [43]
+            }
+        },
+        "square_044": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [44]
+            }
+        },
+        "square_045": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [45]
+            }
+        },
+        "square_046": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [46]
+            }
+        },
+        "square_047": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [47]
+            }
+        },
+        "square_048": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [48]
+            }
+        },
+        "square_049": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [49]
+            }
+        },
+        "square_050": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [50]
+            }
+        },
+        "square_051": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [51]
+            }
+        },
+        "square_052": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [52]
+            }
+        },
+        "square_053": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [53]
+            }
+        },
+        "square_054": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [54]
+            }
+        },
+        "square_055": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [55]
+            }
+        },
+        "square_056": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [56]
+            }
+        },
+        "square_057": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [57]
+            }
+        },
+        "square_058": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [58]
+            }
+        },
+        "square_059": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [59]
+            }
+        },
+        "square_060": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [60]
+            }
+        },
+        "square_061": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [61]
+            }
+        },
+        "square_062": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [62]
+            }
+        },
+        "square_063": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [63]
+            }
+        },
+        "square_064": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [64]
+            }
+        },
+        "square_065": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [65]
+            }
+        },
+        "square_066": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [66]
+            }
+        },
+        "square_067": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [67]
+            }
+        },
+        "square_068": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [68]
+            }
+        },
+        "square_069": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [69]
+            }
+        },
+        "square_070": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [70]
+            }
+        },
+        "square_071": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [71]
+            }
+        },
+        "square_072": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [72]
+            }
+        },
+        "square_073": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [73]
+            }
+        },
+        "square_074": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [74]
+            }
+        },
+        "square_075": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [75]
+            }
+        },
+        "square_076": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [76]
+            }
+        },
+        "square_077": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [77]
+            }
+        },
+        "square_078": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [78]
+            }
+        },
+        "square_079": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [79]
+            }
+        },
+        "square_080": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [80]
+            }
+        },
+        "square_081": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [81]
+            }
+        },
+        "square_082": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [82]
+            }
+        },
+        "square_083": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [83]
+            }
+        },
+        "square_084": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [84]
+            }
+        },
+        "square_085": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [85]
+            }
+        },
+        "square_086": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [86]
+            }
+        },
+        "square_087": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [87]
+            }
+        },
+        "square_088": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [88]
+            }
+        },
+        "square_089": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [89]
+            }
+        },
+        "square_090": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [90]
+            }
+        },
+        "square_091": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [91]
+            }
+        },
+        "square_092": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [92]
+            }
+        },
+        "square_093": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [93]
+            }
+        },
+        "square_094": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [94]
+            }
+        },
+        "square_095": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [95]
+            }
+        },
+        "square_096": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [96]
+            }
+        },
+        "square_097": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [97]
+            }
+        },
+        "square_098": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [98]
+            }
+        },
+        "square_099": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [99]
+            }
+        },
+        "square_100": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [100]
+            }
+        },
+        "square_101": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [101]
+            }
+        },
+        "square_102": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [102]
+            }
+        },
+        "square_103": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [103]
+            }
+        },
+        "square_104": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [104]
+            }
+        },
+        "square_105": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [105]
+            }
+        },
+        "square_106": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [106]
+            }
+        },
+        "square_107": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [107]
+            }
+        },
+        "square_108": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [108]
+            }
+        },
+        "square_109": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [109]
+            }
+        },
+        "square_110": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [110]
+            }
+        },
+        "square_111": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [111]
+            }
+        },
+        "square_112": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [112]
+            }
+        },
+        "square_113": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [113]
+            }
+        },
+        "square_114": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [114]
+            }
+        },
+        "square_115": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [115]
+            }
+        },
+        "square_116": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [116]
+            }
+        },
+        "square_117": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [117]
+            }
+        },
+        "square_118": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [118]
+            }
+        },
+        "square_119": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [119]
+            }
+        },
+        "square_120": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [120]
+            }
+        },
+        "square_121": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [121]
+            }
+        },
+        "square_122": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [122]
+            }
+        },
+        "square_123": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [123]
+            }
+        },
+        "square_124": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [124]
+            }
+        },
+        "square_125": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [125]
+            }
+        },
+        "square_126": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [126]
+            }
+        },
+        "square_127": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [127]
+            }
+        },
+        "square_128": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [128]
+            }
+        },
+        "square_129": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [129]
+            }
+        },
+        "square_130": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [130]
+            }
+        },
+        "square_131": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [131]
+            }
+        },
+        "square_132": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [132]
+            }
+        },
+        "square_133": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [133]
+            }
+        },
+        "square_134": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [134]
+            }
+        },
+        "square_135": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [135]
+            }
+        },
+        "square_136": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [136]
+            }
+        },
+        "square_137": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [137]
+            }
+        },
+        "square_138": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [138]
+            }
+        },
+        "square_139": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [139]
+            }
+        },
+        "square_140": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [140]
+            }
+        },
+        "square_141": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [141]
+            }
+        },
+        "square_142": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [142]
+            }
+        },
+        "square_143": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [143]
+            }
+        },
+        "square_144": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [144]
+            }
+        },
+        "square_145": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [145]
+            }
+        },
+        "square_146": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [146]
+            }
+        },
+        "square_147": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [147]
+            }
+        },
+        "square_148": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [148]
+            }
+        },
+        "square_149": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [149]
+            }
+        },
+        "square_150": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [150]
+            }
+        },
+        "square_151": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [151]
+            }
+        },
+        "square_152": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [152]
+            }
+        },
+        "square_153": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [153]
+            }
+        },
+        "square_154": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [154]
+            }
+        },
+        "square_155": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [155]
+            }
+        },
+        "square_156": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [156]
+            }
+        },
+        "square_157": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [157]
+            }
+        },
+        "square_158": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [158]
+            }
+        },
+        "square_159": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [159]
+            }
+        },
+        "square_160": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [160]
+            }
+        },
+        "square_161": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [161]
+            }
+        },
+        "square_162": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [162]
+            }
+        },
+        "square_163": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [163]
+            }
+        },
+        "square_164": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [164]
+            }
+        },
+        "square_165": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [165]
+            }
+        },
+        "square_166": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [166]
+            }
+        },
+        "square_167": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [167]
+            }
+        },
+        "square_168": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [168]
+            }
+        },
+        "square_169": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [169]
+            }
+        },
+        "square_170": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [170]
+            }
+        },
+        "square_171": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [171]
+            }
+        },
+        "square_172": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [172]
+            }
+        },
+        "square_173": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [173]
+            }
+        },
+        "square_174": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [174]
+            }
+        },
+        "square_175": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [175]
+            }
+        },
+        "square_176": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [176]
+            }
+        },
+        "square_177": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [177]
+            }
+        },
+        "square_178": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [178]
+            }
+        },
+        "square_179": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [179]
+            }
+        },
+        "square_180": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [180]
+            }
+        },
+        "square_181": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [181]
+            }
+        },
+        "square_182": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [182]
+            }
+        },
+        "square_183": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [183]
+            }
+        },
+        "square_184": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [184]
+            }
+        },
+        "square_185": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [185]
+            }
+        },
+        "square_186": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [186]
+            }
+        },
+        "square_187": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [187]
+            }
+        },
+        "square_188": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [188]
+            }
+        },
+        "square_189": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [189]
+            }
+        },
+        "square_190": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [190]
+            }
+        },
+        "square_191": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [191]
+            }
+        },
+        "square_192": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [192]
+            }
+        },
+        "square_193": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [193]
+            }
+        },
+        "square_194": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [194]
+            }
+        },
+        "square_195": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [195]
+            }
+        },
+        "square_196": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [196]
+            }
+        },
+        "square_197": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [197]
+            }
+        },
+        "square_198": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [198]
+            }
+        },
+        "square_199": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [199]
+            }
+        },
+        "square_200": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [200]
+            }
+        },
+        "square_201": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [201]
+            }
+        },
+        "square_202": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [202]
+            }
+        },
+        "square_203": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [203]
+            }
+        },
+        "square_204": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [204]
+            }
+        },
+        "square_205": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [205]
+            }
+        },
+        "square_206": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [206]
+            }
+        },
+        "square_207": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [207]
+            }
+        },
+        "square_208": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [208]
+            }
+        },
+        "square_209": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [209]
+            }
+        },
+        "square_210": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [210]
+            }
+        },
+        "square_211": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [211]
+            }
+        },
+        "square_212": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [212]
+            }
+        },
+        "square_213": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [213]
+            }
+        },
+        "square_214": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [214]
+            }
+        },
+        "square_215": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [215]
+            }
+        },
+        "square_216": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [216]
+            }
+        },
+        "square_217": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [217]
+            }
+        },
+        "square_218": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [218]
+            }
+        },
+        "square_219": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [219]
+            }
+        },
+        "square_220": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [220]
+            }
+        },
+        "square_221": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [221]
+            }
+        },
+        "square_222": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [222]
+            }
+        },
+        "square_223": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [223]
+            }
+        },
+        "square_224": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [224]
+            }
+        },
+        "square_225": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [225]
+            }
+        },
+        "square_226": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [226]
+            }
+        },
+        "square_227": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [227]
+            }
+        },
+        "square_228": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [228]
+            }
+        },
+        "square_229": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [229]
+            }
+        },
+        "square_230": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [230]
+            }
+        },
+        "square_231": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [231]
+            }
+        },
+        "square_232": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [232]
+            }
+        },
+        "square_233": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [233]
+            }
+        },
+        "square_234": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [234]
+            }
+        },
+        "square_235": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [235]
+            }
+        },
+        "square_236": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [236]
+            }
+        },
+        "square_237": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [237]
+            }
+        },
+        "square_238": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [238]
+            }
+        },
+        "square_239": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [239]
+            }
+        },
+        "square_240": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [240]
+            }
+        },
+        "square_241": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [241]
+            }
+        },
+        "square_242": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [242]
+            }
+        },
+        "square_243": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [243]
+            }
+        },
+        "square_244": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [244]
+            }
+        },
+        "square_245": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [245]
+            }
+        },
+        "square_246": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [246]
+            }
+        },
+        "square_247": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [247]
+            }
+        },
+        "square_248": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [248]
+            }
+        },
+        "square_249": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [249]
+            }
+        },
+        "square_250": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [250]
+            }
+        },
+        "square_251": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [251]
+            }
+        },
+        "square_252": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [252]
+            }
+        },
+        "square_253": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [253]
+            }
+        },
+        "square_254": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [254]
+            }
+        },
+        "square_255": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [255]
+            }
+        },
+        "square_256": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [256]
+            }
+        },
+        "square_257": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [257]
+            }
+        },
+        "square_258": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [258]
+            }
+        },
+        "square_259": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [259]
+            }
+        },
+        "square_260": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [260]
+            }
+        },
+        "square_261": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [261]
+            }
+        },
+        "square_262": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [262]
+            }
+        },
+        "square_263": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [263]
+            }
+        },
+        "square_264": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [264]
+            }
+        },
+        "square_265": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [265]
+            }
+        },
+        "square_266": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [266]
+            }
+        },
+        "square_267": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [267]
+            }
+        },
+        "square_268": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [268]
+            }
+        },
+        "square_269": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [269]
+            }
+        },
+        "square_270": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [270]
+            }
+        },
+        "square_271": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [271]
+            }
+        },
+        "square_272": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [272]
+            }
+        },
+        "square_273": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [273]
+            }
+        },
+        "square_274": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [274]
+            }
+        },
+        "square_275": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [275]
+            }
+        },
+        "square_276": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [276]
+            }
+        },
+        "square_277": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [277]
+            }
+        },
+        "square_278": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [278]
+            }
+        },
+        "square_279": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [279]
+            }
+        },
+        "square_280": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [280]
+            }
+        },
+        "square_281": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [281]
+            }
+        },
+        "square_282": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [282]
+            }
+        },
+        "square_283": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [283]
+            }
+        },
+        "square_284": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [284]
+            }
+        },
+        "square_285": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [285]
+            }
+        },
+        "square_286": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [286]
+            }
+        },
+        "square_287": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [287]
+            }
+        },
+        "square_288": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [288]
+            }
+        },
+        "square_289": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [289]
+            }
+        },
+        "square_290": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [290]
+            }
+        },
+        "square_291": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [291]
+            }
+        },
+        "square_292": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [292]
+            }
+        },
+        "square_293": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [293]
+            }
+        },
+        "square_294": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [294]
+            }
+        },
+        "square_295": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [295]
+            }
+        },
+        "square_296": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [296]
+            }
+        },
+        "square_297": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [297]
+            }
+        },
+        "square_298": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [298]
+            }
+        },
+        "square_299": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [299]
+            }
+        },
+        "square_300": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [300]
+            }
+        },
+        "square_301": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [301]
+            }
+        },
+        "square_302": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [302]
+            }
+        },
+        "square_303": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [303]
+            }
+        },
+        "square_304": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [304]
+            }
+        },
+        "square_305": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [305]
+            }
+        },
+        "square_306": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [306]
+            }
+        },
+        "square_307": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [307]
+            }
+        },
+        "square_308": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [308]
+            }
+        },
+        "square_309": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [309]
+            }
+        },
+        "square_310": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [310]
+            }
+        },
+        "square_311": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [311]
+            }
+        },
+        "square_312": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [312]
+            }
+        },
+        "square_313": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [313]
+            }
+        },
+        "square_314": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [314]
+            }
+        },
+        "square_315": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [315]
+            }
+        },
+        "square_316": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [316]
+            }
+        },
+        "square_317": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [317]
+            }
+        },
+        "square_318": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [318]
+            }
+        },
+        "square_319": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [319]
+            }
+        },
+        "square_320": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [320]
+            }
+        },
+        "square_321": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [321]
+            }
+        },
+        "square_322": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [322]
+            }
+        },
+        "square_323": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [323]
+            }
+        },
+        "square_324": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [324]
+            }
+        },
+        "square_325": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [325]
+            }
+        },
+        "square_326": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [326]
+            }
+        },
+        "square_327": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [327]
+            }
+        },
+        "square_328": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [328]
+            }
+        },
+        "square_329": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [329]
+            }
+        },
+        "square_330": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [330]
+            }
+        },
+        "square_331": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [331]
+            }
+        },
+        "square_332": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [332]
+            }
+        },
+        "square_333": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [333]
+            }
+        },
+        "square_334": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [334]
+            }
+        },
+        "square_335": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [335]
+            }
+        },
+        "square_336": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [336]
+            }
+        },
+        "square_337": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [337]
+            }
+        },
+        "square_338": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [338]
+            }
+        },
+        "square_339": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [339]
+            }
+        },
+        "square_340": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [340]
+            }
+        },
+        "square_341": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [341]
+            }
+        },
+        "square_342": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [342]
+            }
+        },
+        "square_343": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [343]
+            }
+        },
+        "square_344": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [344]
+            }
+        },
+        "square_345": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [345]
+            }
+        },
+        "square_346": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [346]
+            }
+        },
+        "square_347": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [347]
+            }
+        },
+        "square_348": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [348]
+            }
+        },
+        "square_349": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [349]
+            }
+        },
+        "square_350": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [350]
+            }
+        },
+        "square_351": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [351]
+            }
+        },
+        "square_352": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [352]
+            }
+        },
+        "square_353": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [353]
+            }
+        },
+        "square_354": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [354]
+            }
+        },
+        "square_355": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [355]
+            }
+        },
+        "square_356": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [356]
+            }
+        },
+        "square_357": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [357]
+            }
+        },
+        "square_358": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [358]
+            }
+        },
+        "square_359": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [359]
+            }
+        },
+        "square_360": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [360]
+            }
+        },
+        "square_361": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [361]
+            }
+        },
+        "square_362": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [362]
+            }
+        },
+        "square_363": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [363]
+            }
+        },
+        "square_364": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [364]
+            }
+        },
+        "square_365": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [365]
+            }
+        },
+        "square_366": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [366]
+            }
+        },
+        "square_367": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [367]
+            }
+        },
+        "square_368": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [368]
+            }
+        },
+        "square_369": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [369]
+            }
+        },
+        "square_370": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [370]
+            }
+        },
+        "square_371": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [371]
+            }
+        },
+        "square_372": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [372]
+            }
+        },
+        "square_373": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [373]
+            }
+        },
+        "square_374": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [374]
+            }
+        },
+        "square_375": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [375]
+            }
+        },
+        "square_376": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [376]
+            }
+        },
+        "square_377": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [377]
+            }
+        },
+        "square_378": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [378]
+            }
+        },
+        "square_379": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [379]
+            }
+        },
+        "square_380": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [380]
+            }
+        },
+        "square_381": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [381]
+            }
+        },
+        "square_382": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [382]
+            }
+        },
+        "square_383": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [383]
+            }
+        },
+        "square_384": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [384]
+            }
+        },
+        "square_385": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [385]
+            }
+        },
+        "square_386": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [386]
+            }
+        },
+        "square_387": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [387]
+            }
+        },
+        "square_388": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [388]
+            }
+        },
+        "square_389": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [389]
+            }
+        },
+        "square_390": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [390]
+            }
+        },
+        "square_391": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [391]
+            }
+        },
+        "square_392": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [392]
+            }
+        },
+        "square_393": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [393]
+            }
+        },
+        "square_394": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [394]
+            }
+        },
+        "square_395": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [395]
+            }
+        },
+        "square_396": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [396]
+            }
+        },
+        "square_397": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [397]
+            }
+        },
+        "square_398": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [398]
+            }
+        },
+        "square_399": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [399]
+            }
+        },
+        "square_400": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [400]
+            }
+        },
+        "square_401": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [401]
+            }
+        },
+        "square_402": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [402]
+            }
+        },
+        "square_403": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [403]
+            }
+        },
+        "square_404": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [404]
+            }
+        },
+        "square_405": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [405]
+            }
+        },
+        "square_406": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [406]
+            }
+        },
+        "square_407": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [407]
+            }
+        },
+        "square_408": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [408]
+            }
+        },
+        "square_409": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [409]
+            }
+        },
+        "square_410": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [410]
+            }
+        },
+        "square_411": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [411]
+            }
+        },
+        "square_412": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [412]
+            }
+        },
+        "square_413": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [413]
+            }
+        },
+        "square_414": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [414]
+            }
+        },
+        "square_415": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [415]
+            }
+        },
+        "square_416": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [416]
+            }
+        },
+        "square_417": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [417]
+            }
+        },
+        "square_418": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [418]
+            }
+        },
+        "square_419": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [419]
+            }
+        },
+        "square_420": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [420]
+            }
+        },
+        "square_421": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [421]
+            }
+        },
+        "square_422": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [422]
+            }
+        },
+        "square_423": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [423]
+            }
+        },
+        "square_424": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [424]
+            }
+        },
+        "square_425": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [425]
+            }
+        },
+        "square_426": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [426]
+            }
+        },
+        "square_427": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [427]
+            }
+        },
+        "square_428": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [428]
+            }
+        },
+        "square_429": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [429]
+            }
+        },
+        "square_430": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [430]
+            }
+        },
+        "square_431": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [431]
+            }
+        },
+        "square_432": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [432]
+            }
+        },
+        "square_433": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [433]
+            }
+        },
+        "square_434": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [434]
+            }
+        },
+        "square_435": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [435]
+            }
+        },
+        "square_436": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [436]
+            }
+        },
+        "square_437": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [437]
+            }
+        },
+        "square_438": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [438]
+            }
+        },
+        "square_439": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [439]
+            }
+        },
+        "square_440": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [440]
+            }
+        },
+        "square_441": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [441]
+            }
+        },
+        "square_442": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [442]
+            }
+        },
+        "square_443": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [443]
+            }
+        },
+        "square_444": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [444]
+            }
+        },
+        "square_445": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [445]
+            }
+        },
+        "square_446": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [446]
+            }
+        },
+        "square_447": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [447]
+            }
+        },
+        "square_448": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [448]
+            }
+        },
+        "square_449": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [449]
+            }
+        },
+        "square_450": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [450]
+            }
+        },
+        "square_451": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [451]
+            }
+        },
+        "square_452": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [452]
+            }
+        },
+        "square_453": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [453]
+            }
+        },
+        "square_454": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [454]
+            }
+        },
+        "square_455": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [455]
+            }
+        },
+        "square_456": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [456]
+            }
+        },
+        "square_457": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [457]
+            }
+        },
+        "square_458": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [458]
+            }
+        },
+        "square_459": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [459]
+            }
+        },
+        "square_460": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [460]
+            }
+        },
+        "square_461": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [461]
+            }
+        },
+        "square_462": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [462]
+            }
+        },
+        "square_463": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [463]
+            }
+        },
+        "square_464": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [464]
+            }
+        },
+        "square_465": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [465]
+            }
+        },
+        "square_466": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [466]
+            }
+        },
+        "square_467": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [467]
+            }
+        },
+        "square_468": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [468]
+            }
+        },
+        "square_469": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [469]
+            }
+        },
+        "square_470": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [470]
+            }
+        },
+        "square_471": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [471]
+            }
+        },
+        "square_472": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [472]
+            }
+        },
+        "square_473": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [473]
+            }
+        },
+        "square_474": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [474]
+            }
+        },
+        "square_475": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [475]
+            }
+        },
+        "square_476": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [476]
+            }
+        },
+        "square_477": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [477]
+            }
+        },
+        "square_478": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [478]
+            }
+        },
+        "square_479": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [479]
+            }
+        },
+        "square_480": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "type": "flux",
+            "cc_light_instr": "sf_square",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [480]
+            }
         }
 	},	// end of "instructions"
 
