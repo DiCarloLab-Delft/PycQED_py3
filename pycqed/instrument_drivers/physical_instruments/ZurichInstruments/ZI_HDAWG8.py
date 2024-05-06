@@ -381,7 +381,6 @@ while (1) {
             for dio_cw in range(self._num_codewords):
                 wf_table.append((zibase.gen_waveform_name(ch, dio_cw),
                                  zibase.gen_waveform_name(ch+1, dio_cw)))
-        # print('WARNING THIS HDAWG IS HACKED!!!!')
         return wf_table
 
     def _codeword_table_preamble(self, awg_nr):
