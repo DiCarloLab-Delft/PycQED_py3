@@ -5997,7 +5997,7 @@ class HAL_Device(HAL_ShimMQ):
         '''
 
         # getthe direction of the CZ gate
-        direction=get_gate_directions(pair[0],pair[1])[0]
+        direction=self.get_gate_directions(pair[0],pair[1])[0]
 
 
         # for diagnostics only
@@ -6046,7 +6046,7 @@ class HAL_Device(HAL_ShimMQ):
         '''
 
         # getthe direction of the CZ gate
-        direction=get_gate_directions(pair[0],pair[1])[0]
+        direction=self.get_gate_directions(pair[0],pair[1])[0]
 
         # for diagnostics only
         #print(pair)
@@ -6223,7 +6223,7 @@ class HAL_Device(HAL_ShimMQ):
         MC = self.instr_MC.get_instr()
         nested_MC = self.instr_nested_MC.get_instr()
         # get gate directions
-        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+        directions = [self.get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
         Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
         Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
         Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
@@ -6465,7 +6465,7 @@ class HAL_Device(HAL_ShimMQ):
         MC = self.instr_MC.get_instr()
         nested_MC = self.instr_nested_MC.get_instr()
         # get gate directions
-        directions = [get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
+        directions = [self.get_gate_directions(q0, q1) for q0, q1 in zip(Q0, Q1)]
         Flux_lm_0 = [self.find_instrument(q0).instr_LutMan_Flux.get_instr() for q0 in Q0]
         Flux_lm_1 = [self.find_instrument(q1).instr_LutMan_Flux.get_instr() for q1 in Q1]
         Flux_lms_park = [self.find_instrument(q).instr_LutMan_Flux.get_instr() for q in Q_parks]
@@ -6752,7 +6752,7 @@ class HAL_Device(HAL_ShimMQ):
         nested_MC = self.instr_nested_MC.get_instr()
 
         # get gate directions of two-qubit gate codewords
-        directions = get_gate_directions(Q_pair_target[0],
+        directions = self.get_gate_directions(Q_pair_target[0],
                                          Q_pair_target[1])
         fl_lm = self.find_instrument(Q_pair_target[0]).instr_LutMan_Flux.get_instr()
         fl_par = f'vcz_amp_fine_{directions[0]}'
@@ -6959,3 +6959,35 @@ class HAL_Device(HAL_ShimMQ):
 
         self._dag = dag
         return dag
+    
+    def get_gate_directions(self, q0, q1,
+                        map_qubits=None):
+        """
+        Helper function to determine two-qubit gate directions.
+        q0 and q1 should be given as high-freq and low-freq qubit, respectively.
+        Default map is surface-17, however other maps are supported.
+        """
+        map_qubits = {'NE' : [-1,0],
+                    'E' : [-1,-1],
+                    'NW' : [0,1],
+                    'C' : [0,0],
+                    'SE' : [0,-1],
+                    'W' : [1,1],
+                    'SW' : [1,0]
+                    }
+        V0 = np.array(map_qubits[q0])
+        V1 = np.array(map_qubits[q1])
+        diff = V1-V0
+        dist = np.sqrt(np.sum((diff)**2))
+        if dist > 1:
+            raise ValueError('Qubits are not nearest neighbors')
+        if diff[0] == 0.:
+            if diff[1] > 0:
+                return ('NE', 'SW')
+            else:
+                return ('SW', 'NE')
+        elif diff[1] == 0.:
+            if diff[0] > 0:
+                return ('SE', 'NW')
+            else:
+                return ('NW', 'SE')
