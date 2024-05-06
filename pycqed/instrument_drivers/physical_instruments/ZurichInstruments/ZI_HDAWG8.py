@@ -693,3 +693,22 @@ while (1) {
 
     def calibrate_CC_dio_protocol(self, CC, verbose=False) -> None:
         raise DeprecationWarning("calibrate_CC_dio_protocol is deprecated, use instrument_drivers.library.DIO.calibrate")
+
+    # region Class Methods
+    @classmethod
+    def from_other_instance(cls, instance: ZI_HDAWG8) -> 'ZI_HDAWG8':
+        """:return: Class-method constructor based on (other) instrument instance."""
+        name: str = instance.name
+        device: str = instance.devname
+        codeword_protocol: str = instance.cfg_codeword_protocol()
+        dios_0_interface: int = instance.get('dios_0_interface')
+        # Close current instance
+        instance.stop()
+        instance.close()
+        # Connect new instance
+        result_instance = ZI_HDAWG8(name=name, device=device)
+        result_instance.cfg_codeword_protocol(codeword_protocol)
+        result_instance.set('dios_0_interface', dios_0_interface)
+        result_instance.clear_errors()
+        return result_instance
+    # endregion

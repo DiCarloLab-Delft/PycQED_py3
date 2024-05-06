@@ -95,4 +95,21 @@ class ZI_HDAWG8_LongCryoscope(ZI_HDAWG8):
             else:
                 raise Exception(f"Unknown modulation type '{self.cfg_sideband_mode()}' and codeword protocol '{self.cfg_codeword_protocol()}'")
         return program
+
+    @classmethod
+    def from_other_instance(cls, instance: ZI_HDAWG8) -> 'ZI_HDAWG8_LongCryoscope':
+        """:return: Class-method constructor based on (other) instrument instance."""
+        name: str = instance.name
+        device: str = instance.devname
+        codeword_protocol: str = instance.cfg_codeword_protocol()
+        dios_0_interface: int = instance.get('dios_0_interface')
+        # Close current instance
+        instance.stop()
+        instance.close()
+        # Connect new instance
+        result_instance = ZI_HDAWG8_LongCryoscope(name=name, device=device)
+        result_instance.cfg_codeword_protocol(codeword_protocol)
+        result_instance.set('dios_0_interface', dios_0_interface)
+        result_instance.clear_errors()
+        return result_instance
     # endregion
