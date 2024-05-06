@@ -49,6 +49,8 @@ from pycqed.utilities.general import (
 from pycqed.instrument_drivers.physical_instruments.QuTech_AWG_Module import (
     QuTech_AWG_Module,
 )
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8_LongCryoscope import ZI_HDAWG8_LongCryoscope
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_HDAWG8 import ZI_HDAWG8
 # from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
 # from pycqed.instrument_drivers.physical_instruments.QuTech_QCC import QCC
 from pycqed.instrument_drivers.physical_instruments.QuTech.CC import CC
@@ -2611,6 +2613,8 @@ class DeviceCCL(Instrument):
         Q_inst = self.find_instrument(qubit)
         flux_lm = Q_inst.instr_LutMan_Flux.get_instr()
         HDAWG_inst = flux_lm.AWG.get_instr()
+        # Employ dedicated HDAWG instrument class for long-cyroscope experiment
+        HDAWG_inst: ZI_HDAWG8_LongCryoscope = ZI_HDAWG8_LongCryoscope.from_other_instance(HDAWG_inst)
         MW_LO_inst = Q_inst.instr_LO_mw.get_instr()
         # Save previous operating parameters
         LO_frequency = MW_LO_inst.frequency()
@@ -2623,95 +2627,7 @@ class DeviceCCL(Instrument):
         Q_inst.mw_gauss_width(20e-9)
         Q_inst.mw_channel_amp(mw_channel_amp/2*1.3)
         # Prepare for the experiment:
-        # Additional to the normal qubit preparation, this requires
-        # changing the driver of the HDAWG to allow for longer flux
-        # pulses without running out of memory. To do this, we hack
-        # the HDAWG by changing a method of the ZIHDAWG class at 
-        # runtime. THEREFORE THIS ROUTINE MUST BE USED CAUTIOUSLY. 
-        # MAKING SURE THAT THE METHOD OF CLASS IS RESET AT THE END 
-        # OF THE ROUTINE IS NECESSARY FOR THE HDAWG TO WORK NORMALLY
-        # AFTER COMPLETION!!!
         if prepare_for_timedomain:
-            # HACK HDAWG to upload long square pulses
-            from functools import partial
-            import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
-            # Define new waveform table method
-            def _get_waveform_table_new(self, awg_nr: int):
-                '''
-                Replaces the "_get_waveform_table" method of the HDAWG
-                '''
-                ch = awg_nr*2
-                wf_table = []
-                if 'flux' in self.cfg_codeword_protocol():
-                    for cw_r in range(1):
-                        for cw_l in range(1):
-                            wf_table.append((zibase.gen_waveform_name(ch, cw_l),
-                                             zibase.gen_waveform_name(ch+1, cw_r)))
-                    
-                    is_odd_channel = flux_lm.cfg_awg_channel()%2
-                    if is_odd_channel: 
-                        for cw_r in range(1):
-                            for cw_l in range(1,2):
-                                wf_table.append((zibase.gen_waveform_name(ch, cw_l),
-                                                 zibase.gen_waveform_name(ch+1, cw_r)))
-                    else:
-                        for cw_r in range(1,2):
-                            for cw_l in range(1):
-                                wf_table.append((zibase.gen_waveform_name(ch, cw_l),
-                                                 zibase.gen_waveform_name(ch+1, cw_r)))
-                print('WARNING THIS HDAWG IS HACKED!!!!')
-                print(wf_table)
-                return wf_table
-            # Store old method
-            HDAWG_inst._original_method = HDAWG_inst._get_waveform_table
-            # Replace to new method
-            HDAWG_inst._get_waveform_table = partial(_get_waveform_table_new,
-                                                     HDAWG_inst)
-            # Define new codeword table method
-            def _codeword_table_preamble_new(self, awg_nr):
-                """
-                Defines a snippet of code to use in the beginning of an AWG program in order to define the waveforms.
-                The generated code depends on the instrument type. For the HDAWG instruments, we use the seWaveDIO
-                function.
-                """
-                program = ''
-
-                wf_table = self._get_waveform_table(awg_nr=awg_nr)
-                is_odd_channel = flux_lm.cfg_awg_channel()%2 #this only works if wf_table has a length of 2 
-                if is_odd_channel:
-                    dio_cws = [0, 1]
-                else:
-                    dio_cws = [0, 8]
-                # for dio_cw, (wf_l, wf_r) in enumerate(wf_table):
-                # Assuming wf_table looks like this: [('wave_ch7_cw000', 'wave_ch8_cw000'), ('wave_ch7_cw000', 'wave_ch8_cw001')]
-                for dio_cw, (wf_l, wf_r) in zip(dio_cws, wf_table):# hardcoded for long cryoscope on even awg channels
-                    csvname_l = self.devname + '_' + wf_l
-                    csvname_r = self.devname + '_' + wf_r
-
-                    # FIXME: Unfortunately, 'static' here also refers to configuration required for flux HDAWG8
-                    if self.cfg_sideband_mode() == 'static' or self.cfg_codeword_protocol() == 'flux':
-                        # program += 'assignWaveIndex(\"{}\", \"{}\", {});\n'.format(
-                        #     csvname_l, csvname_r, dio_cw)
-                        program += 'setWaveDIO({}, \"{}\", \"{}\");\n'.format(
-                            dio_cw, csvname_l, csvname_r)
-                    elif self.cfg_sideband_mode() == 'real-time' and self.cfg_codeword_protocol() == 'novsm_microwave':
-                        # program += 'setWaveDIO({}, 1, 2, \"{}\", 1, 2, \"{}\");\n'.format(
-                        #     dio_cw, csvname_l, csvname_r)
-                        program += 'assignWaveIndex(1, 2, \"{}\", 1, 2, \"{}\", {});\n'.format(
-                            csvname_l, csvname_r, dio_cw)
-                    else:
-                        raise Exception("Unknown modulation type '{}' and codeword protocol '{}'" \
-                                            .format(self.cfg_sideband_mode(), self.cfg_codeword_protocol()))
-
-                if self.cfg_sideband_mode() == 'real-time':
-                    program += '// Initialize the phase of the oscillators\n'
-                    program += 'executeTableEntry(1023);\n'
-                return program
-            # Store old method
-            HDAWG_inst._original_codeword_method = HDAWG_inst._codeword_table_preamble
-            # Replace to new method
-            HDAWG_inst._codeword_table_preamble = partial(_codeword_table_preamble_new,
-                                                     HDAWG_inst)
             # Prepare flux pulse
             flux_lm.sq_length(max_length)
             flux_lm.cfg_max_wf_length(max_length)
@@ -2732,11 +2648,7 @@ class DeviceCCL(Instrument):
                 print('Execution failed. Reseting HDAWG and flux lutman...')
                 # Reset old method in HDAWG
                 if prepare_for_timedomain:
-                    # HDAWG_inst._get_waveform_table = partial(HDAWG_inst._original_method, HDAWG_inst)
-                    HDAWG_inst._get_waveform_table = HDAWG_inst._original_method
-                    HDAWG_inst._codeword_table_preamble = HDAWG_inst._original_codeword_method
-                    del HDAWG_inst._original_method
-                    del HDAWG_inst._original_codeword_method
+                    HDAWG_inst: ZI_HDAWG8 = ZI_HDAWG8.from_other_instance(HDAWG_inst)
                 # Reset mw settings
                 MW_LO_inst.frequency(LO_frequency)
                 Q_inst.mw_gauss_width(mw_gauss_width)
@@ -2760,8 +2672,10 @@ class DeviceCCL(Instrument):
         # Sweep functions
         d = Q_inst.int_avg_det
         # d = self.get_int_avg_det(qubits=[qubit]) # this should be the right detector
-        swf1 = swf.OpenQL_Sweep(openql_program=p,
-                     CCL=self.instr_CC.get_instr())
+        swf1 = swf.OpenQL_Sweep(
+            openql_program=p,
+            CCL=self.instr_CC.get_instr(),
+        )
         swf2 = MW_LO_inst.frequency
         sweep_freqs = frequencies-Q_inst.mw_freq_mod()
         # Setup measurement control
@@ -2780,8 +2694,7 @@ class DeviceCCL(Instrument):
             else:
                 label += f"_{_max_length*1e9:.0f}ns"
             # Analysis relies on snapshot
-            MC.run(label, mode='2D',
-                    disable_snapshot_metadata=False)
+            MC.run(label, mode='2D', disable_snapshot_metadata=False)
         except:
             analyze = False
             print_exception()
@@ -2792,11 +2705,7 @@ class DeviceCCL(Instrument):
         Q_inst.mw_channel_amp(mw_channel_amp)
         # Reset old method in HDAWG
         if prepare_for_timedomain:
-            # HDAWG_inst._get_waveform_table = partial(HDAWG_inst._original_method, HDAWG_inst)
-            HDAWG_inst._get_waveform_table = HDAWG_inst._original_method
-            HDAWG_inst._codeword_table_preamble = HDAWG_inst._original_codeword_method
-            del HDAWG_inst._original_method
-            del HDAWG_inst._original_codeword_method
+            HDAWG_inst: ZI_HDAWG8 = ZI_HDAWG8.from_other_instance(HDAWG_inst)
         # Reset flux settings
         flux_lm.sq_length(20e-9)
         flux_lm.cfg_max_wf_length(cfg_max_length)
