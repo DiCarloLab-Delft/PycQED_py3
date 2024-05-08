@@ -885,3 +885,108 @@ def get_formatted_exception():
     sstb = itb.stb2text(stb)
 
     return sstb
+
+
+####################################
+# Surface-17 utility functions
+####################################
+def get_gate_directions(q0, q1,
+                        map_qubits=None):
+    """
+    Helper function to determine two-qubit gate directions.
+    q0 and q1 should be given as high-freq and low-freq qubit, respectively.
+    Default map is surface-17, however other maps are supported.
+    """
+    map_qubits = {'NE' : [-1,0],
+                    'E' : [-1,-1],
+                    'NW' : [0,1],
+                    'C' : [0,0],
+                    'SE' : [0,-1],
+                    'W' : [1,1],
+                    'SW' : [1,0]
+                    }
+    V0 = np.array(map_qubits[q0])
+    V1 = np.array(map_qubits[q1])
+    diff = V1-V0
+    dist = np.sqrt(np.sum((diff)**2))
+    if dist > 1:
+        raise ValueError('Qubits are not nearest neighbors')
+    if diff[0] == 0.:
+        if diff[1] > 0:
+            return ('NE', 'SW')
+        else:
+            return ('SW', 'NE')
+    elif diff[1] == 0.:
+        if diff[0] > 0:
+            return ('SE', 'NW')
+        else:
+            return ('NW', 'SE')
+
+def get_nearest_neighbors(qubit, map_qubits=None):
+    """
+    Helper function to determine nearest neighbors of a qubit.
+    Default map is surface-17, however other maps are supported.
+    """
+    map_qubits = {'NE' : [-1,0],
+                    'E' : [-1,-1],
+                    'NW' : [0,1],
+                    'C' : [0,0],
+                    'SE' : [0,-1],
+                    'W' : [1,1],
+                    'SW' : [1,0]
+                    }
+    Neighbor_dict = {}
+    Qubits = list(map_qubits.keys())
+    Qubits.remove(qubit)
+    for q in Qubits:
+        V0 = np.array(map_qubits[qubit]) # qubit position
+        V1 = np.array(map_qubits[q])
+        diff = V1-V0
+        dist = np.sqrt(np.sum((diff)**2))
+        if any(diff) == 0.:
+            pass
+        elif diff[0] == 0.:
+            if diff[1] == 1.:
+                Neighbor_dict[q] = 'SW'
+            elif diff[1] == -1.:
+                Neighbor_dict[q] = 'NE'
+        elif diff[1] == 0.:
+            if diff[0] == 1.:
+                Neighbor_dict[q] = 'NW'
+            elif diff[0] == -1.:
+                Neighbor_dict[q] = 'SE'
+    return Neighbor_dict
+
+def get_parking_qubits(qH, qL):
+    '''
+    Get parked qubits during two-qubit gate
+    '''
+    get_gate_directions(qH, qL)
+    # Get all neighbors of 2Q gate
+    qH_neighbors = get_nearest_neighbors(qH)
+    qL_neighbors = get_nearest_neighbors(qL)
+    all_neighbors = {**qH_neighbors, **qL_neighbors}
+    # remove qubits in 2QG
+    del all_neighbors[qH]
+    del all_neighbors[qL]
+    # remove high frequency qubits
+    if 'D4' in all_neighbors.keys():
+        del all_neighbors['D4']
+    if 'D5' in all_neighbors.keys():
+        del all_neighbors['D5']
+    if 'D6' in all_neighbors.keys():
+        del all_neighbors['D6']
+    _keys_to_remove = []
+    # If high ferquency qubit is ancilla
+    if ('Z' in qH) or ('X' in qH):
+        for q in all_neighbors.keys():
+            if ('Z' in q) or ('X' in q):
+                _keys_to_remove.append(q)
+    # If high frequency qubit is ancilla
+    else:
+        for q in all_neighbors.keys():
+            if 'D' in q:
+                _keys_to_remove.append(q)
+    for q in _keys_to_remove:
+        del all_neighbors[q]
+    return list(all_neighbors.keys())

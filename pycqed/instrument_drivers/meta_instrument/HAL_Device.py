@@ -6967,13 +6967,13 @@ class HAL_Device(HAL_ShimMQ):
         q0 and q1 should be given as high-freq and low-freq qubit, respectively.
         Default map is surface-17, however other maps are supported.
         """
-        map_qubits = {'NE' : [-1,0],
-                    'E' : [-1,-1],
-                    'NW' : [0,1],
+        map_qubits = {'NE' : [0,1],
+                    'E' : [1,1],
+                    'NW' : [-1,0],
                     'C' : [0,0],
-                    'SE' : [0,-1],
-                    'W' : [1,1],
-                    'SW' : [1,0]
+                    'SE' : [1,0],
+                    'W' : [-1,-1],
+                    'SW' : [0,-1]
                     }
         V0 = np.array(map_qubits[q0])
         V1 = np.array(map_qubits[q1])
