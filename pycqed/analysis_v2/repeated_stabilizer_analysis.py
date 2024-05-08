@@ -16,6 +16,12 @@ from qce_circuit.connectivity.intrf_channel_identifier import (
     IQubitID,
     QubitIDObj,
 )
+from qce_circuit.library.repetition_code.circuit_components import (
+    IRepetitionCodeDescription,
+    RepetitionCodeDescription,
+)
+from qce_circuit.library.repetition_code.repetition_code_connectivity import Repetition9Code
+from qce_circuit.visualization.visualize_layout.display_connectivity import plot_gate_sequences
 from qce_interp import (
     DataManager,
     QubitIDObj,
@@ -30,7 +36,10 @@ from qce_interp import (
     Distance5LookupTableDecoder,
     LabeledSyndromeDecoder,
     StateAcquisitionContainer,
+    MWPMDecoder,
 )
+from qce_interp.decoder_examples.majority_voting import MajorityVotingDecoder
+from qce_interp.interface_definitions.intrf_syndrome_decoder import IDecoder
 from qce_interp.interface_definitions.intrf_error_identifier import (
     DataArrayLabels,
 )
@@ -39,6 +48,7 @@ from qce_interp.visualization import (
     plot_defect_rate,
     plot_all_defect_rate,
     plot_pij_matrix,
+    plot_compare_fidelity,
 )
 from qce_interp.visualization.plotting_functionality import (
     SubplotKeywordEnum,
@@ -56,81 +66,6 @@ from qce_interp.visualization.plotting_functionality import (
 )
 
 
-# Define a blue color cycler
-blue_shades = [
-    '#1f77b4',  # matplotlib default blue
-    '#add8e6',  # light blue
-    '#0000ff',  # blue
-    '#00008b',  # dark blue
-    '#4169e1',  # royal blue
-    '#00bfff',  # deep sky blue
-    '#87ceeb'   # sky blue
-]
-
-
-def plot_defect_rate(error_identifier: IErrorDetectionIdentifier, qubit_id: IQubitID, qec_cycles: int, **kwargs) -> IFigureAxesPair:
-    """
-    :param error_identifier: Instance that identifiers errors.
-    :param qubit_id: Qubit identifier for which the defects are plotted.
-    :param qec_cycles: Integer number of qec cycles that should be included in the defect plot.
-    :param kwargs: Key-word arguments that are passed to plt.subplots() method.
-    :return: Tuple of Figure and Axes pair.
-    """
-    # Data allocation
-    labeled_error_identifier: LabeledErrorDetectionIdentifier = LabeledErrorDetectionIdentifier(error_identifier)
-    data_array: xr.DataArray = labeled_error_identifier.get_labeled_defect_stabilizer_lookup(cycle_stabilizer_count=qec_cycles)[qubit_id]
-    # Calculate the mean across 'measurement_repetition'
-    averages = data_array.mean(dim=DataArrayLabels.MEASUREMENT.value)
-    label: str = qubit_id.id
-    color: str = kwargs.pop('color', blue_shades[0])
-
-    # Plotting
-    label_format: LabelFormat = LabelFormat(
-        x_label='QEC round',
-        y_label=r'Defect rate $\langle d_i \rangle$',
-    )
-    kwargs[SubplotKeywordEnum.LABEL_FORMAT.value] = label_format
-    fig, ax = construct_subplot(**kwargs)
-    # averages.plot.line('.-', color=color, ax=ax, label=label)
-    x_array: np.ndarray = np.arange(1, len(averages.values) + 1)
-    y_array: np.ndarray = averages.values
-    ax.plot(
-        x_array[1:],
-        y_array[1:],
-        '.-',
-        color=color,
-        label=label,
-    )
-    ax = label_format.apply_to_axes(axes=ax)
-
-    ax.set_ylim([0.0, 0.5])
-    ax.set_xlim([0.5, max(x_array) + 0.5])
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    return fig, ax
-
-
-def plot_all_defect_rate(error_identifier: IErrorDetectionIdentifier, included_rounds: int, **kwargs) -> IFigureAxesPair:
-    """
-    :param error_identifier: Instance that identifiers errors.
-    :param included_rounds: Integer number of qec cycles that should be included in the defect plot.
-    :param kwargs: Key-word arguments that are passed to plt.subplots() method.
-    :return: Tuple of Figure and Axes pair.
-    """
-    # Data allocation
-    fig, ax = construct_subplot(**kwargs)
-    color_cycle = itertools.cycle(blue_shades)
-    for qubit_id in error_identifier.involved_stabilizer_qubit_ids:
-        kwargs[SubplotKeywordEnum.HOST_AXES.value] = (fig, ax)
-        kwargs['color'] = next(color_cycle)
-        fig, ax = plot_defect_rate(
-            error_identifier,
-            qubit_id,
-            qec_cycles=included_rounds,
-            **kwargs,
-        )
-    return fig, ax
-
-
 class RepeatedStabilizerAnalysis(BaseDataAnalysis):
     
     # region Class Constructor
@@ -142,6 +77,10 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
         self.involved_ancilla_qubit_ids: List[IQubitID] = [qubit_id for qubit_id in self.involved_qubit_ids if qubit_id in Surface17Layer().ancilla_qubit_ids]
         self.qec_cycles: List[int] = qec_cycles
         self.initial_state: InitialStateContainer = initial_state
+        self.circuit_description: IRepetitionCodeDescription = RepetitionCodeDescription.from_connectivity(
+            involved_qubit_ids=self.involved_qubit_ids,
+            connectivity=Repetition9Code(),
+        )
         # Required attributes
         self.params_dict: Dict = {}
         self.numeric_params: Dict = {}
@@ -174,7 +113,7 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
         """
         self.data_manager: DataManager = DataManager.from_file_path(
             file_path=self.data_file_path,
-            rounds=self.qec_cycles,
+            qec_rounds=self.qec_cycles,
             heralded_initialization=True,
             qutrit_calibration_points=True,
             involved_data_qubit_ids=self.involved_data_qubit_ids,
@@ -191,6 +130,14 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
         )
         self.labeled_error_identifier: ILabeledErrorDetectionIdentifier = LabeledErrorDetectionIdentifier(
             error_identifier,
+        )
+        self.decoder_majority: IDecoder = MajorityVotingDecoder(
+            error_identifier=error_identifier,
+        )
+        self.decoder_mwpm: IDecoder = MWPMDecoder(
+            error_identifier=error_identifier,
+            circuit_description=self.circuit_description,
+            initial_state_container=self.initial_state,
         )
 
     def prepare_plots(self):
@@ -214,6 +161,31 @@ class RepeatedStabilizerAnalysis(BaseDataAnalysis):
             'included_rounds': self.data_manager.qec_rounds,
             'timestamp': timestamp,
         }
+        # Logical fidelity
+        title: str = 'logical_fidelity'
+        fig, ax = plt.subplots()
+        self.axs_dict[title] = ax
+        self.figs[title] = fig
+        self.plot_dicts[title] = {
+            'plotfn': plot_function_wrapper(plot_compare_fidelity),
+            'decoders': [self.decoder_mwpm, self.decoder_majority],
+            'included_rounds': self.data_manager.qec_rounds,
+            'target_state': self.initial_state,
+            'timestamp': timestamp,
+        }
+        # Gate sequence
+        title: str = 'circuit_layout'
+        sequence = self.circuit_description.to_sequence()
+        sequence_count: int = sequence.gate_sequence_count
+        fig, axs = plt.subplots(figsize=(5 * sequence_count, 5), ncols=sequence_count)
+        self.axs_dict[title] = axs[0]
+        self.figs[title] = fig
+        self.plot_dicts[title] = {
+            'plotfn': plot_function_wrapper(plot_gate_sequences),
+            'description': sequence,
+            'timestamp': timestamp,
+        }
+
         # Defect rates (individual)
         for qubit_id in self.involved_ancilla_qubit_ids:
             title: str = f'defect_rate_{qubit_id.id}'
@@ -288,9 +260,12 @@ def plot_function_wrapper(plot_function: Callable[[Any], Any]) -> Callable[[Opti
         # Data allocation
         timestamp: str = kwargs.pop("timestamp", "not defined")
         fig = ax.get_figure()
+        axs = fig.get_axes()
         fig.suptitle(f'ts: {timestamp}\n')
         
-        kwargs[SubplotKeywordEnum.HOST_AXES.value] = (fig, ax)
+        kwargs[SubplotKeywordEnum.HOST_AXES.value] = (fig, axs)
+        if len(axs) == 1:
+            kwargs[SubplotKeywordEnum.HOST_AXES.value] = (fig, axs[0])
         return plot_function(
             *args,
             **kwargs,
@@ -299,6 +274,9 @@ def plot_function_wrapper(plot_function: Callable[[Any], Any]) -> Callable[[Opti
         
 
 if __name__ == "__main__":
+    from importlib import reload
+    from typing import List, Dict, Any
+    from pycqed.analysis import measurement_analysis as ma
     from pycqed.analysis_v2 import repeated_stabilizer_analysis as repsa
     reload(repsa)
     from pycqed.analysis_v2.repeated_stabilizer_analysis import (
@@ -306,17 +284,26 @@ if __name__ == "__main__":
         InitialStateContainer,
         InitialStateEnum,
     )
+    import itertools as itt
+
+    datadir = r'C:\Experiments\202208_Uran\Data'
+    ma.a_tools.datadir = datadir
+
+    involved_ancilla_ids=['X3', 'X4']
+    involved_data_ids=['D7', 'D8', 'D9']
+    fillvalue = None
+    involved_qubit_names: List[str] = [
+        item
+        for pair in itt.zip_longest(involved_data_ids, involved_ancilla_ids, fillvalue=fillvalue) for item in pair if
+        item != fillvalue
+    ]
     
     analysis = RepeatedStabilizerAnalysis(
-        involved_qubit_names=["D7", "Z3", "D4", "Z1", "D5", "Z4", "D6", "Z2", "D3", "X2", "D2", "X1", "D1"],
-        qec_cycles=[i for i in range(0, 25, 1)],
+        involved_qubit_names=involved_qubit_names,
+        qec_cycles=[i for i in range(0, 10, 1)],
         initial_state=InitialStateContainer.from_ordered_list([
             InitialStateEnum.ZERO,
-            InitialStateEnum.ONE,
             InitialStateEnum.ZERO,
-            InitialStateEnum.ONE,
-            InitialStateEnum.ZERO,
-            InitialStateEnum.ONE,
             InitialStateEnum.ZERO,
         ]),
         label="Repeated_stab_meas",
