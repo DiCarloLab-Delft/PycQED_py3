@@ -3508,7 +3508,7 @@ class Parity_check_ramsey_analysis(ba.BaseDataAnalysis):
         self.qoi = {}
         # Processing
         n = len(self.Q_target+self.Q_control)
-        detector_list = [ name.decode().split(' ')[-1] for name in 
+        detector_list = [ name.split(' ')[-1] for name in 
                           self.raw_data_dict['value_names']]
         calibration_points = ['{:0{}b}'.format(i, n) for i in range(2**n)]
         self.calibration_points = calibration_points
