@@ -416,11 +416,23 @@ class HAL_Transmon(HAL_ShimSQ):
             label='RB single-qubit Clifford fidelity',
             vals=vals.Numbers(0, 1.0),
             parameter_class=ManualParameter)
+        # I believe these were first added by Miguel. 
+        # To my knowledge, only Quantum Inspire uses them.
+        # LDC, 2022/06/24
         for cardinal in ['NW','NE','SW','SE']:
             self.add_parameter(f'F_2QRB_{cardinal}',
                 initial_value=0,
                 label=f'RB two-qubit Clifford fidelity for edge {cardinal}',
                 vals=vals.Numbers(0, 1.0),
+                parameter_class=ManualParameter)
+        # LDC adding parameter to keep track of two-qubit phases. 
+        # These are used by Quantum Inspire. 
+        # 2022/06/24.
+        for cardinal in ['NW','NE','SW','SE']:
+            self.add_parameter(f'CZ_two_qubit_phase_{cardinal}',
+                initial_value=0,
+                label=f'Two-qubit phase for CZ on edge {cardinal}',
+                vals=vals.Numbers(0, 360),
                 parameter_class=ManualParameter)
 
     ##########################################################################
