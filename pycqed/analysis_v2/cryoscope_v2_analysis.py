@@ -719,6 +719,7 @@ def filter_func(t, A, tau, B):
     '''
     return B*(1+A*np.exp(-t/tau))
 
+
 def filter_func_high_pass(t, tau, t0):
     '''
     Filter function implemented
@@ -868,17 +869,31 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
             for i, q in enumerate(self.Qubits):
                 Times = self.proc_data_dict['time']
                 Trace = self.proc_data_dict['Traces'][i]
-                # Look at signal after 50 ns
-                initial_idx = np.argmin(np.abs(Times-20e-9))
+                # Look at signal after 30 ns
+                initial_idx = np.argmin(np.abs(Times-30e-9))
                 Times = Times[initial_idx:]
                 Trace = Trace[initial_idx:]
                 # Fit exponential to trace
                 from scipy.optimize import curve_fit
-                p0 = [-.2, 15e-9, 1.02] # third point changed from 1 to 1.02
-                popt, pcov = curve_fit(filter_func, Times, Trace, p0=p0, maxfev=5000)
-                filtr = {'amp': popt[0], 'tau': popt[1]}
+                p0 = [-.2, 1]
+                device_bounds = ([-483.8e-3, 0], [-0.0, np.inf])
+                popt, pcov = curve_fit(self.modified_filter_func, Times, Trace, p0=p0, bounds=device_bounds, maxfev=5000)
+
+                tau_lb = self.tau_lower_bound(popt[0])
+                tau_bounds = ([tau_lb, np.inf])
+                def dummy_exponential(t, tau):
+                    return popt[1]*(1+popt[0]*np.exp(-t/tau))
+                initial_tau = 15e-9
+                p0 = [initial_tau]
+                tau_solution, tau_solution_cov = curve_fit(dummy_exponential, Times, Trace, p0=p0, bounds=tau_bounds, maxfev=5000)
+
+                filtr = {'amp': popt[0], 'tau': tau_solution[0]}
+                new_popt = []
+                new_popt.append(popt[0])
+                new_popt.append(tau_solution)
+                new_popt.append(popt[1])
                 self.proc_data_dict['exponential_filter'][q] = filtr
-                self.proc_data_dict['fit_params'][q] = popt
+                self.proc_data_dict['fit_params'][q] = new_popt
     
     def prepare_plots(self):
         for i, qubit in enumerate(self.Qubits):
@@ -892,6 +907,37 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
             if self.update_IIRs:
                 self.plot_dicts[f'Cryscope_trace_{qubit}']['filter_pars'] = \
                     self.proc_data_dict['fit_params'][qubit]
+                
+    def tau_lower_bound(self, amplitude):
+        A = 2.08896944e-09
+        B = 2.79228042e+00
+        C = 4.40035783e-09
+        return A*np.exp(-B*amplitude) + C
+
+    def modified_filter_func(self, t, A, B):
+        from scipy.optimize import curve_fit
+        '''
+        Filter function implemented
+        in the HDAWG IIR filter model.
+        '''
+
+        for i, q in enumerate(self.Qubits):
+            Times = self.proc_data_dict['time']
+            Trace = self.proc_data_dict['Traces'][i]
+            # Look at signal after 30 ns
+            initial_idx = np.argmin(np.abs(Times-30e-9))
+            Times = Times[initial_idx:]
+            Trace = Trace[initial_idx:]
+
+        tau_lb = self.tau_lower_bound(A)
+        tau_bounds = ([tau_lb, np.inf])
+        def dummy_exponential(t, tau):
+            return B*(1+A*np.exp(-t/tau))
+        initial_tau = 15e-9
+        p0 = [initial_tau]
+        tau_solution, tau_solution_cov = curve_fit(dummy_exponential, Times, Trace, p0=p0, bounds=tau_bounds, maxfev=5000)
+
+        return B*(1+A*np.exp(-t/tau_solution))
 
 def optimize_fir_software(y, baseline_start=100,
                           baseline_stop=None, taps=72, start_sample=0,

@@ -230,26 +230,26 @@
         "my90 %0": ["rym90 %0"],
         "mx90 %0": ["rxm90 %0"],
 
-        "cz q0, q2": ["barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "phase_corr_se q0", "phase_corr_nw q2", "barrier q0,q2"],
-        "cz q2, q0": ["barrier q0,q2", "sf_cz_se q0", "sf_cz_nw q2", "barrier q0,q2", "phase_corr_se q0", "phase_corr_nw q2", "barrier q0,q2"],
+        "cz q0, q2": ["barrier q0,q2,q3", "sf_cz_sw q0", "sf_cz_ne q2", "sf_park q3", "barrier q0,q2,q3", "phase_corr_sw q0", "phase_corr_ne q2", "phase_corr_park q3", "barrier q0,q2,q3"],
+        "cz q2, q0": ["barrier q0,q2,q3", "sf_cz_sw q0", "sf_cz_ne q2", "sf_park q3", "barrier q0,q2,q3", "phase_corr_sw q0", "phase_corr_ne q2", "phase_corr_park q3", "barrier q0,q2,q3"],
 
-        "cz q0, q3": ["barrier q0,q3", "sf_cz_se q0", "sf_cz_nw q3", "barrier q0,q3", "phase_corr_se q0", "phase_corr_nw q3", "barrier q0,q3"],
-        "cz q3, q0": ["barrier q0,q3", "sf_cz_se q0", "sf_cz_nw q3", "barrier q0,q3", "phase_corr_se q0", "phase_corr_nw q3", "barrier q0,q3"],
+        "cz q0, q3": ["barrier q0,q3,q2", "sf_cz_se q0", "sf_cz_nw q3", "sf_park q2", "barrier q0,q3,q2", "phase_corr_se q0", "phase_corr_nw q3", "phase_corr_park q2", "barrier q0,q3,q2"],
+        "cz q3, q0": ["barrier q0,q3,q2", "sf_cz_se q0", "sf_cz_nw q3", "sf_park q2", "barrier q0,q3,q2", "phase_corr_se q0", "phase_corr_nw q3", "phase_corr_park q2", "barrier q0,q3,q2"],
 
-        "cz q1, q3": ["barrier q1,q3", "sf_cz_sw q1", "sf_cz_ne q3", "barrier q1,q3", "phase_corr_sw q1", "phase_corr_ne q3", "barrier q1,q3"],
-        "cz q3, q1": ["barrier q1,q3", "sf_cz_sw q1", "sf_cz_ne q3", "barrier q1,q3", "phase_corr_sw q1", "phase_corr_ne q3", "barrier q1,q3"],
+        "cz q1, q3": ["barrier q1,q3,q4", "sf_cz_sw q1", "sf_cz_ne q3", "sf_park q4", "barrier q1,q3,q4", "phase_corr_sw q1", "phase_corr_ne q3", "phase_corr_park q4", "barrier q1,q3,q4"],
+        "cz q3, q1": ["barrier q1,q3,q4", "sf_cz_sw q1", "sf_cz_ne q3", "sf_park q4", "barrier q1,q3,q4", "phase_corr_sw q1", "phase_corr_ne q3", "phase_corr_park q4", "barrier q1,q3,q4"],
 
-        "cz q1, q4": ["barrier q1,q4", "sf_cz_sw q1", "sf_cz_ne q4", "barrier q1,q4", "phase_corr_sw q1", "phase_corr_ne q4", "barrier q1,q4"],
-        "cz q4, q1": ["barrier q1,q4", "sf_cz_sw q1", "sf_cz_ne q4", "barrier q1,q4", "phase_corr_sw q1", "phase_corr_ne q4", "barrier q1,q4"],
+        "cz q1, q4": ["barrier q1,q4,q3", "sf_cz_se q1", "sf_cz_nw q4", "sf_park q3", "barrier q1,q4,q3", "phase_corr_se q1", "phase_corr_nw q4", "phase_corr_park q3", "barrier q1,q4,q3"],
+        "cz q4, q1": ["barrier q1,q4,q3", "sf_cz_se q1", "sf_cz_nw q4", "sf_park q3", "barrier q1,q4,q3", "phase_corr_se q1", "phase_corr_nw q4", "phase_corr_park q3", "barrier q1,q4,q3"],
 
-        "cz q2, q5": ["barrier q2,q5", "sf_cz_sw q2", "sf_cz_ne q5", "barrier q2,q5", "phase_corr_sw q2", "phase_corr_ne q5", "barrier q2,q5"],
-        "cz q5, q2": ["barrier q2,q5", "sf_cz_sw q2", "sf_cz_ne q5", "barrier q2,q5", "phase_corr_sw q2", "phase_corr_ne q5", "barrier q2,q5"],
+        "cz q2, q5": ["barrier q2,q5", "sf_cz_se q2", "sf_cz_nw q5", "barrier q2,q5", "phase_corr_se q2", "phase_corr_nw q5", "barrier q2,q5"],
+        "cz q5, q2": ["barrier q2,q5", "sf_cz_se q2", "sf_cz_nw q5", "barrier q2,q5", "phase_corr_se q2", "phase_corr_nw q5", "barrier q2,q5"],
 
-        "cz q3, q5": ["barrier q3,q5", "sf_cz_sw q3", "sf_cz_ne q5", "barrier q3,q5", "phase_corr_sw q3", "phase_corr_ne q5", "barrier q3,q5"],
-        "cz q5, q3": ["barrier q3,q5", "sf_cz_sw q3", "sf_cz_ne q5", "barrier q3,q5", "phase_corr_sw q3", "phase_corr_ne q5", "barrier q3,q5"],
+        "cz q3, q5": ["barrier q3,q5,q6", "sf_cz_sw q3", "sf_cz_ne q5", "sf_park q6", "barrier q3,q5,q6", "phase_corr_sw q3", "phase_corr_ne q5", "phase_corr_park q6", "barrier q3,q5,q6"],
+        "cz q5, q3": ["barrier q3,q5,q6", "sf_cz_sw q3", "sf_cz_ne q5", "sf_park q6", "barrier q3,q5,q6", "phase_corr_sw q3", "phase_corr_ne q5", "phase_corr_park q6", "barrier q3,q5,q6"],
 
-        "cz q3, q6": ["barrier q3,q6", "sf_cz_sw q3", "sf_cz_ne q6", "barrier q3,q6", "phase_corr_sw q3", "phase_corr_ne q6", "barrier q3,q6"],
-        "cz q6, q3": ["barrier q3,q6", "sf_cz_sw q3", "sf_cz_ne q6", "barrier q3,q6", "phase_corr_sw q3", "phase_corr_ne q6", "barrier q3,q6"],
+        "cz q3, q6": ["barrier q3,q6,q5", "sf_cz_se q3", "sf_cz_nw q6", "sf_park q5", "barrier q3,q6,q5", "phase_corr_se q3", "phase_corr_nw q6", "phase_corr_park q5", "barrier q3,q6,q5"],
+        "cz q6, q3": ["barrier q3,q6,q5", "sf_cz_se q3", "sf_cz_nw q6", "sf_park q5", "barrier q3,q6,q5", "phase_corr_se q3", "phase_corr_nw q6", "phase_corr_park q5", "barrier q3,q6,q5"],
 
         "cz q4, q6": ["barrier q4,q6", "sf_cz_sw q4", "sf_cz_ne q6", "barrier q4,q6", "phase_corr_sw q4", "phase_corr_ne q6", "barrier q4,q6"],
         "cz q6, q4": ["barrier q4,q6", "sf_cz_sw q4", "sf_cz_ne q6", "barrier q4,q6", "phase_corr_sw q4", "phase_corr_ne q6", "barrier q4,q6"],

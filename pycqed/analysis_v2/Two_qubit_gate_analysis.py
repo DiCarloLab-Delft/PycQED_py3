@@ -265,7 +265,9 @@ class TLS_landscape_Analysis(ba.BaseDataAnalysis):
                  label: str = '',
                  options_dict: dict = None, 
                  extract_only: bool = False,
-                 auto=True):
+                 auto=True,
+                 flux_lm_qpark = None,
+                 isparked: bool = False):
 
         super().__init__(t_start=t_start, 
                          t_stop=t_stop,
@@ -277,6 +279,8 @@ class TLS_landscape_Analysis(ba.BaseDataAnalysis):
         self.Poly_coefs = Poly_coefs
         self.Q_freq = Q_freq
         self.interaction_freqs = interaction_freqs
+        self.flux_lm_qpark = flux_lm_qpark
+        self.isparked = isparked
         if auto:
             self.run_analysis()
 
@@ -309,10 +313,19 @@ class TLS_landscape_Analysis(ba.BaseDataAnalysis):
         Detunings = P_func(Out_voltage)
         # Save data
         self.proc_data_dict['Out_voltage'] = Out_voltage
-        self.proc_data_dict['Detunings'] = Detunings
+        self.proc_data_dict['Detunings'] = np.real(Detunings)
         self.proc_data_dict['Times'] = Times
         self.proc_data_dict['Pop'] = Pop
-    
+        self.proc_data_dict['park_detuning'] = None
+        if self.isparked:
+            poly = self.flux_lm_qpark.q_polycoeffs_freq_01_det()
+            ch_amp_park = self.flux_lm_qpark.park_amp()
+            sq_amp_park = self.flux_lm_qpark.sq_amp()
+            out_range_park = self.flux_lm_qpark.cfg_awg_channel_range()
+            out_voltage_park = (sq_amp_park * ch_amp_park * out_range_park) / 2
+            park_detuning = poly[0] * out_voltage_park ** 2 + poly[1] * out_voltage_park + poly[2]
+            self.proc_data_dict['park_detuning'] = park_detuning
+
     def prepare_plots(self):
         self.axs_dict = {}
         fig, ax = plt.subplots(figsize=(10,4), dpi=100)
@@ -329,6 +342,8 @@ class TLS_landscape_Analysis(ba.BaseDataAnalysis):
             'Q_freq' : self.Q_freq,
             'interaction_freqs' : self.interaction_freqs,
             'ts' : self.timestamp,
+            'isparked' : self.isparked,
+            'park_detuning': self.proc_data_dict['park_detuning'],
         }
 
     def run_post_extract(self):
@@ -348,7 +363,9 @@ def TLS_landscape_plotfn(
     Times,
     Pop,
     ts,
-    interaction_freqs=None,
+    interaction_freqs = None,
+    isparked = None,
+    park_detuning = None,
     **kw):
     fig = ax.get_figure()
     # Chevrons plot
@@ -362,9 +379,10 @@ def TLS_landscape_plotfn(
     Detunings = get_plot_axis(Detunings)
     Times = get_plot_axis(Times)
     # Frequency qubit population
-    vmax = min([1, np.max(Pop)])
+    vmax = 1 #min([1, np.max(Pop)])
     vmax = max([vmax, 0.15])
-    im = ax.pcolormesh(Detunings*1e-6, Times*1e9, Pop, vmax=1)#vmax)
+    vmin = 0
+    im = ax.pcolormesh(Detunings*1e-6, Times*1e9, Pop, vmax=vmax, vmin = vmin)
     fig.colorbar(im, ax=ax, label='Population')
     # plot two-qubit gate frequencies:
     if interaction_freqs:
@@ -374,14 +392,19 @@ def TLS_landscape_plotfn(
                 ax.text(freq*1e-6, np.mean(Times)*1e9,
                         f'CZ {gate}', va='center', ha='right',
                         color='w', rotation=90)
+    # if isparked:
+    #     ax.axvline(park_detuning*1e-6, color='w', ls='--')
+    #     ax.text(park_detuning*1e-6, np.mean(Times)*1e9,
+    #             f'parking freq', va='center', ha='right',
+    #             color='w', rotation=90)
     ax.set_xlabel(f'{Q_name} detuning (MHz)')
     ax.set_ylabel('Duration (ns)')
-    ax.set_title(f'Population {Q_name}')
+    ax.set_title(f'Population {Q_name}', pad = 35)
     axt0 = ax.twiny()
-    axt0.set_xlim((Q_freq*1e-6-np.array(ax.get_xlim()))*1e-3)
-    axt0.set_xlabel(f'{Q_name} Frequency (GHz)')
-    fig.suptitle(f'{ts}\nTLS landscape {Q_name}', y=.95)
+    axt0.set_xlim((Q_freq*1e-6-np.array(ax.get_xlim()))*1e-3) # removing this for the TLS
+    axt0.set_xlabel(f'{Q_name} Frequency (GHz)', labelpad = 4)
     fig.tight_layout()
+    fig.suptitle(f'{ts}\nTLS landscape {Q_name}', y=1.07)
 
 
 class Two_qubit_gate_tomo_Analysis(ba.BaseDataAnalysis):

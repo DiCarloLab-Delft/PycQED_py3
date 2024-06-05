@@ -6443,6 +6443,7 @@ class HAL_Device(HAL_ShimMQ):
         Q_parks: list = None,
         update_flux_params: bool = False,
         flux_codeword: str = 'cz',
+        cz_repetitions = 1,
         prepare_for_timedomain: bool = True,
         disable_metadata: bool = False):
         """
@@ -6518,6 +6519,7 @@ class HAL_Device(HAL_ShimMQ):
                     prepare_for_timedomain=prepare_for_timedomain,
                     downsample_swp_points=downsample_swp_points,
                     extract_only=extract_only,
+                    cz_repetitions = cz_repetitions,
                     disable_metadata=disable_metadata,
                     verbose=False)
             cp = { f'phi_cond_{i+1}' : a[f'pair_{i+1}_delta_phi_a']\
