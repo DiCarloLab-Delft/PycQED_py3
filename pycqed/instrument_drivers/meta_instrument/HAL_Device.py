@@ -1421,7 +1421,7 @@ class HAL_Device(HAL_ShimMQ):
             self,
             q0: str,
             q_spectators: list,
-            spectator_state="0",
+            spectator_state="1",
             times=np.linspace(0, 10e-6, 26),
             analyze: bool = True,
             close_fig: bool = True,
@@ -1436,7 +1436,7 @@ class HAL_Device(HAL_ShimMQ):
 
         all_qubits = [q0] + q_spectators
         if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=all_qubits, prepare_for_readout=True)
+            self.prepare_for_timedomain(qubits=all_qubits, prepare_for_readout=False)
             self.prepare_readout(qubits=all_qubits)
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1470,7 +1470,8 @@ class HAL_Device(HAL_ShimMQ):
 
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
-        return a
+            a2 = ma2.ResZZAnalysis()
+        return a2
 
 
     def measure_state_tomography(
