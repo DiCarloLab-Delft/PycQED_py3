@@ -1591,6 +1591,61 @@ def off_on_ramzz(
     p.compile()
     return p
 
+def off_on_mw_crosstalk(
+        qubit_idx: int,
+        pulse_comb: str,
+        initialize: bool,
+        platf_cfg: str,
+        cross_driving_qubit: int=None,
+        ):
+
+    """
+    Performs an 'off_on' sequence on the qubit specified.
+        off: (RO) - prepz -      - RO
+        on:  (RO) - prepz - x180 - RO
+    Args:
+        qubit_idx (int) :
+        pulse_comb (list): What pulses to play valid options are
+            "off", "on", "off_on"
+        initialize (bool): if True does an extra initial measurement to
+            post select data.
+        platf_cfg (str) : filepath of OpenQL platform config file
+
+    Pulses can be optionally enabled by putting 'off', respectively 'on' in
+    the pulse_comb string.
+    """
+    p = OqlProgram('off_on_mw_crosstalk', platf_cfg)
+
+    # # Off
+    if 'off' in pulse_comb.lower():
+        k = p.create_kernel("off")
+        k.prepz(qubit_idx)
+        if initialize:
+            k.measure(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    if 'on' in pulse_comb.lower():
+        k = p.create_kernel("on")
+        k.prepz(qubit_idx)
+        if initialize:
+            k.measure(qubit_idx)
+
+        if cross_driving_qubit is not None:
+            k.gate('rx180', [cross_driving_qubit])
+            k.gate("i", [qubit_idx])
+            k.gate("wait", [])
+        else:
+            k.gate('rx180', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
+        raise ValueError(f"pulse_comb {pulse_comb} has to contain only 'on' and 'off'.")
+
+    p.compile()
+    return p
+
 def RO_QND_sequence(q_idx,
                     platf_cfg: str) -> OqlProgram:
     '''

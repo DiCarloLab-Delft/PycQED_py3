@@ -4775,7 +4775,6 @@ class HAL_Transmon(HAL_ShimSQ):
             ## set back the right parameters. 
             qi.freq_qubit(freq_qi)
         except:
-            print_exception()
             qi.freq_qubit(freq_qi)
             raise Exception('Experiment failed')
 
