@@ -4674,6 +4674,121 @@ class HAL_Transmon(HAL_ShimSQ):
                     normalized_probability=False)
             return a
 
+    def measure_rabi_mw_crosstalk(self, MC=None, amps=np.linspace(0, 1, 31),
+                             cross_driving_qubit=None,
+                             analyze=True, close_fig=True, real_imag=True,
+                             disable_metadata = False, 
+                             prepare_for_timedomain=True):
+        """
+        Perform a Rabi experiment in which amplitude of the MW pulse is sweeped
+        while the drive frequency and pulse duration is kept fixed
+
+        Args:
+            amps (array):
+                range of amplitudes to sweep. Amplitude is adjusted via the channel
+                amplitude of the AWG, in max range (0 to 1).
+        """
+
+        if cross_driving_qubit is not None:
+            MW_LutMan = self.find_instrument(cross_driving_qubit).instr_LutMan_MW.get_instr()
+            qubi_cd_idx = self.find_instrument(cross_driving_qubit).cfg_qubit_nr()
+            self.find_instrument(cross_driving_qubit)._prep_td_sources()
+            self.find_instrument(cross_driving_qubit)._prep_mw_pulses()
+
+        else:
+            MW_LutMan = self.instr_LutMan_MW.get_instr()
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        
+        p = sqo.off_on_mw_crosstalk(
+            qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            initialize=False,
+            cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+
+        s = MW_LutMan.channel_amp
+        print(s)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(amps)
+        # real_imag is acutally not polar and as such works for opt weights
+        self.int_avg_det_single._set_real_imag(real_imag)
+        MC.set_detector_function(self.int_avg_det_single)
+
+        label = f'_drive_{cross_driving_qubit}' if cross_driving_qubit else '' 
+        MC.run(name=f'rabi'+self.msmt_suffix+label,
+               disable_snapshot_metadata=disable_metadata)
+        a = None
+        try:
+            a = ma.Rabi_Analysis(label='rabi_')
+        except Exception as e:
+            warnings.warn("Failed to fit Rabi for the cross-driving case.")
+
+        if a:
+            return a
+
+    def measure_mw_crosstalk(self, MC=None, amps=np.linspace(0, 1, 121),
+                 cross_driving_qb=None,disable_metadata = False,
+                 analyze=True, close_fig=True, real_imag=True,
+                 prepare_for_timedomain=True):
+        """
+        Measure MW crosstalk matrix by measuring two Rabi experiments: 
+        1. a0 : standand rabi (drive the qubit qj through its dedicated drive line Dj) 
+        2. a1 : cross-drive rabi (drive the qubit qj through another drive line (Di)
+         at the freq of the qj) 
+        Args:
+            amps (array):
+                range of amplitudes to sweep. If cfg_with_vsm()==True pulse amplitude
+                is adjusted by sweeping the attenuation of the relevant gaussian VSM channel,
+                in max range (0.1 to 1.0).
+                If cfg_with_vsm()==False adjusts the channel amplitude of the AWG in range (0 to 1).
+
+            cross_driving_qubit is qubit qi with its drive line Di.
+        Relevant parameters:
+            mw_amp180 (float):
+                amplitude of the waveform corresponding to pi pulse (from 0 to 1)
+
+            mw_channel_amp (float):
+                AWG channel amplitude (digitally scaling the waveform; form 0 to 1)
+        """
+
+        try:    
+            freq_qj = self.freq_qubit() # set qi to this qubit freq of qubit j
+            cross_driving_qubit = None
+            amps=np.linspace(0, 0.1, 51)
+            a0 = self.measure_rabi_mw_crosstalk(MC, amps,cross_driving_qubit,
+                                          analyze, close_fig, real_imag,disable_metadata,
+                                          prepare_for_timedomain)
+
+            cross_driving_qubit = cross_driving_qb
+            qi = self.find_instrument(cross_driving_qubit)
+            freq_qi = qi.freq_qubit()
+            qi.freq_qubit(freq_qj)
+            amps=np.linspace(0, 1, 121)
+            prepare_for_timedomain = False
+            a1 = self.measure_rabi_mw_crosstalk(MC, amps,cross_driving_qubit,
+                                          analyze, close_fig, real_imag,disable_metadata,
+                                          prepare_for_timedomain)
+            ## set back the right parameters. 
+            qi.freq_qubit(freq_qi)
+        except:
+            print_exception()
+            qi.freq_qubit(freq_qi)
+            raise Exception('Experiment failed')
+
+        try:
+            pi_ajj = abs(a0.fit_result.params['period'].value) / 2
+            pi_aji = abs(a1.fit_result.params['period'].value) / 2
+
+            mw_isolation = 20*np.log10(pi_aji/pi_ajj)
+
+            return mw_isolation
+        except:
+            mw_isolation = 80
+
     ##########################################################################
     # measure_ functions (HAL_Transmon specific, not present in parent class Qubit)
     ##########################################################################
