@@ -241,12 +241,49 @@ class HAL_ShimMQ(Instrument):
 
         # self._prep_td_configure_VSM()
 
-    # FIXME: setup dependent
     def prepare_for_inspire(self):
-        for lutman in ['mw_lutman_QNW','mw_lutman_QNE','mw_lutman_QC','mw_lutman_QSW','mw_lutman_QSE']:
-            self.find_instrument(lutman).set_inspire_lutmap()
+
+        # LDC. Trying to ensure readout is digitized, uses optimal weights, and does single shots w/o averaging
+        self.ro_acq_digitized(True)
+        self.ro_acq_weight_type('optimal')
+        #self.ro_acq_averages(1)
+
+        for qubit in self.qubits():
+            QUBIT = self.find_instrument(qubit)
+            qubit_lutman = self.find_instrument(QUBIT.instr_LutMan_MW())
+            qubit_lutman.set_default_lutmap()
+        
         self.prepare_for_timedomain(qubits=self.qubits())
-        self.find_instrument(self.instr_MC()).soft_avg(1)
+
+        # LDC hack for Quantum Inspire. 2022/07/04
+        # This hot fix addresses the problem that the UHFs are not dividing by the right number of averages.
+        # They seem to be normalizing by the number of averages in the PREVIOUS run.
+        # This way, we set the averages twice. This is the first time.
+        for readout_instrument in [self.instr_acq_0(),
+                                   self.instr_acq_1(),
+                                   self.instr_acq_2()]:
+            if readout_instrument == None:
+                pass
+            else:
+                RO_INSTRUMENT = self.find_instrument(readout_instrument)
+                RO_INSTRUMENT.qas_0_result_averages(1)
+
+        self.find_instrument(self.instr_MC()).soft_avg(1)   
+
+        # RDC 06-04-2023
+        # Save the metadata with PrepInspi
+        from pycqed.measurement import measurement_control
+        MC = self.find_instrument(self.instr_MC())
+        
+        name = 'System_snapshot'
+        MC._set_measurement_name(name)
+        ######################
+        with measurement_control.h5d.Data(
+            name=MC._get_measurement_name(), datadir=MC.datadir()
+        ) as MC.data_object:
+            MC._get_measurement_begintime()
+            MC._save_instrument_settings(MC.data_object)
+
         return True
 
     ##########################################################################
