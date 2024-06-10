@@ -3290,7 +3290,7 @@ class HAL_Device(HAL_ShimMQ):
         self.ro_acq_weight_type("optimal IQ")
         self.ro_acq_digitized(False)
 
-        self.prepare_for_timedomain(qubits=qubits)
+        self.prepare_for_timedomain(qubits=qubits, bypass_flux = False)
         MC.soft_avg(1)  # FIXME: changes state
         # The detector needs to be defined before setting back parameters
         d = self.get_int_logging_detector(qubits=qubits)
@@ -6005,6 +6005,9 @@ class HAL_Device(HAL_ShimMQ):
         #print(pair)
         #print(direction)
 
+        self.ro_acq_weight_type('optimal')
+        self.prepare_for_timedomain(qubits = [pair[0], pair[1]], bypass_flux = False)
+
         # run the conditional oscillation
         a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
         
@@ -6053,6 +6056,9 @@ class HAL_Device(HAL_ShimMQ):
         #print(pair)
         #print(direction)
 
+        self.ro_acq_weight_type('optimal')
+        self.prepare_for_timedomain(qubits = [pair[0], pair[1]], bypass_flux = False)
+
         # get qubit object and the micrwoave lutman for qO
         q0 = self.find_instrument(pair[0])
         mw_lm_q0 = q0.instr_LutMan_MW.get_instr()
@@ -6096,6 +6102,9 @@ class HAL_Device(HAL_ShimMQ):
         The parked qubit is q2. It is also Ramsey'd.
         Leo DC, 22/06/18
         '''
+
+        self.ro_acq_weight_type('optimal')
+        self.prepare_for_timedomain(qubits = [pair[0], pair[1]], bypass_flux = False)
 
         # get qubit object and the micrwoave lutman for qO
         q2 = self.find_instrument(pair[2])

@@ -632,14 +632,23 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
    
         # convert from CZindex to qubit pairs. The third item, if any, is the parked qubit.
         # This conversion is specific to Quantum Inpire Starmon-5.
+
         if CZindex==0:
-          pair=['QNW','QC']
+          pair=['NW', 'W', 'C']
         elif CZindex==1:
-          pair=['QNE','QC']
+          pair=['NW', 'C', 'W']
+        elif CZindex==2:
+          pair=['NE', 'C', 'E']
         elif CZindex==3:
-          pair=['QC','QSW','QSE']
+          pair=['NE', 'E', 'C']
         elif CZindex==4:
-          pair=['QC','QSE','QSW'] 
+          pair=['W', 'SW']
+        elif CZindex==5:
+          pair=['C', 'SW', 'SE']
+        elif CZindex==6:
+          pair=['C', 'SE', 'SW']
+        elif CZindex==7:
+          pair=['E', 'SE']
 
         # reverse the first two elements in pair, and determine if there is a qubit to park
         reversedpair=[pair[1], pair[0]]
@@ -652,8 +661,15 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
         # here, cardinal is the CZ gate direction of the first element in pair, i.e., the qubit that will be Ramsey'd.
         # for example, QNW goes SE to 'meet' QC.
         # The following is specific to Quantum Inspire Starmon-5.
-        cardinal = {str(['QNW','QC']):'SE', str(['QNE','QC']):'SW', str(['QC','QSW']):'SW', str(['QC','QSE']):'SE', \
-              str(['QC','QSW','QSE']):'SW', str(['QC','QSE','QSW']):'SE'}
+               
+        cardinal = {str(['NW', 'W', 'C']):'SW',
+                    str(['NW', 'C', 'W']):'SE',
+                    str(['NE', 'C', 'E']):'SW',
+                    str(['NE', 'E', 'C']):'SE',
+                    str(['W', 'SW']):'SE',
+                    str(['C', 'SW', 'SE']):'SW',
+                    str(['C', 'SE', 'SW']):'SE',
+                    str(['E', 'SE']):'SW'}
         
         #for diagnostics only
         #print(pair,cardinal[str(pair)])
