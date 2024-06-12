@@ -2946,6 +2946,73 @@ class DeviceCCL(Instrument):
         a_obj = ma2.Basic1DAnalysis(label=mmt_label)
         return a_obj
 
+
+    def measure_timing_1d_trace_vs_amplitude(self, q0, latencies: np.ndarray, amplitudes: Optional[np.ndarray] = None, latency_type='flux',
+                                MC=None,  label='timing_vs_amplitude_{}_{}',
+                                buffer_time=40e-9,
+                                prepare_for_timedomain: bool = True,
+                                mw_gate: str = "rx90", sq_length: float = 60e-9):
+        mmt_label = label.format(self.name, q0)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        assert q0 in self.qubits()
+        qubit_obj: TransmonObj = self.find_instrument(q0)
+        q0idx = qubit_obj.cfg_qubit_nr()
+        self.prepare_for_timedomain([q0])
+        fl_lutman = qubit_obj.instr_LutMan_Flux.get_instr()
+        fl_lutman.sq_length(sq_length)
+        CC = self.instr_CC.get_instr()
+        mw_lutman = qubit_obj.instr_LutMan_MW.get_instr()
+
+        mw_channel_amplitude: float = qubit_obj.mw_channel_amp()
+        if amplitudes is None:
+            amplitude_span: float = 0.4  # Needs to be less than 1.0
+            span_lower_bound: float = mw_channel_amplitude - 0.5 * amplitude_span
+            span_upper_bound: float = mw_channel_amplitude + 0.5 * amplitude_span
+            amplitudes: np.ndarray = np.linspace(
+                span_lower_bound,
+                span_upper_bound,
+                10,
+            )
+            allowed_lower_limit: float = 0.0
+            allowed_upper_limit: float = 1.0
+            upper_limit_correction: float = min(0.0, allowed_upper_limit - span_upper_bound)
+            lower_limit_correction: float = max(0.0, allowed_lower_limit - span_lower_bound)
+            amplitudes = amplitudes + upper_limit_correction + lower_limit_correction
+            print(mw_channel_amplitude, min(amplitudes), max(amplitudes))
+
+        # Wait 40 results in a mw separation of flux_pulse_duration+40ns = 120ns
+        p = sqo.FluxTimingCalibration(q0idx,
+                                      times=[buffer_time],
+                                      platf_cfg=self.cfg_openql_platform_fn(),
+                                      flux_cw='fl_cw_06',
+                                      cal_points=False,
+                                      mw_gate=mw_gate)
+        CC.eqasm_program(p.filename)
+
+        d = self.get_int_avg_det(qubits=[q0], single_int_avg=True)
+        MC.set_detector_function(d)
+
+        if latency_type == 'flux':
+            s = swf.tim_flux_latency_sweep(self)
+        elif latency_type == 'mw':
+            s = swf.tim_mw_latency_sweep(self)
+        else:
+            raise ValueError('Latency type {} not understood.'.format(latency_type))
+        s2 = mw_lutman.channel_amp
+
+        MC.set_sweep_functions([s2, s])
+        MC.set_sweep_points(amplitudes)
+        MC.set_sweep_points_2D(latencies)
+        try:
+            MC.run_2D(mmt_label)
+        except Exception as e:
+            mw_lutman.channel_amp(mw_channel_amplitude)
+            raise e
+
+        a_obj = ma2.Basic2DAnalysis(label=mmt_label)
+        return a_obj
+
     def measure_two_qubit_randomized_benchmarking(
         self,
         qubits,
