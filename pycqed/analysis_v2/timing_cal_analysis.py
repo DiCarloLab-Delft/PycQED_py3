@@ -1,13 +1,29 @@
+import os
 import lmfit
+import pycqed.measurement.hdf5_data as hd5
 import numpy as np
+from typing import Dict, Callable, Any, Optional
+import matplotlib.pyplot as plt
 from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
-
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
 from pycqed.analysis import measurement_analysis as ma_old
+from qce_utils.control_interfaces.intrf_channel_identifier import IQubitID, QubitIDObj
+from qce_utils.addon_pycqed.deserialize_xarray_to_obj import DeserializeBootstrap
+from qce_utils.addon_pycqed.object_factories.factory_latency_landscape import LatencyAmplitudeIdentifierFactory
+from qce_utils.control_interfaces.datastorage_control.analysis_factories.factory_latency_transmission import (
+    LatencyAmplitudeIdentifierAnalysis,
+    LatencyAmplitudeIdentifier,
+    LatencyExperimentType,
+)
+from qce_interp.visualization.plotting_functionality import (
+    IFigureAxesPair,
+    SubplotKeywordEnum,
+    LabelFormat,
+)
 
 
 class Timing_Cal_Flux_Coarse(ba.BaseDataAnalysis):
@@ -335,3 +351,140 @@ def annotate_timing_fine_cal(ax, flux_latency, ro_latency,
     ax.text(1.25, .85, timing_info, transform=ax.transAxes)
 
     ax.legend()
+
+
+class TimingMicrowaveFluxAnalysis(ba.BaseDataAnalysis):
+
+    # region Class Constructor
+    def __init__(self, qubit_id: str, flux_pulse_duration: float, microwave_pulse_duration: float, microwave_pulse_separation: float, t_start: str = None, t_stop: str = None, label: str = '', data_file_path: str = None, close_figs: bool = True, options_dict: dict = None, extract_only: bool = False, do_fitting: bool = False, save_qois: bool = True):
+        super().__init__(t_start, t_stop, label, data_file_path, close_figs, options_dict, extract_only, do_fitting, save_qois)
+        # Data allocation
+        self._qubit_id: IQubitID = QubitIDObj(qubit_id)
+        self.object_factory = LatencyAmplitudeIdentifierFactory()
+        self.analysis_factory = LatencyAmplitudeIdentifierAnalysis(
+            qubit_id=self._qubit_id,
+            flux_pulse_duration=flux_pulse_duration,
+            microwave_pulse_duration=microwave_pulse_duration,
+            buffer_duration=microwave_pulse_separation - flux_pulse_duration,
+            experiment_type=LatencyExperimentType.DELAY_MICROWAVE_FIX_FLUX,  # FIXME: Currently hardcoded option
+        )
+        # Required attributes
+        self.params_dict: Dict = {}
+        self.numeric_params: Dict = {}
+        # Obtain data file path
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+        self.data_file_path = a_tools.get_datafilepath_from_timestamp(self.timestamp)
+        # Specify data keys
+        self._raw_data_key: str = 'data'
+        self._raw_value_names_key: str = 'value_names'
+    # endregion
+
+    # region Class Methods
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        param_spec = {
+            self._raw_data_key: ('Experimental Data/Data', 'dset'),
+            self._raw_value_names_key: ('Experimental Data', 'attr:value_names'),
+        }
+        self.raw_data_dict = hd5.extract_pars_from_datafile(self.data_file_path, param_spec)
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(self.data_file_path)[0]
+        # Construct datastructure
+        self.latency_identifier: LatencyAmplitudeIdentifier = self.object_factory.construct(
+            source=DeserializeBootstrap.from_path(self.data_file_path)
+        )
+
+    def process_data(self):
+        """
+        process_data: overloaded in child classes,
+        takes care of mundane tasks such as binning filtering etc
+        """
+        pass
+
+    def prepare_plots(self):
+        """
+        Defines a default plot by setting up the plotting dictionaries to
+        specify what is to be plotted
+        """
+        # Data allocation
+        self.axs_dict = {}
+        self.plot_dicts = {}
+        timestamp: str = self.timestamp
+
+        # (MW) Latency vs (MW) pulse amplitude
+        title: str = 'latency_vs_amplitude'
+        fig, ax = plt.subplots()
+        self.axs_dict[title] = ax
+        self.figs[title] = fig
+        self.plot_dicts[title] = {
+            'plotfn': plot_function_wrapper(self.plot_latency_vs_amplitude_intersection),
+            'qubit_id': self._qubit_id,
+            'latency_identifier': self.latency_identifier,
+            'analysis_factory': self.analysis_factory,
+            'timestamp': timestamp,
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', True):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+    def analyze_fit_results(self):
+        """
+        Do analysis on the results of the fits to extract quantities of
+        interest.
+        """
+        # raise NotImplemented
+        pass
+
+    @staticmethod
+    def plot_latency_vs_amplitude_intersection(qubit_id: IQubitID, latency_identifier: LatencyAmplitudeIdentifier, analysis_factory: LatencyAmplitudeIdentifierAnalysis, **kwargs) -> IFigureAxesPair:
+        """Plot wrapper."""
+        kwargs[SubplotKeywordEnum.LABEL_FORMAT.value] = LabelFormat(
+            x_label=f'{qubit_id.id} MW latency [ns]',
+            y_label=f'{qubit_id.id} Integrated value [a.u.]',
+        )
+        fig, ax = analysis_factory.plot_latency_vs_amplitude_intersection(
+            identifier=latency_identifier,
+            qubit_id=qubit_id,
+            **kwargs,
+        )
+
+        if analysis_factory.analyzable_latency:
+            transition_latencies: np.ndarray = analysis_factory.calculate_relative_transition_latencies(identifier=latency_identifier)
+            relative_latency: float = analysis_factory.calculate_relative_latency(identifier=latency_identifier)
+
+            kwargs[SubplotKeywordEnum.HOST_AXES.value] = fig, ax
+            fig, ax = analysis_factory.plot_latency_transition_detection(
+                transition_latencies=transition_latencies,
+                relative_latency=relative_latency,
+                **kwargs,
+            )
+        return fig, ax
+    # endregion
+
+
+def plot_function_wrapper(plot_function: Callable[[Any], Any]) -> Callable[[Optional[plt.Axes], Any], Any]:
+    def method(ax: Optional[plt.Axes] = None, *args, **kwargs) -> IFigureAxesPair:
+        # Data allocation
+        timestamp: str = kwargs.pop("timestamp", "not defined")
+        fig = ax.get_figure()
+        axs = fig.get_axes()
+        fig.suptitle(f'ts: {timestamp}\n')
+
+        kwargs[SubplotKeywordEnum.HOST_AXES.value] = (fig, axs)
+        if len(axs) == 1:
+            kwargs[SubplotKeywordEnum.HOST_AXES.value] = (fig, axs[0])
+        return plot_function(
+            *args,
+            **kwargs,
+        )
+
+    return method
