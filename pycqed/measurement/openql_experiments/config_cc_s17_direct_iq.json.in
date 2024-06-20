@@ -5,7 +5,7 @@
     "eqasm_compiler" : "eqasm_backend_cc",
 
     "hardware_settings": {
-        "qubit_number": 17,
+        "qubit_number": 26,
         "cycle_time" : 20,        // in [ns]
 
         "eqasm_backend_cc": {
@@ -145,7 +145,7 @@
                 },
                 {
                     "name": "ro_1",
-                    "qubits": [[0], [1], [2], [3], [7], [8], [12], [13], [15]],
+                    "qubits": [[0], [1], [2], [3], [7], [], [], [], []],
                     "signal_type": "measure",
                     "ref_instrument_definition": "zi-uhfqa",
                     "ref_control_mode": "uhfqa-9ch",
@@ -167,13 +167,25 @@
                         "io_module": "CC-CONN-DIO"
                     }
                 },
+                {
+                    "name": "ro_3",
+                    "qubits": [[8], [12], [13], [15], [], [], [], [], []],
+                    "signal_type": "measure",
+                    "ref_instrument_definition": "zi-uhfqa",
+                    "ref_control_mode": "uhfqa-9ch",
+                    "controller": {
+                        "name": "cc",   // FIXME
+                        "slot": 11,
+                        "io_module": "CC-CONN-DIO"
+                    }
+                },
 
                 // microwave.
                 {
                     "name": "mw_0",
                     "qubits": [                                             // data qubits:
-                       [9],
                         [1],
+                        [9],
                         [5],
                         [0]
                     ],
@@ -189,10 +201,10 @@
                 {
                     "name": "mw_1",
                     "qubits": [                                             // ancilla qubits:
-                        [2],
-                        [14],
-                        [],
-                        []
+                        [18], // Added LRU experiment!
+                        [8],
+                        [15],
+                        [17]  // Added LRU experiment!
                     ],
                     "signal_type": "mw",
                     "ref_instrument_definition": "zi-hdawg",
@@ -224,7 +236,7 @@
                     "name": "mw_3",
                     "qubits": [                                             // ancilla qubits:
                         [10],
-                        [15],
+                        [],
                         [13],
                         [16]
                     ],
@@ -240,10 +252,10 @@
                 {
                     "name": "mw_4",
                     "qubits": [                                             // ancilla qubits:
-                        [],
+                        [2], 
                         [6],
                         [7],
-                        [8]
+                        [14]
                     ],
                     "signal_type": "mw",
                     "ref_instrument_definition": "zi-hdawg",
@@ -283,7 +295,7 @@
                 },
                 {
                     "name": "flux_2",
-                    "qubits": [[11], [], [], [], [], [], [], []],
+                    "qubits": [[], [11], [22], [24], [20], [21], [25], [23]],
                     "signal_type": "flux",
                     "ref_instrument_definition": "zi-hdawg",
                     "ref_control_mode": "awg8-flux",
@@ -342,8 +354,59 @@
         "cl_23 %0": ["rx90 %0", "ry90 %0", "rxm90 %0"],
 
         // CZ gates
-        "measure %0": ["rx12 %0", "measure %0"],
+        // "measure %0": ["rx12 %0", "measure %0"],
 
+        // LRU pulses
+        // "lru q16" : ["barrier q19, q16", "cw_lru q19", "update_ph_LRU q16", "barrier q19, q16"], // D6
+        // "lru q13" : ["barrier q17, q13", "cw_lru q17", "update_ph_LRU q13", "barrier q17, q13"], // D5
+        // "lru q15" : ["barrier q18, q15", "cw_lru q18", "update_ph_LRU q15", "barrier q18, q15"], // D4
+        // "lru q3"  : ["barrier q20, q3" , "sf_lru q20", "update_ph_LRU q3" , "barrier q20, q3" ], // X3
+        // "lru q12" : ["barrier q21, q12", "sf_lru q21", "update_ph_LRU q12", "barrier q21, q12"], // Z3
+        // "lru q10" : ["barrier q24, q10", "sf_lru q24", "update_ph_LRU q10", "barrier q24, q10"], // Z4
+        // "lru q9"  : ["barrier q25, q9" , "sf_lru q25", "update_ph_LRU q9" , "barrier q25, q9" ], // X4
+        // "lru q7"  : ["barrier q22, q7" , "sf_lru q22", "update_ph_LRU q7" , "barrier q22, q7" ], // Z1
+        // "lru q14" : ["barrier q23, q14", "sf_lru q23", "update_ph_LRU q14", "barrier q23, q14"], // Z2
+        "lru q15": ["cw_lru q18"], // D4
+        "lru q13": ["cw_lru q17"], // D5
+        "lru q16": ["cw_lru q19"], // D6
+        "lru q1" : ["cw_lru q19"], // D7 (split from D6)
+        "lru q2" : ["cw_lru q19"], // D2 (split from D6)
+        // "lru q6" : ["barrier q18, q6" ,"cw_lru q18", "update_ph_LRU q6", "barrier q18, q6"], // D1 (split from D4)
+        "lru q6" : ["cw_lru q18"], // D1 (split from D4)
+        "lru q0" : ["cw_lru q18"], // D3 (split from D4)
+        "lru q4" : ["cw_lru q17"], // D9 (split from D5)
+        "lru q5" : ["cw_lru q17"], // D8 (split from D5)
+        "lru q3" : ["sf_lru q20"], // X3
+        "lru q12": ["sf_lru q21"], // Z3
+        "lru q10": ["sf_lru q24"], // Z4
+        "lru q9" : ["sf_lru q25"], // X4
+        "lru q7" : ["sf_lru q22"], // Z1
+        "lru q14": ["sf_lru q23"], // Z2
+        "lru q11": ["sf_lru q25"], // X1 (split from X4)
+        "lru q8" : ["sf_lru q22"], // X2 (split from Z1)
+        // "lru q15": ["barrier q15, q18", "cw_lru q18", "update_ph_LRU q15","barrier q15, q18"], // D4
+        // "lru q13": ["barrier q13, q17", "cw_lru q17", "update_ph_LRU q13","barrier q13, q17"], // D5
+        // "lru q16": ["barrier q16, q19", "cw_lru q19", "update_ph_LRU q16","barrier q16, q19"], // D6
+        // "lru  q1": ["barrier q1, q19", "cw_lru q19", "update_ph_LRU  q1","barrier q1, q19"], // D7 (split from D6)
+        // "lru  q2": ["barrier q2, q19", "cw_lru q19", "update_ph_LRU  q2","barrier q2, q19"], // D2 (split from D6)
+        // "lru  q6": ["barrier q6, q18", "cw_lru q18", "update_ph_LRU  q6","barrier q6, q18"], // D1 (split from D4)
+        // "lru  q0": ["barrier q0, q18", "cw_lru q18", "update_ph_LRU  q0","barrier q0, q18"], // D3 (split from D4)
+        // "lru  q4": ["barrier q4, q17", "cw_lru q17", "update_ph_LRU  q4","barrier q4, q17"], // D9 (split from D5)
+        // "lru  q5": ["barrier q5, q17", "cw_lru q17", "update_ph_LRU  q5","barrier q5, q17"], // D8 (split from D5)
+        // "lru q3" : ["barrier q3, q20", "sf_lru q20", "update_ph_LRU  q3","barrier q3, q20"], // X3
+        // "lru q12": ["barrier q12, q21", "sf_lru q21", "update_ph_LRU q12","barrier q12, q21"], // Z3
+        // "lru q10": ["barrier q10, q24", "sf_lru q24", "update_ph_LRU q10","barrier q10, q24"], // Z4
+        // "lru q9" : ["barrier q9, q25", "sf_lru q25", "update_ph_LRU  q9","barrier q9, q25"], // X4
+        // "lru q7" : ["barrier q7, q22", "sf_lru q22", "update_ph_LRU  q7","barrier q7, q22"], // Z1
+        // "lru q14": ["barrier q14, q23", "sf_lru q23", "update_ph_LRU q14","barrier q14, q23"], // Z2
+        // "lru q11": ["barrier q11, q25", "sf_lru q25", "update_ph_LRU q11","barrier q11, q25"], // X1 (split from X4)
+        // "lru q8" : ["barrier q8, q22", "sf_lru q22", "update_ph_LRU  q8","barrier q8, q22"], // X2 (split from Z1)
+        // "lru q1" : ["barrier q1, q22", "sf_lru q22", "update_ph_LRU q1", "barrier q1, q22"],
+        // "lru q15": ["barrier q18", "cw_40 q18", "barrier q18"],
+        // "lru q12": ["barrier q21, q23", "sf_lru q21", "sf_lru q23", "barrier q21, q23"], // Z3
+        // "lru q1" : ["barrier q17", "cw_40 q17", "barrier q17"],
+
+        
         // Updata by Hany [2021-06-01]
         // Individual CZ gates in Surface-17
         // Decomposition of two qubit flux interactions as single-qubit flux
@@ -358,6 +421,10 @@
         // "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_cz_sw q9","sf_park q4", "barrier q9, q5, q4"],
         "cz q9, q5": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_cz_sw q9","sf_park q4", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
         "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_cz_sw q9","sf_park q4", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
+        // "cz q9, q5": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_square q9","sf_park q4", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
+        // "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_square q9","sf_park q4", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
+        // "cz q9, q5": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_square q9", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
+        // "cz q5, q9": ["barrier q9, q5, q4", "sf_cz_ne q5", "sf_square q9", "barrier q9, q5, q4", "update_ph_ne q5", "update_ph_sw q9", "barrier q9, q5, q4"],
         // Edge 1/25
         // "cz q9, q4": ["barrier q9, q4, q5", "sf_cz_nw q4", "sf_cz_se q9","sf_park q5", "barrier q9, q4, q5"],
         // "cz q4, q9": ["barrier q9, q4, q5", "sf_cz_nw q4", "sf_cz_se q9","sf_park q5", "barrier q9, q4, q5"],
@@ -366,8 +433,8 @@
         // Edge 5/29
         // "cz q5, q10": ["barrier q5, q10, q4", "sf_cz_nw q10", "sf_cz_se q5","sf_park q4", "barrier q5, q10, q4"],
         // "cz q10, q5": ["barrier q5, q10, q4", "sf_cz_nw q10", "sf_cz_se q5","sf_cz_sw q4", "barrier q5, q10, q4"],
-        "cz q5, q10": ["barrier q5, q10, q4", "sf_cz_nw q10", "sf_cz_se q5","sf_park q4", "barrier q5, q10, q4", "update_ph_nw q10", "update_ph_se q5", "barrier q5, q10, q4"],
-        "cz q10, q5": ["barrier q5, q10, q4", "sf_cz_nw q10", "sf_cz_se q5","sf_cz_sw q4", "barrier q5, q10, q4", "update_ph_nw q10", "update_ph_se q5", "barrier q5, q10, q4"],
+        "cz q5, q10": ["barrier q5, q10, q4", "sf_cz_nw q10", "sf_cz_se q5", "sf_park q4", "barrier q5, q10, q4", "update_ph_nw q10", "update_ph_se q5", "barrier q5, q10, q4"],
+        "cz q10, q5": ["barrier q5, q10, q4", "sf_cz_nw q10", "sf_cz_se q5", "sf_park q4", "barrier q5, q10, q4", "update_ph_nw q10", "update_ph_se q5", "barrier q5, q10, q4"],
         // Edge 6/30
         // "cz q4, q10": ["barrier q4, q10, q5", "sf_cz_ne q10", "sf_cz_sw q4","sf_park q5", "barrier q4, q10, q5"],
         // "cz q10, q4": ["barrier q4, q10, q5", "sf_cz_ne q10", "sf_cz_sw q4","sf_park q5", "barrier q4, q10, q5"],
@@ -383,16 +450,20 @@
         // "cz q3, q1": ["barrier q1, q3, q5", "sf_cz_nw q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5"],
         "cz q1, q3": ["barrier q1, q3, q5", "sf_cz_nw q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5", "update_ph_nw q3", "update_ph_se q1", "barrier q1, q3, q5"],
         "cz q3, q1": ["barrier q1, q3, q5", "sf_cz_nw q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5", "update_ph_nw q3", "update_ph_se q1", "barrier q1, q3, q5"],
+        // "cz q1, q3": ["barrier q1, q3, q5", "sf_square q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5", "update_ph_nw q3", "update_ph_se q1", "barrier q1, q3, q5"],
+        // "cz q3, q1": ["barrier q1, q3, q5", "sf_square q3", "sf_cz_se q1","sf_park q5", "barrier q1, q3, q5", "update_ph_nw q3", "update_ph_se q1", "barrier q1, q3, q5"],
         // Edge 4/28
         // "cz q3, q5": ["barrier q3, q5, q1", "sf_cz_ne q3", "sf_cz_sw q5","sf_park q1", "barrier q3, q5, q1"],
         // "cz q5, q3": ["barrier q3, q5, q1", "sf_cz_ne q5", "sf_cz_sw q3","sf_park q1", "barrier q3, q5, q1"],
         "cz q3, q5": ["barrier q3, q5, q1", "sf_cz_ne q3", "sf_cz_sw q5","sf_park q1", "barrier q3, q5, q1", "update_ph_ne q3", "update_ph_sw q5", "barrier q3, q5, q1"],
-        "cz q5, q3": ["barrier q3, q5, q1", "sf_cz_ne q5", "sf_cz_sw q3","sf_park q1", "barrier q3, q5, q1", "update_ph_ne q5", "update_ph_sw q3", "barrier q3, q5, q1"],
+        "cz q5, q3": ["barrier q3, q5, q1", "sf_cz_ne q3", "sf_cz_sw q5","sf_park q1", "barrier q3, q5, q1", "update_ph_ne q3", "update_ph_sw q5", "barrier q3, q5, q1"],
         // Edge 7/31
         // "cz q12, q15": ["barrier q12, q15, q3, q7", "sf_cz_nw q15", "sf_cz_se q12","sf_park q3","sf_park q7", "barrier q12, q15, q3, q7"],
         // "cz q15, q12": ["barrier q12, q15, q3, q7", "sf_cz_nw q15", "sf_cz_se q12","sf_park q3","sf_park q7", "barrier q12, q15, q3, q7"],
         "cz q12, q15": ["barrier q12, q15, q3, q7", "sf_cz_nw q15", "sf_cz_se q12","sf_park q3","sf_park q7", "barrier q12, q15, q3, q7", "update_ph_nw q15", "update_ph_se q12", "barrier q12, q15, q3, q7"],
         "cz q15, q12": ["barrier q12, q15, q3, q7", "sf_cz_nw q15", "sf_cz_se q12","sf_park q3","sf_park q7", "barrier q12, q15, q3, q7", "update_ph_nw q15", "update_ph_se q12", "barrier q12, q15, q3, q7"],
+        // "cz q12, q15": ["barrier q12, q15, q3, q7", "sf_cz_nw q15", "sf_cz_se q12","sf_park q7", "barrier q12, q15, q3, q7", "update_ph_nw q15", "update_ph_se q12", "barrier q12, q15, q3, q7"],
+        // "cz q15, q12": ["barrier q12, q15, q3, q7", "sf_cz_nw q15", "sf_cz_se q12","sf_park q7", "barrier q12, q15, q3, q7", "update_ph_nw q15", "update_ph_se q12", "barrier q12, q15, q3, q7"],
         // Edge 8/32
         // "cz q3, q15": ["barrier q3, q15, q7, q12", "sf_cz_ne q15", "sf_cz_sw q3","sf_park q7","sf_park q12", "barrier q3, q15, q7, q12"],
         // "cz q15, q3": ["barrier q3, q15, q7, q12", "sf_cz_ne q15", "sf_cz_sw q3","sf_park q7","sf_park q12", "barrier q3, q15, q7, q12"],
@@ -403,31 +474,43 @@
         // "cz q13, q3": ["barrier q3, q13, q7, q8, q10", "sf_cz_nw q13", "sf_cz_se q3","sf_park q7","sf_park q8","sf_park q10", "barrier q3, q13, q7, q8, q10"],
         "cz q3, q13": ["barrier q3, q13, q7, q8, q10", "sf_cz_nw q13", "sf_cz_se q3","sf_park q7","sf_park q8","sf_park q10", "barrier q3, q13, q7, q8, q10", "update_ph_nw q13", "update_ph_se q3", "barrier q3, q13, q7, q8, q10"],
         "cz q13, q3": ["barrier q3, q13, q7, q8, q10", "sf_cz_nw q13", "sf_cz_se q3","sf_park q7","sf_park q8","sf_park q10", "barrier q3, q13, q7, q8, q10", "update_ph_nw q13", "update_ph_se q3", "barrier q3, q13, q7, q8, q10"],
+        // "cz q3, q13": ["barrier q3, q13, q7, q8, q10", "sf_cz_nw q13", "sf_cz_se q3","sf_park q7","sf_park q10", "barrier q3, q13, q7, q8, q10", "update_ph_nw q13", "update_ph_se q3", "barrier q3, q13, q7, q8, q10"],
+        // "cz q13, q3": ["barrier q3, q13, q7, q8, q10", "sf_cz_nw q13", "sf_cz_se q3","sf_park q7","sf_park q10", "barrier q3, q13, q7, q8, q10", "update_ph_nw q13", "update_ph_se q3", "barrier q3, q13, q7, q8, q10"],
         // Edge 10/34
         // "cz q10, q13": ["barrier q10, q13, q3, q7, q8", "sf_cz_ne q13", "sf_cz_sw q10","sf_park q3","sf_park q7","sf_park q8", "barrier q10, q13, q3, q7, q8"],
         // "cz q13, q10": ["barrier q10, q13, q3, q7, q8", "sf_cz_ne q13", "sf_cz_sw q10","sf_park q3","sf_park q7","sf_park q8", "barrier q10, q13, q3, q7, q8"],
         "cz q10, q13": ["barrier q10, q13, q3, q7, q8", "sf_cz_ne q13", "sf_cz_sw q10","sf_park q3","sf_park q7","sf_park q8", "barrier q10, q13, q3, q7, q8", "update_ph_ne q13", "update_ph_sw q10", "barrier q10, q13, q3, q7, q8"],
         "cz q13, q10": ["barrier q10, q13, q3, q7, q8", "sf_cz_ne q13", "sf_cz_sw q10","sf_park q3","sf_park q7","sf_park q8", "barrier q10, q13, q3, q7, q8", "update_ph_ne q13", "update_ph_sw q10", "barrier q10, q13, q3, q7, q8"],
+        // "cz q10, q13": ["barrier q10, q13, q3, q7, q8", "sf_cz_ne q13", "sf_cz_sw q10","sf_park q7", "barrier q10, q13, q3, q7, q8", "update_ph_ne q13", "update_ph_sw q10", "barrier q10, q13, q3, q7, q8"],
+        // "cz q13, q10": ["barrier q10, q13, q3, q7, q8", "sf_cz_ne q13", "sf_cz_sw q10","sf_park q7", "barrier q10, q13, q3, q7, q8", "update_ph_ne q13", "update_ph_sw q10", "barrier q10, q13, q3, q7, q8"],
         // Edge 11/35
         // "cz q10, q16": ["barrier q10, q16, q8, q14", "sf_cz_nw q16", "sf_cz_se q10","sf_park q8","sf_park q14", "barrier q10, q16, q8, q14"],
         // "cz q16, q10": ["barrier q10, q16, q8, q14", "sf_cz_nw q16", "sf_cz_se q10","sf_park q8","sf_park q14", "barrier q10, q16, q8, q14"],
         "cz q10, q16": ["barrier q10, q16, q8, q14", "sf_cz_nw q16", "sf_cz_se q10","sf_park q8","sf_park q14", "barrier q10, q16, q8, q14", "update_ph_nw q16", "update_ph_se q10", "barrier q10, q16, q8, q14"],
         "cz q16, q10": ["barrier q10, q16, q8, q14", "sf_cz_nw q16", "sf_cz_se q10","sf_park q8","sf_park q14", "barrier q10, q16, q8, q14", "update_ph_nw q16", "update_ph_se q10", "barrier q10, q16, q8, q14"],
+        // "cz q10, q16": ["barrier q10, q16, q8, q14", "sf_cz_nw q16", "sf_cz_se q10","sf_park q14", "barrier q10, q16, q8, q14", "update_ph_nw q16", "update_ph_se q10", "barrier q10, q16, q8, q14"],
+        // "cz q16, q10": ["barrier q10, q16, q8, q14", "sf_cz_nw q16", "sf_cz_se q10","sf_park q14","sf_park q0", "barrier q10, q16, q8, q14", "update_ph_nw q16", "update_ph_se q10", "barrier q10, q16, q8, q14"],
         // Edge 12/36
         // "cz q15, q7": ["barrier q15, q7, q3, q12", "sf_cz_nw q7", "sf_cz_se q15","sf_park q3","sf_park q12", "barrier q15, q7, q3, q12"],
         // "cz q7, q15": ["barrier q15, q7, q3, q12", "sf_cz_nw q7", "sf_cz_se q15","sf_park q3","sf_park q12", "barrier q15, q7, q3, q12"],
         "cz q15, q7": ["barrier q15, q7, q3, q12", "sf_cz_nw q7", "sf_cz_se q15","sf_park q3","sf_park q12", "barrier q15, q7, q3, q12", "update_ph_nw q7", "update_ph_se q15", "barrier q15, q7, q3, q12"],
         "cz q7, q15": ["barrier q15, q7, q3, q12", "sf_cz_nw q7", "sf_cz_se q15","sf_park q3","sf_park q12", "barrier q15, q7, q3, q12", "update_ph_nw q7", "update_ph_se q15", "barrier q15, q7, q3, q12"],
+        // "cz q15, q7": ["barrier q15, q7, q3, q12", "sf_cz_nw q7", "sf_cz_se q15","sf_park q12", "barrier q15, q7, q3, q12", "update_ph_nw q7", "update_ph_se q15", "barrier q15, q7, q3, q12"],
+        // "cz q7, q15": ["barrier q15, q7, q3, q12", "sf_cz_nw q7", "sf_cz_se q15","sf_park q12", "sf_park q1", "barrier q15, q7, q3, q12", "update_ph_nw q7", "update_ph_se q15", "barrier q15, q7, q3, q12"],
         // Edge 13/37
         // "cz q13, q7": ["barrier q13, q7, q3, q8, q10", "sf_cz_ne q7", "sf_cz_sw q13","sf_park q3","sf_park q8","sf_park q10", "barrier q13, q7, q3, q8, q10"],
         // "cz q7, q13": ["barrier q13, q7, q3, q8, q10", "sf_cz_ne q7", "sf_cz_sw q13","sf_park q3","sf_park q8","sf_park q10", "barrier q13, q7, q3, q8, q10"],
         "cz q13, q7": ["barrier q13, q7, q3, q8, q10", "sf_cz_ne q7", "sf_cz_sw q13","sf_park q3","sf_park q8","sf_park q10", "barrier q13, q7, q3, q8, q10", "update_ph_ne q7", "update_ph_sw q13", "barrier q13, q7, q3, q8, q10"],
         "cz q7, q13": ["barrier q13, q7, q3, q8, q10", "sf_cz_ne q7", "sf_cz_sw q13","sf_park q3","sf_park q8","sf_park q10", "barrier q13, q7, q3, q8, q10", "update_ph_ne q7", "update_ph_sw q13", "barrier q13, q7, q3, q8, q10"],
+        // "cz q13, q7": ["barrier q13, q7, q3, q8, q10", "sf_cz_ne q7", "sf_cz_sw q13","sf_park q10", "barrier q13, q7, q3, q8, q10", "update_ph_ne q7", "update_ph_sw q13", "barrier q13, q7, q3, q8, q10"],
+        // "cz q7, q13": ["barrier q13, q7, q3, q8, q10", "sf_cz_ne q7", "sf_cz_sw q13","sf_park q10", "barrier q13, q7, q3, q8, q10", "update_ph_ne q7", "update_ph_sw q13", "barrier q13, q7, q3, q8, q10"],
         // // Edge 14/38
         // "cz q13, q8": ["barrier q13, q8, q3, q7, q10", "sf_cz_nw q8", "sf_cz_se q13","sf_park q3","sf_park q7","sf_park q10", "barrier q13, q8, q3, q7, q10"],
         // "cz q8, q13": ["barrier q13, q8, q3, q7, q10", "sf_cz_nw q8", "sf_cz_se q13","sf_park q3","sf_park q7","sf_park q10", "barrier q13, q8, q3, q7, q10"],
         "cz q13, q8": ["barrier q13, q8, q3, q7, q10", "sf_cz_nw q8", "sf_cz_se q13","sf_park q3","sf_park q7","sf_park q10", "barrier q13, q8, q3, q7, q10", "update_ph_nw q8", "update_ph_se q13", "barrier q13, q8, q3, q7, q10"],
         "cz q8, q13": ["barrier q13, q8, q3, q7, q10", "sf_cz_nw q8", "sf_cz_se q13","sf_park q3","sf_park q7","sf_park q10", "barrier q13, q8, q3, q7, q10", "update_ph_nw q8", "update_ph_se q13", "barrier q13, q8, q3, q7, q10"],
+        // "cz q13, q8": ["barrier q13, q8, q3, q7, q10", "sf_cz_nw q8", "sf_cz_se q13","sf_park q7","sf_park q10", "barrier q13, q8, q3, q7, q10", "update_ph_nw q8", "update_ph_se q13", "barrier q13, q8, q3, q7, q10"],
+        // "cz q8, q13": ["barrier q13, q8, q3, q7, q10", "sf_cz_nw q8", "sf_cz_se q13","sf_park q7","sf_park q10", "barrier q13, q8, q3, q7, q10", "update_ph_nw q8", "update_ph_se q13", "barrier q13, q8, q3, q7, q10"],
         // Edge 15/39
         // "cz q16, q8": ["barrier q16, q8, q10, q14", "sf_cz_ne q8", "sf_cz_sw q16","sf_park q10","sf_park q14", "barrier q16, q8, q10, q14"],
         // "cz q8, q16": ["barrier q16, q8, q10, q14", "sf_cz_ne q8", "sf_cz_sw q16","sf_park q10","sf_park q14", "barrier q16, q8, q10, q14"],
@@ -438,11 +521,24 @@
         // "cz q14, q16": ["barrier q14, q16, q8, q10", "sf_cz_nw q14", "sf_cz_se q16","sf_park q8","sf_park q10", "barrier q14, q16, q8, q10"],
         "cz q16, q14": ["barrier q14, q16, q8, q10", "sf_cz_nw q14", "sf_cz_se q16","sf_park q8","sf_park q10", "barrier q14, q16, q8, q10", "update_ph_nw q14", "update_ph_se q16", "barrier q14, q16, q8, q10"],
         "cz q14, q16": ["barrier q14, q16, q8, q10", "sf_cz_nw q14", "sf_cz_se q16","sf_park q8","sf_park q10", "barrier q14, q16, q8, q10", "update_ph_nw q14", "update_ph_se q16", "barrier q14, q16, q8, q10"],
+        // "cz q16, q14": ["barrier q14, q16, q8, q10", "sf_cz_nw q14", "sf_cz_se q16","sf_park q10", "barrier q14, q16, q8, q10", "update_ph_nw q14", "update_ph_se q16", "barrier q14, q16, q8, q10"],
+        // "cz q14, q16": ["barrier q14, q16, q8, q10", "sf_cz_nw q14", "sf_cz_se q16","sf_park q10", "barrier q14, q16, q8, q10", "update_ph_nw q14", "update_ph_se q16", "barrier q14, q16, q8, q10"],
         // Edge 17/41
         // "cz q7, q6": ["barrier q7, q6, q2", "sf_cz_ne q6", "sf_cz_sw q7","sf_park q2", "barrier q7, q6, q2"],
         // "cz q6, q7": ["barrier q7, q6, q2", "sf_cz_ne q6", "sf_cz_sw q7","sf_park q2", "barrier q7, q6, q2"],
         "cz q7, q6": ["barrier q7, q6, q2", "sf_cz_ne q6", "sf_cz_sw q7","sf_park q2", "barrier q7, q6, q2", "update_ph_ne q6", "update_ph_sw q7", "barrier q7, q6, q2"],
         "cz q6, q7": ["barrier q7, q6, q2", "sf_cz_ne q6", "sf_cz_sw q7","sf_park q2", "barrier q7, q6, q2", "update_ph_ne q6", "update_ph_sw q7", "barrier q7, q6, q2"],
+        // "cz q7, q6": ["barrier q7, q6, q2","rx12 q7", 
+        //               "barrier q7, q6, q2","i q7", 
+        //               "barrier q7, q6, q2","sf_park q7", 
+        //               "barrier q7, q6, q2", "sf_cz_ne q6", "sf_cz_sw q7","sf_park q2",
+        //               "barrier q7, q6, q2","update_ph_ne q6", "update_ph_sw q7", "barrier q7, q6, q2", 
+        //               "barrier q7, q6, q2","i q7", 
+        //               "barrier q7, q6, q2", "sf_park q7",
+        //               "barrier q7, q6, q2","rx12 q7", "barrier q7, q6, q2" ],
+        
+        "cz q6, q7": ["barrier q7, q6, q2", "sf_cz_ne q6", "sf_cz_sw q7","sf_park q2", "barrier q7, q6, q2", "update_ph_ne q6", "update_ph_sw q7", "barrier q7, q6, q2"],
+
         // Edge 18/42
         // "cz q7, q2": ["barrier q7, q2, q6", "sf_cz_nw q2", "sf_cz_se q7","sf_park q6", "barrier q7, q2, q6"],
         // "cz q2, q7": ["barrier q7, q2, q6", "sf_cz_nw q2", "sf_cz_se q7","sf_park q6", "barrier q7, q2, q6"],
@@ -555,95 +651,203 @@
         // "cz q2, q11": ["barrier q2, q11, q6", "sf_cz_ne q11", "sf_cz_sw q2","sf_park q6", "barrier q2, q11, q6", "update_ph_ne q11", "update_ph_sw q2", "barrier q2, q11, q6"],
         // "cz q11, q2": ["barrier q2, q11, q6", "sf_cz_ne q11", "sf_cz_sw q2","sf_park q6", "barrier q2, q11, q6", "update_ph_ne q11", "update_ph_sw q2", "barrier q2, q11, q6"],
 
-
-        // // 2. flux-dance with hard-coded CZ gates in parallel.
-        // // Qubits are ordered in sf_cz target, control.
-        "flux_dance_1 q0": ["barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6", 
+        // Extra auxiliar CZs for surface-17 experiment (Jorge)
+        "cz_aux q3, q13": ["barrier q3, q13, q7, q8, q10", "sf_cz_aux q13", "sf_park q7","sf_park q8","sf_park q10", "barrier q3, q13, q7, q8, q10", "update_ph_nw q13", "update_ph_se q3", "barrier q3, q13, q7, q8, q10"],
+        "cz_aux q13, q3": ["barrier q3, q13, q7, q8, q10", "sf_cz_aux q13", "sf_park q7","sf_park q8","sf_park q10", "barrier q3, q13, q7, q8, q10", "update_ph_nw q13", "update_ph_se q3", "barrier q3, q13, q7, q8, q10"],
+        
+        "cz_aux q3, q5": ["barrier q3, q5, q1", "sf_cz_aux q3", "sf_park q1", "barrier q3, q5, q1", "update_ph_ne q3", "update_ph_sw q5", "barrier q3, q5, q1"],
+        "cz_aux q5, q3": ["barrier q3, q5, q1", "sf_cz_aux q3", "sf_park q1", "barrier q3, q5, q1", "update_ph_ne q3", "update_ph_sw q5", "barrier q3, q5, q1"],
+        
+        "cz_aux q7, q2": ["barrier q7, q2, q6", "sf_cz_aux q7", "sf_park q6", "barrier q7, q2, q6", "update_ph_nw q2", "update_ph_se q7", "barrier q7, q2, q6"],
+        "cz_aux q2, q7": ["barrier q7, q2, q6", "sf_cz_aux q7", "sf_park q6", "barrier q7, q2, q6", "update_ph_nw q2", "update_ph_se q7", "barrier q7, q2, q6"],
+        
+        // 2. flux-dance with hard-coded CZ gates in parallel.
+        // Qubits are ordered in sf_cz target, control.
+        "flux_dance_1 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
                             "sf_cz_ne q3", "sf_cz_sw q5", "sf_cz_sw q16", "sf_cz_ne q8", "sf_cz_ne q11", "sf_cz_sw q2",
                             "sf_park q1", "sf_park q10", "sf_park q14","sf_park q6",
-                            "barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6", 
-                            "update_ph_park_1 q3", "update_ph_park_1 q16", "update_ph_park_1 q11",
-                            // "update_ph_park_1 q5", "update_ph_park_1 q8", "update_ph_park_1 q2",
-                            "barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6"],
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+                            // "update_ph_step_1 q7", "update_ph_step_1 q14","update_ph_step_1 q12", "update_ph_step_1 q10",
+                            // "update_ph_step_1 q6", "update_ph_step_1 q2","update_ph_step_1 q0", "update_ph_step_1 q15",
+                            // "update_ph_step_1 q13", "update_ph_step_1 q16","update_ph_step_1 q1", "update_ph_step_1 q5",
+                            // "update_ph_step_1 q4",
+                            "i q0",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
-        "flux_dance_2 q0": ["barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2",  
+        "flux_dance_2 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",  
                             "sf_cz_nw q3", "sf_cz_se q1", "sf_cz_se q13", "sf_cz_nw q8", "sf_cz_nw q11", "sf_cz_se q6",
                             "sf_park q5", "sf_park q10", "sf_park q7","sf_park q2",
-                            "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2",
-                            "update_ph_park_2 q3", "update_ph_park_2 q13", "update_ph_park_2 q11",
-                            // "update_ph_park_2 q1", "update_ph_park_2 q8", "update_ph_park_2 q6",
-                             "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2"],
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+                            // "update_ph_step_2 q7", "update_ph_step_2 q14","update_ph_step_2 q12", "update_ph_step_2 q10",
+                            // "update_ph_step_2 q6", "update_ph_step_2 q2","update_ph_step_2 q0", "update_ph_step_2 q15",
+                            // "update_ph_step_2 q13", "update_ph_step_2 q16","update_ph_step_2 q1", "update_ph_step_2 q5",
+                            // "update_ph_step_2 q4",
+                            "i q0",
+                            // "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14",
+                            // "cw_01 q6", "cw_01 q2", "cw_01 q0", 
+                            // "cw_01 q15", "cw_01 q13", "cw_01 q16",
+                            // "cw_01 q1", "cw_01 q5", "cw_01 q4",
+                            // "i q0",
+                            "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14"],
 
-        "flux_dance_3 q0": ["barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2", 
+        "flux_dance_3 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
                             "sf_cz_se q9", "sf_cz_nw q4", "sf_cz_nw q13", "sf_cz_se q3", "sf_cz_se q8", "sf_cz_nw q0",
-                             "sf_park q5", "sf_park q10", "sf_park q7","sf_park q2",
-                             "barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2",
-                             "update_ph_park_3 q9", "update_ph_park_3 q13", "update_ph_park_3 q8",
-                             // "update_ph_park_3 q4", "update_ph_park_3 q3", "update_ph_park_3 q0",
-                             "barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2"],
+                            "sf_park q5", "sf_park q10", "sf_park q7","sf_park q2",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+                            // "update_ph_step_3 q7", "update_ph_step_3 q14","update_ph_step_3 q12", "update_ph_step_3 q10",
+                            // "update_ph_step_3 q6", "update_ph_step_3 q2","update_ph_step_3 q0", "update_ph_step_3 q15",
+                            // "update_ph_step_3 q13", "update_ph_step_3 q16","update_ph_step_3 q1", "update_ph_step_3 q5",
+                            // "update_ph_step_3 q4",
+                            "i q0",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
-        "flux_dance_4 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0", 
+        "flux_dance_4 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
                             "sf_cz_sw q9", "sf_cz_ne q5", "sf_cz_ne q15", "sf_cz_sw q3", "sf_cz_sw q8", "sf_cz_ne q2",
-                             "sf_park q4", "sf_park q12", "sf_park q7","sf_park q0",
-                             "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0",
-                             "update_ph_park_4 q9", "update_ph_park_4 q15", "update_ph_park_4 q8",
-                             // "update_ph_park_4 q5", "update_ph_park_4 q3", "update_ph_park_4 q2",
-                             "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0"],
+                            "sf_park q4", "sf_park q12", "sf_park q7","sf_park q0",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+                            "update_ph_step_4 q11", "update_ph_step_4 q8", "update_ph_step_4 q3","update_ph_step_4 q9",
+                            // "update_ph_step_4 q7", "update_ph_step_4 q14","update_ph_step_4 q12", "update_ph_step_4 q10",
+                            "update_ph_step_4 q6", "update_ph_step_4 q2", "update_ph_step_4 q0","update_ph_step_4 q15",
+                            "update_ph_step_4 q13", "update_ph_step_4 q16", "update_ph_step_4 q1","update_ph_step_4 q5",
+                            "update_ph_step_4 q4",
+                            // "i q0",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
-        "flux_dance_5 q0": ["barrier q12, q1, q13, q7, q10, q4, q8, q3, q5", 
+        "flux_dance_5 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
                             "sf_cz_ne q12", "sf_cz_sw q1", "sf_cz_sw q13", "sf_cz_ne q7", "sf_cz_ne q10", "sf_cz_sw q4",
-                             "sf_park q8", "sf_park q3", "sf_park q5",
-                             "barrier q12, q1, q13, q7, q10, q4, q8, q3, q5"],
+                            "sf_park q8", "sf_park q3", "sf_park q5",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+                            // "update_ph_step_5 q7", "update_ph_step_5 q14","update_ph_step_5 q12", "update_ph_step_5 q10",
+                            // "update_ph_step_5 q6", "update_ph_step_5 q2","update_ph_step_5 q0", "update_ph_step_5 q15",
+                            // "update_ph_step_5 q13", "update_ph_step_5 q16","update_ph_step_5 q1", "update_ph_step_5 q5",
+                            // "update_ph_step_5 q4",
+                            "i q0",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
-        "flux_dance_6 q0": ["barrier q15, q12, q7, q2, q16, q10, q8, q3, q6, q14", 
+        "flux_dance_6 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
                             "sf_cz_nw q15", "sf_cz_se q12", "sf_cz_se q7", "sf_cz_nw q2", "sf_cz_nw q16", "sf_cz_se q10",
-                             "sf_park q8", "sf_park q3", "sf_park q6", "sf_park q14",
-                             "barrier q15, q12, q7, q2, q16, q10, q8, q3, q6, q14"],
+                            "sf_park q8", "sf_park q3", "sf_park q6", "sf_park q14",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+                            // "update_ph_step_6 q7", "update_ph_step_6 q14","update_ph_step_6 q12", "update_ph_step_6 q10",
+                            // "update_ph_step_6 q6", "update_ph_step_6 q2","update_ph_step_6 q0", "update_ph_step_6 q15",
+                            // "update_ph_step_6 q13", "update_ph_step_6 q16","update_ph_step_6 q1", "update_ph_step_6 q5",
+                            // "update_ph_step_6 q4",
+                            "i q0",
+                            // "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14",
+                            // "cw_01 q6", "cw_01 q2", "cw_01 q0", 
+                            // "cw_01 q15", "cw_01 q13", "cw_01 q16",
+                            // "cw_01 q1", "cw_01 q5", "cw_01 q4",
+                            // "i q0",
+                            "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14"],
 
-        "flux_dance_7 q0": ["barrier q15, q7, q10, q5, q16, q14, q8, q3, q4, q12", 
+        "flux_dance_7 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
                             "sf_cz_se q15", "sf_cz_nw q7", "sf_cz_nw q10", "sf_cz_se q5", "sf_cz_se q16", "sf_cz_nw q14",
-                             "sf_park q8", "sf_park q3", "sf_park q4", "sf_park q12",
-                             "barrier q15, q7, q10, q5, q16, q14, q8, q3, q4, q12"],
+                            "sf_park q8", "sf_park q3", "sf_park q4", "sf_park q12",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+                            // "update_ph_step_7 q7", "update_ph_step_7 q14","update_ph_step_7 q12", "update_ph_step_7 q10",
+                            // "update_ph_step_7 q6", "update_ph_step_7 q2","update_ph_step_7 q0", "update_ph_step_7 q15",
+                            // "update_ph_step_7 q13", "update_ph_step_7 q16","update_ph_step_7 q1", "update_ph_step_7 q5",
+                            // "update_ph_step_7 q4",
+                            "i q0",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
-        "flux_dance_8 q0": ["barrier q7, q6, q13, q10, q14, q0, q8, q3, q2", 
+        "flux_dance_8 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
                             "sf_cz_sw q7", "sf_cz_ne q6", "sf_cz_ne q13", "sf_cz_sw q10", "sf_cz_sw q14", "sf_cz_ne q0",
-                             "sf_park q8", "sf_park q3", "sf_park q2",
-                             "barrier q7, q6, q13, q10, q14, q0, q8, q3, q2"],
+                            "sf_park q8", "sf_park q3", "sf_park q2",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+                            "update_ph_step_8 q7", "update_ph_step_8 q14","update_ph_step_8 q12", "update_ph_step_8 q10",
+                            "update_ph_step_8 q11", "update_ph_step_8 q8", "update_ph_step_8 q3","update_ph_step_8 q9",
+                            "update_ph_step_8 q6", "update_ph_step_8 q2","update_ph_step_8 q0", "update_ph_step_8 q15",
+                            "update_ph_step_8 q13", "update_ph_step_8 q16","update_ph_step_8 q1", "update_ph_step_8 q5",
+                            "update_ph_step_8 q4",
+                            "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
+        
+        // "flux_dance_5 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
+        //                     "sf_cz_ne q12", "sf_cz_sw q1", "sf_cz_sw q13", "sf_cz_ne q7", "sf_cz_ne q10", "sf_cz_sw q4",
+        //                     "sf_park q5",
+        //                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+        //                     // "update_ph_step_5 q7", "update_ph_step_5 q14","update_ph_step_5 q12", "update_ph_step_5 q10",
+        //                     // "update_ph_step_5 q6", "update_ph_step_5 q2","update_ph_step_5 q0", "update_ph_step_5 q15",
+        //                     // "update_ph_step_5 q13", "update_ph_step_5 q16","update_ph_step_5 q1", "update_ph_step_5 q5",
+        //                     // "update_ph_step_5 q4",
+        //                     "i q0",
+        //                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
+        // "flux_dance_6 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
+        //                     "sf_cz_nw q15", "sf_cz_se q12", "sf_cz_se q7", "sf_cz_nw q2", "sf_cz_nw q16", "sf_cz_se q10",
+        //                     "sf_park q6", "sf_park q14", "sf_park q0",
+        //                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+        //                     // "update_ph_step_6 q7", "update_ph_step_6 q14","update_ph_step_6 q12", "update_ph_step_6 q10",
+        //                     // "update_ph_step_6 q6", "update_ph_step_6 q2","update_ph_step_6 q0", "update_ph_step_6 q15",
+        //                     // "update_ph_step_6 q13", "update_ph_step_6 q16","update_ph_step_6 q1", "update_ph_step_6 q5",
+        //                     // "update_ph_step_6 q4",
+        //                     "i q0",
+        //                     // "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14",
+        //                     // "cw_01 q6", "cw_01 q2", "cw_01 q0", 
+        //                     // "cw_01 q15", "cw_01 q13", "cw_01 q16",
+        //                     // "cw_01 q1", "cw_01 q5", "cw_01 q4",
+        //                     // "i q0",
+        //                     "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14"],
+
+        // "flux_dance_7 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
+        //                     "sf_cz_se q15", "sf_cz_nw q7", "sf_cz_nw q10", "sf_cz_se q5", "sf_cz_se q16", "sf_cz_nw q14",
+        //                     "sf_park q4", "sf_park q12", "sf_park q1",
+        //                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+        //                     // "update_ph_step_7 q7", "update_ph_step_7 q14","update_ph_step_7 q12", "update_ph_step_7 q10",
+        //                     // "update_ph_step_7 q6", "update_ph_step_7 q2","update_ph_step_7 q0", "update_ph_step_7 q15",
+        //                     // "update_ph_step_7 q13", "update_ph_step_7 q16","update_ph_step_7 q1", "update_ph_step_7 q5",
+        //                     // "update_ph_step_7 q4",
+        //                     "i q0",
+        //                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
+
+        // "flux_dance_8 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
+        //                     "sf_cz_sw q7", "sf_cz_ne q6", "sf_cz_ne q13", "sf_cz_sw q10", "sf_cz_sw q14", "sf_cz_ne q0",
+        //                     "sf_park q2",
+        //                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
+        //                     "update_ph_step_8 q7", "update_ph_step_8 q14","update_ph_step_8 q12", "update_ph_step_8 q10",
+        //                     // "update_ph_step_8 q11", "update_ph_step_8 q8", "update_ph_step_8 q3","update_ph_step_8 q9",
+        //                     "update_ph_step_8 q6", "update_ph_step_8 q2","update_ph_step_8 q0", "update_ph_step_8 q15",
+        //                     "update_ph_step_8 q13", "update_ph_step_8 q16","update_ph_step_8 q1", "update_ph_step_8 q5",
+        //                     "update_ph_step_8 q4",
+        //                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
         // // // Qubits are ordered in sf_cz target, control.
         "flux_dance_refocus_1 q0": ["barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6, q0, q7, q15, q13, q12, q4, q9",
                                     "sf_cz_ne q3", "sf_cz_sw q5","sf_cz_sw q16", "sf_cz_ne q8", "sf_cz_ne q11", "sf_cz_sw q2",
                                     "sf_park q1", "sf_park q10", "sf_park q14","sf_park q6",
-                                    "cw_01 q0", "cw_01 q15", "cw_01 q13", "cw_01 q4", "cw_01 q9",
+                                    "cw_01 q0", "cw_01 q15", "cw_01 q13", "cw_01 q4",
                                     "barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6, q0, q7, q15, q13, q12, q4, q9",
-                                    "update_ph_park_1 q11", "update_ph_park_1 q8", "update_ph_park_1 q3",
-                                    "cw_27 q0", "cw_27 q15", "cw_27 q13", "cw_27 q4", "cw_27 q9",
+                                    "cw_27 q0", "cw_27 q15", "cw_27 q13", "cw_27 q4",
+                                    "update_ph_step_4 q1","update_ph_step_4 q16","update_ph_step_4 q6",
                                     "barrier q3, q5, q16, q8, q11, q2, q1, q10, q14, q6, q0, q7, q15, q13, q12, q4, q9"],
 
         "flux_dance_refocus_2 q0": ["barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14",
                                     "sf_cz_nw q3", "sf_cz_se q1","sf_cz_se q13", "sf_cz_nw q8", "sf_cz_nw q11", "sf_cz_se q6",
                                     "sf_park q5", "sf_park q10", "sf_park q7","sf_park q2",
-                                    "cw_01 q15", "cw_01 q4", "cw_01 q0", "cw_01 q9", "cw_01 q16",
+                                    "cw_01 q15", "cw_01 q0", "cw_01 q9", "cw_01 q4",
                                     "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14",
-                                    "cw_27 q15", "cw_27 q4", "cw_27 q0", "cw_27 q9", "cw_27 q16",
+                                    "cw_27 q15", "cw_27 q0", "cw_27 q9", "cw_27 q4",
                                     "barrier q3, q1, q13, q8, q11, q6, q5, q10, q7, q2, q15, q4, q0, q9, q12, q16, q14"],
 
         "flux_dance_refocus_3 q0": ["barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2, q14, q16, q1, q12, q15, q6, q11",
                                     "sf_cz_se q9", "sf_cz_nw q4","sf_cz_nw q13", "sf_cz_se q3", "sf_cz_se q8", "sf_cz_nw q0",
                                     "sf_park q5", "sf_park q10", "sf_park q7","sf_park q2",
-                                    "cw_01 q16", "cw_01 q1", "cw_01 q15", "cw_01 q6", "cw_01 q11",
-                                    "barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2, q14, q16, q1, q12, q15, q6, q11",
-                                    "update_ph_park_1 q9", 
-                                    "cw_27 q16", "cw_27 q1", "cw_27 q15", "cw_27 q6", "cw_27 q11",
+                                    "cw_01 q16", "cw_01 q1", "cw_01 q15", "cw_01 q6",
+                                    "barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2, q14, q16, q1, q12, q15, q6, q11", 
+                                    "cw_27 q16", "cw_27 q1", "cw_27 q15", "cw_27 q6",
+                                    "update_ph_step_4 q13",
                                     "barrier q9, q4, q13, q3, q8, q0, q5, q10, q7, q2, q14, q16, q1, q12, q15, q6, q11"],
 
         "flux_dance_refocus_4 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
                                     "sf_cz_sw q9", "sf_cz_ne q5", "sf_cz_ne q15", "sf_cz_sw q3", "sf_cz_sw q8", "sf_cz_ne q2",
                                     "sf_park q4", "sf_park q12", "sf_park q7","sf_park q0",
-                                    "cw_01 q1", "cw_01 q16", "cw_01 q13", "cw_01 q11", "cw_01 q6",
+                                    "cw_01 q1", "cw_01 q16", "cw_01 q13", "cw_01 q6",
                                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
-                                    "cw_27 q1", "cw_27 q16", "cw_27 q13", "cw_27 q11", "cw_27 q6",
+                                    "cw_27 q1", "cw_27 q16", "cw_27 q13", "cw_27 q6",
+                                    "update_ph_step_4 q11", "update_ph_step_4 q8", "update_ph_step_4 q3","update_ph_step_4 q9",
+                                    "update_ph_step_4 q2", "update_ph_step_4 q0","update_ph_step_4 q15",
+                                    "update_ph_step_4 q5",
+                                    "update_ph_step_4 q4",
                                     "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
         "flux_dance_refocus_5 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
@@ -652,8 +856,8 @@
                                      "sf_park q8", "sf_park q3", "sf_park q5",
                                      "cw_01 q15", "cw_01 q6", "cw_01 q0", "cw_01 q2", "cw_01 q16",
                                      "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
-                                     "update_ph_park_1 q12", "update_ph_park_1 q7", "update_ph_park_1 q10",
                                      "cw_27 q15", "cw_27 q6", "cw_27 q0", "cw_27 q2", "cw_27 q16",
+                                     "update_ph_step_8 q1","update_ph_step_8 q5","update_ph_step_8 q4",
                                      "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
         "flux_dance_refocus_6 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
@@ -671,8 +875,8 @@
                                      "sf_park q8", "sf_park q3", "sf_park q4", "sf_park q12",
                                      "cw_01 q1", "cw_01 q13", "cw_01 q6", "cw_01 q2", "cw_01 q0",
                                      "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
-                                     "update_ph_park_1 q14",
                                      "cw_27 q1", "cw_27 q13", "cw_27 q6", "cw_27 q2", "cw_27 q0",
+                                     "update_ph_step_8 q15","update_ph_step_8 q16", 
                                      "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
         "flux_dance_refocus_8 q0": ["barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6", 
@@ -682,72 +886,53 @@
                                      "cw_01 q1", "cw_01 q5", "cw_01 q4", "cw_01 q15", "cw_01 q16",
                                      "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6",
                                      "cw_27 q1", "cw_27 q5", "cw_27 q4", "cw_27 q15", "cw_27 q16",
+                                     "update_ph_step_8 q7", "update_ph_step_8 q14","update_ph_step_8 q12", "update_ph_step_8 q10",
+                                     "update_ph_step_8 q6", "update_ph_step_8 q2","update_ph_step_8 q0", 
+                                     "update_ph_step_8 q13", 
                                      "barrier q9, q5, q15, q3, q8, q2, q4, q12, q7, q0, q1, q10, q16, q13, q14, q11, q6"],
 
-
-        // fluxing steps for parity checks in a distance_7 repetition code
-        // "repetition_code_1 q0": ["barrier q9, q5, q8, q2, q4, q7, q0, q6", 
-        //                         "sf_cz_sw q9", "sf_cz_ne q5", "sf_cz_sw q7", "sf_cz_ne q6", "sf_cz_se q8", "sf_cz_nw q0",
-        //                         "sf_park q2", "sf_park q4",
-        //                         "barrier q9, q5, q8, q2, q4, q7, q0, q6"],
-
-        // "repetition_code_2 q0": ["barrier q9, q5, q3, q8, q2, q4, q7, q0, q13, q10", 
-        //                         "sf_cz_se q9", "sf_cz_nw q4", "sf_cz_sw q13", "sf_cz_ne q7", "sf_cz_sw q8", "sf_cz_ne q2",
-        //                         "sf_park q5", "sf_park q3", "sf_park q10", "sf_park q0",
-        //                         "barrier q9, q5, q3, q8, q2, q4, q7, q0, q13, q10"],
-
-        // "repetition_code_3 q0": ["barrier q3, q8, q2, q7, q16, q13, q10, q11, q6, q14", 
-        //                         "sf_cz_nw q13", "sf_cz_se q3", "sf_cz_ne q11", "sf_cz_sw q2", "sf_cz_se q16", "sf_cz_nw q14",
-        //                         "sf_park q10", "sf_park q7", "sf_park q8", "sf_park q6",
-        //                         "barrier q3, q8, q2, q7, q16, q13, q10, q11, q6, q14"],
-
-        // "repetition_code_4 q0": ["barrier q5, q3, q2, q1, q14, q11, q6, q0", 
-        //                         "sf_cz_ne q3", "sf_cz_sw q5", "sf_cz_nw q11", "sf_cz_se q6", "sf_cz_sw q14", "sf_cz_ne q0",
-        //                         "sf_park q1", "sf_park q2",
-        //                         "barrier q5, q3, q2, q1, q14, q11, q6, q0"],
-
-        // fluxing steps for parity checks in a distance_7 repetition code with phase updates
-        "repetition_code_1 q0": ["barrier q9, q5, q8, q2, q4, q7, q0, q6, q13, q16",
-                                "sf_cz_sw q9", "sf_cz_ne q5", "sf_cz_sw q7", "sf_cz_ne q6", "sf_cz_se q8", "sf_cz_nw q0",
-                                "sf_park q2", "sf_park q4",
-                                "cw_01 q13", "cw_01 q16",
-                                "barrier q9, q5, q8, q2, q4, q7, q0, q6, q13, q16",
-                                // "update_ph_sw q9", "update_ph_ne q5", "update_ph_sw q7", "update_ph_ne q6", "update_ph_se q8", "update_ph_nw q0", 
-                                // "update_ph_park_1 q2", "update_ph_park_1 q4",
-                                "cw_27 q13", "cw_27 q16", 
-                                "barrier q9, q5, q8, q2, q4, q7, q0, q6, q13, q16"],
-
-        "repetition_code_2 q0": ["barrier q9, q5, q3, q8, q2, q4, q7, q0, q13, q10, q6, q16", 
-                                "sf_cz_se q9", "sf_cz_nw q4", "sf_cz_sw q13", "sf_cz_ne q7", "sf_cz_sw q8", "sf_cz_ne q2",
-                                "sf_park q5", "sf_park q3", "sf_park q10", "sf_park q0",
-                                "cw_01 q6", "cw_01 q16",
-                                "barrier q9, q5, q3, q8, q2, q4, q7, q0, q13, q10, q6, q16",
-                                // "update_ph_se q9", "update_ph_nw q4", "update_ph_sw q13", "update_ph_ne q7", "update_ph_sw q8", "update_ph_ne q2", 
-                                // "update_ph_park_2 q5", "update_ph_park_2 q3", "update_ph_park_2 q10", "update_ph_park_2 q0",
-                                "update_ph_park_1 q9", "update_ph_park_1 q7", "update_ph_park_1 q8",
-                                "cw_27 q6", "cw_27 q16", 
-                                "barrier q9, q5, q3, q8, q2, q4, q7, q0, q13, q10, q6, q16"],
-
-        "repetition_code_3 q0": ["barrier q3, q8, q2, q7, q16, q13, q10, q11, q6, q14, q0, q4, q5", 
-                                "sf_cz_nw q13", "sf_cz_se q3", "sf_cz_ne q11", "sf_cz_sw q2", "sf_cz_se q16", "sf_cz_nw q14",
-                                "sf_park q10", "sf_park q7", "sf_park q8", "sf_park q6",
-                                "cw_01 q5", "cw_01 q4", "cw_01 q0",
-                                "barrier q3, q8, q2, q7, q16, q13, q10, q11, q6, q14, q0, q4, q5",
-                                // "update_ph_nw q13", "update_ph_se q3", "update_ph_ne q11", "update_ph_sw q2", "update_ph_se q16", "update_ph_nw q14", 
-                                // "update_ph_park_3 q10", "update_ph_park_3 q7", "update_ph_park_3 q8", "update_ph_park_3 q6",
-                                "cw_27 q5", "cw_27 q4", "cw_27 q0",
-                                "barrier q3, q8, q2, q7, q16, q13, q10, q11, q6, q14, q0, q4, q5"],
-
-        "repetition_code_4 q0": ["barrier q5, q3, q2, q1, q14, q11, q6, q0, q4, q13, q16", 
-                                "sf_cz_ne q3", "sf_cz_sw q5", "sf_cz_nw q11", "sf_cz_se q6", "sf_cz_sw q14", "sf_cz_ne q0",
-                                "sf_park q1", "sf_park q2",
-                                "cw_01 q4", "cw_01 q13", "cw_01 q16",
-                                "barrier q5, q3, q2, q1, q14, q11, q6, q0, q4, q13, q16", 
-                                // "update_ph_ne q3", "update_ph_sw q5", "update_ph_nw q11", "update_ph_se q6", "update_ph_sw q14", "update_ph_ne q0", 
-                                // "update_ph_park_4 q1", "update_ph_park_4 q2",
-                                "update_ph_park_1 q3", "update_ph_park_1 q11", "update_ph_park_1 q14",
-                                "cw_27 q4", "cw_27 q13", "cw_27 q16",  
-                                "barrier q5, q3, q2, q1, q14, q11, q6, q0, q4, q13, q16"],
+        // [AUTOMATIC GENERATED GATE SEQUENCE - QCoCircuits]
+        // Gate sequence for distance-3 repetition code. Using Z2-Z4 only
+        "repetition_code_1 q0": [
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16",
+            "sf_cz_nw q14", "sf_cz_se q16",  // Z2-D6 2Q gate
+            "sf_park q10",  // Z4 park
+            "sf_park q8",  // X2 park
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16",
+            "update_ph_nw q14",
+            "update_ph_se q16",
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16"
+        ],
+        "repetition_code_2 q0": [
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16",
+            "sf_cz_sw q14", "sf_cz_ne q0",  // Z2-D3 2Q gate
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16",
+            "update_ph_sw q14",
+            "update_ph_ne q0",
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16"
+        ],
+        "repetition_code_3 q0": [
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16",
+            "sf_cz_sw q10", "sf_cz_ne q13",  // Z4-D5 2Q gate
+            "sf_park q3",  // X3 park
+            "sf_park q7",  // Z1 park
+            "sf_park q8",  // X2 park
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16",
+            "update_ph_sw q10",
+            "update_ph_ne q13",
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16"
+        ],
+        "repetition_code_4 q0": [
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16",
+            "sf_cz_se q10", "sf_cz_nw q16",  // Z4-D6 2Q gate
+            "sf_park q14",  // Z2 park
+            "sf_park q8",  // X2 park
+            "sf_park q0",  // D3 park
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16",
+            "update_ph_se q10",
+            "update_ph_nw q16",
+            "barrier q0, q1, q2, q3, q4, q5, q6, q7, q8, q9, q10, q11, q12, q13, q14, q15, q16"
+        ],
 
         // CC additions
         "cnot_park1 %0 %1 %2": ["ry90 %1", "cz %0 %1", "park_cz %2", "ry90 %1"],
@@ -782,7 +967,10 @@
         "rphim45 %0": ["cw_15 %0"],
         "rphi45 %0":  ["cw_16 %0"],
         "rphi135m90 %0": ["cw_17 %0"],
-        "rphi13590 %0": ["cw_18 %0"]
+        "rphi13590 %0": ["cw_18 %0"],
+        "PRNG %0": ["cw_127 %0"],  // Reserved for PRNG operation
+		"rx175 %0": ["cw_31 %0"],
+		"rx170 %0": ["cw_32 %0"]
     },
 
 
@@ -822,6 +1010,16 @@
                 "static_codeword_override": [1]
             }
         },
+        "rxm180": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x",
+            "cc": {
+                "ref_signal": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
+                "static_codeword_override": [27]
+            }
+        },
         "ry180": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
@@ -830,6 +1028,16 @@
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [2]
+            }
+        },
+        "rym180": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "x",
+            "cc": {
+                "ref_signal": "single-qubit-mw",    // NB: reference, instead of defining "signal" here
+                "static_codeword_override": [28]
             }
         },
         "rx90": {
@@ -1243,7 +1451,27 @@
             "cc_light_instr": "rx12",
             "cc": {
                 "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [31]
+                "static_codeword_override": [9]
+            }
+        },
+        "rx23": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "rx23",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [30]
+            }
+        },
+        "cw_lru": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_01",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [1]
             }
         },
         // cw_00 .. cw_31
@@ -1567,6 +1795,176 @@
                 "static_codeword_override": [31]
             }
         },
+        "cw_32": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_32",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [32]
+            }
+        },
+        "cw_33": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_33",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [33]
+            }
+        },
+        "cw_34": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_34",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [34]
+            }
+        },
+        "cw_35": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_35",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [35]
+            }
+        },
+        "cw_36": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_36",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [36]
+            }
+        },
+        "cw_37": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_37",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [37]
+            }
+        },
+        "cw_38": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_38",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [38]
+            }
+        },
+        "cw_39": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_39",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [39]
+            }
+        },
+        "cw_40": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_40",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [40]
+            }
+        },
+        "cw_41": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_41",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [41]
+            }
+        },
+        "cw_42": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_42",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [42]
+            }
+        },
+        "cw_43": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_43",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [43]
+            }
+        },
+        "cw_44": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_44",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [44]
+            }
+        },
+        "cw_45": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_45",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [45]
+            }
+        },
+        "cw_46": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_46",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [46]
+            }
+        },
+        "cw_47": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_47",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [47]
+            }
+        },
+        "cw_127": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "mw",
+            "cc_light_instr": "cw_127",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [127]
+            }
+        },
         // fl_cw_00 .. fl_cw_07
         "fl_cw_00": {
             "duration": @FLUX_DURATION@,
@@ -1819,16 +2217,6 @@
         //     }
         // },
 
-        "cw_27": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
-            "type": "mw",
-            "cc_light_instr": "cw_27",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [27]
-            }
-        },
         // "cw_27 q1": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
@@ -2091,6 +2479,39 @@
             "cc": {
                 "ref_signal": "single-qubit-flux",
                 "static_codeword_override": [5]
+            }
+        },
+        
+        "sf_custom_wf": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_custom_wf",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [7]
+            }
+        },
+        
+        "sf_cz_aux": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_park",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [7]
+            }
+        },
+
+        "sf_lru": {
+            "duration": @FLUX_DURATION@,
+            "matrix": [ [0.0,1.0], [1.0,0.0], [1.0,0.0], [0.0,0.0] ],
+            "type": "flux",
+            "cc_light_instr": "sf_cz_se",
+            "cc": {
+                "ref_signal": "single-qubit-flux",
+                "static_codeword_override": [1]
             }
         },
         // "sf_park q0": {
@@ -3850,12 +4271,25 @@
         // },
         // END OF AUTOMATICALLY GENERATED SECTION
 
-        // BEGIN OF AUTOMATICALLY GENERATED SECTION
-        "update_ph_park_1": {
+        "update_ph_LRU": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
             "type": "mw",
-            "cc_light_instr": "update_ph_park_1",
+            "cc_light_instr": "update_ph_LRU",
+            "cc": {
+                "ref_signal": "single-qubit-mw",
+                "static_codeword_override": [
+                    51
+                ]
+            }
+        },
+
+        // BEGIN OF AUTOMATICALLY GENERATED SECTION
+        "update_ph_step_1": {
+            "duration": @MW_DURATION@,
+            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+            "type": "mw",
+            "cc_light_instr": "update_ph_step_1",
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [
@@ -3863,7 +4297,7 @@
                 ]
             }
         },
-        // "update_ph_park_1 q1": {
+        // "update_ph_step_1 q1": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -3884,7 +4318,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -3892,7 +4326,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q2": {
+        // "update_ph_step_1 q2": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -3913,7 +4347,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -3921,7 +4355,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q3": {
+        // "update_ph_step_1 q3": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -3942,7 +4376,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -3950,7 +4384,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q4": {
+        // "update_ph_step_1 q4": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -3971,7 +4405,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -3979,7 +4413,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q5": {
+        // "update_ph_step_1 q5": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4000,7 +4434,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4008,7 +4442,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q6": {
+        // "update_ph_step_1 q6": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4029,7 +4463,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4037,7 +4471,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q7": {
+        // "update_ph_step_1 q7": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4058,7 +4492,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4066,7 +4500,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q8": {
+        // "update_ph_step_1 q8": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4087,7 +4521,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4095,7 +4529,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q9": {
+        // "update_ph_step_1 q9": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4116,7 +4550,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4124,7 +4558,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q10": {
+        // "update_ph_step_1 q10": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4145,7 +4579,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4153,7 +4587,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q11": {
+        // "update_ph_step_1 q11": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4174,7 +4608,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4182,7 +4616,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q12": {
+        // "update_ph_step_1 q12": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4203,7 +4637,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4211,7 +4645,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q13": {
+        // "update_ph_step_1 q13": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4232,7 +4666,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4240,7 +4674,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q14": {
+        // "update_ph_step_1 q14": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4261,7 +4695,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4269,7 +4703,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q15": {
+        // "update_ph_step_1 q15": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4290,7 +4724,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4298,7 +4732,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_1 q16": {
+        // "update_ph_step_1 q16": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4319,7 +4753,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_1",
+        //     "cc_light_instr": "update_ph_step_1",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4327,11 +4761,11 @@
         //         ]
         //     }
         // },
-        "update_ph_park_2": {
+        "update_ph_step_2": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
             "type": "mw",
-            "cc_light_instr": "update_ph_park_2",
+            "cc_light_instr": "update_ph_step_2",
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [
@@ -4339,7 +4773,7 @@
                 ]
             }
         },
-        // "update_ph_park_2 q1": {
+        // "update_ph_step_2 q1": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4360,7 +4794,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4368,7 +4802,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q2": {
+        // "update_ph_step_2 q2": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4389,7 +4823,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4397,7 +4831,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q3": {
+        // "update_ph_step_2 q3": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4418,7 +4852,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4426,7 +4860,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q4": {
+        // "update_ph_step_2 q4": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4447,7 +4881,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4455,7 +4889,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q5": {
+        // "update_ph_step_2 q5": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4476,7 +4910,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4484,7 +4918,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q6": {
+        // "update_ph_step_2 q6": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4505,7 +4939,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4513,7 +4947,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q7": {
+        // "update_ph_step_2 q7": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4534,7 +4968,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4542,7 +4976,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q8": {
+        // "update_ph_step_2 q8": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4563,7 +4997,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4571,7 +5005,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q9": {
+        // "update_ph_step_2 q9": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4592,7 +5026,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4600,7 +5034,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q10": {
+        // "update_ph_step_2 q10": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4621,7 +5055,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4629,7 +5063,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q11": {
+        // "update_ph_step_2 q11": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4650,7 +5084,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4658,7 +5092,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q12": {
+        // "update_ph_step_2 q12": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4679,7 +5113,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4687,7 +5121,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q13": {
+        // "update_ph_step_2 q13": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4708,7 +5142,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4716,7 +5150,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q14": {
+        // "update_ph_step_2 q14": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4737,7 +5171,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4745,7 +5179,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q15": {
+        // "update_ph_step_2 q15": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4766,7 +5200,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4774,7 +5208,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_2 q16": {
+        // "update_ph_step_2 q16": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4795,7 +5229,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_2",
+        //     "cc_light_instr": "update_ph_step_2",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4803,11 +5237,11 @@
         //         ]
         //     }
         // },
-        "update_ph_park_3": {
+        "update_ph_step_3": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
             "type": "mw",
-            "cc_light_instr": "update_ph_park_3",
+            "cc_light_instr": "update_ph_step_3",
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [
@@ -4815,7 +5249,7 @@
                 ]
             }
         },
-        // "update_ph_park_3 q1": {
+        // "update_ph_step_3 q1": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4836,7 +5270,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4844,7 +5278,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q2": {
+        // "update_ph_step_3 q2": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4865,7 +5299,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4873,7 +5307,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q3": {
+        // "update_ph_step_3 q3": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4894,7 +5328,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4902,7 +5336,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q4": {
+        // "update_ph_step_3 q4": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4923,7 +5357,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4931,7 +5365,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q5": {
+        // "update_ph_step_3 q5": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4952,7 +5386,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4960,7 +5394,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q6": {
+        // "update_ph_step_3 q6": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -4981,7 +5415,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -4989,7 +5423,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q7": {
+        // "update_ph_step_3 q7": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5010,7 +5444,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5018,7 +5452,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q8": {
+        // "update_ph_step_3 q8": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5039,7 +5473,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5047,7 +5481,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q9": {
+        // "update_ph_step_3 q9": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5068,7 +5502,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5076,7 +5510,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q10": {
+        // "update_ph_step_3 q10": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5097,7 +5531,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5105,7 +5539,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q11": {
+        // "update_ph_step_3 q11": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5126,7 +5560,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5134,7 +5568,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q12": {
+        // "update_ph_step_3 q12": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5155,7 +5589,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5163,7 +5597,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q13": {
+        // "update_ph_step_3 q13": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5184,7 +5618,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5192,7 +5626,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q14": {
+        // "update_ph_step_3 q14": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5213,7 +5647,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5221,7 +5655,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q15": {
+        // "update_ph_step_3 q15": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5242,7 +5676,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5250,7 +5684,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_3 q16": {
+        // "update_ph_step_3 q16": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5271,7 +5705,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_3",
+        //     "cc_light_instr": "update_ph_step_3",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5279,11 +5713,11 @@
         //         ]
         //     }
         // },
-        "update_ph_park_4": {
+        "update_ph_step_4": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
             "type": "mw",
-            "cc_light_instr": "update_ph_park_4",
+            "cc_light_instr": "update_ph_step_4",
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [
@@ -5291,7 +5725,7 @@
                 ]
             }
         },
-        // "update_ph_park_4 q1": {
+        // "update_ph_step_4 q1": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5312,7 +5746,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5320,7 +5754,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q2": {
+        // "update_ph_step_4 q2": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5341,7 +5775,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5349,7 +5783,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q3": {
+        // "update_ph_step_4 q3": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5370,7 +5804,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5378,7 +5812,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q4": {
+        // "update_ph_step_4 q4": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5399,7 +5833,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5407,7 +5841,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q5": {
+        // "update_ph_step_4 q5": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5428,7 +5862,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5436,7 +5870,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q6": {
+        // "update_ph_step_4 q6": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5457,7 +5891,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5465,7 +5899,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q7": {
+        // "update_ph_step_4 q7": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5486,7 +5920,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5494,7 +5928,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q8": {
+        // "update_ph_step_4 q8": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5515,7 +5949,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5523,7 +5957,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q9": {
+        // "update_ph_step_4 q9": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5544,7 +5978,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5552,7 +5986,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q10": {
+        // "update_ph_step_4 q10": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5573,7 +6007,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5581,7 +6015,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q11": {
+        // "update_ph_step_4 q11": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5602,7 +6036,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5610,7 +6044,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q12": {
+        // "update_ph_step_4 q12": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5631,7 +6065,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5639,7 +6073,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q13": {
+        // "update_ph_step_4 q13": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5660,7 +6094,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5668,7 +6102,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q14": {
+        // "update_ph_step_4 q14": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5689,7 +6123,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5697,7 +6131,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q15": {
+        // "update_ph_step_4 q15": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5718,7 +6152,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5726,7 +6160,7 @@
         //         ]
         //     }
         // },
-        // "update_ph_park_4 q16": {
+        // "update_ph_step_4 q16": {
         //     "duration": @MW_DURATION@,
         //     "matrix": [
         //         [
@@ -5747,7 +6181,7 @@
         //         ]
         //     ],
         //     "type": "mw",
-        //     "cc_light_instr": "update_ph_park_4",
+        //     "cc_light_instr": "update_ph_step_4",
         //     "cc": {
         //         "ref_signal": "single-qubit-mw",
         //         "static_codeword_override": [
@@ -5755,11 +6189,11 @@
         //         ]
         //     }
         // },
-        "update_ph_park_5 q0": {
+        "update_ph_step_5": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
             "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
+            "cc_light_instr": "update_ph_step_5",
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [
@@ -5767,215 +6201,203 @@
                 ]
             }
         },
-        "update_ph_park_5 q1": {
+        // "update_ph_step_5 q1": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q2": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q3": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q4": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q5": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q6": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q7": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q8": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q9": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q10": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q11": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q12": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q13": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q14": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q15": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_5 q16": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_5",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             56
+        //         ]
+        //     }
+        // },
+        "update_ph_step_6": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
             "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q2": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q3": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q4": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q5": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q6": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q7": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q8": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q9": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q10": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q11": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q12": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q13": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q14": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q15": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_5 q16": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_5",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    56
-                ]
-            }
-        },
-        "update_ph_park_6 q0": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q1": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
+            "cc_light_instr": "update_ph_step_6",
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [
@@ -5983,215 +6405,203 @@
                 ]
             }
         },
-        "update_ph_park_6 q2": {
+        // "update_ph_step_6 q1": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q2": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q3": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q4": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q5": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q6": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q7": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q8": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q9": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q10": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q11": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q12": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q13": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q14": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q15": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_6 q16": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_6",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             57
+        //         ]
+        //     }
+        // },
+        "update_ph_step_7": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
             "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q3": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q4": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q5": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q6": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q7": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q8": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q9": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q10": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q11": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q12": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q13": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q14": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q15": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_6 q16": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_6",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    57
-                ]
-            }
-        },
-        "update_ph_park_7 q0": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q1": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q2": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
+            "cc_light_instr": "update_ph_step_7",
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [
@@ -6199,215 +6609,203 @@
                 ]
             }
         },
-        "update_ph_park_7 q3": {
+        // "update_ph_step_7 q1": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q2": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q3": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q4": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q5": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q6": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q7": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q8": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q9": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q10": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q11": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q12": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q13": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q14": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q15": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_7 q16": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_7",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             58
+        //         ]
+        //     }
+        // },
+        "update_ph_step_8": {
             "duration": @MW_DURATION@,
             "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
             "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q4": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q5": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q6": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q7": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q8": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q9": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q10": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q11": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q12": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q13": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q14": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q15": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_7 q16": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_7",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    58
-                ]
-            }
-        },
-        "update_ph_park_8 q0": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q1": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q2": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q3": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
+            "cc_light_instr": "update_ph_step_8",
             "cc": {
                 "ref_signal": "single-qubit-mw",
                 "static_codeword_override": [
@@ -6415,162 +6813,198 @@
                 ]
             }
         },
-        "update_ph_park_8 q4": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q5": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q6": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q7": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q8": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q9": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q10": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q11": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q12": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q13": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q14": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q15": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
-        "update_ph_park_8 q16": {
-            "duration": @MW_DURATION@,
-            "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
-            "type": "mw",
-            "cc_light_instr": "update_ph_park_8",
-            "cc": {
-                "ref_signal": "single-qubit-mw",
-                "static_codeword_override": [
-                    59
-                ]
-            }
-        },
+        // "update_ph_step_8 q1": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q2": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q3": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q4": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q5": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q6": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q7": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q8": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q9": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q10": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q11": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q12": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q13": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q14": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q15": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
+        // "update_ph_step_8 q16": {
+        //     "duration": @MW_DURATION@,
+        //     "matrix": [ [0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0] ],
+        //     "type": "mw",
+        //     "cc_light_instr": "update_ph_step_8",
+        //     "cc": {
+        //         "ref_signal": "single-qubit-mw",
+        //         "static_codeword_override": [
+        //             59
+        //         ]
+        //     }
+        // },
         // END OF AUTOMATICALLY GENERATED SECTION
 
 

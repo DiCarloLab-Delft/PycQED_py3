@@ -2531,8 +2531,8 @@ class Echo_analysis_V15(TD_Analysis):
 
         verbose = kw.get('verbose', False)
         # Get old values for qubit frequency
-        instr_set = self.data_file['Instrument settings']
         try:
+            instr_set = self.data_file['Instrument settings']
             if self.for_ef:
                 self.qubit_freq_spec = \
                     float(instr_set[self.qb_name].attrs['f_ef_qubit'])
@@ -4697,24 +4697,11 @@ class T1_Analysis(TD_Analysis):
 
             units = SI_prefix_and_scale_factor(val=max(abs(self.ax.get_xticks())),
                                                unit=self.sweep_unit[0])[1]
-            # Get old values
-            instr_set = self.data_file['Instrument settings']
-            try:
-                if self.for_ef:
-                    T1_old = float(
-                        instr_set[self.qb_name].attrs['T1_ef']) * 1e6
-                else:
-                    T1_old = float(instr_set[self.qb_name].attrs['T1']) * 1e6
-                old_vals = '\nold $T_1$ = {:.5f} '.format(T1_old) + units
-            except (TypeError, KeyError, ValueError):
-                logging.warning('qb_name is None. Old parameter values will '
-                                'not be retrieved.')
-                old_vals = ''
 
             textstr = ('$T_1$ = {:.5f} '.format(T1_micro_sec) +
                        units +
                        ' $\pm$ {:.5f} '.format(T1_err_micro_sec) +
-                       units + old_vals)
+                       units)
 
             self.fig.text(0.5, -0.2, textstr, transform=self.ax.transAxes,
                           fontsize=self.font_size,
@@ -4778,7 +4765,8 @@ class Ramsey_Analysis(TD_Analysis):
     Most kw parameters for Rabi_Analysis are also used here.
     """
 
-    def __init__(self, label='Ramsey', phase_sweep_only=False, **kw):
+    def __init__(self, label='Ramsey', phase_sweep_only=False,
+                 **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         self.phase_sweep_only = phase_sweep_only
@@ -4970,15 +4958,17 @@ class Ramsey_Analysis(TD_Analysis):
             close_main_figure=True, save_fig=False, **kw)
 
         verbose = kw.get('verbose', False)
-        # Get old values for qubit frequency
-        instr_set = self.data_file['Instrument settings']
         try:
             if self.for_ef:
+                # Get old values for qubit frequency
+                instr_set = self.data_file['Instrument settings']
                 self.qubit_freq_spec = \
                     float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             elif 'freq_qubit' in kw.keys():
                 self.qubit_freq_spec = kw['freq_qubit']
             else:
+                # Get old values for qubit frequency
+                instr_set = self.data_file['Instrument settings']
                 try:
                     self.qubit_freq_spec = \
                         float(instr_set[self.qb_name].attrs['f_qubit'])
@@ -6335,16 +6325,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         scale = SI_prefix_and_scale_factor(val=max(abs(ax.get_xticks())),
                                            unit=self.sweep_unit[0])[0]
-
-        instr_set = self.data_file['Instrument settings']
-        try:
-            old_RO_freq = float(instr_set[self.qb_name].attrs['f_RO'])
-            old_vals = '\n$f_{\mathrm{old}}$ = %.5f GHz' % (
-                old_RO_freq * scale)
-        except (TypeError, KeyError, ValueError):
-            logging.warning('qb_name is None. Old parameter values will '
-                            'not be retrieved.')
-            old_vals = ''
+        
+        old_vals = ''
 
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
             if kw['custom_power_message'] is None:

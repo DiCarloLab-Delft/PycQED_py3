@@ -54,7 +54,7 @@ _def_lm = {
     4: {"name": "cz_NW", "type": "idle_z", "which": "NW"},
     5: {"name": "park", "type": "square"},
     6: {"name": "square", "type": "square"},
-    7: {"name": "custom_wf", "type": "custom"},
+    7: {"name": "cz_aux", "type": "cz", "which": "aux"},
 }
 
 
@@ -132,6 +132,36 @@ class Base_Flux_LutMan(Base_LutMan):
 
 
 class HDAWG_Flux_LutMan(Base_Flux_LutMan):
+    
+    # region Class Properties
+    @property
+    def total_length(self) -> int:
+        """:return: Total number of sample points dedicated to waveform."""
+        return self.total_park_length + self.total_pad_length
+
+    @property
+    def total_park_length(self) -> int:
+        """:return: Total number of sample points dedicated to parking."""
+        return int(np.round(self.sampling_rate() * self.park_length()))
+
+    @property
+    def total_pad_length(self) -> int:
+        """:return: Total number of sample points dedicated to waveform padding."""
+        return int(np.round(self.sampling_rate() * self.park_pad_length() * 2))
+
+    @property
+    def first_pad_length(self) -> int:
+        """:return: Number of sample points in first pad-'arm' of two-sided parking."""
+        equal_split: int = int(np.round(self.sampling_rate() * self.park_pad_length()))
+        minimum_padding: int = 1
+        return max(min(equal_split + self.park_pad_symmetry_offset(), self.total_pad_length - minimum_padding), minimum_padding)
+
+    @property
+    def second_pad_length(self) -> int:
+        """:return: Number of sample points in second pad-'arm' of two-sided parking."""
+        return self.total_pad_length - self.first_pad_length
+    # endregion
+    
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
@@ -190,18 +220,33 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             length=self.sq_length(),
             sampling_rate=self.sampling_rate(),
             delay=self.sq_delay(),
+            gauss_sigma=self.sq_gauss_sigma(),
         )
 
     def _gen_park(self):
+        zeros = np.zeros(int(self.park_pad_length() * self.sampling_rate()))
+        # Padding
+        first_zeros: np.ndarray = np.zeros(shape=self.first_pad_length)
+        second_zeros: np.ndarray = np.zeros(shape=self.second_pad_length)
+        
         if self.park_double_sided():
             ones = np.ones(int(self.park_length() * self.sampling_rate() / 2))
-            zeros = np.zeros(int(self.park_pad_length() * self.sampling_rate()))
             pulse_pos = self.park_amp() * ones
-            return np.concatenate((zeros, pulse_pos, - pulse_pos, zeros))
+            return np.concatenate((
+                first_zeros, 
+                +1 * pulse_pos,
+                -1 * pulse_pos,
+                second_zeros,
+            ))
         else:
-            return self.park_amp() * np.ones(
+            pulse_pos = self.park_amp() * np.ones(
                 int(self.park_length() * self.sampling_rate())
             )
+            return np.concatenate((
+                first_zeros,
+                pulse_pos,
+                second_zeros,
+            ))
 
     def _add_qubit_parameters(self):
         """
@@ -288,7 +333,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             "vcz_waveform": wf_vcz.vcz_waveform
         }
 
-        for this_cz in ["NE", "NW", "SW", "SE"]:
+        for this_cz in ["NE", "NW", "SW", "SE", "aux"]:
             self.add_parameter(
                 "cz_wf_generator_%s" % this_cz,
                 initial_value="vcz_waveform",
@@ -313,7 +358,17 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             unit="s",
             label="Parking pulse padding duration (single-sided)",
             initial_value=0,
-            vals=vals.Numbers(0, 20e-9),
+            vals=vals.Numbers(0, 100e-6),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "park_pad_symmetry_offset",
+            unit="samples",
+            label="Parking pulse padding samling point offset.\
+                Applies offset to sampling points in initial padding (additive) and final padding (subtractive).\
+                The offset is bounded such that the padding is minimal 1# and maximal total_padding - 1#.",
+            initial_value=0,
+            vals=vals.Numbers(-100, 100),
             parameter_class=ManualParameter,
         )
         self.add_parameter(
@@ -355,6 +410,14 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             "sq_delay",
             unit="s",
             label="Square pulse delay",
+            initial_value=0e-9,
+            vals=vals.Numbers(0, 100e-6),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "sq_gauss_sigma",
+            unit="s",
+            label="Sigma for gaussian filter",
             initial_value=0e-9,
             vals=vals.Numbers(0, 100e-6),
             parameter_class=ManualParameter,
@@ -407,7 +470,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         state_A: str = "01",
         state_B: str = "02",
         which_gate: str = "NE",
-    ):
+        ):
         """
         Calculates detuning between two levels as a function of pulse
         amplitude in Volt.
@@ -441,7 +504,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         state_B: str = "02",
         which_gate: str = "NE",
         positive_branch=True,
-    ):
+        ):
         """
         See `calc_eps_to_amp`
         """
@@ -457,7 +520,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         state_B: str = "02",
         which_gate: str = "NE",
         positive_branch=True,
-    ):
+        ):
         """
         Calculates amplitude in Volt corresponding to an energy difference
         between two states in Hz.
@@ -635,7 +698,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         state: str = "01",
         which_gate: str = "NE",
         positive_branch=True,
-    ):
+        ):
         """
         Calculates amplitude in Volt corresponding to the energy of a state
         in Hz.
@@ -794,13 +857,31 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
         return np.polyval(polycoeffs, amp)
 
+    def calc_parking_freq(self):
+        _gain = self.cfg_awg_channel_amplitude()
+        _rang = self.cfg_awg_channel_range()
+        _dac  = self.park_amp()
+        _out_amp = _gain*_dac*_rang/2
+
+        _coefs = self.q_polycoeffs_freq_01_det()
+        return np.polyval(_coefs, _out_amp)
+
+    def calc_gate_freq(self, direction:str):
+        _gain = self.cfg_awg_channel_amplitude()
+        _rang = self.cfg_awg_channel_range()
+        _dac  = self.get(f'vcz_amp_dac_at_11_02_{direction}')
+        _fac  = self.get(f'vcz_amp_sq_{direction}')
+        _out_amp = _gain*_dac*_fac*_rang/2
+
+        _coefs = self.q_polycoeffs_freq_01_det()
+        return np.polyval(_coefs, _out_amp)
+
     #################################
     #  Waveform loading methods     #
     #################################
-
     def load_waveform_onto_AWG_lookuptable(
         self, wave_id: str, regenerate_waveforms: bool = False
-    ):
+        ):
         """
         Loads a specific waveform to the AWG
         """
@@ -848,7 +929,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def load_waveforms_onto_AWG_lookuptable(
         self, regenerate_waveforms: bool = True, stop_start: bool = True
-    ):
+        ):
         """
         Loads all waveforms specified in the LutMap to an AWG for both this
         LutMap and the partner LutMap.
@@ -881,8 +962,9 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
         Helper method to ensure waveforms have the desired length
         """
         length_samples = roundup1024(
-            int(self.sampling_rate() * self.cfg_max_wf_length())
-        )
+            int(self.sampling_rate() * self.cfg_max_wf_length()),
+            self.cfg_max_wf_length()
+            )
         extra_samples = length_samples - len(waveform)
         if extra_samples >= 0:
             y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
@@ -919,7 +1001,8 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
             distorted_waveform = k.distort_waveform(
                 waveform,
                 length_samples=int(
-                    roundup1024(self.cfg_max_wf_length() * self.sampling_rate())
+                    roundup1024(self.cfg_max_wf_length() * self.sampling_rate(),
+                    self.cfg_max_wf_length())
                 ),
                 inverse=inverse,
             )
@@ -935,7 +1018,6 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
     #################################
     #  Plotting methods            #
     #################################
-
     def plot_cz_trajectory(self, axs=None, show=True, which_gate="NE"):
         """
         Plots the cz trajectory in frequency space.
@@ -1105,7 +1187,7 @@ class HDAWG_Flux_LutMan(Base_Flux_LutMan):
 
     def plot_cz_waveforms(
         self, qubits: list, which_gate_list: list, ax=None, show: bool = True
-    ):
+        ):
         """
         Plots the cz waveforms from several flux lutamns, mainly for
         verification, time alignment and debugging
@@ -1271,10 +1353,218 @@ class QWG_Flux_LutMan(HDAWG_Flux_LutMan):
         )
 
 
+class LRU_Flux_LutMan(Base_Flux_LutMan):
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
+        self._wave_dict_dist = dict()
+        self.sampling_rate(2.4e9)
+
+    def _add_waveform_parameters(self):
+        # CODEWORD 1: Idling
+        self.add_parameter(
+            "idle_pulse_length",
+            unit="s",
+            label="Idling pulse length",
+            initial_value=40e-9,
+            vals=vals.Numbers(0, 100e-6),
+            parameter_class=ManualParameter,
+        )
+        # Parameters for leakage reduction unit pulse.
+        self.add_parameter('mw_lru_modulation', unit='Hz',
+                           docstring=('Modulation frequency for LRU pulse.'),
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter, initial_value=0.0e6)
+        self.add_parameter('mw_lru_amplitude', unit='frac',
+                           docstring=('amplitude for LRU pulse.'),
+                           vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter, initial_value=.8)
+        self.add_parameter('mw_lru_duration',  unit='s',
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=300e-9)
+        self.add_parameter('mw_lru_rise_duration',  unit='s',
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=30e-9)
+
+    def _add_cfg_parameters(self):
+        self.add_parameter(
+            "cfg_awg_channel",
+            initial_value=1,
+            vals=vals.Ints(1, 8),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "_awgs_fl_sequencer_program_expected_hash",  # FIXME: un used?
+            docstring="crc32 hash of the awg8 sequencer program. "
+            "This parameter is used to dynamically determine "
+            "if the program needs to be uploaded. The initial_value is"
+            " None, indicating that the program needs to be uploaded."
+            " After the first program is uploaded, the value is set.",
+            initial_value=None,
+            vals=vals.Ints(),
+            parameter_class=ManualParameter,
+        )
+        self.add_parameter(
+            "cfg_max_wf_length",
+            parameter_class=ManualParameter,
+            initial_value=10e-6,
+            unit="s",
+            vals=vals.Numbers(0, 100e-6),
+        )
+        self.add_parameter(
+            "cfg_awg_channel_range",
+            docstring="peak peak value, channel range of 5 corresponds to -2.5V to +2.5V",
+            get_cmd=self._get_awg_channel_range,
+            unit="V_pp",
+        )
+        self.add_parameter(
+            "cfg_awg_channel_amplitude",
+            docstring="digital scale factor between 0 and 1",
+            get_cmd=self._get_awg_channel_amplitude,
+            set_cmd=self._set_awg_channel_amplitude,
+            unit="a.u.",
+            vals=vals.Numbers(0, 1),
+        )
+
+    def set_default_lutmap(self):
+        """Set the default lutmap for LRU drive pulses."""
+        lm = {
+            0: {"name": "i", "type": "idle"},
+            1: {"name": "lru", "type": "lru"},
+        }
+        self.LutMap(lm)
+
+    def generate_standard_waveforms(self):
+
+        """
+        Generate all the standard waveforms and populates self._wave_dict
+        """
+
+        self._wave_dict = {}
+        # N.B. the  naming convention ._gen_{waveform_name} must be preserved
+        # as it is used in the load_waveform_onto_AWG_lookuptable method.
+        self._wave_dict["i"] = self._gen_i()
+        self._wave_dict["lru"] = self._gen_lru()
+
+    def _gen_i(self):
+        return np.zeros(int(self.idle_pulse_length() * self.sampling_rate()))
+
+    def _gen_lru(self):
+        self.lru_func = wf.mod_lru_pulse
+        _wf = self.lru_func(
+            t_total = self.mw_lru_duration(),
+            t_rise = self.mw_lru_rise_duration(),
+            f_modulation = self.mw_lru_modulation(),
+            amplitude = self.mw_lru_amplitude(),
+            sampling_rate = self.sampling_rate())[0]
+        return _wf
+
+    def _get_awg_channel_amplitude(self):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel() - 1  # -1 is to account for starting at 1
+        awg_nr = awg_ch // 2
+        ch_pair = awg_ch % 2
+
+        channel_amp = AWG.get("awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair))
+        return channel_amp
+
+    def _set_awg_channel_amplitude(self, val):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel() - 1  # -1 is to account for starting at 1
+        awg_nr = awg_ch // 2
+        ch_pair = awg_ch % 2
+        AWG.set("awgs_{}_outputs_{}_amplitude".format(awg_nr, ch_pair), val)
+
+    def _get_awg_channel_range(self):
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel() - 1  # -1 is to account for starting at 1
+        # channel range of 5 corresponds to -2.5V to +2.5V
+        for i in range(5):
+            channel_range_pp = AWG.get("sigouts_{}_range".format(awg_ch))
+            if channel_range_pp is not None:
+                break
+            time.sleep(0.5)
+        return channel_range_pp
+
+    def _append_zero_samples(self, waveform):
+        """
+        Helper method to ensure waveforms have the desired length
+        """
+        length_samples = roundup1024(
+            int(self.sampling_rate() * self.cfg_max_wf_length()),
+            self.cfg_max_wf_length()
+        )
+        extra_samples = length_samples - len(waveform)
+        if extra_samples >= 0:
+            y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
+        else:
+            y_sig = waveform[:extra_samples]
+        return y_sig
+
+    def load_waveform_onto_AWG_lookuptable(
+        self, wave_id: str, regenerate_waveforms: bool = False):
+        """
+        Loads a specific waveform to the AWG
+        """
+        # Here we are ductyping to determine if the waveform name or the
+        # codeword was specified.
+        if type(wave_id) == str:
+            waveform_name = wave_id
+            codeword = get_wf_idx_from_name(wave_id, self.LutMap())
+        else:
+            waveform_name = self.LutMap()[wave_id]["name"]
+            codeword = wave_id
+
+        if regenerate_waveforms:
+            gen_wf_func = getattr(self, "_gen_{}".format(waveform_name))
+            self._wave_dict[waveform_name] = gen_wf_func()
+
+        waveform = self._wave_dict[waveform_name]
+        codeword_str = "wave_ch{}_cw{:03}".format(self.cfg_awg_channel(), codeword)
+
+        # This is where the fixed length waveform is
+        # set to cfg_max_wf_length
+        waveform = self._append_zero_samples(waveform)
+        self._wave_dict_dist[waveform_name] = waveform
+
+        self.AWG.get_instr().set(codeword_str, waveform)
+
+    def load_waveforms_onto_AWG_lookuptable(
+        self, regenerate_waveforms: bool = True, stop_start: bool = True):
+        """
+        Loads all waveforms specified in the LutMap to an AWG for both this
+        LutMap and the partner LutMap.
+
+        Args:
+            regenerate_waveforms (bool): if True calls
+                generate_standard_waveforms before uploading.
+            stop_start           (bool): if True stops and starts the AWG.
+
+        """
+
+        AWG = self.AWG.get_instr()
+
+        if stop_start:
+            AWG.stop()
+
+        for idx, waveform in self.LutMap().items():
+            self.load_waveform_onto_AWG_lookuptable(
+                wave_id=idx, regenerate_waveforms=regenerate_waveforms
+            )
+
+        self.cfg_awg_channel_amplitude()
+        self.cfg_awg_channel_range()
+
+        if stop_start:
+            AWG.start()
+
+
 #########################################################################
 # Convenience functions below
 #########################################################################
 
 
-def roundup1024(n):
-    return int(np.ceil(n / 96) * 96)  # FIXME: does not perform rounding implied by function name
+def roundup1024(n, waveform_length):
+    n_samples = int(waveform_length*2.4e9)
+    return int(np.ceil(n / n_samples) * n_samples)

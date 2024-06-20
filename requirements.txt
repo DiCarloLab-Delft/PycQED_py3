@@ -5,6 +5,7 @@
 # If you are installing pycqed on your computer run
 # `pip install qutip` before you install pycqed
 
+qutip-qip
 qcodes
 numpy<=1.21  # Required for 3rd party packages that still rely on (deprecated) numpy dtype aliases. Such as np.float, np.complex, etc. (sklearn, ...)
 cython
@@ -23,6 +24,7 @@ zhinst-utils; python_version > '3.6'
 packaging
 deprecated
 pytest
+cvxpy
 
 # packages that used to have a minimum version constraint (only)
 adaptive  # >=0.10.0
@@ -46,3 +48,5 @@ pytest
 # wheel
 # # Manually build from source.
 # qutechopenql @ git+https://github.com/DiCarloLab-Delft/OpenQL@82a9881bdb2c2f2b0620c14c549c436f21d1607c  # Build from commit
+pymatching
+git+https://github.com/DiCarloLab-Delft/QCoCircuits

@@ -421,13 +421,13 @@ class CBox_v3_driven_transmon(Transmon):
             if self.RO_acq_weights() == 'SSB':
                 UHFQC.prepare_SSB_weight_and_rotation(
                     IF=self.f_RO_mod(),
-                    weight_function_I=self.RO_acq_weight_function_I(),
-                    weight_function_Q=self.RO_acq_weight_function_Q())
+                    weight_chI=self.RO_acq_weight_function_I(),
+                    weight_chQ=self.RO_acq_weight_function_Q())
             elif self.RO_acq_weights() == 'DSB':
                 UHFQC.prepare_DSB_weight_and_rotation(
                     IF=self.f_RO_mod(),
-                    weight_function_I=self.RO_acq_weight_function_I(),
-                    weight_function_Q=self.RO_acq_weight_function_Q())
+                    weight_chI=self.RO_acq_weight_function_I(),
+                    weight_chQ=self.RO_acq_weight_function_Q())
             elif self.RO_acq_weights() == 'optimal':
                 if (self.RO_optimal_weights_I() is None or
                         self.RO_optimal_weights_Q() is None):

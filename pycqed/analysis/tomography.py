@@ -4,6 +4,7 @@ import logging
 # except ImportError as e:
 #     logging.warning('Could not import qutip, tomo code will not work')
 import qutip as qtp
+from qutip.qip import operations
 import numpy as np
 import time
 import scipy
@@ -38,10 +39,10 @@ class TomoAnalysis_JointRO():
     # The set of single qubit rotation matrixes used in the tomography
     # measurement (will be assumed to be used on all qubits)
     rotation_matrixes = [qtp.identity(2), qtp.sigmax(),
-                         qtp.rotation(qtp.sigmax(), np.pi / 2),
-                         qtp.rotation(qtp.sigmay(), np.pi / 2),
-                         qtp.rotation(qtp.sigmax(), -np.pi / 2),
-                         qtp.rotation(qtp.sigmay(), -np.pi / 2)]
+                         operations.gates.rotation(qtp.sigmax(), np.pi / 2),
+                         operations.gates.rotation(qtp.sigmay(), np.pi / 2),
+                         operations.gates.rotation(qtp.sigmax(), -np.pi / 2),
+                         operations.gates.rotation(qtp.sigmay(), -np.pi / 2)]
     measurement_operator_labels = ['I', 'X', 'x', 'y', '-x', '-y']
     # MAKE SURE THE LABELS CORRESPOND TO THE ROTATION MATRIXES DEFINED ABOVE
 
@@ -1164,10 +1165,10 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         TomoAnalysis_JointRO.rotation_matrixes = [
             qtp.identity(2),
             qtp.sigmax(),
-            qtp.rotation(qtp.sigmay(), np.pi / 2),
-            qtp.rotation(qtp.sigmay(), -np.pi / 2),
-            qtp.rotation(qtp.sigmax(), np.pi / 2),
-            qtp.rotation(qtp.sigmax(), -np.pi / 2)]
+            operations.gates.rotation(qtp.sigmay(), np.pi / 2),
+            operations.gates.rotation(qtp.sigmay(), -np.pi / 2),
+            operations.gates.rotation(qtp.sigmax(), np.pi / 2),
+            operations.gates.rotation(qtp.sigmax(), -np.pi / 2)]
         TomoAnalysis_JointRO.measurement_operator_labels = ['I', 'X', 'y',
                                                             '-y', 'x', '-x']
         TomoAnalysis_JointRO.measurement_basis = [qtp.identity(2),

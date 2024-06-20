@@ -1,16 +1,20 @@
 """
 Created: 2020-07-15
-Author: Victor Negirneac
 """
-
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 from pycqed.analysis.analysis_toolbox import get_datafilepath_from_timestamp
 import pycqed.analysis_v2.cryoscope_v2_tools as cv2_tools
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 import pycqed.analysis_v2.base_analysis as ba
+from pycqed.utilities.general import print_exception
 import pycqed.measurement.hdf5_data as hd5
+from pycqed.qce_utils.analysis_factory.factory_transmon_arc_identifier import (
+    FluxArcIdentifier,
+    FluxArcIdentifierAnalysis,
+)
 from collections import OrderedDict
 from uncertainties import ufloat
 from scipy import signal
@@ -708,6 +712,20 @@ class Cryoscope_v2_Analysis(ba.BaseDataAnalysis):
                     "xunit": "s",
                 }
 
+def filter_func(t, A, tau, B):
+    '''
+    Filter function implemented
+    in the HDAWG IIR filter model.
+    '''
+    return B*(1+A*np.exp(-t/tau))
+
+def filter_func_high_pass(t, tau, t0):
+    '''
+    Filter function implemented
+    in the HDAWG FIR high-pass filter model.
+    '''
+    return np.exp(-(t-t0)/tau)
+
 class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
     """
     Simultaneous cryoscope analysis.
@@ -715,6 +733,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
 
     def __init__(self,
                  update_FIRs: bool=False,
+                 update_IIRs: bool=False,
                  t_start: str = None, 
                  t_stop: str = None,
                  label: str = '',
@@ -722,13 +741,17 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                  extract_only: bool = False,
                  auto=True,
                  poly_params: dict = None,
+                 derivative_window_length: float=5e-9,
                 ):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          options_dict=options_dict,
                          extract_only=extract_only)
         self.poly_params = poly_params
+        self.update_IIRs = update_IIRs
         self.update_FIRs = update_FIRs
+        self.derivative_window_length = derivative_window_length
+        assert not (update_FIRs and update_IIRs), 'Can only either update IIRs or FIRs' 
         if auto:
             self.run_analysis()
 
@@ -788,7 +811,7 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
         for n, qubit in enumerate(self.Qubits):
             data_shape = a_obj.raw_data_dict['measured_values'][0][n*2:n*2+2]
             cryoscope_no_dist = ma2.Cryoscope_Analysis(t_start=self.timestamp,
-                ch_idx_cos=0, ch_idx_sin=1, derivative_window_length=8e-9, close_figs=True,
+                ch_idx_cos=0, ch_idx_sin=1, derivative_window_length=self.derivative_window_length, close_figs=True,
                 ch_amp_key='Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude'.format(qubit),
                 waveform_amp_key='Snapshot/instruments/flux_lm_{}/parameters/sq_amp'.format(qubit),
                 ch_range_key='Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_range'.format(qubit),
@@ -797,13 +820,13 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                 extract_only=True)  
             t = cryoscope_no_dist.ca.time
             a = cryoscope_no_dist.ca.get_amplitudes()
-            baseline_start = 50
-            baseline_stop = 100
+            baseline_start = -50
+            baseline_stop = -30
             norm = np.mean(a[baseline_start:baseline_stop])
             a /= norm
             if np.std(a) < 1e-6: # UHF is switching channels
                     cryoscope_no_dist = ma2.Cryoscope_Analysis(t_start=self.timestamp,
-                        ch_idx_cos=1, ch_idx_sin=0, derivative_window_length=8e-9, close_figs=True,
+                        ch_idx_cos=1, ch_idx_sin=0, derivative_window_length=self.derivative_window_length, close_figs=True,
                         ch_amp_key='Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_amplitude'.format(qubit),
                         waveform_amp_key='Snapshot/instruments/flux_lm_{}/parameters/sq_amp'.format(qubit),
                         ch_range_key='Snapshot/instruments/flux_lm_{}/parameters/cfg_awg_channel_range'.format(qubit),
@@ -813,14 +836,13 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                     t = cryoscope_no_dist.ca.time
                     a = cryoscope_no_dist.ca.get_amplitudes()
                     baseline_start = 50
-                    baseline_stop = 100
+                    baseline_stop = -1
                     norm = np.mean(a[baseline_start:baseline_stop])
                     a /= norm
-
             self.proc_data_dict['Traces'].append(a)
         self.proc_data_dict['time'] = t
         ###################################
-        # Run filter optimizer in parallel
+        # Run FIR filter optimizer
         ###################################
         if self.update_FIRs:
             # Parallel optimization crashes terminal
@@ -837,7 +859,27 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                 conv_filter = cv2_tools.convolve_FIRs([old_filter, new_filter])
                 conv_filter = cv2_tools.convert_FIR_for_HDAWG(conv_filter)
                 self.proc_data_dict['conv_filters'][qubit] = conv_filter
-
+        ###################################
+        # Fit exponential filter
+        ###################################
+        elif self.update_IIRs:
+            self.proc_data_dict['exponential_filter'] = {}
+            self.proc_data_dict['fit_params'] = {}
+            for i, q in enumerate(self.Qubits):
+                Times = self.proc_data_dict['time']
+                Trace = self.proc_data_dict['Traces'][i]
+                # Look at signal after 50 ns
+                initial_idx = np.argmin(np.abs(Times-20e-9))
+                Times = Times[initial_idx:]
+                Trace = Trace[initial_idx:]
+                # Fit exponential to trace
+                from scipy.optimize import curve_fit
+                p0 = [-.2, 15e-9, 1]
+                popt, pcov = curve_fit(filter_func, Times, Trace, p0=p0)
+                filtr = {'amp': popt[0], 'tau': popt[1]}
+                self.proc_data_dict['exponential_filter'][q] = filtr
+                self.proc_data_dict['fit_params'][q] = popt
+    
     def prepare_plots(self):
         for i, qubit in enumerate(self.Qubits):
             self.plot_dicts[f'Cryscope_trace_{qubit}'] = {
@@ -847,9 +889,13 @@ class multi_qubit_cryoscope_analysis(ba.BaseDataAnalysis):
                 'qubit': qubit,
                 'timestamp': self.timestamp
             }
+            if self.update_IIRs:
+                self.plot_dicts[f'Cryscope_trace_{qubit}']['filter_pars'] = \
+                    self.proc_data_dict['fit_params'][qubit]
 
 def optimize_fir_software(y, baseline_start=100,
-                          baseline_stop=None, taps=72, start_sample=0, stop_sample=200, cma_target=0.5):
+                          baseline_stop=None, taps=72, start_sample=0,
+                          stop_sample=200, cma_target=0.5):
     step_response = np.concatenate((np.array([0]), y))
     baseline = np.mean(y[baseline_start:baseline_stop])
     x0 = [1] + (taps - 1) * [0]    
@@ -857,21 +903,671 @@ def optimize_fir_software(y, baseline_start=100,
         y = step_response
         yc = signal.lfilter(x, 1, y)
         return np.mean(np.abs(yc[1+start_sample:stop_sample] - baseline))/np.abs(baseline)
-    return cma.fmin2(objective_function_fir, x0, cma_target)[0]
+    return cma.fmin2(objective_function_fir, x0, cma_target,
+                     options={'ftarget':1e-4, 'maxfevals': 2e5})[0]
 
 def plot_cryoscope_trace(trace, 
                          time, 
                          timestamp,
                          qubit,
+                         filter_pars=None,
                          ax=None, **kw):
-    ax.plot(time, trace)
-    set_xlabel(ax, 'Time', 's')
-    set_ylabel(ax, 'Amplitude', 'a.u.')
-    ax.set_ylim(0.95,1.05)
-    ax.set_xlim(0, time[-1])
     ax.axhline(1, color='grey', ls='-')
     ax.axhline(1.01, color='grey', ls='--')
     ax.axhline(0.99, color='grey', ls='--')
     ax.axhline(1.001, color='grey', ls=':')
     ax.axhline(0.999, color='grey', ls=':')
-    ax.set_title(timestamp+': Step responses Cryoscope '+qubit)
+    ax.plot(time, trace)
+    if filter_pars is not None:
+        ax.plot(time, filter_func(time, *filter_pars), label='IIR filter fit')
+        ax.legend(frameon=False)
+    set_xlabel(ax, 'Time', 's')
+    set_ylabel(ax, 'Amplitude', 'a.u.')
+    bottom, top = ax.get_ylim()
+    bottom = min(.95, bottom)
+    top = max(1.05, top)
+    ax.set_ylim(bottom,top)
+    ax.set_xlim(0, time[-1])
+    ax.set_title(timestamp+': Step response Cryoscope '+qubit)
+
+
+class Time_frequency_analysis(ba.BaseDataAnalysis):
+    def __init__(self,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        # Sort data
+        self.qubit = self.raw_data_dict['folder'].split('_')[-1]
+        Time = self.raw_data_dict['data'][:,0]
+        X_proj = self.raw_data_dict['data'][:,1]
+        Y_proj = self.raw_data_dict['data'][:,2]
+        # PSD of signal
+        time_step = Time[1]-Time[0]
+        _X_proj = X_proj-np.mean(X_proj) # Remove 0 freq coef
+        _Y_proj = Y_proj-np.mean(Y_proj) #
+        PSD = np.abs(np.fft.fft(_X_proj+1j*_Y_proj))**2*time_step/len(Time)
+        Freqs = np.fft.fftfreq(_X_proj.size, time_step)
+        idx = np.argsort(Freqs)
+        Freqs = Freqs[idx]
+        PSD = PSD[idx]
+        # Make lorentzian Fit to extract detuning 
+        # (Doing so, overcomes the frequency sampling accuracy)
+        def lorentz(x, x0, G):
+            return G**2 / ( (x-x0)**2 + G**2 )
+        def fit_func(x, x0, G, A, B):
+            return A*lorentz(x, x0, G) + B
+        # Fit guess
+        det_0 = Freqs[np.argmax(PSD)] 
+        G_0 = 1/(Time[-1]-Time[0])
+        A_0 = np.max(PSD)-np.mean(PSD)
+        B_0 = np.mean(PSD)
+        p0 = [det_0, G_0, A_0, B_0]
+        from scipy.optimize import curve_fit
+        try:
+            popt, pcov = curve_fit(fit_func, Freqs, PSD,
+                                   p0=p0, maxfev=int(1e5))
+            detuning = popt[0]
+        except:
+            print('Fitting Failed!')
+            detuning = Freqs[np.argmax(PSD)] 
+        # Save processed data
+        self.proc_data_dict['Time'] = Time
+        self.proc_data_dict['X_proj'] = X_proj
+        self.proc_data_dict['Y_proj'] = Y_proj
+        self.proc_data_dict['Freqs'] = Freqs
+        self.proc_data_dict['PSD'] = PSD
+        self.proc_data_dict['detuning'] = detuning
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, axs = plt.subplots(figsize=(5, 4), nrows=2, dpi=100)
+        axs = axs.flatten()
+        # fig.patch.set_alpha(0)
+        self.axs_dict[f'FFT_of_time_trace'] = axs[0]
+        self.figs[f'FFT_of_time_trace'] = fig
+        self.plot_dicts['FFT_of_time_trace'] = {
+            'plotfn': FFT_plotfn,
+            'ax_id': 'FFT_of_time_trace',
+            'Time': self.proc_data_dict['Time'],
+            'X_proj': self.proc_data_dict['X_proj'],
+            'Y_proj': self.proc_data_dict['Y_proj'],
+            'Freqs': self.proc_data_dict['Freqs'],
+            'PSD': self.proc_data_dict['PSD'],
+            'detuning': self.proc_data_dict['detuning'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamps[0]
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def FFT_plotfn(
+    Time,
+    X_proj,
+    Y_proj,
+    Freqs,
+    PSD,
+    detuning,
+    qubit,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    axs = fig.get_axes()
+
+    axs[0].plot(Time*1e9, X_proj, 'C0.-')
+    axs[0].plot(Time*1e9, Y_proj, 'C1.-')
+    axs[0].set_xlabel('Pulse duration (ns)')
+    axs[0].set_ylabel('Voltage (a.u.)')
+
+    PSD += np.mean(PSD)
+    axs[1].plot(Freqs*1e-6, PSD, '-')
+    axs[1].set_xlim(Freqs[0]*1e-6, Freqs[-1]*1e-6)
+    axs[1].set_xlabel('Frequency (MHz)')
+    axs[1].set_ylabel('PSD ($\mathrm{Hz^{-1}}$)')
+    axs[1].set_yscale('log')
+
+    axs[0].set_title(f'{timestamp}\n{qubit} Cryoscope trace')
+
+    fig.tight_layout()
+
+
+class Flux_arc_analysis(ba.BaseDataAnalysis):
+    def __init__(self,
+                 channel_amp:float,
+                 channel_range:float,
+                 fix_zero_detuning:bool = True,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.ch_amp = channel_amp
+        self.ch_range = channel_range
+        self.fix_zero_detuning = fix_zero_detuning
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(
+            data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        # Sort data
+        self.qubit = self.raw_data_dict['folder'].split('_')[-1]
+        Amps = self.raw_data_dict['data'][:,0]*self.ch_amp*self.ch_range/2
+        Freqs = self.raw_data_dict['data'][:,1]
+        # Amps = Amps[:-1]
+        # Freqs = Freqs[:-1]
+        # add a point of zero detuning at zero flux amplitude
+        if self.fix_zero_detuning:
+            _Amps = np.array(list(Amps)[:]+[0])
+            _Freqs = np.array(list(Freqs)[:]+[0])
+        else:
+            _Amps = np.array(list(Amps))
+            _Freqs = np.array(list(Freqs))
+        P_coefs = np.polyfit(_Amps, _Freqs, deg=2)
+        # Save processed data
+        self.proc_data_dict['Amps'] = Amps
+        self.proc_data_dict['Freqs'] = Freqs
+        self.qoi = {}
+        self.qoi['P_coefs'] = P_coefs 
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, ax = plt.subplots(figsize=(5, 4), dpi=100)
+        # fig.patch.set_alpha(0)
+        self.axs_dict[f'Voltage_arc_trace'] = ax
+        self.figs[f'Voltage_arc_trace'] = fig
+        self.plot_dicts['Voltage_arc_trace'] = {
+            'plotfn': Voltage_arc_plotfn,
+            'ax_id': 'Voltage_arc_trace',
+            'Amps': self.proc_data_dict['Amps'],
+            'Freqs': self.proc_data_dict['Freqs'],
+            'P_coefs': self.qoi['P_coefs'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamps[0]
+        }
+        fig, ax = plt.subplots(figsize=(5, 4), dpi=100)
+        self.axs_dict[f'detailed_voltage_arc_trace'] = ax
+        self.figs[f'detailed_voltage_arc_trace'] = fig
+        self.plot_dicts['detailed_voltage_arc_trace'] = {
+            'plotfn': voltage_arc_plotfn_detailed,
+            'ax_id': 'detailed_voltage_arc_trace',
+            'amplitudes': self.proc_data_dict['Amps'],
+            'detunings': self.proc_data_dict['Freqs'],
+            'qubit': self.qubit,
+            'timestamp': self.timestamps[0],
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def Voltage_arc_plotfn(
+    Amps,
+    Freqs,
+    P_coefs,
+    qubit,
+    timestamp,
+    ax, **kw):
+    fig = ax.get_figure()
+    _Amps = np.linspace(np.min(Amps)*1.1, np.max(Amps)*1.1)
+    Arc = np.poly1d(P_coefs)
+    ax.plot(_Amps, Arc(_Amps)*1e-6, 'C0-')
+    ax.plot(Amps, Freqs*1e-6, 'C3.')
+    ax.grid(ls = '--')
+    ax.set_ylabel('Detuning (MHz)')
+    ax.set_xlabel('Output Voltage (V)')
+    ax.set_title(f'{timestamp}\n{qubit} Voltage frequency arc')
+    fig.tight_layout()
+
+
+def voltage_arc_plotfn_detailed(
+    amplitudes,
+    detunings,
+    qubit,
+    timestamp,
+    ax,
+    **kw,
+    ):
+    identifier = FluxArcIdentifier(
+        _amplitude_array=amplitudes,
+        _detuning_array=detunings,
+    )
+    fig = ax.get_figure()
+    fig, ax = FluxArcIdentifierAnalysis.plot_flux_arc_identifier(
+        identifier=identifier,
+        host_axes=(fig, ax),
+    )
+    ax.set_title(f'{timestamp}\n{qubit} Detailed voltage frequency arc')
+    return fig, ax
+
+
+class FluxArcSymmetryIntersectionAnalysis(ba.BaseDataAnalysis):
+    """
+    Behaviour class, Analysis that handles intersection calculation of
+    equal positive and negative (AC) flux-pulse amplitudes while sweeping (DC) flux bias.
+    """
+
+    # region Class Constructor
+    def __init__(
+        self,
+        initial_bias: float,
+        t_start: str = None,
+        t_stop: str = None,
+        data_file_path: str = None,
+        label: str = "",
+        options_dict: dict = None,
+    ):
+        super().__init__(
+            t_start=t_start,
+            t_stop=t_stop,
+            label=label,
+            data_file_path=data_file_path,
+            options_dict=options_dict,
+            close_figs=True,
+            extract_only=False,
+            do_fitting=False,
+        )
+        self.initial_bias: float = initial_bias  # A
+    # endregion
+
+    # region Interface Methods
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(data_fp, param_spec)
+        # Parts added to be compatible with base analysis data requirements
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+
+    def process_data(self):
+        self.qubit_id = self.raw_data_dict['folder'].split('_')[-1]
+        self.flux_bias_array: np.ndarray = self.raw_data_dict['data'][:, 0]
+        self.positive_detuning_array: np.ndarray = self.raw_data_dict['data'][:, 1]
+        self.negative_detuning_array: np.ndarray = self.raw_data_dict['data'][:, 2]
+
+        fit1 = np.polyfit(self.flux_bias_array, self.positive_detuning_array, 1)
+        fit2 = np.polyfit(self.flux_bias_array, self.negative_detuning_array, 1)
+
+        # Extract the slope (m) and intercept (b) for both fits
+        m1, b1 = fit1
+        m2, b2 = fit2
+
+        # Calculate the x- and y-coordinate of the intersection
+        self.x_intersect = (b2 - b1) / (m1 - m2)
+        self.y_intersect = m1 * self.x_intersect + b1
+        self.suggested_bias_value = self.x_intersect
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, ax = plt.subplots(figsize=(6, 5), dpi=256)
+        self.axs_dict[f'flux_arc_intersection'] = ax
+        self.figs[f'flux_arc_intersection'] = fig
+        self.plot_dicts['flux_arc_intersection'] = {
+            'plotfn': self.plot_flux_arc_intersection,
+            'ax_id': 'flux_arc_intersection',
+            'flux_bias_array': self.flux_bias_array,
+            'positive_detuning_array': self.positive_detuning_array,
+            'negative_detuning_array': self.negative_detuning_array,
+            'initial_bias': self.initial_bias,
+            'suggested_bias': self.suggested_bias_value,
+            'timestamp': self.timestamps[0],
+            'qubit_name': self.qubit_id,
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+    # endregion
+
+    # region Static Class Methods
+    @staticmethod
+    def plot_flux_arc_intersection(flux_bias_array: np.ndarray, positive_detuning_array: np.ndarray, negative_detuning_array: np.ndarray, initial_bias: float, suggested_bias: float, timestamp: str, qubit_name: str, ax, **kw):
+        fit1 = np.polyfit(flux_bias_array, positive_detuning_array, 1)
+        poly1 = np.poly1d(fit1)
+        fit2 = np.polyfit(flux_bias_array, negative_detuning_array, 1)
+        poly2 = np.poly1d(fit2)
+
+        # Extract the slope (m) and intercept (b) for both fits
+        m1, b1 = fit1
+        m2, b2 = fit2
+
+        # Calculate the x- and y-coordinate of the intersection
+        x_intersect = suggested_bias
+        y_intersect = m1 * x_intersect + b1
+
+        # Figure and Axes
+        fig = ax.get_figure()
+        ax.plot(
+            flux_bias_array,
+            positive_detuning_array,
+            linestyle='none',
+            marker='o',
+        )
+        ax.plot(
+            flux_bias_array,
+            negative_detuning_array,
+            linestyle='none',
+            marker='o',
+        )
+
+        min_x = min(x_intersect, min(flux_bias_array))
+        max_x = max(x_intersect, max(flux_bias_array))
+        span_x = abs(min_x - max_x)
+        high_resolution_x = np.linspace(min_x - 0.1 * span_x, max_x + 0.1 * span_x, 101)
+        y1_fit = poly1(high_resolution_x)
+        y2_fit = poly2(high_resolution_x)
+
+        ax.plot(high_resolution_x, y1_fit, 'C0--')
+        ax.plot(high_resolution_x, y2_fit, 'C1--')
+        ax.plot(x_intersect, y_intersect, linestyle='none', marker='o', alpha=0.8, color='gray')
+        # Suggested value
+        ax.axvline(x_intersect, linestyle='--', marker='None', color='darkgrey')
+
+        transform = transforms.blended_transform_factory(ax.transData, ax.transAxes)
+        ax.text(x_intersect, 0.9, f'   {x_intersect * 1e3:0.4f} mA', ha='left', va='center', transform=transform)
+        ax.set_xlim(min(high_resolution_x), max(high_resolution_x))
+        ax.set_xlabel('Flux bias [A]')
+        ax.set_ylabel('Frequency detuning [Hz]')
+
+        ax.grid(True, alpha=0.5, linestyle='dashed')  # Adds dashed gridlines
+        ax.set_axisbelow(True)  # Puts grid on background
+        ax.set_title(f'{timestamp}\n{qubit_name} Frequency-arc vs DC-flux')
+        return fig, ax
+    # endregion
+
+
+class Cryoscope_long_analysis(ba.BaseDataAnalysis):
+    def __init__(self,
+                 update_IIR: bool = False,
+                 update_IIR_high_pass: bool = False,
+                 t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None, 
+                 extract_only: bool = False,
+                 auto=True
+                 ):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         options_dict=options_dict,
+                         extract_only=extract_only)
+        self.update_IIR = update_IIR
+        self.update_IIR_high_pass = update_IIR_high_pass
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """
+        This is a new style (sept 2019) data extraction.
+        This could at some point move to a higher level class.
+        """
+        self.get_timestamps()
+        self.timestamp = self.timestamps[0]
+
+        data_fp = get_datafilepath_from_timestamp(self.timestamp)
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
+        self.raw_data_dict = hd5.extract_pars_from_datafile(
+                                data_fp, param_spec)
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['folder'] = os.path.split(data_fp)[0]
+        # Extrac poly coefficients of flux arc
+        self.qubit = self.raw_data_dict['folder'].split('_')[-2]
+        data_params = {'polycoeff': (f'Instrument settings/flux_lm_{self.qubit}', 
+                                           'attr:q_polycoeffs_freq_01_det'),
+                       'sq_amp': (f'Instrument settings/flux_lm_{self.qubit}', 
+                                           'attr:sq_amp'),
+                       'frequency': (f'Instrument settings/{self.qubit}', 
+                                           'attr:freq_qubit'),
+                       'freq_mod': (f'Instrument settings/{self.qubit}', 
+                                           'attr:mw_freq_mod')}
+        _dict = hd5.extract_pars_from_datafile(data_fp, data_params)
+        self.poly_coeffs = [ float(n) for n in \
+                            _dict['polycoeff'][1:-1].split(' ') if n != '' ]
+        self.frequency = eval(_dict['frequency'])
+        self.freq_mod = eval(_dict['freq_mod'])
+        self.sq_amp = eval(_dict['sq_amp'])
+
+    def process_data(self):
+        # Sort time axis
+        Time = self.raw_data_dict['data'][:,0]
+        n_time = np.where(Time==Time[0])[0][1]
+        Time = Time[:n_time]
+        # Sort frequency axis
+        Frequencies = self.raw_data_dict['data'][:,1]
+        n_freq = len(np.unique(Frequencies))
+        Frequencies = Frequencies[::n_time]+self.freq_mod
+        # Sort measurement results
+        Data = self.raw_data_dict['data'][:,2].reshape(n_freq, n_time)
+        # Fit landscape for center frequencies
+        from scipy.optimize import curve_fit
+        from scipy.special import erf
+        def skewed_gauss(x, x0, sigma, alpha, a, b):
+            '''
+            Skewed gaussian fit function.
+            '''
+            phi = np.exp(-0.5*((x-x0)/sigma)**2)
+            Phi = 0.5*( 1 + erf( alpha*((x-x0)/sigma) / np.sqrt(2) ) )
+            return a*phi*Phi + b 
+        # Fit skewed gaussian to every time step
+        Center_freqs = np.zeros(n_time)
+        Voltage = np.zeros(n_time)
+        for i in range(n_time):
+            _x = Frequencies
+            _y = Data[:,i]
+            p0 = [_x[np.argmax(_y)], np.std(Frequencies)/2, 0, np.max(_y), np.min(_y)]
+            popt, pcov = curve_fit(skewed_gauss, _x, _y, p0=p0)
+            # Get maximum of function
+            _xx = np.linspace(Frequencies[0], Frequencies[-1], 201)
+            _yy = skewed_gauss(_xx, *popt)
+            Center_freqs[i] = _xx[np.argmax(_yy)]
+            # Convert frequency into voltage output
+            detuning = self.frequency-Center_freqs[i]
+            flux_arc = np.poly1d(self.poly_coeffs)
+            # Calculate corresponding voltage corresponding to detuning
+            if self.sq_amp > 0:
+                # Choose positive voltage
+                Voltage[i] = max((flux_arc-detuning).roots)
+            else:
+                # Choose negative voltage
+                Voltage[i] = min((flux_arc-detuning).roots)
+        # Trace = Voltage/np.mean(Voltage[-6:])
+        Trace = Voltage/np.mean(Voltage[-1:])
+        # Fit exponential to trace
+        if self.update_IIR:
+            try:
+                p0 = [+.001, 400e-9, 1.0085]
+                popt, pcov = curve_fit(filter_func, Time[8:]*1e-9, Trace[8:], p0=p0)
+            except:
+                print_exception()
+                print('Fit failed. Trying new initial guess')
+                p0 = [-.01, 2e-6, 1.003]
+                # try:
+                popt, pcov = curve_fit(filter_func, Time[6:]*1e-9, Trace[6:], p0=p0)
+                print('Fit converged!')
+                # except:
+                #     print_exception()
+                #     popt=p0
+                #     print('Fit failed')
+            filtr = {'amp': popt[0], 'tau': popt[1]}
+            self.proc_data_dict['filter_pars'] = popt
+            self.proc_data_dict['exponential_filter'] = filtr
+        # Fit high pass to trace
+        if self.update_IIR_high_pass:
+            p0 = [1.8e-3, +2e-6]
+            popt, pcov = curve_fit(filter_func_high_pass,
+                                   Time[100:]*1e-9, Trace[100:], p0=p0)
+            filtr = {'tau': popt[0]}
+            self.proc_data_dict['filter_pars'] = p0#popt
+            self.proc_data_dict['high_pass_filter'] = filtr
+        # Save quantities for plot
+        self.proc_data_dict['Time'] = Time
+        self.proc_data_dict['Frequencies'] = Frequencies
+        self.proc_data_dict['Data'] = Data
+        self.proc_data_dict['Center_freqs'] = Center_freqs
+        self.proc_data_dict['Trace'] = Trace
+
+    def prepare_plots(self):
+        self.axs_dict = {}
+        fig, ax = plt.subplots(figsize=(4,3), dpi=200)
+        # fig.patch.set_alpha(0)
+        self.axs_dict[f'Cryoscope_long'] = ax
+        self.figs[f'Cryoscope_long'] = fig
+        self.plot_dicts['Cryoscope_long'] = {
+            'plotfn': Cryoscope_long_plotfn,
+            'ax_id': 'Cryoscope_long',
+            'Time': self.proc_data_dict['Time'],
+            'Frequencies': self.proc_data_dict['Frequencies'],
+            'Data': self.proc_data_dict['Data'],
+            'Center_freqs': self.proc_data_dict['Center_freqs'],
+            'Trace': self.proc_data_dict['Trace'],
+            'qubit': self.qubit,
+            'qubit_freq': self.frequency,
+            'timestamp': self.timestamps[0],
+            'filter_pars': self.proc_data_dict['filter_pars'] \
+                           if (self.update_IIR or self.update_IIR_high_pass) else None,
+        }
+
+    def run_post_extract(self):
+        self.prepare_plots()  # specify default plots
+        self.plot(key_list='auto', axs_dict=self.axs_dict)  # make the plots
+        if self.options_dict.get('save_figs', False):
+            self.save_figures(
+                close_figs=self.options_dict.get('close_figs', True),
+                tag_tstamp=self.options_dict.get('tag_tstamp', True))
+
+def Cryoscope_long_plotfn(Time, 
+                          Frequencies,
+                          Data,
+                          Center_freqs,
+                          Trace,
+                          timestamp,
+                          qubit,
+                          qubit_freq,
+                          filter_pars=None,
+                          ax=None, **kw):
+    fig = ax.get_figure()
+    # Spectroscopy plot
+    if Time[-1] > 2000:
+        _Time = Time/1e3
+    else:
+        _Time = Time
+    ax.pcolormesh(_Time, Frequencies*1e-9, Data, shading='nearest')
+    ax.plot(_Time, Center_freqs*1e-9, 'w-', lw=1)
+    axt = ax.twinx()
+    _lim = ax.get_ylim()
+    _lim = (qubit_freq*1e-9-np.array(_lim))*1e3
+    axt.set_ylim(_lim)
+    axt.set_ylabel('Detuning (MHz)')
+    # ax.set_xlabel('Time (ns)')
+    ax.set_ylabel('Frequency (GHz)')
+    ax.set_title('Spectroscopy of step response')
+    # Cryoscope trace plot
+    ax1 = fig.add_subplot(111)
+    pos = ax1.get_position()
+    ax1.set_position([pos.x0+1.2, pos.y0, pos.width, pos.height])
+    ax1.axhline(1, color='grey', ls='-')
+    ax1.axhline(1.005, color='grey', ls='--')
+    ax1.axhline(0.995, color='grey', ls='--')
+    ax1.axhline(1.001, color='grey', ls=':')
+    ax1.axhline(0.999, color='grey', ls=':')
+    if filter_pars is not None:
+        _x = np.linspace(Time[0], Time[-1], 201)
+        _x_ = np.linspace(_Time[0], _Time[-1], 201)
+        if len(filter_pars) == 2: # High pass compenstaion filter
+            tau = filter_pars[0]*1e6
+            ax1.plot(_x_, filter_func_high_pass(_x*1e-9,*filter_pars), 'C1--', 
+                     label=f'IIR fit ($\\tau={tau:.1f}\\mu$s)')
+        else: # low-pass compensation filter
+            tau = filter_pars[1]*1e9
+            ax1.plot(_x_, filter_func(_x*1e-9,*filter_pars), 'C1--', 
+                     label=f'IIR fit ($\\tau={tau:.0f}$ns)')
+        ax1.legend(frameon=False)
+    ax1.plot(_Time, Trace)
+    bottom, top = ax1.get_ylim()
+    bottom = min(.99, bottom)
+    top = max(1.01, top)
+    ax1.set_ylim(bottom, top)
+    ax1.set_xlim(_Time[0], _Time[-1])
+    # ax1.set_xlabel('Time (ns)')
+    ax1.set_ylabel('Normalized amplitude')
+    ax1.set_title('Reconstructed step response')
+    if Time[-1] > 2000:
+        ax.set_xlabel('Time ($\\mu$s)')
+        ax1.set_xlabel('Time ($\\mu$s)')
+    else:
+        ax.set_xlabel('Time (ns)')
+        ax1.set_xlabel('Time (ns)')
+    # Fig title
+    fig.suptitle(f'{timestamp}\n{qubit} long time-scale cryoscope', x=1.1, y=1.15)

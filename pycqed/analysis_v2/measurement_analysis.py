@@ -59,6 +59,8 @@ import pycqed.analysis_v2.Parity_benchmark_analysis as pba
 reload(pba)
 import pycqed.analysis_v2.Two_qubit_gate_analysis as tqg
 reload(tqg)
+import pycqed.analysis_v2.GBT_analysis as gbta
+reload(gbta)
 
 import pycqed.analysis_v2.fluxing_analysis as fla
 reload(fla)
@@ -72,6 +74,12 @@ reload(mra)
 import pycqed.analysis_v2.cryoscope_v2_analysis as cv2
 reload(cv2)
 
+import pycqed.analysis_v2.LRU_analysis as lrua
+reload(lrua)
+
+import pycqed.analysis_v2.tomography_analysis as tomoa
+reload(tomoa)
+
 from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic1DBinnedAnalysis,
     Basic2DAnalysis, Basic2DInterpolatedAnalysis)
@@ -79,7 +87,7 @@ from pycqed.analysis_v2.timedomain_analysis import (
     FlippingAnalysis, EFRabiAnalysis, DecoherenceAnalysis, Intersect_Analysis,
     Oscillation_Analysis, ComplexRamseyAnalysis, Crossing_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,
-    Grovers_TwoQubitAllStates_Analysis)
+    Grovers_TwoQubitAllStates_Analysis, FineBiasAnalysis)
 from pycqed.analysis_v2.readout_analysis import (
     Singleshot_Readout_Analysis, RO_acquisition_delayAnalysis,
     Dispersive_shift_Analysis, Readout_landspace_Analysis)
@@ -98,6 +106,8 @@ from pycqed.analysis_v2.syndrome_analysis import (
 from pycqed.analysis_v2.cryo_scope_analysis import RamZFluxArc, \
     SlidingPulses_Analysis, Cryoscope_Analysis
 
+import pycqed.analysis_v2.cryo_scope_analysis_V2
+reload(pycqed.analysis_v2.cryo_scope_analysis_V2)
 from pycqed.analysis_v2.cryo_scope_analysis_V2 import RamZFluxArc, \
     SlidingPulses_Analysis, Cryoscope_Analysis
 

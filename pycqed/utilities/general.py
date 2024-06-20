@@ -885,3 +885,184 @@ def get_formatted_exception():
     sstb = itb.stb2text(stb)
 
     return sstb
+
+
+#######################################
+# Flux lutman frequency to amp helpers
+#######################################
+def get_frequency_waveform(wave_par, flux_lutman):
+    '''
+    Calculate detuning of waveform.
+    '''
+    poly_coefs = flux_lutman.q_polycoeffs_freq_01_det()
+    out_range = flux_lutman.cfg_awg_channel_range()
+    ch_amp = flux_lutman.cfg_awg_channel_amplitude()
+    dac_amp = flux_lutman.get(wave_par)
+    out_volt = dac_amp*ch_amp*out_range/2
+    poly_func = np.poly1d(poly_coefs)
+    freq = poly_func(out_volt)
+    return freq
+
+def get_DAC_amp_frequency(freq, flux_lutman):
+    '''
+    Function to calculate DAC amp corresponding 
+    to frequency detuning.
+    '''
+    poly_coefs = flux_lutman.q_polycoeffs_freq_01_det()
+    out_range = flux_lutman.cfg_awg_channel_range()
+    ch_amp = flux_lutman.cfg_awg_channel_amplitude()
+    poly_func = np.poly1d(poly_coefs)
+    out_volt = max((poly_func-freq).roots)
+    sq_amp = out_volt/(ch_amp*out_range/2)
+    # Safe check in case amplitude exceeds maximum
+    if sq_amp>1:
+        print(f'WARNING had to increase gain of {flux_lutman.name} to {ch_amp}!')
+        flux_lutman.cfg_awg_channel_amplitude(ch_amp*1.5)
+        # Can't believe Im actually using recursion!!!
+        sq_amp = get_DAC_amp_frequency(freq, flux_lutman)
+    return sq_amp
+
+def get_Ch_amp_frequency(freq, flux_lutman, DAC_param='sq_amp'):
+    '''
+    Function to calculate channel gain corresponding 
+    to frequency detuning.
+    '''
+    poly_coefs = flux_lutman.q_polycoeffs_freq_01_det()
+    out_range = flux_lutman.cfg_awg_channel_range()
+    dac_amp = flux_lutman.get(DAC_param)
+    poly_func = np.poly1d(poly_coefs)
+    out_volt = max((poly_func-freq).roots)
+    ch_amp = out_volt/(dac_amp*out_range/2)
+    if isinstance(ch_amp, complex):
+        print('Warning: Complex amplitude estimated, setting it to zero.')
+        ch_amp = 0
+    return ch_amp
+
+
+####################################
+# Surface-17 utility functions
+####################################
+def get_gate_directions(q0, q1,
+                        map_qubits=None):
+    """
+    Helper function to determine two-qubit gate directions.
+    q0 and q1 should be given as high-freq and low-freq qubit, respectively.
+    Default map is surface-17, however other maps are supported.
+    """
+    if map_qubits == None:
+        # Surface-17 layout
+        map_qubits = {'Z3' : [-2,-1],
+                      'D9' : [ 0, 2],
+                      'X4' : [-1, 2],
+                      'D8' : [-1, 1],
+                      'Z4' : [ 0, 1],
+                      'D6' : [ 1, 1],
+                      'D7' : [-2, 0],
+                      'X3' : [-1, 0],
+                      'D5' : [ 0, 0],
+                      'X2' : [ 1, 0],
+                      'D3' : [ 2, 0],
+                      'D4' : [-1,-1],
+                      'Z1' : [ 0,-1],
+                      'D2' : [ 1,-1],
+                      'X1' : [ 1,-2],
+                      'Z2' : [ 2, 1],
+                      'D1' : [ 0,-2]
+                     }
+    V0 = np.array(map_qubits[q0])
+    V1 = np.array(map_qubits[q1])
+    diff = V1-V0
+    dist = np.sqrt(np.sum((diff)**2))
+    if dist > 1:
+        raise ValueError('Qubits are not nearest neighbors')
+    if diff[0] == 0.:
+        if diff[1] > 0:
+            return ('NE', 'SW')
+        else:
+            return ('SW', 'NE')
+    elif diff[1] == 0.:
+        if diff[0] > 0:
+            return ('SE', 'NW')
+        else:
+            return ('NW', 'SE')
+
+def get_nearest_neighbors(qubit, map_qubits=None):
+    """
+    Helper function to determine nearest neighbors of a qubit.
+    Default map is surface-17, however other maps are supported.
+    """
+    if map_qubits == None:
+        # Surface-17 layout
+        map_qubits = {'Z3' : [-2,-1],
+                      'D9' : [ 0, 2],
+                      'X4' : [-1, 2],
+                      'D8' : [-1, 1],
+                      'Z4' : [ 0, 1],
+                      'D6' : [ 1, 1],
+                      'D7' : [-2, 0],
+                      'X3' : [-1, 0],
+                      'D5' : [ 0, 0],
+                      'X2' : [ 1, 0],
+                      'D3' : [ 2, 0],
+                      'D4' : [-1,-1],
+                      'Z1' : [ 0,-1],
+                      'D2' : [ 1,-1],
+                      'X1' : [ 1,-2],
+                      'Z2' : [ 2, 1],
+                      'D1' : [ 0,-2]
+                     }
+    Neighbor_dict = {}
+    Qubits = list(map_qubits.keys())
+    Qubits.remove(qubit)
+    for q in Qubits:
+        V0 = np.array(map_qubits[qubit]) # qubit position
+        V1 = np.array(map_qubits[q])
+        diff = V1-V0
+        dist = np.sqrt(np.sum((diff)**2))
+        if any(diff) == 0.:
+            pass
+        elif diff[0] == 0.:
+            if diff[1] == 1.:
+                Neighbor_dict[q] = 'SW'
+            elif diff[1] == -1.:
+                Neighbor_dict[q] = 'NE'
+        elif diff[1] == 0.:
+            if diff[0] == 1.:
+                Neighbor_dict[q] = 'NW'
+            elif diff[0] == -1.:
+                Neighbor_dict[q] = 'SE'
+    return Neighbor_dict
+
+def get_parking_qubits(qH, qL):
+    '''
+    Get parked qubits during two-qubit gate
+    '''
+    get_gate_directions(qH, qL)
+    # Get all neighbors of 2Q gate
+    qH_neighbors = get_nearest_neighbors(qH)
+    qL_neighbors = get_nearest_neighbors(qL)
+    all_neighbors = {**qH_neighbors, **qL_neighbors}
+    # remove qubits in 2QG
+    del all_neighbors[qH]
+    del all_neighbors[qL]
+    # remove high frequency qubits
+    if 'D4' in all_neighbors.keys():
+        del all_neighbors['D4']
+    if 'D5' in all_neighbors.keys():
+        del all_neighbors['D5']
+    if 'D6' in all_neighbors.keys():
+        del all_neighbors['D6']
+    _keys_to_remove = []
+    # If high ferquency qubit is ancilla
+    if ('Z' in qH) or ('X' in qH):
+        for q in all_neighbors.keys():
+            if ('Z' in q) or ('X' in q):
+                _keys_to_remove.append(q)
+    # If high frequency qubit is ancilla
+    else:
+        for q in all_neighbors.keys():
+            if 'D' in q:
+                _keys_to_remove.append(q)
+    for q in _keys_to_remove:
+        del all_neighbors[q]
+    return list(all_neighbors.keys())

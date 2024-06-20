@@ -61,6 +61,7 @@ import logging
 import inspect
 import numpy as np
 from typing import Tuple,List
+from importlib import reload
 
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.ZI_base_instrument as zibase
 import pycqed.instrument_drivers.physical_instruments.ZurichInstruments.UHFQA_core as uhf
@@ -70,7 +71,7 @@ from qcodes.utils import validators
 from qcodes.utils.helpers import full_class
 
 log = logging.getLogger(__name__)
-
+reload(uhf)
 ##########################################################################
 # Exceptions
 ##########################################################################
@@ -141,11 +142,9 @@ class UHFQC(uhf.UHFQA_core, DIO.CalInterface):
 
         # Holds the number of configured cases
         self._cases = None
-
         super().__init__(name=name, device=device, interface=interface, address=address,
                          server=server, port=port, nr_integration_channels=nr_integration_channels,
                          **kw)
-
         t1 = time.time()
         log.info(f'{self.devname}: Initialized UHFQC in {t1 - t0:.3f}s')
 
@@ -1020,7 +1019,6 @@ setTrigger(0);
         configured bits. In addition, it compares the recorded DIO codewords to an expected sequence to make sure that no
         codewords are sampled incorrectly."""
         log.debug("{self.devname}: Finding valid delays")
-
         vld_mask     = 1 << self.geti('awgs/{}/dio/valid/index'.format(awg_nr))
         vld_polarity = self.geti('awgs/{}/dio/valid/polarity'.format(awg_nr))
         strb_mask    = (1 << self.geti('awgs/{}/dio/strobe/index'.format(awg_nr)))
@@ -1041,7 +1039,8 @@ setTrigger(0);
             self.setd('raw/dios/0/delay', delay)  # in 1/300 MHz = 3.33 ns steps
             try:
                 # LabOne 22.02 and higher: clear the sticky timing error detection bits
-                self.setd('raw/dios/0/error/timingclear', 0xffffffff)
+                # self.setd('raw/dios/0/error/timingclear', 0xffffffff)
+                pass
             except RuntimeError:
                 # no timingclear node available
                 pass
@@ -1050,11 +1049,13 @@ setTrigger(0);
             for awg in [0]:
                 try:
                     # LabOne 22.02 and higher: read out timing errors that accumulated since the last call to "timingclear"
-                    error_timing = self.geti('raw/dios/0/error/timingsticky')
+                    # error_timing = self.geti('raw/dios/0/error/timingsticky')
+                    pass
                 except RuntimeError:
-                    error_timing = self.geti('raw/dios/0/error/timing')
-                if error_timing & combined_mask != 0:
-                    valid_sequence = False
+                    # error_timing = self.geti('raw/dios/0/error/timing')
+                    pass
+                # if error_timing & combined_mask != 0:
+                #     valid_sequence = False
 
             if valid_sequence:
                 valid_delays.append(delay)

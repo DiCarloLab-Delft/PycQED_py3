@@ -7,9 +7,9 @@ from deprecated import deprecated
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
+from pycqed.measurement import detector_functions as det
 from qcodes.instrument.parameter import ManualParameter
 
-from pycqed.measurement import detector_functions as det
 from pycqed.utilities.general import gen_sweep_pts
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
@@ -1198,23 +1198,23 @@ class Qubit(Instrument):
     # Normal functions:
     ##########################################################################
 
-    def find_frequency(
-            self,
-            method='spectroscopy',
-            spec_mode='pulsed_marked',
-            steps=[1, 3, 10, 30, 100],
-            artificial_periods=4,
-            freqs=None,
-            f_span=100e6,
-            use_max=False,
-            f_step=1e6,
-            verbose=True,
-            update=True,
-            close_fig=True,
-            MC=None,
-            label=''
-    ):
-        # USED_BY: device_dependency_graphs.py
+    # FIXME: overridden in unused class Transmon
+    def find_frequency(self,
+                       method='spectroscopy',
+                       spec_mode='pulsed_marked',
+                       steps=[1, 3, 10, 30, 100],
+                       artificial_periods=4,
+                       freqs=None,
+                       f_span=100e6,
+                       use_max=False,
+                       f_step=1e6,
+                       verbose=True,
+                       update=True,
+                       close_fig=True,
+                       MC=None,
+                       label = '',
+                       disable_metadata=False
+        ):
         """
         Finds the qubit frequency using either the spectroscopy or the Ramsey
         method.
@@ -1304,7 +1304,8 @@ class Qubit(Instrument):
             return self.calibrate_frequency_ramsey(
                 steps=steps, artificial_periods=artificial_periods,
                 verbose=verbose, update=update,
-                close_fig=close_fig)
+                close_fig=close_fig,
+                disable_metadata=disable_metadata)
         return analysis_spec.fitted_freq
 
     def calibrate_spec_pow(
@@ -1387,16 +1388,16 @@ class Qubit(Instrument):
             self.motzoi(opt_motzoi)
         return opt_motzoi
 
-    def calibrate_frequency_ramsey(
-            self,
-            steps=[1, 3, 10, 30, 100, 300, 1000],
-            artificial_periods=2.5,
-            stepsize: float = 20e-9,
-            verbose: bool = True,
-            update: bool = True,
-            close_fig: bool = True,
-            test_beating: bool = True
-    ):
+    # FIXME: overridden in unused class Transmon
+    def calibrate_frequency_ramsey(self,
+                                   steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   artificial_periods = 2.5,
+                                   stepsize:float =20e-9,
+                                   verbose: bool=True, update: bool=True,
+                                   close_fig: bool=True,
+                                   test_beating: bool=True,
+                                   disable_metadata=False
+        ):
         # USED_BY: inspire_dependency_graph.py,
         # USED_BY: device_dependency_graphs_v2.py,
         # USED_BY: device_dependency_graphs.py
@@ -1427,19 +1428,27 @@ class Qubit(Instrument):
                                 freq_qubit=cur_freq,
                                 label='_{}pulse_sep'.format(n),
                                 analyze=False,
-                                prepare_for_timedomain=True if 0 == i else False)
+                                prepare_for_timedomain=True if 0 == i else False,
+                                disable_metadata=disable_metadata)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
                                    freq_qubit=cur_freq,
                                    artificial_detuning=artificial_detuning,
                                    close_file=False)
-            if test_beating and a.fit_res.chisqr > 0.4:
+            print(a.fit_res.chisqr)
+            if test_beating and a.fit_res.chisqr > 0.1:
                 logging.warning('Found double frequency in Ramsey: large '
                                 'deviation found in single frequency fit.'
                                 'Returning True to continue automation. Retry '
                                 'with test_beating=False to ignore.')
-
-                return True
-            fitted_freq = a.fit_res.params['frequency'].value
+                # If Double beating is found in Ramsey, the chosen frequency
+                # will be set to the average of the two frequencies.
+                b = ma.DoubleFrequency()
+                fitted_freq = (b.fit_res.params['freq_1'].value+\
+                               b.fit_res.params['freq_2'].value)/2
+                b.T2_star = {'T2_star': (b.fit_res.params['tau_1'].value+\
+                                        b.fit_res.params['tau_2'].value)/2}
+            else:
+                fitted_freq = a.fit_res.params['frequency'].value
             measured_detuning = fitted_freq-artificial_detuning
             cur_freq = a.qubit_frequency
 
@@ -1464,6 +1473,7 @@ class Qubit(Instrument):
             self.freq_qubit(cur_freq)
         return cur_freq
 
+    # FIXME: overridden in unused class Transmon
     def calculate_frequency(self, calc_method=None, I_per_phi0=None, I=None):
         # USED_BY: find_frequency()
         """

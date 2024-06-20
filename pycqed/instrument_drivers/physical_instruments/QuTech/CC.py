@@ -18,9 +18,10 @@ from typing import Tuple,List
 from .CCCore import CCCore
 from pycqed.instrument_drivers.library.Transport import Transport
 import pycqed.instrument_drivers.library.DIO as DIO
-
+from importlib import reload
 from qcodes.utils import validators as vals
 from qcodes import Instrument
+# reload(CCCore)
 
 log = logging.getLogger(__name__)
 

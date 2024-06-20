@@ -68,7 +68,7 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     VNA_instr.timeout(10**4)
 
     t_start = ma.a_tools.current_timestamp()
-    MC_instr.run(name=file_name)
+    MC_instr.run(name=file_name, disable_snapshot_metadata=True)
     MC_instr.soft_avg(old_soft_avg)
     t_stop = ma.a_tools.current_timestamp()
     t_meas = ma.a_tools.get_timestamps_in_range(t_start, t_stop, label=file_name)

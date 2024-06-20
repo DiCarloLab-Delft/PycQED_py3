@@ -1,10 +1,10 @@
-from typing import List
+from typing import List, Dict, Optional
 import numpy as np
 
 from pycqed.measurement.openql_experiments.openql_helpers import OqlProgram
 from pycqed.utilities.general import int2base
 from pycqed.instrument_drivers.meta_instrument.LutMans.flux_lutman import _def_lm as _def_lm_flux
-
+import itertools
 
 def single_flux_pulse_seq(qubit_indices: tuple, platf_cfg: str):
     p = OqlProgram("single_flux_pulse_seq", platf_cfg)
@@ -21,7 +21,6 @@ def single_flux_pulse_seq(qubit_indices: tuple, platf_cfg: str):
 
     p.compile()
     return p
-
 
 # FIXME: not really used
 def flux_staircase_seq(platf_cfg: str) -> OqlProgram:
@@ -47,10 +46,8 @@ def multi_qubit_off_on(
         qubits: list,
         initialize: bool,
         second_excited_state: bool,
-        platf_cfg: str,
-        nr_flux_dance: int = None,
-        wait_time: float = None
-) -> OqlProgram:
+        platf_cfg: str
+    ) -> OqlProgram:
     """
     Performs an 'off_on' sequence on the qubits specified.
         off: (RO) - prepz -      -     - RO
@@ -81,29 +78,16 @@ def multi_qubit_off_on(
 
     for i, comb in enumerate(combinations):
         k = p.create_kernel('Prep_{}'.format(comb))
-
         # 1. Prepare qubits in 0
         for q in qubits:
             k.prepz(q)
         k.barrier([])
-
         # 2. post-selection extra init readout
         if initialize:
             for q in qubits:
                 k.measure(q)
             k.barrier(qubits)
-
-        if nr_flux_dance:
-            for i in range(int(nr_flux_dance)):
-                for step in [1, 2, 3, 4]:
-                    # if refocusing:
-                    #     k.gate(f'flux-dance-{step}-refocus', [0])
-                    # else:
-                    k.gate(f'flux-dance-{step}', [0])
-                k.barrier([])  # alignment
-            k.gate("wait", [], wait_time)
-
-            # 3. prepare desired state
+        # 3. prepare desired state
         for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
             if state == '0':
                 k.gate('i', [target_qubit])
@@ -130,7 +114,7 @@ def single_qubit_off_on(
         qtarget,
         initialize: bool,
         platf_cfg: str
-) -> OqlProgram:
+    ) -> OqlProgram:
     n_qubits = len(qubits)
     comb_0 = '0' * n_qubits
     comb_1 = comb_0[:qubits.index(qtarget)] + '1' + comb_0[qubits.index(qtarget) + 1:]
@@ -179,7 +163,7 @@ def targeted_off_on(
         q_target: int,
         pulse_comb: str,
         platf_cfg: str
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Performs an 'off_on' sequence on the qubits specified.
         off: prepz -      - RO
@@ -239,14 +223,15 @@ def targeted_off_on(
 
     return p
 
+
 def Msmt_induced_dephasing_ramsey(
     q_rams: list,
-    q_meas: int,
+    q_meas: list,
     meas_time: int,
     platf_cfg: str,
     echo_times: list = None,
-    exception_qubits: list = None
-) -> OqlProgram:
+    exception_qubits: list = None,
+    ) -> OqlProgram:
     """
     q_target is ramseyed
     q_spec is measured
@@ -261,34 +246,69 @@ def Msmt_induced_dephasing_ramsey(
                 cw_idx = angle//20 + 9
                 k = p.create_kernel(f"Ramsey_meas_{meas}_{angle}_{state}")
 
-                for q in q_rams:
+                for q in q_rams+q_meas:
                     k.prepz(q)
-                k.prepz(q_meas)
                 k.barrier([])
 
                 if state == '1':
-                    k.gate('rx180',[q_meas])
-                for q in q_rams:
+                    for q in q_meas:
+                        k.gate('rx180',[q])
+                for q in q_rams: 
                     k.gate('rx90', [q])
                 k.barrier([])
 
-                if meas == True:
-                    k.measure(q_meas)
-                else:
-                    k.gate('wait', [q_meas], meas_time)
+                for q in q_meas:
+                    if meas == True:
+                        k.measure(q)
+                    else:
+                        k.gate('wait', [q], meas_time)
                 if echo_times != None:
-                    for q, t in zip(q_rams, echo_times):
-                        k.gate('cw_30', [q])
-                        k.gate('wait', [q], t)
-                k.barrier([]) 
-                
-                for q in q_rams:
+                    for j, q in enumerate(q_rams):
+                        if echo_times == 'XmX':
+                            for cycle in range(int(meas_time/2/20)):
+                                k.gate('rx180', [q])
+                                k.gate('rXm180', [q])
+                        elif echo_times == 'YmY':
+                            for cycle in range(int(meas_time/2/20)):
+                                k.gate('rY180', [q])
+                                k.gate('rYm180', [q])
+                        elif echo_times == 'XY':
+                            for cycle in range(int(meas_time/6/20)):
+                                k.gate('i', [q])
+                                k.gate('rx180', [q])
+                                k.gate('i', [q])
+                                k.gate('i', [q])
+                                k.gate('rY180', [q])
+                                k.gate('i', [q])
+                        elif echo_times == 'XYmYmX':
+                            for cycle in range(int(meas_time/4/20)):
+                                k.gate('rx180', [q])
+                                k.gate('rY180', [q])
+                                k.gate('rYm180', [q])
+                                k.gate('rXm180', [q])
+                        elif echo_times == 'XY8':
+                            for cycle in range(int(meas_time/8/20)):
+                                k.gate('rx180', [q])
+                                k.gate('rY180', [q])
+                                k.gate('rx180', [q])
+                                k.gate('rY180', [q])
+                                k.gate('rY180', [q])
+                                k.gate('rx180', [q])
+                                k.gate('rY180', [q])
+                                k.gate('rx180', [q])
+
+                        else:
+                            k.gate('cw_30', [q])
+                            k.gate('wait', [q], echo_times[j])
+                k.barrier([])
+                for q in q_rams: 
                     k.gate('cw_{:02}'.format(cw_idx), [q])
-                    k.gate("wait", [q], 600) # To prevent UHF from missing shots
+                    k.gate("wait", [q], 1000) # To prevent UHF from missing shots
                     k.measure(q)
                 k.barrier([])
                 if meas == True and exception_qubits != None:
                     for q in exception_qubits:
+                        k.gate("wait", [q], 1000) # To prevent UHF from missing shots
                         k.measure(q)
                 p.add_kernel(k)
 
@@ -302,7 +322,6 @@ def Msmt_induced_dephasing_ramsey(
 
     p.compile()
     return p
-
 
 
 def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
@@ -375,7 +394,7 @@ def two_qubit_AllXY(
         sequence_type='sequential',
         replace_q1_pulses_with: str = None,
         repetitions: int = 1
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     AllXY sequence on two qubits.
     Has the option of replacing pulses on q1 with pi pulses
@@ -479,7 +498,7 @@ def residual_coupling_sequence(
         q_spectator_idx: list,
         spectator_state: str,
         platf_cfg: str
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Sequence to measure the residual (ZZ) interaction between two qubits.
     Procedure is described in M18TR.
@@ -505,7 +524,7 @@ def residual_coupling_sequence(
 
     gate_spec = [s.replace('0', 'i').replace('1', 'rx180') for s in spectator_state]
 
-    for i, time in enumerate(times[:-4]):
+    for i, time in enumerate(times[:-2]):
 
         k = p.create_kernel("residual_coupling_seq_{}".format(i))
         k.prepz(q0)
@@ -513,29 +532,15 @@ def residual_coupling_sequence(
             k.prepz(q_s)
         wait_nanoseconds = int(round(time / 1e-9))
         k.gate('rx90', [q0])
-
-        # wait
+        for i_s, q_s in enumerate(q_spectator_idx):
+            k.gate(gate_spec[i_s], [q_s])
         k.gate("wait", all_qubits, wait_nanoseconds)
-
-        # Echo pulse on ramsey qubit, apply selected gate again to cancel effect
         k.gate('rx180', [q0])
         for i_s, q_s in enumerate(q_spectator_idx):
             k.gate(gate_spec[i_s], [q_s])
-
-        # wait
         k.gate("wait", all_qubits, wait_nanoseconds)
-
-        # Transform ramsey qubit state to preferred basis
-        # angle = (i*40) % 360
-        # cw_idx = angle//20 + 9
-        # k.gate('cw_{:02}'.format(cw_idx), [q0])
-        k.gate('ry90', [q0])
         # k.gate('rxm90', [q0])
-        for i_s, q_s in enumerate(q_spectator_idx):
-            k.gate(gate_spec[i_s], [q_s])
-        k.gate('wait', [], 0)
-
-        # Measure qubits
+        k.gate('ry90', [q0])
         k.measure(q0)
         for q_s in q_spectator_idx:
             k.measure(q_s)
@@ -556,7 +561,7 @@ def FluxTimingCalibration(
         platf_cfg: str,
         flux_cw: str = 'fl_cw_02',  # FIXME: unused
         cal_points: bool = True
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
@@ -580,7 +585,12 @@ def FluxTimingCalibration(
     p.add_kernel(k)
 
     if cal_points:
-        p.add_single_qubit_cal_points(qubit_idx=qubit_idx)  # FIXME: unresolved, use multi iso single?
+        cal_states =  ['{:0{}b}'.format(i, len(qubit_idxs)) for i in range(2**len(qubit_idxs))]
+        p.add_multi_q_cal_points(
+            qubits=qubit_idxs,
+            combinations=cal_states
+        )
+        # p.add_single_qubit_cal_points(qubit_idx=qubit_idx)  # FIXME: unresolved
     p.compile()
     return p
 
@@ -591,8 +601,9 @@ def Cryoscope(
         twoq_pair=[2, 0],
         platf_cfg: str = '',
         cc: str = 'CC',
+        wait_time_flux: int = 0,
         double_projections: bool = True
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -609,24 +620,17 @@ def Cryoscope(
 
     p = OqlProgram("Cryoscope", platf_cfg)
 
-    # FIXME: the variables created here are effectively unused
-    if cc.upper() == 'CCL':
-        flux_target = twoq_pair
-    elif cc.upper() == 'QCC' or cc.upper() == 'CC':
-        cw_idx = int(flux_cw[-2:])
-        flux_cw = 'sf_{}'.format(_def_lm_flux[cw_idx]['name'].lower())
-    else:
-        raise ValueError('CC type not understood: {}'.format(cc))
-
     k = p.create_kernel("RamZ_X")
     k.prepz(qubit_idxs[0])
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
+    k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
-        k.gate('sf_square', [q_idx])
+        k.gate(flux_cw, [q_idx])
     k.barrier([])  # alignment workaround
+    k.gate('wait', [], wait_time_flux)
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
     k.barrier([])
@@ -639,10 +643,12 @@ def Cryoscope(
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
         k.gate('rx90', [q_idx])
+    k.gate('wait', [], wait_time_flux)
     k.barrier([])  # alignment workaround
     for q_idx in qubit_idxs:
-        k.gate('sf_square', [q_idx])
+        k.gate(flux_cw, [q_idx])
     k.barrier([])  # alignment workaround
+    k.gate('wait', [], wait_time_flux)
     for q_idx in qubit_idxs:
         k.gate('ry90', [q_idx])
     k.barrier([])
@@ -656,10 +662,12 @@ def Cryoscope(
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('rx90', [q_idx])
+        k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
-            k.gate('sf_square', [q_idx])
+            k.gate(flux_cw, [q_idx])
         k.barrier([])  # alignment workaround
+        k.gate('wait', [], wait_time_flux)
         for q_idx in qubit_idxs:
             k.gate('rxm90', [q_idx])
         k.barrier([])
@@ -672,10 +680,12 @@ def Cryoscope(
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
             k.gate('rx90', [q_idx])
+        k.gate('wait', [], wait_time_flux)
         k.barrier([])  # alignment workaround
         for q_idx in qubit_idxs:
-            k.gate('sf_square', [q_idx])
+            k.gate(flux_cw, [q_idx])
         k.barrier([])  # alignment workaround
+        k.gate('wait', [], wait_time_flux)
         for q_idx in qubit_idxs:
             k.gate('rym90', [q_idx])
         k.barrier([])
@@ -683,6 +693,31 @@ def Cryoscope(
             k.measure(q_idx)
         p.add_kernel(k)
 
+    p.compile()
+    return p
+
+
+def Cryoscope_long(
+    qubit: int,
+    times_ns: list,
+    t_total_ns: int,
+    platf_cfg: str = None):
+    '''
+    Implements sequence for Spectrocopy type cryoscope.
+    '''
+    p = OqlProgram("Cryoscope_long", platf_cfg)
+    for t_ns in times_ns:
+        k = p.create_kernel(f"wait_time_{t_ns}ns")
+        # Preparation
+        k.prepz(qubit)
+        # In this routine, we want to trigger flux codeword 1
+        # as of the time of writting this, <sf_cz_ne> points to fl_cw 01
+        k.gate('sf_cz_ne', [qubit])
+        k.gate("wait", [qubit], t_ns)
+        k.gate('ry180', [qubit])
+        k.gate("wait", [qubit], t_total_ns-t_ns+1000)
+        k.measure(qubit)
+        p.add_kernel(k)
     p.compile()
     return p
 
@@ -733,7 +768,7 @@ def fluxed_ramsey(
         wait_time: float,
         flux_cw: str = 'fl_cw_02',
         platf_cfg: str = ''
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -781,15 +816,13 @@ def fluxed_ramsey(
 
 
 # FIMXE: merge into the real chevron seq
-
-
 def Chevron_hack(
         qubit_idx: int,
         qubit_idx_spec,
         buffer_time,
         buffer_time2,
         platf_cfg: str
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -829,14 +862,15 @@ def Chevron_hack(
 def Chevron(
         qubit_idx: int,
         qubit_idx_spec: int,
-        qubit_idx_parks: int,  # FIXME: incorrect type
+        qubit_idx_parks: Optional[List[int]],  # FIXME: incorrect type
         buffer_time, buffer_time2,
         flux_cw: int,
         platf_cfg: str,
         target_qubit_sequence: str = 'ramsey',
         cc: str = 'CCL',
-        recover_q_spec: bool = False
-) -> OqlProgram:
+        recover_q_spec: bool = False,
+        second_excited_state: bool = False,
+    ) -> OqlProgram:
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -853,6 +887,7 @@ def Chevron(
             or excite it iat the beginning of the sequnce ('excited')
         recover_q_spec (bool): applies the first gate of qspec at the end
             as well if `True`
+        second_excited_state (bool): Applies f12 transition pulse before flux pulse.
     Returns:
         p:              OpenQL Program object containing
 
@@ -867,6 +902,8 @@ def Chevron(
         q0    -x180-flux-x180-RO-
         qspec ----------------RO- (target_qubit_sequence='ground')
 
+        q0    -x180-x12-flux-x12-x180-RO-
+        qspec ------------------------RO- (second_excited_state=True)
     """
     p = OqlProgram("Chevron", platf_cfg)
 
@@ -893,7 +930,8 @@ def Chevron(
 
     k.gate(spec_gate, [qubit_idx_spec])
     k.gate('rx180', [qubit_idx])
-
+    if second_excited_state:
+        k.gate('rx12', [qubit_idx])
     if buffer_nanoseconds > 0:
         k.gate("wait", [qubit_idx], buffer_nanoseconds)
 
@@ -918,9 +956,10 @@ def Chevron(
 
     if buffer_nanoseconds2 > 0:
         k.gate('wait', [qubit_idx], buffer_nanoseconds2)
-
+    if second_excited_state:
+        k.gate('rx12', [qubit_idx])
     k.gate('rx180', [qubit_idx])
-    k.gate('rx180', [qubit_idx_spec])
+    k.gate(spec_gate, [qubit_idx_spec])
 
     if recover_q_spec:
         k.gate(spec_gate, [qubit_idx_spec])
@@ -941,7 +980,7 @@ def two_qubit_ramsey(
         qubit_idx_spec: int,
         platf_cfg: str,
         target_qubit_sequence: str = 'excited'
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -1010,7 +1049,7 @@ def two_qubit_tomo_bell(
         platf_cfg,
         wait_after_flux: float = None,
         flux_codeword: str = 'cz'
-) -> OqlProgram:
+    ) -> OqlProgram:
     '''
     Two qubit bell state tomography.
 
@@ -1084,7 +1123,7 @@ def two_qubit_tomo_bell_by_waiting(
         q1,
         platf_cfg,
         wait_time: int = 20
-) -> OqlProgram:
+    ) -> OqlProgram:
     '''
     Two qubit (bell) state tomography. There are no flux pulses applied,
     only waiting time. It is supposed to take advantage of residual ZZ to
@@ -1144,116 +1183,6 @@ def two_qubit_tomo_bell_by_waiting(
     p.compile()
     return p
 
-
-# FIXME: not really used
-def two_qubit_DJ(q0, q1, platf_cfg) -> OqlProgram:
-    '''
-    Two qubit Deutsch-Josza.
-
-    Args:
-        q0, q1          (str): names of the target qubits
-    '''
-
-    p = OqlProgram("two_qubit_DJ", platf_cfg)
-
-    # experiments
-    # 1
-    k = p.create_kernel("DJ1")
-    k.prepz(q0)  # to ensure enough separation in timing
-    k.prepz(q1)  # to ensure enough separation in timing
-    # prerotations
-    k.gate('ry90', [q0])
-    k.gate('rym90', [q1])
-    # post rotations
-    k.gate('ry90', [q0])
-    k.gate('ry90', [q1])
-    # measure
-    k.measure(q0)
-    k.measure(q1)
-    p.add_kernel(k)
-
-    # 2
-    k = p.create_kernel("DJ2")
-    k.prepz(q0)  # to ensure enough separation in timing
-    k.prepz(q1)  # to ensure enough separation in timing
-    # prerotations
-    k.gate('ry90', [q0])
-    k.gate('rym90', [q1])
-    # rotations
-    k.gate('rx180', [q1])
-    # post rotations
-    k.gate('ry90', [q0])
-    k.gate('ry90', [q1])
-    # measure
-    k.measure(q0)
-    k.measure(q1)
-    p.add_kernel(k)
-
-    # 3
-    k = p.create_kernel("DJ3")
-    k.prepz(q0)  # to ensure enough separation in timing
-    k.prepz(q1)  # to ensure enough separation in timing
-    # prerotations
-    k.gate('ry90', [q0])
-    k.gate('rym90', [q1])
-    # rotations
-    k.gate('ry90', [q1])
-    k.gate('rx180', [q0])
-    k.gate('rx180', [q1])
-
-    # Hardcoded flux pulse, FIXME use actual CZ
-    k.barrier([])  # alignment workaround
-    k.gate('wait', [2, 0], 100)
-    k.gate('fl_cw_01', [2, 0])
-    # FIXME hardcoded extra delays
-    k.gate('wait', [2, 0], 200)
-    k.barrier([])  # alignment workaround
-
-    k.gate('rx180', [q0])
-    k.gate('ry90', [q1])
-
-    # post rotations
-    k.gate('ry90', [q0])
-    k.gate('ry90', [q1])
-    # measure
-    k.measure(q0)
-    k.measure(q1)
-    p.add_kernel(k)
-
-    # 4
-    k = p.create_kernel("DJ4")
-    k.prepz(q0)  # to ensure enough separation in timing
-    k.prepz(q1)  # to ensure enough separation in timing
-    # prerotations
-    k.gate('ry90', [q0])
-    k.gate('rym90', [q1])
-    # rotations
-    k.gate('rym90', [q1])
-    # Hardcoded flux pulse, FIXME use actual CZ
-    k.barrier([])  # alignment workaround
-    k.gate('wait', [2, 0], 100)
-    k.gate('fl_cw_01', [2, 0])
-    # FIXME hardcoded extra delays
-    k.gate('wait', [2, 0], 200)
-    k.barrier([])  # alignment workaround
-
-    k.gate('rx180', [q1])
-    k.gate('rym90', [q1])
-
-    # post rotations
-    k.gate('ry90', [q0])
-    k.gate('ry90', [q1])
-    # measure
-    k.measure(q0)
-    k.measure(q1)
-    p.add_kernel(k)
-
-    # 7 repetitions is because of assumptions in tomo analysis
-    p.add_two_q_cal_points(q0=q0, q1=q1, reps_per_cal_pt=7)
-    p.compile()
-    return p
-
-
 def single_qubit_parity_check(
         qD: int,
         qA: int,
@@ -1263,7 +1192,7 @@ def single_qubit_parity_check(
         initial_states=['0', '1'],
         flux_codeword: str = 'cz',
         parity_axis='Z'
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Implements a circuit for repeated parity checks.
 
@@ -1350,7 +1279,7 @@ def two_qubit_parity_check(
         idling_time: float = 40e-9,
         idling_time_echo: float = 20e-9,
         idling_rounds: int = 0
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Implements a circuit for repeated parity checks on two qubits.
 
@@ -1559,7 +1488,7 @@ def conditional_oscillation_seq(
         flux_codeword_park: str = None,
         parked_qubit_seq: str = 'ground',
         disable_parallel_single_q_gates: bool = False
-) -> OqlProgram:
+    ) -> OqlProgram:
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -1606,6 +1535,8 @@ def conditional_oscillation_seq(
 
             k.barrier([])  # alignment workaround
 
+            k.gate('wait', [q0], 1000000)
+            k.barrier([])
             # #################################################################
             # Single qubit ** parallel ** gates before flux pulses
             # #################################################################
@@ -1743,7 +1674,6 @@ def conditional_oscillation_seq(
         qubits = [q0, q1] if q2 is None else [q0, q1, q2]
         p.add_multi_q_cal_points(
             qubits=qubits,
-            f_state_cal_pt_cw=31,
             combinations=states)
 
     p.compile()
@@ -1862,6 +1792,11 @@ def conditional_oscillation_seq_multi(
                     if flux_codeword == 'cz':
                         for q0, q1 in zip(Q_idxs_target, Q_idxs_control):
                             k.gate(flux_codeword, [q0, q1])
+                    elif flux_codeword == 'sf_square':
+                        for q0, q1 in zip(Q_idxs_target, Q_idxs_control):
+                            k.gate(flux_codeword, [q0])
+                        for q in Q_idxs_parked:
+                            k.gate('sf_park', [q])
                     else:
                         k.gate(flux_codeword, [0])
                         # k.gate('sf_cz_ne', [3])
@@ -1888,7 +1823,7 @@ def conditional_oscillation_seq_multi(
 
             if case == "excitation":
                 for q_idx in Q_idxs_control:
-                    k.gate("rx180", [q_idx])
+                    k.gate("rxm180", [q_idx])
 
             # cw_idx corresponds to special hardcoded angles in the lutman
             # special because the cw phase pulses go in mult of 20 deg
@@ -1929,7 +1864,6 @@ def conditional_oscillation_seq_multi(
         qubits = Q_idxs_target + Q_idxs_control
         p.add_multi_q_cal_points(
             qubits=qubits,
-            f_state_cal_pt_cw=31,
             combinations=states)
 
     p.compile()
@@ -1945,6 +1879,89 @@ def conditional_oscillation_seq_multi(
     return p
 
 
+def parity_check_ramsey(
+        Q_idxs_target,
+        Q_idxs_control,
+        control_cases,
+        flux_cw_list,
+        platf_cfg,
+        angles,
+        nr_spectators: int=0,
+        pc_repetitions: int=1,
+        wait_time_before_flux: int = 0,
+        wait_time_after_flux: int = 0
+        ):
+
+    p = OqlProgram("Parity_check_ramsey", platf_cfg)
+
+    for case in control_cases:
+        for i, angle in enumerate(angles):
+            k = p.create_kernel("{}_{}".format(case, angle))
+            # Preparation
+            for q in Q_idxs_target+Q_idxs_control:
+                k.prepz(q)
+            k.barrier([])
+            # Single qubit gates
+            for j, state in enumerate(case):
+                if state == '1':
+                    k.gate("rx180", [Q_idxs_control[j]])
+                elif state == '2':
+                    k.gate("rx180", [Q_idxs_control[j]])
+                    k.gate("rx12", [Q_idxs_control[j]])
+            for q in Q_idxs_target:
+                k.gate("rx90", [q])
+            k.barrier([]) # alignment workaround
+            # Flux pulses
+            k.gate('wait', [], wait_time_before_flux)
+            for j in range(pc_repetitions):
+                for l, flux_cw in enumerate(flux_cw_list):
+                    if 'cz' in flux_cw:
+                        if len(flux_cw_list) == len(Q_idxs_control)-nr_spectators:
+                            k.gate(flux_cw, [Q_idxs_target[0], Q_idxs_control[l]])
+                        elif len(flux_cw_list) == len(Q_idxs_target):
+                            k.gate(flux_cw, [Q_idxs_target[l], Q_idxs_control[0]])
+                        else:
+                            raise('Flux cw list is not valid.')
+                    else:
+                        k.gate(flux_cw, [0])
+            k.gate('wait', [], wait_time_after_flux)
+            k.barrier([])
+            # Single qubit gates
+            for j, state in enumerate(case):
+                if state == '2':
+                    k.gate("rx12", [Q_idxs_control[j]])
+                    k.gate("rxm180", [Q_idxs_control[j]])
+                if state == '1':
+                    k.gate("rxm180", [Q_idxs_control[j]])
+            # cw_idx corresponds to special hardcoded angles in the lutman
+            # special because the cw phase pulses go in mult of 20 deg
+            cw_idx = angle // 20 + 9
+            phi_gate = 'cw_{:02}'.format(cw_idx)
+            for q in Q_idxs_target:
+                k.gate(phi_gate, [q])
+            k.barrier([])
+            # k.gate('wait', [], 40)
+
+            # Measurement
+            for q in Q_idxs_target+Q_idxs_control:
+                k.measure(q)
+            k.barrier([])
+            p.add_kernel(k)
+
+    qubits = Q_idxs_target + Q_idxs_control
+    cal_states =  ['{:0{}b}'.format(i, len(qubits)) for i in range(2**len(qubits))]
+    p.add_multi_q_cal_points(
+        qubits=qubits,
+        combinations=cal_states
+        )
+    p.compile()
+
+    cal_pts_idx = np.arange(len(control_cases),len(cal_states)+len(control_cases))
+    p.sweep_points = np.concatenate([np.repeat(np.arange(len(control_cases)), len(angles)),
+                                    cal_pts_idx])
+    return p
+
+
 def parity_check_flux_dance(
         Q_idxs_target: List[int],
         Q_idxs_control: List[int],
@@ -1952,7 +1969,10 @@ def parity_check_flux_dance(
         flux_cw_list: List[str],
         Q_idxs_ramsey: List[int] = None,
         Q_idxs_parking: List[int] = None,
+        disable_pc: bool = False,
+        disabled_pc_duration: int = 40,
         nr_flux_dance_before_cal_points: int = None,
+        pc_repetitions: int = 1,
         platf_cfg: str = None,
         angles: np.ndarray = np.arange(0, 360, 20),
         initialization_msmt: bool = False,
@@ -2033,19 +2053,30 @@ def parity_check_flux_dance(
             # #################################################################
             # Flux pulses
             # #################################################################
-            # k.gate('wait', [], wait_time_before_flux)
+            k.gate('wait', [], wait_time_before_flux)
 
-            for flux_cw in flux_cw_list:
-                k.gate(flux_cw, [0])
+            if not disable_pc:
+                for dummy_i in range(pc_repetitions):
+                    for flux_cw in flux_cw_list:
+                        k.gate(flux_cw, [0])
+            else:
+                k.barrier([])
+                k.gate('wait', [], disabled_pc_duration)
+                k.barrier([])
             k.barrier([])
 
-            # k.gate('wait', [], wait_time_after_flux)
+            k.gate('wait', [], wait_time_after_flux)
             # #################################################################
             # Single qubit gates post flux pulses
             # #################################################################
+            for qb in Q_idxs_target:
+                k.gate("update_ph_park_1", [qb])
+
+            k.barrier([])
+
             for i, indx in enumerate(case):
                 if indx == '1':
-                    k.gate("rxm180", [Q_idxs_control[i]])
+                    k.gate("rx180", [Q_idxs_control[i]])
 
             # cw_idx corresponds to special hardcoded angles in the lutman
             # special because the cw phase pulses go in mult of 20 deg
@@ -2092,7 +2123,6 @@ def parity_check_flux_dance(
 
         p.add_multi_q_cal_points(
             qubits=qubits if not Q_idxs_parking else qubits + Q_idxs_parking,
-            f_state_cal_pt_cw=31,
             combinations=cal_states,
             nr_flux_dance=nr_flux_dance_before_cal_points,
             flux_cw_list=flux_cw_list if nr_flux_dance_before_cal_points else None
@@ -2111,7 +2141,7 @@ def parity_check_flux_dance(
     return p
 
 
-def parity_check_fidelity(
+def parity_check_fidelity_old(
         Q_idxs_target: List[str],
         Q_idxs_control: List[str],
         control_cases: List[str],
@@ -2129,7 +2159,7 @@ def parity_check_fidelity(
 
     Pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-    parking qbs: includes all qubits to be parked.
+    parking qbs: includes all qubits to be parked. 
 
     Timing of the sequence:
     q0:  X90   --  C-Phase  (repet. C-Phase) Rphi90 RO
@@ -2140,7 +2170,7 @@ def parity_check_fidelity(
     Args:
          pairs : contains all the gates gates with q0 is the target and q1 is the control.
 
-        parking qbs: includes all qubits to be parked.
+        parking qbs: includes all qubits to be parked. 
 
         flux_codeword (str):
             the gate to be applied to the qubit pair q0, q1
@@ -2156,9 +2186,9 @@ def parity_check_fidelity(
     p = OqlProgram("parity_check_fidelity", platf_cfg)
 
     for case in control_cases:
-
+        # k = p.create_kernel("{}".format(case), p)
         k = p.create_kernel("{}".format(case))
-
+        
         # #################################################################
         # State preparation
         # #################################################################
@@ -2168,7 +2198,7 @@ def parity_check_fidelity(
 
         if initialization_msmt:
             for qb in Q_idxs_target + Q_idxs_control:
-                k.measure(qb)
+                k.measure(qb) 
             k.gate("wait", [], 0)
 
         for i, indx in enumerate(case):
@@ -2194,6 +2224,11 @@ def parity_check_fidelity(
         k.barrier([])
 
         k.gate('wait', [], wait_time_after_flux)
+
+        for qb in Q_idxs_target:
+                k.gate("update_ph_park_1", [qb])
+
+        k.barrier([])
         # #################################################################
         # Single qubit gates post flux pulses
         # #################################################################
@@ -2222,165 +2257,305 @@ def parity_check_fidelity(
 
     return p
 
-def Weight_4_parity_tomography(
-        Q_anc: int,
-        Q_D1: int,
-        Q_D2: int,
-        Q_D3: int,
-        Q_D4: int,
-        platf_cfg: str,
-        simultaneous_measurement: bool=True
+
+def parity_check_fidelity(
+        Q_ancilla_idx: List[str],
+        Q_control_idx: List[str],
+        control_cases: List[str],
+        flux_cw_list: List[str],
+        initialization_msmt: bool = False,
+        wait_time_before_flux: int = 0,
+        wait_time_after_flux: int = 0,
+        platf_cfg: str = None
         ):
-    p = OqlProgram("Weight_4_parity_tomography", platf_cfg)
-    all_Q_idxs = [Q_anc, Q_D1, Q_D2, Q_D3, Q_D4]
+    '''
+    Performs parity check using ancilla and control qubits.
+    '''
+    p = OqlProgram("parity_check_fidelity", platf_cfg)
+    for case in control_cases:
+        k = p.create_kernel("{}".format(case))
+        ####################
+        # State preparation
+        ####################
+        for q in Q_ancilla_idx + Q_control_idx:
+            k.prepz(q)
+        k.barrier([])
+        if initialization_msmt:
+            for q in Q_ancilla_idx + Q_control_idx:
+                k.measure(q)
+            k.gate("wait", [], 0)
+        #####################
+        # Single qubit gates
+        #####################
+        for i, state in enumerate(case):
+            if state == '1':
+                k.gate("rx180", [Q_control_idx[i]])
+        for q in Q_ancilla_idx:
+            k.gate("rym90", [q])
+        k.barrier([])
+        ##############
+        # Flux pulses
+        ##############
+        k.gate('wait', [], wait_time_before_flux)
+        for i, flux_cw in enumerate(flux_cw_list):
+            if 'cz' in flux_cw:
+                k.gate(flux_cw, [Q_ancilla_idx[0], Q_control_idx[i]])
+            else:
+                k.gate(flux_cw, [0])
+        k.gate('wait', [], wait_time_after_flux)
+        # k.barrier([])
+        #####################
+        # Single qubit gates
+        #####################
+        for i, state in enumerate(case):
+            if state == '1':
+                k.gate("rxm180", [Q_control_idx[i]])
+        for q_idx in Q_ancilla_idx:
+            k.gate("ry90", [q_idx])
+        k.barrier([])
+        ##############
+        # Measurement
+        ##############
+        for q in Q_ancilla_idx:
+            k.measure(q)
+        if initialization_msmt:
+            for q in Q_control_idx:
+                k.measure(q)
+        p.add_kernel(k)
+    # Add calibration points
+    Q_total = Q_ancilla_idx
+    if initialization_msmt:
+        Q_total += Q_control_idx
+    n = len(Q_total)
+    states = ['0','1']
+    combinations = [''.join(s) for s in itertools.product(states, repeat=n)]
+    p.add_multi_q_cal_points(qubits=Q_total,
+                             combinations=combinations,
+                             reps_per_cal_pnt=1)
+    p.compile()
+    return p
+
+
+def Weight_n_parity_tomography(
+        Q_anc: int,
+        Q_D: list,
+        platf_cfg: str,
+        flux_cw_list: List[str],
+        Q_exception: List[str],
+        wait_time_before_flux: int = 0,
+        initialization_msmt: bool = False,
+        wait_time_after_flux: int = 0,
+        simultaneous_measurement: bool=True,
+        n_rounds=1,
+        readout_duration_ns: int = 340,
+        mw_duration_ns: int = 20,
+        ):
+    p = OqlProgram("Weight_n_parity_tomography", platf_cfg)
+
+    if ((readout_duration_ns-mw_duration_ns)/2)%mw_duration_ns != 0:
+        print('Warning: Readout duration is not multiple of\
+                Dynamical decoupling block sequence!')
+
+    n = len(Q_D)
+    all_Q_idxs = [Q_anc] + Q_D
     tomo_gates = {'Z': 'i', 'X': 'rym90', 'Y': 'rx90'}
 
-    for op1, g1 in tomo_gates.items():
-        for op2, g2 in tomo_gates.items():
-            for op3, g3 in tomo_gates.items():
-                for op4, g4 in tomo_gates.items():
+    ops = ['Z','X','Y']
+    Operators = [''.join(op) for op in itertools.product(ops, repeat=n)]
+    for op in Operators:
+        k = p.create_kernel(f'{op}')
 
-                    k = oqh.create_kernel(f'Tomo_{op1+op2+op3+op4}', p)
+        for q in all_Q_idxs:
+            k.prepz(q)
+        k.barrier([])
 
-                    for q in all_Q_idxs:
-                        k.prepz(q)
-                        k.gate("ry90", [q])
+        if initialization_msmt:
+            for q in all_Q_idxs:
+                k.measure(q)
+            k.gate("wait", [], 0)
 
-                    k.gate("wait", [], 0)
-                    k.gate("flux-dance-1-refocus", [0])
-                    k.gate("flux-dance-2-refocus", [0])
-                    k.gate("flux-dance-3-refocus", [0])
-                    k.gate("flux-dance-4-refocus", [0])
-                    k.gate("wait", [], 0)
+        for i in range(n_rounds-1):
+            for q in all_Q_idxs:
+                k.gate("ry90", [q])
+            k.gate('wait', [], wait_time_before_flux)
+            for i, flux_cw in enumerate(flux_cw_list):
+                if 'cz' in flux_cw:
+                    k.gate(flux_cw, [Q_anc, Q_D[i]])
+                else:
+                    k.gate(flux_cw, [0])
+            k.gate('wait', [], wait_time_after_flux)
+            k.barrier([])
+            for q in all_Q_idxs:
+                k.gate("rym90", [q])
+            k.barrier([])
+            k.measure(Q_anc)
+            for q in Q_D:
+                for cycle in range(int((readout_duration_ns-mw_duration_ns)/2/mw_duration_ns)):
+                    k.gate('i', [q])
+                k.gate('rx180', [q])
+                for cycle in range(int((readout_duration_ns-mw_duration_ns)/2/mw_duration_ns)):
+                    k.gate('i', [q])
+            k.gate("wait", [], 0)
 
-                    for q in all_Q_idxs:
-                        k.gate("rym90", [q])
-                    k.gate("wait", [], 0)
+        for q in all_Q_idxs:
+            k.gate("ry90", [q])
 
-                    k.measure(Q_anc)
+        k.gate('wait', [], wait_time_before_flux)
+        for i, flux_cw in enumerate(flux_cw_list):
+            if 'cz' in flux_cw:
+                k.gate(flux_cw, [Q_anc, Q_D[i]])
+            else:
+                k.gate(flux_cw, [0])
+        k.gate('wait', [], wait_time_after_flux)
+        k.barrier([])
 
-                    if not simultaneous_measurement:
-                        k.gate("cw_30", [2])
-                        k.gate('wait', [2], 360)
-                        k.gate("cw_30", [0])
-                        k.gate('wait', [0], 380)
-                        k.gate("cw_30", [13])
-                        k.gate('wait', [13], 280)
-                        k.gate("cw_30", [16])
-                        k.gate('wait', [16], 320)
-                        k.gate("wait", [], 0)
+        for q in all_Q_idxs:
+            k.gate("rym90", [q])
+        k.gate("wait", [], 0)
 
-                    for q, g in zip([Q_D1, Q_D2, Q_D3, Q_D4], [g1, g2, g3, g4]):
-                        k.gate(g, [q])
-                        k.measure(q)
-                    k.gate("wait", [], 0)
+        k.measure(Q_anc)
 
-                    if not simultaneous_measurement:
-                        k.measure(Q_D4)
+        if not simultaneous_measurement:
+            for q in Q_D:
+                for cycle in range(int((readout_duration_ns-mw_duration_ns)/2/mw_duration_ns)):
+                    k.gate('i', [q])
+                k.gate('rx180', [q])
+                for cycle in range(int((readout_duration_ns-mw_duration_ns)/2/mw_duration_ns)):
+                    k.gate('i', [q])
+            k.gate("wait", [], 0)
 
-                    p.add_kernel(k)
+        for q, g in zip(Q_D, [tomo_gates[o] for o in op]):
+            k.gate(g, [q])
+            if not simultaneous_measurement:
+                k.gate("wait", [q], 200)
+            k.measure(q)
+        k.gate("wait", [], 0)
+
+        # Fill up measurement register for exception qubits
+        if not simultaneous_measurement:
+            for q in Q_exception:
+                k.gate("wait", [q], 500)
+                k.measure(q)
+        for i in range(n_rounds-1):
+            for q in Q_exception:
+                k.gate("wait", [q], 500)
+                k.measure(q)
+
+        p.add_kernel(k)
 
     # Calibration points
-    combinations = [ s1+s2+s3+s4+s5  for s1 in ['0', '1']
-                                     for s2 in ['0', '1']
-                                     for s3 in ['0', '1']
-                                     for s4 in ['0', '1']
-                                     for s5 in ['0', '1'] ]
-    oqh.add_multi_q_cal_points(p,
-                               qubits=[Q_anc, Q_D1, Q_D2, Q_D3, Q_D4],
-                               combinations=combinations,
-                               reps_per_cal_pnt=1)
-    p = oqh.compile(p)
+    states = ['0','1']
+    combinations = [''.join(s) for s in itertools.product(states, repeat=n+1)]
+    p.add_multi_q_cal_points(qubits=all_Q_idxs,
+                             combinations=combinations,
+                             reps_per_cal_pnt=1)
+    p.compile()
     return p
+
 
 def Parity_Sandia_benchmark(
         qA: int,
         QDs: list,
+        flux_cw_list: List[str],
+        wait_time_before_flux: int = 0,
+        wait_time_after_flux: int = 0,
         platf_cfg: str = None):
-      '''
-      Sandia's weight-4 parity check benchmark protocol.
-      '''
-      delays = {}
-      p = OqlProgram("Sandia_parity_benchmark", platf_cfg)
+    '''
+    Sandia's weight-4 parity check benchmark protocol.
+    '''
+    delays = {}
+    p = OqlProgram("Sandia_parity_benchmark", platf_cfg)
 
-      # lb = ["P_0000","P_1111","Single_parity_check","Double_parity_check"]
-      # for i,ks in enumerate(lb):
+    # lb = ["P_0000","P_1111","Single_parity_check","Double_parity_check"]
+    # for i,ks in enumerate(lb):
 
-      k = p.create_kernel("P_0000")
-      all_q_idxs = QDs+[qA]
-      for q_idx in all_q_idxs:
-            k.prepz(q_idx)
-            k.measure(q_idx)
-      p.add_kernel(k)
-      
-      k = p.create_kernel("P_1111")
-      all_q_idxs = QDs+[qA]
-      for q_idx in all_q_idxs:
-            k.prepz(q_idx)
-            k.gate("rx180", [q_idx])
-            k.measure(q_idx)
-      p.add_kernel(k)
-      
-      k = p.create_kernel("Single_parity_check")
-      all_q_idxs = QDs+[qA]
-      for q_idx in all_q_idxs:
-            k.prepz(q_idx)
-            k.gate("ry90", [q_idx])
-      k.barrier([])
-      k.gate("flux_dance_refocus_1", [0])
-      k.gate("flux_dance_refocus_2", [0])
-      k.gate("flux_dance_refocus_3", [0])
-      k.gate("flux_dance_refocus_4", [0])
-      k.barrier([])
-      for q_idx in all_q_idxs:
-            k.gate("rym90", [q_idx])
-            k.measure(q_idx)
-      p.add_kernel(k)
+    k = p.create_kernel("P_0000")
+    all_q_idxs = QDs+[qA]
+    for q_idx in all_q_idxs:
+        k.prepz(q_idx)
+        k.measure(q_idx)
+    p.add_kernel(k)
+
+    k = p.create_kernel("P_1111")
+    all_q_idxs = QDs+[qA]
+    for q_idx in all_q_idxs:
+        k.prepz(q_idx)
+        k.gate("rx180", [q_idx])
+        k.measure(q_idx)
+    p.add_kernel(k)
+
+    k = p.create_kernel("Single_parity_check")
+    all_q_idxs = QDs+[qA]
+    for q_idx in all_q_idxs:
+        k.prepz(q_idx)
+        k.gate("ry90", [q_idx])
+    k.barrier([])
+    # k.gate("flux_dance_refocus_1", [0])
+    # k.gate("flux_dance_refocus_2", [0])
+    # k.gate("flux_dance_refocus_3", [0])
+    # k.gate("flux_dance_refocus_4", [0])
+    k.gate('wait', [], wait_time_before_flux)
+    for flux_cw in flux_cw_list:
+        k.gate(flux_cw, [0])
+    k.gate('wait', [], wait_time_after_flux)
+    k.barrier([])
+    for q_idx in all_q_idxs:
+        k.gate("rym90", [q_idx])
+        k.measure(q_idx)
+    p.add_kernel(k)
 
 
-      k = p.create_kernel("Double_parity_check")
-      all_q_idxs = QDs+[qA]
-      for q_idx in all_q_idxs:
-            k.prepz(q_idx)
-            k.gate("ry90", [q_idx])
-      k.barrier([])
-      k.gate("flux_dance_refocus_1", [0])
-      k.gate("flux_dance_refocus_2", [0])
-      k.gate("flux_dance_refocus_3", [0])
-      k.gate("flux_dance_refocus_4", [0])
-      k.barrier([])
-      for q_idx in all_q_idxs:
-            k.gate("rym90", [q_idx])
-      k.barrier([])
-      k.measure(qA)
+    k = p.create_kernel("Double_parity_check")
+    all_q_idxs = QDs+[qA]
+    for q_idx in all_q_idxs:
+        k.prepz(q_idx)
+        k.gate("ry90", [q_idx])
+    k.barrier([])
+    # k.gate("flux_dance_refocus_1", [0])
+    # k.gate("flux_dance_refocus_2", [0])
+    # k.gate("flux_dance_refocus_3", [0])
+    # k.gate("flux_dance_refocus_4", [0])
+    k.gate('wait', [], wait_time_before_flux)
+    for flux_cw in flux_cw_list:
+        k.gate(flux_cw, [0])
+    k.gate('wait', [], wait_time_after_flux)
+    k.barrier([])
+    for q_idx in all_q_idxs:
+        k.gate("rym90", [q_idx])
+    k.barrier([])
+    k.measure(qA)
 
-      # correct for msmt induced phaseshift on data qubits using phi-echo pulses
-      k.gate("cw_30", [2])
-      k.gate('wait', [2], 360)
-      k.gate("cw_30", [0])
-      k.gate('wait', [0], 380)
-      k.gate("cw_30", [13])
-      k.gate('wait', [13], 280)
-      k.gate("cw_30", [16])
-      k.gate('wait', [16], 320)
-      k.barrier([])
+    # correct for msmt induced phaseshift on data qubits using phi-echo pulses
+    for q in QDs:
+        for cycle in range(int(720/6/20)):
+            k.gate('i', [q])
+            k.gate('rx180', [q])
+            k.gate('i', [q])
+            k.gate('i', [q])
+            k.gate('rY180', [q])
+            k.gate('i', [q])
+    k.barrier([])
 
-      for q_idx in all_q_idxs:
-            k.gate("ry90", [q_idx])
-      k.barrier([])
-      k.gate("flux_dance_refocus_1", [0])
-      k.gate("flux_dance_refocus_2", [0])
-      k.gate("flux_dance_refocus_3", [0])
-      k.gate("flux_dance_refocus_4", [0])
-      k.barrier([])
-      for q_idx in all_q_idxs:
-            k.gate("rym90", [q_idx])
-            k.measure(q_idx)
-      p.add_kernel(k)
+    for q_idx in all_q_idxs:
+        k.gate("ry90", [q_idx])
+    k.barrier([])
+    # k.gate("flux_dance_refocus_1", [0])
+    # k.gate("flux_dance_refocus_2", [0])
+    # k.gate("flux_dance_refocus_3", [0])
+    # k.gate("flux_dance_refocus_4", [0])
+    k.gate('wait', [], wait_time_before_flux)
+    for flux_cw in flux_cw_list:
+        k.gate(flux_cw, [0])
+    k.gate('wait', [], wait_time_after_flux)
+    k.barrier([])
+    for q_idx in all_q_idxs:
+        k.gate("rym90", [q_idx])
+        k.measure(q_idx)
+    p.add_kernel(k)
 
-      p.compile()
+    p.compile()
 
-      return p
+    return p
 
 # FIXME: not really used, and partly uses hardcoded qubits
 def grovers_two_qubit_all_inputs(
@@ -2391,7 +2566,7 @@ def grovers_two_qubit_all_inputs(
         CZ_duration: int = 260,
         add_echo_pulses: bool = False,
         cal_points: bool = True
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Writes the QASM sequence for Grover's algorithm on two qubits.
     Sequence:
@@ -2468,7 +2643,7 @@ def grovers_two_qubits_repeated(
         qubits,
         platf_cfg: str,
         nr_of_grover_iterations: int
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Writes the QASM sequence for Grover's algorithm on two qubits.
     Sequence:
@@ -2546,7 +2721,7 @@ def grovers_tomography(
         second_CZ_delay: int = 260,
         CZ_duration: int = 260,
         add_echo_pulses: bool = False
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Tomography sequence for Grover's algorithm.
 
@@ -2629,7 +2804,7 @@ def CZ_poisoned_purity_seq(
         platf_cfg: str,
         nr_of_repeated_gates: int,
         cal_points: bool = True
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Creates the |00> + |11> Bell state and does a partial tomography in
     order to determine the purity of both qubits.
@@ -2695,7 +2870,7 @@ def Chevron_first_manifold(
         buffer_time2,
         flux_cw: int,
         platf_cfg: str
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -2744,7 +2919,7 @@ def partial_tomography_cardinal(
         # second_CZ_delay: int = 260,
         # CZ_duration: int = 260,
         # add_echo_pulses: bool = False
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Tomography sequence for Grover's algorithm.
 
@@ -2856,7 +3031,7 @@ def sliding_flux_pulses_seq(
         flux_codeword_b: str = 'fl_cw_01',
         ramsey_axis: str = 'x',
         add_cal_points: bool = True
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Experiment to measure effect flux pulses on each other.
 
@@ -2941,7 +3116,7 @@ def two_qubit_state_tomography(
         platf_cfg,
         wait_after_flux: float = None,
         flux_codeword: str = 'cz'
-) -> OqlProgram:
+    ) -> OqlProgram:
     p = OqlProgram("state_tomography_2Q_{}_{}_{}".format(product_state, qubit_idxs[0], qubit_idxs[1]), platf_cfg)
 
     q0 = qubit_idxs[0]
@@ -3129,7 +3304,7 @@ def two_qubit_Depletion(
         time: float,
         sequence_type='sequential',
         double_points: bool = False
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
 
     """
@@ -3231,7 +3406,7 @@ def Two_qubit_RTE(
         ramsey_time_1: int = 120,
         ramsey_time_2: int = 120,
         echo: bool = False
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
 
     """
@@ -3302,7 +3477,7 @@ def Two_qubit_RTE_pipelined(
         start_states: list = ['0'],
         ramsey_time: int = 120,
         echo: bool = False
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
 
     """
@@ -3366,13 +3541,13 @@ def Ramsey_cross(
         echo: bool,
         platf_cfg: str,
         initial_state: str = '0'
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     q_target is ramseyed
     q_spec is measured
 
     """
-    p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)  # FIXME: duplicate name, does not match function name
+    p = OqlProgram("Ramsey_msmt_induced_dephasing", platf_cfg)
 
     for i, angle in enumerate(angles[:-4]):
         cw_idx = angle // 20 + 9
@@ -3413,56 +3588,6 @@ def Ramsey_cross(
 
     # adding the calibration points
     p.add_single_qubit_cal_points(qubit_idx=q_rams)
-
-    p.compile()
-    return p
-
-
-def TEST_RTE(QX: int, QZ: int, platf_cfg: str, measurements: int) -> OqlProgram:
-    """
-
-    """
-    p = OqlProgram('Multi_RTE', platf_cfg)
-
-    k = p.create_kernel('Multi_RTE')
-    k.prepz(QX)
-    k.prepz(QZ)
-    ######################
-    # Parity check
-    ######################
-    for m in range(measurements):
-        # Superposition
-        k.gate('ry90', [QX])
-        k.gate('i', [QZ])
-        # CZ emulation
-        k.gate('i', [QZ, QX])
-        k.gate('i', [QZ, QX])
-        k.gate('i', [QZ, QX])
-        # CZ emulation
-        k.gate('i', [QZ, QX])
-        k.gate('i', [QZ, QX])
-        k.gate('i', [QZ, QX])
-        # intermidate sequential
-        k.gate('rym90', [QX])
-        k.gate('i', [QZ])
-        k.gate('i', [QX])
-        k.gate('ry90', [QZ])
-        # CZ emulation
-        k.gate('i', [QZ, QX])
-        k.gate('i', [QZ, QX])
-        k.gate('i', [QZ, QX])
-        # CZ emulation
-        k.gate('i', [QZ, QX])
-        k.gate('i', [QZ, QX])
-        k.gate('i', [QZ, QX])
-        # Recovery pulse
-        k.gate('i', [QX])
-        k.gate('rym90', [QZ])
-        # Measurement
-        k.measure(QX)
-        k.measure(QZ)
-
-    p.add_kernel(k)
 
     p.compile()
     return p
@@ -3512,7 +3637,6 @@ def multi_qubit_AllXY(qubits_idx: list, platf_cfg: str, double_points: bool = Tr
 
     p.compile()
     return p
-
 
 # FIXME: indentation is wrong in functions below
 def multi_qubit_rabi(qubits_idx: list, platf_cfg: str = None) -> OqlProgram:
@@ -3610,7 +3734,7 @@ def multi_qubit_flipping(
         cal_points: bool = True,
         ax: str = 'x',
         angle: str = '180'
-) -> OqlProgram:
+    ) -> OqlProgram:
 
     n_qubits = len(qubits_idx)
     if cal_points:
@@ -3673,66 +3797,13 @@ def multi_qubit_motzoi(qubits_idx: list, platf_cfg: str = None) -> OqlProgram:
     return p
 
 
-# def Ramsey_tomo(qR: int,
-#                 qC: int,
-#                 exc_specs: list,
-#                 platf_cfg: str):
-#     """
-#     Performs single qubit tomography on a qubit in the equator.
-#     """
-
-#     p = OqlProgram('single_qubit_tomo', platf_cfg)
-
-#     Tomo_bases = ['Z', 'X', 'Y']
-#     Tomo_gates = ['I', 'rym90', 'rx90']
-
-#     for i in range(2):
-#         for basis, gate in zip(Tomo_bases, Tomo_gates):
-#             k = oqh.create_kernel('Tomo_{}_off_{}'.format(basis, i), p)
-#             k.prepz(qR)
-#             k.prepz(qC)
-#             for qS in exc_specs:
-#                 k.gate('rx180', [qS])
-#             k.gate('ry90', [qR])
-#             k.gate('cz', [qR, qC], 60)
-#             k.gate('wait', [qR, qC], 0)
-#             k.gate(gate, [qR])
-#             k.measure(qR)
-#             k.measure(qC)
-
-#             p.add_kernel(k)
-
-#             k = oqh.create_kernel('Tomo_{}_on_{}'.format(basis, i), p)
-#             k.prepz(qR)
-#             k.prepz(qC)
-#             for qS in exc_specs:
-#                 k.gate('rx180', [qS])
-#             k.gate('ry90', [qR])
-#             k.gate('ry180', [qC])
-#             k.gate('cz', [qR, qC], 60)
-#             k.gate('wait', [qR, qC], 0)
-#             k.gate(gate, [qR])
-#             k.gate('ry180', [qC])
-#             k.measure(qR)
-#             k.measure(qC)
-
-#             p.add_kernel(k)
-
-#     oqh.add_multi_q_cal_points(p,
-#                                qubits=[qR, qC],
-#                                combinations=['00', '10', '20', '01'])
-
-#     p.compile()
-#     return p
-
-
 def Ramsey_tomo(
         qR: list,
         qC: list,
         exc_specs: list,
         platf_cfg: str,
         flux_codeword: str = 'cz'
-) -> OqlProgram:
+    ) -> OqlProgram:
     """
     Performs single qubit tomography on a qubit in the equator.
     """
@@ -3808,6 +3879,1272 @@ def Ramsey_tomo(
                       '1' * len(qR) + '0' * len(qC),
                       '2' * len(qR) + '0' * len(qC),
                       '0' * len(qR) + '1' * len(qC)])
+
+    p.compile()
+    return p
+
+
+def gate_process_tomograhpy(
+        meas_qubit_idx: int,
+        gate_qubit_idx: list,
+        gate_name: str,
+        gate_duration_ns: int,
+        platf_cfg: str,
+        wait_after_gate_ns: int = 0):
+    '''
+    Process tomography on a qubit (<meas_qubit_idx>) while performing
+    gates on other qubits (<gate_qubit_idx>).
+    '''
+    _gate_duration_ns = gate_duration_ns+wait_after_gate_ns
+    if _gate_duration_ns%20 > 0:
+         _gate_duration_ns = ( _gate_duration_ns//20)*20 + 20
+    states = {'0': 'i',
+              '1': 'rx180',
+              'p': 'ry90',
+              'm': 'rym90',
+              'pi': 'rxm90',
+              'mi': 'rx90'}
+    meas_bases = {'Z':'i',
+                  'X':'rym90',
+                  'Y':'rx90'}
+    p = OqlProgram('Gate_process_tomo', platf_cfg)
+    # Idle tomography
+    for state in states.keys():
+        for basis in meas_bases.keys():
+            k = p.create_kernel(f'state_{state}_tomo_{basis}_idle')
+            # State preparation
+            k.prepz(meas_qubit_idx)
+            # k.prepz(gate_qubit_idx)
+            k.gate(states[state], [meas_qubit_idx])
+            # Idle for gate duration
+            k.gate('wait', [], _gate_duration_ns)
+            # Measurement in basis
+            k.gate(meas_bases[basis], [meas_qubit_idx])
+            k.measure(meas_qubit_idx)
+            p.add_kernel(k)
+    # Gate process tomography
+    for state in states.keys():
+        for basis in meas_bases.keys():
+            k = p.create_kernel(f'state_{state}_tomo_{basis}_gate')
+            # State preparation
+            k.prepz(meas_qubit_idx)
+            # k.prepz(gate_qubit_idx)
+            k.gate(states[state], [meas_qubit_idx])
+            # Play gate
+            k.gate('wait', [])
+            for q in gate_qubit_idx:
+                k.gate(gate_name, [q])
+            k.gate('wait', [], wait_after_gate_ns)
+            # Measurement in basis
+            k.gate(meas_bases[basis], [meas_qubit_idx])
+            k.measure(meas_qubit_idx)
+            p.add_kernel(k)
+    # Calibration_points
+    k = p.create_kernel("cal_0")
+    k.prepz(meas_qubit_idx)
+    k.measure(meas_qubit_idx)
+    p.add_kernel(k)
+    k = p.create_kernel("cal_1")
+    k.prepz(meas_qubit_idx)
+    k.gate('rx180', [meas_qubit_idx])
+    k.measure(meas_qubit_idx)
+    p.add_kernel(k)
+    k = p.create_kernel("cal_2")
+    k.prepz(meas_qubit_idx)
+    k.gate('rx180', [meas_qubit_idx])
+    k.gate('rx12', [meas_qubit_idx])
+    k.measure(meas_qubit_idx)
+    p.add_kernel(k)
+    # Compile
+    p.compile()
+    return p
+
+def repeated_CZ_experiment(
+        qubit_idxs: list,
+        rounds: int,
+        gate_time_ns: int,
+        flux_codeword: str,
+        heralded_init: bool,
+        platf_cfg: str) -> OqlProgram:
+
+    p = OqlProgram('repeated_CZ_experiment', platf_cfg)
+    # Main experiment
+    k = p.create_kernel("Gate_experiment")
+    k.prepz(qubit_idxs[0])
+    if heralded_init:
+        for qb in qubit_idxs:
+            k.measure(qb)
+    for i in range(rounds):
+        for qb in qubit_idxs:
+            k.gate('rx90', [qb])
+        k.gate("wait", [])
+        k.gate(flux_codeword, [qubit_idxs[0], qubit_idxs[1]])
+        k.gate("wait", [])
+        for qb in qubit_idxs:
+            k.measure(qb)
+        k.gate("wait", [])
+
+
+    p.add_kernel(k)
+    # Reference experiment
+    k = p.create_kernel("Reference_experiment")
+    k.prepz(qubit_idxs[0])
+    if heralded_init:
+        for qb in qubit_idxs:
+            k.measure(qb)
+    for i in range(rounds):
+        for qb in qubit_idxs:
+            k.gate('rx90', [qb])
+        k.gate("wait", [], gate_time_ns)
+        for qb in qubit_idxs:
+            k.measure(qb)
+        k.gate("wait", [])
+    p.add_kernel(k)
+    # Calibration_points
+    states = ['0','1', '2']
+    combinations = [''.join(s) for s in itertools.product(states, repeat=2)]
+    p.add_multi_q_cal_points(qubits=qubit_idxs,
+                             combinations=combinations,
+                             reps_per_cal_pnt=1)
+    # Compile
+    p.compile()
+    return p
+
+
+def MUX_RO_sequence(
+        qubit_idxs: list,
+        heralded_init: bool,
+        platf_cfg: str,
+        states: list = ['0', '1']) -> OqlProgram:
+    p = OqlProgram('MUX_SSRO_experiment', platf_cfg)
+    n_qubits = len(qubit_idxs)
+    combinations = [''.join(s) for s in itertools.product(states, repeat=n_qubits)]
+    p.add_multi_q_cal_points(qubits=qubit_idxs,
+                             combinations=combinations,
+                             reps_per_cal_pnt=1,
+                             heralded_init=heralded_init)
+    # Compile
+    p.compile()
+    return p
+
+
+###############################
+# Surface-17 specific routines
+###############################
+def repeated_stabilizer_data_measurement_sequence(
+        target_stab:str,
+        Q_anc: int,
+        Q_D: list,
+        X_anci_idxs:list,
+        Z_anci_idxs:list,
+        data_idxs:list,
+        lru_idxs:list,
+        platf_cfg: str,
+        Rounds: list,
+        experiments: list,
+        stabilizer_type: str = 'X',
+        initial_state_qubits: list = [],
+        measurement_time_ns: int = 500,
+        ):
+    p = OqlProgram("Repeated_stabilizer_seq", platf_cfg)
+    Valid_experiments = ['single_stabilizer', 'single_stabilizer_LRU',
+                         'surface_13', 'surface_13_LRU', 'surface_17',
+                         'repetition_code']
+    for exp in experiments:
+        assert exp in Valid_experiments, f'Experiment {exp} not a valid experiment'
+    assert stabilizer_type in ['X', 'Z'], '"stabilizer_type" must be "X" or "Z"'
+    # Data qubit idx dictionary
+    data_qubit_map = { "D1":  6, "D2":  2, "D3":  0,
+                       "D4": 15, "D5": 13, "D7":  1,
+                       "D6": 16, "D8":  5, "D9":  4 }
+    ancilla_qubit_map = {"Z1":  7, "Z2": 14, "Z3": 12, "Z4": 10,
+                         "X1": 11, "X2":  8, "X3":  3, "X4":  9}
+    if initial_state_qubits:
+        for q_name in initial_state_qubits:
+            assert q_name in data_qubit_map.keys(), f'qubit {q_name} not a valid qubit.'
+    # remove X4
+    X_anci_idxs.remove(9)
+    _remaining_ancillas = X_anci_idxs + Z_anci_idxs
+    _remaining_ancillas.remove(Q_anc)
+
+    n = len(Q_D)
+    all_Q_idxs = [Q_anc] + Q_D
+    for n_rounds in Rounds:
+
+        if 'single_stabilizer' in experiments:
+            k = p.create_kernel(f'Single_stabilizer_seq_{n_rounds}rounds')
+            # Preparation & heralded_init
+            for q in data_idxs:
+                k.prepz(q)
+                k.measure(q)
+            for q in _remaining_ancillas+[Q_anc]:
+                k.measure(q)
+            k.gate('wait', [], 400)
+            if initial_state_qubits:
+                if stabilizer_type == 'Z':
+                    for q_name in initial_state_qubits:
+                        k.gate('rx180', [data_qubit_map[q_name]])
+                elif stabilizer_type == 'X':
+                    if q_name in data_qubit_map.keys():
+                        for q_name in initial_state_qubits:
+                            k.gate('ry90', [data_qubit_map[q_name]])
+                    else:
+                        k.gate('rym90', [data_qubit_map[q_name]])
+                else:
+                    raise ValueError('Only Z and X type allowed.')
+                k.barrier([])
+            # QEC Rounds
+            for i in range(n_rounds):
+                # First Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in all_Q_idxs:
+                        k.gate("ry90", [q])
+                else:
+                    for q in [Q_anc]:
+                        k.gate("ry90", [q])
+                k.barrier([])
+                # Flux dance
+                k.gate('wait', [], 0)
+                if 'Z' == target_stab[:1]:
+                    ## Z Flux dances
+                    k.gate(f'flux_dance_5', [0])
+                    k.gate(f'flux_dance_6', [0])
+                    k.gate(f'flux_dance_7', [0])
+                    k.gate(f'flux_dance_8', [0])
+                else:
+                    ## X Flux dances
+                    k.gate(f'flux_dance_1', [0])
+                    k.gate(f'flux_dance_2', [0])
+                    k.gate(f'flux_dance_3', [0])
+                    k.gate(f'flux_dance_4', [0])
+                k.gate('wait', [], 0)
+                # Second Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in all_Q_idxs:
+                        k.gate("rym90", [q])
+                else:
+                    for q in [Q_anc]:
+                        k.gate("rym90", [q])
+                k.barrier([])
+                # Measurement of ancillas
+                k.measure(Q_anc)
+                for q in _remaining_ancillas:
+                    k.measure(q)
+                if i == n_rounds-1:
+                    for q in Q_D:
+                        if stabilizer_type == 'X':
+                            k.gate('rym90', [q])
+                        k.measure(q)
+                else:
+                    for q in Q_D:
+                        # Measurement Echo
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('rx180', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                k.gate("wait", [], 0)
+            p.add_kernel(k)
+
+        if 'single_stabilizer_LRU' in experiments:
+            k = p.create_kernel(f'Single_stabilizer_LRU_seq_{n_rounds}rounds')
+            # Preparation & heralded_init
+            for q in data_idxs:
+                k.prepz(q)
+                k.measure(q)
+            for q in _remaining_ancillas+[Q_anc]:
+                k.measure(q)
+            k.gate('wait', [], 400)
+            if initial_state_qubits:
+                if stabilizer_type == 'Z':
+                    for q_name in initial_state_qubits:
+                        k.gate('rx180', [data_qubit_map[q_name]])
+                elif stabilizer_type == 'X':
+                    if q_name in data_qubit_map.keys():
+                        for q_name in initial_state_qubits:
+                            k.gate('ry90', [data_qubit_map[q_name]])
+                    else:
+                        k.gate('rym90', [data_qubit_map[q_name]])
+                else:
+                    raise ValueError('Only Z and X type allowed.')
+                k.barrier([])
+            # QEC Rounds
+            for i in range(n_rounds):
+                # First Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in all_Q_idxs:
+                        k.gate("ry90", [q])
+                else:
+                    for q in [Q_anc]:
+                        k.gate("ry90", [q])
+                k.barrier([])
+                # Flux dance
+                k.gate('wait', [], 0)
+                if 'Z' == target_stab[:1]:
+                    ## Z Flux dances
+                    k.gate(f'flux_dance_5', [0])
+                    k.gate(f'flux_dance_6', [0])
+                    k.gate(f'flux_dance_7', [0])
+                    k.gate(f'flux_dance_8', [0])
+                else:
+                    ## X Flux dances
+                    k.gate(f'flux_dance_1', [0])
+                    k.gate(f'flux_dance_2', [0])
+                    k.gate(f'flux_dance_3', [0])
+                    k.gate(f'flux_dance_4', [0])
+                k.gate('wait', [], 0)
+                # Second Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in all_Q_idxs:
+                        k.gate("rym90", [q])
+                else:
+                    for q in [Q_anc]:
+                        k.gate("rym90", [q])
+                k.barrier([])
+                # Measurement of ancillas
+                k.measure(Q_anc)
+                for q in _remaining_ancillas:
+                    k.measure(q)
+                if i == n_rounds-1:
+                    for q in Q_D:
+                        if stabilizer_type == 'X':
+                            k.gate('rym90', [q])
+                        k.measure(q)
+                else:
+                    k.barrier([Q_anc, 20, 21, 22, 23, 24, 25]+_remaining_ancillas)
+                    for q in lru_idxs:
+                        k.gate('lru', [q])
+                    # LRU ancillas
+                    # k.gate('lru', [3])  # X3
+                    # k.gate('lru', [12]) # Z3
+                    # k.gate('lru', [10]) # Z4
+                    # k.gate('lru', [9])  # X4
+                    # k.gate('lru', [7])  # Z1
+                    # k.gate('lru', [14]) # Z2
+                    # LRU Data qubits
+                    # k.gate('lru', [13]) # D5
+                    # k.gate('lru', [15]) # D4
+                    # k.gate('lru', [16]) # D6
+                    k.gate('wait', [20, 21, 22, 23, 24, 25], 180)
+                    k.gate('wait', [17, 18, 19], 200)
+                    for q in Q_D:
+                        # if q in Q_D:
+                        # Measurement Echo
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('rx180', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        # LRU Echo
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('update_ph_LRU', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        # else:
+                        #     # Measurement Echo
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('rx180', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     # LRU Echo
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('rx180', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                k.gate("wait", [], 0)
+            p.add_kernel(k)
+
+        if 'surface_13' in experiments:
+            k = p.create_kernel(f'Surface_13_seq_{n_rounds}rounds')
+            # Preparation & heralded_init
+            # for q in data_idxs+[Q_anc]:
+            for q in data_idxs:
+                k.prepz(q)
+                k.measure(q)
+            for q in _remaining_ancillas+[Q_anc]:
+                k.measure(q)
+            k.gate('wait', [], 400)
+            if initial_state_qubits:
+                if stabilizer_type == 'Z':
+                    for q_name in initial_state_qubits:
+                        k.gate('rx180', [data_qubit_map[q_name]])
+                elif stabilizer_type == 'X':
+                    if q_name in data_qubit_map.keys():
+                        for q_name in initial_state_qubits:
+                            k.gate('ry90', [data_qubit_map[q_name]])
+                    else:
+                        k.gate('rym90', [data_qubit_map[q_name]])
+                else:
+                    raise ValueError('Only Z and X type allowed.')
+                k.barrier([])
+            # QEC Rounds
+            for i in range(n_rounds):
+                # First Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in data_idxs:
+                        k.gate("rym90", [q])
+                if 'Z' == target_stab[:1]: # If ancillas are Z
+                    for q in Z_anci_idxs:
+                        k.gate("ry90", [q])
+                else: # If ancillas are X
+                    for q in X_anci_idxs:
+                        k.gate("ry90", [q])
+                k.barrier([])
+                # Flux dance
+                k.gate('wait', [])
+                if 'Z' == target_stab[:1]:
+                    ## Z Flux dances
+                    k.gate(f'flux_dance_5', [0])
+                    k.gate(f'flux_dance_6', [0])
+                    k.gate(f'flux_dance_7', [0])
+                    k.gate(f'flux_dance_8', [0])
+                else:
+                    ## X Flux dances
+                    k.gate(f'flux_dance_1', [0])
+                    k.gate(f'flux_dance_2', [0])
+                    k.gate(f'flux_dance_3', [0])
+                    k.gate(f'flux_dance_4', [0])
+                k.gate('wait', [], 0)
+                k.barrier([])
+                # Second Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in data_idxs:
+                        k.gate("ry90", [q])
+                if 'Z' == target_stab[:1]: # If ancillas are Z
+                    for q in Z_anci_idxs:
+                        k.gate("rym90", [q])
+                else: # If ancillas are X
+                    for q in X_anci_idxs:
+                        k.gate("rym90", [q])
+                k.barrier([])
+                # Measurement of ancillas
+                k.measure(Q_anc)
+                for q in _remaining_ancillas:
+                    k.measure(q)
+                if i == n_rounds-1:
+                    for q in data_idxs:
+                        if stabilizer_type == 'X':
+                            k.gate('rym90', [q])
+                        k.measure(q)
+                else:
+                    for q in data_idxs:
+                        # Single measurement Echo
+                        idle_time = (measurement_time_ns-20)//2
+                        nr_idles = idle_time//20
+                        for idle in range(nr_idles):
+                            k.gate('i', [q])
+                        k.gate('rx180', [q])
+                        for idle in range(nr_idles):
+                            k.gate('i', [q])
+
+                        # for cycle in range(int(480/6/20)):
+                        #     k.gate('i', [q])
+                        #     k.gate('rx180', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('rY180', [q])
+                        #     k.gate('i', [q])
+                k.gate("wait", [], 0)
+            p.add_kernel(k)
+
+        if 'surface_13_LRU' in experiments:
+            k = p.create_kernel(f'Surface_13_LRU_seq_{n_rounds}rounds')
+            # Preparation & heralded_init
+            for q in data_idxs:
+                k.prepz(q)
+                k.measure(q)
+            for q in _remaining_ancillas+[Q_anc]:
+                k.measure(q)
+            k.gate('wait', [], 400)
+            if initial_state_qubits:
+                if stabilizer_type == 'Z':
+                    for q_name in initial_state_qubits:
+                        k.gate('rx180', [data_qubit_map[q_name]])
+                elif stabilizer_type == 'X':
+                    if q_name in data_qubit_map.keys():
+                        for q_name in initial_state_qubits:
+                            k.gate('ry90', [data_qubit_map[q_name]])
+                    else:
+                        k.gate('rym90', [data_qubit_map[q_name]])
+                else:
+                    raise ValueError('Only Z and X type allowed.')
+                k.barrier([])
+            # QEC Rounds
+            for i in range(n_rounds):
+                # First Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in data_idxs:
+                        k.gate("rym90", [q])
+                if 'Z' == target_stab[:1]: # If ancillas are Z
+                    for q in Z_anci_idxs:
+                        k.gate("ry90", [q])
+                else: # If ancillas are X
+                    for q in X_anci_idxs:
+                        k.gate("ry90", [q])
+                k.barrier([])
+                # Flux dance
+                # k.gate('wait', [], 20)
+                if 'Z' == target_stab[:1]:
+                    ## Z Flux dances
+                    k.gate(f'flux_dance_5', [0])
+                    k.gate(f'flux_dance_6', [0])
+                    k.gate(f'flux_dance_7', [0])
+                    k.gate(f'flux_dance_8', [0])
+                else:
+                    ## X Flux dances
+                    k.gate(f'flux_dance_1', [0])
+                    k.gate(f'flux_dance_2', [0])
+                    k.gate(f'flux_dance_3', [0])
+                    k.gate(f'flux_dance_4', [0])
+                k.gate('wait', [], 0)
+                k.barrier([])
+                # Second Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in data_idxs:
+                        k.gate("ry90", [q])
+                if 'Z' == target_stab[:1]: # If ancillas are Z
+                    for q in Z_anci_idxs:
+                        k.gate("rym90", [q])
+                else: # If ancillas are X
+                    for q in X_anci_idxs:
+                        k.gate("rym90", [q])
+                k.barrier([])
+                k.gate('wait', [], 0)
+                # Measurement of ancillas
+                k.measure(Q_anc)
+                for q in _remaining_ancillas:
+                    k.measure(q)
+                if i == n_rounds-1:
+                    for q in data_idxs:
+                        if stabilizer_type == 'X':
+                            k.gate('rym90', [q])
+                        k.measure(q)
+                else:
+                    k.barrier([Q_anc, 20, 21, 22, 23, 24, 25]+_remaining_ancillas)
+                    for q in lru_idxs:
+                        k.gate('lru', [q])
+                    # LRU ancillas
+                    # evaluate LRU idle time
+                    idle_LRU = measurement_time_ns - 20
+                    Z_idle_LRU = measurement_time_ns//3-20
+                    k.gate('wait', [17, 18, 19], idle_LRU+Z_idle_LRU+20)
+                    k.gate('wait', [21, 22, 23, 24], Z_idle_LRU-20)
+                    for q in data_idxs:
+                        # Single measurement Echo
+                        idle_time = (measurement_time_ns-20)//2
+                        nr_idles = idle_time//20
+                        nr_idles_Z = (measurement_time_ns//3-20)//40
+                        for idle in range(nr_idles+nr_idles_Z):
+                            k.gate('i', [q])
+                        k.gate('rx180', [q])
+                        for idle in range(nr_idles+nr_idles_Z):
+                            k.gate('i', [q])
+                        # for cycle in range(int(480/6/20)):
+                        #     k.gate('i', [q])
+                        #     k.gate('rx180', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('i', [q])
+                        #     k.gate('rY180', [q])
+                        #     k.gate('i', [q])
+                k.gate("wait", [], )
+            p.add_kernel(k)
+
+        if 'surface_17' in experiments:
+            k = p.create_kernel(f'Surface_17_{n_rounds}rounds')
+            # Preparation & heralded_init
+            for q in data_idxs:
+                k.prepz(q)
+                k.measure(q)
+            for q in _remaining_ancillas+[Q_anc]:
+                k.measure(q)
+            k.gate('wait', [], 300)
+            if initial_state_qubits:
+                for q_name in initial_state_qubits:
+                    k.gate('rx180', [data_qubit_map[q_name]])
+                k.barrier([])
+            # QEC Rounds
+            for i in range(n_rounds):
+                # First Pi/2 pulse
+                for q in Z_anci_idxs:
+                    k.gate("ry90", [q])
+                k.barrier([])
+                # Flux dance
+                k.gate('wait', [], 0)
+                ## Z Flux dances
+                k.gate(f'flux_dance_5', [0])
+                k.gate(f'flux_dance_6', [0])
+                k.gate(f'flux_dance_7', [0])
+                k.gate(f'flux_dance_8', [0])
+                k.gate('wait', [], 0)
+                k.barrier([])
+                # Second Pi/2 pulse
+                for q in Z_anci_idxs:
+                    k.gate("rym90", [q])
+                k.barrier([])
+
+                for qa in X_anci_idxs:
+                    k.gate("ry90", [qa])
+                for qa in data_idxs:
+                    k.gate("rym90", [qa])
+                k.barrier([])
+
+                #X Flux dances
+                k.gate('wait', [], 0)
+                k.gate(f'flux_dance_1', [0])
+                k.gate(f'flux_dance_2', [0])
+                k.gate(f'flux_dance_3', [0])
+                k.gate(f'flux_dance_4', [0])
+                k.gate('wait', [], 0)
+                k.barrier([])
+
+                for qa in X_anci_idxs:
+                    k.gate("rym90", [qa])
+                for qa in data_idxs:
+                    k.gate("ry90", [qa])
+                k.barrier([])
+                k.measure(Q_anc)
+                for q in _remaining_ancillas:
+                    k.measure(q)
+                if i == n_rounds-1:
+                    for q in data_idxs:
+                        k.measure(q)
+                else:
+                    for q in data_idxs:
+                        # Measurement Echo
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('rx180', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                        k.gate('i', [q])
+                k.gate("wait", [], 0)
+            p.add_kernel(k)
+
+        if 'repetition_code' in experiments:
+            k = p.create_kernel(f'Repetition_code_seq_{n_rounds}rounds')
+            # Preparation & heralded_init
+            for q in data_idxs:
+                k.prepz(q)
+                k.measure(q)
+            for q in _remaining_ancillas+[Q_anc]:
+                k.prepz(q)
+                k.measure(q)
+            k.gate('wait', [], 400)  # to avoid UHF trigger holdoff!
+            # TODO: Add arbitrary state initialization
+            if initial_state_qubits:
+                if stabilizer_type == 'Z':
+                    for q in Q_D:
+                        k.gate("ry90", [q])
+                if stabilizer_type == 'X':
+                    for q in Q_D:
+                        k.gate("i", [q])
+            k.barrier([])
+            # QEC Rounds
+            for i in range(n_rounds):
+                # First Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in Q_D:
+                        k.gate("ry90", [q])
+                # for q in Z_anci_idxs+X_anci_idxs:
+                for q in [Q_anc]:
+                    if q in [ancilla_qubit_map[qa] for qa in \
+                             ['X3', 'Z1', 'X1', 'Z2']]:
+                        k.gate("ry90", [q])
+                # Flux dance
+                k.gate('wait', [])
+                k.gate(f'repetition_code_1', [0])
+                k.gate(f'repetition_code_2', [0])
+                k.gate('wait', [])
+                # Second Pi/2 pulse
+                # for q in Z_anci_idxs+X_anci_idxs:
+                for q in [Q_anc]:
+                    if q in [ancilla_qubit_map[qa] for qa in \
+                             ['X3', 'Z1', 'X1', 'Z2']]:
+                        k.gate("rym90", [q])
+                    # First Pi/2 pulse
+                    elif q in [ancilla_qubit_map[qa] for qa in \
+                               ['Z3', 'X4', 'Z4', 'X2']]:
+                        k.gate("ry90", [q])
+                # Flux dance
+                k.gate('wait', [])
+                k.gate(f'repetition_code_3', [0])
+                k.gate(f'repetition_code_4', [0])
+                k.gate('wait', [])
+                # Second Pi/2 pulse
+                if stabilizer_type == 'X':
+                    for q in Q_D:
+                        k.gate("rym90", [q])
+                # for q in Z_anci_idxs+X_anci_idxs:
+                for q in [Q_anc]:
+                    if q in [ancilla_qubit_map[qa] for qa in \
+                             ['Z3', 'X4', 'Z4', 'X2']]:
+                        k.gate("rym90", [q])
+                k.gate('wait', [])
+                # Measurement of ancillas
+                for q in [Q_anc]:
+                    k.measure(q)
+                # Measure remaining ancillas
+                for q in _remaining_ancillas:
+                    k.measure(q)
+                # Measure data qubits only at the last round
+                if i == n_rounds-1:
+                    for q in data_idxs:
+                        if stabilizer_type == 'X':
+                            k.gate('rym90', [q])
+                        k.measure(q)
+                else:
+                    for q in Q_D:
+                        # Single measurement Echo
+                        idle_time = (measurement_time_ns-20)//2
+                        nr_idles = idle_time//20
+                        for idle in range(nr_idles):
+                            k.gate('i', [q])
+                        k.gate('rx180', [q])
+                        for idle in range(nr_idles):
+                            k.gate('i', [q])
+                k.gate("wait", [], 0)
+            p.add_kernel(k)
+
+    ######################
+    # Calibration points #
+    ######################
+    # Calibration 000
+    k = p.create_kernel('Cal_zeros')
+    for q in data_idxs:
+        k.prepz(q)
+        k.measure(q)
+    for q in _remaining_ancillas+[Q_anc]:
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in data_idxs:
+        k.measure(q)
+    for q in _remaining_ancillas+[Q_anc]:
+        k.measure(q)
+    p.add_kernel(k)
+    # Calibration 111
+    k = p.create_kernel('Cal_ones')
+    for q in data_idxs:
+        k.prepz(q)
+        k.measure(q)
+    for q in _remaining_ancillas+[Q_anc]:
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in data_idxs+_remaining_ancillas+[Q_anc]:
+        k.gate('rx180', [q])
+        k.measure(q)
+    p.add_kernel(k)
+    # Calibration 222
+    k = p.create_kernel('Cal_twos')
+    for q in data_idxs:
+        k.prepz(q)
+        k.measure(q)
+    for q in _remaining_ancillas+[Q_anc]:
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in data_idxs+_remaining_ancillas+[Q_anc]:
+        k.gate('rx180', [q])
+        k.gate('rx12', [q])
+        k.measure(q)
+    p.add_kernel(k)
+
+    p.compile()
+    return p
+
+
+def repetition_code_sequence(
+        involved_ancilla_indices: List[int],
+        involved_data_indices: List[int],
+        all_ancilla_indices: List[int],
+        all_data_indices: List[int],
+        platf_cfg: str,
+        array_of_round_number: List[int],
+        stabilizer_type: str = 'X',
+        measurement_time_ns: int = 500,
+        initial_state: List[int] = None,
+        ):
+    """OpenQL program constructor for repetition code experiement (any distance).
+
+    Args:
+        involved_ancilla_indices (List[int]): Ancilla-qubit indices part of the repetition code. Used by the central controller. Also known as 'cfg_qubit_nr'.
+        involved_data_indices (List[int]): Data-qubit indices part of the repetition code. Used by the central controller. Also known as 'cfg_qubit_nr'.
+        all_ancilla_indices (List[int]): All (ancilla) qubit indices on the device. Used for preparation and calibration points.
+        all_data_indices (List[int]): All (ancilla) qubit indices on the device. Used for preparation and calibration points.
+        platf_cfg (str): Config-file path, required for OqlProgram construction.
+        array_of_round_number (list): Array-like of parity-check repetition number. Example [1, 5, 10] will schedule a stabilizer reptition of x1, x5 and x10 respectively.
+        stabilizer_type (str, optional): _description_. Defaults to 'X'.
+        measurement_time_ns (int, optional): _description_. Defaults to 500.
+
+    Returns:
+        OqlProgram: _description_
+    """
+    p = OqlProgram("Repeated_stabilizer_seq", platf_cfg)
+    assert stabilizer_type in ['X', 'Z'], '"stabilizer_type" must be "X" or "Z"'
+    # Data qubit idx dictionary
+    qubit_id_to_name_lookup: Dict[int, str] = {
+        0: "D3",
+        1: "D7",
+        2: "D2",
+        3: "X3",
+        4: "D9",
+        5: "D8",
+        6: "D1",
+        7: "Z1",
+        8: "X2",
+        9: "X4",
+        10: "Z4",
+        11: "X1",
+        12: "Z3",
+        13: "D5",
+        14: "Z2",
+        15: "D4",
+        16: "D6",
+    }
+
+    # remove X4
+    qubit_nr_x4: int = 9
+    if qubit_nr_x4 in all_ancilla_indices:
+        all_ancilla_indices.remove(qubit_nr_x4)
+
+    all_qubit_indices = all_ancilla_indices + all_data_indices
+
+    for n_rounds in array_of_round_number:
+
+        k = p.create_kernel(f'Repetition_code_seq_{n_rounds}rounds')
+        # Preparation & heralded_init
+        for q in all_qubit_indices:
+            k.prepz(q)
+            k.measure(q)
+        k.gate('wait', [], 400)  # to avoid UHF trigger holdoff!
+        # Arbitrary state initialization
+        if initial_state is None:
+            if stabilizer_type == 'Z':
+                for i, q in enumerate(involved_data_indices):
+                    if i % 2 == 0:
+                        k.gate("i", [q])
+                    else:
+                        k.gate("rx180", [q])
+                        # k.gate("i", [q])
+            if stabilizer_type == 'X':
+                for i, q in enumerate(involved_data_indices):
+                    if i % 2 == 0:
+                        k.gate("ry90", [q])
+                    else:
+                        k.gate("rym90", [q])
+                        # k.gate("i", [q])
+        else:
+            if stabilizer_type == 'Z':
+                for i, q in enumerate(involved_data_indices):
+                    if initial_state[i] == 0:
+                        k.gate("i", [q])
+                    else:
+                        k.gate("rx180", [q])
+                        # k.gate("i", [q])
+            if stabilizer_type == 'X':
+                for i, q in enumerate(involved_data_indices):
+                    if initial_state[i] == 0:
+                        k.gate("ry90", [q])
+                    else:
+                        k.gate("rym90", [q])
+                        # k.gate("i", [q])
+        k.barrier([])
+        # QEC Rounds
+        for i in range(n_rounds):
+            # First Pi/2 pulse
+            if stabilizer_type == 'X':
+                for q in involved_data_indices:
+                    k.gate("ry90", [q])
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['X3', 'Z2']:
+                    k.gate("ry90", [q])
+            # Flux dance
+            k.gate('wait', [])
+            k.gate(f'repetition_code_1', [0])
+            k.gate(f'repetition_code_2', [0])
+            k.gate('wait', [])
+            # Second Pi/2 pulse
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['X3', 'Z2']:
+                    k.gate("rym90", [q])
+                # First Pi/2 pulse
+                elif qubit_id_to_name_lookup[q] in ['Z1', 'X2']:
+                    k.gate("ry90", [q])
+            # Flux dance
+            k.gate('wait', [])
+            k.gate(f'repetition_code_3', [0])
+            k.gate(f'repetition_code_4', [0])
+            k.gate('wait', [])
+            # Second Pi/2 pulse
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['Z1', 'X2']:
+                    k.gate("rym90", [q])
+                # First Pi/2 pulse
+                elif qubit_id_to_name_lookup[q] in ['Z3', 'Z4']:
+                    k.gate("ry90", [q])
+            # Flux dance
+            k.gate('wait', [])
+            k.gate(f'repetition_code_5', [0])
+            k.gate(f'repetition_code_6', [0])
+            k.gate('wait', [])
+            # Second Pi/2 pulse
+            if stabilizer_type == 'X':
+                for q in involved_data_indices:
+                    k.gate("rym90", [q])
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['Z3', 'Z4']:
+                    k.gate("rym90", [q])
+            k.gate('wait', [])
+
+            # During any other round, measure only ancilla's and decouple data qubits.
+            at_last_round: bool = i == n_rounds-1
+            if not at_last_round:
+                # Measure (only) all ancilla's, dynamical decoupling on data qubits
+                for q in all_ancilla_indices:
+                    k.measure(q)
+                for q in involved_data_indices:
+                    # Single measurement Echo
+                    idle_time = (measurement_time_ns-20)//2
+                    nr_idles = idle_time//20
+                    for idle in range(nr_idles):
+                        k.gate('i', [q])
+                    k.gate('rx180', [q])
+                    for idle in range(nr_idles):
+                        k.gate('i', [q])
+                k.gate("wait", [], 0)
+
+        # Make sure all qubits are measured in the last round
+        # Before last round apply correction gate to data qubits, depending on the stabilizer type.
+        # Final measurement and data qubit correction
+        if stabilizer_type == 'X':
+            for q in involved_data_indices:
+                k.gate('rym90', [q])
+        for q in all_qubit_indices:
+            k.measure(q)
+        k.gate("wait", [], 0)
+        p.add_kernel(k)
+
+    ######################
+    # Calibration points #
+    ######################
+    # Calibration 000
+    k = p.create_kernel('Cal_zeros')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.measure(q)
+    p.add_kernel(k)
+    # Calibration 111
+    k = p.create_kernel('Cal_ones')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.gate('rx180', [q])
+        k.measure(q)
+    p.add_kernel(k)
+    # Calibration 222
+    k = p.create_kernel('Cal_twos')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.gate('rx180', [q])
+        k.gate('rx12', [q])
+        k.measure(q)
+    p.add_kernel(k)
+
+    p.compile()
+    return p
+
+
+def repetition_code_sequence_old(
+        involved_ancilla_indices: List[int],
+        involved_data_indices: List[int],
+        all_ancilla_indices: List[int],
+        all_data_indices: List[int],
+        platf_cfg: str,
+        array_of_round_number: List[int],
+        stabilizer_type: str = 'X',
+        measurement_time_ns: int = 500,
+        initial_state: List[int] = None,
+        ):
+    """OpenQL program constructor for repetition code experiement (any distance).
+
+    Args:
+        involved_ancilla_indices (List[int]): Ancilla-qubit indices part of the repetition code. Used by the central controller. Also known as 'cfg_qubit_nr'.
+        involved_data_indices (List[int]): Data-qubit indices part of the repetition code. Used by the central controller. Also known as 'cfg_qubit_nr'.
+        all_ancilla_indices (List[int]): All (ancilla) qubit indices on the device. Used for preparation and calibration points.
+        all_data_indices (List[int]): All (ancilla) qubit indices on the device. Used for preparation and calibration points.
+        platf_cfg (str): Config-file path, required for OqlProgram construction.
+        array_of_round_number (list): Array-like of parity-check repetition number. Example [1, 5, 10] will schedule a stabilizer reptition of x1, x5 and x10 respectively.
+        stabilizer_type (str, optional): _description_. Defaults to 'X'.
+        measurement_time_ns (int, optional): _description_. Defaults to 500.
+
+    Returns:
+        OqlProgram: _description_
+    """
+    p = OqlProgram("Repeated_stabilizer_seq", platf_cfg)
+    assert stabilizer_type in ['X', 'Z'], '"stabilizer_type" must be "X" or "Z"'
+    # Data qubit idx dictionary
+    qubit_id_to_name_lookup: Dict[int, str] = {
+        0: "D3",
+        1: "D7",
+        2: "D2",
+        3: "X3",
+        4: "D9",
+        5: "D8",
+        6: "D1",
+        7: "Z1",
+        8: "X2",
+        9: "X4",
+        10: "Z4",
+        11: "X1",
+        12: "Z3",
+        13: "D5",
+        14: "Z2",
+        15: "D4",
+        16: "D6",
+    }
+
+    # remove X4
+    qubit_nr_x4: int = 9
+    if qubit_nr_x4 in all_ancilla_indices:
+        all_ancilla_indices.remove(qubit_nr_x4)
+
+    all_qubit_indices = all_ancilla_indices + all_data_indices
+
+    for n_rounds in array_of_round_number:
+
+        k = p.create_kernel(f'Repetition_code_seq_{n_rounds}rounds')
+        # Preparation & heralded_init
+        for q in all_qubit_indices:
+            k.prepz(q)
+            k.measure(q)
+        k.gate('wait', [], 400)  # to avoid UHF trigger holdoff!
+        # Arbitrary state initialization
+        if initial_state is None:
+            if stabilizer_type == 'Z':
+                for i, q in enumerate(involved_data_indices):
+                    if i % 2 == 0:
+                        k.gate("i", [q])
+                    else:
+                        k.gate("rx180", [q])
+                        # k.gate("i", [q])
+            if stabilizer_type == 'X':
+                for i, q in enumerate(involved_data_indices):
+                    if i % 2 == 0:
+                        k.gate("ry90", [q])
+                    else:
+                        k.gate("rym90", [q])
+                        # k.gate("i", [q])
+        else:
+            if stabilizer_type == 'Z':
+                for i, q in enumerate(involved_data_indices):
+                    if initial_state[i] == 0:
+                        k.gate("i", [q])
+                    else:
+                        k.gate("rx180", [q])
+                        # k.gate("i", [q])
+            if stabilizer_type == 'X':
+                for i, q in enumerate(involved_data_indices):
+                    if initial_state[i] == 0:
+                        k.gate("ry90", [q])
+                    else:
+                        k.gate("rym90", [q])
+                        # k.gate("i", [q])
+        k.barrier([])
+        # QEC Rounds
+        for i in range(n_rounds):
+            # First Pi/2 pulse
+            if stabilizer_type == 'X':
+                for q in involved_data_indices:
+                    k.gate("ry90", [q])
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['X3', 'Z1', 'X1', 'Z2']:
+                    k.gate("ry90", [q])
+            # Flux dance
+            k.gate('wait', [])
+            k.gate(f'repetition_code_1', [0])
+            k.gate(f'repetition_code_2', [0])
+            k.gate('wait', [])
+            # Second Pi/2 pulse
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['X3', 'Z1', 'X1', 'Z2']:
+                    k.gate("rym90", [q])
+                # First Pi/2 pulse
+                elif qubit_id_to_name_lookup[q] in ['Z3', 'X4', 'Z4', 'X2']:
+                    k.gate("ry90", [q])
+            # Flux dance
+            k.gate('wait', [])
+            k.gate(f'repetition_code_3', [0])
+            k.gate(f'repetition_code_4', [0])
+            k.gate('wait', [])
+            # Second Pi/2 pulse
+            if stabilizer_type == 'X':
+                for q in involved_data_indices:
+                    k.gate("rym90", [q])
+            # for q in Z_anci_idxs+X_anci_idxs:
+            for q in involved_ancilla_indices:
+                if qubit_id_to_name_lookup[q] in ['Z3', 'X4', 'Z4', 'X2']:
+                    k.gate("rym90", [q])
+            k.gate('wait', [])
+
+            # During any other round, measure only ancilla's and decouple data qubits.
+            at_last_round: bool = i == n_rounds-1
+            if not at_last_round:
+                # Measure (only) all ancilla's, dynamical decoupling on data qubits
+                for q in all_ancilla_indices:
+                    k.measure(q)
+                for q in involved_data_indices:
+                    # Single measurement Echo
+                    idle_time = (measurement_time_ns-20)//2
+                    nr_idles = idle_time//20
+                    for idle in range(nr_idles):
+                        k.gate('i', [q])
+                    k.gate('rx180', [q])
+                    for idle in range(nr_idles):
+                        k.gate('i', [q])
+                k.gate("wait", [], 0)
+
+        # Make sure all qubits are measured in the last round
+        # Before last round apply correction gate to data qubits, depending on the stabilizer type.
+        # Final measurement and data qubit correction
+        if stabilizer_type == 'X':
+            for q in involved_data_indices:
+                k.gate('rym90', [q])
+        for q in all_qubit_indices:
+            k.measure(q)
+        k.gate("wait", [], 0)
+        p.add_kernel(k)
+
+    ######################
+    # Calibration points #
+    ######################
+    # Calibration 000
+    k = p.create_kernel('Cal_zeros')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.measure(q)
+    p.add_kernel(k)
+    # Calibration 111
+    k = p.create_kernel('Cal_ones')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.gate('rx180', [q])
+        k.measure(q)
+    p.add_kernel(k)
+    # Calibration 222
+    k = p.create_kernel('Cal_twos')
+    for q in all_qubit_indices:
+        k.prepz(q)
+        k.measure(q)
+    k.gate('wait', [], 400)
+    for q in all_qubit_indices:
+        k.gate('rx180', [q])
+        k.gate('rx12', [q])
+        k.measure(q)
+    p.add_kernel(k)
 
     p.compile()
     return p

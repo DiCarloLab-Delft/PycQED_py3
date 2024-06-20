@@ -27,15 +27,13 @@ class Multi_AllXY_Analysis(ba.BaseDataAnalysis):
         extract_only: bool = False,
         close_figs=False,
         do_fitting: bool = False,
-        auto=True,
-        qubits: list = None
+        auto=True
     ):
         super().__init__(
             label=label,
             t_start = t_start,
             t_stop = t_stop
         )
-        self.qubits = qubits
         if auto:
             self.run_analysis()
             
@@ -44,8 +42,10 @@ class Multi_AllXY_Analysis(ba.BaseDataAnalysis):
         self.timestamps = a_tools.get_timestamps_in_range(self.t_start,self.t_stop, label = self.labels)
         self.raw_data_dict['timestamps'] = self.timestamps
         data_fp = a_tools.get_datafilepath_from_timestamp(self.timestamps[0])
-        param_spec = {'data': ('Experimental Data/Data', 'dset')}
+        param_spec = {'data': ('Experimental Data/Data', 'dset'),
+                      'value_names': ('Experimental Data', 'attr:value_names')}
         data = h5d.extract_pars_from_datafile(data_fp, param_spec)
+        self.qubits = [ name.decode().split(' ')[-1] for name in data['value_names']]
         self.raw_data_dict['points'] = data['data'][:,0]
         for i, q in enumerate(self.qubits):
             self.raw_data_dict['{}_data'.format(q)] = data['data'][:,i+1]

@@ -190,7 +190,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
     def amp_to_freq(self, amp):
         return np.polyval(self.polycoeffs_freq_conv, amp)
 
-    def freq_to_amp(self, freq, positive_branch=True):
+    def freq_to_amp(self, freq, positive_branch=False): # HACKED hacked #True):
         return ct.freq_to_amp_root_parabola(freq,
                                             poly_coeffs=self.polycoeffs_freq_conv,
                                             positive_branch=positive_branch)
@@ -214,14 +214,17 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             a.get_naming_and_values()
             if i == 0:
                 if self.ch_amp_key is None:
-                    ch_amp = 1
+                    ch_amp = .13
                 else:
                     ch_amp = a.data_file[self.ch_amp_key].attrs['value']
                 if self.ch_range_key is None:
-                    ch_range = 2  # corresponds to a scale factor of 1
+                    ch_range = 5  # corresponds to a scale factor of 1
                 else:
                     ch_range = a.data_file[self.ch_range_key].attrs['value']
-                waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
+                if self.waveform_amp_key is None:
+                    waveform_amp = 0.5
+                else:
+                    waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
                 amp = ch_amp*ch_range/2*waveform_amp
 
                 # read conversion polynomial from the datafile if not provided as input

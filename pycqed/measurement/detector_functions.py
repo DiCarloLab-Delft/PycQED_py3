@@ -4,28 +4,70 @@ Measurement Control.
 NB: hardware-specific detectors have been split-off in separate files, see the compatibility imports below
 '''
 
+import qcodes as qc
 import numpy as np
+import numpy.fft as fft
 import logging
 import time
+from string import ascii_uppercase
+from packaging import version
 from deprecated import deprecated
 
 from pycqed.analysis.fit_toolbox import functions as fn
 
 # compatibility imports for functions that were moved under directory det_funcs. New code should use new locations
-from pycqed.measurement.det_fncs.Base import Detector_Function, Mock_Detector, Multi_Detector, Soft_Detector, \
-    Hard_Detector
-from pycqed.measurement.det_fncs.hard.UHFQC import Multi_Detector_UHF, \
-    UHFQC_input_average_detector, UHFQC_demodulated_input_avg_det, \
-    UHFQC_spectroscopy_detector, UHFQC_integrated_average_detector, UHFQC_correlation_detector, \
-    UHFQC_integration_logging_det, UHFQC_statistics_logging_det, UHFQC_single_qubit_statistics_logging_det
-from pycqed.measurement.det_fncs.hard.SignalHound import Signal_Hound_fixed_frequency, Signal_Hound_sweeped_frequency, \
-    SH_mixer_skewness_det
+from pycqed.measurement.det_fncs.Base import (
+    Detector_Function,
+    Mock_Detector,
+    Multi_Detector,
+    Soft_Detector,
+    Hard_Detector,
+)
+from pycqed.measurement.det_fncs.hard.UHFQC import (
+    Multi_Detector_UHF,
+    UHFQC_input_average_detector,
+    UHFQC_demodulated_input_avg_det,
+    UHFQC_spectroscopy_detector,
+    UHFQC_integrated_average_detector,
+    UHFQC_correlation_detector,
+    UHFQC_integration_logging_det,
+    UHFQC_statistics_logging_det,
+    UHFQC_single_qubit_statistics_logging_det,
+)
+from pycqed.measurement.det_fncs.hard.SignalHound import (
+    Signal_Hound_fixed_frequency,
+    Signal_Hound_sweeped_frequency,
+    SH_mixer_skewness_det,
+)
 
 
 from qcodes.instrument.parameter import _BaseParameter
 
 log = logging.getLogger(__name__)
 
+
+###############################################################################
+###############################################################################
+####################             None Detector             ####################
+###############################################################################
+###############################################################################
+
+
+class None_Detector(Detector_Function):
+
+    def __init__(self, **kw):
+        super(None_Detector, self).__init__()
+        self.detector_control = 'soft'
+        self.set_kw()
+        self.name = 'None_Detector'
+        self.value_names = ['None']
+        self.value_units = ['None']
+
+    def acquire_data_point(self, **kw):
+        '''
+        Returns something random for testing
+        '''
+        return np.random.random()
 
 ##########################################################################
 ##########################################################################
@@ -400,8 +442,7 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         c = 0
         while (not passed):
             S21 = self.HS.probe()
-            cond_a = (
-                             abs(S21) / self.last > self.threshold) or (self.last / abs(S21) > self.threshold)
+            cond_a = (abs(S21) / self.last > self.threshold) or (self.last / abs(S21) > self.threshold)
             cond_b = self.HS.frequency() > self.last_frequency
             if cond_a and cond_b:
                 passed = False

@@ -50,6 +50,9 @@ class Base_RO_LutMan(Base_LutMan):
             feedline_map='S7',
             **kw
     ):
+        if num_res > 10:  # FIXME: this is UHFQA limit
+            raise ValueError('At most 10 resonators can be read out.')
+
         self._num_res = num_res
         self._feedline_number = feedline_number
         self._resonator_codeword_bit_mapping: List[int] = kw.pop('force_bit_map', None)

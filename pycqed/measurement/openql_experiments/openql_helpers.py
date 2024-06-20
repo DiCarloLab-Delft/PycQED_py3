@@ -278,11 +278,11 @@ class OqlProgram:
         }
 
         if recompile is False:
-            if _recompile is True:
-                log.warning(
-                    "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
-                    " want to compile?".format(self._platf_cfg, clifford_rb_oql)
-                )
+            # if _recompile is True:
+            #     log.warning(
+            #         "`{}` or\n`{}`\n might have been modified! Are you sure you didn't"
+            #         " want to compile?".format(self._platf_cfg, clifford_rb_oql)
+            #     )
             res_dict["recompile"] = False
         elif recompile is True:
             # Enforce recompilation
@@ -464,9 +464,7 @@ class OqlProgram:
             qubits: List[int],
             combinations: List[str] = ["00", "01", "10", "11"],
             reps_per_cal_pnt: int = 1,
-            f_state_cal_pt_cw: int = 9,  # 9 is the one listed as rX12 in `mw_lutman`
-            nr_flux_dance: int = None,
-            flux_cw_list: List[str] = None
+            heralded_init: bool = False,
     ) -> None:
         """
 
@@ -497,37 +495,22 @@ class OqlProgram:
         state_to_gates = {
             "0": ["i"],
             "1": ["rx180"],
-            "2": ["rx180", "cw_{:02}".format(f_state_cal_pt_cw)],
+            "2": ["rx180", "rX12"],
+            "3": ["rx180", "rX12", "rX23"],
         }
 
         for i, comb in enumerate(comb_repeated):
             k = self.create_kernel('cal{}_{}'.format(i, comb))
 
-            # NOTE: for debugging purposes of the effect of fluxing on readout,
-            #       prepend flux dance before calibration points
             for q_state, q in zip(comb, qubits):
                 k.prepz(q)
+                if heralded_init:
+                    k.measure(q)
             k.gate("wait", [], 0)  # alignment
-
-            if nr_flux_dance and flux_cw_list:
-                for i in range(int(nr_flux_dance)):
-                    for flux_cw in flux_cw_list:
-                        k.gate(flux_cw, [0])
-                    k.gate("wait", [], 0)
-                # k.gate("wait", [], 20) # prevent overlap of flux with mw gates
-
             for q_state, q in zip(comb, qubits):
                 for gate in state_to_gates[q_state]:
                     k.gate(gate, [q])
             k.gate("wait", [], 0)  # alignment
-            # k.gate("wait", [], 20)  # alignment
-
-            # for q_state, q in zip(comb, qubits):
-            #     k.prepz(q)
-            #     for gate in state_to_gates[q_state]:
-            #         k.gate(gate, [q])
-            # k.gate("wait", [], 0)  # alignment
-
             for q in qubits:
                 k.measure(q)
             k.gate('wait', [], 0)  # alignment

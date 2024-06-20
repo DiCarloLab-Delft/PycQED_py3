@@ -93,7 +93,8 @@ def mixer_carrier_cancellation(
     MC.set_sweep_functions([chI_par, chQ_par])
     MC.set_detector_function(detector)  # sets test_detector
     MC.set_adaptive_function_parameters(ad_func_pars)
-    MC.run(name=label, mode='adaptive')
+    MC.run(name=label, mode='adaptive',
+           disable_snapshot_metadata = disable_metadata)
     a = ma.OptimizationAnalysis(label=label)
     # v2 creates a pretty picture of the optimizations
     ma.OptimizationAnalysis_v2(label=label)
@@ -137,7 +138,7 @@ def multi_channel_mixer_carrier_cancellation(SH, source, MC,
     SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency()),
-        Navg=5, delay=0.0, prepare_each_point=False)
+        Navg=5, delay=0.0, prepare_for_each_point=False)
 
     if x0 is None:
         x0 = [0.0]*len(channel_pars)
@@ -145,7 +146,7 @@ def multi_channel_mixer_carrier_cancellation(SH, source, MC,
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': x0,
                     'initial_step': [init_stepsize]*len(channel_pars),
-                    'no_improv_break': 15,
+                    # 'no_improv_break': 15,
                     'minimize': True,
                     'maxiter': 500}
     MC.set_sweep_functions(channel_pars)

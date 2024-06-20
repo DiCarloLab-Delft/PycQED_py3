@@ -234,6 +234,7 @@ def parity_check_cost_function(
         ramsey_qubits: Union[List[str], bool]=False,
         refocusing: bool=True,
         phase_offsets: List[float]=None,
+        pc_repetitions: int=1,
         phase_weight_factor: float=1,
         include_missing_frac_cost: bool=False,
         wait_time_before_flux_ns: int=0,
@@ -274,6 +275,7 @@ def parity_check_cost_function(
         wait_time_after_flux_ns=wait_time_after_flux_ns,
         label_suffix=counter_param(),
         disable_metadata=disable_metadata,
+        pc_repetitions=pc_repetitions,
         plotting=plotting,
         **kwargs
         )

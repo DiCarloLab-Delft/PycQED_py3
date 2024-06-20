@@ -100,7 +100,7 @@ class LinDistortionKernel(Instrument):
         amplitude to zero. This method of disabling is used so as not to
         change the latency that is introduced.
         """
-        max_exp_filters = 5
+        max_exp_filters = 8
         try:
             AWG = self.instr_AWG.get_instr()
         except Exception as e:
@@ -230,7 +230,7 @@ class LinDistortionKernel(Instrument):
                         )
 
                         nr_real_time_exp_models += 1
-                        if nr_real_time_exp_models > 5:
+                        if nr_real_time_exp_models > 8: # changed 5 to 8 Jorge
                             raise ValueError()
                     else:
                         y_sig = kf.exponential_decay_correction(
