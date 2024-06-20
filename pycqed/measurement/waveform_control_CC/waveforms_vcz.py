@@ -3,10 +3,11 @@
     Purpose: generate flux waveforms for VCZ gates and
         phase corrections; toolbox for vcz waveforms
 """
-
+from dataclasses import dataclass
 import numpy as np
 import math
 import logging
+from typing import Dict
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 
@@ -16,7 +17,9 @@ log = logging.getLogger(__name__)
 def add_vcz_parameters(this_flux_lm, which_gate: str = None):
     """
     Adds to `this_flux_lm` the necessary parameters used for the VCZ
-    flux waveform including corrections
+    flux waveform including corrections.
+    Extends the VCZ parameters with additional (pre)parking parameters during the cz flux-pulse
+    in order to avoid specific frequency collision cases.
     """
     this_flux_lm.add_parameter(
         "vcz_amp_dac_at_11_02_%s" % which_gate,
@@ -141,26 +144,6 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         initial_value=False,
         label="Use asymmetric SNZ pulse amplitudes",
     )
-    # this_flux_lm.add_parameter(
-    #     "vcz_amp_pos_%s" % which_gate,
-    #     docstring="Amplitude of positive part of SNZ pulse, "
-    #     "used only if vcz_use_asymmetric_amp is true.",
-    #     parameter_class=ManualParameter,
-    #     vals=vals.Numbers(0.0, 10.0),
-    #     initial_value=1.0,
-    #     unit="a.u.",
-    #     label="Positive SNZ amplitude, if asymmetric is used.",
-    # )
-    # this_flux_lm.add_parameter(
-    #     "vcz_amp_neg_%s" % which_gate,
-    #     docstring="Amplitude of negative part of SNZ pulse, "
-    #     "used only if vcz_use_asymmetric_amp is true.",
-    #     parameter_class=ManualParameter,
-    #     vals=vals.Numbers(0.0, 10.0),
-    #     initial_value=1.0,
-    #     unit="a.u.",
-    #     label="Negative SNZ amplitude, if asymmetric is used.",
-    # )
     this_flux_lm.add_parameter(
         "vcz_asymmetry_%s" % which_gate,
         docstring="Asymmetry of SNZ pulse, "
@@ -189,34 +172,36 @@ def add_vcz_parameters(this_flux_lm, which_gate: str = None):
         unit="nr of samples",
         label="Nr of padded samples part of SNZ pulse.",
     )
-
-    # for specificity in ["coarse", "fine"]:
-    #     this_flux_lm.add_parameter(
-    #         "vcz_{}_optimal_hull_{}".format(specificity, which_gate),
-    #         initial_value=np.array([]),
-    #         label="{} hull".format(specificity),
-    #         docstring=(
-    #             "Stores the boundary points of a optimal region 2D region "
-    #             "generated from a landscape. Intended for data points "
-    #             "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`)"
-    #         ),
-    #         parameter_class=ManualParameter,
-    #         vals=vals.Arrays(),
-    #     )
-    #     this_flux_lm.add_parameter(
-    #         "vcz_{}_cond_phase_contour_{}".format(specificity, which_gate),
-    #         initial_value=np.array([]),
-    #         label="{} contour".format(specificity),
-    #         docstring=(
-    #             "Stores the points for an optimal conditional phase "
-    #             "contour generated from a landscape. Intended for data points "
-    #             "(x, y) = (`vcz_amp_sq_XX`, `vcz_time_middle_XX`) "
-    #             "typically for the 180 deg cond. phase."
-    #         ),
-    #         parameter_class=ManualParameter,
-    #         vals=vals.Arrays(),
-    #     )
-
+    # Parameters used to define pre-parking during NZ gate
+    this_flux_lm.add_parameter(
+        f"vcz_amp_prepark_{which_gate}",
+        docstring="Amplitude of the start and end of the NZ pulse (keeping t_p unchanged),"
+        "pre-parking the qubit before starting the intended interaction."
+        "1.0 means same amplitude as `sq_amp_XX`.",
+        parameter_class=ManualParameter,
+        vals=vals.Numbers(0.0, 1.0),
+        initial_value=0.0,
+        unit="a.u.",
+        label="Pre-park tuning amp.",
+    )
+    this_flux_lm.add_parameter(
+        f"vcz_time_prepark_{which_gate}",
+        docstring="Duration of the pre-park block before and after NZ pulse. "
+        "Should be set such that collision avoidance is the satisfied at the start and end of the NZ pulse.",
+        parameter_class=ManualParameter,
+        vals=vals.Numbers(0, 500e-9),
+        initial_value=0,
+        unit="s",
+        label="Duration pre-park square",
+    )
+    this_flux_lm.add_parameter(
+        f"vcz_use_prepark_{which_gate}",
+        docstring="",
+        parameter_class=ManualParameter,
+        vals=vals.Bool(),
+        initial_value=False,
+        label="Add extra points with amplitude `vcz_amp_prepark_XX`?",
+    )
 
 
 def align_vcz_q_phase_corr_with(
@@ -317,6 +302,9 @@ def vcz_waveform(
     use_asymmetric_NZ = fluxlutman.get("vcz_use_asymmetric_amp_{}".format(which_gate))
     # if one wants to use unipolar pulses instead
     use_net_zero_pulse = fluxlutman.get("vcz_use_net_zero_pulse_{}".format(which_gate))
+    # In case we might want to perform a pre-parking during the NZ pulse
+    # thereby avoiding unwanted frequency collisions with neighboring gates.
+    use_prepark: bool = fluxlutman.get(f"vcz_use_prepark_{which_gate}")
 
     # single qubit phase correction parameters
     correct_q_phase = fluxlutman.get("vcz_correct_q_phase_{}".format(which_gate))
@@ -331,6 +319,9 @@ def vcz_waveform(
     time_middle = fluxlutman.get("vcz_time_middle_{}".format(which_gate))
     time_middle = time_middle * sampling_rate  # avoid numerical issues
 
+    time_prepark: float = fluxlutman.get(f"vcz_time_prepark_{which_gate}")
+    time_prepark: float = time_prepark * sampling_rate  # avoid numerical issues
+
     # padding time at each side of the pulse, to fill to the cycle length
     time_pad = fluxlutman.get("vcz_time_pad_{}".format(which_gate))
     time_pad = time_pad * sampling_rate
@@ -339,6 +330,7 @@ def vcz_waveform(
     # normalized to the amplitude at the CZ interaction point
     norm_amp_sq = fluxlutman.get("vcz_amp_sq_{}".format(which_gate))
     norm_amp_fine = fluxlutman.get("vcz_amp_fine_{}".format(which_gate))
+    norm_amp_prepark: float = fluxlutman.get(f"vcz_amp_prepark_{which_gate}")
 
     # This is to avoid numerical issues when the user would run sweeps with
     # e.g. `time_at_swtspt = np.arange(0/2.4e9, 10/ 2.4e9, 2/2.4e9)`
@@ -348,14 +340,15 @@ def vcz_waveform(
     time_sqr = np.round(time_sqr / dt) * dt
     half_time_q_ph_corr = np.round(time_q_ph_corr / 2 / dt) * dt
     time_pad = np.round(time_pad / dt) * dt
+    time_prepark = np.round(time_prepark / dt) * dt
 
-    # Added pading amplitude by Jorge 22/08/2023
+    # Added padding amplitude by Jorge 22/08/2023
     pad_amp = fluxlutman.get("vcz_amp_pad_{}".format(which_gate))
     # Only add padding if amplitude is > 0
     if abs(amp_at_int_11_02) > 1e-3:
         pad_amps = np.full(int(time_pad / dt), 0) + pad_amp/amp_at_int_11_02
         for _i in range(len(pad_amps)):
-            if _i<n_pad_samples:
+            if _i < n_pad_samples:
                 pad_amps[_i] = 0
     # If not, just add zero padding.
     else:
@@ -372,17 +365,22 @@ def vcz_waveform(
         pos_sq_amps = np.full(int(time_sqr / dt), norm_amp_pos)
         neg_sq_amps = np.full(int(time_sqr / dt), norm_amp_neg)
 
+        slope_amp_pos = slope_amp_neg = np.array([])
         if use_amp_fine:
             # slope amp will be using the same scaling factor as in the symmetric case, 
             # but relative to pos and neg amplitudes 
             # such that this amp is in the range [0, 1]
             slope_amp_pos = np.array([norm_amp_fine * norm_amp_pos])
             slope_amp_neg = np.array([norm_amp_fine * norm_amp_neg])
-        else: # sdfsdfsd
-            slope_amp_pos = slope_amp_neg = np.array([])
 
-        pos_NZ_amps = np.concatenate((pos_sq_amps, slope_amp_pos))
-        neg_NZ_amps = np.concatenate((slope_amp_neg, neg_sq_amps))
+        prepark_amp_pos: np.ndarray = np.array([])
+        prepark_amp_neg: np.ndarray = np.array([])
+        if use_prepark:
+            prepark_amp_pos = np.array([norm_amp_prepark * norm_amp_pos] * int(time_prepark / dt))
+            prepark_amp_neg = np.array([norm_amp_prepark * norm_amp_neg] * int(time_prepark / dt))
+
+        pos_NZ_amps = np.concatenate((prepark_amp_pos, pos_sq_amps, slope_amp_pos))
+        neg_NZ_amps = np.concatenate((slope_amp_neg, neg_sq_amps, prepark_amp_neg))
 
         amp = np.concatenate(
             ([amp_at_sweetspot],
@@ -394,13 +392,16 @@ def vcz_waveform(
             [amp_at_sweetspot])
         )
     else:
+        slope_amp = np.array([])
         if use_amp_fine:
             # such that this amp is in the range [0, 1]
             slope_amp = np.array([norm_amp_fine * norm_amp_sq])
-        else:
-            slope_amp = np.array([])
 
-        half_NZ_amps = np.concatenate((sq_amps, slope_amp))
+        prepark_amps: np.ndarray = np.array([])
+        if use_prepark:
+            prepark_amps = np.array([norm_amp_prepark * norm_amp_sq] * int(time_prepark / dt))
+
+        half_NZ_amps = np.concatenate((prepark_amps, sq_amps, slope_amp))
 
         amp = np.concatenate(
             ([amp_at_sweetspot],
@@ -467,6 +468,21 @@ def vcz_waveform(
         return {"time": tlist / sampling_rate, "amp": amp}
 
     return amp
+
+
+def scz_waveform(
+    fluxlutman,
+    which_gate: str = None,
+    sim_ctrl_cz=None,
+    return_dict=False
+    ):
+    return vcz_waveform(
+        fluxlutman=fluxlutman,
+        which_gate=which_gate,
+        sim_ctrl_cz=sim_ctrl_cz,
+        return_dict=return_dict,
+    )
+
 
 # ######################################################################
 # Auxiliary tools
