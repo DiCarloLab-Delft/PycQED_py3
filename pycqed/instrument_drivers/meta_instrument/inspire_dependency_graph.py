@@ -265,7 +265,7 @@ class inspire_dep_graph_RO(AutoDepGraph_DAG):
                         calibrate_function_args={'qubits': [Qubit.name], # for QI put [Qubit.name]
                                                   'q_target': Qubit.name, 
                                                   'return_analysis': False,
-                                                  'averages': 2 ** 15,   # this is the number of avgs to use for each transient
+                                                  'averages': 2 ** 16,   # this is the number of avgs to use for each transient
                                                   'soft_averaging': 15,
                                                   'update': True,
                                                   'verify': True,
@@ -687,12 +687,20 @@ class inspire_dep_graph_2Q(AutoDepGraph_DAG):
         center = flux_lm.parameters['q_amp_center_{}'.format(cardinal[str(pair)])].get()
         #q_parks = [pair[2]] if len(pair)==3 else ['QNW'] if pair[0]=='QNE' else ['QNE']
         q_parks = [pair[2]] if len(pair)==3 else []
-        self.add_node('SNZ',
-                          calibrate_function=self.device.name + '.measure_vcz_A_B_landscape',
-                          calibrate_function_args={ 'Q0': [pair[0]], 'Q1': [pair[1]], 'update_flux_params': True,
-                                                    'A_points': 11, 'A_ranges': [(.98*center, 1.02*center)], 
-                                                    'B_amps': np.linspace(0, 1, 11),
-                                                    'Q_parks': q_parks})
+        if CZindex in [0, 1, 2, 3]:
+          self.add_node('SNZ',
+                            calibrate_function=self.device.name + '.measure_vcz_A_B_landscape',
+                            calibrate_function_args={ 'Q0': [pair[0]], 'Q1': [pair[1]], 'update_flux_params': True,
+                                                      'A_points': 11, 'A_ranges': [(.98*center, 1.02*center)], 
+                                                      'B_amps': np.linspace(0, 1, 11),
+                                                      'Q_parks': q_parks})
+        else:
+          self.add_node('SNZ',
+                            calibrate_function=self.device.name + '.measure_vcz_A_B_landscape',
+                            calibrate_function_args={ 'Q0': [pair[0]], 'Q1': [pair[1]], 'update_flux_params': True,
+                                                      'A_points': 11, 'A_ranges': [(.995*center, 1.005*center)], 
+                                                      'B_amps': np.linspace(0, 1, 11),
+                                                      'Q_parks': q_parks})
         # Assess two-qubit phase
         self.add_node('TQP',
                         calibrate_function=self.device.name + '.measure_two_qubit_phase_GBT',
