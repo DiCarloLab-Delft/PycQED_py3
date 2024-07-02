@@ -250,6 +250,13 @@ class Base_MW_LutMan(Base_LutMan):
             parameter_class=ManualParameter,
             initial_value=0
         )
+        self.add_parameter(
+            'mw_pulse_length',
+            vals=vals.Numbers(min_value=1e-9),
+            unit='s',
+            parameter_class=ManualParameter,
+            initial_value=20e-9
+        )
 
         # spec parameters
         self.add_parameter(
@@ -333,6 +340,7 @@ class Base_MW_LutMan(Base_LutMan):
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
+                    time_gate = self.mw_pulse_length(),
                     f_modulation=f_modulation,
                     sampling_rate=self.sampling_rate(),
                     motzoi=self.mw_motzoi(),
@@ -345,6 +353,7 @@ class Base_MW_LutMan(Base_LutMan):
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
+                    time_gate = self.mw_pulse_length(),
                     f_modulation=self.mw_ef_modulation(),
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
@@ -352,7 +361,8 @@ class Base_MW_LutMan(Base_LutMan):
 
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
-                    **waveform["drag_pars"])
+                    **waveform["drag_pars"],
+                    time_gate = self.mw_pulse_length())
 
             elif waveform['type'] == 'spec':
                 self._wave_dict[idx] = self.spec_func(
@@ -404,6 +414,7 @@ class Base_MW_LutMan(Base_LutMan):
                 self._wave_dict[idx] = self.wf_func(
                     amp=0,
                     phase=0,
+                    time_gate = self.mw_pulse_length(),
                     sigma_length=self.mw_gauss_width(),
                     f_modulation=f_modulation,
                     sampling_rate=self.sampling_rate(),
@@ -1023,6 +1034,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
+                    time_gate = self.mw_pulse_length(),
                     f_modulation=f_modulation,
                     sampling_rate=self.sampling_rate(),
                     motzoi=self.mw_motzoi(),
@@ -1035,6 +1047,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                     amp=amp,
                     phase=waveform['phi'],
                     sigma_length=self.mw_gauss_width(),
+                    time_gate = self.mw_pulse_length(),
                     f_modulation=self.mw_ef_modulation(),
                     sampling_rate=self.sampling_rate(),
                     motzoi=0,
@@ -1042,7 +1055,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
             elif waveform['type'] == 'raw-drag':
                 self._wave_dict[idx] = self.wf_func(
-                    **waveform["drag_pars"])
+                    **waveform["drag_pars"],
+                    time_gate = self.mw_pulse_length())
 
             elif waveform['type'] == 'spec':
                 self._wave_dict[idx] = self.spec_func(
@@ -1547,57 +1561,67 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         # FIXME: this creates _wave_dict, independent of LutMap
         self._wave_dict['I'] = self.wf_func(
             amp=0, sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=0, delay=self.pulse_delay())
         self._wave_dict['rX180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rX90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rXm90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rYm90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rPhi180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rPhi90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rPhim90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
@@ -1613,6 +1637,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
             self._wave_dict['r{}_90'.format(angle)] = self.wf_func(
                 amp=self.mw_amp180()*self.mw_amp90_scale(),
                 sigma_length=self.mw_gauss_width(),
+                time_gate = self.mw_pulse_length(),
                 f_modulation=f_modulation,
                 sampling_rate=self.sampling_rate(), phase=angle,
                 motzoi=self.mw_motzoi(), delay=self.pulse_delay())
@@ -1622,40 +1647,47 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         ########################################
         self._wave_dict['X180c'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY180c'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rX90c'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rY90c'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rXm90c'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())
         self._wave_dict['rYm90c'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
+            time_gate = self.mw_pulse_length(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90+self.phi(),
             motzoi=self.mw_motzoi(), delay=self.pulse_delay())

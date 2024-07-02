@@ -5985,6 +5985,7 @@ class HAL_Device(HAL_ShimMQ):
     def measure_two_qubit_phase_GBT(
             self,
             pair,
+            ro_acq_averages = 2**12,
             eps=10,                # error threshold for two-qubit phase, in degrees
             updateSQP=True        # determines whether to update single-qubit phase while at it.
             ):
@@ -5996,6 +5997,7 @@ class HAL_Device(HAL_ShimMQ):
         Finally, we check if the two-qubit-phase is in bounds, as determined by eps. 
         Leo DC, 22/06/17
         '''
+        self.ro_acq_averages(ro_acq_averages)
 
         # getthe direction of the CZ gate
         direction=self.get_gate_directions(pair[0],pair[1])[0]
@@ -6454,6 +6456,7 @@ class HAL_Device(HAL_ShimMQ):
         update_flux_params: bool = False,
         flux_codeword: str = 'cz',
         cz_repetitions = 1,
+        ro_acq_averages = 2**9,
         prepare_for_timedomain: bool = True,
         disable_metadata: bool = False):
         """
@@ -6468,6 +6471,8 @@ class HAL_Device(HAL_ShimMQ):
         A_points : Number of points to sweep for amplitude range.
         Q_parks : list of qubits parked during operation.
         """
+        self.ro_acq_averages(ro_acq_averages)
+
         if isinstance(Q0, str):
             Q0 = [Q0]
         if isinstance(Q1, str):

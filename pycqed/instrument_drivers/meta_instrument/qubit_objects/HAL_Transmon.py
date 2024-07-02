@@ -3214,11 +3214,13 @@ class HAL_Transmon(HAL_ShimSQ):
             c['ro_cost'] = 10 * r['depletion_cost'] + 10 * (1 - a.qoi['Fidelity']) + 2 - (a.qoi['p00_0'] + a.qoi['p11_1'])
 
         print('Important values:')
-        print('- Depletion Cost: {}'.format(r['depletion_cost']))
+        if opt_for != None:
+            print('- Depletion Cost: {}'.format(r['depletion_cost']))
         print('- Assignment Fidelity: {}%'.format(np.round(a.qoi['Fidelity'] * 100, 2)))
         print('- QND_g: {}%'.format(np.round(a.qoi['p00_0'] * 100, 2)))
         print('- QND_e: {}%'.format(np.round(a.qoi['p11_1'] * 100, 2)))
-        print('- Readout Pulse Cost: {}'.format(c['ro_cost']))
+        if opt_for != None:
+            print('- Readout Pulse Cost: {}'.format(c['ro_cost']))
 
         return c
 
@@ -4703,18 +4705,18 @@ class HAL_Transmon(HAL_ShimSQ):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         
-        p = sqo.off_on_mw_crosstalk(qubit_idx=self.cfg_qubit_nr(),
-                                    pulse_comb='on',
-                                    initialize=False,
-                                    cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
-                                    platf_cfg=self.cfg_openql_platform_fn())
+        p = sqo.off_on_mw_crosstalk(
+            qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            initialize=False,
+            cross_driving_qubit=qubi_cd_idx if cross_driving_qubit else None,
+            platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
         s = MW_LutMan.channel_amp
         print(s)
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
-        # real_imag is actually not polar and as such works for opt weights
+        # real_imag is acutally not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
 
@@ -4730,18 +4732,13 @@ class HAL_Transmon(HAL_ShimSQ):
         if a:
             return a
 
-    def measure_mw_crosstalk(self,
-                            MC=None,
-                            amps=np.linspace(0, 1, 31),
-                            cross_driving_qb: str = None,
-                            disable_metadata = False,
-                            analyze=True,
-                            close_fig=True,
-                            real_imag=True,
-                            prepare_for_timedomain=True):
+    def measure_mw_crosstalk(self, MC=None, amps=np.linspace(0, 1, 121),
+                 cross_driving_qb=None,disable_metadata = False,
+                 analyze=True, close_fig=True, real_imag=True,
+                 prepare_for_timedomain=True):
         """
         Measure MW crosstalk matrix by measuring two Rabi experiments: 
-        1. a0 : standard rabi (drive the qubit qj through its dedicated drive line Dj) 
+        1. a0 : standand rabi (drive the qubit qj through its dedicated drive line Dj) 
         2. a1 : cross-drive rabi (drive the qubit qj through another drive line (Di)
          at the freq of the qj) 
         Args:
@@ -4763,52 +4760,35 @@ class HAL_Transmon(HAL_ShimSQ):
         try:    
             freq_qj = self.freq_qubit() # set qi to this qubit freq of qubit j
             cross_driving_qubit = None
-            a0 = self.measure_rabi_mw_crosstalk(MC,
-                                                amps,
-                                                cross_driving_qubit,
-                                                analyze,
-                                                close_fig,
-                                                real_imag,
-                                                disable_metadata,
-                                                prepare_for_timedomain)
+            amps=np.linspace(0, 0.1, 51)
+            a0 = self.measure_rabi_mw_crosstalk(MC, amps,cross_driving_qubit,
+                                          analyze, close_fig, real_imag,disable_metadata,
+                                          prepare_for_timedomain)
 
             cross_driving_qubit = cross_driving_qb
             qi = self.find_instrument(cross_driving_qubit)
             freq_qi = qi.freq_qubit()
             qi.freq_qubit(freq_qj)
+            amps=np.linspace(0, 1, 121)
             prepare_for_timedomain = False
-            a1 = self.measure_rabi_mw_crosstalk(MC,
-                                                amps,
-                                                cross_driving_qubit,
-                                                analyze,
-                                                close_fig,
-                                                real_imag,
-                                                disable_metadata,
-                                                prepare_for_timedomain)
+            a1 = self.measure_rabi_mw_crosstalk(MC, amps,cross_driving_qubit,
+                                          analyze, close_fig, real_imag,disable_metadata,
+                                          prepare_for_timedomain)
             ## set back the right parameters. 
             qi.freq_qubit(freq_qi)
         except:
             qi.freq_qubit(freq_qi)
             raise Exception('Experiment failed')
 
-        pi_ajj = abs(a0.fit_result.params['period'].value) / 2
-
-        T_period = 4 * a0.rabi_amplitudes['piPulse']
-        B_offset = np.min(a0.data[1])
-        A_amplitude = np.max(a0.data[1]) - B_offset
-        A_prime = a1.data[1][-1]
-        if A_prime <= B_offset:
-            mw_isolation = 80
-        else:
-            f_solution = (1 / (2*np.pi)) * np.arcsin((A_prime - B_offset) / A_amplitude)
-            T_period_solution = 1 / f_solution
-
-            # pi_aji = abs(a1.fit_result.params['period'].value) / 2
-            pi_aji = T_period_solution / 2
+        try:
+            pi_ajj = abs(a0.fit_result.params['period'].value) / 2
+            pi_aji = abs(a1.fit_result.params['period'].value) / 2
 
             mw_isolation = 20*np.log10(pi_aji/pi_ajj)
 
-        return mw_isolation
+            return mw_isolation
+        except:
+            mw_isolation = 80
 
     ##########################################################################
     # measure_ functions (HAL_Transmon specific, not present in parent class Qubit)

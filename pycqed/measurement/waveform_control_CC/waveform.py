@@ -25,7 +25,8 @@ import numpy as np
 
 def gauss_pulse(
         amp: float=1.0,
-        sigma_length: float=5.0e-9,
+        sigma_length: float=4.0e-9,
+        time_gate: float = 20.0e-9,
         nr_sigma: int = 4,
         sampling_rate: float = 2.4e9,
         axis: str = 'x',
@@ -34,7 +35,6 @@ def gauss_pulse(
         motzoi: float = 0,
         delay: float = 0,
         subtract_offset: str = 'average',
-        time_gate: float = 20.0e-9
         ):
     '''
     This version of gauss_pulse is written by LDC. 2022/07/29
@@ -398,6 +398,7 @@ def rotate_wave(wave_I, wave_Q, phase: float, unit: str = 'deg'):
 def mod_gauss(
         amp,
         sigma_length,
+        time_gate,
         f_modulation,
         axis='x',
         phase=0,
@@ -410,7 +411,7 @@ def mod_gauss(
     '''
     Simple modulated gauss pulse. All inputs are in s and Hz.
     '''
-    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
+    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, time_gate, nr_sigma=nr_sigma,
                                    sampling_rate=sampling_rate, axis=axis,
                                    phase=phase,
                                    motzoi=motzoi, delay=delay)
