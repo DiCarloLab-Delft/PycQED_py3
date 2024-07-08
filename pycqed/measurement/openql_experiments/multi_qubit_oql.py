@@ -3622,20 +3622,24 @@ def multi_qubit_T1(times, qubits_idx: list, platf_cfg: str) -> OqlProgram:
 def multi_qubit_Echo(times, qubits_idx: list, platf_cfg: str) -> OqlProgram:
     n_qubits = len(qubits_idx)
     points = len(times[0])
+    delta_phase = 40
 
     p = OqlProgram('multi_qubit_echo_', platf_cfg)
 
     for i in range(points - 4):
         k = p.create_kernel('echo_{}'.format(i))
         for q, qubit in enumerate(qubits_idx):
-            k.prepz(qubit)
+
+            startIndex=32
+            angle = (i*delta_phase) % 360
+            cw_idx = 32 + angle//20
             wait_nanoseconds = int(round(times[q][i] / 1e-9 / 2))
+
+            k.prepz(qubit)
             k.gate('rx90', [qubit])
             k.gate("wait", [qubit], wait_nanoseconds)
             k.gate('rx180', [qubit])
             k.gate("wait", [qubit], wait_nanoseconds)
-            angle = (i * 40) % 360
-            cw_idx = angle // 20 + 9
             if angle == 0:
                 k.gate('rx90', [qubit])
             else:

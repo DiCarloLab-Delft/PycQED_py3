@@ -233,6 +233,10 @@ def randomized_benchmarking(
         qubit_map = {"q0": qubits[0]}
         number_of_qubits = 1
         Cl = SingleQubitClifford
+    elif len(qubits) == 1 and simultaneous_single_qubit_RB: # for parallel dependency graphs
+        qubit_map = {"q0": qubits[0]}
+        number_of_qubits = 1
+        Cl = SingleQubitClifford
     elif len(qubits) == 2 and not simultaneous_single_qubit_RB:
         qubit_map = {"q0": qubits[0], "q1": qubits[1]}
         number_of_qubits = 2
@@ -241,6 +245,11 @@ def randomized_benchmarking(
         qubit_map = {"q0": qubits[0], "q1": qubits[1]}
         # arguments used to generate 2 single qubit sequences
         number_of_qubits = 2
+        Cl = SingleQubitClifford
+    elif len(qubits) == 3 and simultaneous_single_qubit_RB:
+        qubit_map = {"q0": qubits[0], "q1": qubits[1], "q2": qubits[2]}
+        # arguments used to generate 3 single qubit sequences
+        number_of_qubits = 3
         Cl = SingleQubitClifford
     elif len(qubits) == 3 and simultaneous_single_qubit_parking_RB:
         # In this case we want to benchmark the single qubit gates when

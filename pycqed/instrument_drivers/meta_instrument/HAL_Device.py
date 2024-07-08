@@ -4417,7 +4417,8 @@ class HAL_Device(HAL_ShimMQ):
             ro_acq_weight_type: str = "optimal IQ",
             compile_only: bool = False,
             pool=None,  # a multiprocessing.Pool()
-            rb_tasks=None  # used after called with `compile_only=True`
+            rb_tasks=None,  # used after called with `compile_only=True`
+            disable_metadata = False
         ):
         """
         Performs simultaneous single qubit RB on two qubits.
@@ -4563,7 +4564,7 @@ class HAL_Device(HAL_ShimMQ):
 
         MC.set_detector_function(d)
         label = label.format(nr_seeds, recompile, qubits[0], qubits[1])
-        MC.run(label, exp_metadata={"bins": sweep_points})
+        MC.run(label, exp_metadata={"bins": sweep_points}, disable_snapshot_metadata = disable_metadata)
 
         # N.B. if interleaving cliffords are used, this won't work
         # [2020-07-11 Victor] not sure if NB still holds
@@ -4594,14 +4595,14 @@ class HAL_Device(HAL_ShimMQ):
             MC: Optional[MeasurementControl] = None,
             nr_cliffords=2 ** np.arange(11),
             nr_seeds=100,
+            interleaving_cliffords=[None],
+            label=None,
             recompile: bool = "as needed",
             cal_points: bool = True,
             ro_acq_weight_type: str = "optimal IQ",
             compile_only: bool = False,
             pool=None,  # a multiprocessing.Pool()
             rb_tasks=None,  # used after called with `compile_only=True
-            label_name=None,
-            prepare_for_timedomain=True
         ):
         """
         Performs simultaneous single qubit RB on multiple qubits.
@@ -4636,8 +4637,7 @@ class HAL_Device(HAL_ShimMQ):
         self.ro_acq_weight_type(ro_acq_weight_type)
         self.ro_acq_digitized(False)
 
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain(qubits=qubits, bypass_flux=True)
+        self.prepare_for_timedomain(qubits=qubits, bypass_flux=True)
         if MC is None:
             MC = self.instr_MC.get_instr()
         MC.soft_avg(1)
@@ -4668,7 +4668,7 @@ class HAL_Device(HAL_ShimMQ):
                         list(map(int, nr_cliffords)),
                         '_'.join(qubits)
                     ),
-                    interleaving_cliffords=[None],
+                    interleaving_cliffords=interleaving_cliffords,
                     simultaneous_single_qubit_RB=True,
                     cal_points=cal_points,
                     net_cliffords=[0, 3],  # measures with and without inverting
@@ -4704,9 +4704,9 @@ class HAL_Device(HAL_ShimMQ):
         if cal_points:
             sweep_points = np.append(
                 np.repeat(nr_cliffords, 2),
-                [nr_cliffords[-1] + 0.5]
-                + [nr_cliffords[-1] + 1.5]
-                + [nr_cliffords[-1] + 2.5],
+                [nr_cliffords[-1] + 0.5] * 2
+                + [nr_cliffords[-1] + 1.5] * 2
+                + [nr_cliffords[-1] + 2.5] * 3,
             )
         else:
             sweep_points = np.repeat(nr_cliffords, 2)
@@ -4737,23 +4737,46 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_detector_function(d)
 
         label="Multi_Qubit_sim_RB_{}seeds_recompile={}_".format(nr_seeds, recompile)
-        if label_name is None:
+        if label is None:
             label += '_'.join(qubits)
         else:
-            label += label_name
+            label += label
         MC.run(label, exp_metadata={"bins": sweep_points})
 
-        cal_2Q = ["0"*len(qubits), "1"*len(qubits), "2"*len(qubits)]
         Analysis = []
-        for i in range(len(qubits)):
-            rates_I_quad_ch_idx = 2*i
-            cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
+
+        if len(qubits) == 1:
+            cal_1Q = np.repeat(["0", "1", "2"], 2)
+            rates_I_quad_ch_idx = 0
             a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
                 label=label,
                 rates_I_quad_ch_idx=rates_I_quad_ch_idx,
                 cal_pnts_in_dset=cal_1Q
             )
             Analysis.append(a)
+        elif len(qubits) == 2:
+            cal_2Q = ["00", "01", "10", "11", "02", "20", "22"]
+            for i in range(len(qubits)):
+                rates_I_quad_ch_idx = 2*i
+                cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_2Q]
+                a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
+                    label=label,
+                    rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+                    cal_pnts_in_dset=cal_1Q
+                )
+                Analysis.append(a)
+        elif len(qubits) == 3:
+            cal_3Q = ["000", "001", "010", "011", "100", "101", "110", "111",
+                      "000", "002", "020", "022", "200", "202", "220", "222"]
+            for i in range(len(qubits)):
+                rates_I_quad_ch_idx = 2*i
+                cal_1Q = [state[rates_I_quad_ch_idx // 2] for state in cal_3Q]
+                a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(
+                    label=label,
+                    rates_I_quad_ch_idx=rates_I_quad_ch_idx,
+                    cal_pnts_in_dset=cal_1Q
+                )
+                Analysis.append(a)
 
         return Analysis
 
@@ -4891,7 +4914,8 @@ class HAL_Device(HAL_ShimMQ):
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain=True,
             update_T2=True,
-            update_frequency=False
+            update_frequency=False,
+            disable_metadata = False
     ):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -4939,9 +4963,9 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_detector_function(d)
         if label is None:
             label = 'Multi_Ramsey_' + '_'.join(qubits)
-        MC.run(label)
+        MC.run(label, disable_snapshot_metadata = disable_metadata)
 
-        a = ma2.Multi_Ramsey_Analysis(qubits=qubits, times=times, artificial_detuning=artificial_detuning, label=label)
+        a = ma2.Multi_Ramsey_Analysis(device = self, qubits=qubits, times=times, artificial_detuning=artificial_detuning, label=label)
         qoi = a.proc_data_dict['quantities_of_interest']
         for q in qubits:
             qub = self.find_instrument(q)
@@ -4962,7 +4986,8 @@ class HAL_Device(HAL_ShimMQ):
             qubits: list = None,
             MC: Optional[MeasurementControl] = None,
             double_points=True,
-            termination_opt=0.08
+            termination_opt=0.08,
+            disable_metadata = False
     ):
         # USED_BY: device_dependency_graphs_v2.py,
 
@@ -4991,7 +5016,7 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_points(np.arange(42))
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
-        MC.run('Multi_AllXY_'+'_'.join(qubits))
+        MC.run('Multi_AllXY_'+'_'.join(qubits), disable_snapshot_metadata = disable_metadata)
 
         a = ma2.Multi_AllXY_Analysis(qubits = qubits)
 
@@ -5011,7 +5036,8 @@ class HAL_Device(HAL_ShimMQ):
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain: bool = True,
             analyze: bool = True,
-            update: bool = True
+            update: bool = True,
+            disable_metadata = False
         ):
         '''
         NOTE: THIS ROUTINE DOES NOT CURRENTLY WORK WITH NON-EQUAL TIMES FOR THE DIFFERENT QUBITS!!!! LDC 2022/07/07
@@ -5024,25 +5050,25 @@ class HAL_Device(HAL_ShimMQ):
         if qubits is None:
             qubits = self.qubits()
 
-        # sort qubits as per the device qubit list
-        # (a) get list of all qubits on device
-        devicequbitlist=self.qubits()
-        numqubitsAll=len(devicequbitlist)
+        # # sort qubits as per the device qubit list
+        # # (a) get list of all qubits on device
+        # devicequbitlist=self.qubits()
+        # numqubitsAll=len(devicequbitlist)
 
-        # (b) determine the position of the input qubits on device list
-        numqubits=len(qubits)
-        qubitpos=[]
-        for i in range(numqubits):
-            thisqubit=qubits[i]
-            for j in range(numqubitsAll):
-                if (thisqubit==devicequbitlist[j]):
-                    qubitpos.append(j)
-        # (c) sort positions in increasing order according to the device list
-        qubitpos=sorted(qubitpos)
-        sortedqubits=qubits
-        for i in range(numqubits):
-            sortedqubits[i]=devicequbitlist[qubitpos[i]]
-        qubits=sortedqubits
+        # # (b) determine the position of the input qubits on device list
+        # numqubits=len(qubits)
+        # qubitpos=[]
+        # for i in range(numqubits):
+        #     thisqubit=qubits[i]
+        #     for j in range(numqubitsAll):
+        #         if (thisqubit==devicequbitlist[j]):
+        #             qubitpos.append(j)
+        # # (c) sort positions in increasing order according to the device list
+        # qubitpos=sorted(qubitpos)
+        # sortedqubits=qubits
+        # for i in range(numqubits):
+        #     sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        # qubits=sortedqubits
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
@@ -5086,7 +5112,7 @@ class HAL_Device(HAL_ShimMQ):
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
         label = 'Multi_T1_' + '_'.join(qubits)
-        MC.run(label)
+        MC.run(label, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma2.Multi_T1_Analysis(qubits=qubits, times=times)
@@ -5116,7 +5142,8 @@ class HAL_Device(HAL_ShimMQ):
             MC: Optional[MeasurementControl] = None,
             prepare_for_timedomain: bool = True,
             analyze: bool = True,
-            update: bool = True
+            update: bool = True,
+            disable_metadata = False
         ):
         '''
         This code was last revised by LDC, 2022/07/07.
@@ -5132,25 +5159,25 @@ class HAL_Device(HAL_ShimMQ):
         if qubits is None:
             qubits = self.qubits()
 
-        # sort qubits as per the device qubit list
-        # (a) get list of all qubits on device
-        devicequbitlist=self.qubits()
-        numqubitsAll=len(devicequbitlist)
+        # # sort qubits as per the device qubit list
+        # # (a) get list of all qubits on device
+        # devicequbitlist=self.qubits()
+        # numqubitsAll=len(devicequbitlist)
 
-        # (b) determine the position of the input qubits on device list
-        numqubits=len(qubits)
-        qubitpos=[]
-        for i in range(numqubits):
-            thisqubit=qubits[i]
-            for j in range(numqubitsAll):
-                if (thisqubit==devicequbitlist[j]):
-                    qubitpos.append(j)
-        # (c) sort positions in increasing order according to the device list
-        qubitpos=sorted(qubitpos)
-        sortedqubits=qubits
-        for i in range(numqubits):
-            sortedqubits[i]=devicequbitlist[qubitpos[i]]
-        qubits=sortedqubits
+        # # (b) determine the position of the input qubits on device list
+        # numqubits=len(qubits)
+        # qubitpos=[]
+        # for i in range(numqubits):
+        #     thisqubit=qubits[i]
+        #     for j in range(numqubitsAll):
+        #         if (thisqubit==devicequbitlist[j]):
+        #             qubitpos.append(j)
+        # # (c) sort positions in increasing order according to the device list
+        # qubitpos=sorted(qubitpos)
+        # sortedqubits=qubits
+        # for i in range(numqubits):
+        #     sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        # qubits=sortedqubits
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain(qubits=qubits)
@@ -5196,7 +5223,7 @@ class HAL_Device(HAL_ShimMQ):
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
         label = 'Multi_Echo_' + '_'.join(qubits)
-        MC.run(label)
+        MC.run(label, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma2.Multi_Echo_Analysis(label=label, qubits=qubits, times=times)
@@ -5222,37 +5249,40 @@ class HAL_Device(HAL_ShimMQ):
             qubits: List[str] = None, 
             nr_sequence: int = 7,                   # max number of iterations
             number_of_flips=np.arange(0, 31, 2),    # specifies the number of pi pulses at each step
-            eps=0.0005):                            # specifies the GBT threshold
+            eps=0.0005,
+            disable_metadata = False):                            # specifies the GBT threshold
 
 
-        # sort qubits as per the device qubit list
-        # (a) get list of all qubits on device
-        devicequbitlist=self.qubits()
-        numqubitsAll=len(devicequbitlist)
+        # # sort qubits as per the device qubit list
+        # # (a) get list of all qubits on device
+        # devicequbitlist=self.qubits()
+        # numqubitsAll=len(devicequbitlist)
 
-        # (b) determine the position of the input qubits on device list
+        # # (b) determine the position of the input qubits on device list
+        # numqubits=len(qubits)
+        # qubitpos=[]
+        # for i in range(numqubits):
+        #     thisqubit=qubits[i]
+        #     for j in range(numqubitsAll):
+        #         if (thisqubit==devicequbitlist[j]):
+        #             qubitpos.append(j)
+        # # (c) sort positions in increasing order according to the device list
+        # qubitpos=sorted(qubitpos)
+        # sortedqubits=qubits
+        # for i in range(numqubits):
+        #     sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        # qubits=sortedqubits
+        # # for diagnostics only
+        # #print(qubits)
+
         numqubits=len(qubits)
-        qubitpos=[]
-        for i in range(numqubits):
-            thisqubit=qubits[i]
-            for j in range(numqubitsAll):
-                if (thisqubit==devicequbitlist[j]):
-                    qubitpos.append(j)
-        # (c) sort positions in increasing order according to the device list
-        qubitpos=sorted(qubitpos)
-        sortedqubits=qubits
-        for i in range(numqubits):
-            sortedqubits[i]=devicequbitlist[qubitpos[i]]
-        qubits=sortedqubits
-        # for diagnostics only
-        #print(qubits)
-
 
         for i in range(nr_sequence):
             a = self.measure_multi_flipping(qubits=qubits, 
                                             number_of_flips=number_of_flips,
                                             analyze=True,
-                                            update=True)
+                                            update=True,
+                                            disable_metadata = disable_metadata)
             # for diagnostics only
             print("Iteration ",i,":")
             print(qubits)
@@ -5284,7 +5314,8 @@ class HAL_Device(HAL_ShimMQ):
             prepare_for_timedomain=True,
             analyze=True,
             update=False,
-            scale_factor_based_on_line: bool = False):
+            scale_factor_based_on_line: bool = False,
+            disable_metadata = False):
 
         # allow flipping only with pi/2 or pi, and x or y pulses
         assert angle in ['90', '180']
@@ -5293,26 +5324,26 @@ class HAL_Device(HAL_ShimMQ):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
-        # get list of all qubits on device
-        devicequbitlist=self.qubits()
-        numqubitsAll=len(devicequbitlist)
+        # # get list of all qubits on device
+        # devicequbitlist=self.qubits()
+        # numqubitsAll=len(devicequbitlist)
 
-        # determine the position of the input qubits on device list
-        numqubits=len(qubits)
-        qubitpos=[]
-        for i in range(numqubits):
-            thisqubit=qubits[i]
-            for j in range(numqubitsAll):
-                if (thisqubit==devicequbitlist[j]):
-                    qubitpos.append(j)
-        # sort positions in increasing order according to the device list
-        qubitpos=sorted(qubitpos)
-        sortedqubits=qubits
-        for i in range(numqubits):
-            sortedqubits[i]=devicequbitlist[qubitpos[i]]
-        qubits=sortedqubits
-        # for diagnostics only
-        #print(qubits)
+        # # determine the position of the input qubits on device list
+        # numqubits=len(qubits)
+        # qubitpos=[]
+        # for i in range(numqubits):
+        #     thisqubit=qubits[i]
+        #     for j in range(numqubitsAll):
+        #         if (thisqubit==devicequbitlist[j]):
+        #             qubitpos.append(j)
+        # # sort positions in increasing order according to the device list
+        # qubitpos=sorted(qubitpos)
+        # sortedqubits=qubits
+        # for i in range(numqubits):
+        #     sortedqubits[i]=devicequbitlist[qubitpos[i]]
+        # qubits=sortedqubits
+        # # for diagnostics only
+        # #print(qubits)
 
         if qubits is None:
             qubits = self.qubits()
@@ -5326,7 +5357,11 @@ class HAL_Device(HAL_ShimMQ):
         else:
             nf = np.array(number_of_flips)
             dn = nf[1] - nf[0]
-            nf = np.concatenate([nf, (nf[-1] + 1 * dn, nf[-1] + 2 * dn, nf[-1] + 3 * dn, nf[-1] + 4 * dn)])
+            nf = np.concatenate([nf,
+                                 (nf[-1] + 1 * dn,
+                                  nf[-1] + 2 * dn,
+                                  nf[-1] + 3 * dn,
+                                  nf[-1] + 4 * dn)])
 
 
         qubits_idx = []
@@ -5349,7 +5384,7 @@ class HAL_Device(HAL_ShimMQ):
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
         label = 'Multi_flipping_' + '_'.join(qubits)
-        MC.run(label)
+        MC.run(label, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma2.Multi_Flipping_Analysis(qubits=qubits, label=label)
@@ -5370,13 +5405,15 @@ class HAL_Device(HAL_ShimMQ):
                                 qb.mw_vsm_G_amp(amp_old * scale_factor)
                             else:
                                 amp_old = qb.mw_channel_amp()
-                                qb.mw_channel_amp(amp_old * scale_factor)
+                                amp_new = amp_old * scale_factor
+                                qb.mw_channel_amp(amp_new)
                         elif angle == '90':
                             amp_old = qb.mw_amp90_scale()
-                            qb.mw_amp90_scale(amp_old * scale_factor)
+                            amp_new = amp_old * scale_factor
+                            qb.mw_amp90_scale(amp_new)
 
                         print('Qubit {}: Pulse amplitude for {}-{} pulse changed from {:.3f} to {:.3f}'.format(
-                            q, ax, angle, amp_old, scale_factor * amp_old))
+                            q, ax, angle, amp_old, amp_new))
 
                 return scale_factor_vec
             return a
@@ -5432,7 +5469,8 @@ class HAL_Device(HAL_ShimMQ):
             prepare_for_timedomain=True,
             MC: Optional[MeasurementControl] = None,
             amps=None,
-            calibrate=True
+            calibrate=True,
+            disable_metadata = False
     ):
         if qubits is None:
             qubits = self.qubits()
@@ -5461,7 +5499,7 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_points(amps)
         MC.set_detector_function(d)
         label = 'Multi_Motzoi_' + '_'.join(qubits)
-        MC.run(name=label)
+        MC.run(name=label, disable_snapshot_metadata = disable_metadata)
 
         a = ma2.Multi_Motzoi_Analysis(qubits=qubits, label=label)
         if calibrate:
@@ -5987,7 +6025,8 @@ class HAL_Device(HAL_ShimMQ):
             pair,
             ro_acq_averages = 2**12,
             eps=10,                # error threshold for two-qubit phase, in degrees
-            updateSQP=True        # determines whether to update single-qubit phase while at it.
+            updateSQP=True,        # determines whether to update single-qubit phase while at it.
+            disable_metadata = False
             ):
         '''
         The goal of this routine is to measure the two-qubit phase of a CZ specified by operation_pair.
@@ -6011,7 +6050,7 @@ class HAL_Device(HAL_ShimMQ):
         self.prepare_for_timedomain(qubits = [pair[0], pair[1]], bypass_flux = False)
 
         # run the conditional oscillation
-        a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+        a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1], disable_metadata = disable_metadata)
         
         # get qubit object and the micrwoave lutman for qO
         q0 = self.find_instrument(pair[0])
@@ -6041,7 +6080,8 @@ class HAL_Device(HAL_ShimMQ):
             self,
             pair,
             eps=1,               # error threshold for single-qubit phase, in degrees
-            numpasses=5           # number of attemps to reach threshold
+            numpasses=5,           # number of attemps to reach threshold
+            disable_metadata = False
             ):
         '''
         The goal of this routine is to calibrate the single-qubit phase of a qubit q0 during a CZ between q0 and q1.
@@ -6067,7 +6107,7 @@ class HAL_Device(HAL_ShimMQ):
 
         for thispass in range(0,numpasses):
             # run the conditional oscillation
-            a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1])
+            a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1], disable_metadata = disable_metadata)
 
             # get the two-qubit-phase, update it in qubit obect, and calculate absolute error.
             tqp = a.proc_data_dict['quantities_of_interest']['phi_cond'].nominal_value # note that analysis always return a positive value
@@ -6095,7 +6135,8 @@ class HAL_Device(HAL_ShimMQ):
             self,
             pair,
             eps=5,          # error threshold for single-qubit phase, in degrees
-            numpasses=5     # number of attemps to reach threshold
+            numpasses=5,     # number of attemps to reach threshold
+            disable_metadata = False
             ):
         '''
         The goal of this routine is to cabrate the single-qubit phase of the parked qubit in a CZ gate.
@@ -6117,7 +6158,8 @@ class HAL_Device(HAL_ShimMQ):
         for thispass in range(numpasses):
 
             # run the conditional oscillation experiment
-            a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1], q2=pair[2], parked_qubit_seq='ramsey')   
+            a = self.measure_conditional_oscillation(q0=pair[0], q1=pair[1], q2=pair[2], parked_qubit_seq='ramsey',
+                                                     disable_metadata = disable_metadata)   
             # get single-qubit phase update
             dphi0 = a.proc_data_dict['quantities_of_interest']['park_phase_off'].nominal_value
             dphi0 = np.mod(dphi0,360) # ensure modulo 360 degrees.
@@ -6151,7 +6193,8 @@ class HAL_Device(HAL_ShimMQ):
             update_frequency=True,
             stepsize: float = None,
             termination_opt=0,
-            steps=[1, 1, 3, 10, 30, 100, 300, 1000]
+            steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+            disable_metadata = False
     ):
         if qubits is None:
             qubits = self.qubits()
@@ -6177,7 +6220,8 @@ class HAL_Device(HAL_ShimMQ):
                 label=label,
                 prepare_for_timedomain=prepare_for_timedomain,
                 update_frequency=False,
-                update_T2=update_T2
+                update_T2=update_T2,
+                disable_metadata = disable_metadata
             )
             for q in qubits:
                 qub = self.find_instrument(q)
