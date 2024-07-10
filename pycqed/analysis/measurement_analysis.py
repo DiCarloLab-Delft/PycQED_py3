@@ -1099,7 +1099,7 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, plot_cal_points=True,
-                 for_ef=False, qb_name=None, **kw):
+                 for_ef=False, qb_name=None, fit_double_exp = False, **kw):
         kw['cal_points'] = cal_points
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
@@ -1113,6 +1113,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.center_point = center_point
         self.plot_cal_points = plot_cal_points
         self.for_ef = for_ef
+        self.fit_double_exp = fit_double_exp
 
         # Always call parent class constructor before assigning attributes.
         super(TD_Analysis, self).__init__(qb_name=qb_name, **kw)
@@ -4664,27 +4665,62 @@ class T1_Analysis(TD_Analysis):
 
     def fit_T1(self, **kw):
 
-        # Guess for params
-        fit_mods.ExpDecayModel.set_param_hint('amplitude',
-                                              value=1,
-                                              min=0,
-                                              max=2)
-        fit_mods.ExpDecayModel.set_param_hint('tau',
-                                              value=self.sweep_points[1] * 50,
-                                              min=self.sweep_points[1],
-                                              max=self.sweep_points[-1] * 1000)
-        fit_mods.ExpDecayModel.set_param_hint('offset',
-                                              value=0,
-                                              vary=False)
-        fit_mods.ExpDecayModel.set_param_hint('n',
-                                              value=1,
-                                              vary=False)
-        self.params = fit_mods.ExpDecayModel.make_params()
+        if self.fit_double_exp == True:
+            # Guess for params
+            from pycqed.analysis.fitting_models import DoubleExpDecayFunc
+            DoubleExpDecayModel = lmfit.Model(DoubleExpDecayFunc)
 
-        fit_res = fit_mods.ExpDecayModel.fit(data=self.normalized_data_points,
-                                             t=self.sweep_points[:-
-                                                                 self.NoCalPoints],
-                                             params=self.params)
+            DoubleExpDecayModel.set_param_hint('amp1',
+                                                value=0.5,
+                                                min=0,
+                                                max=1)
+            DoubleExpDecayModel.set_param_hint('amp2',
+                                                value=0.5,
+                                                min=0,
+                                                max=1)
+            DoubleExpDecayModel.set_param_hint('tau1',
+                                                value=self.sweep_points[1] * 50,
+                                                min=self.sweep_points[1],
+                                                max=self.sweep_points[-1] * 1000)
+            DoubleExpDecayModel.set_param_hint('tau2',
+                                                value=self.sweep_points[3] * 50,
+                                                min=self.sweep_points[1],
+                                                max=self.sweep_points[-1] * 1000)
+            DoubleExpDecayModel.set_param_hint('offset',
+                                                value=0,
+                                                vary=False)
+            DoubleExpDecayModel.set_param_hint('n',
+                                                value=1,
+                                                vary=False)
+            self.params = DoubleExpDecayModel.make_params()
+
+            fit_res = DoubleExpDecayModel.fit(data=self.normalized_data_points,
+                                                t=self.sweep_points[:-
+                                                                    self.NoCalPoints],
+                                                params=self.params)
+
+        else:
+            # Guess for params
+            fit_mods.ExpDecayModel.set_param_hint('amplitude',
+                                                value=1,
+                                                min=0,
+                                                max=2)
+            fit_mods.ExpDecayModel.set_param_hint('tau',
+                                                value=self.sweep_points[1] * 50,
+                                                min=self.sweep_points[1],
+                                                max=self.sweep_points[-1] * 1000)
+            fit_mods.ExpDecayModel.set_param_hint('offset',
+                                                value=0,
+                                                vary=False)
+            fit_mods.ExpDecayModel.set_param_hint('n',
+                                                value=1,
+                                                vary=False)
+            self.params = fit_mods.ExpDecayModel.make_params()
+
+            fit_res = fit_mods.ExpDecayModel.fit(data=self.normalized_data_points,
+                                                t=self.sweep_points[:-
+                                                                    self.NoCalPoints],
+                                                params=self.params)
 
         if kw.get('print_fit_results', False):
             print(fit_res.fit_report())
@@ -4707,61 +4743,123 @@ class T1_Analysis(TD_Analysis):
         self.fit_res = self.fit_T1(**kw)
         self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
 
-        # Create self.T1 and self.T1_stderr and save them
-        self.get_measured_T1()  # in seconds
-        self.save_computed_parameters(
-            self.T1_dict, var_name=self.value_names[0])
+        if self.fit_double_exp == True:
+            self.get_measured_double_T1()  # in seconds
+            self.save_computed_parameters(
+                self.T1_dict, var_name=self.value_names[0])
 
-        T1_micro_sec = self.T1_dict['T1'] * 1e6
-        T1_err_micro_sec = self.T1_dict['T1_stderr'] * 1e6
-        # Print T1 and error on screen
-        if kw.get('print_parameters', False):
-            print('T1 = {:.5f} ('.format(T1_micro_sec) + 'μs) \t '
-                                                         'T1 StdErr = {:.5f} ('.format(
-                T1_err_micro_sec) + 'μs)')
+            T1_1_micro_sec = self.fit_res.uvars['tau1'].n * 1e6
+            T1_1_err_micro_sec = self.fit_res.uvars['tau1'].s * 1e6
+            T1_2_micro_sec = self.fit_res.uvars['tau2'].n * 1e6
+            T1_2_err_micro_sec = self.fit_res.uvars['tau2'].s * 1e6
+            # Print T1 and error on screen
+            if kw.get('print_parameters', False):
+                print('T1_1 = {:.5f} ('.format(T1_1_micro_sec) + 'μs) \t '
+                                                            'T1_1 StdErr = {:.5f} ('.format(
+                    T1_1_err_micro_sec) + 'μs)')
+                print('T1_2 = {:.5f} ('.format(T1_2_micro_sec) + 'μs) \t '
+                                                            'T1_2 StdErr = {:.5f} ('.format(
+                    T1_2_err_micro_sec) + 'μs)')
 
-        # Plot best fit and initial fit + data
-        if self.make_fig:
+            # Plot best fit and initial fit + data
+            if self.make_fig:
 
-            units = SI_prefix_and_scale_factor(val=max(abs(self.ax.get_xticks())),
-                                               unit=self.sweep_unit[0])[1]
-            # We will not bother retrieving old T1 values from dataset
-            old_vals = ''
+                units = SI_prefix_and_scale_factor(val=max(abs(self.ax.get_xticks())),
+                                                unit=self.sweep_unit[0])[1]
+                # We will not bother retrieving old T1 values from dataset
+                old_vals = ''
 
-            textstr = ('$T_1$ = {:.3f} '.format(T1_micro_sec) +
-                       units +
-                       ' $\pm$ {:.3f} '.format(T1_err_micro_sec) +
-                       units + old_vals)
+                best_vals = self.fit_res.best_values
 
-            self.fig.text(0.5, 0, textstr, transform=self.ax.transAxes,
-                          fontsize=self.font_size,
-                          verticalalignment='top',
-                          horizontalalignment='center',
-                          bbox=self.box_props)
+                textstr = ('$T1_1$ = {:.3f} '.format(T1_1_micro_sec) +
+                        units +
+                        ' $\pm$ {:.3f} '.format(T1_1_err_micro_sec) +
+                        units +
+                        '\n$T1_2$ = {:.3f} '.format(T1_2_micro_sec) +
+                        units +
+                        ' $\pm$ {:.3f} '.format(T1_2_err_micro_sec) +
+                        units + old_vals)
 
-            if show_guess:
-                self.ax.plot(self.sweep_points[:-self.NoCalPoints],
-                             self.fit_res.init_fit, 'k--', linewidth=self.line_width)
+                self.fig.text(0.5, 0.9, textstr, transform=self.ax.transAxes,
+                            fontsize=self.font_size,
+                            verticalalignment='top',
+                            horizontalalignment='center',
+                            bbox=self.box_props)
 
-            best_vals = self.fit_res.best_values
-            t = np.linspace(self.sweep_points[0],
-                            self.sweep_points[-self.NoCalPoints], 1000)
+                if show_guess:
+                    self.ax.plot(self.sweep_points[:-self.NoCalPoints],
+                                self.fit_res.init_fit, 'k--', linewidth=self.line_width)
 
-            y = fit_mods.ExpDecayFunc(
-                t, tau=best_vals['tau'],
-                n=best_vals['n'],
-                amplitude=best_vals['amplitude'],
-                offset=best_vals['offset'])
+                best_vals = self.fit_res.best_values
+                t = np.linspace(self.sweep_points[0],
+                                self.sweep_points[-self.NoCalPoints], 1000)
 
-            self.ax.plot(t, y, 'r-', linewidth=self.line_width)
+                y = fit_mods.DoubleExpDecayFunc(
+                    t,
+                    tau1=best_vals['tau1'],
+                    tau2=best_vals['tau2'],
+                    n=best_vals['n'],
+                    amp1=best_vals['amp1'],
+                    amp2=best_vals['amp2'],
+                    offset=best_vals['offset'])
+                
+        else:
+            
+            # Create self.T1 and self.T1_stderr and save them
+            self.get_measured_T1()  # in seconds
+            self.save_computed_parameters(
+                self.T1_dict, var_name=self.value_names[0])
 
-            self.ax.locator_params(axis='x', nbins=6)
+            T1_micro_sec = self.T1_dict['T1'] * 1e6
+            T1_err_micro_sec = self.T1_dict['T1_stderr'] * 1e6
+            # Print T1 and error on screen
+            if kw.get('print_parameters', False):
+                print('T1 = {:.5f} ('.format(T1_micro_sec) + 'μs) \t '
+                                                            'T1 StdErr = {:.5f} ('.format(
+                    T1_err_micro_sec) + 'μs)')
 
-            if show:
-                plt.show()
+            # Plot best fit and initial fit + data
+            if self.make_fig:
 
-            self.save_fig(
-                self.fig, figname=self.measurementstring + '_Fit', **kw)
+                units = SI_prefix_and_scale_factor(val=max(abs(self.ax.get_xticks())),
+                                                unit=self.sweep_unit[0])[1]
+                # We will not bother retrieving old T1 values from dataset
+                old_vals = ''
+
+                textstr = ('$T_1$ = {:.3f} '.format(T1_micro_sec) +
+                        units +
+                        ' $\pm$ {:.3f} '.format(T1_err_micro_sec) +
+                        units + old_vals)
+
+                self.fig.text(0.5, 0, textstr, transform=self.ax.transAxes,
+                            fontsize=self.font_size,
+                            verticalalignment='top',
+                            horizontalalignment='center',
+                            bbox=self.box_props)
+
+                if show_guess:
+                    self.ax.plot(self.sweep_points[:-self.NoCalPoints],
+                                self.fit_res.init_fit, 'k--', linewidth=self.line_width)
+
+                best_vals = self.fit_res.best_values
+                t = np.linspace(self.sweep_points[0],
+                                self.sweep_points[-self.NoCalPoints], 1000)
+
+                y = fit_mods.ExpDecayFunc(
+                    t, tau=best_vals['tau'],
+                    n=best_vals['n'],
+                    amplitude=best_vals['amplitude'],
+                    offset=best_vals['offset'])
+
+        self.ax.plot(t, y, 'r-', linewidth=self.line_width)
+
+        self.ax.locator_params(axis='x', nbins=6)
+
+        if show:
+            plt.show()
+
+        self.save_fig(
+            self.fig, figname=self.measurementstring + '_Fit', **kw)
 
         if close_file:
             self.data_file.close()
@@ -4781,6 +4879,24 @@ class T1_Analysis(TD_Analysis):
         self.T1_dict = {'T1': self.T1, 'T1_stderr': T1_stderr}
 
         return self.T1, T1_stderr
+
+    def get_measured_double_T1(self):
+        fitted_pars = self.data_file['Analysis']['Fitted Params F|1>']
+
+        self.T1_1 = fitted_pars['tau1'].attrs['value']
+        T1_1_stderr = fitted_pars['tau1'].attrs['stderr']
+
+        self.T1_2 = fitted_pars['tau2'].attrs['value']
+        T1_2_stderr = fitted_pars['tau2'].attrs['stderr']
+        # T1 = self.fit_res.params['tau'].value
+        # T1_stderr = self.fit_res.params['tau'].stderr
+
+        # return as dict for use with "save_computed_parameters"; units are
+        # seconds
+        self.T1_dict = {'T1_1': self.T1_1, 'T1_1_stderr': T1_1_stderr,
+                        'T1_2': self.T1_2, 'T1_2_stderr': T1_2_stderr}
+
+        return self.T1_1, self.T1_2
 
 
 class Ramsey_Analysis(TD_Analysis):

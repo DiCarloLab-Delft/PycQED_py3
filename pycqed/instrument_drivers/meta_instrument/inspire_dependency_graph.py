@@ -1128,28 +1128,25 @@ class inspire_dep_graph_QUICKpar(AutoDepGraph_DAG):
                         CZname + ' SQP Pulsed')
         
         for qubit_group in qubit_groups:
-          if pair[0] in qubit_group:
-
+          if pair[0] in qubit_group['qubit_list']:
             self.add_edge(CZname + ' SQP Pulsed',
                             f"Flipping_{qubit_group['name']}")
 
         if(doSQPs):
           self.add_edge('Prep Inspire',
                         CZname + ' SQP Static')
-
-        for qubit_group in qubit_groups:
-          if pair[1] in qubit_group:
-            self.add_edge(CZname + ' SQP Static',
-                          f"Flipping_{qubit_group['name']}")
+          for qubit_group in qubit_groups:
+            if pair[1] in qubit_group['qubit_list']:
+              self.add_edge(CZname + ' SQP Static',
+                            f"Flipping_{qubit_group['name']}")
 
         if(parkingqubitexists):
           ##### need to add specific routing for parked qubit. 
           ##### the one below does not do the job!!!!!
           self.add_edge('Prep Inspire',
                         CZname + ' SQP Parked')
-
           for qubit_group in qubit_groups:
-            if pair[2] in qubit_group:
+            if pair[2] in qubit_group['qubit_list']:
               self.add_edge(CZname + ' SQP Parked',
                             f"Flipping_{qubit_group['name']}")
 

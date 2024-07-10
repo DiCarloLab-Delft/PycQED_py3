@@ -5644,6 +5644,82 @@ class HAL_Device(HAL_ShimMQ):
         a = ma2.tqg.Two_qubit_gate_tomo_Analysis(label='Ramsey', n_pairs=len(qubit_ramsey))
 
         return a.qoi
+    
+    def measure_T1_TLS(
+            self,
+            q0: str,
+            q0_amp: float,
+            q0_pulse_length: float, # in [s]
+            q_parks: list,
+            times=None,
+            close_fig=True,
+            analyze=True,
+            MC: Optional[MeasurementControl] = None,
+            disable_metadata: bool = False,
+            auto = True,
+            fit_double_exp = False
+    ):
+        """
+        N.B. this is a good example for a generic timedomain experiment using the HAL_Transmon.
+        """
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        for qubit in q_parks:
+            QUBIT = self.find_instrument(qubit)
+            flux_lm_QUBIT = self.find_instrument(QUBIT.instr_LutMan_Flux())
+            flux_lm_QUBIT.sq_length(q0_pulse_length)
+            flux_lm_QUBIT.park_length(q0_pulse_length)
+            flux_lm_QUBIT.sq_amp(0.25)
+            flux_lm_QUBIT.park_amp(0.25)
+            flux_lm_QUBIT.cfg_awg_channel_amplitude(0.3)
+        self.prepare_for_timedomain(qubits = q_parks, bypass_flux = False)
+        
+        Q0 = self.find_instrument(q0)
+        flux_lm_Q0 = self.find_instrument(Q0.instr_LutMan_Flux())
+        flux_lm_Q0.cfg_awg_channel_amplitude(q0_amp)
+        flux_lm_Q0.sq_amp(0.25)
+        flux_lm_Q0.sq_length(q0_pulse_length)
+        self.prepare_for_timedomain(qubits = [q0], bypass_flux = False)
+
+        if times is None:
+            times = np.linspace(0, Q0.T1() * 4, 31)
+
+        dt = times[1] - times[0]
+
+        times = np.concatenate([times, (times[-1] + 1 * dt,
+                                        times[-1] + 2 * dt,
+                                        times[-1] + 3 * dt,
+                                        times[-1] + 4 * dt)])
+
+        q0_idx = Q0.cfg_qubit_nr()
+        q_parks_idx = []
+        for q in q_parks:
+            q_parks_idx.append(self.find_instrument(q).cfg_qubit_nr())
+
+        p = mqo.T1_TLS(
+            q0_idx = q0_idx,
+            q_parks_idx = q_parks_idx,
+            platf_cfg = self.cfg_openql_platform_fn(),
+            times = times
+        )
+
+        s = swf.OpenQL_Sweep(
+            openql_program=p,
+            parameter_name='Time',
+            unit='s',
+            CCL=self.instr_CC.get_instr()
+        )
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        d = self.get_int_avg_det()
+        MC.set_detector_function(d)
+        MC.run('T1' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
+
+        if analyze:
+            a = ma.T1_Analysis(auto=auto, fit_double_exp = fit_double_exp, close_fig=True)
+            return a.T1
 
     ##########################################################################
     # public functions: calibrate

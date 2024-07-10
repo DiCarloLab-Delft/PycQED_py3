@@ -3724,6 +3724,65 @@ def multi_qubit_motzoi(qubits_idx: list, platf_cfg: str = None) -> OqlProgram:
     p.compile()
     return p
 
+def T1_TLS(q0_idx: int,
+           q_parks_idx: list,
+           platf_cfg: str,
+           times: List[float],
+           ):
+    """
+    Single qubit T1 sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each T1 element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object
+
+
+    """
+    p = OqlProgram('T1_TLS', platf_cfg)
+
+    times = np.concatenate([np.array([0.0]), times])
+
+    for i, time in enumerate(times[:-5]):
+        k = p.create_kernel('T1_TLS_{}'.format(i))
+        k.prepz(q0_idx)
+        for q_park in q_parks_idx:
+            k.prepz(q_park)
+        k.barrier([])  # alignment workaround
+
+        k.gate('rx180', [q0_idx])
+        k.barrier([])  # alignment workaround
+
+        if i == 0:
+            k.measure(q0_idx)
+            p.add_kernel(k)
+        else:
+            k.gate('sf_square', [q0_idx])        
+            for q_park in q_parks_idx:
+                k.gate('sf_square', [q_park])  # square pulse
+            k.barrier([])  # alignment workaround
+
+            wait_nanoseconds = int(round(time/1e-9))
+            k.gate("wait", [q0_idx], wait_nanoseconds)
+            k.barrier([])  # alignment workaround
+
+            k.gate('sf_square', [q0_idx])        
+            for q_park in q_parks_idx:
+                k.gate('sf_square', [q_park])  # square pulse
+            k.barrier([])  # alignment workaround
+
+            k.measure(q0_idx)
+            p.add_kernel(k)
+
+    # adding the calibration points
+    p.add_single_qubit_cal_points(qubit_idx=q0_idx)
+
+    p.compile()
+    return p
 
 # def Ramsey_tomo(qR: int,
 #                 qC: int,
