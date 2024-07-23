@@ -470,8 +470,7 @@ class Multi_T1_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['{}_nor_data'.format(q)] = nor_data
             
             ### fit to normalized data ###
-            # times = self.proc_data_dict['{}_times'.format(q)]
-            times = self.times
+            times = self.proc_data_dict['{}_times'.format(q)]
             
             fit_mods.ExpDecayModel.set_param_hint('amplitude',
                                               value=1,
@@ -503,19 +502,18 @@ class Multi_T1_Analysis(ba.BaseDataAnalysis):
                                         'plotfn': plot_Multi_T1,
                                         'data': self.proc_data_dict,
                                         'qubit': q,
-                                        'times': self.times,
                                         'title': 'T1_'+q+'_'
                                         +self.raw_data_dict['timestamps'][0],
                                         'plotsize': (10,10)
                                         }
             
 
-def plot_Multi_T1(qubit, times, data,title, ax=None, **kwargs): 
+def plot_Multi_T1(qubit, data,title, ax=None, **kwargs): 
     if ax is None:
         fig, ax = plt.subplots(figsize=(15,15))
            
     q = qubit
-    # times = data['{}_times'.format(q)]*1e6
+    times = data['{}_times'.format(q)]*1e6
     nor_data = data['{}_nor_data'.format(q)]
     fit_data = data['{}_fitted_data'.format(q)]
     T1 = data['quantities_of_interest'][q]['tau']*1e6

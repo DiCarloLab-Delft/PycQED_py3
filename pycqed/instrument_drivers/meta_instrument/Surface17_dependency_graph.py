@@ -1469,7 +1469,7 @@ def TLS_density_wrapper(qubit,
 	# device.prepare_readout(qubits=[qubit, 'QC'])
 	# device.ro_acq_digitized(False)
 	if not Parked_qubits:
-		Parked_qubits = None
+		Parked_qubits = []
 	if qubit == 'C':
 		spectator_qubit = 'NW'
 	else:

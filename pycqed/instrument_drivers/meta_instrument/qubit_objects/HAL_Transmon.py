@@ -1410,8 +1410,7 @@ class HAL_Transmon(HAL_ShimSQ):
         nested_MC.set_sweep_points(freqs)
         nested_MC.set_sweep_function_2D(self.ro_pulse_amp)
         nested_MC.set_sweep_points_2D(amps)
-
-        d = det.Function_Detector(self.measure_ssro,
+        d = det.Function_Detector(self.measure_ssro(),
                                   result_keys=['SNR', 'F_a', 'F_d'],
                                   value_names=['SNR', 'F_a', 'F_d'],
                                   value_units=['a.u.', 'a.u.', 'a.u.'],

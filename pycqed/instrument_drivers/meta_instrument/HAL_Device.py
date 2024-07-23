@@ -5715,11 +5715,11 @@ class HAL_Device(HAL_ShimMQ):
         MC.set_sweep_points(times)
         d = self.get_int_avg_det()
         MC.set_detector_function(d)
-        MC.run('T1' + self.msmt_suffix, disable_snapshot_metadata = disable_metadata)
+        MC.run('T1_TLS_qubit_' + Q0.name, disable_snapshot_metadata = disable_metadata)
 
         if analyze:
             a = ma.T1_Analysis(auto=auto, fit_double_exp = fit_double_exp, close_fig=True)
-            return a.T1
+            return a.T1_1, a.T1_2
 
     ##########################################################################
     # public functions: calibrate
