@@ -1654,7 +1654,7 @@ class HAL_Device(HAL_ShimMQ):
                 threshold = a.qoi[label]['threshold_raw']
                 # LDC turning off this update for now. 2022/06/28
                 # self.find_instrument(qubit).ro_acq_threshold(threshold)
-        return True
+        return a.plot_dicts['cross_fid_matrix_post']['prob_matrix']
 
 
     def measure_ssro_single_qubit(
