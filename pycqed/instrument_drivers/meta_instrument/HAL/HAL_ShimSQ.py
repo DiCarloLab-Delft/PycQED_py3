@@ -634,8 +634,8 @@ class HAL_ShimSQ(Qubit):
 
         # added by RDC 16/09/2023, PPC
         self.add_parameter(
-            'cancellation_phase',
-            initial_value=180,
+            'pump_on',
+            initial_value=False,
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -647,10 +647,20 @@ class HAL_ShimSQ(Qubit):
             'pump_power',
             initial_value=-20,
             parameter_class=ManualParameter)
+        
+        self.add_parameter(
+            'cancellation_on',
+            initial_value=False,
+            parameter_class=ManualParameter)
 
         self.add_parameter(
             'cancellation_attenuation',
             initial_value=0,
+            parameter_class=ManualParameter)
+        
+        self.add_parameter(
+            'cancellation_phase',
+            initial_value=180,
             parameter_class=ManualParameter)
 
         #############################
@@ -1385,7 +1395,10 @@ class HAL_ShimSQ(Qubit):
             SHFPPC channel; either communicates with Channel 1 (paramp_channel = 0) 
             or Channel 2 (paramp_channel = 1).
         """
+        device_SHFPPC.ppchannels[paramp_channel].synthesizer.pump.on(self.pump_on())
         device_SHFPPC.ppchannels[paramp_channel].synthesizer.pump.freq(self.pump_freq())
         device_SHFPPC.ppchannels[paramp_channel].synthesizer.pump.power(self.pump_power())
+
+        device_SHFPPC.ppchannels[paramp_channel].cancellation.on(self.cancellation_on())
         device_SHFPPC.ppchannels[paramp_channel].cancellation.phaseshift(self.cancellation_phase())
         device_SHFPPC.ppchannels[paramp_channel].cancellation.attenuation(self.cancellation_attenuation())
